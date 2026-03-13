@@ -7,3 +7,5 @@ app/.build/
 .idea/
 iMcp-*.md
 iconnect-test-report-*.md
+.mcpregistry_*
+.smithery/

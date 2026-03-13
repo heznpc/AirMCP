@@ -1,7 +1,7 @@
 /**
  * `npx iconnect-mcp doctor` — diagnose iConnect installation.
  *
- * Checks: Node version, config files, Claude Desktop config,
+ * Checks: Node version, config files, MCP client configs,
  * module status, and optionally probes macOS permissions.
  */
 
@@ -12,13 +12,29 @@ import { MODULE_NAMES, STARTER_MODULES, NPM_PACKAGE_NAME } from "../shared/confi
 
 const HOME = process.env.HOME ?? process.env.USERPROFILE ?? "";
 
-const CLAUDE_CONFIG_PATH = join(
-  HOME,
-  "Library",
-  "Application Support",
-  "Claude",
-  "claude_desktop_config.json",
-);
+interface McpClient {
+  name: string;
+  configPath: string;
+  serversKey: string;
+}
+
+const MCP_CLIENTS: McpClient[] = [
+  {
+    name: "Claude Desktop",
+    configPath: join(HOME, "Library", "Application Support", "Claude", "claude_desktop_config.json"),
+    serversKey: "mcpServers",
+  },
+  {
+    name: "Cursor",
+    configPath: join(HOME, ".cursor", "mcp.json"),
+    serversKey: "mcpServers",
+  },
+  {
+    name: "Windsurf",
+    configPath: join(HOME, ".codeium", "windsurf", "mcp_config.json"),
+    serversKey: "mcpServers",
+  },
+];
 const ICONNECT_CONFIG_PATH = join(HOME, ".config", "iconnect", "config.json");
 
 const OK = "\x1b[32m✓\x1b[0m";
@@ -63,21 +79,26 @@ export async function runDoctor(): Promise<void> {
     check("Config file", WARN, "Not found — using starter preset (5 modules)");
   }
 
-  // 4. Claude Desktop config
-  if (existsSync(CLAUDE_CONFIG_PATH)) {
-    try {
-      const raw = JSON.parse(readFileSync(CLAUDE_CONFIG_PATH, "utf-8"));
-      const servers = raw?.mcpServers ?? {};
-      if (servers.iconnect) {
-        check("Claude Desktop", OK, "iconnect entry found");
-      } else {
-        check("Claude Desktop", WARN, `Config exists but no 'iconnect' entry — run: npx ${NPM_PACKAGE_NAME} init`);
+  // 4. MCP client configs
+  let anyClientFound = false;
+  for (const client of MCP_CLIENTS) {
+    if (existsSync(client.configPath)) {
+      anyClientFound = true;
+      try {
+        const raw = JSON.parse(readFileSync(client.configPath, "utf-8"));
+        const servers = raw?.[client.serversKey] ?? {};
+        if (servers.iconnect) {
+          check(client.name, OK, "iconnect entry found");
+        } else {
+          check(client.name, WARN, `Config exists but no 'iconnect' entry — run: npx ${NPM_PACKAGE_NAME} init`);
+        }
+      } catch {
+        check(client.name, WARN, `Config parse error: ${client.configPath}`);
       }
-    } catch {
-      check("Claude Desktop", WARN, `Config parse error: ${CLAUDE_CONFIG_PATH}`);
     }
-  } else {
-    check("Claude Desktop", WARN, `Config not found — run: npx ${NPM_PACKAGE_NAME} init`);
+  }
+  if (!anyClientFound) {
+    check("MCP Clients", WARN, `No client configs found — run: npx ${NPM_PACKAGE_NAME} init`);
   }
 
   // 5. Enabled modules

@@ -1,16 +1,20 @@
 {
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.heznpc/iconnect",
-  "description": "MCP server for the entire Apple ecosystem — Notes, Reminders, Calendar, Contacts, Mail, Messages, Music, Finder, Safari, System, Photos, Shortcuts, TV, and Apple Intelligence.",
-  "version": "0.1.1",
+  "description": "MCP server for the entire Apple ecosystem — 123 tools across 14 modules. macOS only.",
+  "version": "0.1.2",
   "repository": {
-    "url": "https://github.com/heznpc/iConnect"
+    "url": "https://github.com/heznpc/iConnect",
+    "source": "github"
   },
   "packages": [
     {
       "registryType": "npm",
       "identifier": "iconnect-mcp",
-      "version": "0.1.1",
-      "transport": "stdio"
+      "version": "0.1.2",
+      "transport": {
+        "type": "stdio"
+      }
     }
   ]
 }

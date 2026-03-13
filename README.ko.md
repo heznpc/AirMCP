@@ -20,6 +20,8 @@ Apple 생태계 전체를 위한 MCP 서버 — Notes, Reminders, Calendar, Cont
 
 ## 빠른 시작
 
+모든 MCP 호환 클라이언트에서 사용 가능합니다.
+
 ### Claude Desktop
 
 `~/Library/Application Support/Claude/claude_desktop_config.json`에 추가:
@@ -41,6 +43,40 @@ Apple 생태계 전체를 위한 MCP 서버 — Notes, Reminders, Calendar, Cont
 claude mcp add iconnect -- npx -y iconnect-mcp
 ```
 
+### Cursor
+
+`.cursor/mcp.json`에 추가:
+
+```json
+{
+  "mcpServers": {
+    "iconnect": {
+      "command": "npx",
+      "args": ["-y", "iconnect-mcp"]
+    }
+  }
+}
+```
+
+### Windsurf
+
+`~/.codeium/windsurf/mcp_config.json`에 추가:
+
+```json
+{
+  "mcpServers": {
+    "iconnect": {
+      "command": "npx",
+      "args": ["-y", "iconnect-mcp"]
+    }
+  }
+}
+```
+
+### 기타 MCP 클라이언트
+
+MCP stdio 전송을 지원하는 모든 클라이언트에서 사용 가능. 서버 명령어: `npx -y iconnect-mcp`
+
 ### 로컬 개발
 
 ```bash
@@ -59,7 +95,7 @@ cd app && swift build -c release
 # 바이너리: app/.build/release/iConnectApp
 ```
 
-기능: 서버 상태 표시, 원클릭 권한 설정, Claude 설정 클립보드 복사.
+기능: 서버 상태 표시, 원클릭 권한 설정, MCP 클라이언트 설정 클립보드 복사.
 
 ### HTTP 모드
 

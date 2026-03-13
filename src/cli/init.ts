@@ -3,7 +3,7 @@
  *
  * 1. Choose modules (toggle-style)
  * 2. Write ~/.config/iconnect/config.json
- * 3. Patch Claude Desktop config (auto-detect path)
+ * 3. Auto-detect and patch MCP client configs (Claude Desktop, Cursor, Windsurf, etc.)
  */
 
 import { createInterface } from "node:readline";
@@ -13,13 +13,29 @@ import { MODULE_NAMES, STARTER_MODULES, NPM_PACKAGE_NAME } from "../shared/confi
 
 const HOME = process.env.HOME ?? process.env.USERPROFILE ?? "";
 
-const CLAUDE_CONFIG_PATH = join(
-  HOME,
-  "Library",
-  "Application Support",
-  "Claude",
-  "claude_desktop_config.json",
-);
+interface McpClient {
+  name: string;
+  configPath: string;
+  serversKey: string;
+}
+
+const MCP_CLIENTS: McpClient[] = [
+  {
+    name: "Claude Desktop",
+    configPath: join(HOME, "Library", "Application Support", "Claude", "claude_desktop_config.json"),
+    serversKey: "mcpServers",
+  },
+  {
+    name: "Cursor",
+    configPath: join(HOME, ".cursor", "mcp.json"),
+    serversKey: "mcpServers",
+  },
+  {
+    name: "Windsurf",
+    configPath: join(HOME, ".codeium", "windsurf", "mcp_config.json"),
+    serversKey: "mcpServers",
+  },
+];
 
 const ICONNECT_CONFIG_DIR = join(HOME, ".config", "iconnect");
 const ICONNECT_CONFIG_PATH = join(ICONNECT_CONFIG_DIR, "config.json");
@@ -133,39 +149,57 @@ export async function runInit(): Promise<void> {
   writeFileSync(ICONNECT_CONFIG_PATH, JSON.stringify(configPayload, null, 2) + "\n");
   console.log(` \x1b[32m✓\x1b[0m ${ICONNECT_CONFIG_PATH}`);
 
-  // --- Step 3: Patch Claude Desktop config ---
-  process.stdout.write("  Configuring Claude Desktop...");
-
+  // --- Step 3: Auto-detect and patch MCP client configs ---
   const iconnectEntry = {
     command: "npx",
     args: ["-y", NPM_PACKAGE_NAME],
   };
 
-  try {
-    let existing: Record<string, unknown> = {};
-    if (existsSync(CLAUDE_CONFIG_PATH)) {
-      existing = JSON.parse(readFileSync(CLAUDE_CONFIG_PATH, "utf-8"));
+  let patchedClients = 0;
+  const detectedClients: string[] = [];
+
+  for (const client of MCP_CLIENTS) {
+    const configExists = existsSync(client.configPath);
+    const parentExists = existsSync(join(client.configPath, ".."));
+
+    // Only patch if the config file or its parent directory already exists (client is installed)
+    if (!configExists && !parentExists) continue;
+
+    detectedClients.push(client.name);
+    process.stdout.write(`  Configuring ${client.name}...`);
+
+    try {
+      let existing: Record<string, unknown> = {};
+      if (configExists) {
+        existing = JSON.parse(readFileSync(client.configPath, "utf-8"));
+      }
+
+      const servers = (existing[client.serversKey] as Record<string, unknown>) ?? {};
+      servers.iconnect = iconnectEntry;
+      existing[client.serversKey] = servers;
+
+      mkdirSync(join(client.configPath, ".."), { recursive: true });
+      writeFileSync(client.configPath, JSON.stringify(existing, null, 2) + "\n");
+      console.log(" \x1b[32m✓\x1b[0m");
+      patchedClients++;
+    } catch (e) {
+      console.log(` \x1b[33m⚠\x1b[0m ${e instanceof Error ? e.message : String(e)}`);
     }
+  }
 
-    const servers = (existing.mcpServers as Record<string, unknown>) ?? {};
-    servers.iconnect = iconnectEntry;
-    existing.mcpServers = servers;
-
-    // Ensure parent directory exists
-    mkdirSync(join(CLAUDE_CONFIG_PATH, ".."), { recursive: true });
-    writeFileSync(CLAUDE_CONFIG_PATH, JSON.stringify(existing, null, 2) + "\n");
-    console.log(" \x1b[32m✓\x1b[0m");
-  } catch (e) {
-    console.log(` \x1b[33m⚠\x1b[0m ${e instanceof Error ? e.message : String(e)}`);
+  if (detectedClients.length === 0) {
+    console.log("  \x1b[33m⚠\x1b[0m No MCP clients detected.");
     console.log("");
-    console.log("  Add this to your Claude Desktop config manually:");
+    console.log("  Add this to your MCP client config manually:");
     console.log(`  \x1b[2m${JSON.stringify({ mcpServers: { iconnect: iconnectEntry } }, null, 2)}\x1b[0m`);
   }
 
   // --- Done ---
   console.log("");
-  console.log(`  \x1b[32m✓\x1b[0m Setup complete! ${enabled.size} modules enabled.`);
-  console.log("  \x1b[2mRestart Claude Desktop to connect iConnect.\x1b[0m");
+  console.log(`  \x1b[32m✓\x1b[0m Setup complete! ${enabled.size} modules enabled, ${patchedClients} client(s) configured.`);
+  if (detectedClients.length > 0) {
+    console.log(`  \x1b[2mRestart ${detectedClients.join(", ")} to connect iConnect.\x1b[0m`);
+  }
   console.log("");
 
   rl.close();

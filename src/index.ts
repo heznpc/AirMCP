@@ -114,11 +114,11 @@ function createServer(): McpServer {
     },
     async ({ name, args }) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const prompts = (server as any)._registeredPrompts as Map<string, { callback: (...a: any[]) => any }> | undefined;
+      const prompts = (server as any)._registeredPrompts as Record<string, { callback: (...a: any[]) => any }> | undefined;
       if (!prompts) return err("Prompt registry not available");
-      const prompt = prompts.get(name);
+      const prompt = prompts[name];
       if (!prompt) {
-        const available = [...prompts.keys()].sort();
+        const available = Object.keys(prompts).sort();
         return err(`Unknown prompt "${name}". Available: ${available.join(", ")}`);
       }
       try {

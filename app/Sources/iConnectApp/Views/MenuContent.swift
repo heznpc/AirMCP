@@ -277,7 +277,7 @@ struct MenuContent: View {
 
         Divider()
 
-        Text("iConnect v0.1.2")
+        Text("iConnect v0.2.0")
             .foregroundStyle(.secondary)
 
         Button("Quit") {

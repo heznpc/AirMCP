@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { IConnectConfig } from "../shared/config.js";
-import { ok, err } from "../shared/result.js";
+import { ok, toolError } from "../shared/result.js";
 import { runSwift } from "../shared/swift.js";
 
 interface TextResult {
@@ -53,7 +53,7 @@ export function registerIntelligenceTools(server: McpServer, _config: IConnectCo
         const result = await runSwift<TextResult>("summarize", JSON.stringify({ text }));
         return ok(result);
       } catch (e) {
-        return err(`Failed to summarize: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("summarize", e);
       }
     },
   );
@@ -84,7 +84,7 @@ export function registerIntelligenceTools(server: McpServer, _config: IConnectCo
         const result = await runSwift<TextResult>("rewrite", JSON.stringify({ text, tone }));
         return ok(result);
       } catch (e) {
-        return err(`Failed to rewrite: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("rewrite", e);
       }
     },
   );
@@ -110,7 +110,7 @@ export function registerIntelligenceTools(server: McpServer, _config: IConnectCo
         const result = await runSwift<TextResult>("proofread", JSON.stringify({ text }));
         return ok(result);
       } catch (e) {
-        return err(`Failed to proofread: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("proofread", e);
       }
     },
   );
@@ -151,7 +151,7 @@ export function registerIntelligenceTools(server: McpServer, _config: IConnectCo
         );
         return ok(result);
       } catch (e) {
-        return err(`Failed to generate text: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("generate text", e);
       }
     },
   );
@@ -193,7 +193,7 @@ export function registerIntelligenceTools(server: McpServer, _config: IConnectCo
         );
         return ok(result);
       } catch (e) {
-        return err(`Failed to generate structured output: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("generate structured output", e);
       }
     },
   );
@@ -223,7 +223,7 @@ export function registerIntelligenceTools(server: McpServer, _config: IConnectCo
         const result = await runSwift<TagResult>("tag-content", JSON.stringify({ text, tags }));
         return ok(result);
       } catch (e) {
-        return err(`Failed to tag content: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("tag content", e);
       }
     },
   );
@@ -233,7 +233,7 @@ export function registerIntelligenceTools(server: McpServer, _config: IConnectCo
     {
       title: "AI Chat",
       description:
-        "Send a message to a named on-device AI chat session using Apple Foundation Models. Use a consistent sessionName to maintain conversational context across calls. Requires macOS 26+.",
+        "Send a message to an on-device AI session using Apple Foundation Models. Note: each call creates a fresh session — sessionName is for caller-side tracking only, not server-side persistence. Requires macOS 26+.",
       inputSchema: {
         sessionName: z
           .string()
@@ -259,7 +259,7 @@ export function registerIntelligenceTools(server: McpServer, _config: IConnectCo
         );
         return ok(result);
       } catch (e) {
-        return err(`Failed to chat: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("chat", e);
       }
     },
   );
@@ -283,7 +283,7 @@ export function registerIntelligenceTools(server: McpServer, _config: IConnectCo
         const result = await runSwift<AiStatusResult>("ai-status", "{}");
         return ok(result);
       } catch (e) {
-        return err(`Failed to check AI status: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("check AI status", e);
       }
     },
   );

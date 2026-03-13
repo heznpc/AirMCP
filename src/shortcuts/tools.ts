@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { IConnectConfig } from "../shared/config.js";
-import { ok, err } from "../shared/result.js";
+import { ok, toolError } from "../shared/result.js";
 import {
   listShortcutsScript,
   runShortcutScript,
@@ -24,7 +24,7 @@ export function registerShortcutsTools(server: McpServer, _config: IConnectConfi
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   }, async () => {
     try { return ok(await runJxa(listShortcutsScript())); }
-    catch (e) { return err(`Failed to list shortcuts: ${e instanceof Error ? e.message : String(e)}`); }
+    catch (e) { return toolError("list shortcuts", e); }
   });
 
   server.registerTool("run_shortcut", {
@@ -37,7 +37,7 @@ export function registerShortcutsTools(server: McpServer, _config: IConnectConfi
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   }, async ({ name, input }) => {
     try { return ok(await runJxa(runShortcutScript(name, input))); }
-    catch (e) { return err(`Failed to run shortcut: ${e instanceof Error ? e.message : String(e)}`); }
+    catch (e) { return toolError("run shortcut", e); }
   });
 
   server.registerTool("search_shortcuts", {
@@ -49,7 +49,7 @@ export function registerShortcutsTools(server: McpServer, _config: IConnectConfi
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   }, async ({ query }) => {
     try { return ok(await runJxa(searchShortcutsScript(query))); }
-    catch (e) { return err(`Failed to search shortcuts: ${e instanceof Error ? e.message : String(e)}`); }
+    catch (e) { return toolError("search shortcuts", e); }
   });
 
   server.registerTool("get_shortcut_detail", {
@@ -61,7 +61,7 @@ export function registerShortcutsTools(server: McpServer, _config: IConnectConfi
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   }, async ({ name }) => {
     try { return ok(await runJxa(getShortcutDetailScript(name))); }
-    catch (e) { return err(`Failed to get shortcut detail: ${e instanceof Error ? e.message : String(e)}`); }
+    catch (e) { return toolError("get shortcut detail", e); }
   });
 
   server.registerTool("create_shortcut", {
@@ -73,7 +73,7 @@ export function registerShortcutsTools(server: McpServer, _config: IConnectConfi
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   }, async ({ name }) => {
     try { return ok(await runJxa(createShortcutScript(name))); }
-    catch (e) { return err(`Failed to create shortcut: ${e instanceof Error ? e.message : String(e)}`); }
+    catch (e) { return toolError("create shortcut", e); }
   });
 
   server.registerTool("delete_shortcut", {
@@ -85,7 +85,7 @@ export function registerShortcutsTools(server: McpServer, _config: IConnectConfi
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
   }, async ({ name }) => {
     try { return ok(await runJxa(deleteShortcutScript(name))); }
-    catch (e) { return err(`Failed to delete shortcut: ${e instanceof Error ? e.message : String(e)}`); }
+    catch (e) { return toolError("delete shortcut", e); }
   });
 
   server.registerTool("export_shortcut", {
@@ -98,7 +98,7 @@ export function registerShortcutsTools(server: McpServer, _config: IConnectConfi
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   }, async ({ name, outputPath }) => {
     try { return ok(await runJxa(exportShortcutScript(name, outputPath))); }
-    catch (e) { return err(`Failed to export shortcut: ${e instanceof Error ? e.message : String(e)}`); }
+    catch (e) { return toolError("export shortcut", e); }
   });
 
   server.registerTool("import_shortcut", {
@@ -110,7 +110,7 @@ export function registerShortcutsTools(server: McpServer, _config: IConnectConfi
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   }, async ({ filePath }) => {
     try { return ok(await runJxa(importShortcutScript(filePath))); }
-    catch (e) { return err(`Failed to import shortcut: ${e instanceof Error ? e.message : String(e)}`); }
+    catch (e) { return toolError("import shortcut", e); }
   });
 
   server.registerTool("duplicate_shortcut", {
@@ -123,7 +123,7 @@ export function registerShortcutsTools(server: McpServer, _config: IConnectConfi
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   }, async ({ name, newName }) => {
     try { return ok(await runJxa(duplicateShortcutScript(name, newName))); }
-    catch (e) { return err(`Failed to duplicate shortcut: ${e instanceof Error ? e.message : String(e)}`); }
+    catch (e) { return toolError("duplicate shortcut", e); }
   });
 
   server.registerTool("edit_shortcut", {
@@ -135,6 +135,6 @@ export function registerShortcutsTools(server: McpServer, _config: IConnectConfi
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   }, async ({ name }) => {
     try { return ok(await runJxa(editShortcutScript(name))); }
-    catch (e) { return err(`Failed to open shortcut for editing: ${e instanceof Error ? e.message : String(e)}`); }
+    catch (e) { return toolError("open shortcut for editing", e); }
   });
 }

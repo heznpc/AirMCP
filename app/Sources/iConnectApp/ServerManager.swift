@@ -12,8 +12,8 @@ final class ServerManager {
 
     var status: Status = .checking
     var autoStartEnabled: Bool {
-        get { UserDefaults.standard.bool(forKey: "autoStartServer") }
-        set { UserDefaults.standard.set(newValue, forKey: "autoStartServer") }
+        get { UserDefaults.standard.bool(forKey: IConnectConstants.keyAutoStart) }
+        set { UserDefaults.standard.set(newValue, forKey: IConnectConstants.keyAutoStart) }
     }
 
     private var timer: Timer?
@@ -108,21 +108,10 @@ final class ServerManager {
 
     // MARK: - Static Process Launchers (nonisolated)
 
-    private nonisolated static let nodeSearchPaths: [String] = {
-        let home = NSHomeDirectory()
-        return [
-            "/usr/local/bin",
-            "/opt/homebrew/bin",
-            "\(home)/n/bin",
-            "\(home)/.volta/bin",
-        ]
-    }()
-
     private static func launchServer(stdoutPipe: Pipe?, stderrPipe: Pipe?) async -> Process? {
         await withCheckedContinuation { continuation in
             DispatchQueue.global().async {
-                let npxPath = findNpx()
-                guard let npxPath else {
+                guard let npxPath = NodeEnvironment.findExecutable(named: "npx") else {
                     continuation.resume(returning: nil)
                     return
                 }
@@ -132,11 +121,7 @@ final class ServerManager {
                 process.arguments = ["-y", IConnectConstants.npmPackageName]
                 process.standardOutput = stdoutPipe ?? FileHandle.nullDevice
                 process.standardError = stderrPipe ?? FileHandle.nullDevice
-
-                var env = ProcessInfo.processInfo.environment
-                let currentPath = env["PATH"] ?? "/usr/bin:/bin"
-                env["PATH"] = (nodeSearchPaths + [currentPath]).joined(separator: ":")
-                process.environment = env
+                process.environment = NodeEnvironment.buildEnv()
 
                 do {
                     try process.run()
@@ -188,40 +173,6 @@ final class ServerManager {
         } catch {
             // Ignore errors
         }
-    }
-
-    private nonisolated static func findNpx() -> String? {
-        let candidates = nodeSearchPaths.map { $0 + "/npx" }
-
-        for path in candidates {
-            if FileManager.default.isExecutableFile(atPath: path) {
-                return path
-            }
-        }
-
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/which")
-        process.arguments = ["npx"]
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-            if process.terminationStatus == 0 {
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                let path = String(data: data, encoding: .utf8)?
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                if let path, !path.isEmpty {
-                    return path
-                }
-            }
-        } catch {
-            // fall through
-        }
-
-        return nil
     }
 
     // MARK: - Display Helpers

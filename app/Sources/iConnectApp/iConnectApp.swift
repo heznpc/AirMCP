@@ -51,7 +51,7 @@ struct iConnectApp: App {
                 if !appInitialized {
                     appInitialized = true
                     updateManager.startPeriodicChecks()
-                    if !UserDefaults.standard.bool(forKey: "onboardingCompleted") {
+                    if !UserDefaults.standard.bool(forKey: IConnectConstants.keyOnboardingCompleted) {
                         showOnboardingWindow()
                     } else {
                         serverManager.autoStartIfNeeded()
@@ -107,6 +107,7 @@ final class OnboardingWindowHolder: NSObject {
     var window: NSWindow?
 
     func setWindow(_ newWindow: NSWindow) {
+        NotificationCenter.default.removeObserver(self)
         window = newWindow
         NotificationCenter.default.addObserver(
             self,

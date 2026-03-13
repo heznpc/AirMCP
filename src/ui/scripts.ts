@@ -204,8 +204,10 @@ export function uiPressKeyScript(
     ctrl: "control down",
   };
 
+  const validModifiers = new Set(Object.keys(modMap));
   const usingParts = (modifiers ?? [])
-    .map((m) => modMap[m.toLowerCase()] ?? `${m} down`)
+    .filter((m) => validModifiers.has(m.toLowerCase()))
+    .map((m) => modMap[m.toLowerCase()])
     .filter((v, i, a) => a.indexOf(v) === i);
   const usingStr = usingParts.length > 0 ? `, {using: [${usingParts.map((m) => `'${m}'`).join(", ")}]}` : "";
 

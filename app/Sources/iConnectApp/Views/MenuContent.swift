@@ -24,9 +24,10 @@ private struct ModuleInfo: Identifiable {
     /// Whether this module is available on the current macOS version.
     var isAvailableOnCurrentOS: Bool {
         guard let required = minMacosVersion else { return true }
-        let current = ProcessInfo.processInfo.operatingSystemVersion.majorVersion
-        return current >= required
+        return Self.currentMacOSVersion >= required
     }
+
+    private static let currentMacOSVersion = ProcessInfo.processInfo.operatingSystemVersion.majorVersion
 }
 
 private let allModules: [ModuleInfo] = [
@@ -54,8 +55,10 @@ private let allModules: [ModuleInfo] = [
                description: "Browse, search, albums", toolCount: 9),
     ModuleInfo(id: "shortcuts", name: "Shortcuts", icon: "command",
                description: "Run, list, import, export shortcuts", toolCount: 10),
+    ModuleInfo(id: "ui", name: "UI Automation", icon: "hand.tap",
+               description: "Accessibility-based app control", toolCount: 6),
     ModuleInfo(id: "intelligence", name: "Intelligence", icon: "brain",
-               description: "AI summarize, rewrite (macOS 26+)", toolCount: 3, minMacosVersion: 26),
+               description: "AI summarize, rewrite, generate (macOS 26+)", toolCount: 8, minMacosVersion: 26),
     ModuleInfo(id: "tv", name: "TV", icon: "tv",
                description: "Playback, library, search", toolCount: 6),
 ]
@@ -64,6 +67,8 @@ private let allModules: [ModuleInfo] = [
 
 enum IConnectConstants {
     static let npmPackageName = "iconnect-mcp"
+    static let keyAutoStart = "autoStartServer"
+    static let keyOnboardingCompleted = "onboardingCompleted"
 
     static let claudeDesktopConfig = """
     {
@@ -383,7 +388,7 @@ struct MenuContent: View {
                 Label(label, systemImage: module.icon)
             }
         } else {
-            Label("\(label) — requires macOS \(module.minMacosVersion!)+", systemImage: module.icon)
+            Label("\(label) — requires macOS \(module.minMacosVersion ?? 0)+", systemImage: module.icon)
                 .foregroundStyle(.secondary)
         }
     }

@@ -35,6 +35,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(join(__dirname, "..", "package.json"), "utf-8")) as { version: string };
 
 const config = parseConfig();
+const osVersion = getOsVersion();
 
 // HITL client — shared across all servers, created once if enabled
 let hitlClient: HitlClient | null = null;
@@ -69,7 +70,6 @@ function createServer(): McpServer {
     installHitlGuard(server, hitlClient, config);
   }
 
-  const osVersion = getOsVersion();
   const enabled: string[] = [];
   const disabled: string[] = [];
   const osBlocked: string[] = [];

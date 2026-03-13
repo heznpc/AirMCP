@@ -23,6 +23,7 @@ private let onboardingModules: [OnboardingModule] = [
     OnboardingModule(id: "system", name: "System", icon: "gearshape", description: "System preferences and clipboard"),
     OnboardingModule(id: "photos", name: "Photos", icon: "photo", description: "Browse and search photos"),
     OnboardingModule(id: "shortcuts", name: "Shortcuts", icon: "command", description: "Run and manage shortcuts"),
+    OnboardingModule(id: "ui", name: "UI Automation", icon: "hand.tap", description: "Accessibility-based app control"),
     OnboardingModule(id: "intelligence", name: "Intelligence", icon: "brain", description: "AI features (macOS 26+)"),
     OnboardingModule(id: "tv", name: "TV", icon: "tv", description: "Playback and library"),
 ]
@@ -430,35 +431,7 @@ struct OnboardingView: View {
     }
 
     private nonisolated static func nodeExists() -> Bool {
-        let home = NSHomeDirectory()
-        let searchPaths = [
-            "/usr/local/bin",
-            "/opt/homebrew/bin",
-            "\(home)/n/bin",
-            "\(home)/.volta/bin",
-        ]
-
-        // Check common paths first
-        for dir in searchPaths {
-            if FileManager.default.isExecutableFile(atPath: "\(dir)/node") {
-                return true
-            }
-        }
-
-        // Fall back to which
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/which")
-        process.arguments = ["node"]
-        process.standardOutput = Pipe()
-        process.standardError = FileHandle.nullDevice
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-            return process.terminationStatus == 0
-        } catch {
-            return false
-        }
+        NodeEnvironment.nodeExists()
     }
 
     private func detectClients() {
@@ -518,8 +491,7 @@ struct OnboardingView: View {
 
         // Read existing config or start fresh
         var config: [String: Any]
-        if fm.fileExists(atPath: path),
-           let data = fm.contents(atPath: path),
+        if let data = fm.contents(atPath: path),
            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         {
             config = json
@@ -556,7 +528,7 @@ struct OnboardingView: View {
         configManager.disabledModules = Array(disabledModules)
 
         // Mark onboarding complete
-        UserDefaults.standard.set(true, forKey: "onboardingCompleted")
+        UserDefaults.standard.set(true, forKey: IConnectConstants.keyOnboardingCompleted)
 
         onComplete()
 

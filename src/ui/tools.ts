@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { IConnectConfig } from "../shared/config.js";
-import { ok, err } from "../shared/result.js";
+import { ok, err, toolError } from "../shared/result.js";
 import {
   uiOpenAppScript,
   uiClickScript,
@@ -33,7 +33,7 @@ export function registerUiTools(server: McpServer, _config: IConnectConfig): voi
       try {
         return ok(await runJxa(uiOpenAppScript(appName)));
       } catch (e) {
-        return err(`Failed to open app: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("open app", e);
       }
     },
   );
@@ -69,7 +69,7 @@ export function registerUiTools(server: McpServer, _config: IConnectConfig): voi
         }
         return ok(await runJxa(uiClickScript(appName, x, y, text, role, index)));
       } catch (e) {
-        return err(`Failed to click element: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("click element", e);
       }
     },
   );
@@ -95,7 +95,7 @@ export function registerUiTools(server: McpServer, _config: IConnectConfig): voi
       try {
         return ok(await runJxa(uiTypeScript(text, appName)));
       } catch (e) {
-        return err(`Failed to type text: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("type text", e);
       }
     },
   );
@@ -122,7 +122,7 @@ export function registerUiTools(server: McpServer, _config: IConnectConfig): voi
       try {
         return ok(await runJxa(uiPressKeyScript(key, modifiers, appName)));
       } catch (e) {
-        return err(`Failed to press key: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("press key", e);
       }
     },
   );
@@ -149,7 +149,7 @@ export function registerUiTools(server: McpServer, _config: IConnectConfig): voi
       try {
         return ok(await runJxa(uiScrollScript(direction, amount, appName)));
       } catch (e) {
-        return err(`Failed to scroll: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("scroll", e);
       }
     },
   );
@@ -176,7 +176,7 @@ export function registerUiTools(server: McpServer, _config: IConnectConfig): voi
       try {
         return ok(await runJxa(uiReadScript(appName, maxDepth, maxElements)));
       } catch (e) {
-        return err(`Failed to read UI: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("read UI", e);
       }
     },
   );

@@ -78,12 +78,12 @@ export function importShortcutScript(filePath: string): string {
 }
 
 export function duplicateShortcutScript(name: string, newName: string): string {
-  const tmpPath = `/tmp/${escJxaShell(newName)}.shortcut`;
+  const safeName = escJxaShell(newName).replace(/[^a-zA-Z0-9_-]/g, "_");
   return `
     const app = Application.currentApplication();
     app.includeStandardAdditions = true;
-    app.doShellScript('shortcuts export "${escJxaShell(name)}" -o "${tmpPath}" && shortcuts import "${tmpPath}"');
-    app.doShellScript('rm -f "${tmpPath}"');
+    app.doShellScript('shortcuts export "${escJxaShell(name)}" -o "/tmp/${safeName}.shortcut" && shortcuts import "/tmp/${safeName}.shortcut"');
+    app.doShellScript('rm -f "/tmp/${safeName}.shortcut"');
     JSON.stringify({original: '${esc(name)}', duplicate: '${esc(newName)}', success: true});
   `;
 }

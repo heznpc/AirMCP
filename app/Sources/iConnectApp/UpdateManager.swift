@@ -63,60 +63,10 @@ final class UpdateManager {
 
     // MARK: - Static Helpers (nonisolated)
 
-    private nonisolated static let nodeSearchPaths: [String] = {
-        let home = NSHomeDirectory()
-        return [
-            "/usr/local/bin",
-            "/opt/homebrew/bin",
-            "\(home)/n/bin",
-            "\(home)/.volta/bin",
-        ]
-    }()
-
-    private nonisolated static func buildEnv() -> [String: String] {
-        var env = ProcessInfo.processInfo.environment
-        let currentPath = env["PATH"] ?? "/usr/bin:/bin"
-        env["PATH"] = (nodeSearchPaths + [currentPath]).joined(separator: ":")
-        return env
-    }
-
-    private nonisolated static func findNpm() -> String? {
-        let candidates = nodeSearchPaths.map { $0 + "/npm" }
-        for path in candidates {
-            if FileManager.default.isExecutableFile(atPath: path) {
-                return path
-            }
-        }
-
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/which")
-        process.arguments = ["npm"]
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-            if process.terminationStatus == 0 {
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                let path = String(data: data, encoding: .utf8)?
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                if let path, !path.isEmpty {
-                    return path
-                }
-            }
-        } catch {
-            // fall through
-        }
-
-        return nil
-    }
-
     private nonisolated static func fetchLatestVersion() async -> String? {
         await withCheckedContinuation { continuation in
             DispatchQueue.global().async {
-                guard let npmPath = findNpm() else {
+                guard let npmPath = NodeEnvironment.findExecutable(named: "npm") else {
                     continuation.resume(returning: nil)
                     return
                 }
@@ -124,7 +74,7 @@ final class UpdateManager {
                 let process = Process()
                 process.executableURL = URL(fileURLWithPath: npmPath)
                 process.arguments = ["view", IConnectConstants.npmPackageName, "version"]
-                process.environment = buildEnv()
+                process.environment = NodeEnvironment.buildEnv()
 
                 let pipe = Pipe()
                 process.standardOutput = pipe
@@ -151,7 +101,7 @@ final class UpdateManager {
     private nonisolated static func runNpmInstall() async -> Bool {
         await withCheckedContinuation { continuation in
             DispatchQueue.global().async {
-                guard let npmPath = findNpm() else {
+                guard let npmPath = NodeEnvironment.findExecutable(named: "npm") else {
                     continuation.resume(returning: false)
                     return
                 }
@@ -159,7 +109,7 @@ final class UpdateManager {
                 let process = Process()
                 process.executableURL = URL(fileURLWithPath: npmPath)
                 process.arguments = ["install", "-g", "\(IConnectConstants.npmPackageName)@latest"]
-                process.environment = buildEnv()
+                process.environment = NodeEnvironment.buildEnv()
                 process.standardOutput = FileHandle.nullDevice
                 process.standardError = FileHandle.nullDevice
 

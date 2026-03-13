@@ -52,20 +52,16 @@ final class LogManager {
     func append(_ text: String, isError: Bool) {
         let lines = text.components(separatedBy: .newlines)
             .filter { !$0.isEmpty }
+        guard !lines.isEmpty else { return }
 
+        var updated = entries
         for line in lines {
-            let entry = LogEntry(
-                timestamp: Date(),
-                message: line,
-                isError: isError
-            )
-            entries.append(entry)
+            updated.append(LogEntry(timestamp: Date(), message: line, isError: isError))
         }
-
-        // Trim to max size
-        if entries.count > Self.maxEntries {
-            entries.removeFirst(entries.count - Self.maxEntries)
+        if updated.count > Self.maxEntries {
+            updated.removeFirst(updated.count - Self.maxEntries)
         }
+        entries = updated
     }
 
     func clear() {

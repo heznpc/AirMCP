@@ -113,8 +113,8 @@ function createServer(): McpServer {
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ name, args }) => {
-      const prompts = (server as unknown as { _registeredPrompts: Map<string, { callback: Function }> })
-        ._registeredPrompts;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const prompts = (server as any)._registeredPrompts as Map<string, { callback: (...a: any[]) => any }> | undefined;
       if (!prompts) return err("Prompt registry not available");
       const prompt = prompts.get(name);
       if (!prompt) {

@@ -1,13 +1,13 @@
 # AirMCP
 
-MCP server for the entire Apple ecosystem — Notes, Reminders, Calendar, Contacts, Mail, Messages, Music, Finder, Safari, System, Photos, Shortcuts, Apple Intelligence, TV, Screen Capture, Maps, and Podcasts. Connect any AI to your Mac.
+MCP server for the entire Apple ecosystem — Notes, Reminders, Calendar, Contacts, Mail, Messages, Music, Finder, Safari, System, Photos, Shortcuts, Apple Intelligence, TV, Screen Capture, Maps, Podcasts, Weather, Pages, Numbers, and Keynote. Connect any AI to your Mac.
 
 > Available in multiple languages at the [project landing page](https://heznpc.github.io/AirMCP/).
 
 ## Features
 
-- **173 tools** (18 modules) — Apple app CRUD + system control + Apple Intelligence + UI Automation + Screen Capture + Maps + Podcasts + dynamic shortcuts
-- **29 prompts** — per-app workflows (notes, calendar, reminders, shortcuts) + cross-module + developer workflows
+- **211 tools** (22 modules) — Apple app CRUD + system control + Apple Intelligence + UI Automation + Screen Capture + Maps + Podcasts + Weather + iWork (Pages/Numbers/Keynote) + dynamic shortcuts
+- **30 prompts** — per-app workflows (notes, calendar, reminders, shortcuts) + cross-module + developer workflows
 - **11 MCP resources** — Notes, Calendar, Reminders live data URIs
 - **JXA + Swift bridge** — JXA for basic automation, EventKit/PhotoKit for advanced features
 - **Recurring events/reminders** — EventKit recurrence rules (macOS 26+ Swift bridge)
@@ -521,7 +521,7 @@ Or edit `~/.config/airmcp/config.json` directly:
 | `npx airmcp init` | Interactive setup wizard |
 | `npx airmcp doctor` | Diagnose installation issues |
 | `npx airmcp` | Start MCP server (stdio, default) |
-| `npx airmcp --full` | Start with all 18 modules enabled |
+| `npx airmcp --full` | Start with all 22 modules enabled |
 | `npx airmcp --http` | Start as HTTP server (port 3847) |
 
 ## Configuration

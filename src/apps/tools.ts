@@ -100,7 +100,11 @@ function getWeekMonday(dateStr?: string): string {
   const day = d.getDay();
   const diff = d.getDate() - day + (day === 0 ? -6 : 1);
   d.setDate(diff);
-  return d.toISOString().slice(0, 10);
+  // Use local date parts — toISOString() returns UTC which shifts dates in UTC+ timezones
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 export function registerApps(server: McpServer, opts: { calendar: boolean; music: boolean }): void {

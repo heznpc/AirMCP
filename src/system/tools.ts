@@ -28,6 +28,13 @@ import {
 
 let caffeinatePid: number | null = null;
 
+// Clean up orphaned caffeinate process on server exit
+process.on("exit", () => {
+  if (caffeinatePid !== null) {
+    try { process.kill(caffeinatePid); } catch { /* already exited */ }
+  }
+});
+
 export function registerSystemTools(server: McpServer, _config: AirMcpConfig): void {
   server.registerTool(
     "get_clipboard",

@@ -1,6 +1,6 @@
 # AirMCP Skills Guide
 
-A practical guide for AI agents to effectively use AirMCP's 173 tools across 18 modules to orchestrate the Apple ecosystem via MCP.
+A practical guide for AI agents to effectively use AirMCP's 211 tools across 22 modules to orchestrate the Apple ecosystem via MCP.
 
 ## Overview
 
@@ -26,7 +26,7 @@ AirMCP bridges AI agents to native macOS applications through JXA (JavaScript fo
 | **mail** | Mail | `list_messages`, `read_message`, `search_messages`, `send_mail`, `reply_mail`, `flag_message`, `move_message` | 11 |
 | **maps** | Maps | `search_location`, `get_directions`, `drop_pin`, `search_nearby`, `share_location` | 6 |
 | **messages** | Messages | `list_chats`, `read_chat`, `send_message`, `send_file`, `search_chats` | 6 |
-| **music** | Music | `list_playlists`, `play_track`, `now_playing`, `playback_control`, `create_playlist`, `search_tracks` | 13 |
+| **music** | Music | `list_playlists`, `play_track`, `now_playing`, `playback_control`, `create_playlist`, `search_tracks`, `get_rating`, `set_rating`, `set_favorited`, `set_disliked` | 17 |
 | **notes** | Notes | `list_notes`, `search_notes`, `read_note`, `create_note`, `update_note`, `scan_notes`, `create_folder` | 12 |
 | **photos** | Photos | `list_photos`, `search_photos`, `get_photo_info`, `create_album`, `add_to_album`, `list_favorites` | 9 |
 | **podcasts** | Podcasts | `list_podcast_shows`, `list_podcast_episodes`, `podcast_now_playing`, `play_podcast_episode` | 6 |
@@ -34,9 +34,13 @@ AirMCP bridges AI agents to native macOS applications through JXA (JavaScript fo
 | **safari** | Safari | `list_tabs`, `read_page_content`, `open_url`, `run_javascript`, `list_bookmarks`, `add_to_reading_list` | 12 |
 | **screen** | Screen Capture | `capture_screen`, `capture_window`, `capture_area`, `list_windows`, `record_screen` | 5 |
 | **shortcuts** | Shortcuts | `list_shortcuts`, `run_shortcut`, `get_shortcut_detail`, `search_shortcuts`, `export_shortcut` | 11 |
-| **system** | System | `get_clipboard`, `set_clipboard`, `show_notification`, `capture_screenshot`, `get_battery_status`, `toggle_dark_mode` | 17 |
+| **system** | System | `get_clipboard`, `set_clipboard`, `show_notification`, `capture_screenshot`, `get_battery_status`, `toggle_dark_mode`, `system_sleep`, `prevent_sleep`, `system_power` | 20 |
 | **tv** | TV | `tv_list_playlists`, `tv_now_playing`, `tv_playback_control`, `tv_search`, `tv_play` | 6 |
 | **ui** | UI Automation | `ui_open_app`, `ui_click`, `ui_type`, `ui_press_key`, `ui_scroll`, `ui_read` | 6 |
+| **weather** | Weather | `get_current_weather`, `get_daily_forecast`, `get_hourly_forecast` | 3 |
+| **pages** | Pages | `pages_create`, `pages_open`, `pages_export`, `pages_get_content`, `pages_set_content`, `pages_list`, `pages_replace_text` | 7 |
+| **numbers** | Numbers | `numbers_create`, `numbers_open`, `numbers_export`, `numbers_get_cells`, `numbers_set_cells`, `numbers_add_row`, `numbers_list_sheets`, `numbers_add_sheet`, `numbers_list` | 9 |
+| **keynote** | Keynote | `keynote_create`, `keynote_open`, `keynote_export`, `keynote_list_slides`, `keynote_add_slide`, `keynote_set_slide_text`, `keynote_start_slideshow`, `keynote_stop_slideshow`, `keynote_list` | 9 |
 | **semantic** | Semantic Search | `semantic_index`, `semantic_search`, `find_related`, `semantic_status` | 4 |
 | **cross** | Cross-App | `summarize_context` | 1 |
 

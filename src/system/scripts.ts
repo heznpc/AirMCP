@@ -298,3 +298,103 @@ export function systemPowerScript(action: string): string {
     JSON.stringify({action: '${action}', success: true});
   `;
 }
+
+// --- App Management ---
+
+export function launchAppScript(name: string): string {
+  return `
+    const app = Application('${esc(name)}');
+    app.activate();
+    JSON.stringify({launched: true, name: '${esc(name)}'});
+  `;
+}
+
+export function quitAppScript(name: string): string {
+  return `
+    const app = Application('${esc(name)}');
+    app.quit();
+    JSON.stringify({quit: true, name: '${esc(name)}'});
+  `;
+}
+
+export function isAppRunningScript(name: string): string {
+  return `
+    const se = Application('System Events');
+    const procs = se.processes.whose({name: '${esc(name)}'})();
+    if (procs.length > 0) {
+      const p = procs[0];
+      JSON.stringify({running: true, name: p.name(), bundleIdentifier: p.bundleIdentifier(), pid: p.unixId(), visible: p.visible()});
+    } else {
+      JSON.stringify({running: false, name: '${esc(name)}'});
+    }
+  `;
+}
+
+// --- Window Management ---
+
+export function listAllWindowsScript(): string {
+  return `
+    const se = Application('System Events');
+    const procs = se.processes.whose({backgroundOnly: false})();
+    const results = [];
+    for (let p = 0; p < procs.length; p++) {
+      const proc = procs[p];
+      let procName = '';
+      let pid = 0;
+      try { procName = proc.name(); } catch(e) { continue; }
+      try { pid = proc.unixId(); } catch(e) {}
+      let wins;
+      try { wins = proc.windows(); } catch(e) { continue; }
+      for (let w = 0; w < wins.length; w++) {
+        const win = wins[w];
+        const info = {app: procName, pid: pid, title: '', position: null, size: null, minimized: false};
+        try { info.title = win.name() || ''; } catch(e) {}
+        try { info.position = win.position(); } catch(e) {}
+        try { info.size = win.size(); } catch(e) {}
+        try { info.minimized = win.minimized ? win.minimized() : false; } catch(e) {}
+        results.push(info);
+      }
+    }
+    JSON.stringify({total: results.length, windows: results});
+  `;
+}
+
+function windowSelector(appName: string, windowTitle?: string): string {
+  if (windowTitle) {
+    return `const proc = se.processes.byName('${esc(appName)}');
+    const wins = proc.windows.whose({name: '${esc(windowTitle)}'})();
+    if (wins.length === 0) throw new Error('No window found: ${esc(windowTitle)}');
+    const win = wins[0];`;
+  }
+  return `const proc = se.processes.byName('${esc(appName)}');
+    const wins = proc.windows();
+    if (wins.length === 0) throw new Error('No windows found for ${esc(appName)}');
+    const win = wins[0];`;
+}
+
+export function moveWindowScript(appName: string, x: number, y: number, windowTitle?: string): string {
+  return `
+    const se = Application('System Events');
+    ${windowSelector(appName, windowTitle)}
+    win.position = [${x}, ${y}];
+    JSON.stringify({moved: true, app: '${esc(appName)}', position: win.position()});
+  `;
+}
+
+export function resizeWindowScript(appName: string, width: number, height: number, windowTitle?: string): string {
+  return `
+    const se = Application('System Events');
+    ${windowSelector(appName, windowTitle)}
+    win.size = [${width}, ${height}];
+    JSON.stringify({resized: true, app: '${esc(appName)}', size: win.size()});
+  `;
+}
+
+export function minimizeWindowScript(appName: string, restore: boolean, windowTitle?: string): string {
+  return `
+    const se = Application('System Events');
+    ${windowSelector(appName, windowTitle)}
+    win.minimized = ${!restore};
+    JSON.stringify({app: '${esc(appName)}', minimized: ${!restore}});
+  `;
+}

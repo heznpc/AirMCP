@@ -6,7 +6,7 @@ MCP server for the entire Apple ecosystem — Notes, Reminders, Calendar, Contac
 
 ## Features
 
-- **211 tools** (22 modules) — Apple app CRUD + system control + Apple Intelligence + UI Automation + Screen Capture + Maps + Podcasts + Weather + iWork (Pages/Numbers/Keynote) + dynamic shortcuts
+- **220 tools** (22 modules) — Apple app CRUD + system control + Apple Intelligence + UI Automation + Screen Capture + Maps + Podcasts + Weather + iWork (Pages/Numbers/Keynote) + dynamic shortcuts
 - **30 prompts** — per-app workflows (notes, calendar, reminders, shortcuts) + cross-module + developer workflows
 - **11 MCP resources** — Notes, Calendar, Reminders live data URIs
 - **JXA + Swift bridge** — JXA for basic automation, EventKit/PhotoKit for advanced features

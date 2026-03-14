@@ -1,6 +1,6 @@
 # AirMCP Skills Guide
 
-A practical guide for AI agents to effectively use AirMCP's 211 tools across 22 modules to orchestrate the Apple ecosystem via MCP.
+A practical guide for AI agents to effectively use AirMCP's 220 tools across 22 modules to orchestrate the Apple ecosystem via MCP.
 
 ## Overview
 
@@ -24,7 +24,7 @@ AirMCP bridges AI agents to native macOS applications through JXA (JavaScript fo
 | **finder** | Finder | `search_files`, `list_directory`, `get_file_info`, `set_file_tags`, `recent_files`, `create_directory` | 8 |
 | **intelligence** | Apple Intelligence | `summarize_text`, `rewrite_text`, `proofread_text`, `generate_text`, `tag_content`, `ai_chat` | 8 |
 | **mail** | Mail | `list_messages`, `read_message`, `search_messages`, `send_mail`, `reply_mail`, `flag_message`, `move_message` | 11 |
-| **maps** | Maps | `search_location`, `get_directions`, `drop_pin`, `search_nearby`, `share_location` | 6 |
+| **maps** | Maps | `search_location`, `get_directions`, `drop_pin`, `search_nearby`, `share_location` | 8 |
 | **messages** | Messages | `list_chats`, `read_chat`, `send_message`, `send_file`, `search_chats` | 6 |
 | **music** | Music | `list_playlists`, `play_track`, `now_playing`, `playback_control`, `create_playlist`, `search_tracks`, `get_rating`, `set_rating`, `set_favorited`, `set_disliked` | 17 |
 | **notes** | Notes | `list_notes`, `search_notes`, `read_note`, `create_note`, `update_note`, `scan_notes`, `create_folder` | 12 |
@@ -34,7 +34,7 @@ AirMCP bridges AI agents to native macOS applications through JXA (JavaScript fo
 | **safari** | Safari | `list_tabs`, `read_page_content`, `open_url`, `run_javascript`, `list_bookmarks`, `add_to_reading_list` | 12 |
 | **screen** | Screen Capture | `capture_screen`, `capture_window`, `capture_area`, `list_windows`, `record_screen` | 5 |
 | **shortcuts** | Shortcuts | `list_shortcuts`, `run_shortcut`, `get_shortcut_detail`, `search_shortcuts`, `export_shortcut` | 11 |
-| **system** | System | `get_clipboard`, `set_clipboard`, `show_notification`, `capture_screenshot`, `get_battery_status`, `toggle_dark_mode`, `system_sleep`, `prevent_sleep`, `system_power` | 20 |
+| **system** | System | `get_clipboard`, `set_clipboard`, `show_notification`, `capture_screenshot`, `get_battery_status`, `toggle_dark_mode`, `system_sleep`, `prevent_sleep`, `system_power` | 27 |
 | **tv** | TV | `tv_list_playlists`, `tv_now_playing`, `tv_playback_control`, `tv_search`, `tv_play` | 6 |
 | **ui** | UI Automation | `ui_open_app`, `ui_click`, `ui_type`, `ui_press_key`, `ui_scroll`, `ui_read` | 6 |
 | **weather** | Weather | `get_current_weather`, `get_daily_forecast`, `get_hourly_forecast` | 3 |

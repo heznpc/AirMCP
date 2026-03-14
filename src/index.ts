@@ -201,7 +201,7 @@ async function main() {
       res.json({
         name: NPM_PACKAGE_NAME,
         version: pkg.version,
-        description: "MCP server for the entire Apple ecosystem — 211 tools, 30 prompts across 22 modules. macOS only.",
+        description: "MCP server for the entire Apple ecosystem — 220 tools, 30 prompts across 22 modules. macOS only.",
         transport: { type: "streamable-http", url: "/mcp" },
         capabilities: {
           tools: true,

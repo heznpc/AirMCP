@@ -24,6 +24,13 @@ import {
   systemSleepScript,
   preventSleepScript,
   systemPowerScript,
+  launchAppScript,
+  quitAppScript,
+  isAppRunningScript,
+  listAllWindowsScript,
+  moveWindowScript,
+  resizeWindowScript,
+  minimizeWindowScript,
 } from "./scripts.js";
 
 let caffeinatePid: number | null = null;
@@ -506,6 +513,149 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
         return ok(await runJxa<{ action: string; success: boolean }>(systemPowerScript(action)));
       } catch (e) {
         return toolError("system power", e);
+      }
+    },
+  );
+
+  // --- App Management Tools ---
+
+  server.registerTool(
+    "launch_app",
+    {
+      title: "Launch App",
+      description: "Launch an application by name. Lightweight — just activates the app without reading its accessibility tree.",
+      inputSchema: {
+        name: z.string().min(1).describe("Application name (e.g. 'Safari', 'Xcode') or bundle ID"),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    },
+    async ({ name }) => {
+      try {
+        return ok(await runJxa(launchAppScript(name)));
+      } catch (e) {
+        return toolError("launch app", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "quit_app",
+    {
+      title: "Quit App",
+      description: "Quit a running application by name. May cause unsaved work to be lost.",
+      inputSchema: {
+        name: z.string().min(1).describe("Application name (e.g. 'Safari')"),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ name }) => {
+      try {
+        return ok(await runJxa(quitAppScript(name)));
+      } catch (e) {
+        return toolError("quit app", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "is_app_running",
+    {
+      title: "Is App Running",
+      description: "Check whether an application is currently running. Returns process details if found.",
+      inputSchema: {
+        name: z.string().min(1).describe("Application name to check (e.g. 'Safari')"),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ name }) => {
+      try {
+        return ok(await runJxa(isAppRunningScript(name)));
+      } catch (e) {
+        return toolError("check app running", e);
+      }
+    },
+  );
+
+  // --- Window Management Tools ---
+
+  server.registerTool(
+    "list_all_windows",
+    {
+      title: "List All Windows",
+      description: "List windows across all running applications with title, size, position, app name, and PID.",
+      inputSchema: {},
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async () => {
+      try {
+        return ok(await runJxa(listAllWindowsScript()));
+      } catch (e) {
+        return toolError("list all windows", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "move_window",
+    {
+      title: "Move Window",
+      description: "Move a window to a specific position on screen.",
+      inputSchema: {
+        appName: z.string().min(1).describe("Application name (e.g. 'Safari')"),
+        x: z.number().int().describe("X coordinate for top-left corner"),
+        y: z.number().int().describe("Y coordinate for top-left corner"),
+        windowTitle: z.string().optional().describe("Specific window title. If omitted, targets the first window."),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ appName, x, y, windowTitle }) => {
+      try {
+        return ok(await runJxa(moveWindowScript(appName, x, y, windowTitle)));
+      } catch (e) {
+        return toolError("move window", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "resize_window",
+    {
+      title: "Resize Window",
+      description: "Resize a window to specific dimensions.",
+      inputSchema: {
+        appName: z.string().min(1).describe("Application name (e.g. 'Safari')"),
+        width: z.number().int().min(1).describe("Window width in pixels"),
+        height: z.number().int().min(1).describe("Window height in pixels"),
+        windowTitle: z.string().optional().describe("Specific window title. If omitted, targets the first window."),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ appName, width, height, windowTitle }) => {
+      try {
+        return ok(await runJxa(resizeWindowScript(appName, width, height, windowTitle)));
+      } catch (e) {
+        return toolError("resize window", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "minimize_window",
+    {
+      title: "Minimize Window",
+      description: "Minimize or restore a window.",
+      inputSchema: {
+        appName: z.string().min(1).describe("Application name (e.g. 'Safari')"),
+        restore: z.boolean().optional().default(false).describe("Set true to restore (un-minimize) instead of minimizing"),
+        windowTitle: z.string().optional().describe("Specific window title. If omitted, targets the first window."),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ appName, restore, windowTitle }) => {
+      try {
+        return ok(await runJxa(minimizeWindowScript(appName, restore, windowTitle)));
+      } catch (e) {
+        return toolError("minimize window", e);
       }
     },
   );

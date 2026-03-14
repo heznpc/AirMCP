@@ -11,6 +11,7 @@ import {
   searchNearbyScript,
   shareLocationScript,
 } from "./scripts.js";
+import { fetchGeocode, fetchReverseGeocode } from "./api.js";
 
 export function registerMapsTools(server: McpServer, _config: AirMcpConfig): void {
   server.registerTool(
@@ -135,6 +136,45 @@ export function registerMapsTools(server: McpServer, _config: AirMcpConfig): voi
         return ok(await runJxa(shareLocationScript(latitude, longitude, label)));
       } catch (e) {
         return toolError("share location", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "geocode",
+    {
+      title: "Geocode",
+      description: "Convert a place name or address to geographic coordinates. Returns up to 5 matching locations with latitude, longitude, country, and timezone.",
+      inputSchema: {
+        query: z.string().min(1).describe("Place name or address (e.g. 'Seoul', 'Tokyo Tower', '1600 Pennsylvania Ave')"),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    },
+    async ({ query }) => {
+      try {
+        return ok(await fetchGeocode(query));
+      } catch (e) {
+        return toolError("geocode", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "reverse_geocode",
+    {
+      title: "Reverse Geocode",
+      description: "Convert geographic coordinates to a place name and address.",
+      inputSchema: {
+        latitude: z.number().min(-90).max(90).describe("Latitude coordinate"),
+        longitude: z.number().min(-180).max(180).describe("Longitude coordinate"),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    },
+    async ({ latitude, longitude }) => {
+      try {
+        return ok(await fetchReverseGeocode(latitude, longitude));
+      } catch (e) {
+        return toolError("reverse geocode", e);
       }
     },
   );

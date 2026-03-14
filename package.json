@@ -1,6 +1,6 @@
 {
   "name": "airmcp",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "description": "MCP server for the entire Apple ecosystem — Notes, Reminders, Calendar, Contacts, Mail, Messages, Music, Finder, Safari, System, Photos, Shortcuts, Apple Intelligence, TV, Screen Capture, Maps, and Podcasts. Connect any AI to your Mac.",
   "keywords": [
     "mcp",
@@ -39,13 +39,13 @@
     "applescript",
     "macos"
   ],
-  "homepage": "https://github.com/heznpc/iConnect",
+  "homepage": "https://github.com/heznpc/AirMCP",
   "bugs": {
-    "url": "https://github.com/heznpc/iConnect/issues"
+    "url": "https://github.com/heznpc/AirMCP/issues"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/heznpc/iConnect.git"
+    "url": "https://github.com/heznpc/AirMCP.git"
   },
   "license": "MIT",
   "author": "heznpc",

@@ -283,7 +283,7 @@ struct MenuContent: View {
 
         Divider()
 
-        Text("AirMCP v0.3.0")
+        Text("AirMCP v1.0.0")
             .foregroundStyle(.secondary)
 
         Button("Quit") {

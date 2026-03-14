@@ -54,6 +54,42 @@ npx airmcp doctor
 
 Checks Node.js version, config files, MCP client setup, macOS permissions, and module status — all in one command.
 
+## Try It — Talk to Your Mac
+
+Once connected, just ask your AI in natural language. Here are some things you can try:
+
+**Everyday**
+- "Read my latest notes and summarize them"
+- "What's on my calendar today?"
+- "Show me overdue reminders and reschedule them to tomorrow"
+- "Play some jazz on Apple Music"
+
+**Productivity**
+- "Draft a meeting agenda in Notes, then create calendar events for each topic"
+- "Find all emails from Alex about the project and create reminders for action items"
+- "Search my contacts for everyone at Acme Corp"
+
+**System Control**
+- "Turn on dark mode, set volume to 50%, and lower brightness"
+- "Take a screenshot and save it to my Desktop"
+- "What apps are running right now? Quit anything I'm not using"
+
+**Research & Web**
+- "Open the Apple developer docs in Safari and summarize the page"
+- "Search my Safari tabs for that article I was reading about Swift"
+
+**Power User**
+- "Scan nearby Bluetooth devices"
+- "Get my current GPS coordinates and show the weather here"
+- "Record my screen for 10 seconds"
+- "Run my 'Morning Routine' shortcut"
+
+**Cross-App Workflows**
+- "Check today's meetings, find related notes, and create a prep checklist in Reminders"
+- "Search my files for the Q1 report, read it, and draft a summary email to the team"
+
+These are just starting points — with 226 tools across 24 Apple apps, the combinations are endless.
+
 ---
 
 ## Client Setup

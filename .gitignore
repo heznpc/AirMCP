@@ -6,6 +6,7 @@ app/.build/
 .DS_Store
 .idea/
 iMcp-*.md
+iConnect-*.md
 iconnect-test-report-*.md
 .mcpregistry_*
 .smithery/

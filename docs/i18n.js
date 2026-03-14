@@ -1,14 +1,21 @@
 const I18n = (() => {
   const STORAGE_KEY = 'iconnect-lang';
-  const SUPPORTED = ['en', 'ko'];
+  const SUPPORTED = ['en', 'ko', 'ja', 'zh-CN', 'zh-TW', 'es', 'fr', 'de', 'pt'];
   let locale = {};
   let currentLang = 'en';
 
   function detect() {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved && SUPPORTED.includes(saved)) return saved;
-    const nav = navigator.language || '';
+    const nav = (navigator.language || '').toLowerCase();
+    if (nav === 'zh-cn' || nav === 'zh-hans' || nav.startsWith('zh-hans')) return 'zh-CN';
+    if (nav.startsWith('zh')) return 'zh-TW';
     if (nav.startsWith('ko')) return 'ko';
+    if (nav.startsWith('ja')) return 'ja';
+    if (nav.startsWith('es')) return 'es';
+    if (nav.startsWith('fr')) return 'fr';
+    if (nav.startsWith('de')) return 'de';
+    if (nav.startsWith('pt')) return 'pt';
     return 'en';
   }
 
@@ -37,6 +44,7 @@ const I18n = (() => {
     });
 
     document.documentElement.lang = currentLang;
+    document.dispatchEvent(new CustomEvent('langchange', { detail: currentLang }));
   }
 
   async function init() {
@@ -45,17 +53,19 @@ const I18n = (() => {
     apply(data);
   }
 
-  async function toggle() {
-    currentLang = currentLang === 'en' ? 'ko' : 'en';
-    localStorage.setItem(STORAGE_KEY, currentLang);
-    const data = await load(currentLang);
+  async function setLang(lang) {
+    if (!SUPPORTED.includes(lang)) return;
+    currentLang = lang;
+    localStorage.setItem(STORAGE_KEY, lang);
+    const data = await load(lang);
     apply(data);
   }
 
   function get(key) { return locale[key] || key; }
   function lang() { return currentLang; }
+  function languages() { return SUPPORTED; }
 
-  return { init, toggle, get, lang };
+  return { init, setLang, get, lang, languages };
 })();
 
 I18n.init();

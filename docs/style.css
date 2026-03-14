@@ -246,6 +246,34 @@ button{font:inherit;cursor:pointer;border:0;background:0 0}
 .reveal{opacity:0;transform:translateY(20px);transition:opacity .8s cubic-bezier(.2,.8,.2,1),transform .8s cubic-bezier(.2,.8,.2,1)}
 .reveal.visible{opacity:1;transform:none}
 
+/* === Language dropdown === */
+.lang-select{position:relative}
+.lang-dropdown{
+  position:absolute;top:calc(100% + 8px);right:0;
+  min-width:140px;
+  background:var(--nav-bg);
+  backdrop-filter:blur(24px) saturate(1.7);-webkit-backdrop-filter:blur(24px) saturate(1.7);
+  border:1px solid var(--nav-border);
+  border-radius:12px;
+  padding:4px;
+  opacity:0;pointer-events:none;
+  transform:translateY(-4px);
+  transition:opacity .2s,transform .2s;
+  z-index:110;
+  max-height:320px;overflow-y:auto;
+}
+.lang-dropdown.open{opacity:1;pointer-events:auto;transform:none}
+.lang-dropdown button{
+  display:block;width:100%;text-align:left;
+  padding:7px 12px;border-radius:8px;
+  font-size:.8rem;font-weight:500;
+  opacity:.5;transition:all .15s;
+}
+.lang-dropdown button:hover{opacity:.9;background:rgba(255,255,255,.06)}
+.lang-dropdown button.active{opacity:1;color:rgba(56,189,248,.9)}
+[data-theme="light"] .lang-dropdown button:hover{background:rgba(0,0,0,.04)}
+[data-theme="light"] .lang-dropdown button.active{color:rgba(14,120,200,.9)}
+
 /* === Mobile === */
 @media(max-width:640px){
   #navLinks{display:none}
@@ -256,4 +284,5 @@ button{font:inherit;cursor:pointer;border:0;background:0 0}
     padding:20px;gap:14px;border-bottom:1px solid var(--nav-border);
   }
   .nav-mobile{display:flex}
+  .lang-dropdown{position:fixed;top:auto;bottom:20px;right:20px;left:20px;min-width:auto}
 }

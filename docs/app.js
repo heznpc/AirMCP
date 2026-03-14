@@ -13,8 +13,31 @@ themeToggle.addEventListener('click', () => {
   setTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
 });
 
-// === Language toggle ===
-document.getElementById('langToggle').addEventListener('click', () => I18n.toggle());
+// === Language dropdown ===
+const langDropdown = document.getElementById('langDropdown');
+const langToggleBtn = document.getElementById('langToggle');
+
+langToggleBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  langDropdown.classList.toggle('open');
+});
+
+langDropdown.querySelectorAll('[data-lang]').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    I18n.setLang(btn.dataset.lang);
+    langDropdown.classList.remove('open');
+  });
+});
+
+document.addEventListener('click', () => langDropdown.classList.remove('open'));
+
+document.addEventListener('langchange', (e) => {
+  const lang = e.detail;
+  langDropdown.querySelectorAll('[data-lang]').forEach(b => {
+    b.classList.toggle('active', b.dataset.lang === lang);
+  });
+});
 
 // === Mobile nav ===
 const mobileToggle = document.getElementById('mobileToggle');

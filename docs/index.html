@@ -46,9 +46,23 @@
         <button class="pill-btn" id="themeToggle" aria-label="Toggle theme">
           <span class="theme-icon">☀</span>
         </button>
-        <button class="pill-btn" id="langToggle" aria-label="Toggle language">
-          <span data-i18n="lang_label">EN</span>
-        </button>
+        <div class="lang-select" id="langSelect">
+          <button class="pill-btn" id="langToggle" aria-label="Select language">
+            <span data-i18n="lang_label">EN</span>
+            <svg class="inline ml-1 -mr-1" width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 3l2 2 2-2"/></svg>
+          </button>
+          <div class="lang-dropdown" id="langDropdown">
+            <button data-lang="en">English</button>
+            <button data-lang="ko">한국어</button>
+            <button data-lang="ja">日本語</button>
+            <button data-lang="zh-CN">简体中文</button>
+            <button data-lang="zh-TW">繁體中文</button>
+            <button data-lang="es">Español</button>
+            <button data-lang="fr">Français</button>
+            <button data-lang="de">Deutsch</button>
+            <button data-lang="pt">Português</button>
+          </div>
+        </div>
       </div>
       <button class="nav-mobile" id="mobileToggle" aria-label="Menu"><span></span><span></span></button>
     </div>

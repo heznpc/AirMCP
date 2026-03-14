@@ -265,6 +265,39 @@ button{font:inherit;cursor:pointer;border:0;background:0 0}
 }
 .modal-overlay.open .modal-glass{transform:none}
 .modal-glass .glass-content{padding:36px}
+.modal-glass--expanded{max-width:640px}
+.modal-scroll{max-height:80vh;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.12) transparent}
+.modal-scroll::-webkit-scrollbar{width:6px}
+.modal-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:3px}
+[data-theme="light"] .modal-scroll::-webkit-scrollbar-thumb{background:rgba(0,0,0,.12)}
+
+/* Modal example prompt */
+.modal-example{margin-bottom:20px}
+.modal-prompt{
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);
+  border-radius:12px;padding:14px 18px;font-size:.875rem;font-style:italic;opacity:.6;line-height:1.6;
+}
+[data-theme="light"] .modal-prompt{background:rgba(0,0,0,.03);border-color:rgba(0,0,0,.06)}
+
+/* Modal tool grid */
+.modal-tool-grid{display:grid;grid-template-columns:1fr;gap:6px}
+.modal-tool-item{
+  display:flex;align-items:center;gap:10px;padding:8px 12px;
+  border-radius:10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.04);
+  transition:background .2s;
+}
+.modal-tool-item:hover{background:rgba(255,255,255,.07)}
+[data-theme="light"] .modal-tool-item{background:rgba(0,0,0,.02);border-color:rgba(0,0,0,.04)}
+[data-theme="light"] .modal-tool-item:hover{background:rgba(0,0,0,.05)}
+.modal-tool-name{font-family:'JetBrains Mono',monospace;font-size:.75rem;opacity:.7;white-space:nowrap}
+.modal-tool-desc{font-size:.72rem;opacity:.35;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.modal-tool-badge{
+  font-size:.6rem;padding:2px 7px;border-radius:6px;font-weight:500;white-space:nowrap;
+  opacity:.7;
+}
+.modal-tool-badge--read{background:rgba(45,212,191,.15);color:rgb(45,212,191)}
+.modal-tool-badge--write{background:rgba(251,191,36,.15);color:rgb(251,191,36)}
+.modal-tool-badge--destructive{background:rgba(239,68,68,.15);color:rgb(239,68,68)}
 
 /* === Reveal === */
 .reveal{opacity:0;transform:translateY(20px);transition:opacity .8s cubic-bezier(.2,.8,.2,1),transform .8s cubic-bezier(.2,.8,.2,1)}

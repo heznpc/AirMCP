@@ -123,6 +123,8 @@
   "install_title": "几秒即可开始。",
   "install_sub": "全局安装或通过npx直接运行。",
   "install_note": "需要Node.js 18+和macOS。支持Claude Code、Codex及所有MCP客户端。",
+  "modal_try": "试一试",
+  "modal_tools_label": "工具列表",
   "tryit_label": "试一试",
   "tryit_title": "直接说。用自然语言。",
   "tryit_sub": "不需要记命令。告诉AI你需要什么就好。",

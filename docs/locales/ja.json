@@ -123,6 +123,8 @@
   "install_title": "数秒で開始。",
   "install_sub": "グローバルインストール、またはnpxで直接実行。",
   "install_note": "Node.js 18+とmacOSが必要です。Claude Code、Codex、あらゆるMCPクライアントに対応。",
+  "modal_try": "試してみよう",
+  "modal_tools_label": "ツール一覧",
   "tryit_label": "試してみよう",
   "tryit_title": "普通に話しかけるだけ。",
   "tryit_sub": "コマンドを覚える必要はありません。AIに必要なことを伝えるだけ。",

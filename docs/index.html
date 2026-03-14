@@ -613,18 +613,30 @@
     </div>
   </footer>
 
-  <!-- Modal -->
+  <!-- Modal (expanded) -->
   <div class="modal-overlay" id="modal">
-    <div class="modal-glass">
+    <div class="modal-glass modal-glass--expanded">
       <div class="glass-fx"></div>
       <div class="glass-tint"></div>
       <div class="glass-shine"></div>
-      <div class="glass-content">
+      <div class="glass-content modal-scroll">
         <button class="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center text-lg opacity-40 hover:opacity-80 border border-white/10 transition-opacity z-10" id="modalClose" aria-label="Close">&times;</button>
         <span class="mod-icon mod-icon--lg" id="modalIcon"></span>
-        <h3 class="text-xl font-bold tracking-tight mb-3" id="modalTitle"></h3>
-        <p class="text-sm opacity-45 leading-relaxed mb-5" id="modalDetail"></p>
-        <code class="block font-mono text-xs opacity-30" id="modalTags"></code>
+        <h3 class="text-xl font-bold tracking-tight mb-2" id="modalTitle"></h3>
+        <p class="text-sm opacity-45 leading-relaxed mb-4" id="modalDetail"></p>
+        <code class="block font-mono text-xs opacity-30 mb-5" id="modalTags"></code>
+
+        <!-- Try example -->
+        <div class="modal-example" id="modalExample">
+          <p class="text-xs font-medium opacity-40 uppercase tracking-wider mb-2" data-i18n="modal_try">Try it</p>
+          <div class="modal-prompt" id="modalPrompt"></div>
+        </div>
+
+        <!-- Tool list -->
+        <div class="modal-tools" id="modalTools">
+          <p class="text-xs font-medium opacity-40 uppercase tracking-wider mb-3" data-i18n="modal_tools_label">Tools</p>
+          <div class="modal-tool-grid" id="modalToolGrid"></div>
+        </div>
       </div>
     </div>
   </div>

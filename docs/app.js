@@ -85,7 +85,8 @@ const modalTags = document.getElementById('modalTags');
 
 document.querySelectorAll('#moduleGrid .glass-card[data-detail]').forEach(card => {
   card.addEventListener('click', () => {
-    modalIcon.textContent = card.dataset.icon || '';
+    const modKey = card.dataset.modKey;
+    modalIcon.innerHTML = modKey ? ModIcons.getSvg(modKey) : '';
     modalTitle.textContent = card.querySelector('.card-title').textContent;
     modalDetail.textContent = I18n.get(card.dataset.detail);
     modalTags.textContent = card.querySelector('.card-tags').textContent;

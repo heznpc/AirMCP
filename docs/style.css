@@ -168,6 +168,12 @@ button{font:inherit;cursor:pointer;border:0;background:0 0}
   box-shadow:0 16px 40px rgba(0,0,0,.08),0 0 1px rgba(255,255,255,.5);
 }
 
+/* Module icons */
+.mod-icon{display:block;width:36px;height:36px;margin-bottom:12px;line-height:0}
+.mod-icon svg{width:36px;height:36px}
+.mod-icon--lg{width:48px;height:48px;margin-bottom:16px}
+.mod-icon--lg svg{width:48px;height:48px}
+
 /* Card inner elements */
 .card-badge{font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:rgba(56,189,248,.8);margin-bottom:8px;display:block}
 .card-title{font-size:1rem;font-weight:700;letter-spacing:-.02em;margin-bottom:4px}

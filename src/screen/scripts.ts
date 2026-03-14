@@ -34,7 +34,7 @@ export function captureScreenScript(display?: number): string {
 export function captureWindowScript(appName?: string): string {
   const filePath = tempScreenshotPath();
   const activateBlock = appName
-    ? `Application('${esc(appName)}').activate(); delay(0.5);`
+    ? `Application('${esc(appName)}').activate(); delay(1.0);`
     : "";
   const targetApp = appName ? `'${esc(appName)}'` : "null";
   return `

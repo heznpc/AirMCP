@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { readFile, unlink } from "node:fs/promises";
+import { readFile, stat, unlink } from "node:fs/promises";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import { toolError } from "../shared/result.js";
@@ -12,6 +12,8 @@ import {
   recordScreenScript,
 } from "./scripts.js";
 
+const MAX_CAPTURE_SIZE = 5 * 1024 * 1024; // 5MB
+
 /**
  * Run a JXA capture script that returns { path: string },
  * read the resulting PNG as base64, clean up the temp file,
@@ -21,6 +23,10 @@ async function captureAndReturn(script: string) {
   const result = await runJxa<{ path: string }>(script);
   const filePath = result.path;
   try {
+    const { size } = await stat(filePath);
+    if (size > MAX_CAPTURE_SIZE) {
+      throw new Error("Screenshot too large (>5MB). Use capture_area for a smaller region or reduce resolution.");
+    }
     const buffer = await readFile(filePath);
     const base64 = buffer.toString("base64");
     return {
@@ -179,6 +185,11 @@ export function registerScreenTools(server: McpServer, _config: AirMcpConfig): v
     async ({ duration, display }) => {
       try {
         const result = await runJxa<{ path: string; duration: number }>(recordScreenScript(duration, display));
+        const { size } = await stat(result.path);
+        if (size > MAX_CAPTURE_SIZE) {
+          try { await unlink(result.path); } catch { /* ignore */ }
+          throw new Error("Recording too large (>5MB). Use a shorter duration or smaller region.");
+        }
         return {
           content: [
             {

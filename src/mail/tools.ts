@@ -17,6 +17,8 @@ import {
   replyMailScript,
 } from "./scripts.js";
 
+const MAX_RECIPIENTS = 20;
+
 export function registerMailTools(server: McpServer, config: AirMcpConfig): void {
   const { allowSendMail } = config;
   server.registerTool(
@@ -201,11 +203,11 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
       title: "Send Email",
       description: "Compose and send an email via Apple Mail. Requires allowSendMail config.",
       inputSchema: {
-        to: z.array(z.string().email()).min(1).describe("Recipient email addresses"),
+        to: z.array(z.string().email()).min(1).max(MAX_RECIPIENTS).describe(`Recipient email addresses (max ${MAX_RECIPIENTS})`),
         subject: z.string().describe("Email subject"),
         body: z.string().describe("Email body text"),
-        cc: z.array(z.string().email()).optional().describe("CC recipients"),
-        bcc: z.array(z.string().email()).optional().describe("BCC recipients"),
+        cc: z.array(z.string().email()).max(MAX_RECIPIENTS).optional().describe(`CC recipients (max ${MAX_RECIPIENTS})`),
+        bcc: z.array(z.string().email()).max(MAX_RECIPIENTS).optional().describe(`BCC recipients (max ${MAX_RECIPIENTS})`),
         account: z.string().optional().describe("Sender email address (uses default account if omitted)"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },

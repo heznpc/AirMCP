@@ -97,11 +97,11 @@ export function editShortcutScript(name: string): string {
     shortcuts.activate();
     delay(1);
     se.keystroke('f', {using: 'command down'});
-    delay(0.5);
+    delay(0.3);
     se.keystroke('${esc(name)}');
     delay(1);
     se.keyCode(36);
-    delay(0.5);
+    delay(0.3);
     JSON.stringify({shortcut: '${esc(name)}', success: true, note: 'Opened shortcut in Shortcuts app for editing. Use the Shortcuts app UI to make changes.'});
   `;
 }
@@ -117,9 +117,9 @@ export function createShortcutScript(name: string): string {
     se.keystroke('n', {using: 'command down'});
     delay(1);
     se.keystroke('${esc(name)}');
-    delay(0.5);
+    delay(0.3);
     se.keyCode(36);
-    delay(0.5);
+    delay(0.3);
     JSON.stringify({created: '${esc(name)}', success: true, note: 'Shortcut created via Shortcuts app UI automation. Open Shortcuts app to add actions.'});
   `;
 }

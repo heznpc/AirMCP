@@ -21,7 +21,12 @@ export function registerNotePrompts(server: McpServer): void {
 4. 확인 후 create_folder로 필요한 폴더를 생성해
 5. bulk_move_notes로 메모를 해당 폴더로 실제 이동시켜
 
-중요: MD 파일을 작성하지 말고, 실제 Apple Notes 앱에서 폴더를 만들고 메모를 이동해야 해.`,
+중요: MD 파일을 작성하지 말고, 실제 Apple Notes 앱에서 폴더를 만들고 메모를 이동해야 해.
+
+에러 처리:
+- 도구 호출 실패 시 사용자에게 알리고 대안 도구 시도 (예: scan_notes 실패 시 list_notes 시도)
+- 권한 에러 시 setup_permissions 안내
+- 앱이 응답하지 않으면 다음 단계로 건너뛰기`,
       );
     },
   );
@@ -43,7 +48,12 @@ export function registerNotePrompts(server: McpServer): void {
 4. 각 그룹별로 "어떤 걸 남기고 어떤 걸 삭제할지" 제안해
 5. 나의 확인 후 delete_note로 중복 메모를 삭제해
 
-중요: 삭제 전에 반드시 나에게 확인을 받아. 미리보기만 보고 판단하지 말고 compare_notes로 전체 내용을 확인해.`,
+중요: 삭제 전에 반드시 나에게 확인을 받아. 미리보기만 보고 판단하지 말고 compare_notes로 전체 내용을 확인해.
+
+에러 처리:
+- 도구 호출 실패 시 사용자에게 알리고 대안 도구 시도 (예: compare_notes 실패 시 read_note로 개별 확인)
+- 권한 에러 시 setup_permissions 안내
+- 앱이 응답하지 않으면 다음 단계로 건너뛰기`,
       );
     },
   );
@@ -65,7 +75,12 @@ export function registerNotePrompts(server: McpServer): void {
 4. 정리가 필요한 메모가 있으면 제안해 (미분류, 빈 메모 등)
 5. 내가 원하면 폴더 이동이나 삭제를 실행해
 
-중요: 실제 AirMCP 도구를 사용해서 Apple Notes 데이터를 조회해.`,
+중요: 실제 AirMCP 도구를 사용해서 Apple Notes 데이터를 조회해.
+
+에러 처리:
+- 도구 호출 실패 시 사용자에게 알리고 대안 도구 시도 (예: scan_notes 실패 시 list_notes 시도)
+- 권한 에러 시 setup_permissions 안내
+- 앱이 응답하지 않으면 다음 단계로 건너뛰기`,
       );
     },
   );

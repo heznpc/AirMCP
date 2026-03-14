@@ -46,7 +46,12 @@ Important:
 - Always use exact shortcut names from list_shortcuts or search_shortcuts — names must match exactly
 - Some shortcuts may trigger UI prompts or require user interaction — warn me before running those
 - Never assume a shortcut exists; always verify with search_shortcuts first
-- Ask for confirmation before running shortcuts that perform destructive or irreversible actions`,
+- Ask for confirmation before running shortcuts that perform destructive or irreversible actions
+
+Error handling:
+- If a tool call fails, inform the user and try an alternative (e.g., if run_shortcut fails, try search_shortcuts to verify the name)
+- On permission errors, guide the user to setup_permissions
+- If an app is unresponsive, skip to the next step`,
       );
     },
   );
@@ -101,7 +106,12 @@ Execute the following steps using AirMCP tools:
 Important:
 - Use get_shortcut_detail on shortcuts with ambiguous names to provide accurate descriptions
 - Do not run any shortcuts during discovery — this is a read-only exploration
-- If the list is very large, focus on the most useful categories first`,
+- If the list is very large, focus on the most useful categories first
+
+Error handling:
+- If a tool call fails, inform the user and try an alternative (e.g., if get_shortcut_detail fails, use search_shortcuts for basic info)
+- On permission errors, guide the user to setup_permissions
+- If an app is unresponsive, skip to the next step`,
       );
     },
   );
@@ -166,7 +176,12 @@ Important:
 - Some shortcuts will trigger UI prompts — warn me before running them
 - If a shortcut consistently fails, it may need to be edited in the Shortcuts app directly
 - Report the exact error output for accurate diagnosis
-- Do not modify or delete any shortcuts — only inspect and run them`,
+- Do not modify or delete any shortcuts — only inspect and run them
+
+Error handling:
+- If a tool call fails, inform the user and try an alternative (e.g., if search_shortcuts fails, use list_shortcuts and filter manually)
+- On permission errors, guide the user to setup_permissions
+- If an app is unresponsive, skip to the next step`,
       );
     },
   );

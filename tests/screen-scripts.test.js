@@ -63,7 +63,7 @@ describe('screen script generators', () => {
 
   test('captureWindowScript includes delay after activate', () => {
     const script = captureWindowScript('Xcode');
-    expect(script).toContain('delay(0.5)');
+    expect(script).toContain('delay(1.0)');
   });
 
   // --- captureAreaScript ---

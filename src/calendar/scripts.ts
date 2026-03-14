@@ -303,6 +303,6 @@ export function todayEventsScript(): string {
       }
     }
     all.sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
-    JSON.stringify({total: all.length, events: all});
+    JSON.stringify({total: all.length, returned: all.length, events: all});
   `;
 }

@@ -167,20 +167,21 @@ async function main() {
     app.use(express.json());
 
     const transports = new Map<string, StreamableHTTPServerTransport>();
-    const SESSION_TTL = 30 * 60 * 1000; // 30 minutes
+    const MAX_SESSIONS = 50;
+    const SESSION_IDLE_TTL = 5 * 60 * 1000; // 5 minutes — orphaned/idle session cleanup
     const sessionActivity = new Map<string, number>();
 
     const cleanupInterval = setInterval(() => {
       const now = Date.now();
       for (const [id, lastActive] of sessionActivity) {
-        if (now - lastActive > SESSION_TTL) {
+        if (now - lastActive > SESSION_IDLE_TTL) {
           const transport = transports.get(id);
           if (transport) transport.close?.();
           transports.delete(id);
           sessionActivity.delete(id);
         }
       }
-    }, 5 * 60 * 1000);
+    }, 1 * 60 * 1000); // cleanup every 1 minute
 
     process.on("exit", () => clearInterval(cleanupInterval));
 
@@ -198,6 +199,15 @@ async function main() {
           res.status(400).json({
             jsonrpc: "2.0",
             error: { code: -32000, message: "Bad Request: No valid session ID provided" },
+            id: null,
+          });
+          return;
+        }
+
+        if (transports.size >= MAX_SESSIONS) {
+          res.status(503).json({
+            jsonrpc: "2.0",
+            error: { code: -32000, message: "Too many concurrent sessions. Try again later." },
             id: null,
           });
           return;

@@ -99,7 +99,7 @@ export function searchMessagesScript(
         });
       }
     }
-    JSON.stringify({returned: result.length, chats: result});
+    JSON.stringify({total: chats.length, returned: result.length, chats: result});
   `;
 }
 

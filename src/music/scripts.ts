@@ -85,7 +85,7 @@ export function searchTracksScript(query: string, limit: number): string {
     const Music = Application('Music');
     const lib = Music.playlists.whose({name: 'Library'})();
     if (lib.length === 0) {
-      JSON.stringify({returned: 0, tracks: []});
+      JSON.stringify({total: 0, returned: 0, tracks: []});
     } else {
       const tracks = lib[0].tracks();
       const q = '${esc(query)}'.toLowerCase();
@@ -104,7 +104,7 @@ export function searchTracksScript(query: string, limit: number): string {
           });
         }
       }
-      JSON.stringify({returned: result.length, tracks: result});
+      JSON.stringify({total: tracks.length, returned: result.length, tracks: result});
     }
   `;
 }

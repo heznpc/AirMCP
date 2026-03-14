@@ -24,7 +24,12 @@ export function registerReminderPrompts(server: McpServer): void {
    - 비슷한 항목 통합
 5. 나의 확인 후 delete_reminder 또는 update_reminder로 실행해
 
-중요: 삭제 전에 반드시 나에게 확인을 받아.`,
+중요: 삭제 전에 반드시 나에게 확인을 받아.
+
+에러 처리:
+- 도구 호출 실패 시 사용자에게 알리고 대안 도구 시도 (예: list_reminders 실패 시 search_reminders 시도)
+- 권한 에러 시 setup_permissions 안내
+- 앱이 응답하지 않으면 다음 단계로 건너뛰기`,
       );
     },
   );
@@ -50,7 +55,12 @@ export function registerReminderPrompts(server: McpServer): void {
 4. 우선 처리할 항목을 제안해
 5. 내가 원하면 complete_reminder로 완료 처리하거나 update_reminder로 기한을 변경해
 
-중요: 실제 AirMCP 도구를 사용해서 Apple Reminders 데이터를 조회해.`,
+중요: 실제 AirMCP 도구를 사용해서 Apple Reminders 데이터를 조회해.
+
+에러 처리:
+- 도구 호출 실패 시 사용자에게 알리고 대안 도구 시도 (예: list_reminders 실패 시 search_reminders 시도)
+- 권한 에러 시 setup_permissions 안내
+- 앱이 응답하지 않으면 다음 단계로 건너뛰기`,
       );
     },
   );

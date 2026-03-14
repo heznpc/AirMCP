@@ -10,7 +10,7 @@ export function uiOpenAppScript(appName: string): string {
     const se = Application('System Events');
     const app = Application('${esc(appName)}');
     app.activate();
-    delay(0.5);
+    delay(1.0);
 
     const proc = se.processes.whose({frontmost: true})()[0];
     const procName = proc.name();
@@ -72,7 +72,7 @@ export function uiClickScript(
   if (x !== undefined && y !== undefined) {
     return `
       const se = Application('System Events');
-      ${appName ? `Application('${esc(appName)}').activate(); delay(0.3);` : ""}
+      ${appName ? `Application('${esc(appName)}').activate(); delay(1.0);` : ""}
       const app = Application.currentApplication();
       app.includeStandardAdditions = true;
       app.doShellScript('cliclick c:${x},${y}');
@@ -87,7 +87,7 @@ export function uiClickScript(
 
   return `
     const se = Application('System Events');
-    ${appName ? `Application('${esc(appName)}').activate(); delay(0.3);` : ""}
+    ${appName ? `Application('${esc(appName)}').activate(); delay(1.0);` : ""}
 
     const proc = se.processes.whose({frontmost: true})()[0];
     const wins = proc.windows();
@@ -148,7 +148,7 @@ export function uiClickScript(
 export function uiTypeScript(text: string, appName?: string): string {
   return `
     const se = Application('System Events');
-    ${appName ? `Application('${esc(appName)}').activate(); delay(0.3);` : ""}
+    ${appName ? `Application('${esc(appName)}').activate(); delay(1.0);` : ""}
     se.keystroke('${esc(text)}');
     JSON.stringify({ typed: true, length: ${text.length} });
   `;
@@ -217,7 +217,7 @@ export function uiPressKeyScript(
   if (keyCode !== undefined) {
     return `
       const se = Application('System Events');
-      ${appName ? `Application('${esc(appName)}').activate(); delay(0.3);` : ""}
+      ${appName ? `Application('${esc(appName)}').activate(); delay(1.0);` : ""}
       se.keyCode(${keyCode}${usingStr});
       JSON.stringify({ pressed: true, keyCode: ${keyCode}, key: '${esc(key)}' });
     `;
@@ -226,7 +226,7 @@ export function uiPressKeyScript(
   // Single character keystroke
   return `
     const se = Application('System Events');
-    ${appName ? `Application('${esc(appName)}').activate(); delay(0.3);` : ""}
+    ${appName ? `Application('${esc(appName)}').activate(); delay(1.0);` : ""}
     se.keystroke('${esc(key)}'${usingStr});
     JSON.stringify({ pressed: true, key: '${esc(key)}' });
   `;
@@ -260,7 +260,7 @@ export function uiScrollScript(
 
   return `
     const se = Application('System Events');
-    ${appName ? `Application('${esc(appName)}').activate(); delay(0.3);` : ""}
+    ${appName ? `Application('${esc(appName)}').activate(); delay(1.0);` : ""}
 
     const proc = se.processes.whose({frontmost: true})()[0];
     const wins = proc.windows();
@@ -298,7 +298,7 @@ export function uiReadScript(appName?: string, maxDepth?: number, maxElements?: 
 
   return `
     const se = Application('System Events');
-    ${appName ? `Application('${esc(appName)}').activate(); delay(0.3);` : ""}
+    ${appName ? `Application('${esc(appName)}').activate(); delay(1.0);` : ""}
 
     const proc = se.processes.whose({frontmost: true})()[0];
     const procName = proc.name();

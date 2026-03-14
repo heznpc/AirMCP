@@ -27,7 +27,12 @@ export function registerCrossPrompts(server: McpServer): void {
    - body: 원본 메모 참조
    - dueDate: 언급된 기한 (없으면 이벤트 다음 날)
 
-중요: 삭제/수정 전에 반드시 확인을 받아.`,
+중요: 삭제/수정 전에 반드시 확인을 받아.
+
+에러 처리:
+- 도구 호출 실패 시 사용자에게 알리고 대안 도구 시도 (예: read_event 실패 시 search_events로 이벤트 검색)
+- 권한 에러 시 setup_permissions 안내
+- 앱이 응답하지 않으면 다음 단계로 건너뛰기`,
       );
     },
   );
@@ -59,7 +64,12 @@ export function registerCrossPrompts(server: McpServer): void {
    - 일정 조정 제안
    - 우선 처리할 리마인더
 
-중요: 실제 AirMCP 도구를 사용해서 Apple Notes, Calendar, Reminders 데이터를 조회해.`,
+중요: 실제 AirMCP 도구를 사용해서 Apple Notes, Calendar, Reminders 데이터를 조회해.
+
+에러 처리:
+- 도구 호출 실패 시 사용자에게 알리고 대안 도구 시도 (예: list_events 실패 시 search_events 시도)
+- 권한 에러 시 setup_permissions 안내
+- 앱이 응답하지 않으면 다음 단계로 건너뛰기`,
       );
     },
   );
@@ -86,7 +96,12 @@ export function registerCrossPrompts(server: McpServer): void {
    b. 각 action item을 create_reminder로 생성해
 5. 생성된 메모와 리마인더를 확인해줘
 
-중요: 미팅 내용은 나에게 물어보고, 자의적으로 작성하지 마.`,
+중요: 미팅 내용은 나에게 물어보고, 자의적으로 작성하지 마.
+
+에러 처리:
+- 도구 호출 실패 시 사용자에게 알리고 대안 도구 시도 (예: read_event 실패 시 search_events로 이벤트 검색)
+- 권한 에러 시 setup_permissions 안내
+- 앱이 응답하지 않으면 다음 단계로 건너뛰기`,
       );
     },
   );
@@ -127,7 +142,12 @@ export function registerCrossPrompts(server: McpServer): void {
 - 우선 처리 항목
 - 준비가 필요한 미팅
 
-중요: 실제 AirMCP 도구를 사용해서 데이터를 조회해.`,
+중요: 실제 AirMCP 도구를 사용해서 데이터를 조회해.
+
+에러 처리:
+- 도구 호출 실패 시 사용자에게 알리고 대안 도구 시도 (예: list_reminders 실패 시 search_reminders 시도)
+- 권한 에러 시 setup_permissions 안내
+- 앱이 응답하지 않으면 다음 단계로 건너뛰기`,
       );
     },
   );
@@ -153,7 +173,12 @@ export function registerCrossPrompts(server: McpServer): void {
    - 기존 메모와의 연관성 (있으면)
 5. 추가 조사가 필요한 부분이 있으면 알려줘
 
-중요: Safari 탭의 URL을 출처로 반드시 포함해.`,
+중요: Safari 탭의 URL을 출처로 반드시 포함해.
+
+에러 처리:
+- 도구 호출 실패 시 사용자에게 알리고 대안 도구 시도 (예: read_page_content 실패 시 다른 탭 시도)
+- 권한 에러 시 setup_permissions 안내
+- 앱이 응답하지 않으면 다음 단계로 건너뛰기`,
       );
     },
   );
@@ -194,7 +219,12 @@ export function registerCrossPrompts(server: McpServer): void {
 - 현재 재생 상태 안내
 - 음악을 틀거나 변경하고 싶으면 playback_control 사용 가능
 
-중요: 집중 시간 내 미팅이 있으면 반드시 경고해줘.`,
+중요: 집중 시간 내 미팅이 있으면 반드시 경고해줘.
+
+에러 처리:
+- 도구 호출 실패 시 사용자에게 알리고 대안 도구 시도 (예: list_events 실패 시 today_events 시도)
+- 권한 에러 시 setup_permissions 안내
+- 앱이 응답하지 않으면 다음 단계로 건너뛰기`,
       );
     },
   );
@@ -227,7 +257,12 @@ export function registerCrossPrompts(server: McpServer): void {
    - 적용한 태그 목록
    - 추가 정리 제안
 
-중요: 파일 삭제/이동은 하지 말고, 태그 적용 전에 반드시 확인을 받아.`,
+중요: 파일 삭제/이동은 하지 말고, 태그 적용 전에 반드시 확인을 받아.
+
+에러 처리:
+- 도구 호출 실패 시 사용자에게 알리고 대안 도구 시도 (예: search_files 실패 시 list_directory 시도)
+- 권한 에러 시 setup_permissions 안내
+- 앱이 응답하지 않으면 다음 단계로 건너뛰기`,
       );
     },
   );
@@ -269,7 +304,12 @@ export function registerCrossPrompts(server: McpServer): void {
    - 오늘의 할 일 우선순위
    - 주의할 사항
 
-중요: 실제 파일시스템과 Apple 앱 데이터를 조회해서 정확한 컨텍스트를 구성해.`,
+중요: 실제 파일시스템과 Apple 앱 데이터를 조회해서 정확한 컨텍스트를 구성해.
+
+에러 처리:
+- 도구 호출 실패 시 사용자에게 알리고 대안 도구 시도 (예: search_files 실패 시 list_directory 시도)
+- 권한 에러 시 setup_permissions 안내
+- 앱이 응답하지 않으면 다음 단계로 건너뛰기`,
       );
     },
   );
@@ -317,7 +357,12 @@ export function registerCrossPrompts(server: McpServer): void {
    - 제안하는 수정 순서
    - 추가 조사가 필요한 부분
 
-중요: 에러 분석은 실제 데이터 기반으로. 추측만으로 판단하지 마.`,
+중요: 에러 분석은 실제 데이터 기반으로. 추측만으로 판단하지 마.
+
+에러 처리:
+- 도구 호출 실패 시 사용자에게 알리고 대안 도구 시도 (예: search_files 실패 시 list_directory 시도)
+- 권한 에러 시 setup_permissions 안내
+- 앱이 응답하지 않으면 다음 단계로 건너뛰기`,
       );
     },
   );
@@ -359,7 +404,12 @@ export function registerCrossPrompts(server: McpServer): void {
 
 5. **알림**: show_notification으로 캡처 완료 알림
 
-중요: 캡처 전에 준비가 필요하면 나에게 알려줘. 민감한 정보가 포함될 수 있으니 확인 후 진행.`,
+중요: 캡처 전에 준비가 필요하면 나에게 알려줘. 민감한 정보가 포함될 수 있으니 확인 후 진행.
+
+에러 처리:
+- 도구 호출 실패 시 사용자에게 알리고 대안 도구 시도 (예: capture_screenshot 실패 시 capture_window 시도)
+- 권한 에러 시 setup_permissions 안내
+- 앱이 응답하지 않으면 다음 단계로 건너뛰기`,
       );
     },
   );
@@ -415,7 +465,12 @@ export function registerCrossPrompts(server: McpServer): void {
    - 알려진 이슈
    - 업그레이드 가이드 (필요 시)
 
-중요: 빌드 트리거 전에 반드시 확인을 받아. 체크리스트 항목은 상황에 맞게 조정해.`,
+중요: 빌드 트리거 전에 반드시 확인을 받아. 체크리스트 항목은 상황에 맞게 조정해.
+
+에러 처리:
+- 도구 호출 실패 시 사용자에게 알리고 대안 도구 시도 (예: search_events 실패 시 list_events 시도)
+- 권한 에러 시 setup_permissions 안내
+- 앱이 응답하지 않으면 다음 단계로 건너뛰기`,
       );
     },
   );
@@ -460,7 +515,12 @@ export function registerCrossPrompts(server: McpServer): void {
    - 타임라인 제안
    - 리스크/의존성 경고
 
-중요: 태스크 분해 결과를 먼저 보여주고 확인받은 후에 리마인더/캘린더를 생성해.`,
+중요: 태스크 분해 결과를 먼저 보여주고 확인받은 후에 리마인더/캘린더를 생성해.
+
+에러 처리:
+- 도구 호출 실패 시 사용자에게 알리고 대안 도구 시도 (예: create_reminder 실패 시 재시도 또는 다음 항목으로)
+- 권한 에러 시 setup_permissions 안내
+- 앱이 응답하지 않으면 다음 단계로 건너뛰기`,
       );
     },
   );
@@ -511,7 +571,12 @@ export function registerCrossPrompts(server: McpServer): void {
    - 빌드 결과 (성공/실패)
    - 다음 단계 제안
 
-중요: 빌드 결과는 실제 파일 시스템 데이터 기반으로 판단해.`,
+중요: 빌드 결과는 실제 파일 시스템 데이터 기반으로 판단해.
+
+에러 처리:
+- 도구 호출 실패 시 사용자에게 알리고 대안 도구 시도 (예: search_files 실패 시 list_directory 시도)
+- 권한 에러 시 setup_permissions 안내
+- 앱이 응답하지 않으면 다음 단계로 건너뛰기`,
       );
     },
   );
@@ -565,7 +630,12 @@ export function registerCrossPrompts(server: McpServer): void {
    - 답장이 필요한 메일 목록과 초안
    - 일정 충돌 경고
 
-중요: 메일 삭제나 답장 전송은 반드시 확인을 받아. 분류 결과를 먼저 보여주고 진행해.`,
+중요: 메일 삭제나 답장 전송은 반드시 확인을 받아. 분류 결과를 먼저 보여주고 진행해.
+
+에러 처리:
+- 도구 호출 실패 시 사용자에게 알리고 대안 도구 시도 (예: list_messages 실패 시 search_messages 시도)
+- 권한 에러 시 setup_permissions 안내
+- 앱이 응답하지 않으면 다음 단계로 건너뛰기`,
       );
     },
   );
@@ -630,7 +700,12 @@ export function registerCrossPrompts(server: McpServer): void {
    - 목적지 주요 정보 (위치, 이동시간)
    - 추가로 준비할 사항 제안
 
-중요: 캘린더 이벤트 생성 전에 반드시 확인을 받아. 기존 일정과의 충돌을 반드시 알려줘.`,
+중요: 캘린더 이벤트 생성 전에 반드시 확인을 받아. 기존 일정과의 충돌을 반드시 알려줘.
+
+에러 처리:
+- 도구 호출 실패 시 사용자에게 알리고 대안 도구 시도 (예: search_location 실패 시 search_nearby 시도)
+- 권한 에러 시 setup_permissions 안내
+- 앱이 응답하지 않으면 다음 단계로 건너뛰기`,
       );
     },
   );
@@ -693,7 +768,12 @@ export function registerCrossPrompts(server: McpServer): void {
    - 생성된 노트/리마인더 목록
    - 추가 조사 제안
 
-중요: 출처 URL을 반드시 포함해. 요약은 원문의 맥락을 보존하되 간결하게.`,
+중요: 출처 URL을 반드시 포함해. 요약은 원문의 맥락을 보존하되 간결하게.
+
+에러 처리:
+- 도구 호출 실패 시 사용자에게 알리고 대안 도구 시도 (예: read_page_content 실패 시 다른 탭 시도)
+- 권한 에러 시 setup_permissions 안내
+- 앱이 응답하지 않으면 다음 단계로 건너뛰기`,
       );
     },
   );
@@ -784,7 +864,12 @@ export function registerCrossPrompts(server: McpServer): void {
 - 준비가 필요한 미팅
 - 집중 작업 추천 시간대
 
-중요: 모든 데이터는 실제 AirMCP 도구로 조회해서 정확한 정보를 제공해.`,
+중요: 모든 데이터는 실제 AirMCP 도구로 조회해서 정확한 정보를 제공해.
+
+에러 처리:
+- 도구 호출 실패 시 사용자에게 알리고 대안 도구 시도 (예: list_messages 실패 시 get_unread_count만 시도)
+- 권한 에러 시 setup_permissions 안내
+- 앱이 응답하지 않으면 다음 단계로 건너뛰기`,
       );
     },
   );
@@ -862,7 +947,12 @@ ${description ? `프로젝트 설명: ${description}` : ""}
    - 생성된 캘린더 이벤트 (있으면)
    - 다음 단계 제안
 
-중요: 캘린더 이벤트는 시간 확인 후 생성. 폴더/노트/리마인더는 바로 생성 가능.`,
+중요: 캘린더 이벤트는 시간 확인 후 생성. 폴더/노트/리마인더는 바로 생성 가능.
+
+에러 처리:
+- 도구 호출 실패 시 사용자에게 알리고 대안 도구 시도 (예: create_folder 실패 시 기본 폴더에 노트 생성)
+- 권한 에러 시 setup_permissions 안내
+- 앱이 응답하지 않으면 다음 단계로 건너뛰기`,
       );
     },
   );
@@ -949,7 +1039,12 @@ ${description ? `프로젝트 설명: ${description}` : ""}
    - create_reminder("[주간 리뷰] 이월 항목 정리", dueDate: 다음 월요일)
    - 필요하면 추가 팔로업 리마인더
 
-중요: 모든 데이터는 실제 AirMCP 도구로 조회해. 통계는 정확한 수치를 제공해.`,
+중요: 모든 데이터는 실제 AirMCP 도구로 조회해. 통계는 정확한 수치를 제공해.
+
+에러 처리:
+- 도구 호출 실패 시 사용자에게 알리고 대안 도구 시도 (예: list_reminders 실패 시 search_reminders 시도)
+- 권한 에러 시 setup_permissions 안내
+- 앱이 응답하지 않으면 다음 단계로 건너뛰기`,
       );
     },
   );

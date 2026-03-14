@@ -7,6 +7,8 @@ export function esc(str: string): string {
     .replace(/\n/g, "\\n")
     .replace(/\r/g, "\\r")
     .replace(/\t/g, "\\t")
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\x01-\x08\x0b\x0c\x0e-\x1f]/g, "")
     .replace(/\u2028/g, "\\u2028")
     .replace(/\u2029/g, "\\u2029");
 }

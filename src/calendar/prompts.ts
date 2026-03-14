@@ -29,7 +29,12 @@ export function registerCalendarPrompts(server: McpServer): void {
    - 집중 업무 시간 확보 제안
 5. 내가 원하면 update_event로 일정을 수정해
 
-중요: 실제 AirMCP 도구를 사용해서 Apple Calendar 데이터를 조회해.`,
+중요: 실제 AirMCP 도구를 사용해서 Apple Calendar 데이터를 조회해.
+
+에러 처리:
+- 도구 호출 실패 시 사용자에게 알리고 대안 도구 시도 (예: list_events 실패 시 search_events 시도)
+- 권한 에러 시 setup_permissions 안내
+- 앱이 응답하지 않으면 다음 단계로 건너뛰기`,
       );
     },
   );
@@ -53,7 +58,12 @@ export function registerCalendarPrompts(server: McpServer): void {
    - 준비할 사항 제안
    - 예상 안건
 
-중요: 실제 AirMCP 도구를 사용해서 Apple Calendar와 Notes 데이터를 조회해.`,
+중요: 실제 AirMCP 도구를 사용해서 Apple Calendar와 Notes 데이터를 조회해.
+
+에러 처리:
+- 도구 호출 실패 시 사용자에게 알리고 대안 도구 시도 (예: read_event 실패 시 search_events로 이벤트 검색)
+- 권한 에러 시 setup_permissions 안내
+- 앱이 응답하지 않으면 다음 단계로 건너뛰기`,
       );
     },
   );

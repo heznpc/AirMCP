@@ -1,4 +1,4 @@
-import { execFile, type ChildProcess } from "node:child_process";
+import { execFile } from "node:child_process";
 
 const TIMEOUT_MS = 30_000;
 const MAX_BUFFER = 10 * 1024 * 1024; // 10 MB
@@ -11,7 +11,7 @@ const TRANSIENT_PATTERNS = [
 ];
 
 // ── Fix 6: PII scrubbing ──────────────────────────────────────────────
-const EMAIL_RE = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
+const EMAIL_RE = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
 const PATH_RE = /\/Users\/[^\s'",;)}\]]+/g;
 const MAX_ERR_LEN = 200;
 
@@ -120,9 +120,7 @@ function execJxa(
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     let settled = false;
-    let child: ChildProcess | undefined;
-
-    child = execFile(
+    const child = execFile(
       "osascript",
       ["-l", "JavaScript", "-e", script],
       { timeout, maxBuffer: MAX_BUFFER },

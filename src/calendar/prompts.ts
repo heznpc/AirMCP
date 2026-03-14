@@ -15,7 +15,7 @@ export function registerCalendarPrompts(server: McpServer): void {
         `Review upcoming ${n} days of events, identify conflicts, and suggest optimizations.`,
         `앞으로 ${n}일간의 캘린더 일정을 리뷰해줘.
 
-다음 단계를 반드시 iConnect 도구를 사용해서 실행해:
+다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 
 1. list_calendars로 모든 캘린더를 확인해
 2. list_events(startDate: "${start}", endDate: "${end}")로 일정을 조회해
@@ -29,7 +29,7 @@ export function registerCalendarPrompts(server: McpServer): void {
    - 집중 업무 시간 확보 제안
 5. 내가 원하면 update_event로 일정을 수정해
 
-중요: 실제 iConnect 도구를 사용해서 Apple Calendar 데이터를 조회해.`,
+중요: 실제 AirMCP 도구를 사용해서 Apple Calendar 데이터를 조회해.`,
       );
     },
   );
@@ -42,7 +42,7 @@ export function registerCalendarPrompts(server: McpServer): void {
         "Read event details, find related notes, and prepare meeting context.",
         `미팅 준비를 도와줘.
 
-다음 단계를 반드시 iConnect 도구를 사용해서 실행해:
+다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 
 1. read_event(id: "${eventId}")로 이벤트 상세 정보를 확인해
 2. 이벤트 제목과 참석자 정보를 파악해
@@ -53,7 +53,7 @@ export function registerCalendarPrompts(server: McpServer): void {
    - 준비할 사항 제안
    - 예상 안건
 
-중요: 실제 iConnect 도구를 사용해서 Apple Calendar와 Notes 데이터를 조회해.`,
+중요: 실제 AirMCP 도구를 사용해서 Apple Calendar와 Notes 데이터를 조회해.`,
       );
     },
   );

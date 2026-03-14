@@ -1,5 +1,5 @@
 /**
- * `npx iconnect-mcp doctor` — diagnose iConnect installation.
+ * `npx airmcp doctor` — diagnose AirMCP installation.
  *
  * Checks: Node version, config files, MCP client configs,
  * module status, and optionally probes macOS permissions.
@@ -35,7 +35,7 @@ const MCP_CLIENTS: McpClient[] = [
     serversKey: "mcpServers",
   },
 ];
-const ICONNECT_CONFIG_PATH = join(HOME, ".config", "iconnect", "config.json");
+const AIRMCP_CONFIG_PATH = join(HOME, ".config", "airmcp", "config.json");
 
 const OK = "\x1b[32m✓\x1b[0m";
 const WARN = "\x1b[33m⚠\x1b[0m";
@@ -54,7 +54,7 @@ function check(label: string, status: string, detail: string): void {
 
 export async function runDoctor(): Promise<void> {
   console.log("");
-  console.log("\x1b[1m\x1b[36m  iConnect Doctor\x1b[0m");
+  console.log("\x1b[1m\x1b[36m  AirMCP Doctor\x1b[0m");
   console.log("");
 
   // 1. Node version
@@ -64,16 +64,16 @@ export async function runDoctor(): Promise<void> {
 
   // 2. macOS check
   const platform = process.platform;
-  check("Platform", platform === "darwin" ? OK : FAIL, platform === "darwin" ? "macOS" : `${platform} — iConnect requires macOS`);
+  check("Platform", platform === "darwin" ? OK : FAIL, platform === "darwin" ? "macOS" : `${platform} — AirMCP requires macOS`);
 
   // 3. Config file
   let fileConfig: FileConfig | null = null;
-  if (existsSync(ICONNECT_CONFIG_PATH)) {
+  if (existsSync(AIRMCP_CONFIG_PATH)) {
     try {
-      fileConfig = JSON.parse(readFileSync(ICONNECT_CONFIG_PATH, "utf-8")) as FileConfig;
-      check("Config file", OK, ICONNECT_CONFIG_PATH);
+      fileConfig = JSON.parse(readFileSync(AIRMCP_CONFIG_PATH, "utf-8")) as FileConfig;
+      check("Config file", OK, AIRMCP_CONFIG_PATH);
     } catch {
-      check("Config file", WARN, `${ICONNECT_CONFIG_PATH} (parse error)`);
+      check("Config file", WARN, `${AIRMCP_CONFIG_PATH} (parse error)`);
     }
   } else {
     check("Config file", WARN, "Not found — using starter preset (5 modules)");
@@ -87,10 +87,10 @@ export async function runDoctor(): Promise<void> {
       try {
         const raw = JSON.parse(readFileSync(client.configPath, "utf-8"));
         const servers = raw?.[client.serversKey] ?? {};
-        if (servers.iconnect) {
-          check(client.name, OK, "iconnect entry found");
+        if (servers.airmcp) {
+          check(client.name, OK, "airmcp entry found");
         } else {
-          check(client.name, WARN, `Config exists but no 'iconnect' entry — run: npx ${NPM_PACKAGE_NAME} init`);
+          check(client.name, WARN, `Config exists but no 'airmcp' entry — run: npx ${NPM_PACKAGE_NAME} init`);
         }
       } catch {
         check(client.name, WARN, `Config parse error: ${client.configPath}`);
@@ -170,7 +170,7 @@ export async function runDoctor(): Promise<void> {
   }
 
   // 7. Swift bridge
-  const swiftBridgePath = join(process.cwd(), "swift", ".build", "release", "iconnect-bridge");
+  const swiftBridgePath = join(process.cwd(), "swift", ".build", "release", "airmcp-bridge");
   if (existsSync(swiftBridgePath)) {
     check("Swift bridge", OK, "Built");
   } else {

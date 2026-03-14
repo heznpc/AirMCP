@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
-import type { IConnectConfig } from "../shared/config.js";
+import type { AirMcpConfig } from "../shared/config.js";
 import { ok, toolError } from "../shared/result.js";
 import {
   listPlaylistsScript,
@@ -12,7 +12,7 @@ import {
   playTrackScript,
 } from "./scripts.js";
 
-export function registerTvTools(server: McpServer, _config: IConnectConfig): void {
+export function registerTvTools(server: McpServer, _config: AirMcpConfig): void {
   server.registerTool(
     "tv_list_playlists",
     {

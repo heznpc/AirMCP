@@ -27,7 +27,7 @@ export interface SearchResult {
   similarity: number;
 }
 
-const STORE_DIR = join(homedir(), ".iconnect");
+const STORE_DIR = join(homedir(), ".airmcp");
 const STORE_PATH = join(STORE_DIR, "vectors.json");
 
 /** Search a store data object by cosine similarity to a query vector. */

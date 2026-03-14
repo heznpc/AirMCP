@@ -1,4 +1,4 @@
-import { IConnectConfig, isModuleEnabled } from "../shared/config.js";
+import { AirMcpConfig, isModuleEnabled } from "../shared/config.js";
 import { EmbeddingProvider, detectProvider, embedText, embedBatch } from "./embeddings.js";
 import { VectorStore, VectorEntry, SearchResult } from "./store.js";
 import { runJxa } from "../shared/jxa.js";
@@ -149,7 +149,7 @@ export class SemanticSearchService {
   private indexing: Promise<void> | null = null;
   private store: VectorStore;
 
-  constructor(private config: IConnectConfig) {
+  constructor(private config: AirMcpConfig) {
     this.store = new VectorStore();
   }
 

@@ -11,13 +11,13 @@ import {
 /*  Helpers to save / restore env vars touched by tests                */
 /* ------------------------------------------------------------------ */
 const ENV_KEYS = [
-  'ICONNECT_FULL',
-  'ICONNECT_INCLUDE_SHARED',
-  'ICONNECT_ALLOW_SEND_MESSAGES',
-  'ICONNECT_ALLOW_SEND_MAIL',
-  'ICONNECT_SHARE_APPROVAL',
-  'ICONNECT_HITL_LEVEL',
-  ...MODULE_NAMES.map((m) => `ICONNECT_DISABLE_${m.toUpperCase()}`),
+  'AIRMCP_FULL',
+  'AIRMCP_INCLUDE_SHARED',
+  'AIRMCP_ALLOW_SEND_MESSAGES',
+  'AIRMCP_ALLOW_SEND_MAIL',
+  'AIRMCP_SHARE_APPROVAL',
+  'AIRMCP_HITL_LEVEL',
+  ...MODULE_NAMES.map((m) => `AIRMCP_DISABLE_${m.toUpperCase()}`),
 ];
 
 let savedEnv;
@@ -123,10 +123,10 @@ describe('parseConfig()', () => {
     }
   });
 
-  /* ------ ICONNECT_FULL=true ----------------------------------------- */
+  /* ------ AIRMCP_FULL=true ----------------------------------------- */
 
-  test('with ICONNECT_FULL=true, all modules are enabled', () => {
-    process.env.ICONNECT_FULL = 'true';
+  test('with AIRMCP_FULL=true, all modules are enabled', () => {
+    process.env.AIRMCP_FULL = 'true';
     const cfg = parseConfig();
 
     for (const mod of MODULE_NAMES) {
@@ -134,20 +134,20 @@ describe('parseConfig()', () => {
     }
   });
 
-  /* ------ ICONNECT_DISABLE_NOTES=true -------------------------------- */
+  /* ------ AIRMCP_DISABLE_NOTES=true -------------------------------- */
 
-  test('with ICONNECT_DISABLE_NOTES=true, notes is disabled', () => {
-    process.env.ICONNECT_FULL = 'true';
-    process.env.ICONNECT_DISABLE_NOTES = 'true';
+  test('with AIRMCP_DISABLE_NOTES=true, notes is disabled', () => {
+    process.env.AIRMCP_FULL = 'true';
+    process.env.AIRMCP_DISABLE_NOTES = 'true';
     const cfg = parseConfig();
 
     expect(cfg.disabledModules.has('notes')).toBe(true);
   });
 
   test('per-module disable env var overrides full mode', () => {
-    process.env.ICONNECT_FULL = 'true';
-    process.env.ICONNECT_DISABLE_CALENDAR = 'true';
-    process.env.ICONNECT_DISABLE_MUSIC = 'true';
+    process.env.AIRMCP_FULL = 'true';
+    process.env.AIRMCP_DISABLE_CALENDAR = 'true';
+    process.env.AIRMCP_DISABLE_MUSIC = 'true';
     const cfg = parseConfig();
 
     expect(cfg.disabledModules.has('calendar')).toBe(true);
@@ -175,20 +175,20 @@ describe('parseConfig()', () => {
 
   /* ------ boolean env var overrides ------------------------------ */
 
-  test('ICONNECT_INCLUDE_SHARED=true enables includeShared', () => {
-    process.env.ICONNECT_INCLUDE_SHARED = 'true';
+  test('AIRMCP_INCLUDE_SHARED=true enables includeShared', () => {
+    process.env.AIRMCP_INCLUDE_SHARED = 'true';
     const cfg = parseConfig();
     expect(cfg.includeShared).toBe(true);
   });
 
-  test('ICONNECT_ALLOW_SEND_MESSAGES=false disables allowSendMessages', () => {
-    process.env.ICONNECT_ALLOW_SEND_MESSAGES = 'false';
+  test('AIRMCP_ALLOW_SEND_MESSAGES=false disables allowSendMessages', () => {
+    process.env.AIRMCP_ALLOW_SEND_MESSAGES = 'false';
     const cfg = parseConfig();
     expect(cfg.allowSendMessages).toBe(false);
   });
 
-  test('ICONNECT_ALLOW_SEND_MAIL=false disables allowSendMail', () => {
-    process.env.ICONNECT_ALLOW_SEND_MAIL = 'false';
+  test('AIRMCP_ALLOW_SEND_MAIL=false disables allowSendMail', () => {
+    process.env.AIRMCP_ALLOW_SEND_MAIL = 'false';
     const cfg = parseConfig();
     expect(cfg.allowSendMail).toBe(false);
   });
@@ -215,30 +215,30 @@ describe('parseConfig()', () => {
     expect(cfg.hitl.socketPath).toContain('hitl.sock');
   });
 
-  test('ICONNECT_HITL_LEVEL env var overrides default', () => {
-    process.env.ICONNECT_HITL_LEVEL = 'all';
+  test('AIRMCP_HITL_LEVEL env var overrides default', () => {
+    process.env.AIRMCP_HITL_LEVEL = 'all';
     const cfg = parseConfig();
     expect(cfg.hitl.level).toBe('all');
   });
 
   test('invalid HITL level falls back to "off"', () => {
-    process.env.ICONNECT_HITL_LEVEL = 'invalid-value';
+    process.env.AIRMCP_HITL_LEVEL = 'invalid-value';
     const cfg = parseConfig();
     expect(cfg.hitl.level).toBe('off');
   });
 
   /* ------ share approval via env var ----------------------------- */
 
-  test('ICONNECT_SHARE_APPROVAL env var populates shareApprovalModules', () => {
-    process.env.ICONNECT_SHARE_APPROVAL = 'notes,calendar';
+  test('AIRMCP_SHARE_APPROVAL env var populates shareApprovalModules', () => {
+    process.env.AIRMCP_SHARE_APPROVAL = 'notes,calendar';
     const cfg = parseConfig();
     expect(cfg.shareApprovalModules.has('notes')).toBe(true);
     expect(cfg.shareApprovalModules.has('calendar')).toBe(true);
     expect(cfg.shareApprovalModules.size).toBe(2);
   });
 
-  test('ICONNECT_SHARE_APPROVAL ignores invalid module names', () => {
-    process.env.ICONNECT_SHARE_APPROVAL = 'notes,bogus,calendar';
+  test('AIRMCP_SHARE_APPROVAL ignores invalid module names', () => {
+    process.env.AIRMCP_SHARE_APPROVAL = 'notes,bogus,calendar';
     const cfg = parseConfig();
     expect(cfg.shareApprovalModules.has('notes')).toBe(true);
     expect(cfg.shareApprovalModules.has('calendar')).toBe(true);

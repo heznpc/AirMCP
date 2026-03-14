@@ -1,11 +1,11 @@
 {
-  "meta_title": "iConnect — AI를 Apple 생태계 전체에 연결하세요",
+  "meta_title": "AirMCP — AI를 Apple 생태계 전체에 연결하세요",
   "meta_description": "18개 모듈, 170+ 도구를 갖춘 오픈소스 MCP 서버. Claude, Codex 등 모든 MCP 클라이언트에서 Apple 앱을 제어하세요.",
   "nav_modules": "모듈",
   "nav_workflows": "워크플로",
   "nav_install": "설치",
   "lang_label": "KO",
-  "hero_tag": "npx iconnect-mcp init → 연결 완료",
+  "hero_tag": "npx airmcp init → 연결 완료",
   "hero_tagline": "AI를 Apple 생태계 전체에 연결하세요.",
   "hero_sub": "170+ 도구. 23 프롬프트. 11 리소스. 하나의 MCP 서버.",
   "hero_cta": "시작하기",

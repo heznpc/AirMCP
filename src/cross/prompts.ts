@@ -12,7 +12,7 @@ export function registerCrossPrompts(server: McpServer): void {
         "Extract action items from meeting notes and create reminders.",
         `미팅 메모에서 할 일을 추출해서 리마인더로 만들어줘.
 
-다음 단계를 반드시 iConnect 도구를 사용해서 실행해:
+다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 
 1. read_event(id: "${eventId}")로 이벤트 정보를 확인해
 2. search_notes로 이벤트 제목/참석자 관련 메모를 검색해
@@ -43,7 +43,7 @@ export function registerCrossPrompts(server: McpServer): void {
         `Digest of the past ${n} days: notes, events, and reminders combined.`,
         `지난 ${n}일간의 Apple 생태계 전체 요약을 해줘.
 
-다음 단계를 반드시 iConnect 도구를 사용해서 실행해:
+다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 
 1. **캘린더**: list_events(startDate: "${since}", endDate: "${until}")로 지난 이벤트 조회
 2. **메모**: scan_notes로 메모를 스캔하고 ${since} 이후 생성/수정된 것만 필터링
@@ -59,7 +59,7 @@ export function registerCrossPrompts(server: McpServer): void {
    - 일정 조정 제안
    - 우선 처리할 리마인더
 
-중요: 실제 iConnect 도구를 사용해서 Apple Notes, Calendar, Reminders 데이터를 조회해.`,
+중요: 실제 AirMCP 도구를 사용해서 Apple Notes, Calendar, Reminders 데이터를 조회해.`,
       );
     },
   );
@@ -72,7 +72,7 @@ export function registerCrossPrompts(server: McpServer): void {
         "Create follow-up note and reminders after a meeting.",
         `미팅 후 팔로업을 정리해줘.
 
-다음 단계를 반드시 iConnect 도구를 사용해서 실행해:
+다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 
 1. read_event(id: "${eventId}")로 이벤트 정보를 확인해
 2. 이벤트 제목, 참석자, 시간을 파악해
@@ -103,7 +103,7 @@ export function registerCrossPrompts(server: McpServer): void {
         "Daily briefing: today's events, due reminders, and recent notes.",
         `오늘(${dateStr})의 데일리 브리핑을 해줘.
 
-다음 단계를 반드시 iConnect 도구를 사용해서 실행해:
+다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 
 1. **오늘 일정**: list_events(startDate: "${todayStart}", endDate: "${todayEnd}")
 2. **마감 리마인더**: list_reminders(completed: false) → 오늘 마감 + overdue 필터링
@@ -127,7 +127,7 @@ export function registerCrossPrompts(server: McpServer): void {
 - 우선 처리 항목
 - 준비가 필요한 미팅
 
-중요: 실제 iConnect 도구를 사용해서 데이터를 조회해.`,
+중요: 실제 AirMCP 도구를 사용해서 데이터를 조회해.`,
       );
     },
   );
@@ -140,7 +140,7 @@ export function registerCrossPrompts(server: McpServer): void {
         "Safari + Notes research workflow: search tabs, read content, compile findings into a note.",
         `"${topic}" 주제로 리서치를 진행해줘.
 
-다음 단계를 반드시 iConnect 도구를 사용해서 실행해:
+다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 
 1. **Safari 탭 검색**: list_tabs로 현재 열린 Safari 탭 목록을 확인해
 2. **관련 탭 읽기**: "${topic}"과 관련된 탭을 찾아서 read_page_content로 페이지 내용을 읽어
@@ -171,7 +171,7 @@ export function registerCrossPrompts(server: McpServer): void {
         `Set up a ${hours}-hour focus session: check calendar, prioritize reminders, manage music.`,
         `${hours}시간 집중 세션을 설정해줘.
 
-다음 단계를 반드시 iConnect 도구를 사용해서 실행해:
+다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 
 1. **일정 확인**: list_events(startDate: "${nowISO}", endDate: "${endISO}")로 집중 시간 내 일정 확인
 2. **리마인더 확인**: list_reminders(completed: false)로 미완료 리마인더 조회
@@ -207,7 +207,7 @@ export function registerCrossPrompts(server: McpServer): void {
         "Finder + Notes file organization: scan directory, apply tags, and create summary note.",
         `"${directory}" 폴더의 파일을 정리해줘.
 
-다음 단계를 반드시 iConnect 도구를 사용해서 실행해:
+다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 
 1. **파일 검색**: search_files로 "${directory}" 내 파일 목록을 확인해
 2. **파일 정보 확인**: get_file_info로 주요 파일의 상세 정보(크기, 생성일, 수정일 등)를 확인해
@@ -240,7 +240,7 @@ export function registerCrossPrompts(server: McpServer): void {
         "Developer session setup: scan project, check specs, research docs, log to notes.",
         `"${projectPath}" 프로젝트로 개발 세션을 시작해줘.
 
-다음 단계를 반드시 iConnect 도구를 사용해서 실행해:
+다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 
 1. **프로젝트 구조 파악**: list_directory("${projectPath}")로 프로젝트 루트 확인
    - search_files로 주요 파일 패턴 검색 (package.json, Makefile, README 등)
@@ -287,7 +287,7 @@ export function registerCrossPrompts(server: McpServer): void {
         "Debug loop: capture errors, locate code, log bugs, create fix tasks.",
         `디버깅 루프를 시작해줘.${errorCtx}${pathCtx}
 
-다음 단계를 반드시 iConnect 도구를 사용해서 실행해:
+다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 
 1. **에러 수집**:
    - Safari 탭 확인: list_tabs로 열린 탭 중 localhost/개발 서버 탭 찾기
@@ -334,14 +334,14 @@ export function registerCrossPrompts(server: McpServer): void {
         "Screen capture workflow: screenshot, save to Photos, create note with annotation.",
         `"${desc}" 화면 캡처 플로우를 시작해줘.
 
-다음 단계를 반드시 iConnect 도구를 사용해서 실행해:
+다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 
 1. **현재 상태 파악**:
    - get_frontmost_app으로 현재 활성 앱 확인
    - get_screen_info로 디스플레이 정보 확인
 
 2. **스크린샷 캡처**: capture_screenshot으로 화면 캡처:
-   - path: "/tmp/iconnect-capture-${timestamp}.png"
+   - path: "/tmp/airmcp-capture-${timestamp}.png"
    - region: "fullscreen" (또는 필요에 따라 "window"/"selection")
    - 필요하면 여러 장 캡처 (다른 앱/화면 전환 후)
 
@@ -376,7 +376,7 @@ export function registerCrossPrompts(server: McpServer): void {
         "Release preparation: check schedule, collect changelog, create checklist, trigger build.",
         `"${appName}" v${ver} 릴리즈 준비를 해줘.
 
-다음 단계를 반드시 iConnect 도구를 사용해서 실행해:
+다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 
 1. **릴리즈 일정 확인**:
    - search_events("${appName} release", 향후 30일)로 릴리즈 일정 검색
@@ -428,7 +428,7 @@ export function registerCrossPrompts(server: McpServer): void {
         "Idea to task pipeline: capture idea in Notes, decompose into tasks, create reminders, block calendar.",
         `"${idea}" 아이디어를 태스크로 분해해줘.
 
-다음 단계를 반드시 iConnect 도구를 사용해서 실행해:
+다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 
 1. **아이디어 기록**: create_note로 아이디어 노트 생성:
    - 제목: "[Idea] ${idea.slice(0, 50)}"
@@ -473,7 +473,7 @@ export function registerCrossPrompts(server: McpServer): void {
         "Build log analysis: check build output, log errors to Notes, celebrate success with Music.",
         `"${projectPath}" 빌드 결과를 분석해줘.
 
-다음 단계를 반드시 iConnect 도구를 사용해서 실행해:
+다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 
 1. **빌드 아웃풋 확인**:
    - list_directory("${projectPath}")로 프로젝트 구조 확인
@@ -527,7 +527,7 @@ export function registerCrossPrompts(server: McpServer): void {
         "Inbox Zero workflow: triage all unread emails with categorization, replies, and follow-up actions.",
         `Inbox Zero 이메일 정리를 시작해줘. (${today})
 
-다음 단계를 반드시 iConnect 도구를 사용해서 실행해:
+다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 
 1. **수신함 스캔**:
    - list_mailboxes로 전체 메일함 현황과 미읽음 수 확인
@@ -584,7 +584,7 @@ export function registerCrossPrompts(server: McpServer): void {
         "Trip planning workflow: calendar, Maps, reminders checklist, notes, and travel events.",
         `"${destination}" 여행 계획을 세워줘. (${start} ~ ${end})
 
-다음 단계를 반드시 iConnect 도구를 사용해서 실행해:
+다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 
 1. **일정 확인**:
    - list_events(startDate: "${start}", endDate: "${end}")로 여행 기간 기존 일정 확인
@@ -644,7 +644,7 @@ export function registerCrossPrompts(server: McpServer): void {
         "Content curation workflow: gather from Safari, summarize, organize in Notes, tag files, set follow-ups.",
         `"${topic}" 주제로 콘텐츠를 수집하고 정리해줘. (${today})
 
-다음 단계를 반드시 iConnect 도구를 사용해서 실행해:
+다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 
 1. **Safari 탭 수집**:
    - list_tabs로 현재 열린 모든 Safari 탭 확인
@@ -712,7 +712,7 @@ export function registerCrossPrompts(server: McpServer): void {
         "Morning briefing: full daily overview with calendar, emails, reminders, notes, music, and system status.",
         `좋은 아침! 오늘(${dateStr}) 모닝 브리핑을 해줘.
 
-다음 단계를 반드시 iConnect 도구를 사용해서 실행해:
+다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 
 1. **오늘 일정** (상세):
    - today_events로 오늘 이벤트 전체 조회
@@ -784,7 +784,7 @@ export function registerCrossPrompts(server: McpServer): void {
 - 준비가 필요한 미팅
 - 집중 작업 추천 시간대
 
-중요: 모든 데이터는 실제 iConnect 도구로 조회해서 정확한 정보를 제공해.`,
+중요: 모든 데이터는 실제 AirMCP 도구로 조회해서 정확한 정보를 제공해.`,
       );
     },
   );
@@ -803,7 +803,7 @@ export function registerCrossPrompts(server: McpServer): void {
         `"${projectName}" 프로젝트를 시작해줘. (${today})
 ${description ? `프로젝트 설명: ${description}` : ""}
 
-다음 단계를 반드시 iConnect 도구를 사용해서 실행해:
+다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 
 1. **프로젝트 폴더 생성** (Finder):
    - create_directory("~/Projects/${projectName}")로 프로젝트 루트 폴더 생성
@@ -881,7 +881,7 @@ ${description ? `프로젝트 설명: ${description}` : ""}
         "Weekly review: completed tasks, events attended, notes activity, email stats, photos, music, and summary.",
         `주간 리뷰를 시작해줘. (${sinceStr} ~ ${dateStr}, ${n}일간)
 
-다음 단계를 반드시 iConnect 도구를 사용해서 실행해:
+다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 
 1. **완료한 리마인더**:
    - list_reminders(completed: true)로 완료 리마인더 조회
@@ -949,7 +949,7 @@ ${description ? `프로젝트 설명: ${description}` : ""}
    - create_reminder("[주간 리뷰] 이월 항목 정리", dueDate: 다음 월요일)
    - 필요하면 추가 팔로업 리마인더
 
-중요: 모든 데이터는 실제 iConnect 도구로 조회해. 통계는 정확한 수치를 제공해.`,
+중요: 모든 데이터는 실제 AirMCP 도구로 조회해. 통계는 정확한 수치를 제공해.`,
       );
     },
   );

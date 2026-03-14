@@ -1,4 +1,4 @@
-# iConnect MCP 디렉토리 등록 가이드
+# AirMCP 디렉토리 등록 가이드
 
 > 2026-03-14 기준 전체 MCP 마켓플레이스 리스트. 복붙용 정보 + 등록 상태 포함.
 
@@ -7,11 +7,11 @@
 ## 공통 복붙 정보
 
 ```
-Name: iConnect
+Name: AirMCP
 Description: MCP server for the entire Apple ecosystem — Notes, Reminders, Calendar, Contacts, Mail, Messages, Music, Finder, Safari, System, Photos, Shortcuts, Apple Intelligence, and TV.
 Repository: https://github.com/heznpc/iConnect
-npm: https://www.npmjs.com/package/iconnect-mcp
-Install: npx -y iconnect-mcp
+npm: https://www.npmjs.com/package/airmcp
+Install: npx -y airmcp
 Tools: 170+ tools, 23 prompts, 11 resources across 18 modules
 Transport: stdio (default) + HTTP/SSE (--http)
 License: MIT
@@ -22,9 +22,9 @@ Claude Desktop Config (복붙용):
 ```json
 {
   "mcpServers": {
-    "iconnect": {
+    "airmcp": {
       "command": "npx",
-      "args": ["-y", "iconnect-mcp"]
+      "args": ["-y", "airmcp"]
     }
   }
 }
@@ -82,7 +82,7 @@ Claude Desktop Config (복붙용):
 ### 준비 완료
 
 - `server.json` ✅ (레포 루트에 이미 존재)
-- `package.json`의 `mcpName` ✅ (`io.github.heznpc/iconnect`)
+- `package.json`의 `mcpName` ✅ (`io.github.heznpc/airmcp`)
 - `mcp-publisher` CLI ✅ (brew install 완료)
 
 ### 인증 후 실행할 명령
@@ -134,7 +134,7 @@ mcp-publisher publish
 
 ```bash
 cd /Users/ren/IdeaProjects/iConnect
-smithery mcp publish --name iconnect --transport stdio
+smithery mcp publish --name airmcp --transport stdio
 ```
 
 ---
@@ -152,7 +152,7 @@ smithery mcp publish --name iconnect --transport stdio
 | 필드 | 필수 | 입력값 |
 |------|------|--------|
 | Type | O | `MCP Server` |
-| Name | O | `iConnect` |
+| Name | O | `AirMCP` |
 | URL | O | `https://github.com/heznpc/iConnect` |
 | Server Config | X | 위 Claude Desktop Config JSON 붙여넣기 |
 
@@ -211,7 +211,7 @@ smithery mcp publish --name iconnect --transport stdio
 
 | 필드 | 필수 | 입력값 |
 |------|------|--------|
-| Name | O | `iConnect` |
+| Name | O | `AirMCP` |
 | Description | O | `MCP server for the entire Apple ecosystem — Notes, Reminders, Calendar, Contacts, Mail, Messages, Music, Finder, Safari, System, Photos, Shortcuts, Apple Intelligence, and TV. 170+ tools across 18 modules.` |
 | Link | O | `https://github.com/heznpc/iConnect` |
 | Logo | X | 있으면 업로드 |
@@ -231,7 +231,7 @@ smithery mcp publish --name iconnect --transport stdio
 
 | 필드 | 입력값 |
 |------|--------|
-| Server Name | `iConnect` |
+| Server Name | `AirMCP` |
 | Short Description | `MCP server for the entire Apple ecosystem — 170+ tools across 14 Apple app modules` |
 | Link | `https://github.com/heznpc/iConnect` |
 | Category | `Productivity` |
@@ -346,7 +346,7 @@ smithery mcp publish --name iconnect --transport stdio
 | `server.json` | MCP Registry | ✅ 존재 |
 | `smithery.yaml` | Smithery | ✅ 존재 |
 | `glama.json` | Glama | ✅ 존재 |
-| `package.json` `mcpName` | MCP Registry | ✅ 존재 |
+| `package.json` `mcpName` | MCP Registry | ✅ 존재 (`io.github.heznpc/airmcp`) |
 | 로고/아이콘 | Claude Integrations, cursor.directory 등 | ❌ 미준비 |
 
 ---

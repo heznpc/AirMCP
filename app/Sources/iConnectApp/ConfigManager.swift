@@ -34,7 +34,7 @@ final class ConfigManager {
 
     private static let configDir: URL = {
         FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".config/iconnect", isDirectory: true)
+            .appendingPathComponent(".config/airmcp", isDirectory: true)
     }()
 
     private static let configFile: URL = {
@@ -131,7 +131,7 @@ final class ConfigManager {
     // MARK: - Swift Bridge
 
     var swiftBridgeAvailable: Bool {
-        // Look for IConnectBridge relative to the executable or common install paths
+        // Look for AirMcpBridge relative to the executable or common install paths
         let candidates = [
             bundleBridgePath,
             homeBridgePath,
@@ -140,12 +140,12 @@ final class ConfigManager {
         return candidates.contains { FileManager.default.isExecutableFile(atPath: $0) }
     }
 
-    /// Path relative to where npm/npx installs: ~/.config/iconnect or common dev path
+    /// Path relative to where npm/npx installs: ~/.config/airmcp or common dev path
     private var homeBridgePath: String? {
         // Check typical dev checkout via npx package cache
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         // Common dev location
-        let devPath = home + "/IdeaProjects/iConnect/swift/.build/release/IConnectBridge"
+        let devPath = home + "/IdeaProjects/iConnect/swift/.build/release/AirMcpBridge"
         if FileManager.default.isExecutableFile(atPath: devPath) {
             return devPath
         }
@@ -156,7 +156,7 @@ final class ConfigManager {
     private var bundleBridgePath: String? {
         let bundle = Bundle.main.bundlePath
         let base = (bundle as NSString).deletingLastPathComponent
-        let path = (base as NSString).appendingPathComponent("swift/.build/release/IConnectBridge")
+        let path = (base as NSString).appendingPathComponent("swift/.build/release/AirMcpBridge")
         return path
     }
 }

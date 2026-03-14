@@ -3,12 +3,12 @@
 import PackageDescription
 
 let package = Package(
-    name: "ImcpBridge",
+    name: "AirMcpBridge",
     platforms: [.macOS(.v14)],
     targets: [
         .executableTarget(
-            name: "ImcpBridge",
-            path: "Sources/ImcpBridge"
+            name: "AirMcpBridge",
+            path: "Sources/AirMcpBridge"
         ),
     ]
 )

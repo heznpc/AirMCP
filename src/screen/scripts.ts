@@ -7,7 +7,7 @@ import { esc } from "../shared/esc.js";
  * Uses a timestamp to avoid collisions.
  */
 function tempScreenshotPath(): string {
-  return `/tmp/iconnect-screenshot-${Date.now()}.png`;
+  return `/tmp/airmcp-screenshot-${Date.now()}.png`;
 }
 
 /**
@@ -63,7 +63,7 @@ export function captureWindowScript(appName?: string): string {
  */
 export function recordScreenScript(duration: number, display?: number): string {
   const safeDuration = Math.min(Math.max(Math.floor(duration), 1), 60);
-  const filePath = `/tmp/iconnect-recording-${Date.now()}.mov`;
+  const filePath = `/tmp/airmcp-recording-${Date.now()}.mov`;
   const displayFlag = display !== undefined ? ` -D ${Math.floor(display)}` : "";
   return `
     const app = Application.currentApplication();

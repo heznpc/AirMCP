@@ -1,5 +1,5 @@
 const I18n = (() => {
-  const STORAGE_KEY = 'iconnect-lang';
+  const STORAGE_KEY = 'airmcp-lang';
   const SUPPORTED = ['en', 'ko', 'ja', 'zh-CN', 'zh-TW', 'es', 'fr', 'de', 'pt'];
   let locale = {};
   let currentLang = 'en';

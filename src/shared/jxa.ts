@@ -40,7 +40,7 @@ export async function runJxa<T>(script: string): Promise<T> {
         }
         throw e;
       }
-      console.error(`[iConnect] JXA retry attempt ${attempt + 2}/3`);
+      console.error(`[AirMCP] JXA retry attempt ${attempt + 2}/3`);
       await new Promise((r) => setTimeout(r, RETRY_DELAYS[attempt]));
     }
   }

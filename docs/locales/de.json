@@ -1,11 +1,11 @@
 {
-  "meta_title": "iConnect — Verbinde KI mit deinem gesamten Apple-Ökosystem",
+  "meta_title": "AirMCP — Verbinde KI mit deinem gesamten Apple-Ökosystem",
   "meta_description": "Open-Source MCP-Server mit über 170 Tools in 18 Modulen. Verbinde Claude, Codex und jeden MCP-Client mit Apple-Apps.",
   "nav_modules": "Module",
   "nav_workflows": "Workflows",
   "nav_install": "Installieren",
   "lang_label": "DE",
-  "hero_tag": "npx iconnect-mcp init → verbunden",
+  "hero_tag": "npx airmcp init → verbunden",
   "hero_tagline": "Verbinde KI mit deinem gesamten Apple-Ökosystem.",
   "hero_sub": "Über 170 Tools. 23 Prompts. 11 Ressourcen. Ein MCP-Server.",
   "hero_cta": "Loslegen",

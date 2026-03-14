@@ -119,11 +119,11 @@ struct OnboardingView: View {
                 .font(.system(size: 56))
                 .foregroundStyle(Color.accentColor)
 
-            Text("Welcome to iConnect")
+            Text("Welcome to AirMCP")
                 .font(.title)
                 .fontWeight(.bold)
 
-            Text("iConnect lets AI assistants like Claude interact with your Mac apps \u{2014} Notes, Calendar, Mail, Reminders, and more \u{2014} through the Model Context Protocol (MCP).")
+            Text("AirMCP lets AI assistants like Claude interact with your Mac apps \u{2014} Notes, Calendar, Mail, Reminders, and more \u{2014} through the Model Context Protocol (MCP).")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: 400)
@@ -165,7 +165,7 @@ struct OnboardingView: View {
                     .foregroundStyle(.red)
                     .font(.headline)
 
-                Text("iConnect requires Node.js to run. Please install it and relaunch the app.")
+                Text("AirMCP requires Node.js to run. Please install it and relaunch the app.")
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: 380)
@@ -193,7 +193,7 @@ struct OnboardingView: View {
                 .font(.title2)
                 .fontWeight(.semibold)
 
-            Text("Select which Mac apps iConnect can access. You can change these later in Settings.")
+            Text("Select which Mac apps AirMCP can access. You can change these later in Settings.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -281,7 +281,7 @@ struct OnboardingView: View {
                 .font(.title2)
                 .fontWeight(.semibold)
 
-            Text("iConnect uses AppleScript to communicate with Mac apps. macOS will ask for permission the first time each app is accessed.")
+            Text("AirMCP uses AppleScript to communicate with Mac apps. macOS will ask for permission the first time each app is accessed.")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: 400)
@@ -290,7 +290,7 @@ struct OnboardingView: View {
                 permissionRow(
                     icon: "checkmark.shield",
                     title: "Automation",
-                    detail: "Allow iConnect to control apps when prompted"
+                    detail: "Allow AirMCP to control apps when prompted"
                 )
                 permissionRow(
                     icon: "accessibility",
@@ -351,7 +351,7 @@ struct OnboardingView: View {
                 .font(.title2)
                 .fontWeight(.semibold)
 
-            Text("iConnect detected the following MCP-compatible clients. Patch their config to add iConnect automatically.")
+            Text("AirMCP detected the following MCP-compatible clients. Patch their config to add AirMCP automatically.")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: 400)
@@ -499,15 +499,15 @@ struct OnboardingView: View {
             config = [:]
         }
 
-        // Build the iconnect entry
-        let iconnectEntry: [String: Any] = [
+        // Build the airmcp entry
+        let airmcpEntry: [String: Any] = [
             "command": "npx",
-            "args": ["-y", IConnectConstants.npmPackageName],
+            "args": ["-y", AirMcpConstants.npmPackageName],
         ]
 
         // Merge into mcpServers
         var servers = config["mcpServers"] as? [String: Any] ?? [:]
-        servers["iconnect"] = iconnectEntry
+        servers["airmcp"] = airmcpEntry
         config["mcpServers"] = servers
 
         // Write back
@@ -528,7 +528,7 @@ struct OnboardingView: View {
         configManager.disabledModules = Array(disabledModules)
 
         // Mark onboarding complete
-        UserDefaults.standard.set(true, forKey: IConnectConstants.keyOnboardingCompleted)
+        UserDefaults.standard.set(true, forKey: AirMcpConstants.keyOnboardingCompleted)
 
         onComplete()
 

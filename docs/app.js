@@ -1,5 +1,5 @@
 // === Theme toggle ===
-const THEME_KEY = 'iconnect-theme';
+const THEME_KEY = 'airmcp-theme';
 const themeToggle = document.getElementById('themeToggle');
 const themeIcon = themeToggle.querySelector('.theme-icon');
 

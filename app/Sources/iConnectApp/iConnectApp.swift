@@ -31,7 +31,7 @@ struct iConnectApp: App {
     }
 
     var body: some Scene {
-        MenuBarExtra("iConnect", systemImage: "apple.terminal") {
+        MenuBarExtra("AirMCP", systemImage: "apple.terminal") {
             MenuContent(
                 serverManager: serverManager,
                 permissionManager: permissionManager,
@@ -51,7 +51,7 @@ struct iConnectApp: App {
                 if !appInitialized {
                     appInitialized = true
                     updateManager.startPeriodicChecks()
-                    if !UserDefaults.standard.bool(forKey: IConnectConstants.keyOnboardingCompleted) {
+                    if !UserDefaults.standard.bool(forKey: AirMcpConstants.keyOnboardingCompleted) {
                         showOnboardingWindow()
                     } else {
                         serverManager.autoStartIfNeeded()
@@ -88,7 +88,7 @@ struct iConnectApp: App {
 
         let hostingController = NSHostingController(rootView: onboardingView)
         let window = NSWindow(contentViewController: hostingController)
-        window.title = "iConnect Setup"
+        window.title = "AirMCP Setup"
         window.styleMask = [.titled, .closable]
         window.setContentSize(NSSize(width: 520, height: 480))
         window.center()

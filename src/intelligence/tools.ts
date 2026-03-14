@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { IConnectConfig } from "../shared/config.js";
+import type { AirMcpConfig } from "../shared/config.js";
 import { ok, toolError } from "../shared/result.js";
 import { runSwift } from "../shared/swift.js";
 
@@ -31,7 +31,7 @@ interface AiStatusResult {
   foundationModelsSupported: boolean;
 }
 
-export function registerIntelligenceTools(server: McpServer, _config: IConnectConfig): void {
+export function registerIntelligenceTools(server: McpServer, _config: AirMcpConfig): void {
   server.registerTool(
     "summarize_text",
     {

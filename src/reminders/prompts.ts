@@ -13,7 +13,7 @@ export function registerReminderPrompts(server: McpServer): void {
         "Scan reminders, identify overdue/completed, and suggest cleanup.",
         `Apple Reminders에서 ${scope} 리마인더를 정리해줘.
 
-다음 단계를 반드시 iConnect 도구를 사용해서 실행해:
+다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 
 1. list_reminder_lists로 모든 리스트를 확인해
 2. list_reminders로 리마인더를 조회해 (list, completed 필터 사용 가능)
@@ -38,7 +38,7 @@ export function registerReminderPrompts(server: McpServer): void {
         "Review today's due reminders, flag overdue items, and suggest priorities.",
         `오늘(${today})의 리마인더를 리뷰해줘.
 
-다음 단계를 반드시 iConnect 도구를 사용해서 실행해:
+다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 
 1. list_reminders(completed: false)로 미완료 리마인더를 모두 조회해
 2. 오늘 마감인 항목과 이미 기한이 지난 항목을 분류해
@@ -50,7 +50,7 @@ export function registerReminderPrompts(server: McpServer): void {
 4. 우선 처리할 항목을 제안해
 5. 내가 원하면 complete_reminder로 완료 처리하거나 update_reminder로 기한을 변경해
 
-중요: 실제 iConnect 도구를 사용해서 Apple Reminders 데이터를 조회해.`,
+중요: 실제 AirMCP 도구를 사용해서 Apple Reminders 데이터를 조회해.`,
       );
     },
   );

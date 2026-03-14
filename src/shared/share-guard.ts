@@ -1,4 +1,4 @@
-import type { IConnectConfig } from "./config.js";
+import type { AirMcpConfig } from "./config.js";
 import { needsShareApproval } from "./config.js";
 import type { HitlClient } from "./hitl.js";
 
@@ -26,7 +26,7 @@ export function setShareGuardHitlClient(client: HitlClient | null): void {
  */
 export function filterSharedAccess<T extends Shareable>(
   items: T[],
-  config: IConnectConfig,
+  config: AirMcpConfig,
   moduleName: string,
 ): T[] {
   if (config.includeShared) return items;
@@ -49,7 +49,7 @@ export function filterSharedAccess<T extends Shareable>(
  */
 export async function guardSharedAccess(
   isShared: boolean,
-  config: IConnectConfig,
+  config: AirMcpConfig,
   moduleName: string,
   toolName: string,
   args: Record<string, unknown>,
@@ -76,5 +76,5 @@ export async function guardSharedAccess(
   }
 
   // Default: deny shared access
-  return `This ${moduleName} item is shared. Modifying shared items is disabled by default. Set ICONNECT_INCLUDE_SHARED=true to allow.`;
+  return `This ${moduleName} item is shared. Modifying shared items is disabled by default. Set AIRMCP_INCLUDE_SHARED=true to allow.`;
 }

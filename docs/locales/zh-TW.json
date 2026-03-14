@@ -1,11 +1,11 @@
 {
-  "meta_title": "iConnect — 將AI連接到整個Apple生態系統",
+  "meta_title": "AirMCP — 將AI連接到整個Apple生態系統",
   "meta_description": "開源MCP伺服器，18個模組、170多個工具。將Claude、Codex及任何MCP用戶端連接到Apple應用程式。",
   "nav_modules": "模組",
   "nav_workflows": "工作流程",
   "nav_install": "安裝",
   "lang_label": "繁中",
-  "hero_tag": "npx iconnect-mcp init → 連接完成",
+  "hero_tag": "npx airmcp init → 連接完成",
   "hero_tagline": "將AI連接到整個Apple生態系統。",
   "hero_sub": "170多個工具。23個提示詞。11個資源。一個MCP伺服器。",
   "hero_cta": "開始使用",

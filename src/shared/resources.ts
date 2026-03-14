@@ -5,7 +5,7 @@ import { listRemindersScript } from "../reminders/scripts.js";
 import { nowPlayingScript } from "../music/scripts.js";
 import { getClipboardScript, getFrontmostAppScript } from "../system/scripts.js";
 import { getUnreadCountScript } from "../mail/scripts.js";
-import { IConnectConfig, isModuleEnabled } from "./config.js";
+import { AirMcpConfig, isModuleEnabled } from "./config.js";
 
 // ── Resource registration factory ──
 
@@ -85,7 +85,7 @@ async function fetchUpcomingEvents(): Promise<unknown[]> {
 /**
  * Register MCP resources that expose live Apple data for direct client reads.
  */
-export function registerResources(server: McpServer, config?: IConnectConfig): void {
+export function registerResources(server: McpServer, config?: AirMcpConfig): void {
   const enabled = (mod: string) => !config || isModuleEnabled(config, mod);
 
   // ── Notes ──

@@ -1,5 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { IConnectConfig, HitlLevel } from "./config.js";
+import type { AirMcpConfig, HitlLevel } from "./config.js";
 import type { HitlClient } from "./hitl.js";
 import { err } from "./result.js";
 
@@ -36,7 +36,7 @@ function shouldRequireApproval(
 export function installHitlGuard(
   server: McpServer,
   hitlClient: HitlClient,
-  config: IConnectConfig,
+  config: AirMcpConfig,
 ): void {
   const original = server.registerTool.bind(server);
 

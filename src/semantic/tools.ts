@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { ok, err, toolError } from "../shared/result.js";
-import { IConnectConfig } from "../shared/config.js";
+import { AirMcpConfig } from "../shared/config.js";
 import { SemanticSearchService } from "./service.js";
 
 /**
@@ -11,7 +11,7 @@ import { SemanticSearchService } from "./service.js";
  * All mutable state (provider cache, indexing lock, vector store) lives in
  * SemanticSearchService; this module is a thin MCP registration layer.
  */
-export function registerSemanticTools(server: McpServer, config: IConnectConfig): void {
+export function registerSemanticTools(server: McpServer, config: AirMcpConfig): void {
   const service = new SemanticSearchService(config);
 
   // -- Index: build/rebuild the vector store from Apple app data --

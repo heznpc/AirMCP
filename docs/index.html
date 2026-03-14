@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title data-i18n="meta_title">iConnect — Connect AI to Your Entire Apple Ecosystem</title>
+  <title data-i18n="meta_title">AirMCP — Connect AI to Your Entire Apple Ecosystem</title>
   <meta name="description" data-i18n-attr="content" data-i18n="meta_description" content="Open-source MCP server with 170+ tools across 18 modules. Connect Claude, Codex, and any MCP client to Apple apps.">
   <meta name="theme-color" content="#0e1117">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍎</text></svg>">
@@ -37,12 +37,12 @@
   <!-- Nav -->
   <nav class="glass-nav" id="nav">
     <div class="max-w-[1080px] mx-auto px-5 flex items-center justify-between h-full">
-      <a href="#" class="font-mono text-sm font-medium opacity-80 tracking-tight">iConnect</a>
+      <a href="#" class="font-mono text-sm font-medium opacity-80 tracking-tight">AirMCP</a>
       <div class="flex items-center gap-6" id="navLinks">
         <a href="#modules" class="text-sm opacity-45 font-medium hover:opacity-90 transition-opacity" data-i18n="nav_modules">Modules</a>
         <a href="#workflows" class="text-sm opacity-45 font-medium hover:opacity-90 transition-opacity" data-i18n="nav_workflows">Workflows</a>
         <a href="#install" class="text-sm opacity-45 font-medium hover:opacity-90 transition-opacity" data-i18n="nav_install">Install</a>
-        <a href="https://github.com/heznpc/iConnect" target="_blank" rel="noopener" class="text-sm opacity-45 font-medium hover:opacity-90 transition-opacity">GitHub</a>
+        <a href="https://github.com/heznpc/AirMCP" target="_blank" rel="noopener" class="text-sm opacity-45 font-medium hover:opacity-90 transition-opacity">GitHub</a>
         <button class="pill-btn" id="themeToggle" aria-label="Toggle theme">
           <span class="theme-icon">☀</span>
         </button>
@@ -71,13 +71,13 @@
   <!-- Hero -->
   <header class="relative z-[1] pt-[calc(56px+100px)] pb-16 text-center">
     <div class="max-w-[1080px] mx-auto px-5">
-      <p class="font-mono text-sm opacity-30 tracking-tight mb-6 reveal" data-i18n="hero_tag">npx iconnect-mcp init → connected</p>
-      <h1 class="text-[clamp(3.6rem,10vw,7rem)] font-bold leading-[.98] tracking-tighter hero-h1 reveal" data-delay="60">iConnect</h1>
+      <p class="font-mono text-sm opacity-30 tracking-tight mb-6 reveal" data-i18n="hero_tag">npx airmcp init → connected</p>
+      <h1 class="text-[clamp(3.6rem,10vw,7rem)] font-bold leading-[.98] tracking-tighter hero-h1 reveal" data-delay="60">AirMCP</h1>
       <p class="mt-5 text-xl opacity-50 font-medium reveal" data-delay="90" data-i18n="hero_tagline">Connect AI to your entire Apple ecosystem.</p>
       <p class="mt-3 text-base opacity-30 max-w-[50ch] mx-auto leading-relaxed reveal" data-delay="120" data-i18n="hero_sub">170+ tools. 23 prompts. 11 resources. One MCP server.</p>
       <div class="flex gap-3 justify-center mt-10 reveal" data-delay="160">
         <a href="#install" class="lg-btn" data-i18n="hero_cta">Get Started</a>
-        <a href="https://github.com/heznpc/iConnect" target="_blank" rel="noopener" class="lg-btn lg-btn--ghost">GitHub</a>
+        <a href="https://github.com/heznpc/AirMCP" target="_blank" rel="noopener" class="lg-btn lg-btn--ghost">GitHub</a>
       </div>
     </div>
   </header>
@@ -344,7 +344,7 @@
             <div class="step-num">1</div>
             <h3 class="card-title mt-4 mb-2" data-i18n="step1_title">Install</h3>
             <p class="card-desc" data-i18n="step1_desc">Interactive setup wizard. Choose your modules.</p>
-            <code class="inline-block mt-4 px-4 py-2 rounded-lg text-xs font-mono opacity-50 bg-white/[.04]">npx iconnect-mcp init</code>
+            <code class="inline-block mt-4 px-4 py-2 rounded-lg text-xs font-mono opacity-50 bg-white/[.04]">npx airmcp init</code>
           </div>
         </div>
         <div class="glass-card reveal" data-delay="80">
@@ -381,9 +381,9 @@
           </div>
           <pre class="font-mono text-sm leading-7 config-code">{
   <span class="c-key">"mcpServers"</span>: {
-    <span class="c-key">"iconnect"</span>: {
+    <span class="c-key">"airmcp"</span>: {
       <span class="c-key">"command"</span>: <span class="c-str">"npx"</span>,
-      <span class="c-key">"args"</span>: [<span class="c-str">"-y"</span>, <span class="c-str">"iconnect-mcp"</span>]
+      <span class="c-key">"args"</span>: [<span class="c-str">"-y"</span>, <span class="c-str">"airmcp"</span>]
     }
   }
 }</pre>
@@ -506,10 +506,10 @@
         <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
         <div class="glass-content text-left">
           <pre class="font-mono text-sm leading-8"><span class="opacity-25"># Install globally</span>
-<span class="opacity-40">$ </span><span class="opacity-70">npm install -g iconnect-mcp</span>
+<span class="opacity-40">$ </span><span class="opacity-70">npm install -g airmcp</span>
 
 <span class="opacity-25"># Or run directly</span>
-<span class="opacity-40">$ </span><span class="opacity-70">npx iconnect-mcp</span></pre>
+<span class="opacity-40">$ </span><span class="opacity-70">npx airmcp</span></pre>
         </div>
       </div>
       <p class="mt-6 text-xs opacity-25 reveal" data-delay="140" data-i18n="install_note">Requires Node.js 18+ and macOS. Works with Claude Code, Codex, and any MCP client.</p>
@@ -519,12 +519,12 @@
   <!-- Footer -->
   <footer class="relative z-[1] py-6 border-t border-white/[.04]">
     <div class="max-w-[1080px] mx-auto px-5 flex flex-col items-center gap-3 text-center">
-      <span class="font-mono text-sm font-medium opacity-60">iConnect</span>
+      <span class="font-mono text-sm font-medium opacity-60">AirMCP</span>
       <p class="text-xs opacity-20" data-i18n="footer_tagline">Built for Claude Code, Codex, and every MCP client.</p>
       <div class="flex gap-5 text-xs opacity-25">
-        <a href="https://github.com/heznpc/iConnect" class="hover:opacity-60 transition-opacity">GitHub</a>
-        <a href="https://github.com/heznpc/iConnect/issues" class="hover:opacity-60 transition-opacity">Issues</a>
-        <a href="https://www.npmjs.com/package/iconnect-mcp" class="hover:opacity-60 transition-opacity">npm</a>
+        <a href="https://github.com/heznpc/AirMCP" class="hover:opacity-60 transition-opacity">GitHub</a>
+        <a href="https://github.com/heznpc/AirMCP/issues" class="hover:opacity-60 transition-opacity">Issues</a>
+        <a href="https://www.npmjs.com/package/airmcp" class="hover:opacity-60 transition-opacity">npm</a>
       </div>
       <p class="text-[.7rem] opacity-15">MIT License</p>
     </div>

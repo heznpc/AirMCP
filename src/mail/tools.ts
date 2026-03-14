@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
-import type { IConnectConfig } from "../shared/config.js";
+import type { AirMcpConfig } from "../shared/config.js";
 import { ok, err } from "../shared/result.js";
 import {
   listMailboxesScript,
@@ -17,7 +17,7 @@ import {
   replyMailScript,
 } from "./scripts.js";
 
-export function registerMailTools(server: McpServer, config: IConnectConfig): void {
+export function registerMailTools(server: McpServer, config: AirMcpConfig): void {
   const { allowSendMail } = config;
   server.registerTool(
     "list_mailboxes",
@@ -211,7 +211,7 @@ export function registerMailTools(server: McpServer, config: IConnectConfig): vo
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },
     async ({ to, subject, body, cc, bcc, account }) => {
-      if (!allowSendMail) return err("Sending mail is disabled. Set allowSendMail: true in config or ICONNECT_ALLOW_SEND_MAIL=true.");
+      if (!allowSendMail) return err("Sending mail is disabled. Set allowSendMail: true in config or AIRMCP_ALLOW_SEND_MAIL=true.");
       try {
         return ok(await runJxa(sendMailScript(to, subject, body, cc, bcc, account)));
       } catch (e) {
@@ -233,7 +233,7 @@ export function registerMailTools(server: McpServer, config: IConnectConfig): vo
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },
     async ({ id, body, replyAll }) => {
-      if (!allowSendMail) return err("Sending mail is disabled. Set allowSendMail: true in config or ICONNECT_ALLOW_SEND_MAIL=true.");
+      if (!allowSendMail) return err("Sending mail is disabled. Set allowSendMail: true in config or AIRMCP_ALLOW_SEND_MAIL=true.");
       try {
         return ok(await runJxa(replyMailScript(id, body, replyAll)));
       } catch (e) {

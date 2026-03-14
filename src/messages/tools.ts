@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
-import type { IConnectConfig } from "../shared/config.js";
+import type { AirMcpConfig } from "../shared/config.js";
 import { ok, err } from "../shared/result.js";
 import {
   listChatsScript,
@@ -12,7 +12,7 @@ import {
   listParticipantsScript,
 } from "./scripts.js";
 
-export function registerMessagesTools(server: McpServer, config: IConnectConfig): void {
+export function registerMessagesTools(server: McpServer, config: AirMcpConfig): void {
   const { allowSendMessages } = config;
   server.registerTool(
     "list_chats",
@@ -84,7 +84,7 @@ export function registerMessagesTools(server: McpServer, config: IConnectConfig)
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },
     async ({ target, text }) => {
-      if (!allowSendMessages) return err("Sending messages is disabled. Set ICONNECT_ALLOW_SEND_MESSAGES=true to enable.");
+      if (!allowSendMessages) return err("Sending messages is disabled. Set AIRMCP_ALLOW_SEND_MESSAGES=true to enable.");
       try {
         return ok(await runJxa(sendMessageScript(target, text)));
       } catch (e) {
@@ -105,7 +105,7 @@ export function registerMessagesTools(server: McpServer, config: IConnectConfig)
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },
     async ({ target, filePath }) => {
-      if (!allowSendMessages) return err("Sending messages is disabled. Set ICONNECT_ALLOW_SEND_MESSAGES=true to enable.");
+      if (!allowSendMessages) return err("Sending messages is disabled. Set AIRMCP_ALLOW_SEND_MESSAGES=true to enable.");
       try {
         return ok(await runJxa(sendFileScript(target, filePath)));
       } catch (e) {

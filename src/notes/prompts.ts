@@ -13,7 +13,7 @@ export function registerNotePrompts(server: McpServer): void {
         "Scan all notes, classify by topic, create folders, and move notes into them.",
         `Apple Notes의 "${target}" 폴더에 있는 메모를 정리해줘.
 
-다음 단계를 반드시 iConnect 도구를 사용해서 실행해:
+다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 
 1. scan_notes(folder: "${target}")로 해당 폴더의 메모를 스캔해. 메모가 많으면 offset으로 페이징해서 전부 확인해
 2. 스캔 결과를 분석해서 주제별로 분류해
@@ -35,7 +35,7 @@ export function registerNotePrompts(server: McpServer): void {
         "Find duplicate or similar notes, compare content, and suggest cleanup.",
         `Apple Notes에서 ${scope} 중복/유사 메모를 찾아서 정리해줘.
 
-다음 단계를 반드시 iConnect 도구를 사용해서 실행해:
+다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 
 1. scan_notes로 메모를 스캔해 (folder 파라미터로 범위 지정 가능, offset으로 페이징)
 2. 제목이나 미리보기가 비슷한 메모 그룹을 찾아
@@ -57,7 +57,7 @@ export function registerNotePrompts(server: McpServer): void {
         "Summarize notes from the past week and suggest organization actions.",
         `Apple Notes 주간 리뷰를 해줘.
 
-다음 단계를 반드시 iConnect 도구를 사용해서 실행해:
+다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 
 1. scan_notes로 전체 메모를 스캔해 (메모가 많으면 offset으로 페이징)
 2. ${oneWeekAgo} 이후에 생성되거나 수정된 메모만 필터링해
@@ -65,7 +65,7 @@ export function registerNotePrompts(server: McpServer): void {
 4. 정리가 필요한 메모가 있으면 제안해 (미분류, 빈 메모 등)
 5. 내가 원하면 폴더 이동이나 삭제를 실행해
 
-중요: 실제 iConnect 도구를 사용해서 Apple Notes 데이터를 조회해.`,
+중요: 실제 AirMCP 도구를 사용해서 Apple Notes 데이터를 조회해.`,
       );
     },
   );

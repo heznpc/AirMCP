@@ -3,7 +3,7 @@ import { z } from "zod";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { runJxa } from "../shared/jxa.js";
-import type { IConnectConfig } from "../shared/config.js";
+import type { AirMcpConfig } from "../shared/config.js";
 import { ok, toolError } from "../shared/result.js";
 import {
   listShortcutsScript,
@@ -36,7 +36,7 @@ export function sanitizeToolName(name: string): string {
   return `shortcut_${sanitized}`;
 }
 
-export function registerShortcutsTools(server: McpServer, _config: IConnectConfig): void {
+export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig): void {
   server.registerTool("list_shortcuts", {
     title: "List Shortcuts",
     description: "List all available Siri Shortcuts on this Mac.",
@@ -169,7 +169,7 @@ export async function registerDynamicShortcutTools(server: McpServer): Promise<n
     const result = await execFileAsync("shortcuts", ["list"], { timeout: 10_000 });
     output = result.stdout;
   } catch (e) {
-    console.error(`[iConnect] Failed to list shortcuts for dynamic registration: ${e instanceof Error ? e.message : String(e)}`);
+    console.error(`[AirMCP] Failed to list shortcuts for dynamic registration: ${e instanceof Error ? e.message : String(e)}`);
     return 0;
   }
 
@@ -177,7 +177,7 @@ export async function registerDynamicShortcutTools(server: McpServer): Promise<n
   if (names.length === 0) return 0;
 
   if (names.length > MAX_DYNAMIC_SHORTCUTS) {
-    console.error(`[iConnect] Found ${names.length} shortcuts, registering first ${MAX_DYNAMIC_SHORTCUTS} (limit reached)`);
+    console.error(`[AirMCP] Found ${names.length} shortcuts, registering first ${MAX_DYNAMIC_SHORTCUTS} (limit reached)`);
   }
 
   const toRegister = names.slice(0, MAX_DYNAMIC_SHORTCUTS);
@@ -187,11 +187,11 @@ export async function registerDynamicShortcutTools(server: McpServer): Promise<n
   for (const name of toRegister) {
     const toolName = sanitizeToolName(name);
     if (!toolName) {
-      console.error(`[iConnect] Skipping shortcut with unsanitizable name: "${name}"`);
+      console.error(`[AirMCP] Skipping shortcut with unsanitizable name: "${name}"`);
       continue;
     }
     if (seen.has(toolName)) {
-      console.error(`[iConnect] Skipping duplicate tool name: ${toolName} (from "${name}")`);
+      console.error(`[AirMCP] Skipping duplicate tool name: ${toolName} (from "${name}")`);
       continue;
     }
     seen.add(toolName);
@@ -208,7 +208,7 @@ export async function registerDynamicShortcutTools(server: McpServer): Promise<n
       catch (e) { return toolError(`run shortcut "${name}"`, e); }
     });
 
-    console.error(`[iConnect] Registered dynamic shortcut: ${name}`);
+    console.error(`[AirMCP] Registered dynamic shortcut: ${name}`);
     count++;
   }
 

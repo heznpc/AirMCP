@@ -16,7 +16,7 @@ export function registerShortcutPrompts(server: McpServer): void {
         "Guide for creating complex automation workflows by chaining multiple shortcuts.",
         `Build an automation workflow to achieve: "${goal}"${inputCtx}
 
-Execute the following steps using iConnect tools:
+Execute the following steps using AirMCP tools:
 
 1. **Discover available shortcuts**:
    - list_shortcuts to get all available Siri Shortcuts on this Mac
@@ -64,7 +64,7 @@ Important:
         "Help users find, understand, and explore their available Siri Shortcuts.",
         `Help me discover and understand my available Siri Shortcuts. ${filterCtx}
 
-Execute the following steps using iConnect tools:
+Execute the following steps using AirMCP tools:
 
 1. **List all shortcuts**:
    - list_shortcuts to get the complete list of Siri Shortcuts on this Mac
@@ -120,7 +120,7 @@ Important:
         "Diagnose and fix shortcut execution issues.",
         `Troubleshoot the Siri Shortcut "${shortcutName}".${errorCtx}
 
-Execute the following steps using iConnect tools:
+Execute the following steps using AirMCP tools:
 
 1. **Verify the shortcut exists**:
    - search_shortcuts(query: "${shortcutName}") to find the shortcut

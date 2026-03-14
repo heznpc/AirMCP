@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
-import type { IConnectConfig } from "../shared/config.js";
+import type { AirMcpConfig } from "../shared/config.js";
 import { ok, err } from "../shared/result.js";
 import { filterSharedAccess, guardSharedAccess } from "../shared/share-guard.js";
 import {
@@ -83,13 +83,13 @@ interface CompareResult extends Shareable {
   charCount: number;
 }
 
-async function guardShared(id: string, config: IConnectConfig, toolName: string): Promise<string | null> {
+async function guardShared(id: string, config: AirMcpConfig, toolName: string): Promise<string | null> {
   if (config.includeShared) return null;
   const result = await runJxa<{ shared: boolean }>(guardSharedScript(id));
   return guardSharedAccess(result.shared, config, "notes", toolName, { id });
 }
 
-export function registerNoteTools(server: McpServer, config: IConnectConfig): void {
+export function registerNoteTools(server: McpServer, config: AirMcpConfig): void {
 
   // --- Layer 1: CRUD ---
 

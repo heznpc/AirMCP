@@ -11,6 +11,6 @@ startCommand:
     |-
     (config) => ({
       command: 'npx',
-      args: ['-y', 'iconnect-mcp'],
-      env: config.includeShared ? { ICONNECT_INCLUDE_SHARED: 'true' } : {}
+      args: ['-y', 'airmcp'],
+      env: config.includeShared ? { AIRMCP_INCLUDE_SHARED: 'true' } : {}
     })

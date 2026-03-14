@@ -1,5 +1,5 @@
 {
-  "name": "iconnect-mcp",
+  "name": "airmcp",
   "version": "0.3.0",
   "description": "MCP server for the entire Apple ecosystem — Notes, Reminders, Calendar, Contacts, Mail, Messages, Music, Finder, Safari, System, Photos, Shortcuts, Apple Intelligence, TV, Screen Capture, Maps, and Podcasts. Connect any AI to your Mac.",
   "keywords": [
@@ -49,12 +49,12 @@
   },
   "license": "MIT",
   "author": "heznpc",
-  "mcpName": "io.github.heznpc/iconnect",
+  "mcpName": "io.github.heznpc/airmcp",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "iconnect": "dist/index.js"
+    "airmcp": "dist/index.js"
   },
   "files": [
     "dist"

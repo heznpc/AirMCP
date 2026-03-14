@@ -55,7 +55,7 @@ final class UpdateManager {
             if success {
                 availableVersion = nil
             } else {
-                updateError = "Update failed. Run manually: npm install -g iconnect-mcp@latest"
+                updateError = "Update failed. Run manually: npm install -g airmcp@latest"
             }
             isUpdating = false
         }
@@ -73,7 +73,7 @@ final class UpdateManager {
 
                 let process = Process()
                 process.executableURL = URL(fileURLWithPath: npmPath)
-                process.arguments = ["view", IConnectConstants.npmPackageName, "version"]
+                process.arguments = ["view", AirMcpConstants.npmPackageName, "version"]
                 process.environment = NodeEnvironment.buildEnv()
 
                 let pipe = Pipe()
@@ -108,7 +108,7 @@ final class UpdateManager {
 
                 let process = Process()
                 process.executableURL = URL(fileURLWithPath: npmPath)
-                process.arguments = ["install", "-g", "\(IConnectConstants.npmPackageName)@latest"]
+                process.arguments = ["install", "-g", "\(AirMcpConstants.npmPackageName)@latest"]
                 process.environment = NodeEnvironment.buildEnv()
                 process.standardOutput = FileHandle.nullDevice
                 process.standardError = FileHandle.nullDevice

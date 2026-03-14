@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { readFile, unlink } from "node:fs/promises";
 import { runJxa } from "../shared/jxa.js";
-import type { IConnectConfig } from "../shared/config.js";
+import type { AirMcpConfig } from "../shared/config.js";
 import { toolError } from "../shared/result.js";
 import {
   captureScreenScript,
@@ -35,7 +35,7 @@ async function captureAndReturn(script: string) {
   }
 }
 
-export function registerScreenTools(server: McpServer, _config: IConnectConfig): void {
+export function registerScreenTools(server: McpServer, _config: AirMcpConfig): void {
   server.registerTool(
     "capture_screen",
     {

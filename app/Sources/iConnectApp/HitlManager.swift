@@ -45,7 +45,7 @@ final class HitlManager {
     private var receiveBuffers: [ObjectIdentifier: Data] = [:]
 
     private let socketPath: String = {
-        NSHomeDirectory() + "/.config/iconnect/hitl.sock"
+        NSHomeDirectory() + "/.config/airmcp/hitl.sock"
     }()
 
     var timeoutSeconds: Int = 30

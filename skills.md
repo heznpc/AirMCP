@@ -1,10 +1,10 @@
-# iConnect Skills Guide
+# AirMCP Skills Guide
 
-A practical guide for AI agents to effectively use iConnect's 160+ tools across 18 modules to orchestrate the Apple ecosystem via MCP.
+A practical guide for AI agents to effectively use AirMCP's 160+ tools across 18 modules to orchestrate the Apple ecosystem via MCP.
 
 ## Overview
 
-iConnect bridges AI agents to native macOS applications through JXA (JavaScript for Automation) and Swift. Each module wraps a single Apple app or system capability, exposing read, write, and search tools. Cross-app prompts combine multiple modules into multi-step workflows.
+AirMCP bridges AI agents to native macOS applications through JXA (JavaScript for Automation) and Swift. Each module wraps a single Apple app or system capability, exposing read, write, and search tools. Cross-app prompts combine multiple modules into multi-step workflows.
 
 ## Core Principles
 
@@ -314,7 +314,7 @@ Prompts are pre-built multi-step workflows invoked via `get_workflow` or the MCP
 - **Limit result sizes**: Many list tools accept a `limit` parameter. Use it to avoid overwhelming the context window with hundreds of results.
 
 ### Privacy and Safety
-- **HITL for writes**: iConnect enforces human-in-the-loop confirmation for destructive or sensitive operations. Never assume a write will succeed silently.
+- **HITL for writes**: AirMCP enforces human-in-the-loop confirmation for destructive or sensitive operations. Never assume a write will succeed silently.
 - **Never expose raw email content**: Summarize rather than quoting full email bodies, especially when they may contain signatures with personal information.
 - **Confirm before sending**: `send_mail`, `send_message`, `reply_mail` all require user confirmation. Always show the draft before triggering.
 - **Export before delete**: Back up shortcuts (`export_shortcut`) before deleting. Back up notes content before deleting.

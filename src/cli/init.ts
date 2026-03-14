@@ -1,8 +1,8 @@
 /**
- * `npx iconnect-mcp init` — interactive setup wizard.
+ * `npx airmcp init` — interactive setup wizard.
  *
  * 1. Choose modules (toggle-style)
- * 2. Write ~/.config/iconnect/config.json
+ * 2. Write ~/.config/airmcp/config.json
  * 3. Auto-detect and patch MCP client configs (Claude Desktop, Cursor, Windsurf, etc.)
  */
 
@@ -37,8 +37,8 @@ const MCP_CLIENTS: McpClient[] = [
   },
 ];
 
-const ICONNECT_CONFIG_DIR = join(HOME, ".config", "iconnect");
-const ICONNECT_CONFIG_PATH = join(ICONNECT_CONFIG_DIR, "config.json");
+const AIRMCP_CONFIG_DIR = join(HOME, ".config", "airmcp");
+const AIRMCP_CONFIG_PATH = join(AIRMCP_CONFIG_DIR, "config.json");
 
 const MODULE_LABELS: Record<string, string> = {
   notes: "Notes",
@@ -90,7 +90,7 @@ export async function runInit(): Promise<void> {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
 
   console.log("");
-  console.log("\x1b[1m\x1b[36m  iConnect Setup Wizard\x1b[0m");
+  console.log("\x1b[1m\x1b[36m  AirMCP Setup Wizard\x1b[0m");
   console.log("\x1b[2m  Connect your Mac to any AI via MCP\x1b[0m");
   console.log("");
 
@@ -142,18 +142,18 @@ export async function runInit(): Promise<void> {
   console.log("");
   process.stdout.write("  Writing config...");
 
-  mkdirSync(ICONNECT_CONFIG_DIR, { recursive: true });
+  mkdirSync(AIRMCP_CONFIG_DIR, { recursive: true });
   const configPayload = {
     disabledModules,
     includeShared: false,
     allowSendMessages: true,
     allowSendMail: true,
   };
-  writeFileSync(ICONNECT_CONFIG_PATH, JSON.stringify(configPayload, null, 2) + "\n");
-  console.log(` \x1b[32m✓\x1b[0m ${ICONNECT_CONFIG_PATH}`);
+  writeFileSync(AIRMCP_CONFIG_PATH, JSON.stringify(configPayload, null, 2) + "\n");
+  console.log(` \x1b[32m✓\x1b[0m ${AIRMCP_CONFIG_PATH}`);
 
   // --- Step 3: Auto-detect and patch MCP client configs ---
-  const iconnectEntry = {
+  const airmcpEntry = {
     command: "npx",
     args: ["-y", NPM_PACKAGE_NAME],
   };
@@ -178,7 +178,7 @@ export async function runInit(): Promise<void> {
       }
 
       const servers = (existing[client.serversKey] as Record<string, unknown>) ?? {};
-      servers.iconnect = iconnectEntry;
+      servers.airmcp = airmcpEntry;
       existing[client.serversKey] = servers;
 
       mkdirSync(join(client.configPath, ".."), { recursive: true });
@@ -194,14 +194,14 @@ export async function runInit(): Promise<void> {
     console.log("  \x1b[33m⚠\x1b[0m No MCP clients detected.");
     console.log("");
     console.log("  Add this to your MCP client config manually:");
-    console.log(`  \x1b[2m${JSON.stringify({ mcpServers: { iconnect: iconnectEntry } }, null, 2)}\x1b[0m`);
+    console.log(`  \x1b[2m${JSON.stringify({ mcpServers: { airmcp: airmcpEntry } }, null, 2)}\x1b[0m`);
   }
 
   // --- Done ---
   console.log("");
   console.log(`  \x1b[32m✓\x1b[0m Setup complete! ${enabled.size} modules enabled, ${patchedClients} client(s) configured.`);
   if (detectedClients.length > 0) {
-    console.log(`  \x1b[2mRestart ${detectedClients.join(", ")} to connect iConnect.\x1b[0m`);
+    console.log(`  \x1b[2mRestart ${detectedClients.join(", ")} to connect AirMCP.\x1b[0m`);
   }
   console.log("");
 

@@ -7,7 +7,7 @@ const TIMEOUT_MS = 60_000; // 60s — LLM inference can be slow
 const MAX_BUFFER = 10 * 1024 * 1024; // 10 MB
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const BINARY_PATH = resolve(__dirname, "../../swift/.build/release/ImcpBridge");
+const BINARY_PATH = resolve(__dirname, "../../swift/.build/release/AirMcpBridge");
 
 let bridgeChecked = false;
 let bridgeError: string | null = null;

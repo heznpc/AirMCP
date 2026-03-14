@@ -43,9 +43,9 @@ let hitlClient: HitlClient | null = null;
 if (config.hitl.level !== "off") {
   hitlClient = new HitlClient(config.hitl);
   setShareGuardHitlClient(hitlClient);
-  console.error(`iConnect HITL enabled: level=${config.hitl.level}, timeout=${config.hitl.timeout}s, socket=${config.hitl.socketPath}`);
+  console.error(`AirMCP HITL enabled: level=${config.hitl.level}, timeout=${config.hitl.timeout}s, socket=${config.hitl.socketPath}`);
 } else {
-  console.error("iConnect HITL disabled");
+  console.error("AirMCP HITL disabled");
 }
 
 // Clean up HITL socket on exit
@@ -88,18 +88,18 @@ async function createServer(): Promise<McpServer> {
     }
   }
   if (osBlocked.length > 0) {
-    console.error(`iConnect modules unavailable on macOS ${osVersion}: ${osBlocked.join(", ")}`);
+    console.error(`AirMCP modules unavailable on macOS ${osVersion}: ${osBlocked.join(", ")}`);
   }
   if (disabled.length > 0) {
-    console.error(`iConnect modules disabled: ${disabled.join(", ")}`);
+    console.error(`AirMCP modules disabled: ${disabled.join(", ")}`);
   }
-  console.error(`iConnect modules enabled: ${enabled.join(", ")}`);
+  console.error(`AirMCP modules enabled: ${enabled.join(", ")}`);
 
   // Dynamic shortcut tools: auto-discover and register individual shortcuts
   if (shortcutsEnabled) {
     const dynamicCount = await registerDynamicShortcutTools(server);
     if (dynamicCount > 0) {
-      console.error(`[iConnect] ${dynamicCount} dynamic shortcut tools registered`);
+      console.error(`[AirMCP] ${dynamicCount} dynamic shortcut tools registered`);
     }
   }
 
@@ -259,13 +259,13 @@ async function main() {
     });
 
     app.listen(port, () => {
-      console.error(`iConnect server running on http://localhost:${port}/mcp (shared notes: ${config.includeShared ? "on" : "off"}, send messages: ${config.allowSendMessages ? "on" : "off"}, send mail: ${config.allowSendMail ? "on" : "off"})`);
+      console.error(`AirMCP server running on http://localhost:${port}/mcp (shared notes: ${config.includeShared ? "on" : "off"}, send messages: ${config.allowSendMessages ? "on" : "off"}, send mail: ${config.allowSendMail ? "on" : "off"})`);
     });
   } else {
     const server = await createServer();
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    console.error(`iConnect server running on stdio (shared notes: ${config.includeShared ? "on" : "off"}, send messages: ${config.allowSendMessages ? "on" : "off"}, send mail: ${config.allowSendMail ? "on" : "off"})`);
+    console.error(`AirMCP server running on stdio (shared notes: ${config.includeShared ? "on" : "off"}, send messages: ${config.allowSendMessages ? "on" : "off"}, send mail: ${config.allowSendMail ? "on" : "off"})`);
   }
 }
 

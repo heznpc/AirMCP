@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { runJxa } from "./jxa.js";
 import { ok } from "./result.js";
-import { IConnectConfig, isModuleEnabled } from "./config.js";
+import { AirMcpConfig, isModuleEnabled } from "./config.js";
 
 /** Map: module name → macOS app name + permission-probe script */
 const MODULE_APP_MAP: Array<{ module: string; name: string; script: string }> = [
@@ -19,13 +19,13 @@ const MODULE_APP_MAP: Array<{ module: string; name: string; script: string }> = 
   { module: "tv", name: "TV", script: "const TV = Application('TV'); JSON.stringify({app: 'TV', accessible: true});" },
 ];
 
-export function registerSetupTools(server: McpServer, config?: IConnectConfig): void {
+export function registerSetupTools(server: McpServer, config?: AirMcpConfig): void {
   server.registerTool(
     "setup_permissions",
     {
       title: "Setup Permissions",
       description:
-        "Trigger macOS permission prompts for all Apple apps used by iConnect. Run this once after installation to grant all permissions at once. Each app will show a one-time macOS permission dialog.",
+        "Trigger macOS permission prompts for all Apple apps used by AirMCP. Run this once after installation to grant all permissions at once. Each app will show a one-time macOS permission dialog.",
       inputSchema: {},
       annotations: {
         readOnlyHint: true,

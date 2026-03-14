@@ -4,17 +4,17 @@ import Photos
 import NaturalLanguage
 import Accelerate
 
-// IConnectBridge CLI — thin wrapper around Apple frameworks.
+// AirMcpBridge CLI — thin wrapper around Apple frameworks.
 // Reads JSON from stdin, dispatches to subcommand, writes JSON to stdout.
 //
 // Usage:
-//   echo '{"text":"Hello world"}' | IConnectBridge summarize
-//   echo '{"text":"Hello","tone":"friendly"}' | IConnectBridge rewrite
-//   echo '{"text":"Helo wrold"}' | IConnectBridge proofread
-//   echo '{"title":"Standup","startDate":"...","endDate":"...","recurrence":{...}}' | IConnectBridge create-recurring-event
-//   echo '{"title":"Take meds","recurrence":{...}}' | IConnectBridge create-recurring-reminder
-//   echo '{"filePath":"/tmp/photo.jpg"}' | IConnectBridge import-photo
-//   echo '{"identifiers":["ABC123"]}' | IConnectBridge delete-photos
+//   echo '{"text":"Hello world"}' | AirMcpBridge summarize
+//   echo '{"text":"Hello","tone":"friendly"}' | AirMcpBridge rewrite
+//   echo '{"text":"Helo wrold"}' | AirMcpBridge proofread
+//   echo '{"title":"Standup","startDate":"...","endDate":"...","recurrence":{...}}' | AirMcpBridge create-recurring-event
+//   echo '{"title":"Take meds","recurrence":{...}}' | AirMcpBridge create-recurring-reminder
+//   echo '{"filePath":"/tmp/photo.jpg"}' | AirMcpBridge import-photo
+//   echo '{"identifiers":["ABC123"]}' | AirMcpBridge delete-photos
 
 #if canImport(FoundationModels)
 import FoundationModels
@@ -250,13 +250,13 @@ func nlLanguageFromCode(_ code: String?) -> NLLanguage? {
 
 func embedText(_ text: String, language: NLLanguage) throws -> [Double] {
     guard let embedding = NLContextualEmbedding(language: language) else {
-        throw NSError(domain: "IConnectBridge", code: 1,
+        throw NSError(domain: "AirMcpBridge", code: 1,
             userInfo: [NSLocalizedDescriptionKey: "NLContextualEmbedding unavailable for language: \(language.rawValue)"])
     }
     try embedding.load()
 
     guard let result = try? embedding.embeddingResult(for: text, language: language) else {
-        throw NSError(domain: "IConnectBridge", code: 2,
+        throw NSError(domain: "AirMcpBridge", code: 2,
             userInfo: [NSLocalizedDescriptionKey: "Failed to generate embedding for text"])
     }
 
@@ -267,7 +267,7 @@ func embedText(_ text: String, language: NLLanguage) throws -> [Double] {
     }
 
     guard !tokenVectors.isEmpty else {
-        throw NSError(domain: "IConnectBridge", code: 3,
+        throw NSError(domain: "AirMcpBridge", code: 3,
             userInfo: [NSLocalizedDescriptionKey: "No token vectors generated"])
     }
 
@@ -287,7 +287,7 @@ func embedText(_ text: String, language: NLLanguage) throws -> [Double] {
 
 let args = CommandLine.arguments
 guard args.count >= 2 else {
-    writeError("Usage: IConnectBridge <command>")
+    writeError("Usage: AirMcpBridge <command>")
     exit(1)
 }
 

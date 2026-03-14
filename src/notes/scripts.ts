@@ -109,7 +109,7 @@ export function createNoteScript(body: string, folder?: string): string {
       const Notes = Application('Notes');
       const folders = Notes.folders.whose({name: '${esc(folder)}'})();
       if (folders.length === 0) throw new Error('Folder not found: ${esc(folder)}');
-      if (folders[0].shared()) throw new Error('Cannot create notes in shared folder: ${esc(folder)}. Set ICONNECT_INCLUDE_SHARED=true to allow.');
+      if (folders[0].shared()) throw new Error('Cannot create notes in shared folder: ${esc(folder)}. Set AIRMCP_INCLUDE_SHARED=true to allow.');
       const note = Notes.Note({body: '${esc(body)}'});
       folders[0].notes.push(note);
       JSON.stringify({id: note.id(), name: note.name()});

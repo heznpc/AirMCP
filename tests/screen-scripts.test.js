@@ -12,7 +12,7 @@ describe('screen script generators', () => {
   test('captureScreenScript generates screencapture command', () => {
     const script = captureScreenScript();
     expect(script).toContain('screencapture -x -t png');
-    expect(script).toContain('/tmp/iconnect-screenshot-');
+    expect(script).toContain('/tmp/airmcp-screenshot-');
     expect(script).toContain('.png');
     expect(script).toContain('JSON.stringify');
     expect(script).toContain('doShellScript');
@@ -44,7 +44,7 @@ describe('screen script generators', () => {
   test('captureWindowScript captures frontmost window by default', () => {
     const script = captureWindowScript();
     expect(script).toContain('screencapture -x -t png -l');
-    expect(script).toContain('/tmp/iconnect-screenshot-');
+    expect(script).toContain('/tmp/airmcp-screenshot-');
     expect(script).toContain('JSON.stringify');
     expect(script).toContain('CGWindowListCopyWindowInfo');
   });
@@ -71,7 +71,7 @@ describe('screen script generators', () => {
     const script = captureAreaScript(100, 200, 300, 400);
     expect(script).toContain('-R 100,200,300,400');
     expect(script).toContain('screencapture -x -t png');
-    expect(script).toContain('/tmp/iconnect-screenshot-');
+    expect(script).toContain('/tmp/airmcp-screenshot-');
   });
 
   test('captureAreaScript floors coordinate values', () => {

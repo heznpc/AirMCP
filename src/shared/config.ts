@@ -20,7 +20,7 @@ export function getOsVersion(): number {
 }
 
 /** npm package name — single source of truth for npx/install references */
-export const NPM_PACKAGE_NAME = "iconnect-mcp";
+export const NPM_PACKAGE_NAME = "airmcp";
 
 export type HitlLevel = "off" | "destructive-only" | "all-writes" | "all";
 
@@ -65,7 +65,7 @@ export const STARTER_MODULES: ReadonlySet<string> = new Set([
 
 export type ModuleName = (typeof MODULE_NAMES)[number];
 
-export interface IConnectConfig {
+export interface AirMcpConfig {
   /** Include shared notes/folders in results. Default: false */
   includeShared: boolean;
   /** Set of disabled module names */
@@ -98,7 +98,7 @@ interface LoadResult {
 function loadFileConfig(): LoadResult {
   try {
     const home = process.env.HOME ?? process.env.USERPROFILE ?? "";
-    const file = join(home, ".config", "iconnect", "config.json");
+    const file = join(home, ".config", "airmcp", "config.json");
     const data = readFileSync(file, "utf-8");
     return { config: JSON.parse(data) as FileConfig, fileExists: true };
   } catch {
@@ -122,15 +122,15 @@ function envBool(envKey: string, fileValue: boolean | undefined, defaultValue: b
   return fileValue ?? defaultValue;
 }
 
-export function parseConfig(): IConnectConfig {
+export function parseConfig(): AirMcpConfig {
   const { config: file, fileExists } = loadFileConfig();
-  const fullMode = process.env.ICONNECT_FULL === "true" || process.argv.includes("--full");
+  const fullMode = process.env.AIRMCP_FULL === "true" || process.argv.includes("--full");
 
   // Disabled modules: env vars override, then JSON fallback, then starter preset
   const disabledModules = new Set<string>();
   const fileDisabled = new Set(file.disabledModules ?? []);
   for (const mod of MODULE_NAMES) {
-    const envKey = `ICONNECT_DISABLE_${mod.toUpperCase()}`;
+    const envKey = `AIRMCP_DISABLE_${mod.toUpperCase()}`;
     const envVal = process.env[envKey];
     if (envVal === "true") {
       disabledModules.add(mod);
@@ -144,7 +144,7 @@ export function parseConfig(): IConnectConfig {
 
   // Share approval: env var overrides, then JSON fallback
   const shareApprovalModules = new Set<string>();
-  const shareApprovalEnv = process.env.ICONNECT_SHARE_APPROVAL;
+  const shareApprovalEnv = process.env.AIRMCP_SHARE_APPROVAL;
   if (shareApprovalEnv) {
     for (const raw of shareApprovalEnv.split(",")) {
       const mod = raw.trim().toLowerCase();
@@ -161,19 +161,19 @@ export function parseConfig(): IConnectConfig {
   }
 
   // Boolean configs: env var > JSON > default
-  const includeShared = envBool("ICONNECT_INCLUDE_SHARED", file.includeShared, false);
-  const allowSendMessages = envBool("ICONNECT_ALLOW_SEND_MESSAGES", file.allowSendMessages, true);
-  const allowSendMail = envBool("ICONNECT_ALLOW_SEND_MAIL", file.allowSendMail, true);
+  const includeShared = envBool("AIRMCP_INCLUDE_SHARED", file.includeShared, false);
+  const allowSendMessages = envBool("AIRMCP_ALLOW_SEND_MESSAGES", file.allowSendMessages, true);
+  const allowSendMail = envBool("AIRMCP_ALLOW_SEND_MAIL", file.allowSendMail, true);
 
   // HITL config: env var > JSON > default
   const home = process.env.HOME ?? process.env.USERPROFILE ?? "";
-  const hitlLevelRaw = process.env.ICONNECT_HITL_LEVEL ?? file.hitl?.level ?? "off";
+  const hitlLevelRaw = process.env.AIRMCP_HITL_LEVEL ?? file.hitl?.level ?? "off";
   const hitlLevel: HitlLevel = HITL_LEVELS.includes(hitlLevelRaw)
     ? (hitlLevelRaw as HitlLevel)
     : "off";
   const hitlWhitelist = new Set<string>(file.hitl?.whitelist ?? []);
   const hitlTimeout = file.hitl?.timeout ?? 30;
-  const hitlSocketPath = join(home, ".config", "iconnect", "hitl.sock");
+  const hitlSocketPath = join(home, ".config", "airmcp", "hitl.sock");
 
   const hitl: HitlConfig = {
     level: hitlLevel,
@@ -192,10 +192,10 @@ export function parseConfig(): IConnectConfig {
   };
 }
 
-export function isModuleEnabled(config: IConnectConfig, moduleName: string): boolean {
+export function isModuleEnabled(config: AirMcpConfig, moduleName: string): boolean {
   return !config.disabledModules.has(moduleName);
 }
 
-export function needsShareApproval(config: IConnectConfig, moduleName: string): boolean {
+export function needsShareApproval(config: AirMcpConfig, moduleName: string): boolean {
   return config.shareApprovalModules.has(moduleName);
 }

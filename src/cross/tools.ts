@@ -2,13 +2,13 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { ok, err } from "../shared/result.js";
 import { buildSnapshot } from "../shared/resources.js";
-import { IConnectConfig, isModuleEnabled } from "../shared/config.js";
+import { AirMcpConfig, isModuleEnabled } from "../shared/config.js";
 
 /**
  * Cross-module tools that leverage MCP Sampling to delegate
  * intelligence to the client's LLM — no API keys needed.
  */
-export function registerCrossTools(mcpServer: McpServer, config: IConnectConfig): void {
+export function registerCrossTools(mcpServer: McpServer, config: AirMcpConfig): void {
   const lowServer = mcpServer.server;
   const enabled = (mod: string) => isModuleEnabled(config, mod);
 

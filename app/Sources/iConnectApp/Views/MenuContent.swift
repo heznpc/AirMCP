@@ -71,15 +71,15 @@ private let allModules: [ModuleInfo] = [
 
 // MARK: - Shared Constants
 
-enum IConnectConstants {
-    static let npmPackageName = "iconnect-mcp"
+enum AirMcpConstants {
+    static let npmPackageName = "airmcp"
     static let keyAutoStart = "autoStartServer"
     static let keyOnboardingCompleted = "onboardingCompleted"
 
     static let claudeDesktopConfig = """
     {
       "mcpServers": {
-        "iconnect": {
+        "airmcp": {
           "command": "npx",
           "args": ["-y", "\(npmPackageName)"]
         }
@@ -283,7 +283,7 @@ struct MenuContent: View {
 
         Divider()
 
-        Text("iConnect v0.3.0")
+        Text("AirMCP v0.3.0")
             .foregroundStyle(.secondary)
 
         Button("Quit") {
@@ -443,11 +443,11 @@ struct MenuContent: View {
     // MARK: - Clipboard Helpers
 
     private func copyClaudeConfig() {
-        IConnectConstants.copyToClipboard(IConnectConstants.claudeDesktopConfig)
+        AirMcpConstants.copyToClipboard(AirMcpConstants.claudeDesktopConfig)
     }
 
     private func copyClaudeCodeConfig() {
-        IConnectConstants.copyToClipboard("claude mcp add iconnect -- npx -y \(IConnectConstants.npmPackageName)")
+        AirMcpConstants.copyToClipboard("claude mcp add airmcp -- npx -y \(AirMcpConstants.npmPackageName)")
     }
 
     // MARK: - Share Approval Toggles

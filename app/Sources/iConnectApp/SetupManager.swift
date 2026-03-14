@@ -68,7 +68,7 @@ final class SetupManager {
             try? await Task.sleep(nanoseconds: 500_000_000)
 
             await MainActor.run {
-                IConnectConstants.copyToClipboard(IConnectConstants.claudeDesktopConfig)
+                AirMcpConstants.copyToClipboard(AirMcpConstants.claudeDesktopConfig)
                 self?.state = .done
             }
         }

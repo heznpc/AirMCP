@@ -12,8 +12,8 @@ final class ServerManager {
 
     var status: Status = .checking
     var autoStartEnabled: Bool {
-        get { UserDefaults.standard.bool(forKey: IConnectConstants.keyAutoStart) }
-        set { UserDefaults.standard.set(newValue, forKey: IConnectConstants.keyAutoStart) }
+        get { UserDefaults.standard.bool(forKey: AirMcpConstants.keyAutoStart) }
+        set { UserDefaults.standard.set(newValue, forKey: AirMcpConstants.keyAutoStart) }
     }
 
     private var timer: Timer?
@@ -41,7 +41,7 @@ final class ServerManager {
 
     func checkStatus() {
         Task.detached {
-            let isRunning = Self.pgrepIConnect()
+            let isRunning = Self.pgrepAirMcp()
             let newStatus: Status = isRunning ? .running : .stopped
             await MainActor.run { [weak self] in
                 guard self?.status != newStatus else { return }
@@ -118,7 +118,7 @@ final class ServerManager {
 
                 let process = Process()
                 process.executableURL = URL(fileURLWithPath: npxPath)
-                process.arguments = ["-y", IConnectConstants.npmPackageName]
+                process.arguments = ["-y", AirMcpConstants.npmPackageName]
                 process.standardOutput = stdoutPipe ?? FileHandle.nullDevice
                 process.standardError = stderrPipe ?? FileHandle.nullDevice
                 process.environment = NodeEnvironment.buildEnv()
@@ -136,7 +136,7 @@ final class ServerManager {
     private static func performPkill() async {
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             DispatchQueue.global().async {
-                pkillIConnect()
+                pkillAirMcp()
                 continuation.resume()
             }
         }
@@ -144,10 +144,10 @@ final class ServerManager {
 
     // MARK: - Process Utilities
 
-    private nonisolated static func pgrepIConnect() -> Bool {
+    private nonisolated static func pgrepAirMcp() -> Bool {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
-        process.arguments = ["-f", "node.*iconnect"]
+        process.arguments = ["-f", "node.*airmcp"]
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
 
@@ -160,10 +160,10 @@ final class ServerManager {
         }
     }
 
-    private nonisolated static func pkillIConnect() {
+    private nonisolated static func pkillAirMcp() {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
-        process.arguments = ["-f", "node.*iconnect"]
+        process.arguments = ["-f", "node.*airmcp"]
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
 

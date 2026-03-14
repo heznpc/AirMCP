@@ -1,12 +1,12 @@
 # iConnect
 
-MCP server for the entire Apple ecosystem — Notes, Reminders, Calendar, Contacts, Mail, Messages, Music, Finder, Safari, System, Photos, Shortcuts, Apple Intelligence, TV, Screen Capture, and Maps. Connect any AI to your Mac.
+MCP server for the entire Apple ecosystem — Notes, Reminders, Calendar, Contacts, Mail, Messages, Music, Finder, Safari, System, Photos, Shortcuts, Apple Intelligence, TV, Screen Capture, Maps, and Podcasts. Connect any AI to your Mac.
 
 > [한국어](README.ko.md)
 
 ## Features
 
-- **150+ tools** (17 modules) — Apple app CRUD + system control + Apple Intelligence + UI Automation + Screen Capture + Maps + dynamic shortcuts
+- **170+ tools** (18 modules) — Apple app CRUD + system control + Apple Intelligence + UI Automation + Screen Capture + Maps + Podcasts + dynamic shortcuts
 - **23 prompts** — per-app workflows + cross-module + developer workflows (dev-session, debug-loop, build-log)
 - **11 MCP resources** — Notes, Calendar, Reminders live data URIs
 - **JXA + Swift bridge** — JXA for basic automation, EventKit/PhotoKit for advanced features
@@ -232,7 +232,7 @@ Useful for running a Mac Mini as an "always-on AI hub."
 | `send_mail` | Compose and send an email | write |
 | `reply_mail` | Reply to an email message | write |
 
-### Music (9 tools)
+### Music (13 tools)
 
 | Tool | Description | Type |
 |------|-------------|------|
@@ -245,6 +245,10 @@ Useful for running a Mac Mini as an "always-on AI hub."
 | `play_playlist` | Start playing a playlist | write |
 | `get_track_info` | Detailed track metadata | read |
 | `set_shuffle` | Set shuffle and repeat mode | write |
+| `create_playlist` | Create a new playlist | write |
+| `add_to_playlist` | Add a track to a playlist | write |
+| `remove_from_playlist` | Remove a track from a playlist | destructive |
+| `delete_playlist` | Delete an existing playlist | destructive |
 
 ### Finder (8 tools)
 
@@ -259,7 +263,7 @@ Useful for running a Mac Mini as an "always-on AI hub."
 | `trash_file` | Move to Trash | destructive |
 | `create_directory` | Create new directory | write |
 
-### Safari (8 tools)
+### Safari (12 tools)
 
 | Tool | Description | Type |
 |------|-------------|------|
@@ -271,8 +275,12 @@ Useful for running a Mac Mini as an "always-on AI hub."
 | `activate_tab` | Switch to a specific tab | write |
 | `run_javascript` | Execute JavaScript in tab | write |
 | `search_tabs` | Search tabs by title/URL | read |
+| `list_bookmarks` | List all bookmarks across folders | read |
+| `add_bookmark` | Add a bookmark to Safari | write |
+| `list_reading_list` | List Reading List items | read |
+| `add_to_reading_list` | Add URL to Reading List | write |
 
-### System (10 tools)
+### System (17 tools)
 
 | Tool | Description | Type |
 |------|-------------|------|
@@ -286,6 +294,13 @@ Useful for running a Mac Mini as an "always-on AI hub."
 | `get_screen_info` | Display information | read |
 | `show_notification` | Show system notification | write |
 | `capture_screenshot` | Capture screenshot (full/window/selection) | write |
+| `get_wifi_status` | WiFi connection status and signal | read |
+| `toggle_wifi` | Turn WiFi on or off | write |
+| `list_bluetooth_devices` | List paired Bluetooth devices | read |
+| `get_battery_status` | Battery percentage, charging, time remaining | read |
+| `get_brightness` | Get display brightness level | read |
+| `set_brightness` | Set display brightness level | write |
+| `toggle_focus_mode` | Toggle Do Not Disturb on or off | write |
 
 ### Photos (9 tools)
 
@@ -364,7 +379,7 @@ Requires macOS 26+ with Apple Silicon.
 | `tv_search` | Search movies/TV shows | read |
 | `tv_play` | Play movie/episode by name | write |
 
-### Screen Capture (4 tools)
+### Screen Capture (5 tools)
 
 | Tool | Description | Type |
 |------|-------------|------|
@@ -372,6 +387,7 @@ Requires macOS 26+ with Apple Silicon.
 | `capture_window` | Capture a specific app window | read |
 | `capture_area` | Capture a screen region by coordinates | read |
 | `list_windows` | List all visible windows with position/size | read |
+| `record_screen` | Record screen for 1-60 seconds (.mov) | write |
 
 ### Maps (6 tools)
 
@@ -383,6 +399,17 @@ Requires macOS 26+ with Apple Silicon.
 | `open_address` | Open a specific address in Apple Maps | write |
 | `search_nearby` | Search for places near a location | write |
 | `share_location` | Generate a shareable Apple Maps link | read |
+
+### Podcasts (6 tools)
+
+| Tool | Description | Type |
+|------|-------------|------|
+| `list_podcast_shows` | List subscribed podcast shows | read |
+| `list_podcast_episodes` | List episodes for a show | read |
+| `podcast_now_playing` | Currently playing podcast episode | read |
+| `podcast_playback_control` | Play, pause, next, previous | write |
+| `play_podcast_episode` | Play a specific episode by name | write |
+| `search_podcast_episodes` | Search episodes by keyword | read |
 
 ## Resources
 
@@ -494,7 +521,7 @@ Or edit `~/.config/iconnect/config.json` directly:
 | `npx iconnect-mcp init` | Interactive setup wizard |
 | `npx iconnect-mcp doctor` | Diagnose installation issues |
 | `npx iconnect-mcp` | Start MCP server (stdio, default) |
-| `npx iconnect-mcp --full` | Start with all 15 modules enabled |
+| `npx iconnect-mcp --full` | Start with all 18 modules enabled |
 | `npx iconnect-mcp --http` | Start as HTTP server (port 3847) |
 
 ## Configuration

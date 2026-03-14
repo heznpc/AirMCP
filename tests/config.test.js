@@ -48,8 +48,8 @@ function clearConfigEnv() {
 /* ================================================================== */
 
 describe('MODULE_NAMES', () => {
-  test('contains exactly 17 modules', () => {
-    expect(MODULE_NAMES).toHaveLength(17);
+  test('contains exactly 18 modules', () => {
+    expect(MODULE_NAMES).toHaveLength(18);
   });
 
   test('includes the "tv" module', () => {
@@ -61,7 +61,7 @@ describe('MODULE_NAMES', () => {
       'notes', 'reminders', 'calendar', 'contacts', 'mail',
       'messages', 'music', 'finder', 'safari', 'system',
       'photos', 'shortcuts', 'intelligence', 'tv', 'ui',
-      'screen', 'maps',
+      'screen', 'maps', 'podcasts',
     ];
     for (const name of expected) {
       expect(MODULE_NAMES).toContain(name);
@@ -85,7 +85,8 @@ describe('STARTER_MODULES', () => {
 
   test('does not contain non-core modules', () => {
     const nonStarter = ['contacts', 'mail', 'messages', 'music', 'finder',
-                        'safari', 'photos', 'intelligence', 'tv', 'ui'];
+                        'safari', 'photos', 'intelligence', 'tv', 'ui',
+                        'screen', 'maps', 'podcasts'];
     for (const mod of nonStarter) {
       expect(STARTER_MODULES.has(mod)).toBe(false);
     }

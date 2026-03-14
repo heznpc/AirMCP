@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { IConnectConfig } from "../shared/config.js";
-import { ok, err } from "../shared/result.js";
+import { ok, toolError } from "../shared/result.js";
 import {
   getClipboardScript,
   setClipboardScript,
@@ -14,6 +14,13 @@ import {
   getScreenInfoScript,
   showNotificationScript,
   captureScreenshotScript,
+  getWifiStatusScript,
+  toggleWifiScript,
+  listBluetoothDevicesScript,
+  getBatteryStatusScript,
+  getBrightnessScript,
+  setBrightnessScript,
+  toggleFocusModeScript,
 } from "./scripts.js";
 
 export function registerSystemTools(server: McpServer, _config: IConnectConfig): void {
@@ -34,7 +41,7 @@ export function registerSystemTools(server: McpServer, _config: IConnectConfig):
       try {
         return ok(await runJxa<{ content: string }>(getClipboardScript()));
       } catch (e) {
-        return err(`Failed to get clipboard: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("get clipboard", e);
       }
     },
   );
@@ -58,7 +65,7 @@ export function registerSystemTools(server: McpServer, _config: IConnectConfig):
       try {
         return ok(await runJxa<{ set: boolean; length: number }>(setClipboardScript(text)));
       } catch (e) {
-        return err(`Failed to set clipboard: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("set clipboard", e);
       }
     },
   );
@@ -80,7 +87,7 @@ export function registerSystemTools(server: McpServer, _config: IConnectConfig):
       try {
         return ok(await runJxa<{ outputVolume: number; inputVolume: number; outputMuted: boolean }>(getVolumeScript()));
       } catch (e) {
-        return err(`Failed to get volume: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("get volume", e);
       }
     },
   );
@@ -105,7 +112,7 @@ export function registerSystemTools(server: McpServer, _config: IConnectConfig):
       try {
         return ok(await runJxa<{ outputVolume: number; outputMuted: boolean }>(setVolumeScript(volume, muted)));
       } catch (e) {
-        return err(`Failed to set volume: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("set volume", e);
       }
     },
   );
@@ -127,7 +134,7 @@ export function registerSystemTools(server: McpServer, _config: IConnectConfig):
       try {
         return ok(await runJxa<{ darkMode: boolean }>(toggleDarkModeScript()));
       } catch (e) {
-        return err(`Failed to toggle dark mode: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("toggle dark mode", e);
       }
     },
   );
@@ -149,7 +156,7 @@ export function registerSystemTools(server: McpServer, _config: IConnectConfig):
       try {
         return ok(await runJxa<{ name: string; bundleIdentifier: string; pid: number }>(getFrontmostAppScript()));
       } catch (e) {
-        return err(`Failed to get frontmost app: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("get frontmost app", e);
       }
     },
   );
@@ -171,7 +178,7 @@ export function registerSystemTools(server: McpServer, _config: IConnectConfig):
       try {
         return ok(await runJxa(listRunningAppsScript()));
       } catch (e) {
-        return err(`Failed to list running apps: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("list running apps", e);
       }
     },
   );
@@ -193,7 +200,7 @@ export function registerSystemTools(server: McpServer, _config: IConnectConfig):
       try {
         return ok(await runJxa(getScreenInfoScript()));
       } catch (e) {
-        return err(`Failed to get screen info: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("get screen info", e);
       }
     },
   );
@@ -220,7 +227,7 @@ export function registerSystemTools(server: McpServer, _config: IConnectConfig):
       try {
         return ok(await runJxa(showNotificationScript(message, title, subtitle, sound)));
       } catch (e) {
-        return err(`Failed to show notification: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("show notification", e);
       }
     },
   );
@@ -245,7 +252,169 @@ export function registerSystemTools(server: McpServer, _config: IConnectConfig):
       try {
         return ok(await runJxa(captureScreenshotScript(path, region)));
       } catch (e) {
-        return err(`Failed to capture screenshot: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("capture screenshot", e);
+      }
+    },
+  );
+
+  // --- Network & Display Control Tools ---
+
+  server.registerTool(
+    "get_wifi_status",
+    {
+      title: "Get WiFi Status",
+      description: "Get the current WiFi status including connected network name, signal strength, and channel.",
+      inputSchema: {},
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async () => {
+      try {
+        return ok(await runJxa(getWifiStatusScript()));
+      } catch (e) {
+        return toolError("get wifi status", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "toggle_wifi",
+    {
+      title: "Toggle WiFi",
+      description: "Turn WiFi on or off.",
+      inputSchema: {
+        enable: z.boolean().describe("True to enable WiFi, false to disable"),
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async ({ enable }) => {
+      try {
+        return ok(await runJxa(toggleWifiScript(enable)));
+      } catch (e) {
+        return toolError("toggle wifi", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "list_bluetooth_devices",
+    {
+      title: "List Bluetooth Devices",
+      description: "List paired Bluetooth devices with their connection status.",
+      inputSchema: {},
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async () => {
+      try {
+        return ok(await runJxa(listBluetoothDevicesScript()));
+      } catch (e) {
+        return toolError("list bluetooth devices", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "get_battery_status",
+    {
+      title: "Get Battery Status",
+      description: "Get battery percentage, charging state, power source, and estimated time remaining.",
+      inputSchema: {},
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async () => {
+      try {
+        return ok(await runJxa(getBatteryStatusScript()));
+      } catch (e) {
+        return toolError("get battery status", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "get_brightness",
+    {
+      title: "Get Brightness",
+      description: "Get the current display brightness level.",
+      inputSchema: {},
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async () => {
+      try {
+        return ok(await runJxa(getBrightnessScript()));
+      } catch (e) {
+        return toolError("get brightness", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "set_brightness",
+    {
+      title: "Set Brightness",
+      description: "Set the display brightness level. Requires the 'brightness' CLI tool (brew install brightness).",
+      inputSchema: {
+        level: z.number().min(0).max(1).describe("Brightness level from 0.0 (darkest) to 1.0 (brightest)"),
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async ({ level }) => {
+      try {
+        return ok(await runJxa(setBrightnessScript(level)));
+      } catch (e) {
+        return toolError("set brightness", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "toggle_focus_mode",
+    {
+      title: "Toggle Focus Mode",
+      description: "Toggle Do Not Disturb (Focus mode) on or off.",
+      inputSchema: {
+        enable: z.boolean().describe("True to enable Do Not Disturb, false to disable"),
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async ({ enable }) => {
+      try {
+        return ok(await runJxa(toggleFocusModeScript(enable)));
+      } catch (e) {
+        return toolError("toggle focus mode", e);
       }
     },
   );

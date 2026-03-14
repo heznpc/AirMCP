@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { IConnectConfig } from "../shared/config.js";
-import { ok, err } from "../shared/result.js";
+import { ok, toolError } from "../shared/result.js";
 import {
   listPlaylistsScript,
   listTracksScript,
@@ -13,6 +13,10 @@ import {
   playPlaylistScript,
   getTrackInfoScript,
   setShuffleScript,
+  createPlaylistScript,
+  addToPlaylistScript,
+  removeFromPlaylistScript,
+  deletePlaylistScript,
 } from "./scripts.js";
 
 export function registerMusicTools(server: McpServer, _config: IConnectConfig): void {
@@ -28,7 +32,7 @@ export function registerMusicTools(server: McpServer, _config: IConnectConfig): 
       try {
         return ok(await runJxa(listPlaylistsScript()));
       } catch (e) {
-        return err(`Failed to list playlists: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("list playlists", e);
       }
     },
   );
@@ -48,7 +52,7 @@ export function registerMusicTools(server: McpServer, _config: IConnectConfig): 
       try {
         return ok(await runJxa(listTracksScript(playlist, limit)));
       } catch (e) {
-        return err(`Failed to list tracks: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("list tracks", e);
       }
     },
   );
@@ -65,7 +69,7 @@ export function registerMusicTools(server: McpServer, _config: IConnectConfig): 
       try {
         return ok(await runJxa(nowPlayingScript()));
       } catch (e) {
-        return err(`Failed to get now playing: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("get now playing", e);
       }
     },
   );
@@ -84,7 +88,7 @@ export function registerMusicTools(server: McpServer, _config: IConnectConfig): 
       try {
         return ok(await runJxa(playbackControlScript(action)));
       } catch (e) {
-        return err(`Failed to control playback: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("control playback", e);
       }
     },
   );
@@ -104,7 +108,7 @@ export function registerMusicTools(server: McpServer, _config: IConnectConfig): 
       try {
         return ok(await runJxa(searchTracksScript(query, limit)));
       } catch (e) {
-        return err(`Failed to search tracks: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("search tracks", e);
       }
     },
   );
@@ -124,7 +128,7 @@ export function registerMusicTools(server: McpServer, _config: IConnectConfig): 
       try {
         return ok(await runJxa(playTrackScript(trackName, playlist)));
       } catch (e) {
-        return err(`Failed to play track: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("play track", e);
       }
     },
   );
@@ -144,7 +148,7 @@ export function registerMusicTools(server: McpServer, _config: IConnectConfig): 
       try {
         return ok(await runJxa(playPlaylistScript(name, shuffle)));
       } catch (e) {
-        return err(`Failed to play playlist: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("play playlist", e);
       }
     },
   );
@@ -163,7 +167,7 @@ export function registerMusicTools(server: McpServer, _config: IConnectConfig): 
       try {
         return ok(await runJxa(getTrackInfoScript(trackName)));
       } catch (e) {
-        return err(`Failed to get track info: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("get track info", e);
       }
     },
   );
@@ -183,7 +187,85 @@ export function registerMusicTools(server: McpServer, _config: IConnectConfig): 
       try {
         return ok(await runJxa(setShuffleScript(shuffle, songRepeat)));
       } catch (e) {
-        return err(`Failed to set shuffle/repeat: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("set shuffle/repeat", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "create_playlist",
+    {
+      title: "Create Playlist",
+      description: "Create a new playlist in Music.",
+      inputSchema: {
+        name: z.string().describe("Name for the new playlist"),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async ({ name }) => {
+      try {
+        return ok(await runJxa(createPlaylistScript(name)));
+      } catch (e) {
+        return toolError("create playlist", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "add_to_playlist",
+    {
+      title: "Add to Playlist",
+      description: "Add a track to an existing playlist.",
+      inputSchema: {
+        playlistName: z.string().describe("Playlist name"),
+        trackName: z.string().describe("Track name to add"),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async ({ playlistName, trackName }) => {
+      try {
+        return ok(await runJxa(addToPlaylistScript(playlistName, trackName)));
+      } catch (e) {
+        return toolError("add to playlist", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "remove_from_playlist",
+    {
+      title: "Remove from Playlist",
+      description: "Remove a track from a playlist.",
+      inputSchema: {
+        playlistName: z.string().describe("Playlist name"),
+        trackName: z.string().describe("Track name to remove"),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+    },
+    async ({ playlistName, trackName }) => {
+      try {
+        return ok(await runJxa(removeFromPlaylistScript(playlistName, trackName)));
+      } catch (e) {
+        return toolError("remove from playlist", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "delete_playlist",
+    {
+      title: "Delete Playlist",
+      description: "Delete an existing playlist from Music.",
+      inputSchema: {
+        name: z.string().describe("Playlist name to delete"),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+    },
+    async ({ name }) => {
+      try {
+        return ok(await runJxa(deletePlaylistScript(name)));
+      } catch (e) {
+        return toolError("delete playlist", e);
       }
     },
   );

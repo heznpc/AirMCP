@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { IConnectConfig } from "../shared/config.js";
-import { ok, err } from "../shared/result.js";
+import { ok, toolError } from "../shared/result.js";
 import {
   listTabsScript,
   readPageContentScript,
@@ -12,6 +12,10 @@ import {
   activateTabScript,
   runJavascriptScript,
   searchTabsScript,
+  listBookmarksScript,
+  addBookmarkScript,
+  listReadingListScript,
+  addToReadingListScript,
 } from "./scripts.js";
 
 export function registerSafariTools(server: McpServer, _config: IConnectConfig): void {
@@ -27,7 +31,7 @@ export function registerSafariTools(server: McpServer, _config: IConnectConfig):
       try {
         return ok(await runJxa(listTabsScript()));
       } catch (e) {
-        return err(`Failed to list tabs: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("list tabs", e);
       }
     },
   );
@@ -48,7 +52,7 @@ export function registerSafariTools(server: McpServer, _config: IConnectConfig):
       try {
         return ok(await runJxa(readPageContentScript(windowIndex, tabIndex, maxLength)));
       } catch (e) {
-        return err(`Failed to read page: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("read page", e);
       }
     },
   );
@@ -65,7 +69,7 @@ export function registerSafariTools(server: McpServer, _config: IConnectConfig):
       try {
         return ok(await runJxa(getCurrentTabScript()));
       } catch (e) {
-        return err(`Failed to get current tab: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("get current tab", e);
       }
     },
   );
@@ -84,7 +88,7 @@ export function registerSafariTools(server: McpServer, _config: IConnectConfig):
       try {
         return ok(await runJxa(openUrlScript(url)));
       } catch (e) {
-        return err(`Failed to open URL: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("open URL", e);
       }
     },
   );
@@ -104,7 +108,7 @@ export function registerSafariTools(server: McpServer, _config: IConnectConfig):
       try {
         return ok(await runJxa(closeTabScript(windowIndex, tabIndex)));
       } catch (e) {
-        return err(`Failed to close tab: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("close tab", e);
       }
     },
   );
@@ -124,7 +128,7 @@ export function registerSafariTools(server: McpServer, _config: IConnectConfig):
       try {
         return ok(await runJxa(activateTabScript(windowIndex, tabIndex)));
       } catch (e) {
-        return err(`Failed to activate tab: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("activate tab", e);
       }
     },
   );
@@ -145,7 +149,7 @@ export function registerSafariTools(server: McpServer, _config: IConnectConfig):
       try {
         return ok(await runJxa(runJavascriptScript(code, windowIndex, tabIndex)));
       } catch (e) {
-        return err(`Failed to run JavaScript: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("run JavaScript", e);
       }
     },
   );
@@ -164,7 +168,82 @@ export function registerSafariTools(server: McpServer, _config: IConnectConfig):
       try {
         return ok(await runJxa(searchTabsScript(query)));
       } catch (e) {
-        return err(`Failed to search tabs: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("search tabs", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "list_bookmarks",
+    {
+      title: "List Bookmarks",
+      description: "List all Safari bookmarks across all folders, including subfolder paths.",
+      inputSchema: {},
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async () => {
+      try {
+        return ok(await runJxa(listBookmarksScript()));
+      } catch (e) {
+        return toolError("list bookmarks", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "add_bookmark",
+    {
+      title: "Add Bookmark",
+      description: "Add a bookmark to Safari. Optionally specify a folder name; defaults to Favorites/BookmarksBar.",
+      inputSchema: {
+        url: z.string().url().describe("URL to bookmark"),
+        title: z.string().describe("Bookmark title"),
+        folder: z.string().optional().describe("Target bookmark folder name (default: Favorites or BookmarksBar)"),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async ({ url, title, folder }) => {
+      try {
+        return ok(await runJxa(addBookmarkScript(url, title, folder)));
+      } catch (e) {
+        return toolError("add bookmark", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "list_reading_list",
+    {
+      title: "List Reading List",
+      description: "List all items in Safari's Reading List.",
+      inputSchema: {},
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async () => {
+      try {
+        return ok(await runJxa(listReadingListScript()));
+      } catch (e) {
+        return toolError("list reading list", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "add_to_reading_list",
+    {
+      title: "Add to Reading List",
+      description: "Add a URL to Safari's Reading List with an optional title.",
+      inputSchema: {
+        url: z.string().url().describe("URL to add to Reading List"),
+        title: z.string().optional().describe("Title for the Reading List item"),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async ({ url, title }) => {
+      try {
+        return ok(await runJxa(addToReadingListScript(url, title)));
+      } catch (e) {
+        return toolError("add to reading list", e);
       }
     },
   );

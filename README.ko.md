@@ -1,12 +1,12 @@
 # iConnect
 
-Apple 생태계 전체를 위한 MCP 서버 — Notes, Reminders, Calendar, Contacts, Mail, Messages, Music, Finder, Safari, System, Photos, Shortcuts, Apple Intelligence, TV, Screen Capture, Maps. AI를 Mac에 연결합니다.
+Apple 생태계 전체를 위한 MCP 서버 — Notes, Reminders, Calendar, Contacts, Mail, Messages, Music, Finder, Safari, System, Photos, Shortcuts, Apple Intelligence, TV, Screen Capture, Maps, Podcasts. AI를 Mac에 연결합니다.
 
 > [English](README.md)
 
 ## 특징
 
-- **150+ 도구** (17개 모듈) — Apple 앱 CRUD + 시스템 제어 + Apple Intelligence + UI Automation + 스크린 캡처 + 지도 + 동적 단축어
+- **170+ 도구** (18개 모듈) — Apple 앱 CRUD + 시스템 제어 + Apple Intelligence + UI Automation + 스크린 캡처 + 지도 + 팟캐스트 + 동적 단축어
 - **23개 프롬프트** — 앱별 워크플로우 + 크로스 모듈 + 개발자 워크플로우 (dev-session, debug-loop, build-log)
 - **11개 MCP 리소스** — Notes, Calendar, Reminders 실시간 데이터 URI
 - **JXA + Swift 브릿지** — JXA로 기본 자동화, EventKit/PhotoKit으로 고급 기능

@@ -515,4 +515,442 @@ export function registerCrossPrompts(server: McpServer): void {
       );
     },
   );
+
+  // ── Professional Workflow Prompts ──
+
+  server.prompt(
+    "inbox-zero",
+    "Professional email triage: scan, categorize, draft replies, create follow-ups, archive.",
+    () => {
+      const today = new Date().toISOString().split("T")[0];
+      return userPrompt(
+        "Inbox Zero workflow: triage all unread emails with categorization, replies, and follow-up actions.",
+        `Inbox Zero 이메일 정리를 시작해줘. (${today})
+
+다음 단계를 반드시 iConnect 도구를 사용해서 실행해:
+
+1. **수신함 스캔**:
+   - list_mailboxes로 전체 메일함 현황과 미읽음 수 확인
+   - list_accounts로 메일 계정 목록 확인
+   - get_unread_count로 미읽음 총 개수 파악
+   - list_messages(mailbox: "INBOX", unreadOnly: true)로 미읽음 메일 목록 가져오기
+
+2. **메일 분류** — 각 미읽음 메일을 read_message로 읽고 분류해:
+   - 🔴 **긴급 (Urgent)**: 즉시 대응 필요 (마감 임박, 장애, 상위 결재)
+   - 🟡 **조치 필요 (Action)**: 답장/작업 필요하지만 시간 여유 있음
+   - 🔵 **참고 (FYI)**: 읽기만 하면 되는 정보 공유
+   - ⚪ **스팸/불필요**: 뉴스레터, 광고, 자동 알림
+
+3. **긴급 항목 처리**:
+   - today_events로 오늘 일정 확인하여 미팅 관련 메일 우선 처리
+   - list_events로 향후 일정 조회하여 일정 충돌 확인
+   - 각 긴급 메일에 대한 답장 초안 제안
+
+4. **조치 필요 항목**:
+   - create_reminder로 각 항목에 대한 팔로업 리마인더 생성:
+     제목: "[메일] {발신자} - {제목 요약}"
+     dueDate: 적절한 마감일
+     body: 메일 ID 참조 + 필요한 조치 설명
+   - 미팅 관련이면 search_events로 관련 일정 확인
+
+5. **정리 작업**:
+   - 처리 완료 메일: mark_message_read로 읽음 처리
+   - 중요 메일: flag_message로 깃발 표시
+   - 정리할 메일: move_message로 적절한 폴더로 이동
+   - 스팸/불필요: 확인 후 이동 제안
+
+6. **결과 요약**:
+   - 분류별 메일 수
+   - 생성된 리마인더 목록
+   - 답장이 필요한 메일 목록과 초안
+   - 일정 충돌 경고
+
+중요: 메일 삭제나 답장 전송은 반드시 확인을 받아. 분류 결과를 먼저 보여주고 진행해.`,
+      );
+    },
+  );
+
+  server.prompt(
+    "travel-planner",
+    {
+      destination: z.string().describe("Travel destination"),
+      startDate: z.string().optional().describe("Trip start date (YYYY-MM-DD)"),
+      endDate: z.string().optional().describe("Trip end date (YYYY-MM-DD)"),
+    },
+    ({ destination, startDate, endDate }) => {
+      const start = startDate ?? "TBD";
+      const end = endDate ?? "TBD";
+      return userPrompt(
+        "Trip planning workflow: calendar, Maps, reminders checklist, notes, and travel events.",
+        `"${destination}" 여행 계획을 세워줘. (${start} ~ ${end})
+
+다음 단계를 반드시 iConnect 도구를 사용해서 실행해:
+
+1. **일정 확인**:
+   - list_events(startDate: "${start}", endDate: "${end}")로 여행 기간 기존 일정 확인
+   - 충돌하는 일정이 있으면 목록으로 정리해서 경고
+
+2. **목적지 탐색**:
+   - search_location("${destination}")로 목적지 정보 검색
+   - search_nearby("${destination}", category: "hotel")로 숙소 검색
+   - search_nearby("${destination}", category: "restaurant")로 맛집 검색
+   - get_directions로 이동 경로/시간 확인
+
+3. **여행 체크리스트 생성**:
+   - create_reminder_list("[여행] ${destination}")로 전용 리마인더 리스트 생성
+   - 다음 항목을 create_reminder로 생성:
+     - [ ] 숙소 예약
+     - [ ] 교통편 예약 (비행기/기차/렌터카)
+     - [ ] 여행자 보험
+     - [ ] 짐 싸기
+     - [ ] 여권/신분증 확인
+     - [ ] 충전기/어댑터
+     - [ ] 필수 의약품
+     - [ ] 현지 통화/카드 준비
+     - [ ] 비상 연락처 정리
+     - [ ] 숙소 체크인 정보 확인
+   각 리마인더에 적절한 마감일 설정
+
+4. **여행 노트 폴더 생성**:
+   - create_folder("[여행] ${destination}")로 Notes 폴더 생성
+   - create_note로 다음 문서 생성:
+     a. "[여행] ${destination} - 일정표": 날짜별 일정 계획
+     b. "[여행] ${destination} - 예약 정보": 숙소, 교통편 예약 번호 기록용
+     c. "[여행] ${destination} - 맛집/관광지": 검색 결과 정리
+
+5. **캘린더 이벤트 생성** (확인 후):
+   - create_event로 여행 기간 이벤트 생성:
+     summary: "[여행] ${destination}"
+     allDay: true (여행 기간 전체)
+   - 출발/도착 시간 이벤트 별도 생성
+
+6. **결과 브리핑**:
+   - 여행 기간 일정 충돌 여부
+   - 생성된 체크리스트 요약
+   - 목적지 주요 정보 (위치, 이동시간)
+   - 추가로 준비할 사항 제안
+
+중요: 캘린더 이벤트 생성 전에 반드시 확인을 받아. 기존 일정과의 충돌을 반드시 알려줘.`,
+      );
+    },
+  );
+
+  server.prompt(
+    "content-curator",
+    { topic: z.string().describe("Research topic or content area to curate") },
+    ({ topic }) => {
+      const today = new Date().toISOString().split("T")[0];
+      return userPrompt(
+        "Content curation workflow: gather from Safari, summarize, organize in Notes, tag files, set follow-ups.",
+        `"${topic}" 주제로 콘텐츠를 수집하고 정리해줘. (${today})
+
+다음 단계를 반드시 iConnect 도구를 사용해서 실행해:
+
+1. **Safari 탭 수집**:
+   - list_tabs로 현재 열린 모든 Safari 탭 확인
+   - "${topic}" 관련 탭을 식별
+   - 관련 탭을 read_page_content로 하나씩 읽기
+   - list_reading_list에서 관련 항목 확인
+   - list_bookmarks에서 관련 북마크 확인
+
+2. **콘텐츠 분석 및 요약**:
+   - 수집한 각 페이지의 핵심 내용 추출
+   - ai_status로 Apple Intelligence 사용 가능 여부 확인
+   - 사용 가능하면: summarize_text로 각 페이지 요약 생성
+   - 사용 불가하면: 직접 핵심 포인트 3-5개로 요약
+
+3. **기존 자료 확인**:
+   - search_notes("${topic}")로 기존 관련 메모 검색
+   - search_files(query: "${topic}")로 관련 파일 검색
+   - 기존 자료가 있으면 read_note로 내용 확인하여 중복 방지
+
+4. **Notes에 정리**:
+   - create_folder("[리서치] ${topic}") 폴더 생성 (없으면)
+   - create_note로 종합 리서치 노트 생성:
+     제목: "[리서치] ${topic} - ${today}"
+     내용 구조:
+     - 개요/배경
+     - 핵심 발견 사항 (번호 매기기)
+     - 각 소스별 요약
+     - 출처 URL 목록
+     - 미해결 질문/추가 조사 필요 사항
+     - 기존 메모와의 연관성
+
+5. **파일 태깅**:
+   - 관련 파일이 있으면 set_file_tags로 태그 적용:
+     태그 제안: "${topic}", "리서치", "참고자료"
+   - 태그 적용 전 확인 요청
+
+6. **팔로업 설정**:
+   - create_reminder로 후속 작업 리마인더 생성:
+     - "[리서치] ${topic} 추가 조사" (미해결 항목용)
+     - "[리서치] ${topic} 리뷰" (1주 후 리뷰용)
+   - 관련 URL을 add_to_reading_list로 리딩 리스트에 추가
+
+7. **결과 요약**:
+   - 수집된 소스 수
+   - 핵심 발견 사항 TOP 5
+   - 생성된 노트/리마인더 목록
+   - 추가 조사 제안
+
+중요: 출처 URL을 반드시 포함해. 요약은 원문의 맥락을 보존하되 간결하게.`,
+      );
+    },
+  );
+
+  server.prompt(
+    "morning-brief",
+    "Comprehensive morning briefing: calendar, reminders, email, notes, music, system status.",
+    () => {
+      const today = new Date();
+      const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
+      const todayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1).toISOString();
+      const tomorrowEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 2).toISOString();
+      const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000).toISOString();
+      const dateStr = today.toISOString().split("T")[0];
+      return userPrompt(
+        "Morning briefing: full daily overview with calendar, emails, reminders, notes, music, and system status.",
+        `좋은 아침! 오늘(${dateStr}) 모닝 브리핑을 해줘.
+
+다음 단계를 반드시 iConnect 도구를 사용해서 실행해:
+
+1. **오늘 일정** (상세):
+   - today_events로 오늘 이벤트 전체 조회
+   - list_events(startDate: "${todayStart}", endDate: "${todayEnd}")로 시간순 정렬
+   - 각 이벤트의 준비 사항 분석:
+     - 미팅이면: 참석자 확인, 관련 메모 search_notes로 검색
+     - 발표/리뷰면: 관련 파일 search_files로 확인
+   - list_events(startDate: "${todayEnd}", endDate: "${tomorrowEnd}")로 내일 일정도 미리 보기
+
+2. **리마인더 현황**:
+   - list_reminders(completed: false)로 미완료 리마인더 전체 조회
+   - 분류:
+     - 🔴 기한 지남 (overdue)
+     - 🟡 오늘 마감
+     - 🟢 이번 주 마감
+     - ⚪ 기한 미지정
+   - 우선순위(priority) 기준 정렬
+
+3. **이메일 요약**:
+   - get_unread_count로 미읽음 메일 수 확인
+   - list_messages(mailbox: "INBOX", unreadOnly: true, limit: 10)로 최근 미읽음 메일 목록
+   - 각 메일의 발신자/제목으로 우선순위 판단:
+     - 상사/팀원 메일 → 우선
+     - 외부 파트너 → 중요
+     - 뉴스레터/알림 → 나중에
+
+4. **최근 메모 활동**:
+   - scan_notes로 메모 스캔
+   - ${yesterday} 이후 생성/수정된 메모 필터링
+   - 어제 작업하던 내용 요약
+
+5. **음악 추천**:
+   - now_playing으로 현재 재생 상태 확인
+   - list_playlists로 사용 가능한 재생목록 확인
+   - 아침에 어울리는 플레이리스트 추천
+
+6. **시스템 상태**:
+   - get_battery_status로 배터리 잔량 확인
+   - get_wifi_status로 네트워크 연결 상태 확인
+   - get_brightness로 화면 밝기 확인
+
+7. **종합 브리핑 형식**:
+
+🌅 **모닝 브리핑 — ${dateStr}**
+
+📅 **오늘 일정** (N건)
+- 시간순 이벤트 + 준비사항
+- 빈 시간대 (집중 작업 가능)
+
+⏰ **마감/긴급 리마인더** (N건)
+- overdue 항목 강조
+- 오늘 마감 항목
+
+📧 **이메일** (미읽음 N건)
+- 우선 확인 필요 메일 TOP 3
+- 나머지 요약
+
+📝 **어제 이어서**
+- 최근 수정 메모 요약
+
+🎵 **추천 플레이리스트**
+- 아침 작업용 추천
+
+🔋 **시스템**
+- 배터리, Wi-Fi, 밝기 상태
+
+💡 **오늘의 제안**
+- 가장 먼저 할 일
+- 준비가 필요한 미팅
+- 집중 작업 추천 시간대
+
+중요: 모든 데이터는 실제 iConnect 도구로 조회해서 정확한 정보를 제공해.`,
+      );
+    },
+  );
+
+  server.prompt(
+    "project-kickoff",
+    {
+      projectName: z.string().describe("Name of the new project"),
+      description: z.string().optional().describe("Brief project description"),
+    },
+    ({ projectName, description }) => {
+      const desc = description ?? projectName;
+      const today = new Date().toISOString().split("T")[0];
+      return userPrompt(
+        "Project kickoff: create folder, notes, reminders, calendar events, and bookmarks for a new project.",
+        `"${projectName}" 프로젝트를 시작해줘. (${today})
+${description ? `프로젝트 설명: ${description}` : ""}
+
+다음 단계를 반드시 iConnect 도구를 사용해서 실행해:
+
+1. **프로젝트 폴더 생성** (Finder):
+   - create_directory("~/Projects/${projectName}")로 프로젝트 루트 폴더 생성
+   - create_directory("~/Projects/${projectName}/docs")로 문서 폴더 생성
+   - create_directory("~/Projects/${projectName}/resources")로 리소스 폴더 생성
+
+2. **Notes 폴더 및 문서 생성**:
+   - create_folder("[프로젝트] ${projectName}")로 Notes 폴더 생성
+   - create_note로 핵심 문서 생성:
+     a. "[프로젝트] ${projectName} - 개요":
+        - 프로젝트명: ${projectName}
+        - 설명: ${desc}
+        - 시작일: ${today}
+        - 목표/범위
+        - 팀원/역할
+        - 주요 마일스톤
+     b. "[프로젝트] ${projectName} - 회의록":
+        - 킥오프 미팅부터 기록용
+     c. "[프로젝트] ${projectName} - 의사결정 로그":
+        - 주요 결정사항 추적용
+
+3. **리마인더 리스트 및 태스크 생성**:
+   - create_reminder_list("[프로젝트] ${projectName}")로 전용 리스트 생성
+   - 초기 태스크를 create_reminder로 생성:
+     - [ ] 프로젝트 요구사항 정의
+     - [ ] 기술 스택 결정
+     - [ ] 마일스톤 일정 수립
+     - [ ] 팀 역할 배분
+     - [ ] 개발 환경 구성
+     - [ ] 초기 설계 문서 작성
+   각 태스크에 우선순위와 예상 마감일 설정
+
+4. **캘린더 반복 이벤트** (확인 후):
+   - create_recurring_event로 정기 미팅 생성:
+     a. "[${projectName}] 데일리 스탠드업" — 매일 (월~금)
+     b. "[${projectName}] 주간 리뷰" — 매주
+     c. "[${projectName}] 스프린트 회고" — 격주
+   - 시간은 나에게 확인 후 설정
+
+5. **Safari 리소스** (선택):
+   - 프로젝트 관련 URL이 있으면:
+     add_bookmark으로 북마크 추가
+     add_to_reading_list로 리딩 리스트에 추가
+   - 나에게 참고 URL이 있는지 물어봐
+
+6. **프로젝트 파일 태깅**:
+   - set_file_tags("~/Projects/${projectName}", tags: ["프로젝트", "${projectName}"])
+
+7. **킥오프 알림**:
+   - show_notification("${projectName} 프로젝트가 시작되었습니다!", {title: "Project Kickoff"})
+
+8. **결과 요약**:
+   - 생성된 폴더 구조
+   - 생성된 노트 목록
+   - 생성된 리마인더 목록
+   - 생성된 캘린더 이벤트 (있으면)
+   - 다음 단계 제안
+
+중요: 캘린더 이벤트는 시간 확인 후 생성. 폴더/노트/리마인더는 바로 생성 가능.`,
+      );
+    },
+  );
+
+  server.prompt(
+    "weekly-review",
+    { days: z.number().int().min(1).max(14).optional().describe("Review period in days (default: 7)") },
+    ({ days }) => {
+      const n = days ?? 7;
+      const now = new Date();
+      const since = new Date(now.getTime() - n * 24 * 60 * 60 * 1000).toISOString();
+      const until = now.toISOString();
+      const dateStr = now.toISOString().split("T")[0];
+      const sinceStr = since.split("T")[0];
+      return userPrompt(
+        "Weekly review: completed tasks, events attended, notes activity, email stats, photos, music, and summary.",
+        `주간 리뷰를 시작해줘. (${sinceStr} ~ ${dateStr}, ${n}일간)
+
+다음 단계를 반드시 iConnect 도구를 사용해서 실행해:
+
+1. **완료한 리마인더**:
+   - list_reminders(completed: true)로 완료 리마인더 조회
+   - ${sinceStr} 이후 완료된 항목만 필터링
+   - 리스트별 완료 수 집계
+   - list_reminders(completed: false)로 미완료 항목 조회
+   - 기한 지난(overdue) 항목 식별
+
+2. **캘린더 이벤트 회고**:
+   - list_events(startDate: "${since}", endDate: "${until}")로 기간 내 이벤트 조회
+   - 이벤트 유형 분류 (미팅, 개인, 집중시간 등)
+   - 총 미팅 시간 계산
+   - 빈 시간 / 집중 시간 비율 분석
+
+3. **메모 활동**:
+   - scan_notes로 전체 메모 스캔
+   - ${sinceStr} 이후 생성/수정된 메모 필터링
+   - 주제별 분류
+   - 활발하게 작업한 메모 TOP 5
+
+4. **이메일 현황**:
+   - list_mailboxes로 메일함 상태 확인
+   - get_unread_count로 현재 미읽음 수
+   - search_messages로 기간 내 발신 메일 확인 (보낸편지함)
+   - 메일 처리 현황 요약
+
+5. **사진 기록**:
+   - list_photos(limit: 20)로 최근 사진 확인
+   - ${sinceStr} 이후 촬영/추가된 사진 필터링
+   - 이번 주 사진 수 및 주요 앨범
+
+6. **음악 활동**:
+   - now_playing으로 현재 재생 상태
+   - list_playlists로 재생목록 확인
+   - 최근 들은 음악 트렌드 파악
+
+7. **주간 리뷰 노트 생성**: create_note로 리뷰 노트 작성:
+   제목: "[주간 리뷰] ${sinceStr} ~ ${dateStr}"
+
+   📊 **성과 요약**
+   - 완료한 리마인더: N/M (완료율)
+   - 참석한 미팅: N건 (총 N시간)
+   - 작성/수정한 메모: N건
+   - 처리한 이메일: N건
+
+   ✅ **이번 주 완료 항목**
+   - 완료 리마인더 목록
+
+   ⚠️ **이월 항목**
+   - 미완료 리마인더 (기한 지남 강조)
+
+   📅 **캘린더 분석**
+   - 미팅 비율 vs 집중 시간
+   - 가장 바빴던 날
+
+   📝 **메모 활동**
+   - 활발한 주제 분석
+
+   🎯 **다음 주 제안**
+   - 이월 항목 우선 처리
+   - 일정 최적화 제안
+   - 정리 필요 사항
+
+8. **후속 리마인더 생성**:
+   - create_reminder("[주간 리뷰] 이월 항목 정리", dueDate: 다음 월요일)
+   - 필요하면 추가 팔로업 리마인더
+
+중요: 모든 데이터는 실제 iConnect 도구로 조회해. 통계는 정확한 수치를 제공해.`,
+      );
+    },
+  );
 }

@@ -20,6 +20,7 @@ import { registerTvTools } from "../tv/tools.js";
 import { registerUiTools } from "../ui/tools.js";
 import { registerScreenTools } from "../screen/tools.js";
 import { registerMapsTools } from "../maps/tools.js";
+import { registerPodcastsTools } from "../podcasts/tools.js";
 
 export const MODULE_REGISTRY: ModuleRegistration[] = [
   { name: "notes", tools: registerNoteTools, prompts: registerNotePrompts },
@@ -39,4 +40,5 @@ export const MODULE_REGISTRY: ModuleRegistration[] = [
   { name: "ui", tools: registerUiTools },
   { name: "screen", tools: registerScreenTools },
   { name: "maps", tools: registerMapsTools },
+  { name: "podcasts", tools: registerPodcastsTools },
 ];

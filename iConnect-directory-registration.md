@@ -12,7 +12,7 @@ Description: MCP server for the entire Apple ecosystem — Notes, Reminders, Cal
 Repository: https://github.com/heznpc/iConnect
 npm: https://www.npmjs.com/package/iconnect-mcp
 Install: npx -y iconnect-mcp
-Tools: 123 tools, 23 prompts, 11 resources across 14 modules
+Tools: 170+ tools, 23 prompts, 11 resources across 18 modules
 Transport: stdio (default) + HTTP/SSE (--http)
 License: MIT
 Author: heznpc
@@ -212,7 +212,7 @@ smithery mcp publish --name iconnect --transport stdio
 | 필드 | 필수 | 입력값 |
 |------|------|--------|
 | Name | O | `iConnect` |
-| Description | O | `MCP server for the entire Apple ecosystem — Notes, Reminders, Calendar, Contacts, Mail, Messages, Music, Finder, Safari, System, Photos, Shortcuts, Apple Intelligence, and TV. 123 tools across 14 modules.` |
+| Description | O | `MCP server for the entire Apple ecosystem — Notes, Reminders, Calendar, Contacts, Mail, Messages, Music, Finder, Safari, System, Photos, Shortcuts, Apple Intelligence, and TV. 170+ tools across 18 modules.` |
 | Link | O | `https://github.com/heznpc/iConnect` |
 | Logo | X | 있으면 업로드 |
 | Cursor Deep Link | X | https://docs.cursor.com/tools/developers#generate-install-link 에서 생성 |
@@ -232,7 +232,7 @@ smithery mcp publish --name iconnect --transport stdio
 | 필드 | 입력값 |
 |------|--------|
 | Server Name | `iConnect` |
-| Short Description | `MCP server for the entire Apple ecosystem — 123 tools across 14 Apple app modules` |
+| Short Description | `MCP server for the entire Apple ecosystem — 170+ tools across 14 Apple app modules` |
 | Link | `https://github.com/heznpc/iConnect` |
 | Category | `Productivity` |
 | Contact Email | (본인 이메일) |

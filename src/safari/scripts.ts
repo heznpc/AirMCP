@@ -126,3 +126,90 @@ export function searchTabsScript(query: string): string {
     JSON.stringify({returned: result.length, tabs: result});
   `;
 }
+
+export function listBookmarksScript(): string {
+  return `
+    const Safari = Application('Safari');
+    const folders = Safari.bookmarkFolders();
+    const result = [];
+    function collect(folder, path) {
+      const items = folder.bookmarkItems();
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        try {
+          const u = item.url();
+          result.push({ title: item.name(), url: u, folder: path });
+        } catch (_) {}
+      }
+      const subs = folder.bookmarkFolders();
+      for (let s = 0; s < subs.length; s++) {
+        collect(subs[s], path + '/' + subs[s].name());
+      }
+    }
+    for (let f = 0; f < folders.length; f++) {
+      collect(folders[f], folders[f].name());
+    }
+    JSON.stringify({ count: result.length, bookmarks: result });
+  `;
+}
+
+export function addBookmarkScript(url: string, title: string, folder?: string): string {
+  const folderPart = folder
+    ? `
+    const folders = Safari.bookmarkFolders();
+    let target = null;
+    const wanted = '${esc(folder)}';
+    for (let f = 0; f < folders.length; f++) {
+      if (folders[f].name() === wanted) { target = folders[f]; break; }
+    }
+    if (!target) throw new Error('Bookmark folder not found: ' + wanted);
+    `
+    : `
+    const folders = Safari.bookmarkFolders();
+    let target = null;
+    for (let f = 0; f < folders.length; f++) {
+      if (folders[f].name() === 'BookmarksBar' || folders[f].name() === 'Favorites') {
+        target = folders[f]; break;
+      }
+    }
+    if (!target) target = folders[0];
+    `;
+  return `
+    const Safari = Application('Safari');
+    ${folderPart}
+    const props = { url: '${esc(url)}', name: '${esc(title)}' };
+    const bm = Safari.BookmarkItem(props);
+    target.bookmarkItems.push(bm);
+    JSON.stringify({ added: true, title: '${esc(title)}', url: '${esc(url)}', folder: target.name() });
+  `;
+}
+
+export function listReadingListScript(): string {
+  return `
+    const Safari = Application('Safari');
+    const folders = Safari.bookmarkFolders();
+    let rl = null;
+    for (let f = 0; f < folders.length; f++) {
+      if (folders[f].name() === 'com.apple.ReadingList') { rl = folders[f]; break; }
+    }
+    if (!rl) throw new Error('Reading List folder not found');
+    const items = rl.bookmarkItems();
+    const result = [];
+    for (let i = 0; i < items.length; i++) {
+      try {
+        result.push({ title: items[i].name(), url: items[i].url() });
+      } catch (_) {}
+    }
+    JSON.stringify({ count: result.length, items: result });
+  `;
+}
+
+export function addToReadingListScript(url: string, title?: string): string {
+  const titleArg = title ? `'${esc(title)}'` : "null";
+  return `
+    const Safari = Application('Safari');
+    Safari.activate();
+    Safari.addReadingListItem('${esc(url)}', { withTitle: ${titleArg} });
+    JSON.stringify({ added: true, url: '${esc(url)}', title: ${titleArg} || '${esc(url)}' });
+  `;
+}

@@ -44,13 +44,13 @@ private let allModules: [ModuleInfo] = [
     ModuleInfo(id: "messages", name: "Messages", icon: "bubble.left",
                description: "Read, search, send", toolCount: 6),
     ModuleInfo(id: "music", name: "Music", icon: "music.note",
-               description: "Playback, playlists, library", toolCount: 9),
+               description: "Playback, playlists, library", toolCount: 13),
     ModuleInfo(id: "finder", name: "Finder", icon: "folder",
                description: "Files, folders, search", toolCount: 8),
     ModuleInfo(id: "safari", name: "Safari", icon: "safari",
-               description: "Tabs, bookmarks, reading list", toolCount: 8),
+               description: "Tabs, bookmarks, reading list", toolCount: 12),
     ModuleInfo(id: "system", name: "System", icon: "gearshape",
-               description: "Preferences, clipboard, display", toolCount: 10),
+               description: "Preferences, clipboard, display", toolCount: 17),
     ModuleInfo(id: "photos", name: "Photos", icon: "photo",
                description: "Browse, search, albums", toolCount: 9),
     ModuleInfo(id: "shortcuts", name: "Shortcuts", icon: "command",
@@ -65,6 +65,8 @@ private let allModules: [ModuleInfo] = [
                description: "Screenshot, window list, recording", toolCount: 5),
     ModuleInfo(id: "maps", name: "Maps", icon: "map",
                description: "Search, directions, pins", toolCount: 6),
+    ModuleInfo(id: "podcasts", name: "Podcasts", icon: "antenna.radiowaves.left.and.right.circle",
+               description: "Shows, episodes, playback", toolCount: 6),
 ]
 
 // MARK: - Shared Constants

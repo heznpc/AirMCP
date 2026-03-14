@@ -140,3 +140,130 @@ export function showNotificationScript(message: string, title?: string, subtitle
     JSON.stringify({sent: true, message: '${esc(message)}'});
   `;
 }
+
+export function getWifiStatusScript(): string {
+  return `
+    const app = Application.currentApplication();
+    app.includeStandardAdditions = true;
+    const output = app.doShellScript('/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport -I 2>/dev/null || echo "WiFi off"');
+    const lines = output.split('\\n');
+    const info = {};
+    for (const line of lines) {
+      const match = line.match(/^\\s*([^:]+):\\s*(.+)$/);
+      if (match) info[match[1].trim()] = match[2].trim();
+    }
+    JSON.stringify({
+      ssid: info['SSID'] || null,
+      bssid: info['BSSID'] || null,
+      signalStrength: info['agrCtlRSSI'] ? parseInt(info['agrCtlRSSI']) : null,
+      noiseLevel: info['agrCtlNoise'] ? parseInt(info['agrCtlNoise']) : null,
+      channel: info['channel'] || null,
+      connected: !!info['SSID'],
+      raw: output
+    });
+  `;
+}
+
+export function toggleWifiScript(enable: boolean): string {
+  return `
+    const app = Application.currentApplication();
+    app.includeStandardAdditions = true;
+    app.doShellScript('networksetup -setairportpower en0 ${enable ? "on" : "off"}');
+    JSON.stringify({wifi: ${enable ? "'on'" : "'off'"}, success: true});
+  `;
+}
+
+export function listBluetoothDevicesScript(): string {
+  return `
+    const app = Application.currentApplication();
+    app.includeStandardAdditions = true;
+    const output = app.doShellScript('system_profiler SPBluetoothDataType -json 2>/dev/null');
+    const data = JSON.parse(output);
+    const devices = [];
+    const btData = data.SPBluetoothDataType || [];
+    for (const section of btData) {
+      const devicesMap = section.devices_list || section.device_connected || [];
+      for (const entry of (Array.isArray(devicesMap) ? devicesMap : [devicesMap])) {
+        if (typeof entry === 'object' && entry !== null) {
+          for (const name of Object.keys(entry)) {
+            const info = entry[name] || {};
+            devices.push({
+              name: name,
+              connected: info.device_connected === 'device_connected_yes' || info.device_connected === 'attrib_Yes' || false,
+              address: info.device_address || null,
+              type: info.device_minorType || null
+            });
+          }
+        }
+      }
+    }
+    JSON.stringify({total: devices.length, devices: devices});
+  `;
+}
+
+export function getBrightnessScript(): string {
+  return `
+    const app = Application.currentApplication();
+    app.includeStandardAdditions = true;
+    const output = app.doShellScript('ioreg -c AppleBacklightDisplay -d 1 | grep -i brightness | head -1 2>/dev/null || echo ""');
+    let brightness = null;
+    const match = output.match(/"brightness"\\s*=\\s*(\\d+)/);
+    if (match) {
+      brightness = parseInt(match[1]) / 1024;
+    }
+    JSON.stringify({brightness: brightness, raw: output});
+  `;
+}
+
+export function setBrightnessScript(level: number): string {
+  const clamped = Math.max(0, Math.min(1, level));
+  return `
+    const app = Application.currentApplication();
+    app.includeStandardAdditions = true;
+    try {
+      app.doShellScript('brightness ${clamped}');
+      JSON.stringify({brightness: ${clamped}, success: true});
+    } catch(e) {
+      JSON.stringify({brightness: null, success: false, error: 'brightness CLI not found. Install via: brew install brightness'});
+    }
+  `;
+}
+
+export function getBatteryStatusScript(): string {
+  return `
+    const app = Application.currentApplication();
+    app.includeStandardAdditions = true;
+    const output = app.doShellScript('pmset -g batt');
+    const lines = output.split('\\n');
+    let percentage = null;
+    let charging = false;
+    let timeRemaining = null;
+    let source = null;
+    for (const line of lines) {
+      if (line.indexOf('AC Power') !== -1) source = 'AC Power';
+      if (line.indexOf('Battery Power') !== -1) source = 'Battery Power';
+      const pctMatch = line.match(/(\\d+)%/);
+      if (pctMatch) percentage = parseInt(pctMatch[1]);
+      if (line.indexOf('charging') !== -1 && line.indexOf('discharging') === -1 && line.indexOf('not charging') === -1) charging = true;
+      const timeMatch = line.match(/(\\d+:\\d+) remaining/);
+      if (timeMatch) timeRemaining = timeMatch[1];
+    }
+    JSON.stringify({
+      percentage: percentage,
+      charging: charging,
+      source: source,
+      timeRemaining: timeRemaining,
+      raw: output
+    });
+  `;
+}
+
+export function toggleFocusModeScript(enable: boolean): string {
+  return `
+    const app = Application.currentApplication();
+    app.includeStandardAdditions = true;
+    app.doShellScript('defaults -currentHost write com.apple.notificationcenterui doNotDisturb -boolean ${enable ? "true" : "false"}');
+    app.doShellScript('killall NotificationCenter 2>/dev/null || true');
+    JSON.stringify({doNotDisturb: ${enable}, success: true});
+  `;
+}

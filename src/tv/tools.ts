@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { IConnectConfig } from "../shared/config.js";
-import { ok, err } from "../shared/result.js";
+import { ok, toolError } from "../shared/result.js";
 import {
   listPlaylistsScript,
   listTracksScript,
@@ -25,7 +25,7 @@ export function registerTvTools(server: McpServer, _config: IConnectConfig): voi
       try {
         return ok(await runJxa(listPlaylistsScript()));
       } catch (e) {
-        return err(`Failed to list TV playlists: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("list TV playlists", e);
       }
     },
   );
@@ -45,7 +45,7 @@ export function registerTvTools(server: McpServer, _config: IConnectConfig): voi
       try {
         return ok(await runJxa(listTracksScript(playlist, limit)));
       } catch (e) {
-        return err(`Failed to list TV tracks: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("list TV tracks", e);
       }
     },
   );
@@ -62,7 +62,7 @@ export function registerTvTools(server: McpServer, _config: IConnectConfig): voi
       try {
         return ok(await runJxa(nowPlayingScript()));
       } catch (e) {
-        return err(`Failed to get TV now playing: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("get TV now playing", e);
       }
     },
   );
@@ -81,7 +81,7 @@ export function registerTvTools(server: McpServer, _config: IConnectConfig): voi
       try {
         return ok(await runJxa(playbackControlScript(action)));
       } catch (e) {
-        return err(`Failed to control TV playback: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("control TV playback", e);
       }
     },
   );
@@ -101,7 +101,7 @@ export function registerTvTools(server: McpServer, _config: IConnectConfig): voi
       try {
         return ok(await runJxa(searchTracksScript(query, limit)));
       } catch (e) {
-        return err(`Failed to search TV: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("search TV", e);
       }
     },
   );
@@ -120,7 +120,7 @@ export function registerTvTools(server: McpServer, _config: IConnectConfig): voi
       try {
         return ok(await runJxa(playTrackScript(name)));
       } catch (e) {
-        return err(`Failed to play TV content: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("play TV content", e);
       }
     },
   );

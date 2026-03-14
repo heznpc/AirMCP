@@ -1,240 +1,331 @@
-# iConnect Shortcuts Skills Guide
+# iConnect Skills Guide
 
-A practical guide for AI agents on using Siri Shortcuts effectively through iConnect's MCP tools.
+A practical guide for AI agents to effectively use iConnect's 160+ tools across 18 modules to orchestrate the Apple ecosystem via MCP.
 
-## Available Tools
+## Overview
 
-| Tool | Purpose |
-|------|---------|
-| `list_shortcuts` | List all shortcuts on the Mac |
-| `search_shortcuts` | Find shortcuts by keyword |
-| `get_shortcut_detail` | Inspect a shortcut's actions |
-| `run_shortcut` | Execute a shortcut with optional text input |
-| `create_shortcut` | Create a new empty shortcut (UI automation) |
-| `delete_shortcut` | Permanently delete a shortcut by name |
-| `export_shortcut` | Export a shortcut to a .shortcut file |
-| `import_shortcut` | Import a shortcut from a .shortcut file |
+iConnect bridges AI agents to native macOS applications through JXA (JavaScript for Automation) and Swift. Each module wraps a single Apple app or system capability, exposing read, write, and search tools. Cross-app prompts combine multiple modules into multi-step workflows.
 
-## Shortcut Patterns
+## Core Principles
 
-### Conditions
+1. **Read before write** -- always check existing data before creating duplicates. Use `search_notes`, `search_reminders`, `search_events` first.
+2. **Cross-app linking** -- reference related IDs across modules. Mention a note ID in a reminder body; include an event ID in a follow-up note. This creates a traceable graph.
+3. **Batch over loops** -- prefer tools that return lists (`list_reminders`, `scan_notes`) over calling single-item tools repeatedly.
+4. **Check availability** -- not all modules may be enabled. Use `summarize_context` or check tool listing to confirm before attempting operations.
+5. **HITL for mutations** -- human-in-the-loop confirmation is enforced for destructive operations (delete, send, move). Always present a plan before executing writes.
+6. **Minimal privilege** -- read-only operations are always safe. Write operations may require user confirmation. Send/delete operations always require confirmation.
 
-Shortcuts support If/Otherwise/End If blocks for branching logic. Common conditions:
+## Module Quick Reference
 
-- **Input type checks** — branch based on whether input is text, URL, image, etc.
-- **Text comparisons** — equals, contains, begins with, ends with
-- **Number comparisons** — equals, greater than, less than
-- **Date comparisons** — is before, is after, is today
+| Module | App | Key Tools | Tool Count |
+|--------|-----|-----------|------------|
+| **calendar** | Calendar | `list_events`, `create_event`, `search_events`, `today_events`, `get_upcoming_events`, `create_recurring_event` | 10 |
+| **contacts** | Contacts | `list_contacts`, `search_contacts`, `read_contact`, `create_contact`, `add_contact_email` | 10 |
+| **finder** | Finder | `search_files`, `list_directory`, `get_file_info`, `set_file_tags`, `recent_files`, `create_directory` | 8 |
+| **intelligence** | Apple Intelligence | `summarize_text`, `rewrite_text`, `proofread_text`, `generate_text`, `tag_content`, `ai_chat` | 8 |
+| **mail** | Mail | `list_messages`, `read_message`, `search_messages`, `send_mail`, `reply_mail`, `flag_message`, `move_message` | 11 |
+| **maps** | Maps | `search_location`, `get_directions`, `drop_pin`, `search_nearby`, `share_location` | 6 |
+| **messages** | Messages | `list_chats`, `read_chat`, `send_message`, `send_file`, `search_chats` | 6 |
+| **music** | Music | `list_playlists`, `play_track`, `now_playing`, `playback_control`, `create_playlist`, `search_tracks` | 13 |
+| **notes** | Notes | `list_notes`, `search_notes`, `read_note`, `create_note`, `update_note`, `scan_notes`, `create_folder` | 12 |
+| **photos** | Photos | `list_photos`, `search_photos`, `get_photo_info`, `create_album`, `add_to_album`, `list_favorites` | 9 |
+| **podcasts** | Podcasts | `list_podcast_shows`, `list_podcast_episodes`, `podcast_now_playing`, `play_podcast_episode` | 6 |
+| **reminders** | Reminders | `list_reminders`, `create_reminder`, `complete_reminder`, `search_reminders`, `create_reminder_list`, `create_recurring_reminder` | 11 |
+| **safari** | Safari | `list_tabs`, `read_page_content`, `open_url`, `run_javascript`, `list_bookmarks`, `add_to_reading_list` | 12 |
+| **screen** | Screen Capture | `capture_screen`, `capture_window`, `capture_area`, `list_windows`, `record_screen` | 5 |
+| **shortcuts** | Shortcuts | `list_shortcuts`, `run_shortcut`, `get_shortcut_detail`, `search_shortcuts`, `export_shortcut` | 10 |
+| **system** | System | `get_clipboard`, `set_clipboard`, `show_notification`, `capture_screenshot`, `get_battery_status`, `toggle_dark_mode` | 17 |
+| **tv** | TV | `tv_list_playlists`, `tv_now_playing`, `tv_playback_control`, `tv_search`, `tv_play` | 6 |
+| **ui** | UI Automation | `ui_open_app`, `ui_click`, `ui_type`, `ui_press_key`, `ui_scroll`, `ui_read` | 6 |
+| **semantic** | Semantic Search | `semantic_index`, `semantic_search`, `find_related`, `semantic_status` | 4 |
+| **cross** | Cross-App | `summarize_context`, `get_workflow` | 2 |
 
-Example flow: receive input, check if it contains a URL, open Safari if yes, save to Notes if no.
+## Workflow Patterns
 
-### Loops
+### Communication Management
 
-- **Repeat** — execute actions a fixed number of times
-- **Repeat with Each** — iterate over a list of items (files, text lines, contacts)
-- The `Current Item` variable holds each element during iteration
-
-### Variables
-
-- **Set Variable / Get Variable** — store and retrieve named values
-- **Magic Variables** — every action output is automatically available as a variable
-- **Ask for Input** — prompt the user (note: blocks automation when run via CLI)
-
-### Text Processing
-
-- **Split Text** — split by newline, comma, or custom separator
-- **Combine Text** — join list items with a separator
-- **Replace Text** — regex or literal replacement
-- **Match Text** — regex pattern matching with capture groups
-- **Change Case** — upper, lower, title case
-
-### Data Flow
-
-- **Get Dictionary Value** — extract values from JSON/dictionary objects
-- **Set Dictionary Value** — build structured data
-- **Get Item from List** — index into a list (first, last, random, index N)
-- **Count** — count items in a list or characters in text
-
-## Chaining Strategies
-
-### Sequential chaining
-
-Pass the output of one shortcut as input to the next:
-
+#### Email Triage Pattern
 ```
-1. run_shortcut("Extract URLs", input: articleText)
-   -> returns list of URLs
-2. run_shortcut("Summarize Page", input: urls)
-   -> returns summaries
-3. run_shortcut("Format Report", input: summaries)
-   -> returns formatted report
+1. get_unread_count             -> gauge inbox load
+2. list_messages(unreadOnly)    -> scan subjects and senders
+3. read_message(id)             -> read priority emails
+4. create_reminder              -> action items from emails
+5. flag_message / mark_message_read -> organize
+6. reply_mail / send_mail       -> respond (with HITL)
 ```
 
-### Discovery-first approach
-
-Always verify shortcuts exist before running them:
-
+#### Message Response Pattern
 ```
-1. search_shortcuts(query: "pdf")
-   -> find relevant shortcuts
-2. get_shortcut_detail(name: "Convert to PDF")
-   -> understand what it expects
-3. run_shortcut(name: "Convert to PDF", input: data)
-   -> execute with correct input
+1. list_chats                   -> see active conversations
+2. read_chat(id)                -> read recent messages
+3. search_contacts(name)        -> look up sender details
+4. send_message                 -> reply (with HITL)
 ```
 
-### Export-modify-import cycle
-
-For sharing or backing up shortcut configurations:
-
+#### Contact Lookup + Communication Chain
 ```
-1. export_shortcut(name: "My Workflow", outputPath: "~/Desktop/My Workflow.shortcut")
-   -> saves to file
-2. Transfer or back up the .shortcut file
-3. import_shortcut(filePath: "~/Desktop/My Workflow.shortcut")
-   -> import on same or different Mac
+1. search_contacts("name")      -> find person
+2. read_contact(id)             -> get email, phone, address
+3. search_messages(query)       -> find past emails with them
+4. search_chats(query)          -> find past messages with them
+5. search_events(query)         -> find shared calendar events
 ```
 
-## Common System Actions Reference
+### Productivity
 
-These are built-in Shortcuts actions frequently found in user shortcuts:
-
-| Action | What it does |
-|--------|-------------|
-| Get Current Date | Returns current date/time |
-| Format Date | Convert date to string with format |
-| Get Contents of URL | HTTP request (GET, POST, PUT) |
-| Show Result | Display output (or return to CLI) |
-| Show Notification | System notification banner |
-| Copy to Clipboard | Copy text to clipboard |
-| Get Clipboard | Read clipboard content |
-| Open URL | Open in default browser |
-| Open App | Launch an application |
-| Run Shell Script | Execute bash/zsh commands |
-| Run AppleScript | Execute AppleScript code |
-| Get File | Access files from iCloud Drive or local storage |
-| Save File | Save data to a file |
-| Send Message | Send via Messages app |
-| Send Email | Compose and send via Mail |
-| Create Note | Add a note in Apple Notes |
-| Add New Reminder | Create a reminder |
-| Add New Event | Create a calendar event |
-| Set Volume | Adjust system volume |
-| Set Brightness | Adjust screen brightness |
-| Toggle Appearance | Switch dark/light mode |
-
-## Error Handling Patterns
-
-### Name matching errors
-
-Shortcut names must match exactly, including case and whitespace:
-
+#### Note-Taking to Action Items
 ```
-# Wrong
-run_shortcut(name: "my shortcut")
-
-# Right - verify first
-search_shortcuts(query: "my shortcut")
-# Use the exact name returned
-run_shortcut(name: "My Shortcut")
+1. create_note / update_note    -> capture meeting notes
+2. read_note(id)                -> review content
+3. Extract action items from text (look for TODO, action, follow-up patterns)
+4. create_reminder per item     -> convert to trackable tasks
+5. create_event                 -> block time for tasks
 ```
 
-### Timeout handling
-
-Some shortcuts take longer than the default timeout (30 seconds). If a shortcut times out:
-- Check if it requires user interaction (UI prompts block CLI execution)
-- Check if it performs network requests that may be slow
-- Consider breaking it into smaller shortcuts
-
-### Missing shortcut errors
-
-If `run_shortcut` fails with "shortcut not found":
-1. Use `list_shortcuts` to get all available names
-2. Use `search_shortcuts` with partial keywords
-3. Check for typos or name changes
-
-### Permission errors
-
-Some shortcut actions require specific permissions:
-- Accessibility access for UI automation
-- Location services for location-based shortcuts
-- Photo library access for photo operations
-- Contacts access for contact operations
-
-If a shortcut fails with permission errors, guide the user to grant the required permission in System Settings > Privacy & Security.
-
-### Handling shortcuts that require interaction
-
-Some shortcuts trigger UI dialogs (Ask for Input, Choose from Menu). These will hang when run via CLI. Strategies:
-- Inspect with `get_shortcut_detail` to identify interactive actions before running
-- Provide input text via the `input` parameter to skip input prompts when possible
-- Warn the user that a shortcut may require manual interaction
-
-## Examples: Combining iConnect Modules with Shortcuts
-
-### Daily digest automation
-
+#### Calendar Blocking + Reminder Sync
 ```
-1. list_events (Calendar) -> get today's meetings
-2. list_reminders (Reminders) -> get due tasks
-3. run_shortcut("Format Daily Digest", input: combined data)
-4. create_note (Notes) -> save the formatted digest
+1. list_reminders(completed: false)  -> get pending tasks
+2. get_upcoming_events               -> find free slots
+3. create_event per task             -> block focus time
+4. update_reminder with due dates    -> align deadlines
 ```
 
-### File processing pipeline
-
+#### File Organization + Tagging
 ```
-1. search_files (Finder) -> find files matching criteria
-2. run_shortcut("Convert to PDF", input: file paths)
-3. run_shortcut("Compress Files", input: PDF paths)
-4. show_notification (System) -> notify completion
-```
-
-### Research workflow
-
-```
-1. run_shortcut("Search Web", input: query)
-2. read_page_content (Safari) -> extract content
-3. run_shortcut("Summarize Text", input: content)
-4. create_note (Notes) -> save research summary
-5. create_reminder (Reminders) -> follow-up task
+1. list_directory(path)         -> survey contents
+2. get_file_info(path)          -> check sizes, dates
+3. recent_files(path, days)     -> find active files
+4. set_file_tags(path, tags)    -> categorize
+5. create_note                  -> document the organization
 ```
 
-### Backup shortcuts
+### Research and Learning
 
+#### Safari to Notes to Reminders Pipeline
 ```
-1. list_shortcuts -> get all shortcut names
-2. For each shortcut:
-   export_shortcut(name, outputPath: "~/Shortcuts-Backup/<name>.shortcut")
-3. show_notification (System) -> "Backup complete: N shortcuts exported"
-```
-
-### Import shared shortcuts
-
-```
-1. search_files (Finder) -> find .shortcut files in Downloads
-2. For each file:
-   import_shortcut(filePath)
-3. list_shortcuts -> verify imports
+1. list_tabs                    -> find open research tabs
+2. read_page_content(tabId)     -> extract content
+3. summarize_text (if Intelligence available) -> condense
+4. create_note                  -> save organized findings
+5. add_to_reading_list          -> queue for later reading
+6. create_reminder              -> follow-up tasks
 ```
 
-### Clean up unused shortcuts
+#### Multi-Source Research Compilation
+```
+1. search_notes(topic)          -> existing research
+2. list_tabs / read_page_content -> current browser research
+3. search_files(topic)          -> local documents
+4. search_messages(topic)       -> email threads
+5. create_note                  -> unified research document
+6. set_file_tags                -> tag related files
+```
 
+### Media Management
+
+#### Photo Organization Workflow
 ```
-1. list_shortcuts -> get all names
-2. get_shortcut_detail for each -> inspect actions
-3. Identify empty or broken shortcuts
-4. delete_shortcut for confirmed removals
-5. create_note (Notes) -> log what was cleaned up
+1. list_photos / search_photos  -> find photos by keyword or date
+2. get_photo_info(id)           -> check metadata
+3. create_album("name")         -> create themed album
+4. add_to_album(photoId, album) -> organize into albums
+5. list_favorites               -> review starred photos
 ```
+
+#### Music Discovery + Playlist Curation
+```
+1. search_tracks(query)         -> find songs
+2. get_track_info(id)           -> check details
+3. create_playlist("name")      -> new playlist
+4. add_to_playlist(track, list) -> build the playlist
+5. play_playlist(name)          -> start listening
+6. now_playing                  -> check current track
+```
+
+#### Podcast Queue Management
+```
+1. list_podcast_shows           -> subscribed shows
+2. list_podcast_episodes(show)  -> available episodes
+3. search_podcast_episodes(q)   -> find specific topics
+4. play_podcast_episode(id)     -> start listening
+5. podcast_now_playing          -> check status
+```
+
+### System Automation
+
+#### Screen Capture to Documentation
+```
+1. get_frontmost_app            -> identify active app
+2. list_windows                 -> see available windows
+3. capture_screen / capture_window -> take screenshot
+4. create_note                  -> document with context
+5. create_album + add_to_album  -> organize in Photos
+```
+
+#### App State Inspection
+```
+1. get_frontmost_app            -> current app
+2. list_running_apps            -> all running apps
+3. get_screen_info              -> display configuration
+4. get_clipboard                -> clipboard contents
+5. get_battery_status           -> power state
+6. get_wifi_status              -> connectivity
+```
+
+#### Shortcut Chaining for Complex Workflows
+```
+1. search_shortcuts(keyword)    -> find relevant shortcuts
+2. get_shortcut_detail(name)    -> inspect actions and inputs
+3. run_shortcut(name, input)    -> execute step 1
+4. Use output as input for next run_shortcut -> chain steps
+5. show_notification            -> report completion
+```
+
+### Cross-App Patterns
+
+#### The "Morning Routine" Pattern
+Use the `morning-brief` prompt, or manually:
+```
+1. today_events                 -> calendar overview
+2. list_reminders(completed: false) -> pending tasks + overdue
+3. get_unread_count + list_messages  -> email snapshot
+4. scan_notes                   -> recent notes activity
+5. get_battery_status           -> system health
+6. now_playing / play_playlist  -> set the mood
+```
+
+#### The "Inbox Zero" Pattern
+Use the `inbox-zero` prompt, or manually:
+```
+1. list_messages(unreadOnly: true) -> all unread
+2. read_message for each        -> categorize: urgent/action/FYI/spam
+3. create_reminder              -> track action items
+4. today_events                 -> check meeting-related emails
+5. flag_message / mark_message_read -> triage
+6. move_message                 -> archive processed emails
+```
+
+#### The "Project Setup" Pattern
+Use the `project-kickoff` prompt, or manually:
+```
+1. create_directory             -> project folder in Finder
+2. create_folder                -> Notes folder
+3. create_note (x3)             -> overview, meetings, decisions
+4. create_reminder_list         -> task tracking list
+5. create_reminder (xN)         -> initial tasks
+6. create_recurring_event       -> standups, reviews
+7. add_bookmark                 -> project resources
+8. set_file_tags                -> tag project root
+```
+
+#### The "Weekly Review" Pattern
+Use the `weekly-review` prompt, or manually:
+```
+1. list_reminders(completed: true)  -> achievements
+2. list_reminders(completed: false) -> carryover items
+3. list_events(past 7 days)         -> meetings attended
+4. scan_notes                       -> notes activity
+5. get_unread_count                 -> email backlog
+6. list_photos                      -> photos taken
+7. create_note                      -> review summary
+```
+
+#### The "Travel Planner" Pattern
+Use the `travel-planner` prompt, or manually:
+```
+1. list_events(travel dates)    -> schedule conflicts
+2. search_location(destination) -> Maps lookup
+3. search_nearby(hotels, food)  -> local options
+4. create_reminder_list         -> packing/booking checklist
+5. create_folder + create_note  -> trip documents
+6. create_event (all-day)       -> block travel dates
+```
+
+## Available Prompts
+
+Prompts are pre-built multi-step workflows invoked via `get_workflow` or the MCP prompts API.
+
+| Prompt | Description | Parameters |
+|--------|-------------|------------|
+| `daily-briefing` | Today's events, due reminders, recent notes | none |
+| `morning-brief` | Full morning overview with email, music, system status | none |
+| `inbox-zero` | Email triage and organization workflow | none |
+| `weekly-digest` | Past N days summary across apps | `days` (1-30) |
+| `weekly-review` | Comprehensive retrospective with stats | `days` (1-14) |
+| `meeting-notes-to-reminders` | Extract action items from meeting notes | `eventId` |
+| `event-follow-up` | Post-meeting note and task creation | `eventId` |
+| `research-with-safari` | Safari tab research compiled into notes | `topic` |
+| `content-curator` | Multi-source content gathering and organization | `topic` |
+| `focus-session` | Set up distraction-free work block | `duration` (hours) |
+| `file-organizer` | Scan, tag, and document a directory | `directory` |
+| `dev-session` | Developer context loading for a project | `projectPath` |
+| `debug-loop` | Error capture, analysis, and bug logging | `errorMessage`, `projectPath` |
+| `screen-capture-flow` | Screenshot, organize in Photos, document in Notes | `description` |
+| `app-release-prep` | Release checklist, changelog, build trigger | `appName`, `version` |
+| `idea-to-task` | Break down an idea into reminders and calendar blocks | `idea` |
+| `build-log` | Analyze build output, log errors or celebrate success | `projectPath` |
+| `travel-planner` | Full trip planning across calendar, maps, reminders, notes | `destination`, `startDate`, `endDate` |
+| `project-kickoff` | Set up new project across all apps | `projectName`, `description` |
+
+## Error Handling
+
+### Common Error Patterns
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| `JXA execution failed` | App not running or not responding | The app will auto-launch; retry once. If persistent, check if app is frozen. |
+| `Shortcut not found` | Name mismatch (case-sensitive) | Use `search_shortcuts` to find exact name. |
+| `Permission denied` | Missing Automation/Accessibility permission | Guide user to System Settings > Privacy & Security. |
+| `Timeout` | Long-running JXA or shortcut | Break into smaller operations. Shortcuts with UI prompts will hang in CLI mode. |
+| `No results` | Empty dataset or wrong filter | Broaden search terms; check date ranges; verify the correct mailbox/list/folder. |
+| `Module not available` | Module disabled in config or app not installed | Check config; some modules require specific macOS versions (Intelligence requires macOS 26+). |
+
+### Fallback Strategies
+
+1. **If a tool fails, try the search variant first**: `list_notes` failing? Try `search_notes` or `scan_notes`.
+2. **If Intelligence is unavailable**: fall back to manual summarization or skip AI-enhanced steps.
+3. **If a specific mailbox/list/folder is not found**: use the list variant (`list_mailboxes`, `list_reminder_lists`, `list_folders`) to discover available names.
+4. **If a shortcut hangs**: it likely has interactive UI prompts. Use `get_shortcut_detail` to inspect before running.
+5. **If calendar events fail to create**: verify the target calendar exists with `list_calendars` and is writable.
+
+### Permission Requirements by Module
+
+| Module | Required Permission |
+|--------|-------------------|
+| calendar, contacts, reminders, notes, mail, photos, messages | Automation (per-app) |
+| finder, system | Automation + Full Disk Access (for some paths) |
+| safari | Automation + "Allow JavaScript from Apple Events" in Safari Develop menu |
+| screen, ui | Screen Recording + Accessibility |
+| shortcuts | Automation |
+| intelligence | macOS 26+ with Apple Intelligence enabled |
+| music, tv, podcasts | Automation |
+| maps | Automation |
 
 ## Best Practices
 
-1. **Always discover first** — use `list_shortcuts` and `search_shortcuts` before attempting to run anything.
-2. **Inspect before executing** — use `get_shortcut_detail` to understand what a shortcut does before running it.
-3. **Use exact names** — shortcut names are case-sensitive. Always use the name exactly as returned by `list_shortcuts`.
-4. **Export before deleting** — use `export_shortcut` to back up a shortcut before using `delete_shortcut`.
-5. **Chain with other modules** — combine Shortcuts with Notes, Calendar, Reminders, Finder, and other iConnect modules for powerful workflows.
-6. **Handle errors gracefully** — wrap shortcut operations in try/catch logic and provide meaningful fallbacks.
-7. **Warn about UI prompts** — shortcuts with interactive actions will block CLI execution. Always check with `get_shortcut_detail` first.
-8. **Respect destructive operations** — `delete_shortcut` is permanent. Always confirm with the user before deleting.
+### Data Freshness
+- **Re-read, do not cache**: Apple app data changes constantly (new emails, reminder completions, calendar updates). Always call the tool to get current state rather than relying on data from earlier in the conversation.
+- **Use scan for snapshots**: `scan_notes` is optimized for quick overviews. Use `read_note` only when you need the full content of a specific note.
+- **Date filtering**: When listing events or reminders, always provide tight date ranges to reduce response size.
+
+### Performance
+- **Avoid rapid-fire JXA calls**: Each tool call invokes a JXA or Swift subprocess. Batch where possible (e.g., `list_reminders` returns all at once rather than calling `read_reminder` in a loop).
+- **Use search tools**: `search_notes`, `search_reminders`, `search_events`, `search_messages` are faster than listing everything and filtering client-side.
+- **Limit result sizes**: Many list tools accept a `limit` parameter. Use it to avoid overwhelming the context window with hundreds of results.
+
+### Privacy and Safety
+- **HITL for writes**: iConnect enforces human-in-the-loop confirmation for destructive or sensitive operations. Never assume a write will succeed silently.
+- **Never expose raw email content**: Summarize rather than quoting full email bodies, especially when they may contain signatures with personal information.
+- **Confirm before sending**: `send_mail`, `send_message`, `reply_mail` all require user confirmation. Always show the draft before triggering.
+- **Export before delete**: Back up shortcuts (`export_shortcut`) before deleting. Back up notes content before deleting.
+- **Sensitive files**: Be cautious with `get_clipboard`, `read_page_content`, and `read_message` -- they may contain passwords, tokens, or private information. Do not log or repeat sensitive content.
+
+### Semantic Search
+- **Index first**: Call `semantic_index` or `semantic_status` to ensure the index is current before using `semantic_search`.
+- **Auto-indexing**: The system automatically re-indexes every 30 minutes on semantic search calls, so explicit indexing is rarely needed.
+- **Use for discovery**: `semantic_search` and `find_related` are best for discovering connections across notes, reminders, events, and mail that keyword search would miss.
+
+### Cross-App Best Practices
+- **Create reference links**: When creating a reminder from an email, include the message subject in the reminder body. When creating a follow-up note from a meeting, include the event ID.
+- **Use consistent naming**: Prefix related items with the same tag (e.g., `[Project X]` in note titles, reminder titles, and event summaries) to make cross-app searches effective.
+- **Leverage prompts**: For complex multi-step workflows, use the built-in prompts (`morning-brief`, `inbox-zero`, `project-kickoff`, etc.) rather than building from scratch. They encode best practices and proper tool sequencing.

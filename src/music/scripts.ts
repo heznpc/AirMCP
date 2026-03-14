@@ -186,3 +186,45 @@ export function setShuffleScript(shuffle?: boolean, songRepeat?: string): string
     });
   `;
 }
+
+export function createPlaylistScript(name: string): string {
+  return `
+    const Music = Application('Music');
+    const pl = Music.make({new: 'playlist', withProperties: {name: '${esc(name)}'}});
+    JSON.stringify({name: pl.name(), id: pl.id()});
+  `;
+}
+
+export function addToPlaylistScript(playlistName: string, trackName: string): string {
+  return `
+    const Music = Application('Music');
+    const pls = Music.playlists.whose({name: '${esc(playlistName)}'})();
+    if (pls.length === 0) throw new Error('Playlist not found: ${esc(playlistName)}');
+    const tracks = Music.tracks.whose({name: '${esc(trackName)}'})();
+    if (tracks.length === 0) throw new Error('Track not found: ${esc(trackName)}');
+    Music.duplicate(tracks[0], {to: pls[0]});
+    JSON.stringify({added: true, track: '${esc(trackName)}', playlist: '${esc(playlistName)}'});
+  `;
+}
+
+export function removeFromPlaylistScript(playlistName: string, trackName: string): string {
+  return `
+    const Music = Application('Music');
+    const pls = Music.playlists.whose({name: '${esc(playlistName)}'})();
+    if (pls.length === 0) throw new Error('Playlist not found: ${esc(playlistName)}');
+    const tracks = pls[0].tracks.whose({name: '${esc(trackName)}'})();
+    if (tracks.length === 0) throw new Error('Track not found: ${esc(trackName)}');
+    tracks[0].delete();
+    JSON.stringify({removed: true, track: '${esc(trackName)}', playlist: '${esc(playlistName)}'});
+  `;
+}
+
+export function deletePlaylistScript(name: string): string {
+  return `
+    const Music = Application('Music');
+    const pls = Music.playlists.whose({name: '${esc(name)}'})();
+    if (pls.length === 0) throw new Error('Playlist not found: ${esc(name)}');
+    pls[0].delete();
+    JSON.stringify({deleted: true, playlist: '${esc(name)}'});
+  `;
+}

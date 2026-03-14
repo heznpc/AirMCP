@@ -267,3 +267,34 @@ export function toggleFocusModeScript(enable: boolean): string {
     JSON.stringify({doNotDisturb: ${enable}, success: true});
   `;
 }
+
+export function systemSleepScript(): string {
+  return `
+    const se = Application('System Events');
+    se.sleep();
+    JSON.stringify({action: 'sleep', success: true});
+  `;
+}
+
+export function preventSleepScript(seconds: number): string {
+  const secs = Math.max(1, Math.round(seconds));
+  return `
+    const app = Application.currentApplication();
+    app.includeStandardAdditions = true;
+    const pid = app.doShellScript('caffeinate -t ${secs} & echo $!');
+    JSON.stringify({action: 'prevent_sleep', pid: parseInt(pid.trim()), seconds: ${secs}});
+  `;
+}
+
+const ALLOWED_POWER_ACTIONS = new Set(["shutdown", "restart"]);
+
+export function systemPowerScript(action: string): string {
+  if (!ALLOWED_POWER_ACTIONS.has(action)) {
+    throw new Error(`Invalid power action: ${action}`);
+  }
+  return `
+    const se = Application('System Events');
+    se.${action}();
+    JSON.stringify({action: '${action}', success: true});
+  `;
+}

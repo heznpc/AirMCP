@@ -52,6 +52,7 @@ export const MODULE_NAMES = [
   "screen",
   "maps",
   "podcasts",
+  "weather",
   "pages",
   "numbers",
   "keynote",

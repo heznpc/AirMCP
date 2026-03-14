@@ -164,7 +164,8 @@ export function getTrackInfoScript(trackName: string): string {
       duration: t.duration(),
       playedCount: t.playedCount(),
       rating: t.rating(),
-      loved: t.loved(),
+      favorited: t.favorited(),
+      disliked: t.disliked(),
       dateAdded: t.dateAdded() ? t.dateAdded().toISOString() : null,
       sampleRate: t.sampleRate(),
       bitRate: t.bitRate(),
@@ -226,5 +227,53 @@ export function deletePlaylistScript(name: string): string {
     if (pls.length === 0) throw new Error('Playlist not found: ${esc(name)}');
     pls[0].delete();
     JSON.stringify({deleted: true, playlist: '${esc(name)}'});
+  `;
+}
+
+/** JXA preamble: look up a track by name in the Library playlist. */
+function trackLookup(trackName: string): string {
+  return `const Music = Application('Music');
+    const lib = Music.playlists.whose({name: 'Library'})();
+    if (lib.length === 0) throw new Error('Library not found');
+    const tracks = lib[0].tracks.whose({name: '${esc(trackName)}'})();
+    if (tracks.length === 0) throw new Error('Track not found: ${esc(trackName)}');`;
+}
+
+export function getRatingScript(trackName: string): string {
+  return `
+    ${trackLookup(trackName)}
+    const t = tracks[0];
+    JSON.stringify({
+      name: t.name(),
+      artist: t.artist(),
+      rating: t.rating(),
+      favorited: t.favorited(),
+      disliked: t.disliked()
+    });
+  `;
+}
+
+export function setRatingScript(trackName: string, rating: number): string {
+  const clamped = Math.max(0, Math.min(100, Math.round(rating)));
+  return `
+    ${trackLookup(trackName)}
+    tracks[0].rating = ${clamped};
+    JSON.stringify({name: tracks[0].name(), rating: tracks[0].rating()});
+  `;
+}
+
+export function setFavoritedScript(trackName: string, favorited: boolean): string {
+  return `
+    ${trackLookup(trackName)}
+    tracks[0].favorited = ${favorited};
+    JSON.stringify({name: tracks[0].name(), favorited: tracks[0].favorited()});
+  `;
+}
+
+export function setDislikedScript(trackName: string, disliked: boolean): string {
+  return `
+    ${trackLookup(trackName)}
+    tracks[0].disliked = ${disliked};
+    JSON.stringify({name: tracks[0].name(), disliked: tracks[0].disliked()});
   `;
 }

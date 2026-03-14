@@ -21,6 +21,7 @@ import { registerUiTools } from "../ui/tools.js";
 import { registerScreenTools } from "../screen/tools.js";
 import { registerMapsTools } from "../maps/tools.js";
 import { registerPodcastsTools } from "../podcasts/tools.js";
+import { registerWeatherTools } from "../weather/tools.js";
 import { registerPagesTools } from "../pages/tools.js";
 import { registerNumbersTools } from "../numbers/tools.js";
 import { registerKeynoteTools } from "../keynote/tools.js";
@@ -44,6 +45,7 @@ export const MODULE_REGISTRY: ModuleRegistration[] = [
   { name: "screen", tools: registerScreenTools },
   { name: "maps", tools: registerMapsTools },
   { name: "podcasts", tools: registerPodcastsTools },
+  { name: "weather", tools: registerWeatherTools },
   { name: "pages", tools: registerPagesTools },
   { name: "numbers", tools: registerNumbersTools },
   { name: "keynote", tools: registerKeynoteTools },

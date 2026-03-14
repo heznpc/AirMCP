@@ -26,6 +26,7 @@ import { registerSemanticTools } from "./semantic/tools.js";
 import { registerResources } from "./shared/resources.js";
 import { registerSetupTools } from "./shared/setup.js";
 import { registerSkillEngine } from "./skills/index.js";
+import { registerApps } from "./apps/tools.js";
 import { parseConfig, isModuleEnabled, getOsVersion, NPM_PACKAGE_NAME } from "./shared/config.js";
 import { MODULE_REGISTRY } from "./shared/modules.js";
 import { registerDynamicShortcutTools } from "./shortcuts/tools.js";
@@ -119,6 +120,12 @@ async function createServer(): Promise<McpServer> {
 
   // Personal Skills Engine (YAML-based workflows)
   await registerSkillEngine(server);
+
+  // MCP Apps — interactive UI views (Calendar week, Music player)
+  registerApps(server, {
+    calendar: enabled.includes("calendar"),
+    music: enabled.includes("music"),
+  });
 
   // get_workflow: expose prompt handlers as a tool for autonomous agents (Cowork, etc.)
   server.registerTool(

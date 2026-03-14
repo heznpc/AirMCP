@@ -17,6 +17,10 @@ import {
   addToPlaylistScript,
   removeFromPlaylistScript,
   deletePlaylistScript,
+  getRatingScript,
+  setRatingScript,
+  setFavoritedScript,
+  setDislikedScript,
 } from "./scripts.js";
 
 export function registerMusicTools(server: McpServer, _config: AirMcpConfig): void {
@@ -266,6 +270,85 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
         return ok(await runJxa(deletePlaylistScript(name)));
       } catch (e) {
         return toolError("delete playlist", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "get_rating",
+    {
+      title: "Get Rating",
+      description: "Get the rating, favorited, and disliked status for a track.",
+      inputSchema: {
+        trackName: z.string().describe("Track name to look up"),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ trackName }) => {
+      try {
+        return ok(await runJxa(getRatingScript(trackName)));
+      } catch (e) {
+        return toolError("get rating", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "set_rating",
+    {
+      title: "Set Rating",
+      description: "Set the star rating (0-100) for a track. Use multiples of 20 for full stars (0, 20, 40, 60, 80, 100).",
+      inputSchema: {
+        trackName: z.string().describe("Track name"),
+        rating: z.number().int().min(0).max(100).describe("Rating value (0-100)"),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ trackName, rating }) => {
+      try {
+        return ok(await runJxa(setRatingScript(trackName, rating)));
+      } catch (e) {
+        return toolError("set rating", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "set_favorited",
+    {
+      title: "Set Favorited",
+      description: "Mark or unmark a track as favorited (loved).",
+      inputSchema: {
+        trackName: z.string().describe("Track name"),
+        favorited: z.boolean().describe("Whether to mark as favorited"),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ trackName, favorited }) => {
+      try {
+        return ok(await runJxa(setFavoritedScript(trackName, favorited)));
+      } catch (e) {
+        return toolError("set favorited", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "set_disliked",
+    {
+      title: "Set Disliked",
+      description: "Mark or unmark a track as disliked.",
+      inputSchema: {
+        trackName: z.string().describe("Track name"),
+        disliked: z.boolean().describe("Whether to mark as disliked"),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ trackName, disliked }) => {
+      try {
+        return ok(await runJxa(setDislikedScript(trackName, disliked)));
+      } catch (e) {
+        return toolError("set disliked", e);
       }
     },
   );

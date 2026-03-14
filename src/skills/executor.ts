@@ -47,6 +47,166 @@ function resolvePath(path: string, results: Map<string, unknown>): unknown {
   return current;
 }
 
+/* ------------------------------------------------------------------ */
+/*  Lightweight expression evaluator for only_if / skip_if conditions */
+/* ------------------------------------------------------------------ */
+
+type Token =
+  | { kind: "value"; value: unknown }
+  | { kind: "op"; op: string }
+  | { kind: "paren"; paren: "(" | ")" };
+
+/**
+ * Tokenize a condition expression.
+ *
+ * Recognised token forms:
+ *   {{path}}              → resolved template value
+ *   123  /  3.14          → number literal
+ *   "str" / 'str'         → string literal
+ *   true / false / null   → keyword literal
+ *   >= <= == != > < && || → operators
+ *   ( )                   → grouping
+ */
+function tokenize(expr: string, results: Map<string, unknown>): Token[] {
+  // Regex must be created here (not module‑level) because the `g` flag
+  // carries mutable lastIndex state.
+  const TOKEN_RE =
+    /\{\{([^}]+)\}\}|(\d+(?:\.\d+)?)|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')|(true|false|null)\b|(>=|<=|==|!=|&&|\|\||[><])|([()])/g;
+
+  const tokens: Token[] = [];
+  let m: RegExpExecArray | null;
+
+  while ((m = TOKEN_RE.exec(expr)) !== null) {
+    if (m[1] !== undefined) {
+      // Template variable
+      tokens.push({ kind: "value", value: resolvePath(m[1].trim(), results) });
+    } else if (m[2] !== undefined) {
+      // Number literal
+      tokens.push({ kind: "value", value: parseFloat(m[2]) });
+    } else if (m[3] !== undefined) {
+      // Quoted string – strip surrounding quotes and unescape
+      const raw = m[3].slice(1, -1).replace(/\\(.)/g, "$1");
+      tokens.push({ kind: "value", value: raw });
+    } else if (m[4] !== undefined) {
+      // Keyword literal
+      const kw = m[4];
+      const val = kw === "true" ? true : kw === "false" ? false : null;
+      tokens.push({ kind: "value", value: val });
+    } else if (m[5] !== undefined) {
+      // Operator
+      tokens.push({ kind: "op", op: m[5] });
+    } else if (m[6] !== undefined) {
+      // Parenthesis
+      tokens.push({ kind: "paren", paren: m[6] as "(" | ")" });
+    }
+  }
+
+  return tokens;
+}
+
+function compare(left: unknown, op: string, right: unknown): boolean {
+  switch (op) {
+    case "==": return left == right;
+    case "!=": return left != right;
+    case ">":  return Number(left) >  Number(right);
+    case "<":  return Number(left) <  Number(right);
+    case ">=": return Number(left) >= Number(right);
+    case "<=": return Number(left) <= Number(right);
+    default:   return false;
+  }
+}
+
+/**
+ * Recursive‑descent parser with standard operator precedence:
+ *
+ *   parseOr        → parseAnd  ( '||' parseAnd  )*
+ *   parseAnd       → parseComp ( '&&' parseComp )*
+ *   parseComparison→ parsePrimary ( cmpOp parsePrimary )?
+ *   parsePrimary   → value  |  '(' parseOr ')'
+ */
+const CMP_OPS = new Set(["==", "!=", ">", "<", ">=", "<="]);
+
+function parseExpr(tokens: Token[]): unknown {
+  let pos = 0;
+
+  function peek(): Token | undefined {
+    return tokens[pos];
+  }
+
+  function advance(): Token {
+    return tokens[pos++];
+  }
+
+  function peekOp(): string | undefined {
+    const t = peek();
+    return t?.kind === "op" ? t.op : undefined;
+  }
+
+  function parseOr(): unknown {
+    let left = parseAnd();
+    while (peekOp() === "||") {
+      advance();
+      left = left || parseAnd();
+    }
+    return left;
+  }
+
+  function parseAnd(): unknown {
+    let left = parseComparison();
+    while (peekOp() === "&&") {
+      advance();
+      left = left && parseComparison();
+    }
+    return left;
+  }
+
+  function parseComparison(): unknown {
+    const left = parsePrimary();
+    const op = peekOp();
+    if (op && CMP_OPS.has(op)) {
+      advance();
+      return compare(left, op, parsePrimary());
+    }
+    return left;
+  }
+
+  function parsePrimary(): unknown {
+    const t = peek();
+    if (!t) return undefined;
+    if (t.kind === "value") {
+      advance();
+      return t.value;
+    }
+    if (t.kind === "paren" && t.paren === "(") {
+      advance();
+      const val = parseOr();
+      if (peek()?.kind === "paren") advance();
+      return val;
+    }
+    advance();
+    return undefined;
+  }
+
+  return parseOr();
+}
+
+/**
+ * Evaluate a condition expression used in `only_if` / `skip_if`.
+ *
+ * - Resolves `{{…}}` template variables from prior step results.
+ * - Supports comparison (`>`, `<`, `==`, `!=`, `>=`, `<=`) and
+ *   logical (`&&`, `||`) operators with parentheses for grouping.
+ * - A single resolved value falls back to a truthy check (backward compat).
+ *
+ * Returns a boolean.
+ */
+export function evaluateCondition(expr: string, results: Map<string, unknown>): boolean {
+  const tokens = tokenize(expr, results);
+  if (tokens.length === 0) return false;
+  if (tokens.length === 1 && tokens[0].kind === "value") return !!tokens[0].value;
+  return !!parseExpr(tokens);
+}
+
 /**
  * Look up a registered tool's handler on the McpServer and invoke it.
  */
@@ -90,15 +250,13 @@ export async function executeSkill(
   for (const step of skill.steps) {
     // Evaluate only_if / skip_if
     if (step.only_if) {
-      const resolved = resolveTemplates(step.only_if, results);
-      if (!resolved) {
+      if (!evaluateCondition(step.only_if, results)) {
         stepResults.push({ id: step.id, status: "skipped" });
         continue;
       }
     }
     if (step.skip_if) {
-      const resolved = resolveTemplates(step.skip_if, results);
-      if (resolved) {
+      if (evaluateCondition(step.skip_if, results)) {
         stepResults.push({ id: step.id, status: "skipped" });
         continue;
       }

@@ -21,7 +21,12 @@ import {
   getBrightnessScript,
   setBrightnessScript,
   toggleFocusModeScript,
+  systemSleepScript,
+  preventSleepScript,
+  systemPowerScript,
 } from "./scripts.js";
+
+let caffeinatePid: number | null = null;
 
 export function registerSystemTools(server: McpServer, _config: AirMcpConfig): void {
   server.registerTool(
@@ -415,6 +420,85 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
         return ok(await runJxa(toggleFocusModeScript(enable)));
       } catch (e) {
         return toolError("toggle focus mode", e);
+      }
+    },
+  );
+
+  // --- Sleep & Power Management Tools ---
+
+  server.registerTool(
+    "system_sleep",
+    {
+      title: "System Sleep",
+      description: "Put the Mac to sleep.",
+      inputSchema: {},
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+    },
+    async () => {
+      try {
+        return ok(await runJxa<{ action: string; success: boolean }>(systemSleepScript()));
+      } catch (e) {
+        return toolError("system sleep", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "prevent_sleep",
+    {
+      title: "Prevent Sleep",
+      description: "Prevent the Mac from sleeping for a specified duration using caffeinate. Returns the process PID for cancellation.",
+      inputSchema: {
+        seconds: z.number().int().min(1).max(86400).optional().default(3600).describe("Duration in seconds (default: 3600 = 1 hour, max: 86400 = 24 hours)"),
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+    },
+    async ({ seconds }) => {
+      try {
+        // Kill any previous caffeinate process before starting a new one
+        if (caffeinatePid !== null) {
+          try { process.kill(caffeinatePid); } catch { /* already exited */ }
+          caffeinatePid = null;
+        }
+        const result = await runJxa<{ action: string; pid: number; seconds: number }>(preventSleepScript(seconds));
+        caffeinatePid = result.pid;
+        return ok(result);
+      } catch (e) {
+        return toolError("prevent sleep", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "system_power",
+    {
+      title: "System Power",
+      description: "Shutdown or restart the Mac. Use with caution.",
+      inputSchema: {
+        action: z.enum(["shutdown", "restart"]).describe("Power action: shutdown or restart"),
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+    },
+    async ({ action }) => {
+      try {
+        return ok(await runJxa<{ action: string; success: boolean }>(systemPowerScript(action)));
+      } catch (e) {
+        return toolError("system power", e);
       }
     },
   );

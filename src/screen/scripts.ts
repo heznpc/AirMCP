@@ -26,26 +26,50 @@ export function captureScreenScript(display?: number): string {
 }
 
 /**
- * Capture a specific app window.
- * Activates the app first, then captures the frontmost window.
+ * Capture a specific app window autonomously (no user interaction).
+ * Uses CGWindowListCopyWindowInfo to find the window ID, then screencapture -l <id>.
+ * If appName is given, activates that app and captures its frontmost window.
+ * If omitted, captures the frontmost window of the frontmost app.
  */
 export function captureWindowScript(appName?: string): string {
   const filePath = tempScreenshotPath();
-  if (appName) {
-    return `
-      const app = Application.currentApplication();
-      app.includeStandardAdditions = true;
-      Application('${esc(appName)}').activate();
-      delay(0.5);
-      app.doShellScript('screencapture -x -t png -w "${filePath}"');
-      JSON.stringify({ path: '${filePath}' });
-    `;
-  }
+  const activateBlock = appName
+    ? `Application('${esc(appName)}').activate(); delay(0.5);`
+    : "";
+  const targetApp = appName ? `'${esc(appName)}'` : "null";
   return `
     const app = Application.currentApplication();
     app.includeStandardAdditions = true;
-    app.doShellScript('screencapture -x -t png -w "${filePath}"');
+    ${activateBlock}
+    // Get window ID via CGWindowListCopyWindowInfo (Python one-liner to avoid JXA limitations)
+    const targetApp = ${targetApp};
+    const pyCmd = targetApp
+      ? 'python3 -c "import Quartz,json;ws=[w for w in Quartz.CGWindowListCopyWindowInfo(Quartz.kCGWindowListOptionOnScreenOnly|Quartz.kCGWindowListExcludeDesktopElements,Quartz.kCGNullWindowID) if w.get(\\"kCGWindowOwnerName\\")==\\"' + targetApp + '\\" and w.get(\\"kCGWindowLayer\\")==0];print(ws[0][\\"kCGWindowNumber\\"] if ws else 0)"'
+      : 'python3 -c "import Quartz;ws=[w for w in Quartz.CGWindowListCopyWindowInfo(Quartz.kCGWindowListOptionOnScreenOnly|Quartz.kCGWindowListExcludeDesktopElements,Quartz.kCGNullWindowID) if w.get(\\"kCGWindowLayer\\")==0];print(ws[0][\\"kCGWindowNumber\\"] if ws else 0)"';
+    const wid = parseInt(app.doShellScript(pyCmd).trim(), 10);
+    if (wid > 0) {
+      app.doShellScript('screencapture -x -t png -l ' + wid + ' "${filePath}"');
+    } else {
+      // Fallback: capture full screen if no window found
+      app.doShellScript('screencapture -x -t png "${filePath}"');
+    }
     JSON.stringify({ path: '${filePath}' });
+  `;
+}
+
+/**
+ * Record the screen for a specified duration.
+ * Uses screencapture -v (video mode) with a timeout to stop recording.
+ */
+export function recordScreenScript(duration: number, display?: number): string {
+  const safeDuration = Math.min(Math.max(Math.floor(duration), 1), 60);
+  const filePath = `/tmp/iconnect-recording-${Date.now()}.mov`;
+  const displayFlag = display !== undefined ? ` -D ${Math.floor(display)}` : "";
+  return `
+    const app = Application.currentApplication();
+    app.includeStandardAdditions = true;
+    app.doShellScript('screencapture -x -v${displayFlag} "${filePath}" & SCPID=$!; sleep ${safeDuration}; kill $SCPID 2>/dev/null; wait $SCPID 2>/dev/null || true');
+    JSON.stringify({ path: '${filePath}', duration: ${safeDuration} });
   `;
 }
 

@@ -62,7 +62,7 @@ private let allModules: [ModuleInfo] = [
     ModuleInfo(id: "tv", name: "TV", icon: "tv",
                description: "Playback, library, search", toolCount: 6),
     ModuleInfo(id: "screen", name: "Screen", icon: "camera.viewfinder",
-               description: "Screenshot capture, window list", toolCount: 4),
+               description: "Screenshot, window list, recording", toolCount: 5),
     ModuleInfo(id: "maps", name: "Maps", icon: "map",
                description: "Search, directions, pins", toolCount: 6),
 ]

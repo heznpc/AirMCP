@@ -4,6 +4,7 @@ import {
   captureWindowScript,
   captureAreaScript,
   listWindowsScript,
+  recordScreenScript,
 } from '../dist/screen/scripts.js';
 
 describe('screen script generators', () => {
@@ -42,16 +43,17 @@ describe('screen script generators', () => {
   // --- captureWindowScript ---
   test('captureWindowScript captures frontmost window by default', () => {
     const script = captureWindowScript();
-    expect(script).toContain('screencapture -x -t png -w');
+    expect(script).toContain('screencapture -x -t png -l');
     expect(script).toContain('/tmp/iconnect-screenshot-');
     expect(script).toContain('JSON.stringify');
+    expect(script).toContain('CGWindowListCopyWindowInfo');
   });
 
   test('captureWindowScript activates app when appName given', () => {
     const script = captureWindowScript('Safari');
     expect(script).toContain("Application('Safari')");
     expect(script).toContain('activate()');
-    expect(script).toContain('screencapture -x -t png -w');
+    expect(script).toContain('screencapture -x -t png -l');
   });
 
   test('captureWindowScript omits activate when no appName', () => {
@@ -139,5 +141,31 @@ describe('screen esc() injection prevention', () => {
     const script = captureScreenScript(1);
     // Display flag should be a clean integer
     expect(script).toMatch(/-D \d+/);
+  });
+});
+
+describe('recordScreenScript', () => {
+  test('uses screencapture -v for video', () => {
+    const script = recordScreenScript(5);
+    expect(script).toContain('screencapture -x -v');
+    expect(script).toContain('.mov');
+    expect(script).toContain('sleep 5');
+  });
+
+  test('clamps duration to 1-60', () => {
+    const short = recordScreenScript(0);
+    expect(short).toContain('sleep 1');
+    const long = recordScreenScript(120);
+    expect(long).toContain('sleep 60');
+  });
+
+  test('supports display parameter', () => {
+    const script = recordScreenScript(10, 2);
+    expect(script).toContain('-D 2');
+  });
+
+  test('omits display flag when not specified', () => {
+    const script = recordScreenScript(5);
+    expect(script).not.toContain('-D');
   });
 });

@@ -9,6 +9,7 @@ import {
   captureWindowScript,
   captureAreaScript,
   listWindowsScript,
+  recordScreenScript,
 } from "./scripts.js";
 
 /**
@@ -144,6 +145,54 @@ export function registerScreenTools(server: McpServer, _config: IConnectConfig):
         };
       } catch (e) {
         return toolError("list windows", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "record_screen",
+    {
+      title: "Record Screen",
+      description:
+        "Record the screen for a specified duration (1-60 seconds). Returns the recording as a .mov file path. Requires Screen Recording permission.",
+      inputSchema: {
+        duration: z
+          .number()
+          .int()
+          .min(1)
+          .max(60)
+          .describe("Recording duration in seconds (1-60)"),
+        display: z
+          .number()
+          .int()
+          .min(1)
+          .optional()
+          .describe("Display number for multi-monitor setups (1 = main display). Omit for default display."),
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async ({ duration, display }) => {
+      try {
+        const result = await runJxa<{ path: string; duration: number }>(recordScreenScript(duration, display));
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify({
+                path: result.path,
+                duration: result.duration,
+                message: `Screen recorded for ${result.duration}s. File saved to ${result.path}`,
+              }),
+            },
+          ],
+        };
+      } catch (e) {
+        return toolError("record screen", e);
       }
     },
   );

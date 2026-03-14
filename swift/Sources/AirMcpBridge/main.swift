@@ -85,11 +85,14 @@ func readStdin() -> Data {
     return data
 }
 
-func writeOutput(_ output: Output) throws {
-    let encoder = JSONEncoder()
-    let data = try encoder.encode(output)
+func writeJSON<T: Encodable>(_ value: T) throws {
+    let data = try JSONEncoder().encode(value)
     FileHandle.standardOutput.write(data)
     FileHandle.standardOutput.write(Data("\n".utf8))
+}
+
+func writeOutput(_ output: Output) throws {
+    try writeJSON(output)
 }
 
 func writeError(_ message: String) {
@@ -407,7 +410,7 @@ class BluetoothManager: NSObject, CBCentralManagerDelegate, @unchecked Sendable 
         return result
     }
 
-    func connect(identifier: String) async throws -> String? {
+    private func resolvePeripheral(_ identifier: String) async throws -> (CBCentralManager, CBPeripheral) {
         let state = await initialize()
         guard state == .poweredOn, let mgr = manager else {
             throw NSError(domain: "AirMcpBridge", code: 1,
@@ -422,29 +425,30 @@ class BluetoothManager: NSObject, CBCentralManagerDelegate, @unchecked Sendable 
             throw NSError(domain: "AirMcpBridge", code: 3,
                 userInfo: [NSLocalizedDescriptionKey: "Peripheral not found: \(identifier). Run scan-bluetooth first."])
         }
+        return (mgr, peripheral)
+    }
+
+    func connect(identifier: String) async throws -> String? {
+        let (mgr, peripheral) = try await resolvePeripheral(identifier)
+
+        let timeoutItem = DispatchWorkItem { [weak self] in
+            self?.connectContinuation?.resume(throwing: NSError(domain: "AirMcpBridge", code: 5,
+                userInfo: [NSLocalizedDescriptionKey: "Connection timed out after 10 seconds"]))
+            self?.connectContinuation = nil
+            mgr.cancelPeripheralConnection(peripheral)
+        }
+        btQueue.asyncAfter(deadline: .now() + 10, execute: timeoutItem)
 
         let _ = try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Bool, Error>) in
             self.connectContinuation = cont
             mgr.connect(peripheral, options: nil)
         }
+        timeoutItem.cancel()
         return peripheral.name
     }
 
     func disconnect(identifier: String) async throws -> String? {
-        let state = await initialize()
-        guard state == .poweredOn, let mgr = manager else {
-            throw NSError(domain: "AirMcpBridge", code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "Bluetooth is not powered on"])
-        }
-        guard let uuid = UUID(uuidString: identifier) else {
-            throw NSError(domain: "AirMcpBridge", code: 2,
-                userInfo: [NSLocalizedDescriptionKey: "Invalid UUID: \(identifier)"])
-        }
-        let peripherals = mgr.retrievePeripherals(withIdentifiers: [uuid])
-        guard let peripheral = peripherals.first else {
-            throw NSError(domain: "AirMcpBridge", code: 3,
-                userInfo: [NSLocalizedDescriptionKey: "Peripheral not found: \(identifier)"])
-        }
+        let (mgr, peripheral) = try await resolvePeripheral(identifier)
         mgr.cancelPeripheralConnection(peripheral)
         return peripheral.name
     }
@@ -498,12 +502,11 @@ guard args.count >= 2 else {
 let command = args[1]
 let stdinData = readStdin()
 
-let eventStore = EKEventStore()
-
 switch command {
 
 // --- EventKit: Recurring Events ---
 case "create-recurring-event":
+    let eventStore = EKEventStore()
     guard let eventInput = try? JSONDecoder().decode(RecurringEventInput.self, from: stdinData) else {
         writeError("Invalid JSON. Expected RecurringEventInput.")
         exit(1)
@@ -540,12 +543,11 @@ case "create-recurring-event":
     try eventStore.save(event, span: .futureEvents)
 
     let output = EventOutput(id: event.eventIdentifier, title: event.title, recurring: true)
-    let data = try JSONEncoder().encode(output)
-    FileHandle.standardOutput.write(data)
-    FileHandle.standardOutput.write(Data("\n".utf8))
+    try writeJSON(output)
 
 // --- EventKit: Recurring Reminders ---
 case "create-recurring-reminder":
+    let eventStore = EKEventStore()
     guard let remInput = try? JSONDecoder().decode(RecurringReminderInput.self, from: stdinData) else {
         writeError("Invalid JSON. Expected RecurringReminderInput.")
         exit(1)
@@ -584,9 +586,7 @@ case "create-recurring-reminder":
     try eventStore.save(reminder, commit: true)
 
     let output = ReminderOutput(id: reminder.calendarItemIdentifier, title: reminder.title ?? "", recurring: true)
-    let data = try JSONEncoder().encode(output)
-    FileHandle.standardOutput.write(data)
-    FileHandle.standardOutput.write(Data("\n".utf8))
+    try writeJSON(output)
 
 // --- PhotoKit: Import ---
 case "import-photo":
@@ -617,9 +617,7 @@ case "import-photo":
     }
 
     let output = PhotoImportOutput(imported: true, identifier: localId)
-    let data = try JSONEncoder().encode(output)
-    FileHandle.standardOutput.write(data)
-    FileHandle.standardOutput.write(Data("\n".utf8))
+    try writeJSON(output)
 
 // --- PhotoKit: Delete ---
 case "delete-photos":
@@ -644,9 +642,7 @@ case "delete-photos":
 
     let deletedIds = toDelete.map { $0.localIdentifier }
     let output = PhotoDeleteOutput(deleted: deletedIds.count, identifiers: deletedIds)
-    let data = try JSONEncoder().encode(output)
-    FileHandle.standardOutput.write(data)
-    FileHandle.standardOutput.write(Data("\n".utf8))
+    try writeJSON(output)
 
 // --- NLContextualEmbedding: embed text ---
 case "embed-text":
@@ -658,9 +654,7 @@ case "embed-text":
     do {
         let vector = try embedText(input.text, language: lang)
         let output = EmbedTextOutput(vector: vector, dimension: vector.count)
-        let data = try JSONEncoder().encode(output)
-        FileHandle.standardOutput.write(data)
-        FileHandle.standardOutput.write(Data("\n".utf8))
+        try writeJSON(output)
     } catch {
         writeError("Embedding failed: \(error.localizedDescription)")
     }
@@ -679,9 +673,7 @@ case "embed-batch":
         }
         let dim = vectors.first?.count ?? 0
         let output = EmbedBatchOutput(vectors: vectors, dimension: dim, count: vectors.count)
-        let data = try JSONEncoder().encode(output)
-        FileHandle.standardOutput.write(data)
-        FileHandle.standardOutput.write(Data("\n".utf8))
+        try writeJSON(output)
     } catch {
         writeError("Batch embedding failed: \(error.localizedDescription)")
     }
@@ -903,9 +895,7 @@ case "ai-status":
         hasAppleSilicon: hasAppleSilicon,
         foundationModelsSupported: fmSupported
     )
-    let data = try JSONEncoder().encode(statusOutput)
-    FileHandle.standardOutput.write(data)
-    FileHandle.standardOutput.write(Data("\n".utf8))
+    try writeJSON(statusOutput)
 
 // --- CoreLocation: get current location ---
 case "get-location":
@@ -921,9 +911,7 @@ case "get-location":
             verticalAccuracy: location.verticalAccuracy,
             timestamp: formatter.string(from: location.timestamp)
         )
-        let data = try JSONEncoder().encode(output)
-        FileHandle.standardOutput.write(data)
-        FileHandle.standardOutput.write(Data("\n".utf8))
+        try writeJSON(output)
     } catch {
         writeError("Location error: \(error.localizedDescription)")
     }
@@ -938,18 +926,14 @@ case "location-permission":
     }
     let authorized = status == .authorizedAlways
     let output = LocationPermissionOutput(status: locationStatusString(status), authorized: authorized)
-    let data = try JSONEncoder().encode(output)
-    FileHandle.standardOutput.write(data)
-    FileHandle.standardOutput.write(Data("\n".utf8))
+    try writeJSON(output)
 
 // --- CoreBluetooth: state ---
 case "bluetooth-state":
     let bt = BluetoothManager()
     let state = await bt.initialize()
     let output = BluetoothStateOutput(state: bluetoothStateString(state), powered: state == .poweredOn)
-    let data = try JSONEncoder().encode(output)
-    FileHandle.standardOutput.write(data)
-    FileHandle.standardOutput.write(Data("\n".utf8))
+    try writeJSON(output)
 
 // --- CoreBluetooth: scan ---
 case "scan-bluetooth":
@@ -958,9 +942,7 @@ case "scan-bluetooth":
     let bt = BluetoothManager()
     let devices = await bt.scan(duration: min(max(duration, 1), 30))
     let output = BluetoothScanOutput(total: devices.count, devices: devices)
-    let data = try JSONEncoder().encode(output)
-    FileHandle.standardOutput.write(data)
-    FileHandle.standardOutput.write(Data("\n".utf8))
+    try writeJSON(output)
 
 // --- CoreBluetooth: connect ---
 case "connect-bluetooth":
@@ -972,9 +954,7 @@ case "connect-bluetooth":
     do {
         let name = try await bt.connect(identifier: connInput.identifier)
         let output = BluetoothConnectOutput(success: true, identifier: connInput.identifier, name: name)
-        let data = try JSONEncoder().encode(output)
-        FileHandle.standardOutput.write(data)
-        FileHandle.standardOutput.write(Data("\n".utf8))
+        try writeJSON(output)
     } catch {
         writeError("Bluetooth connect error: \(error.localizedDescription)")
     }
@@ -989,9 +969,7 @@ case "disconnect-bluetooth":
     do {
         let name = try await bt.disconnect(identifier: disconnInput.identifier)
         let output = BluetoothConnectOutput(success: true, identifier: disconnInput.identifier, name: name)
-        let data = try JSONEncoder().encode(output)
-        FileHandle.standardOutput.write(data)
-        FileHandle.standardOutput.write(Data("\n".utf8))
+        try writeJSON(output)
     } catch {
         writeError("Bluetooth disconnect error: \(error.localizedDescription)")
     }

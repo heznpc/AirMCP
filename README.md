@@ -6,7 +6,7 @@ MCP server for the entire Apple ecosystem — Notes, Reminders, Calendar, Contac
 
 ## Features
 
-- **226 tools** (24 modules) — Apple app CRUD + system control + Apple Intelligence + UI Automation + Screen Capture + Maps + Podcasts + Weather + iWork (Pages/Numbers/Keynote) + dynamic shortcuts
+- **242 tools** (25 modules) — Apple app CRUD + system control + Apple Intelligence + UI Automation + Screen Capture + Maps + Podcasts + Weather + iWork (Pages/Numbers/Keynote) + Google Workspace + dynamic shortcuts
 - **31 prompts** — per-app workflows (notes, calendar, reminders, shortcuts) + cross-module + developer workflows + YAML skills
 - **12 MCP resources** — Notes, Calendar, Reminders, Music, Mail, System live data URIs
 - **JXA + Swift bridge** — JXA for basic automation, EventKit/PhotoKit for advanced features
@@ -487,6 +487,29 @@ Requires macOS 26+ with Apple Silicon.
 | `connect_bluetooth` | Connect to a BLE device by UUID | write |
 | `disconnect_bluetooth` | Disconnect a BLE device | write |
 
+### Google Workspace (16 tools)
+
+Requires: `npm install -g @googleworkspace/cli && gws auth setup`
+
+| Tool | Description | Type |
+|------|-------------|------|
+| `gws_status` | Check GWS CLI availability | read |
+| `gws_gmail_list` | List Gmail messages with query | read |
+| `gws_gmail_read` | Read Gmail message by ID | read |
+| `gws_gmail_send` | Send email via Gmail | write |
+| `gws_drive_list` | List Google Drive files | read |
+| `gws_drive_read` | Get Drive file metadata | read |
+| `gws_drive_search` | Full-text search across Drive | read |
+| `gws_sheets_read` | Read Google Sheet values | read |
+| `gws_sheets_write` | Write to Google Sheet | write |
+| `gws_calendar_list` | List Google Calendar events | read |
+| `gws_calendar_create` | Create Google Calendar event | write |
+| `gws_docs_read` | Read Google Doc content | read |
+| `gws_tasks_list` | List Google Tasks | read |
+| `gws_tasks_create` | Create Google Task | write |
+| `gws_people_search` | Search Google Contacts | read |
+| `gws_raw` | Execute any GWS CLI command | write |
+
 ## Resources
 
 MCP resources provide live data from Apple apps via URI.
@@ -742,7 +765,14 @@ Modules with OS requirements (e.g., Intelligence requires macOS 26+) are automat
 
 ## Roadmap
 
-### v2.0 (Current)
+### v2.1 (Current)
+
+- **Google Workspace** — Gmail, Drive, Sheets, Calendar, Docs, Tasks, People via `@googleworkspace/cli`
+- **Gemini Embedding 2** — Upgraded to `text-embedding-004`, hybrid provider (on-device + cloud), configurable model/dimension
+- **Dynamic module loading** — New modules = 1 line in MANIFEST (no import boilerplate)
+- **Centralized constants** — All API URLs, timeouts, buffer sizes in `src/shared/constants.ts` with env var overrides
+
+### v2.0
 
 - **CoreLocation** — Native GPS coordinates via Swift/CLLocationManager
 - **CoreBluetooth** — BLE device scanning, state, connect/disconnect via Swift/CBCentralManager

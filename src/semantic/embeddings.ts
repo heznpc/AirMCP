@@ -1,4 +1,5 @@
 import { runSwift, checkSwiftBridge } from "../shared/swift.js";
+import { API, MODELS, TIMEOUT, LIMITS } from "../shared/constants.js";
 
 interface EmbedTextResult {
   vector: number[];
@@ -25,13 +26,11 @@ interface GeminiBatchEmbedResponse {
 
 export type EmbeddingProvider = "gemini" | "swift" | "hybrid" | "none";
 
-// Configurable via env vars
-const GEMINI_MODEL = process.env.AIRMCP_EMBEDDING_MODEL || "text-embedding-004";
-const GEMINI_DIMENSION = parseInt(process.env.AIRMCP_EMBEDDING_DIM || "768", 10);
-
-const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1/models";
-const GEMINI_EMBED_URL = `${GEMINI_BASE}/${GEMINI_MODEL}:embedContent`;
-const GEMINI_BATCH_URL = `${GEMINI_BASE}/${GEMINI_MODEL}:batchEmbedContents`;
+// Derived from centralized constants
+const GEMINI_MODEL = MODELS.GEMINI_EMBEDDING;
+const GEMINI_DIMENSION = MODELS.EMBEDDING_DIM;
+const GEMINI_EMBED_URL = `${API.GEMINI_BASE}/${GEMINI_MODEL}:embedContent`;
+const GEMINI_BATCH_URL = `${API.GEMINI_BASE}/${GEMINI_MODEL}:batchEmbedContents`;
 
 /**
  * Detect which embedding provider is available.
@@ -71,7 +70,7 @@ async function geminiEmbed(text: string): Promise<number[]> {
       taskType: "SEMANTIC_SIMILARITY",
       outputDimensionality: GEMINI_DIMENSION,
     }),
-    signal: AbortSignal.timeout(15_000),
+    signal: AbortSignal.timeout(TIMEOUT.EMBED_SINGLE),
   });
 
   if (!res.ok) {
@@ -106,7 +105,7 @@ async function geminiBatchEmbed(texts: string[]): Promise<number[][]> {
           outputDimensionality: GEMINI_DIMENSION,
         })),
       }),
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(TIMEOUT.EMBED_BATCH),
     });
 
     if (!res.ok) {

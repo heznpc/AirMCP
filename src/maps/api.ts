@@ -1,11 +1,13 @@
 // Geocoding API clients — Open-Meteo (forward) + Nominatim (reverse).
 
-const GEOCODE_URL = "https://geocoding-api.open-meteo.com/v1/search";
-const REVERSE_URL = "https://nominatim.openstreetmap.org/reverse";
+import { API, TIMEOUT, IDENTITY } from "../shared/constants.js";
+
+const GEOCODE_URL = API.GEOCODING;
+const REVERSE_URL = API.REVERSE_GEOCODE;
 
 export async function fetchGeocode(query: string, count = 5) {
   const params = new URLSearchParams({ name: query, count: String(count), language: "en", format: "json" });
-  const res = await fetch(`${GEOCODE_URL}?${params}`, { signal: AbortSignal.timeout(10_000) });
+  const res = await fetch(`${GEOCODE_URL}?${params}`, { signal: AbortSignal.timeout(TIMEOUT.GEOCODE) });
   if (!res.ok) throw new Error(`Geocoding API error: ${res.status} ${res.statusText}`);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const data: any = await res.json();
@@ -26,8 +28,8 @@ export async function fetchGeocode(query: string, count = 5) {
 export async function fetchReverseGeocode(latitude: number, longitude: number) {
   const params = new URLSearchParams({ lat: String(latitude), lon: String(longitude), format: "json" });
   const res = await fetch(`${REVERSE_URL}?${params}`, {
-    headers: { "User-Agent": "AirMCP/2.0 (MCP Server)" },
-    signal: AbortSignal.timeout(10_000),
+    headers: { "User-Agent": IDENTITY.USER_AGENT },
+    signal: AbortSignal.timeout(TIMEOUT.GEOCODE),
   });
   if (!res.ok) throw new Error(`Reverse geocoding error: ${res.status} ${res.statusText}`);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

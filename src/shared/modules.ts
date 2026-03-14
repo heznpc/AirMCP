@@ -38,6 +38,7 @@ const MANIFEST: Array<{
   { name: "keynote" },
   { name: "location" },
   { name: "bluetooth" },
+  { name: "google" },
 ];
 
 /**

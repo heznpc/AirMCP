@@ -1,6 +1,8 @@
 // Weather API client using Open-Meteo (free, no API key required).
 
-const BASE_URL = "https://api.open-meteo.com/v1/forecast";
+import { API } from "../shared/constants.js";
+
+const BASE_URL = API.WEATHER;
 
 const WEATHER_CODES: Record<number, string> = {
   0: "Clear sky",

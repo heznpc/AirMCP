@@ -54,7 +54,7 @@ private let allModules: [ModuleInfo] = [
     ModuleInfo(id: "photos", name: "Photos", icon: "photo",
                description: "Browse, search, albums", toolCount: 9),
     ModuleInfo(id: "shortcuts", name: "Shortcuts", icon: "command",
-               description: "Run, list, import, export shortcuts", toolCount: 10),
+               description: "Run, list, import, export shortcuts", toolCount: 11),
     ModuleInfo(id: "ui", name: "UI Automation", icon: "hand.tap",
                description: "Accessibility-based app control", toolCount: 6),
     ModuleInfo(id: "intelligence", name: "Intelligence", icon: "brain",

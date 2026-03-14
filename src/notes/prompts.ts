@@ -49,7 +49,7 @@ export function registerNotePrompts(server: McpServer): void {
   );
 
   server.prompt(
-    "weekly-review",
+    "notes-weekly-review",
     "Summarize notes from the past week and suggest organization actions.",
     () => {
       const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();

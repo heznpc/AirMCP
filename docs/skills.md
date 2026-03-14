@@ -1,6 +1,6 @@
 # AirMCP Skills Guide
 
-A practical guide for AI agents to effectively use AirMCP's 160+ tools across 18 modules to orchestrate the Apple ecosystem via MCP.
+A practical guide for AI agents to effectively use AirMCP's 173 tools across 18 modules to orchestrate the Apple ecosystem via MCP.
 
 ## Overview
 
@@ -33,12 +33,12 @@ AirMCP bridges AI agents to native macOS applications through JXA (JavaScript fo
 | **reminders** | Reminders | `list_reminders`, `create_reminder`, `complete_reminder`, `search_reminders`, `create_reminder_list`, `create_recurring_reminder` | 11 |
 | **safari** | Safari | `list_tabs`, `read_page_content`, `open_url`, `run_javascript`, `list_bookmarks`, `add_to_reading_list` | 12 |
 | **screen** | Screen Capture | `capture_screen`, `capture_window`, `capture_area`, `list_windows`, `record_screen` | 5 |
-| **shortcuts** | Shortcuts | `list_shortcuts`, `run_shortcut`, `get_shortcut_detail`, `search_shortcuts`, `export_shortcut` | 10 |
+| **shortcuts** | Shortcuts | `list_shortcuts`, `run_shortcut`, `get_shortcut_detail`, `search_shortcuts`, `export_shortcut` | 11 |
 | **system** | System | `get_clipboard`, `set_clipboard`, `show_notification`, `capture_screenshot`, `get_battery_status`, `toggle_dark_mode` | 17 |
 | **tv** | TV | `tv_list_playlists`, `tv_now_playing`, `tv_playback_control`, `tv_search`, `tv_play` | 6 |
 | **ui** | UI Automation | `ui_open_app`, `ui_click`, `ui_type`, `ui_press_key`, `ui_scroll`, `ui_read` | 6 |
 | **semantic** | Semantic Search | `semantic_index`, `semantic_search`, `find_related`, `semantic_status` | 4 |
-| **cross** | Cross-App | `summarize_context`, `get_workflow` | 2 |
+| **cross** | Cross-App | `summarize_context` | 1 |
 
 ## Workflow Patterns
 
@@ -266,6 +266,20 @@ Prompts are pre-built multi-step workflows invoked via `get_workflow` or the MCP
 | `build-log` | Analyze build output, log errors or celebrate success | `projectPath` |
 | `travel-planner` | Full trip planning across calendar, maps, reminders, notes | `destination`, `startDate`, `endDate` |
 | `project-kickoff` | Set up new project across all apps | `projectName`, `description` |
+| **Notes** | | |
+| `organize-notes` | Scan notes, classify by topic, create folders, move | `folder` (optional) |
+| `find-duplicates` | Find duplicate/similar notes and suggest cleanup | `folder` (optional) |
+| `notes-weekly-review` | Summarize notes from past week, suggest organization | none |
+| **Calendar** | | |
+| `schedule-review` | Review upcoming events, identify conflicts | `days` (1-90) |
+| `meeting-prep` | Read event details, find related notes, prepare context | `eventId` |
+| **Reminders** | | |
+| `organize-reminders` | Scan reminders, identify overdue/completed, suggest cleanup | `list` (optional) |
+| `daily-review` | Review today's due reminders and suggest priorities | none |
+| **Shortcuts** | | |
+| `shortcut-automation` | Guide for creating complex automation workflows | `goal`, `input` (optional) |
+| `shortcut-discovery` | Find shortcuts matching a use case | `useCase` |
+| `shortcut-troubleshooting` | Debug a failing shortcut | `shortcutName`, `errorMessage` (optional) |
 
 ## Error Handling
 

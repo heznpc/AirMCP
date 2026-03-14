@@ -1,1163 +1,538 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>iConnect — Connect AI to Your Entire Apple Ecosystem</title>
-<meta name="description" content="Open-source MCP server with 170+ tools across 18 modules. Connect Claude, Codex, and any MCP client to Apple Notes, Calendar, Reminders, Messages, Mail, Music, and more.">
-<meta name="theme-color" content="#0071e3">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍎</text></svg>">
-<style>
-/* ============================================================
-   RESET & BASE
-   ============================================================ */
-*, *::before, *::after {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-:root {
-  --white: #fff;
-  --black: #000;
-  --near-black: #1d1d1f;
-  --gray-100: #f5f5f7;
-  --gray-200: #e8e8ed;
-  --gray-400: #86868b;
-  --gray-600: #6e6e73;
-  --blue: #0071e3;
-  --blue-hover: #0077ed;
-  --purple: #6e56cf;
-  --gradient: linear-gradient(135deg, #0071e3, #6e56cf);
-  --font: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
-  --mono: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, monospace;
-  --section-pad: clamp(80px, 12vw, 160px);
-  --content-width: 1080px;
-  --wide-width: 1200px;
-}
-
-html {
-  scroll-behavior: smooth;
-  -webkit-text-size-adjust: 100%;
-}
-
-body {
-  font-family: var(--font);
-  color: var(--near-black);
-  background: var(--white);
-  line-height: 1.5;
-  overflow-x: hidden;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-a {
-  color: var(--blue);
-  text-decoration: none;
-  transition: color 0.2s;
-}
-
-a:hover {
-  color: var(--blue-hover);
-}
-
-img, svg {
-  display: block;
-  max-width: 100%;
-}
-
-/* ============================================================
-   UTILITY
-   ============================================================ */
-.container {
-  width: 100%;
-  max-width: var(--content-width);
-  margin: 0 auto;
-  padding: 0 24px;
-}
-
-.container--wide {
-  max-width: var(--wide-width);
-}
-
-/* ============================================================
-   SCROLL REVEAL
-   ============================================================ */
-.reveal {
-  opacity: 0;
-  transform: translateY(32px);
-  transition: opacity 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-              transform 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-}
-
-.reveal.visible {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-/* staggered children */
-.reveal-stagger .reveal-child {
-  opacity: 0;
-  transform: translateY(24px);
-  transition: opacity 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-              transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-}
-
-.reveal-stagger.visible .reveal-child {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.reveal-stagger.visible .reveal-child:nth-child(1)  { transition-delay: 0.00s; }
-.reveal-stagger.visible .reveal-child:nth-child(2)  { transition-delay: 0.06s; }
-.reveal-stagger.visible .reveal-child:nth-child(3)  { transition-delay: 0.12s; }
-.reveal-stagger.visible .reveal-child:nth-child(4)  { transition-delay: 0.18s; }
-.reveal-stagger.visible .reveal-child:nth-child(5)  { transition-delay: 0.24s; }
-.reveal-stagger.visible .reveal-child:nth-child(6)  { transition-delay: 0.30s; }
-.reveal-stagger.visible .reveal-child:nth-child(7)  { transition-delay: 0.36s; }
-.reveal-stagger.visible .reveal-child:nth-child(8)  { transition-delay: 0.42s; }
-.reveal-stagger.visible .reveal-child:nth-child(9)  { transition-delay: 0.48s; }
-.reveal-stagger.visible .reveal-child:nth-child(10) { transition-delay: 0.54s; }
-.reveal-stagger.visible .reveal-child:nth-child(11) { transition-delay: 0.60s; }
-.reveal-stagger.visible .reveal-child:nth-child(12) { transition-delay: 0.66s; }
-.reveal-stagger.visible .reveal-child:nth-child(13) { transition-delay: 0.72s; }
-.reveal-stagger.visible .reveal-child:nth-child(14) { transition-delay: 0.78s; }
-
-/* ============================================================
-   NAV
-   ============================================================ */
-.nav {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 100;
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: saturate(180%) blur(20px);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-  transition: background 0.3s;
-}
-
-.nav__inner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 52px;
-  max-width: var(--wide-width);
-  margin: 0 auto;
-  padding: 0 24px;
-}
-
-.nav__brand {
-  font-size: 1.15rem;
-  font-weight: 700;
-  color: var(--near-black);
-  letter-spacing: -0.02em;
-}
-
-.nav__links {
-  display: flex;
-  gap: 28px;
-  list-style: none;
-}
-
-.nav__links a {
-  font-size: 0.82rem;
-  font-weight: 500;
-  color: var(--gray-600);
-  transition: color 0.2s;
-}
-
-.nav__links a:hover {
-  color: var(--near-black);
-}
-
-@media (max-width: 600px) {
-  .nav__links { display: none; }
-}
-
-/* ============================================================
-   HERO
-   ============================================================ */
-.hero {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding: 120px 24px 80px;
-  background: var(--white);
-  position: relative;
-  overflow: hidden;
-}
-
-/* subtle radial glow behind hero */
-.hero::before {
-  content: '';
-  position: absolute;
-  width: 800px;
-  height: 800px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(0, 113, 227, 0.06) 0%, transparent 70%);
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -55%);
-  pointer-events: none;
-}
-
-.hero__title {
-  font-size: clamp(4rem, 12vw, 7.5rem);
-  font-weight: 800;
-  letter-spacing: -0.04em;
-  line-height: 1.05;
-  background: var(--gradient);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  margin-bottom: 20px;
-  position: relative;
-}
-
-.hero__tagline {
-  font-size: clamp(1.25rem, 3vw, 2rem);
-  font-weight: 600;
-  color: var(--near-black);
-  letter-spacing: -0.02em;
-  margin-bottom: 12px;
-}
-
-.hero__sub {
-  font-size: clamp(0.95rem, 2vw, 1.15rem);
-  color: var(--gray-600);
-  font-weight: 400;
-  margin-bottom: 40px;
-}
-
-.hero__buttons {
-  display: flex;
-  gap: 16px;
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 14px 28px;
-  border-radius: 980px;
-  font-size: 1rem;
-  font-weight: 500;
-  font-family: var(--font);
-  cursor: pointer;
-  border: none;
-  transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
-}
-
-.btn:active {
-  transform: scale(0.97);
-}
-
-.btn--primary {
-  background: var(--blue);
-  color: var(--white);
-}
-
-.btn--primary:hover {
-  background: var(--blue-hover);
-  color: var(--white);
-}
-
-.btn--secondary {
-  background: transparent;
-  color: var(--blue);
-  border: 1px solid rgba(0, 113, 227, 0.3);
-}
-
-.btn--secondary:hover {
-  background: rgba(0, 113, 227, 0.06);
-  color: var(--blue);
-}
-
-/* ============================================================
-   STATS BAR
-   ============================================================ */
-.stats {
-  background: var(--near-black);
-  color: var(--white);
-  padding: 56px 24px;
-}
-
-.stats__grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 24px;
-  max-width: var(--content-width);
-  margin: 0 auto;
-  text-align: center;
-}
-
-.stats__item-number {
-  font-size: clamp(2rem, 5vw, 3rem);
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1.2;
-}
-
-.stats__item-label {
-  font-size: 0.9rem;
-  color: var(--gray-400);
-  margin-top: 4px;
-  font-weight: 400;
-}
-
-@media (max-width: 500px) {
-  .stats__grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 32px 16px;
-  }
-}
-
-/* ============================================================
-   SECTION TITLES
-   ============================================================ */
-.section-label {
-  font-size: 0.85rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--blue);
-  margin-bottom: 12px;
-}
-
-.section-label--light {
-  color: rgba(0, 113, 227, 0.8);
-}
-
-.section-title {
-  font-size: clamp(2rem, 5vw, 3.25rem);
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1.1;
-  margin-bottom: 16px;
-}
-
-.section-subtitle {
-  font-size: clamp(1rem, 2vw, 1.2rem);
-  color: var(--gray-600);
-  max-width: 620px;
-  line-height: 1.6;
-}
-
-.section-subtitle--light {
-  color: var(--gray-400);
-}
-
-/* ============================================================
-   MODULES GRID
-   ============================================================ */
-.modules {
-  background: var(--gray-100);
-  padding: var(--section-pad) 24px;
-}
-
-.modules__header {
-  text-align: center;
-  margin-bottom: 56px;
-}
-
-.modules__header .section-subtitle {
-  margin: 0 auto;
-}
-
-.modules__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 16px;
-  max-width: var(--wide-width);
-  margin: 0 auto;
-}
-
-.module-card {
-  background: var(--white);
-  border-radius: 20px;
-  padding: 28px 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  transition: transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-              box-shadow 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-  cursor: default;
-}
-
-.module-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
-}
-
-.module-card__icon {
-  font-size: 2rem;
-  line-height: 1;
-}
-
-.module-card__name {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: var(--near-black);
-  letter-spacing: -0.01em;
-}
-
-.module-card__count {
-  font-size: 0.82rem;
-  color: var(--gray-400);
-  font-weight: 500;
-}
-
-/* ============================================================
-   HOW IT WORKS
-   ============================================================ */
-.how {
-  background: var(--white);
-  padding: var(--section-pad) 24px;
-}
-
-.how__header {
-  text-align: center;
-  margin-bottom: 64px;
-}
-
-.how__header .section-subtitle {
-  margin: 0 auto;
-}
-
-.how__steps {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 40px;
-  max-width: var(--content-width);
-  margin: 0 auto;
-  position: relative;
-}
-
-/* connecting line */
-.how__steps::before {
-  content: '';
-  position: absolute;
-  top: 36px;
-  left: calc(16.66% + 20px);
-  right: calc(16.66% + 20px);
-  height: 2px;
-  background: var(--gray-200);
-}
-
-@media (max-width: 700px) {
-  .how__steps {
-    grid-template-columns: 1fr;
-    gap: 48px;
-  }
-
-  .how__steps::before {
-    display: none;
-  }
-}
-
-.step {
-  text-align: center;
-  position: relative;
-}
-
-.step__number {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  background: var(--gray-100);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--blue);
-  margin-bottom: 20px;
-  position: relative;
-  z-index: 1;
-}
-
-.step__title {
-  font-size: 1.2rem;
-  font-weight: 600;
-  margin-bottom: 8px;
-  color: var(--near-black);
-}
-
-.step__detail {
-  font-size: 0.95rem;
-  color: var(--gray-600);
-  line-height: 1.6;
-}
-
-.step__code {
-  display: inline-block;
-  margin-top: 12px;
-  padding: 8px 16px;
-  background: var(--near-black);
-  color: #a5d6ff;
-  font-family: var(--mono);
-  font-size: 0.82rem;
-  border-radius: 8px;
-  word-break: break-all;
-}
-
-/* ============================================================
-   CODE EXAMPLE
-   ============================================================ */
-.config {
-  background: var(--near-black);
-  color: var(--white);
-  padding: var(--section-pad) 24px;
-}
-
-.config__inner {
-  max-width: var(--content-width);
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 64px;
-  align-items: center;
-}
-
-@media (max-width: 768px) {
-  .config__inner {
-    grid-template-columns: 1fr;
-    gap: 40px;
-  }
-}
-
-.config__text .section-subtitle {
-  color: var(--gray-400);
-}
-
-.config__block {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  padding: 28px;
-  overflow-x: auto;
-}
-
-.config__block-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 20px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.config__dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-}
-
-.config__dot--red { background: #ff5f57; }
-.config__dot--yellow { background: #febc2e; }
-.config__dot--green { background: #28c840; }
-
-.config__block-title {
-  font-family: var(--mono);
-  font-size: 0.75rem;
-  color: var(--gray-400);
-  margin-left: 8px;
-}
-
-.config__code {
-  font-family: var(--mono);
-  font-size: 0.85rem;
-  line-height: 1.7;
-  color: #e6edf3;
-  white-space: pre;
-}
-
-.config__code .key { color: #a5d6ff; }
-.config__code .string { color: #a5d6ff; }
-.config__code .punct { color: var(--gray-400); }
-.config__code .bracket { color: #e6edf3; }
-
-/* ============================================================
-   WORKFLOWS
-   ============================================================ */
-.workflows {
-  background: var(--gray-100);
-  padding: var(--section-pad) 24px;
-}
-
-.workflows__header {
-  text-align: center;
-  margin-bottom: 56px;
-}
-
-.workflows__header .section-subtitle {
-  margin: 0 auto;
-}
-
-.workflows__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 16px;
-  max-width: var(--wide-width);
-  margin: 0 auto;
-}
-
-.workflow-card {
-  background: var(--white);
-  border-radius: 16px;
-  padding: 24px;
-  transition: transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-              box-shadow 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-  cursor: default;
-}
-
-.workflow-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.07);
-}
-
-.workflow-card__modules {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 14px;
-}
-
-.workflow-card__tag {
-  font-size: 0.72rem;
-  font-weight: 600;
-  padding: 3px 10px;
-  border-radius: 980px;
-  background: rgba(0, 113, 227, 0.08);
-  color: var(--blue);
-}
-
-.workflow-card__name {
-  font-size: 1.05rem;
-  font-weight: 600;
-  color: var(--near-black);
-  margin-bottom: 6px;
-  letter-spacing: -0.01em;
-}
-
-.workflow-card__name code {
-  font-family: var(--mono);
-  font-size: 0.85em;
-  background: var(--gray-100);
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-
-.workflow-card__desc {
-  font-size: 0.88rem;
-  color: var(--gray-600);
-  line-height: 1.55;
-}
-
-/* ============================================================
-   INSTALLATION
-   ============================================================ */
-.install {
-  background: var(--black);
-  color: var(--white);
-  padding: var(--section-pad) 24px;
-  text-align: center;
-}
-
-.install__header {
-  margin-bottom: 48px;
-}
-
-.install__header .section-title {
-  color: var(--white);
-}
-
-.install__header .section-subtitle {
-  color: var(--gray-400);
-  margin: 0 auto;
-}
-
-.install__commands {
-  max-width: 560px;
-  margin: 0 auto;
-  text-align: left;
-}
-
-.install__block {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  padding: 28px 32px;
-  font-family: var(--mono);
-  font-size: 0.9rem;
-  line-height: 2;
-  color: #e6edf3;
-  margin-bottom: 20px;
-  position: relative;
-  overflow: hidden;
-}
-
-.install__block::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: var(--gradient);
-}
-
-.install__comment {
-  color: var(--gray-600);
-}
-
-.install__prompt {
-  color: var(--gray-400);
-  user-select: none;
-}
-
-.install__cmd {
-  color: #a5d6ff;
-}
-
-.install__note {
-  font-size: 0.85rem;
-  color: var(--gray-600);
-  margin-top: 24px;
-}
-
-/* ============================================================
-   FOOTER
-   ============================================================ */
-.footer {
-  background: var(--near-black);
-  color: var(--gray-400);
-  padding: 40px 24px;
-  text-align: center;
-}
-
-.footer__inner {
-  max-width: var(--content-width);
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-}
-
-.footer__brand {
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: var(--white);
-  letter-spacing: -0.02em;
-}
-
-.footer__tagline {
-  font-size: 0.85rem;
-  color: var(--gray-600);
-}
-
-.footer__links {
-  display: flex;
-  gap: 24px;
-  margin-top: 4px;
-}
-
-.footer__links a {
-  font-size: 0.82rem;
-  color: var(--gray-400);
-  transition: color 0.2s;
-}
-
-.footer__links a:hover {
-  color: var(--white);
-}
-
-.footer__copy {
-  font-size: 0.78rem;
-  color: var(--gray-600);
-  margin-top: 8px;
-}
-
-/* ============================================================
-   RESPONSIVE REFINEMENTS
-   ============================================================ */
-@media (max-width: 480px) {
-  .hero {
-    padding: 100px 20px 60px;
-  }
-
-  .btn {
-    padding: 12px 22px;
-    font-size: 0.92rem;
-  }
-
-  .module-card {
-    padding: 22px 20px;
-  }
-
-  .config__block {
-    padding: 20px 16px;
-  }
-
-  .config__code {
-    font-size: 0.75rem;
-  }
-
-  .install__block {
-    padding: 22px 20px;
-    font-size: 0.8rem;
-  }
-}
-</style>
-</head>
-<body>
-
-<!-- ============================================================
-     NAV
-     ============================================================ -->
-<nav class="nav" role="navigation" aria-label="Primary">
-  <div class="nav__inner">
-    <a href="#" class="nav__brand">iConnect</a>
-    <ul class="nav__links">
-      <li><a href="#modules">Modules</a></li>
-      <li><a href="#how-it-works">How It Works</a></li>
-      <li><a href="#workflows">Workflows</a></li>
-      <li><a href="#installation">Install</a></li>
-      <li><a href="https://github.com/heznpc/iConnect">GitHub</a></li>
-    </ul>
-  </div>
-</nav>
-
-<!-- ============================================================
-     HERO
-     ============================================================ -->
-<section class="hero">
-  <div class="container">
-    <h1 class="hero__title">iConnect</h1>
-    <p class="hero__tagline">Connect AI to your entire Apple ecosystem.</p>
-    <p class="hero__sub">170+ tools. 23 prompts. 11 resources. One MCP server.</p>
-    <div class="hero__buttons">
-      <a href="#installation" class="btn btn--primary">Get Started</a>
-      <a href="https://github.com/heznpc/iConnect" class="btn btn--secondary">View on GitHub</a>
-    </div>
-  </div>
-</section>
-
-<!-- ============================================================
-     STATS BAR
-     ============================================================ -->
-<section class="stats" aria-label="Project stats">
-  <div class="stats__grid reveal-stagger">
-    <div class="reveal-child">
-      <div class="stats__item-number">14</div>
-      <div class="stats__item-label">Modules</div>
-    </div>
-    <div class="reveal-child">
-      <div class="stats__item-number">123</div>
-      <div class="stats__item-label">Tools</div>
-    </div>
-    <div class="reveal-child">
-      <div class="stats__item-number">23</div>
-      <div class="stats__item-label">Prompts</div>
-    </div>
-    <div class="reveal-child">
-      <div class="stats__item-number">216</div>
-      <div class="stats__item-label">Tests</div>
-    </div>
-  </div>
-</section>
-
-<!-- ============================================================
-     MODULES
-     ============================================================ -->
-<section class="modules" id="modules">
-  <div class="modules__header reveal">
-    <p class="section-label">Modules</p>
-    <h2 class="section-title">One server. Fourteen apps.</h2>
-    <p class="section-subtitle">Every tool is native, fast, and built on AppleScript and Apple frameworks. No hacks, no workarounds.</p>
-  </div>
-
-  <div class="modules__grid reveal-stagger">
-    <div class="module-card reveal-child">
-      <span class="module-card__icon" role="img" aria-label="Notes">&#x1F4DD;</span>
-      <span class="module-card__name">Notes</span>
-      <span class="module-card__count">12 tools</span>
-    </div>
-    <div class="module-card reveal-child">
-      <span class="module-card__icon" role="img" aria-label="Reminders">&#x23F0;</span>
-      <span class="module-card__name">Reminders</span>
-      <span class="module-card__count">11 tools</span>
-    </div>
-    <div class="module-card reveal-child">
-      <span class="module-card__icon" role="img" aria-label="Calendar">&#x1F4C5;</span>
-      <span class="module-card__name">Calendar</span>
-      <span class="module-card__count">10 tools</span>
-    </div>
-    <div class="module-card reveal-child">
-      <span class="module-card__icon" role="img" aria-label="Contacts">&#x1F465;</span>
-      <span class="module-card__name">Contacts</span>
-      <span class="module-card__count">10 tools</span>
-    </div>
-    <div class="module-card reveal-child">
-      <span class="module-card__icon" role="img" aria-label="Mail">&#x2709;&#xFE0F;</span>
-      <span class="module-card__name">Mail</span>
-      <span class="module-card__count">11 tools</span>
-    </div>
-    <div class="module-card reveal-child">
-      <span class="module-card__icon" role="img" aria-label="Music">&#x1F3B5;</span>
-      <span class="module-card__name">Music</span>
-      <span class="module-card__count">9 tools</span>
-    </div>
-    <div class="module-card reveal-child">
-      <span class="module-card__icon" role="img" aria-label="Finder">&#x1F4C1;</span>
-      <span class="module-card__name">Finder</span>
-      <span class="module-card__count">8 tools</span>
-    </div>
-    <div class="module-card reveal-child">
-      <span class="module-card__icon" role="img" aria-label="Safari">&#x1F310;</span>
-      <span class="module-card__name">Safari</span>
-      <span class="module-card__count">8 tools</span>
-    </div>
-    <div class="module-card reveal-child">
-      <span class="module-card__icon" role="img" aria-label="System">&#x2699;&#xFE0F;</span>
-      <span class="module-card__name">System</span>
-      <span class="module-card__count">10 tools</span>
-    </div>
-    <div class="module-card reveal-child">
-      <span class="module-card__icon" role="img" aria-label="Photos">&#x1F4F7;</span>
-      <span class="module-card__name">Photos</span>
-      <span class="module-card__count">9 tools</span>
-    </div>
-    <div class="module-card reveal-child">
-      <span class="module-card__icon" role="img" aria-label="Messages">&#x1F4AC;</span>
-      <span class="module-card__name">Messages</span>
-      <span class="module-card__count">6 tools</span>
-    </div>
-    <div class="module-card reveal-child">
-      <span class="module-card__icon" role="img" aria-label="Shortcuts">&#x26A1;</span>
-      <span class="module-card__name">Shortcuts</span>
-      <span class="module-card__count">4 tools</span>
-    </div>
-    <div class="module-card reveal-child">
-      <span class="module-card__icon" role="img" aria-label="Intelligence">&#x1F9E0;</span>
-      <span class="module-card__name">Intelligence</span>
-      <span class="module-card__count">3 tools &middot; macOS 26+</span>
-    </div>
-    <div class="module-card reveal-child">
-      <span class="module-card__icon" role="img" aria-label="TV">&#x1F4FA;</span>
-      <span class="module-card__name">TV</span>
-      <span class="module-card__count">6 tools</span>
-    </div>
-  </div>
-</section>
-
-<!-- ============================================================
-     HOW IT WORKS
-     ============================================================ -->
-<section class="how" id="how-it-works">
-  <div class="how__header reveal">
-    <p class="section-label">How It Works</p>
-    <h2 class="section-title">Up and running in minutes.</h2>
-    <p class="section-subtitle">No configuration files to wrestle with. No dependencies to install. Just one command.</p>
-  </div>
-
-  <div class="how__steps reveal-stagger">
-    <div class="step reveal-child">
-      <div class="step__number">1</div>
-      <h3 class="step__title">Install</h3>
-      <p class="step__detail">Interactive setup wizard. Choose modules, auto-configure your MCP client.</p>
-      <span class="step__code">npx iconnect-mcp init</span>
-    </div>
-    <div class="step reveal-child">
-      <div class="step__number">2</div>
-      <h3 class="step__title">Configure</h3>
-      <p class="step__detail">Or add a single JSON block to Claude Code, Codex, or any MCP client manually.</p>
-    </div>
-    <div class="step reveal-child">
-      <div class="step__number">3</div>
-      <h3 class="step__title">Use</h3>
-      <p class="step__detail">AI reads your notes, manages your calendar, controls Music, sends mail, and more.</p>
-    </div>
-  </div>
-</section>
-
-<!-- ============================================================
-     CODE EXAMPLE
-     ============================================================ -->
-<section class="config">
-  <div class="config__inner">
-    <div class="config__text reveal">
-      <p class="section-label section-label--light">Configuration</p>
-      <h2 class="section-title" style="color: #fff;">One block. That's it.</h2>
-      <p class="section-subtitle" style="color: var(--gray-400);">Add this to your MCP client configuration and every Apple app is instantly available to your AI.</p>
-    </div>
-    <div class="config__block reveal">
-      <div class="config__block-header">
-        <span class="config__dot config__dot--red"></span>
-        <span class="config__dot config__dot--yellow"></span>
-        <span class="config__dot config__dot--green"></span>
-        <span class="config__block-title">mcp-config.json</span>
-      </div>
-      <code class="config__code"><span class="bracket">{</span>
-  <span class="key">"mcpServers"</span><span class="punct">:</span> <span class="bracket">{</span>
-    <span class="key">"iconnect"</span><span class="punct">:</span> <span class="bracket">{</span>
-      <span class="key">"command"</span><span class="punct">:</span> <span class="string">"npx"</span><span class="punct">,</span>
-      <span class="key">"args"</span><span class="punct">:</span> <span class="bracket">[</span><span class="string">"-y"</span><span class="punct">,</span> <span class="string">"iconnect-mcp"</span><span class="bracket">]</span>
-    <span class="bracket">}</span>
-  <span class="bracket">}</span>
-<span class="bracket">}</span></code>
-    </div>
-  </div>
-</section>
-
-<!-- ============================================================
-     WORKFLOWS
-     ============================================================ -->
-<section class="workflows" id="workflows">
-  <div class="workflows__header reveal">
-    <p class="section-label">Cross-Module Workflows</p>
-    <h2 class="section-title">Prompts that connect everything.</h2>
-    <p class="section-subtitle">Pre-built prompts that orchestrate multiple Apple apps together. Ask your AI to run any of these by name.</p>
-  </div>
-
-  <div class="workflows__grid reveal-stagger">
-    <div class="workflow-card reveal-child">
-      <div class="workflow-card__modules">
-        <span class="workflow-card__tag">Calendar</span>
-        <span class="workflow-card__tag">Reminders</span>
-        <span class="workflow-card__tag">Notes</span>
-      </div>
-      <h3 class="workflow-card__name"><code>daily-briefing</code></h3>
-      <p class="workflow-card__desc">Summarize today's events, due reminders, and recent notes in one concise briefing.</p>
-    </div>
-
-    <div class="workflow-card reveal-child">
-      <div class="workflow-card__modules">
-        <span class="workflow-card__tag">Calendar</span>
-        <span class="workflow-card__tag">Notes</span>
-        <span class="workflow-card__tag">Reminders</span>
-      </div>
-      <h3 class="workflow-card__name"><code>weekly-digest</code></h3>
-      <p class="workflow-card__desc">Review the past week and plan ahead with a digest of events, notes, and completed tasks.</p>
-    </div>
-
-    <div class="workflow-card reveal-child">
-      <div class="workflow-card__modules">
-        <span class="workflow-card__tag">Calendar</span>
-        <span class="workflow-card__tag">Notes</span>
-      </div>
-      <h3 class="workflow-card__name"><code>meeting-prep</code></h3>
-      <p class="workflow-card__desc">Pull event details, search related notes, and build context to prepare for any meeting.</p>
-    </div>
-
-    <div class="workflow-card reveal-child">
-      <div class="workflow-card__modules">
-        <span class="workflow-card__tag">Safari</span>
-        <span class="workflow-card__tag">Notes</span>
-      </div>
-      <h3 class="workflow-card__name"><code>research-with-safari</code></h3>
-      <p class="workflow-card__desc">Research topics using Safari tabs and reading list, then save findings to Notes.</p>
-    </div>
-
-    <div class="workflow-card reveal-child">
-      <div class="workflow-card__modules">
-        <span class="workflow-card__tag">Calendar</span>
-        <span class="workflow-card__tag">Reminders</span>
-        <span class="workflow-card__tag">Music</span>
-      </div>
-      <h3 class="workflow-card__name"><code>focus-session</code></h3>
-      <p class="workflow-card__desc">Check for conflicts, prioritize reminders, and manage music for a distraction-free session.</p>
-    </div>
-
-    <div class="workflow-card reveal-child">
-      <div class="workflow-card__modules">
-        <span class="workflow-card__tag">Finder</span>
-        <span class="workflow-card__tag">Notes</span>
-      </div>
-      <h3 class="workflow-card__name"><code>file-organizer</code></h3>
-      <p class="workflow-card__desc">Scan a folder, categorize contents, and create a structured summary in Notes.</p>
-    </div>
-
-    <div class="workflow-card reveal-child">
-      <div class="workflow-card__modules">
-        <span class="workflow-card__tag">Calendar</span>
-        <span class="workflow-card__tag">Notes</span>
-        <span class="workflow-card__tag">Reminders</span>
-      </div>
-      <h3 class="workflow-card__name"><code>event-follow-up</code></h3>
-      <p class="workflow-card__desc">After a meeting, create follow-up notes and action item reminders automatically.</p>
-    </div>
-  </div>
-</section>
-
-<!-- ============================================================
-     INSTALLATION
-     ============================================================ -->
-<section class="install" id="installation">
-  <div class="install__header reveal">
-    <p class="section-label section-label--light">Installation</p>
-    <h2 class="section-title">Start in seconds.</h2>
-    <p class="section-subtitle">Install globally, or run directly with npx. No build step required.</p>
-  </div>
-
-  <div class="install__commands reveal">
-    <div class="install__block">
-<span class="install__comment"># Install globally</span>
-<span class="install__prompt">$ </span><span class="install__cmd">npm install -g iconnect-mcp</span>
-
-<span class="install__comment"># Or run directly</span>
-<span class="install__prompt">$ </span><span class="install__cmd">npx iconnect-mcp</span>
-    </div>
-    <p class="install__note">Requires Node.js 18+ and macOS. Works with Claude Code, Codex, and any MCP-compatible client.</p>
-  </div>
-</section>
-
-<!-- ============================================================
-     FOOTER
-     ============================================================ -->
-<footer class="footer">
-  <div class="footer__inner">
-    <span class="footer__brand">iConnect</span>
-    <p class="footer__tagline">Built for Claude Code, Codex, and every MCP client.</p>
-    <div class="footer__links">
-      <a href="https://github.com/heznpc/iConnect">GitHub</a>
-      <a href="https://github.com/heznpc/iConnect/issues">Issues</a>
-      <a href="https://www.npmjs.com/package/iconnect-mcp">npm</a>
-    </div>
-    <p class="footer__copy">MIT License &middot; Made with care for the Apple ecosystem.</p>
-  </div>
-</footer>
-
-<!-- ============================================================
-     SCROLL REVEAL SCRIPT (IntersectionObserver only)
-     ============================================================ -->
-<script>
-(function () {
-  var targets = document.querySelectorAll('.reveal, .reveal-stagger');
-  if (!('IntersectionObserver' in window)) {
-    targets.forEach(function (t) { t.classList.add('visible'); });
-    return;
-  }
-  var observer = new IntersectionObserver(function (entries) {
-    entries.forEach(function (entry) {
-      if (entry.isIntersecting) {
-        entry.target.classList.add('visible');
-        observer.unobserve(entry.target);
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title data-i18n="meta_title">iConnect — Connect AI to Your Entire Apple Ecosystem</title>
+  <meta name="description" data-i18n-attr="content" data-i18n="meta_description" content="Open-source MCP server with 170+ tools across 18 modules. Connect Claude, Codex, and any MCP client to Apple apps.">
+  <meta name="theme-color" content="#0e1117">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍎</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['-apple-system','BlinkMacSystemFont','Helvetica Neue','Helvetica','Arial','sans-serif'],
+            mono: ['JetBrains Mono','ui-monospace','monospace'],
+          }
+        }
       }
-    });
-  }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
-  targets.forEach(function (t) { observer.observe(t); });
-})();
-</script>
+    }
+  </script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="font-sans antialiased overflow-x-hidden leading-relaxed">
 
+  <!-- Ambient orbs -->
+  <div class="scene" aria-hidden="true">
+    <div class="orb orb-a"></div>
+    <div class="orb orb-b"></div>
+    <div class="orb orb-c"></div>
+  </div>
+
+  <!-- Nav -->
+  <nav class="glass-nav" id="nav">
+    <div class="max-w-[1080px] mx-auto px-5 flex items-center justify-between h-full">
+      <a href="#" class="font-mono text-sm font-medium opacity-80 tracking-tight">iConnect</a>
+      <div class="flex items-center gap-6" id="navLinks">
+        <a href="#modules" class="text-sm opacity-45 font-medium hover:opacity-90 transition-opacity" data-i18n="nav_modules">Modules</a>
+        <a href="#workflows" class="text-sm opacity-45 font-medium hover:opacity-90 transition-opacity" data-i18n="nav_workflows">Workflows</a>
+        <a href="#install" class="text-sm opacity-45 font-medium hover:opacity-90 transition-opacity" data-i18n="nav_install">Install</a>
+        <a href="https://github.com/heznpc/iConnect" target="_blank" rel="noopener" class="text-sm opacity-45 font-medium hover:opacity-90 transition-opacity">GitHub</a>
+        <button class="pill-btn" id="themeToggle" aria-label="Toggle theme">
+          <span class="theme-icon">☀</span>
+        </button>
+        <button class="pill-btn" id="langToggle" aria-label="Toggle language">
+          <span data-i18n="lang_label">EN</span>
+        </button>
+      </div>
+      <button class="nav-mobile" id="mobileToggle" aria-label="Menu"><span></span><span></span></button>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <header class="relative z-[1] pt-[calc(56px+100px)] pb-16 text-center">
+    <div class="max-w-[1080px] mx-auto px-5">
+      <p class="font-mono text-sm opacity-30 tracking-tight mb-6 reveal" data-i18n="hero_tag">npx iconnect-mcp init → connected</p>
+      <h1 class="text-[clamp(3.6rem,10vw,7rem)] font-bold leading-[.98] tracking-tighter hero-h1 reveal" data-delay="60">iConnect</h1>
+      <p class="mt-5 text-xl opacity-50 font-medium reveal" data-delay="90" data-i18n="hero_tagline">Connect AI to your entire Apple ecosystem.</p>
+      <p class="mt-3 text-base opacity-30 max-w-[50ch] mx-auto leading-relaxed reveal" data-delay="120" data-i18n="hero_sub">170+ tools. 23 prompts. 11 resources. One MCP server.</p>
+      <div class="flex gap-3 justify-center mt-10 reveal" data-delay="160">
+        <a href="#install" class="lg-btn" data-i18n="hero_cta">Get Started</a>
+        <a href="https://github.com/heznpc/iConnect" target="_blank" rel="noopener" class="lg-btn lg-btn--ghost">GitHub</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Stats -->
+  <section class="relative z-[1] pb-20">
+    <div class="max-w-[720px] mx-auto px-5">
+      <div class="grid grid-cols-4 gap-3 max-sm:grid-cols-2 reveal" data-delay="200">
+        <div class="glass-stat">
+          <div class="glass-fx"></div>
+          <div class="glass-tint"></div>
+          <div class="glass-content text-center py-5">
+            <div class="text-2xl font-bold tracking-tight">18</div>
+            <div class="text-xs opacity-35 mt-1" data-i18n="stat_modules">Modules</div>
+          </div>
+        </div>
+        <div class="glass-stat">
+          <div class="glass-fx"></div>
+          <div class="glass-tint"></div>
+          <div class="glass-content text-center py-5">
+            <div class="text-2xl font-bold tracking-tight">170+</div>
+            <div class="text-xs opacity-35 mt-1" data-i18n="stat_tools">Tools</div>
+          </div>
+        </div>
+        <div class="glass-stat">
+          <div class="glass-fx"></div>
+          <div class="glass-tint"></div>
+          <div class="glass-content text-center py-5">
+            <div class="text-2xl font-bold tracking-tight">23</div>
+            <div class="text-xs opacity-35 mt-1" data-i18n="stat_prompts">Prompts</div>
+          </div>
+        </div>
+        <div class="glass-stat">
+          <div class="glass-fx"></div>
+          <div class="glass-tint"></div>
+          <div class="glass-content text-center py-5">
+            <div class="text-2xl font-bold tracking-tight">11</div>
+            <div class="text-xs opacity-35 mt-1" data-i18n="stat_resources">Resources</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Modules -->
+  <section id="modules" class="relative z-[1] py-10 pb-24">
+    <div class="max-w-[1080px] mx-auto px-5">
+      <div class="text-center mb-10">
+        <p class="section-label reveal" data-i18n="modules_label">Modules</p>
+        <h2 class="text-[clamp(2rem,5vw,3rem)] font-bold tracking-tight mt-2 reveal" data-delay="40" data-i18n="modules_title">One server. Every Apple app.</h2>
+        <p class="mt-3 text-sm opacity-35 max-w-[48ch] mx-auto reveal" data-delay="80" data-i18n="modules_sub">Native. Fast. Built on AppleScript and Apple frameworks.</p>
+      </div>
+
+      <div class="flex gap-1.5 mb-9 flex-wrap justify-center reveal" data-delay="100">
+        <button class="pill-btn active" data-filter="all" data-i18n="filter_all">All</button>
+        <button class="pill-btn" data-filter="productivity" data-i18n="filter_productivity">Productivity</button>
+        <button class="pill-btn" data-filter="media" data-i18n="filter_media">Media</button>
+        <button class="pill-btn" data-filter="system" data-i18n="filter_system">System</button>
+        <button class="pill-btn" data-filter="advanced" data-i18n="filter_advanced">Advanced</button>
+      </div>
+
+      <div class="grid grid-cols-3 gap-4 max-lg:grid-cols-2 max-sm:grid-cols-1" id="moduleGrid">
+
+        <!-- Productivity -->
+        <div class="glass-card reveal" data-category="productivity" data-detail="detail_notes" data-icon="📝">
+          <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
+          <div class="glass-content">
+            <span class="text-3xl mb-3 block">📝</span>
+            <h3 class="card-title" data-i18n="mod_notes">Notes</h3>
+            <p class="card-desc" data-i18n="mod_notes_p">Create, search, and manage Apple Notes.</p>
+            <code class="card-tags" data-i18n="mod_notes_t">12 tools</code>
+          </div>
+        </div>
+
+        <div class="glass-card reveal" data-category="productivity" data-delay="40" data-detail="detail_reminders" data-icon="⏰">
+          <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
+          <div class="glass-content">
+            <span class="text-3xl mb-3 block">⏰</span>
+            <h3 class="card-title" data-i18n="mod_reminders">Reminders</h3>
+            <p class="card-desc" data-i18n="mod_reminders_p">Manage lists, due dates, and priorities.</p>
+            <code class="card-tags" data-i18n="mod_reminders_t">11 tools</code>
+          </div>
+        </div>
+
+        <div class="glass-card reveal" data-category="productivity" data-delay="80" data-detail="detail_calendar" data-icon="📅">
+          <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
+          <div class="glass-content">
+            <span class="text-3xl mb-3 block">📅</span>
+            <h3 class="card-title" data-i18n="mod_calendar">Calendar</h3>
+            <p class="card-desc" data-i18n="mod_calendar_p">Events, schedules, and availability.</p>
+            <code class="card-tags" data-i18n="mod_calendar_t">10 tools</code>
+          </div>
+        </div>
+
+        <div class="glass-card reveal" data-category="productivity" data-delay="40" data-detail="detail_contacts" data-icon="👥">
+          <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
+          <div class="glass-content">
+            <span class="text-3xl mb-3 block">👥</span>
+            <h3 class="card-title" data-i18n="mod_contacts">Contacts</h3>
+            <p class="card-desc" data-i18n="mod_contacts_p">Search, create, and update contacts.</p>
+            <code class="card-tags" data-i18n="mod_contacts_t">10 tools</code>
+          </div>
+        </div>
+
+        <div class="glass-card reveal" data-category="productivity" data-delay="80" data-detail="detail_mail" data-icon="✉️">
+          <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
+          <div class="glass-content">
+            <span class="text-3xl mb-3 block">✉️</span>
+            <h3 class="card-title" data-i18n="mod_mail">Mail</h3>
+            <p class="card-desc" data-i18n="mod_mail_p">Read, compose, and manage email.</p>
+            <code class="card-tags" data-i18n="mod_mail_t">11 tools</code>
+          </div>
+        </div>
+
+        <div class="glass-card reveal" data-category="productivity" data-delay="120" data-detail="detail_messages" data-icon="💬">
+          <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
+          <div class="glass-content">
+            <span class="text-3xl mb-3 block">💬</span>
+            <h3 class="card-title" data-i18n="mod_messages">Messages</h3>
+            <p class="card-desc" data-i18n="mod_messages_p">Read and send iMessages.</p>
+            <code class="card-tags" data-i18n="mod_messages_t">6 tools</code>
+          </div>
+        </div>
+
+        <!-- Media -->
+        <div class="glass-card reveal" data-category="media" data-detail="detail_music" data-icon="🎵">
+          <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
+          <div class="glass-content">
+            <span class="text-3xl mb-3 block">🎵</span>
+            <h3 class="card-title" data-i18n="mod_music">Music</h3>
+            <p class="card-desc" data-i18n="mod_music_p">Playback, playlists, and library control.</p>
+            <code class="card-tags" data-i18n="mod_music_t">13 tools</code>
+          </div>
+        </div>
+
+        <div class="glass-card reveal" data-category="media" data-delay="40" data-detail="detail_photos" data-icon="📷">
+          <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
+          <div class="glass-content">
+            <span class="text-3xl mb-3 block">📷</span>
+            <h3 class="card-title" data-i18n="mod_photos">Photos</h3>
+            <p class="card-desc" data-i18n="mod_photos_p">Albums, search, and metadata.</p>
+            <code class="card-tags" data-i18n="mod_photos_t">9 tools</code>
+          </div>
+        </div>
+
+        <div class="glass-card reveal" data-category="media" data-delay="80" data-detail="detail_tv" data-icon="📺">
+          <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
+          <div class="glass-content">
+            <span class="text-3xl mb-3 block">📺</span>
+            <h3 class="card-title" data-i18n="mod_tv">TV</h3>
+            <p class="card-desc" data-i18n="mod_tv_p">Browse and control Apple TV app.</p>
+            <code class="card-tags" data-i18n="mod_tv_t">6 tools</code>
+          </div>
+        </div>
+
+        <div class="glass-card reveal" data-category="media" data-delay="120" data-detail="detail_podcasts" data-icon="🎙️">
+          <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
+          <div class="glass-content">
+            <span class="text-3xl mb-3 block">🎙️</span>
+            <h3 class="card-title" data-i18n="mod_podcasts">Podcasts</h3>
+            <p class="card-desc" data-i18n="mod_podcasts_p">Browse shows and control playback.</p>
+            <code class="card-tags" data-i18n="mod_podcasts_t">6 tools</code>
+          </div>
+        </div>
+
+        <!-- System -->
+        <div class="glass-card reveal" data-category="system" data-detail="detail_system" data-icon="⚙️">
+          <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
+          <div class="glass-content">
+            <span class="text-3xl mb-3 block">⚙️</span>
+            <h3 class="card-title" data-i18n="mod_system">System</h3>
+            <p class="card-desc" data-i18n="mod_system_p">Dark mode, volume, WiFi, Bluetooth, and more.</p>
+            <code class="card-tags" data-i18n="mod_system_t">17 tools</code>
+          </div>
+        </div>
+
+        <div class="glass-card reveal" data-category="system" data-delay="40" data-detail="detail_finder" data-icon="📁">
+          <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
+          <div class="glass-content">
+            <span class="text-3xl mb-3 block">📁</span>
+            <h3 class="card-title" data-i18n="mod_finder">Finder</h3>
+            <p class="card-desc" data-i18n="mod_finder_p">Browse, move, and organize files.</p>
+            <code class="card-tags" data-i18n="mod_finder_t">8 tools</code>
+          </div>
+        </div>
+
+        <div class="glass-card reveal" data-category="system" data-delay="80" data-detail="detail_safari" data-icon="🌐">
+          <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
+          <div class="glass-content">
+            <span class="text-3xl mb-3 block">🌐</span>
+            <h3 class="card-title" data-i18n="mod_safari">Safari</h3>
+            <p class="card-desc" data-i18n="mod_safari_p">Tabs, reading list, and page content.</p>
+            <code class="card-tags" data-i18n="mod_safari_t">12 tools</code>
+          </div>
+        </div>
+
+        <div class="glass-card reveal" data-category="system" data-delay="120" data-detail="detail_screen" data-icon="🖥️">
+          <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
+          <div class="glass-content">
+            <span class="text-3xl mb-3 block">🖥️</span>
+            <h3 class="card-title" data-i18n="mod_screen">Screen</h3>
+            <p class="card-desc" data-i18n="mod_screen_p">Screenshot and screen capture.</p>
+            <code class="card-tags" data-i18n="mod_screen_t">5 tools</code>
+          </div>
+        </div>
+
+        <div class="glass-card reveal" data-category="system" data-delay="160" data-detail="detail_maps" data-icon="🗺️">
+          <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
+          <div class="glass-content">
+            <span class="text-3xl mb-3 block">🗺️</span>
+            <h3 class="card-title" data-i18n="mod_maps">Maps</h3>
+            <p class="card-desc" data-i18n="mod_maps_p">Search locations and get directions.</p>
+            <code class="card-tags" data-i18n="mod_maps_t">6 tools</code>
+          </div>
+        </div>
+
+        <!-- Advanced -->
+        <div class="glass-card reveal" data-category="advanced" data-detail="detail_shortcuts" data-icon="⚡">
+          <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
+          <div class="glass-content">
+            <span class="text-3xl mb-3 block">⚡</span>
+            <h3 class="card-title" data-i18n="mod_shortcuts">Shortcuts</h3>
+            <p class="card-desc" data-i18n="mod_shortcuts_p">Run and manage Shortcuts automations.</p>
+            <code class="card-tags" data-i18n="mod_shortcuts_t">10 tools</code>
+          </div>
+        </div>
+
+        <div class="glass-card reveal" data-category="advanced" data-delay="40" data-detail="detail_intelligence" data-icon="🧠">
+          <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
+          <div class="glass-content">
+            <small class="card-badge" data-i18n="badge_macos26">macOS 26+</small>
+            <span class="text-3xl mb-3 block">🧠</span>
+            <h3 class="card-title" data-i18n="mod_intelligence">Intelligence</h3>
+            <p class="card-desc" data-i18n="mod_intelligence_p">Apple Intelligence writing tools and image generation.</p>
+            <code class="card-tags" data-i18n="mod_intelligence_t">8 tools</code>
+          </div>
+        </div>
+
+        <div class="glass-card reveal" data-category="advanced" data-delay="80" data-detail="detail_ui" data-icon="🖱️">
+          <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
+          <div class="glass-content">
+            <span class="text-3xl mb-3 block">🖱️</span>
+            <h3 class="card-title" data-i18n="mod_ui">UI Automation</h3>
+            <p class="card-desc" data-i18n="mod_ui_p">Accessibility-based UI inspection and control.</p>
+            <code class="card-tags" data-i18n="mod_ui_t">6 tools</code>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- How It Works -->
+  <section class="relative z-[1] py-20">
+    <div class="max-w-[1080px] mx-auto px-5">
+      <div class="text-center mb-12">
+        <p class="section-label reveal" data-i18n="how_label">How It Works</p>
+        <h2 class="text-[clamp(2rem,5vw,3rem)] font-bold tracking-tight mt-2 reveal" data-delay="40" data-i18n="how_title">Up and running in minutes.</h2>
+      </div>
+      <div class="grid grid-cols-3 gap-4 max-md:grid-cols-1">
+        <div class="glass-card reveal" data-delay="40">
+          <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
+          <div class="glass-content text-center py-10">
+            <div class="step-num">1</div>
+            <h3 class="card-title mt-4 mb-2" data-i18n="step1_title">Install</h3>
+            <p class="card-desc" data-i18n="step1_desc">Interactive setup wizard. Choose your modules.</p>
+            <code class="inline-block mt-4 px-4 py-2 rounded-lg text-xs font-mono opacity-50 bg-white/[.04]">npx iconnect-mcp init</code>
+          </div>
+        </div>
+        <div class="glass-card reveal" data-delay="80">
+          <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
+          <div class="glass-content text-center py-10">
+            <div class="step-num">2</div>
+            <h3 class="card-title mt-4 mb-2" data-i18n="step2_title">Configure</h3>
+            <p class="card-desc" data-i18n="step2_desc">Add one JSON block to any MCP client.</p>
+          </div>
+        </div>
+        <div class="glass-card reveal" data-delay="120">
+          <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
+          <div class="glass-content text-center py-10">
+            <div class="step-num">3</div>
+            <h3 class="card-title mt-4 mb-2" data-i18n="step3_title">Use</h3>
+            <p class="card-desc" data-i18n="step3_desc">AI reads notes, manages calendar, sends mail, and more.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Config -->
+  <section class="relative z-[1] py-16">
+    <div class="max-w-[860px] mx-auto px-5">
+      <div class="glass-card reveal">
+        <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
+        <div class="glass-content">
+          <div class="flex items-center gap-2 mb-5 pb-4 border-b border-white/[.06]">
+            <span class="w-3 h-3 rounded-full bg-[#ff5f57]"></span>
+            <span class="w-3 h-3 rounded-full bg-[#febc2e]"></span>
+            <span class="w-3 h-3 rounded-full bg-[#28c840]"></span>
+            <span class="font-mono text-xs opacity-30 ml-2">mcp-config.json</span>
+          </div>
+          <pre class="font-mono text-sm leading-7 config-code">{
+  <span class="c-key">"mcpServers"</span>: {
+    <span class="c-key">"iconnect"</span>: {
+      <span class="c-key">"command"</span>: <span class="c-str">"npx"</span>,
+      <span class="c-key">"args"</span>: [<span class="c-str">"-y"</span>, <span class="c-str">"iconnect-mcp"</span>]
+    }
+  }
+}</pre>
+          <p class="mt-5 text-sm opacity-30" data-i18n="config_desc">Add this to Claude Code, Codex, or any MCP client.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Workflows -->
+  <section id="workflows" class="relative z-[1] py-10 pb-24">
+    <div class="max-w-[1080px] mx-auto px-5">
+      <div class="text-center mb-10">
+        <p class="section-label reveal" data-i18n="wf_label">Workflows</p>
+        <h2 class="text-[clamp(2rem,5vw,3rem)] font-bold tracking-tight mt-2 reveal" data-delay="40" data-i18n="wf_title">Prompts that connect everything.</h2>
+        <p class="mt-3 text-sm opacity-35 max-w-[48ch] mx-auto reveal" data-delay="80" data-i18n="wf_sub">Pre-built prompts that orchestrate multiple Apple apps together.</p>
+      </div>
+
+      <div class="grid grid-cols-2 gap-4 max-md:grid-cols-1">
+        <div class="glass-card reveal">
+          <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
+          <div class="glass-content">
+            <div class="flex gap-1.5 mb-3 flex-wrap">
+              <span class="wf-tag">Calendar</span>
+              <span class="wf-tag">Reminders</span>
+              <span class="wf-tag">Notes</span>
+            </div>
+            <h3 class="card-title"><code class="font-mono text-[.85em] opacity-80">daily-briefing</code></h3>
+            <p class="card-desc" data-i18n="wf_daily">Summarize today's events, due reminders, and recent notes.</p>
+          </div>
+        </div>
+
+        <div class="glass-card reveal" data-delay="40">
+          <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
+          <div class="glass-content">
+            <div class="flex gap-1.5 mb-3 flex-wrap">
+              <span class="wf-tag">Calendar</span>
+              <span class="wf-tag">Notes</span>
+              <span class="wf-tag">Reminders</span>
+            </div>
+            <h3 class="card-title"><code class="font-mono text-[.85em] opacity-80">weekly-digest</code></h3>
+            <p class="card-desc" data-i18n="wf_weekly">Review the past week and plan ahead.</p>
+          </div>
+        </div>
+
+        <div class="glass-card reveal" data-delay="40">
+          <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
+          <div class="glass-content">
+            <div class="flex gap-1.5 mb-3 flex-wrap">
+              <span class="wf-tag">Calendar</span>
+              <span class="wf-tag">Notes</span>
+            </div>
+            <h3 class="card-title"><code class="font-mono text-[.85em] opacity-80">meeting-prep</code></h3>
+            <p class="card-desc" data-i18n="wf_meeting">Pull event details, search notes, build context.</p>
+          </div>
+        </div>
+
+        <div class="glass-card reveal" data-delay="80">
+          <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
+          <div class="glass-content">
+            <div class="flex gap-1.5 mb-3 flex-wrap">
+              <span class="wf-tag">Safari</span>
+              <span class="wf-tag">Notes</span>
+            </div>
+            <h3 class="card-title"><code class="font-mono text-[.85em] opacity-80">research-with-safari</code></h3>
+            <p class="card-desc" data-i18n="wf_research">Research topics using Safari, save findings to Notes.</p>
+          </div>
+        </div>
+
+        <div class="glass-card reveal" data-delay="80">
+          <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
+          <div class="glass-content">
+            <div class="flex gap-1.5 mb-3 flex-wrap">
+              <span class="wf-tag">Calendar</span>
+              <span class="wf-tag">Reminders</span>
+              <span class="wf-tag">Music</span>
+            </div>
+            <h3 class="card-title"><code class="font-mono text-[.85em] opacity-80">focus-session</code></h3>
+            <p class="card-desc" data-i18n="wf_focus">Check conflicts, prioritize reminders, manage music.</p>
+          </div>
+        </div>
+
+        <div class="glass-card reveal" data-delay="120">
+          <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
+          <div class="glass-content">
+            <div class="flex gap-1.5 mb-3 flex-wrap">
+              <span class="wf-tag">Finder</span>
+              <span class="wf-tag">Notes</span>
+            </div>
+            <h3 class="card-title"><code class="font-mono text-[.85em] opacity-80">file-organizer</code></h3>
+            <p class="card-desc" data-i18n="wf_file">Scan a folder, categorize, summarize in Notes.</p>
+          </div>
+        </div>
+
+        <div class="glass-card col-span-2 max-md:col-span-1 reveal" data-delay="120">
+          <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
+          <div class="glass-content">
+            <div class="flex gap-1.5 mb-3 flex-wrap">
+              <span class="wf-tag">Calendar</span>
+              <span class="wf-tag">Notes</span>
+              <span class="wf-tag">Reminders</span>
+            </div>
+            <h3 class="card-title"><code class="font-mono text-[.85em] opacity-80">event-follow-up</code></h3>
+            <p class="card-desc" data-i18n="wf_followup">After a meeting, create follow-up notes and action items automatically.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Install -->
+  <section id="install" class="relative z-[1] py-20">
+    <div class="max-w-[560px] mx-auto px-5 text-center">
+      <div>
+        <p class="section-label reveal" data-i18n="install_label">Installation</p>
+        <h2 class="text-[clamp(2rem,5vw,3rem)] font-bold tracking-tight mt-2 reveal" data-delay="40" data-i18n="install_title">Start in seconds.</h2>
+        <p class="mt-3 text-sm opacity-35 reveal" data-delay="80" data-i18n="install_sub">Install globally, or run directly with npx.</p>
+      </div>
+      <div class="glass-card mt-10 reveal" data-delay="100">
+        <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
+        <div class="glass-content text-left">
+          <pre class="font-mono text-sm leading-8"><span class="opacity-25"># Install globally</span>
+<span class="opacity-40">$ </span><span class="opacity-70">npm install -g iconnect-mcp</span>
+
+<span class="opacity-25"># Or run directly</span>
+<span class="opacity-40">$ </span><span class="opacity-70">npx iconnect-mcp</span></pre>
+        </div>
+      </div>
+      <p class="mt-6 text-xs opacity-25 reveal" data-delay="140" data-i18n="install_note">Requires Node.js 18+ and macOS. Works with Claude Code, Codex, and any MCP client.</p>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="relative z-[1] py-6 border-t border-white/[.04]">
+    <div class="max-w-[1080px] mx-auto px-5 flex flex-col items-center gap-3 text-center">
+      <span class="font-mono text-sm font-medium opacity-60">iConnect</span>
+      <p class="text-xs opacity-20" data-i18n="footer_tagline">Built for Claude Code, Codex, and every MCP client.</p>
+      <div class="flex gap-5 text-xs opacity-25">
+        <a href="https://github.com/heznpc/iConnect" class="hover:opacity-60 transition-opacity">GitHub</a>
+        <a href="https://github.com/heznpc/iConnect/issues" class="hover:opacity-60 transition-opacity">Issues</a>
+        <a href="https://www.npmjs.com/package/iconnect-mcp" class="hover:opacity-60 transition-opacity">npm</a>
+      </div>
+      <p class="text-[.7rem] opacity-15">MIT License</p>
+    </div>
+  </footer>
+
+  <!-- Modal -->
+  <div class="modal-overlay" id="modal">
+    <div class="modal-glass">
+      <div class="glass-fx"></div>
+      <div class="glass-tint"></div>
+      <div class="glass-shine"></div>
+      <div class="glass-content">
+        <button class="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center text-lg opacity-40 hover:opacity-80 border border-white/10 transition-opacity z-10" id="modalClose" aria-label="Close">&times;</button>
+        <span class="text-4xl mb-4 block" id="modalIcon"></span>
+        <h3 class="text-xl font-bold tracking-tight mb-3" id="modalTitle"></h3>
+        <p class="text-sm opacity-45 leading-relaxed mb-5" id="modalDetail"></p>
+        <code class="block font-mono text-xs opacity-30" id="modalTags"></code>
+      </div>
+    </div>
+  </div>
+
+  <script src="i18n.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>

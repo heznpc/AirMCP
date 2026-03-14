@@ -14,6 +14,7 @@ async function runScript<T>(script: string): Promise<T> {
     const as = script.slice("applescript:".length);
     const { stdout } = await execFileAsync("osascript", ["-e", as], { timeout: 15_000 });
     // Strip control chars that AppleScript may inject
+    // eslint-disable-next-line no-control-regex
     const clean = stdout.trim().replace(/[\x00-\x1f\x7f]/g, (c) => c === "\n" || c === "\r" || c === "\t" ? "" : "");
     return JSON.parse(clean) as T;
   }

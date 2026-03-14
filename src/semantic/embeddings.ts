@@ -1,5 +1,5 @@
 import { runSwift, checkSwiftBridge } from "../shared/swift.js";
-import { API, MODELS, TIMEOUT, LIMITS } from "../shared/constants.js";
+import { API, MODELS, TIMEOUT } from "../shared/constants.js";
 
 interface EmbedTextResult {
   vector: number[];

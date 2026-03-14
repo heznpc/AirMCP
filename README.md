@@ -712,6 +712,12 @@ Modules with OS requirements (e.g., Intelligence requires macOS 26+) are automat
 - **Geocoding** — Forward/reverse geocoding via Open-Meteo and Nominatim APIs
 - **Security hardening** — Sensitive modules (mail, messages) opt-in by default, architecture limitations documented
 
+### Platform Constraints (macOS 26+)
+
+- **Safari bookmarks/reading list** — Apple removed JXA bookmark scripting classes in macOS 26. The plist fallback (`~/Library/Safari/Bookmarks.plist`) requires Full Disk Access, which TCC blocks for MCP server processes. Investigating Shortcuts-based or WebExtension bridge approaches.
+- **Safari `add_bookmark`** — Legacy JXA `make new bookmark` no longer supported in macOS 26. No programmatic alternative available yet.
+- **Podcasts** — Apple removed the Podcasts JXA scripting dictionary entirely in macOS 26. All 6 Podcasts tools return errors. Investigating Shortcuts bridge or Media framework alternatives.
+
 ### Future
 
 - **OAuth 2.1 + PKCE** — HTTP transport authentication for remote deployments

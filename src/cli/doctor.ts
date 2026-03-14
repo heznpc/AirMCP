@@ -148,7 +148,9 @@ export async function runDoctor(): Promise<void> {
       safari: "Safari",
       system: "System Events",
       photos: "Photos",
+      shortcuts: "Shortcuts",
       tv: "TV",
+      maps: "Maps",
     };
 
     for (const mod of enabledMods) {

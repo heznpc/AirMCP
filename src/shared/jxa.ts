@@ -22,7 +22,6 @@ function isTransient(e: unknown): boolean {
 
 export async function runJxa<T>(script: string): Promise<T> {
   let stdout: string;
-  let lastError: unknown;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
@@ -34,7 +33,6 @@ export async function runJxa<T>(script: string): Promise<T> {
       stdout = result.stdout;
       break;
     } catch (e: unknown) {
-      lastError = e;
       if (!isTransient(e) || attempt === MAX_RETRIES) {
         const err = e as { killed?: boolean; signal?: string };
         if (err.killed || err.signal === "SIGTERM") {

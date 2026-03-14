@@ -1,12 +1,12 @@
 # iConnect
 
-Apple 생태계 전체를 위한 MCP 서버 — Notes, Reminders, Calendar, Contacts, Mail, Messages, Music, Finder, Safari, System, Photos, Shortcuts, Apple Intelligence, TV. AI를 Mac에 연결합니다.
+Apple 생태계 전체를 위한 MCP 서버 — Notes, Reminders, Calendar, Contacts, Mail, Messages, Music, Finder, Safari, System, Photos, Shortcuts, Apple Intelligence, TV, Screen Capture, Maps. AI를 Mac에 연결합니다.
 
 > [English](README.md)
 
 ## 특징
 
-- **140개 도구** (15개 모듈) — Apple 앱 CRUD + 시스템 제어 + Apple Intelligence + UI Automation + TV
+- **150+ 도구** (17개 모듈) — Apple 앱 CRUD + 시스템 제어 + Apple Intelligence + UI Automation + 스크린 캡처 + 지도 + 동적 단축어
 - **23개 프롬프트** — 앱별 워크플로우 + 크로스 모듈 + 개발자 워크플로우 (dev-session, debug-loop, build-log)
 - **11개 MCP 리소스** — Notes, Calendar, Reminders 실시간 데이터 URI
 - **JXA + Swift 브릿지** — JXA로 기본 자동화, EventKit/PhotoKit으로 고급 기능
@@ -324,6 +324,26 @@ macOS 26+ Apple Silicon 필요.
 | `tv_playback_control` | 재생/일시정지/다음/이전 제어 | 쓰기 |
 | `tv_search` | 영화/TV 프로그램 검색 | 읽기 |
 | `tv_play` | 이름으로 영화/에피소드 재생 | 쓰기 |
+
+### 스크린 캡처 (4개 도구)
+
+| 도구 | 설명 | 유형 |
+|------|------|------|
+| `capture_screen` | 전체 화면 스크린샷 캡처 (PNG 이미지 반환) | 읽기 |
+| `capture_window` | 특정 앱 윈도우 캡처 | 읽기 |
+| `capture_area` | 좌표로 화면 영역 캡처 | 읽기 |
+| `list_windows` | 모든 윈도우 목록 (위치/크기 포함) | 읽기 |
+
+### 지도 (6개 도구)
+
+| 도구 | 설명 | 유형 |
+|------|------|------|
+| `search_location` | Apple 지도에서 장소 검색 | 쓰기 |
+| `get_directions` | 두 위치 간 경로 안내 | 쓰기 |
+| `drop_pin` | 특정 좌표에 핀 표시 | 쓰기 |
+| `open_address` | 특정 주소를 Apple 지도에서 열기 | 쓰기 |
+| `search_nearby` | 주변 장소 검색 | 쓰기 |
+| `share_location` | 공유 가능한 Apple 지도 링크 생성 | 읽기 |
 
 ## 리소스
 

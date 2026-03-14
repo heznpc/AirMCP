@@ -55,6 +55,9 @@ const MODULE_LABELS: Record<string, string> = {
   shortcuts: "Shortcuts",
   intelligence: "Intelligence",
   tv: "TV",
+  ui: "UI Automation",
+  screen: "Screen Capture",
+  maps: "Maps",
 };
 
 function ask(rl: ReturnType<typeof createInterface>, question: string): Promise<string> {
@@ -130,7 +133,7 @@ export async function runInit(): Promise<void> {
       continue;
     }
 
-    console.log("  \x1b[33mType a number (1-13), \"all\", \"starter\", or Enter to continue.\x1b[0m");
+    console.log(`  \x1b[33mType a number (1-${MODULE_NAMES.length}), "all", "starter", or Enter to continue.\x1b[0m`);
   }
 
   // --- Step 2: Write config.json ---

@@ -1,12 +1,12 @@
 # iConnect
 
-MCP server for the entire Apple ecosystem — Notes, Reminders, Calendar, Contacts, Mail, Messages, Music, Finder, Safari, System, Photos, Shortcuts, Apple Intelligence, and TV. Connect any AI to your Mac.
+MCP server for the entire Apple ecosystem — Notes, Reminders, Calendar, Contacts, Mail, Messages, Music, Finder, Safari, System, Photos, Shortcuts, Apple Intelligence, TV, Screen Capture, and Maps. Connect any AI to your Mac.
 
 > [한국어](README.ko.md)
 
 ## Features
 
-- **140 tools** (15 modules) — Apple app CRUD + system control + Apple Intelligence + UI Automation + TV
+- **150+ tools** (17 modules) — Apple app CRUD + system control + Apple Intelligence + UI Automation + Screen Capture + Maps + dynamic shortcuts
 - **23 prompts** — per-app workflows + cross-module + developer workflows (dev-session, debug-loop, build-log)
 - **11 MCP resources** — Notes, Calendar, Reminders live data URIs
 - **JXA + Swift bridge** — JXA for basic automation, EventKit/PhotoKit for advanced features
@@ -363,6 +363,26 @@ Requires macOS 26+ with Apple Silicon.
 | `tv_playback_control` | Play/pause/next/previous control | write |
 | `tv_search` | Search movies/TV shows | read |
 | `tv_play` | Play movie/episode by name | write |
+
+### Screen Capture (4 tools)
+
+| Tool | Description | Type |
+|------|-------------|------|
+| `capture_screen` | Capture full screen screenshot (returns PNG image) | read |
+| `capture_window` | Capture a specific app window | read |
+| `capture_area` | Capture a screen region by coordinates | read |
+| `list_windows` | List all visible windows with position/size | read |
+
+### Maps (6 tools)
+
+| Tool | Description | Type |
+|------|-------------|------|
+| `search_location` | Search for a place in Apple Maps | write |
+| `get_directions` | Get directions between two locations | write |
+| `drop_pin` | Drop a pin at specific coordinates | write |
+| `open_address` | Open a specific address in Apple Maps | write |
+| `search_nearby` | Search for places near a location | write |
+| `share_location` | Generate a shareable Apple Maps link | read |
 
 ## Resources
 

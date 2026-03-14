@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.heznpc/iconnect",
-  "description": "MCP server for the entire Apple ecosystem — 123 tools across 14 modules. macOS only.",
+  "description": "MCP server for the entire Apple ecosystem — 150+ tools across 17 modules. macOS only.",
   "version": "0.2.0",
   "repository": {
     "url": "https://github.com/heznpc/iConnect",

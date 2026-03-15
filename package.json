@@ -99,7 +99,7 @@
     "@types/express": "^5.0.6",
     "@types/node": "^22.0.0",
     "eslint": "^10.0.3",
-    "globals": "^16.0.0",
+    "globals": "^17.4.0",
     "husky": "^9.1.7",
     "jest": "^30.3.0",
     "lint-staged": "^16.4.0",

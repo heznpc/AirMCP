@@ -143,4 +143,16 @@ export class VectorStore {
     const store = await this.load();
     return store.entries[id] ?? null;
   }
+
+  /** Get all entries (for Spotlight sync). */
+  async getAllEntries(): Promise<Record<string, VectorEntry>> {
+    const store = await this.load();
+    return store.entries;
+  }
+
+  /** Clear entire store (for privacy / fresh re-index). */
+  async clear(): Promise<void> {
+    this.cache = { version: 1, entries: {} };
+    await this.save(this.cache);
+  }
 }

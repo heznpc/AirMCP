@@ -1,6 +1,6 @@
 # AirMCP — Full Tool Reference
 
-> 244 tools, 29 prompts across 29 modules.
+> 247 tools, 29 prompts across 29 modules.
 > Auto-generated from source by scripts/gen-llms-txt.mjs
 
 ## Bluetooth
@@ -275,6 +275,10 @@ Generate an image from a text description using Apple Intelligence on-device ima
 ### scan_document
 
 Extract text and structure from an image file using Apple Vision framework OCR. 
+
+### ai_plan
+
+Use Apple's on-device Foundation Model to analyze context and generate a plan of AirMCP tool calls. 
 
 ### ai_status
 
@@ -828,6 +832,14 @@ Search across Apple app data by meaning, not just keywords.
 ### find_related
 
 Given a note, event, reminder, or email ID, find semantically related items across all indexed Apple apps. 
+
+### spotlight_sync
+
+Push semantically indexed data to macOS Core Spotlight, making it discoverable via Spotlight search and Siri. 
+
+### semantic_clear
+
+Delete all indexed data from the local vector store. Use for privacy or to force a fresh re-index.
 
 ### semantic_status
 

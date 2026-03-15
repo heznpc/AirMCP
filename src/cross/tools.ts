@@ -3,6 +3,7 @@ import { z } from "zod";
 import { ok, err } from "../shared/result.js";
 import { buildSnapshot } from "../shared/resources.js";
 import { AirMcpConfig, isModuleEnabled } from "../shared/config.js";
+import { runSwift, checkSwiftBridge } from "../shared/swift.js";
 
 /**
  * Cross-module tools that leverage MCP Sampling to delegate
@@ -79,9 +80,25 @@ export function registerCrossTools(mcpServer: McpServer, config: AirMcpConfig): 
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         if (msg.includes("not supported") || msg.includes("sampling") || msg.includes("Method not found")) {
+          // Fallback: try on-device Foundation Models
+          const swiftErr = await checkSwiftBridge();
+          if (!swiftErr) {
+            try {
+              const fmResult = await runSwift<{ output: string }>(
+                "generate-text",
+                JSON.stringify({
+                  prompt: `Summarize this context concisely and actionably:\n\n${snapshotText}`,
+                  systemInstruction: "You are a personal assistant. Be concise. Prioritize time-sensitive items.",
+                }),
+              );
+              return ok({ briefing: fmResult.output, model: "apple-foundation-models", fallback: true });
+            } catch {
+              // FM also unavailable, return raw snapshot
+            }
+          }
           return ok({
             briefing: null,
-            fallback: "Client does not support MCP Sampling. Returning raw context snapshot.",
+            fallback: "Client does not support MCP Sampling and Foundation Models unavailable. Returning raw snapshot.",
             snapshot: JSON.parse(snapshotText),
           });
         }

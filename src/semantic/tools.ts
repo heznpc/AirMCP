@@ -3,6 +3,7 @@ import { z } from "zod";
 import { ok, err, toolError } from "../shared/result.js";
 import { AirMcpConfig } from "../shared/config.js";
 import { SemanticSearchService } from "./service.js";
+import { runSwift, checkSwiftBridge } from "../shared/swift.js";
 
 /**
  * Semantic search tools -- on-device NLContextualEmbedding via Swift bridge
@@ -108,6 +109,68 @@ export function registerSemanticTools(server: McpServer, config: AirMcpConfig): 
         return ok(result);
       } catch (e) {
         return toolError("semantic search", e);
+      }
+    },
+  );
+
+  // -- Spotlight: push indexed data to macOS Spotlight for Siri discovery --
+  server.registerTool(
+    "spotlight_sync",
+    {
+      title: "Sync to Spotlight",
+      description:
+        "Push semantically indexed data to macOS Core Spotlight, making it discoverable via Spotlight search and Siri. " +
+        "Run after semantic_index to expose your notes, events, reminders, and emails to system-wide search. " +
+        "Requires Swift bridge (npm run swift-build).",
+      inputSchema: {},
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async () => {
+      try {
+        const swiftErr = await checkSwiftBridge();
+        if (swiftErr) return err(swiftErr);
+
+        const stats = await service.status();
+        if (stats.total === 0) {
+          return err("No indexed data. Run semantic_index first.");
+        }
+
+        // Get all entries from the store and push to Spotlight
+        const store = await service.getStoreData();
+        const items = Object.values(store).map((entry) => ({
+          id: entry.id,
+          title: entry.title,
+          content: entry.text,
+          source: entry.source,
+        }));
+
+        const result = await runSwift<{ indexed: number; success: boolean }>(
+          "spotlight-index",
+          JSON.stringify({ items }),
+        );
+        return ok(result);
+      } catch (e) {
+        return toolError("spotlight sync", e);
+      }
+    },
+  );
+
+  // -- Clear: delete all vector store data --
+  server.registerTool(
+    "semantic_clear",
+    {
+      title: "Clear Semantic Index",
+      description: "Delete all indexed data from the local vector store. Use for privacy or to force a fresh re-index.",
+      inputSchema: {},
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    },
+    async () => {
+      try {
+        const before = await service.status();
+        await service.clear();
+        return ok({ cleared: before.total, message: "Vector store cleared successfully." });
+      } catch (e) {
+        return toolError("clear index", e);
       }
     },
   );

@@ -6,6 +6,7 @@ import Accelerate
 import CoreLocation
 import CoreBluetooth
 import Vision
+import CoreSpotlight
 
 #if canImport(ImagePlayground)
 import ImagePlayground
@@ -309,6 +310,22 @@ struct GenerateImageInput: Decodable {
 struct GenerateImageOutput: Encodable {
     let generated: Bool
     let path: String
+}
+
+struct SpotlightItem: Decodable {
+    let id: String
+    let title: String
+    let content: String
+    let source: String // notes, calendar, reminders, mail
+}
+
+struct SpotlightIndexInput: Decodable {
+    let items: [SpotlightItem]
+}
+
+struct SpotlightIndexOutput: Encodable {
+    let indexed: Int
+    let success: Bool
 }
 
 struct ScanDocumentInput: Decodable {
@@ -1035,6 +1052,34 @@ case "generate-image":
     #else
     writeError("Image generation requires macOS 26+ with Apple Silicon. This binary was compiled without ImagePlayground support.")
     #endif
+
+// --- Core Spotlight: index items for Siri/Spotlight discovery ---
+case "spotlight-index":
+    guard let indexInput = try? JSONDecoder().decode(SpotlightIndexInput.self, from: stdinData) else {
+        writeError("Invalid JSON. Expected SpotlightIndexInput.")
+        exit(1)
+    }
+
+    let searchableItems = indexInput.items.map { item -> CSSearchableItem in
+        let attrs = CSSearchableItemAttributeSet(contentType: .text)
+        attrs.title = item.title
+        attrs.textContent = item.content
+        attrs.contentDescription = "AirMCP \(item.source)"
+        attrs.identifier = item.id
+        return CSSearchableItem(
+            uniqueIdentifier: "airmcp.\(item.source).\(item.id)",
+            domainIdentifier: "com.airmcp.\(item.source)",
+            attributeSet: attrs
+        )
+    }
+
+    do {
+        try await CSSearchableIndex.default().indexSearchableItems(searchableItems)
+        let output = SpotlightIndexOutput(indexed: searchableItems.count, success: true)
+        try writeJSON(output)
+    } catch {
+        writeError("Spotlight indexing error: \(error.localizedDescription)")
+    }
 
 // --- Vision: scan document from image ---
 case "scan-document":

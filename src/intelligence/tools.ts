@@ -340,6 +340,65 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
     },
   );
 
+  // --- AI Plan: on-device agent planner using Foundation Models ---
+
+  server.registerTool(
+    "ai_plan",
+    {
+      title: "AI Plan",
+      description:
+        "Use Apple's on-device Foundation Model to analyze context and generate a plan of AirMCP tool calls. " +
+        "The model acts as an autonomous planner — it reads the provided context and suggests which tools to call " +
+        "and in what order. Returns a JSON array of planned actions. Requires macOS 26+. " +
+        "Works completely offline with no API keys.",
+      inputSchema: {
+        goal: z.string().describe("What you want to accomplish (e.g. 'organize my day', 'prepare for meeting')"),
+        context: z.string().optional().describe("Additional context (e.g. snapshot text, recent events)"),
+        availableTools: z
+          .array(z.string())
+          .optional()
+          .describe("List of available tool names to plan with. Defaults to common tools."),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+    },
+    async ({ goal, context, availableTools }) => {
+      try {
+        const tools = availableTools ?? [
+          "list_notes", "search_notes", "create_note",
+          "list_events", "today_events", "create_event",
+          "list_reminders", "create_reminder",
+          "list_messages", "search_contacts",
+          "summarize_text", "rewrite_text",
+        ];
+        const prompt = [
+          `Goal: ${goal}`,
+          context ? `Context:\n${context}` : "",
+          `Available tools: ${tools.join(", ")}`,
+          "",
+          "Generate a JSON array of planned actions. Each action should have:",
+          '{"step": 1, "tool": "tool_name", "args": {...}, "purpose": "why this step"}',
+          "Return ONLY the JSON array, no other text.",
+        ].filter(Boolean).join("\n");
+
+        const result = await runSwift<StructuredResult>(
+          "generate-structured",
+          JSON.stringify({
+            prompt,
+            systemInstruction: "You are an action planner. Analyze the goal and available tools, then output a JSON array of steps to achieve the goal. Be practical and concise.",
+          }),
+        );
+        return ok({ plan: result.output, valid_json: result.valid_json, model: "apple-foundation-models" });
+      } catch (e) {
+        return toolError("AI plan", e);
+      }
+    },
+  );
+
   // --- AI Status ---
 
   server.registerTool(

@@ -265,6 +265,14 @@ export class SemanticSearchService {
     return { embeddingAvailable: available, provider, ...stats };
   }
 
+  async getStoreData(): Promise<Record<string, VectorEntry>> {
+    return this.store.getAllEntries();
+  }
+
+  async clear(): Promise<void> {
+    await this.store.clear();
+  }
+
   // -- Private helpers --
 
   private isModuleEnabled(mod: string): boolean {

@@ -92,8 +92,8 @@ export function registerCrossTools(mcpServer: McpServer, config: AirMcpConfig): 
                 }),
               );
               return ok({ briefing: fmResult.output, model: "apple-foundation-models", fallback: true });
-            } catch {
-              // FM also unavailable, return raw snapshot
+            } catch (fmErr) {
+              console.error(`[AirMCP] FM fallback failed: ${fmErr instanceof Error ? fmErr.message : String(fmErr)}`);
             }
           }
           return ok({

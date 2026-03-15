@@ -115,9 +115,12 @@ struct OnboardingView: View {
         VStack(spacing: 16) {
             Spacer()
 
-            Image(systemName: "apple.terminal")
-                .font(.system(size: 56))
-                .foregroundStyle(Color.accentColor)
+            if let iconURL = Bundle.module.url(forResource: "AppIcon@2x", withExtension: "png", subdirectory: "Resources"),
+               let nsImage = NSImage(contentsOf: iconURL) {
+                Image(nsImage: nsImage)
+                    .resizable()
+                    .frame(width: 72, height: 72)
+            }
 
             Text("Welcome to AirMCP")
                 .font(.title)

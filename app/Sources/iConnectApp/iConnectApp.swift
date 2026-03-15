@@ -28,6 +28,12 @@ struct iConnectApp: App {
         }
         self.notificationDelegate = delegate
         UNUserNotificationCenter.current().delegate = delegate
+
+        // Set app icon from bundled resource
+        if let iconURL = Bundle.module.url(forResource: "AppIcon@2x", withExtension: "png", subdirectory: "Resources"),
+           let icon = NSImage(contentsOf: iconURL) {
+            NSApp.applicationIconImage = icon
+        }
     }
 
     var body: some Scene {

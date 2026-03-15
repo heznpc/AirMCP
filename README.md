@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="icons/airmcp-icon-256.png" alt="AirMCP" width="128">
+</p>
+
 # AirMCP
 
 MCP server for the entire Apple ecosystem — Notes, Reminders, Calendar, Contacts, Mail, Messages, Music, Finder, Safari, System, Photos, Shortcuts, Apple Intelligence, TV, Screen Capture, Maps, Podcasts, Weather, Pages, Numbers, Keynote, Location, and Bluetooth. Connect any AI to your Mac.

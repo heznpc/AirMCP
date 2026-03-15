@@ -8,7 +8,10 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "iConnectApp",
-            path: "Sources/iConnectApp"
+            path: "Sources/iConnectApp",
+            resources: [
+                .copy("Resources")
+            ]
         ),
     ]
 )

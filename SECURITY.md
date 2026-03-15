@@ -5,7 +5,8 @@
 If you discover a security vulnerability, please report it responsibly:
 
 1. **Do NOT** open a public issue
-2. Email the maintainer or use GitHub's private vulnerability reporting
+2. Use [GitHub Security Advisories](https://github.com/heznpc/AirMCP/security/advisories/new) to report privately
+3. Or email: **heznpc** (via GitHub profile)
 
 ## Security Features
 

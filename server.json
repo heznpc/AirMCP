@@ -1,8 +1,8 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.heznpc/airmcp",
-  "description": "MCP server for the entire Apple ecosystem — 226 tools, 30 prompts across 24 modules. macOS only.",
-  "version": "2.1.0",
+  "description": "MCP server for the entire Apple ecosystem — 252 tools, 30 prompts across 25 modules. macOS only.",
+  "version": "2.2.0",
   "repository": {
     "url": "https://github.com/heznpc/AirMCP",
     "source": "github"
@@ -11,7 +11,7 @@
     {
       "registryType": "npm",
       "identifier": "airmcp",
-      "version": "2.1.0",
+      "version": "2.2.0",
       "transport": {
         "type": "stdio"
       }

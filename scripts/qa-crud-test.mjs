@@ -257,7 +257,7 @@ const CRUD_MODULES = [
         tool: "update_reminder",
         args: () => ({
           id: ctx.get("remId"),
-          name: `${QA_PREFIX} Updated Reminder ${TS}`,
+          title: `${QA_PREFIX} Updated Reminder ${TS}`,
           priority: 1,
         }),
         validate: (r) => !!r.id || r.updated === true,

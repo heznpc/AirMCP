@@ -304,9 +304,9 @@ const COVERAGE_PLAN = [
   { tool: "rewrite_text", args: { text: "This is a test sentence for rewriting.", tone: "professional" } },
   { tool: "proofread_text", args: { text: "Ths is a tset sentance with erors." } },
   { tool: "generate_text", args: { prompt: "Write one sentence about macOS automation." } },
-  { tool: "generate_structured", args: { prompt: "List 2 colors", schema: JSON.stringify({ type: "object", properties: { colors: { type: "array", items: { type: "string" } } } }) } },
+  { tool: "generate_structured", args: { prompt: "List 2 colors", schema: { colors: { type: "array", description: "List of color names" } } } },
   { tool: "tag_content", args: { text: "Apple released macOS 26 with new features for developers.", tags: ["tech", "apple", "software", "sports"] } },
-  { tool: "ai_chat", args: { session: "qa-e2e-test", message: "Say hello in one word." } },
+  { tool: "ai_chat", args: { sessionName: "qa-e2e-test", message: "Say hello in one word." } },
 
   // ── TV (6) ────────────────────────────────────────────────────────
   { tool: "tv_list_playlists", args: {} },
@@ -473,7 +473,7 @@ async function resolveChainedArgs(chainKey, ctx) {
     case "chatId2": {
       const r = parseResult(await callTool("list_chats", {}));
       const id = r.data?.chats?.[0]?.id;
-      return id ? { id } : null;
+      return id ? { chatId: id } : null;
     }
     case "shortcutName": {
       const r = parseResult(await callTool("list_shortcuts", {}));

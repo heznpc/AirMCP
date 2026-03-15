@@ -10,13 +10,11 @@ const WHITE = "\x1b[97m";  // bright white
 const GREEN = "\x1b[32m";
 const YELLOW = "\x1b[33m";
 
-const CYAN = "\x1b[36m";
-const MAGENTA = "\x1b[35m";
 export const LOGO_LINES = [
-  `${CYAN}     ___   _      ${MAGENTA}__  __  ___  ___${RESET}`,
-  `${CYAN}    / _ | (_)____${MAGENTA}/  |/  |/ __\\/ _ \\${RESET}`,
-  `${CYAN}   / __ |/ / __/${MAGENTA}/ /|_/ / /__/ ___/${RESET}`,
-  `${CYAN}  /_/ |_/_/_/  ${MAGENTA}/_/  /_/\\___/_/${RESET}`,
+  `${WHITE}     ___   _      __  __  ___  ___${RESET}`,
+  `${WHITE}    / _ | (_)____/  |/  |/ __\\/ _ \\${RESET}`,
+  `${WHITE}   / __ |/ / __// /|_/ / /__/ ___/${RESET}`,
+  `${WHITE}  /_/ |_/_/_/  /_/  /_/\\___/_/${RESET}`,
 ];
 
 export interface BannerInfo {

@@ -7,6 +7,24 @@ const TRANSIENT_PATTERNS = [
   "-1728",
 ];
 
+// ── JXA error code descriptions ──────────────────────────────────────
+const JXA_ERROR_CODES: Record<string, string> = {
+  "-1743": "Permission denied — grant Automation access in System Settings > Privacy & Security > Automation",
+  "-1728": "Object not found — the app may need to be opened first",
+  "-1712": "Scripting not enabled — enable in System Settings > Privacy & Security > Automation",
+  "-1708": "Application does not understand this command",
+  "-1725": "Invalid parameter — check input values",
+  "-600":  "Application is not running",
+  "-10810": "Application launch failed — the app may be damaged or missing",
+};
+
+function describeJxaError(msg: string): string | null {
+  for (const [code, desc] of Object.entries(JXA_ERROR_CODES)) {
+    if (msg.includes(code)) return `${desc} (${code})`;
+  }
+  return null;
+}
+
 // ── PII scrubbing ────────────────────────────────────────────────────
 const EMAIL_RE = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
 const PATH_RE = /\/Users\/[^\s'",;)}\]]+/g;
@@ -178,7 +196,8 @@ async function runJxaInner<T>(script: string, app: string | undefined): Promise<
         }
         const rawMsg = `${err.stderr ?? ""} ${err.message ?? ""}`.trim();
         const cleanMsg = scrubPii(rawMsg);
-        throw new Error(`osascript error: ${cleanMsg}`, { cause: e });
+        const friendly = describeJxaError(rawMsg);
+        throw new Error(friendly ? `osascript error: ${friendly}` : `osascript error: ${cleanMsg}`, { cause: e });
       }
       console.error(`[AirMCP] JXA retry attempt ${attempt + 2}/3`);
       await new Promise((r) => setTimeout(r, CONCURRENCY.JXA_RETRY_DELAYS[attempt]));

@@ -82,11 +82,21 @@ export async function runGws<T = unknown>(
 
   const timeout = opts?.timeout ?? GWS_TIMEOUT;
 
-  const { stdout } = await execFileAsync(bin, args, {
-    timeout,
-    maxBuffer: GWS_MAX_BUFFER,
-    env: { ...process.env },
-  });
+  let stdout: string;
+  try {
+    const result = await execFileAsync(bin, args, {
+      timeout,
+      maxBuffer: GWS_MAX_BUFFER,
+      env: { ...process.env },
+    });
+    stdout = result.stdout;
+  } catch (e) {
+    const err = e as { killed?: boolean; signal?: string; message?: string };
+    if (err.killed || err.signal === "SIGTERM") {
+      throw new Error(`Google Workspace CLI timed out after ${timeout / 1000}s`, { cause: e });
+    }
+    throw new Error(`Google Workspace CLI failed: ${e instanceof Error ? e.message : String(e)}`, { cause: e });
+  }
 
   // gws may return NDJSON (one JSON per line) with --page-all
   const trimmed = stdout.trim();

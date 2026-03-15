@@ -75,7 +75,7 @@ async function geminiEmbed(text: string): Promise<number[]> {
 
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`Gemini API error ${res.status}: ${body}`);
+    throw new Error(`Gemini API error ${res.status}: ${body.slice(0, 200)}`);
   }
 
   const data = (await res.json()) as GeminiEmbedResponse;
@@ -110,7 +110,7 @@ async function geminiBatchEmbed(texts: string[]): Promise<number[][]> {
 
     if (!res.ok) {
       const body = await res.text();
-      throw new Error(`Gemini batch API error ${res.status}: ${body}`);
+      throw new Error(`Gemini batch API error ${res.status}: ${body.slice(0, 200)}`);
     }
 
     const data = (await res.json()) as GeminiBatchEmbedResponse;

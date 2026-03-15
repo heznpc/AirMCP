@@ -1,6 +1,6 @@
 // Weather API client using Open-Meteo (free, no API key required).
 
-import { API } from "../shared/constants.js";
+import { API, TIMEOUT } from "../shared/constants.js";
 
 const BASE_URL = API.WEATHER;
 
@@ -42,7 +42,9 @@ function describeWeatherCode(code: number): string {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function fetchOpenMeteo(latitude: number, longitude: number, extra: Record<string, string>): Promise<any> {
   const params = new URLSearchParams({ latitude: String(latitude), longitude: String(longitude), timezone: "auto", ...extra });
-  const res = await fetch(`${BASE_URL}?${params}`);
+  const res = await fetch(`${BASE_URL}?${params}`, {
+    signal: AbortSignal.timeout(TIMEOUT.GEOCODE),
+  });
   if (!res.ok) throw new Error(`Open-Meteo API error: ${res.status} ${res.statusText}`);
   return res.json();
 }

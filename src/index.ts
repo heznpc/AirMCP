@@ -1,5 +1,10 @@
 #!/usr/bin/env node
 
+if (!process.env.HOME && !process.env.USERPROFILE) {
+  console.error("[AirMCP] HOME environment variable not set — cannot initialize");
+  process.exit(1);
+}
+
 // CLI subcommands: route before heavy imports
 const _sub = process.argv[2];
 if (_sub === "init" || _sub === "doctor" || _sub === "--help" || _sub === "-h" || _sub === "help") {

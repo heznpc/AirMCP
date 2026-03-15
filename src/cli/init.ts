@@ -106,7 +106,7 @@ function ask(rl: ReturnType<typeof createInterface>, question: string): Promise<
 const DIM = "\x1b[2m";
 const RESET = "\x1b[0m";
 const BOLD = "\x1b[1m";
-const CYAN = "\x1b[36m";
+const WHITE = "\x1b[97m";
 const GREEN = "\x1b[32m";
 const YELLOW = "\x1b[33m";
 
@@ -143,7 +143,7 @@ export async function runInit(): Promise<void> {
     await typeLine(line, 3, "stdout");
   }
   writeOut("\n");
-  await typeLine(`  ${BOLD}${CYAN}AirMCP Setup Wizard${RESET}`, 10, "stdout");
+  await typeLine(`  ${BOLD}${WHITE}AirMCP Setup Wizard${RESET}`, 10, "stdout");
   await typeLine(`  ${DIM}Connect your Mac to any AI via MCP${RESET}`, 5, "stdout");
   writeOut("\n");
   await sleep(200);
@@ -165,7 +165,7 @@ export async function runInit(): Promise<void> {
   printModules(enabled);
 
   for (;;) {
-    const input = (await ask(rl, `  ${CYAN}>${RESET} ${DIM}(number / all / starter / prod / Enter to save)${RESET} `)).trim().toLowerCase();
+    const input = (await ask(rl, `  ${WHITE}>${RESET} ${DIM}(number / all / starter / prod / Enter to save)${RESET} `)).trim().toLowerCase();
 
     if (input === "") break;
 

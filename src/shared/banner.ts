@@ -6,16 +6,15 @@
 const DIM = "\x1b[2m";
 const RESET = "\x1b[0m";
 const BOLD = "\x1b[1m";
-const CYAN = "\x1b[36m";
+const WHITE = "\x1b[97m";  // bright white
 const GREEN = "\x1b[32m";
 const YELLOW = "\x1b[33m";
-const MAGENTA = "\x1b[35m";
 
 export const LOGO_LINES = [
-  `${CYAN}     ___   _      ${MAGENTA}__  __  ___  ___${RESET}`,
-  `${CYAN}    / _ | (_)____${MAGENTA}/  |/  |/ __\\/ _ \\${RESET}`,
-  `${CYAN}   / __ |/ / __/${MAGENTA}/ /|_/ / /__/ ___/${RESET}`,
-  `${CYAN}  /_/ |_/_/_/  ${MAGENTA}/_/  /_/\\___/_/${RESET}`,
+  `${WHITE}${BOLD}     ___   _      __  __  ___  ___${RESET}`,
+  `${WHITE}${BOLD}    / _ | (_)____/  |/  |/ __\\/ _ \\${RESET}`,
+  `${WHITE}${BOLD}   / __ |/ / __// /|_/ / /__/ ___/${RESET}`,
+  `${WHITE}${BOLD}  /_/ |_/_/_/  /_/  /_/\\___/_/${RESET}`,
 ];
 
 export interface BannerInfo {
@@ -74,8 +73,8 @@ async function fillLine(label: string, value: string, delay: number): Promise<vo
 async function animateModules(modules: string[], perModuleDelay: number): Promise<void> {
   write(`  ${DIM}├${RESET} `);
   for (let i = 0; i < modules.length; i++) {
-    if (i > 0) write(`${DIM}, ${RESET}`);
-    write(`${GREEN}${modules[i]}${RESET}`);
+    if (i > 0) write(`${DIM},${RESET} `);
+    write(`${WHITE}${modules[i]}${RESET}`);
     if (perModuleDelay > 0) await sleep(perModuleDelay);
   }
   write("\n");
@@ -124,17 +123,17 @@ export async function printBanner(info: BannerInfo): Promise<void> {
 
   // Security
   write(`  ${BOLD}Security${RESET}\n`);
-  write(`  ${DIM}├${RESET} Send Messages: ${info.sendMessages ? `${GREEN}on${RESET}` : `${DIM}off${RESET}`}\n`);
-  write(`  ${DIM}├${RESET} Send Mail: ${info.sendMail ? `${GREEN}on${RESET}` : `${DIM}off${RESET}`}\n`);
+  write(`  ${DIM}├${RESET} Send Messages: ${info.sendMessages ? `${WHITE}on${RESET}` : `${DIM}off${RESET}`}\n`);
+  write(`  ${DIM}├${RESET} Send Mail: ${info.sendMail ? `${WHITE}on${RESET}` : `${DIM}off${RESET}`}\n`);
 
   write("\n");
 
   // Transport — final line with a brief pause for dramatic effect
   await sleep(100);
   if (info.transport === "http") {
-    await typeLine(`  ${GREEN}▶${RESET} Server running on ${BOLD}http://localhost:${info.port}/mcp${RESET}`, 8);
+    await typeLine(`  ${WHITE}▶${RESET} Server running on ${BOLD}http://localhost:${info.port}/mcp${RESET}`, 8);
   } else {
-    await typeLine(`  ${GREEN}▶${RESET} Server running on ${BOLD}stdio${RESET}`, 8);
+    await typeLine(`  ${WHITE}▶${RESET} Server running on ${BOLD}stdio${RESET}`, 8);
   }
 
   write("\n");

@@ -1,0 +1,1073 @@
+# AirMCP — Full Tool Reference
+
+> 242 tools, 29 prompts across 29 modules.
+> Auto-generated from source by scripts/gen-llms-txt.mjs
+
+## Bluetooth
+
+### get_bluetooth_state
+
+Check whether Bluetooth is powered on, off, or unauthorized.
+
+### scan_bluetooth
+
+Scan for nearby BLE (Bluetooth Low Energy) devices. Returns device names, UUIDs, and signal strength (RSSI). 
+
+### connect_bluetooth
+
+Connect to a BLE device by its UUID. The UUID can be obtained from scan_bluetooth results. 
+
+### disconnect_bluetooth
+
+Disconnect a BLE device by its UUID.
+
+## Calendar
+
+### list_calendars
+
+List all calendars with name, color, and writable status.
+
+### list_events
+
+List events within a date range. Requires startDate and endDate (ISO 8601). Optionally filter by calendar name. Supports limit/offset pagination.
+
+### read_event
+
+Read full details of a calendar event by ID. Includes attendees (read-only), location, description, and recurrence info.
+
+### create_event
+
+Create a new calendar event. Recurring events cannot be created via automation. Attendees cannot be added programmatically.
+
+### update_event
+
+Update event properties. Only specified fields are changed. Attendees and recurrence rules cannot be modified via automation.
+
+### delete_event
+
+Delete a calendar event by ID. This action is permanent.
+
+### search_events
+
+Search events by keyword in title or description within a date range.
+
+### get_upcoming_events
+
+Get the next N upcoming events from now (searches up to 30 days ahead). A convenience wrapper that doesn't require date range parameters.
+
+### today_events
+
+Get all calendar events for today.
+
+### create_recurring_event
+
+Create a recurring calendar event via EventKit. Supports daily, weekly, monthly, and yearly recurrence with configurable intervals. Requires macOS 26+ Swift bridge.
+
+### Prompts
+
+- **schedule-review**: 
+- **meeting-prep**: 
+
+## Contacts
+
+### list_contacts
+
+List contacts with name, primary email, and phone. Supports pagination.
+
+### search_contacts
+
+Search contacts by name, email, phone, or organization.
+
+### read_contact
+
+Read full details of a contact by ID including all emails, phones, and addresses.
+
+### create_contact
+
+Create a new contact with name and optional email, phone, organization.
+
+### update_contact
+
+Update contact properties. Only specified fields are changed.
+
+### delete_contact
+
+Delete a contact by ID. This action is permanent.
+
+### list_groups
+
+List all contact groups.
+
+### add_contact_email
+
+Add an email address to an existing contact.
+
+### add_contact_phone
+
+Add a phone number to an existing contact.
+
+### list_group_members
+
+List contacts in a specific group.
+
+## core
+
+### get_workflow
+
+Retrieve a registered MCP prompt by name and return its workflow instructions as text. 
+
+### Prompts
+
+- **meeting-notes-to-reminders**: 
+- **weekly-digest**: 
+- **event-follow-up**: 
+- **daily-briefing**: 
+- **research-with-safari**: 
+- **focus-session**: 
+- **file-organizer**: 
+- **dev-session**: 
+- **debug-loop**: 
+- **screen-capture-flow**: 
+- **app-release-prep**: 
+- **idea-to-task**: 
+- **build-log**: 
+- **inbox-zero**: 
+- **travel-planner**: 
+- **content-curator**: 
+- **morning-brief**: 
+- **project-kickoff**: 
+- **weekly-review**: 
+
+## Finder
+
+### search_files
+
+Search files using Spotlight (mdfind). Searches file names and content.
+
+### get_file_info
+
+Get detailed file information including size, dates, kind, and tags.
+
+### set_file_tags
+
+Set Finder tags on a file. Replaces all existing tags.
+
+### recent_files
+
+Find recently modified files in a folder using Spotlight.
+
+### list_directory
+
+List files and folders in a directory with metadata (kind, size, modification date).
+
+### move_file
+
+Move or rename a file or folder to a new location.
+
+### trash_file
+
+Move a file or folder to the Trash using Finder.
+
+### create_directory
+
+Create a new directory (and intermediate directories if needed).
+
+## Google Workspace
+
+### gws_status
+
+Check if Google Workspace CLI (gws) is installed and authenticated.
+
+### gws_gmail_list
+
+List recent Gmail messages. Supports query filters (e.g. 'from:alice is:unread').
+
+### gws_gmail_read
+
+Read a Gmail message by ID. Returns subject, from, to, date, and body.
+
+### gws_gmail_send
+
+Send an email via Gmail. Encodes the message in RFC 2822 format.
+
+### gws_drive_list
+
+List files in Google Drive. Supports query filters.
+
+### gws_drive_read
+
+Get metadata for a Google Drive file by ID.
+
+### gws_drive_search
+
+Full-text search across Google Drive files by content or name.
+
+### gws_sheets_read
+
+Read cell values from a Google Sheets spreadsheet.
+
+### gws_sheets_write
+
+Write values to a Google Sheets range.
+
+### gws_calendar_list
+
+List upcoming events from Google Calendar.
+
+### gws_calendar_create
+
+Create an event in Google Calendar.
+
+### gws_docs_read
+
+Read the content of a Google Doc by document ID.
+
+### gws_tasks_list
+
+List tasks from Google Tasks (default task list).
+
+### gws_tasks_create
+
+Create a task in Google Tasks.
+
+### gws_people_search
+
+Search contacts in Google People/Contacts.
+
+### gws_raw
+
+Execute any Google Workspace CLI command. For advanced use when specific tools don't cover your need.
+
+## Apple Intelligence
+
+### summarize_text
+
+Summarize text using Apple Intelligence (on-device Foundation Models). Requires macOS 26+ with Apple Silicon.
+
+### rewrite_text
+
+Rewrite text in a specified tone using Apple Intelligence (on-device Foundation Models). Requires macOS 26+ with Apple Silicon.
+
+### proofread_text
+
+Proofread and correct grammar/spelling using Apple Intelligence (on-device Foundation Models). Requires macOS 26+ with Apple Silicon.
+
+### generate_text
+
+Generate text using Apple's on-device Foundation Model with custom system instructions. Runs entirely on-device via Apple Silicon. Requires macOS 26+.
+
+### generate_structured
+
+Generate structured JSON output from Apple's on-device Foundation Model with optional schema constraints. Useful for extracting structured data from natural language. Requires macOS 26+.
+
+### tag_content
+
+Classify and tag content using Apple's on-device Foundation Model. Returns confidence scores for each provided tag/category. Requires macOS 26+.
+
+### ai_chat
+
+Send a message to an on-device AI session using Apple Foundation Models. Note: each call creates a fresh session — sessionName is for caller-side tracking only, not server-side persistence. Requires macOS 26+.
+
+### ai_status
+
+Check availability and status of Apple's on-device Foundation Models. Returns whether the model is available, macOS version, and Apple Silicon status.
+
+## Keynote
+
+### keynote_list_documents
+
+List all open Keynote presentations.
+
+### keynote_create_document
+
+Create a new blank Keynote presentation.
+
+### keynote_list_slides
+
+List all slides in a Keynote presentation with title, body preview, and presenter notes.
+
+### keynote_get_slide
+
+Get detailed content of a specific slide including all text items and presenter notes.
+
+### keynote_add_slide
+
+Add a new slide to a Keynote presentation.
+
+### keynote_set_presenter_notes
+
+Set presenter notes on a specific slide.
+
+### keynote_export_pdf
+
+Export a Keynote presentation to PDF.
+
+### keynote_start_slideshow
+
+Start playing a Keynote slideshow from a specific slide.
+
+### keynote_close_document
+
+Close an open Keynote presentation, optionally saving changes.
+
+## Location
+
+### get_current_location
+
+Get the device's current geographic location (latitude, longitude, altitude). 
+
+### get_location_permission
+
+Check the current Location Services authorization status. 
+
+## Mail
+
+### list_mailboxes
+
+List all mailboxes across accounts with unread counts.
+
+### list_messages
+
+List recent messages in a mailbox (e.g. 'INBOX'). Returns subject, sender, date, read status.
+
+### read_message
+
+Read full content of an email message by ID. Content length is configurable (default: 5000 chars, max: 100000).
+
+### search_messages
+
+Search messages by keyword in subject or sender within a mailbox.
+
+### mark_message_read
+
+Mark an email message as read or unread.
+
+### flag_message
+
+Flag or unflag an email message.
+
+### get_unread_count
+
+Get unread message count across all mailboxes.
+
+### move_message
+
+Move a message to another mailbox.
+
+### list_accounts
+
+List all mail accounts.
+
+### send_mail
+
+Compose and send an email via Apple Mail. Requires allowSendMail config.
+
+### reply_mail
+
+Reply to an email message. Requires allowSendMail config.
+
+## Maps
+
+### search_location
+
+Search for a place or location in Apple Maps.
+
+### get_directions
+
+Get directions between two locations in Apple Maps.
+
+### drop_pin
+
+Drop a pin at specific coordinates in Apple Maps.
+
+### open_address
+
+Open a specific address in Apple Maps.
+
+### search_nearby
+
+Search for places near a location in Apple Maps. If no coordinates are given, searches near the current location.
+
+### share_location
+
+Generate a shareable Apple Maps link for a location.
+
+### geocode
+
+Convert a place name or address to geographic coordinates. Returns up to 5 matching locations with latitude, longitude, country, and timezone.
+
+### reverse_geocode
+
+Convert geographic coordinates to a place name and address.
+
+## Messages
+
+### list_chats
+
+List recent chats in Messages with participants and last update time.
+
+### read_chat
+
+Read chat details including participants and last update time by chat ID.
+
+### search_chats
+
+Search chats by participant name, handle, or chat name.
+
+### send_message
+
+Send a text message via iMessage/SMS. Requires a phone number or email as the target handle.
+
+### send_file
+
+Send a file attachment via iMessage/SMS. Requires absolute file path and recipient handle.
+
+### list_participants
+
+List all participants in a specific chat.
+
+## Music
+
+### list_playlists
+
+List all Music playlists with track counts and duration.
+
+### list_tracks
+
+List tracks in a playlist with name, artist, album, and duration.
+
+### now_playing
+
+Get the currently playing track and playback state.
+
+### playback_control
+
+Control Music playback: play, pause, nextTrack, previousTrack.
+
+### search_tracks
+
+Search tracks in Music library by name, artist, or album.
+
+### play_track
+
+Play a specific track by name, optionally from a specific playlist.
+
+### play_playlist
+
+Start playing a playlist by name, with optional shuffle control.
+
+### get_track_info
+
+Get detailed metadata for a specific track by name.
+
+### set_shuffle
+
+Enable/disable shuffle and set repeat mode (off, one, all).
+
+### create_playlist
+
+Create a new playlist in Music.
+
+### add_to_playlist
+
+Add a track to an existing playlist.
+
+### remove_from_playlist
+
+Remove a track from a playlist.
+
+### delete_playlist
+
+Delete an existing playlist from Music.
+
+### get_rating
+
+Get the rating, favorited, and disliked status for a track.
+
+### set_rating
+
+Set the star rating (0-100) for a track. Use multiples of 20 for full stars (0, 20, 40, 60, 80, 100).
+
+### set_favorited
+
+Mark or unmark a track as favorited (loved).
+
+### set_disliked
+
+Mark or unmark a track as disliked.
+
+## Notes
+
+### list_notes
+
+List all notes with title, folder, and dates. Optionally filter by folder name. Supports pagination via limit/offset.
+
+### search_notes
+
+Search notes by keyword in title and body. Returns matching notes with a 200-char preview.
+
+### read_note
+
+Read the full content of a specific note by its ID. Returns HTML body and plaintext.
+
+### create_note
+
+Create a new note with HTML body. The first line of the body becomes the note title automatically. Optionally specify a target folder.
+
+### update_note
+
+Replace the entire body of an existing note. WARNING: This overwrites all content. Read the note first if you need to preserve parts of it. Attachments may be lost.
+
+### delete_note
+
+Delete a note by ID. The note is moved to Recently Deleted and permanently removed after 30 days.
+
+### list_folders
+
+List all folders across all accounts with note counts.
+
+### create_folder
+
+Create a new folder. Optionally specify which account to create it in.
+
+### move_note
+
+Move a note to a different folder. NOTE: Apple Notes has no native move command, so this copies the note body to the target folder and deletes the original. The note will get a new ID and creation date. Attachments (images) will be lost.
+
+### scan_notes
+
+Bulk scan notes returning metadata and a text preview for each. Supports pagination via offset. Optionally filter by folder. Use this to get an overview before organizing.
+
+### compare_notes
+
+Retrieve full plaintext content of 2-5 notes at once for comparison. Use this after scan_notes to safely compare potentially duplicate or similar notes before deciding what to keep, merge, or delete.
+
+### bulk_move_notes
+
+Move multiple notes to a target folder at once. Same limitations as move_note apply to each note (new ID, date reset, attachments lost). Returns per-note success/failure results.
+
+### Prompts
+
+- **organize-notes**: 
+- **find-duplicates**: 
+- **notes-weekly-review**: 
+
+## Numbers
+
+### numbers_list_documents
+
+List all open Numbers spreadsheets.
+
+### numbers_create_document
+
+Create a new blank Numbers spreadsheet.
+
+### numbers_list_sheets
+
+List all sheets (tabs) in a Numbers spreadsheet.
+
+### numbers_get_cell
+
+Read a single cell value by address (e.g. 'A1').
+
+### numbers_set_cell
+
+Write a value to a single cell.
+
+### numbers_read_cells
+
+Read a range of cells from a sheet. Uses 0-based row/column indices.
+
+### numbers_add_sheet
+
+Add a new sheet to a Numbers spreadsheet.
+
+### numbers_export_pdf
+
+Export a Numbers spreadsheet to PDF.
+
+### numbers_close_document
+
+Close an open Numbers spreadsheet, optionally saving changes.
+
+## Pages
+
+### pages_list_documents
+
+List all open Pages documents with name, path, and modified status.
+
+### pages_open_document
+
+Open a Pages document from a file path.
+
+### pages_create_document
+
+Create a new blank Pages document.
+
+### pages_get_body_text
+
+Get the body text content of an open Pages document.
+
+### pages_set_body_text
+
+Replace the body text of an open Pages document.
+
+### pages_export_pdf
+
+Export an open Pages document to PDF.
+
+### pages_close_document
+
+Close an open Pages document, optionally saving changes.
+
+## Photos
+
+### list_albums
+
+List all photo albums with name and item count.
+
+### list_photos
+
+List photos in an album with metadata. Use list_albums to find album names first.
+
+### search_photos
+
+Search photos by filename, name, or description keyword.
+
+### get_photo_info
+
+Get detailed metadata for a specific photo by ID.
+
+### list_favorites
+
+List photos marked as favorites.
+
+### create_album
+
+Create a new photo album.
+
+### add_to_album
+
+Add photos to an existing album by photo IDs and album name.
+
+### import_photo
+
+Import a photo from a file path into Photos library. Optionally add to an existing album. Requires macOS 26+ Swift bridge.
+
+### delete_photos
+
+Delete photos by local identifier. Shows macOS confirmation dialog for user approval. Requires macOS 26+ Swift bridge.
+
+## Podcasts
+
+### list_podcast_shows
+
+List all subscribed podcast shows with episode counts.
+
+### list_podcast_episodes
+
+List episodes of a podcast show with title, date, duration, and played status.
+
+### podcast_now_playing
+
+Get the currently playing podcast episode and playback state.
+
+### podcast_playback_control
+
+Control Podcasts playback: play, pause, next, previous.
+
+### play_podcast_episode
+
+Play a specific podcast episode by name, optionally from a specific show.
+
+### search_podcast_episodes
+
+Search across all podcast episodes by name or description.
+
+## Reminders
+
+### list_reminder_lists
+
+List all reminder lists with reminder counts.
+
+### list_reminders
+
+List reminders. Optionally filter by list name and/or completion status. Supports pagination via limit/offset.
+
+### read_reminder
+
+Read the full details of a specific reminder by ID.
+
+### create_reminder
+
+Create a new reminder. Optionally set notes, due date, priority (0=none, 1-4=high, 5=medium, 6-9=low), and target list. Recurrence rules cannot be set via automation.
+
+### update_reminder
+
+Update reminder properties. Only specified fields are changed. Set dueDate to null to clear it. Recurrence rules cannot be modified via automation.
+
+### complete_reminder
+
+Mark a reminder as completed or un-complete it.
+
+### delete_reminder
+
+Delete a reminder by ID. This action is permanent.
+
+### search_reminders
+
+Search reminders by keyword in name or body across all lists (case-insensitive).
+
+### create_reminder_list
+
+Create a new reminder list.
+
+### delete_reminder_list
+
+Delete a reminder list by name. This action is permanent and removes all reminders in the list.
+
+### create_recurring_reminder
+
+Create a recurring reminder via EventKit. Supports daily, weekly, monthly, and yearly recurrence with configurable intervals. Requires macOS 26+ Swift bridge.
+
+### Prompts
+
+- **organize-reminders**: 
+- **daily-review**: 
+
+## Safari
+
+### list_tabs
+
+List all open tabs across all Safari windows with title and URL.
+
+### read_page_content
+
+Read the HTML source of a Safari tab. Specify window and tab index from list_tabs.
+
+### get_current_tab
+
+Get the title and URL of the active Safari tab.
+
+### open_url
+
+Open a URL in Safari's frontmost window.
+
+### close_tab
+
+Close a specific Safari tab. Use list_tabs to find window/tab indices.
+
+### activate_tab
+
+Switch to a specific Safari tab. Use list_tabs to find window/tab indices.
+
+### run_javascript
+
+Execute JavaScript in a Safari tab. Use list_tabs to find window/tab indices. Returns the result as a string.
+
+### search_tabs
+
+Search open Safari tabs by title or URL keyword.
+
+### list_bookmarks
+
+List all Safari bookmarks across all folders, including subfolder paths.
+
+### add_bookmark
+
+Add a bookmark to Safari. Optionally specify a folder name; defaults to Favorites/BookmarksBar.
+
+### list_reading_list
+
+List all items in Safari's Reading List.
+
+### add_to_reading_list
+
+Add a URL to Safari's Reading List with an optional title.
+
+## Screen Capture
+
+### capture_screen
+
+Capture a full-screen screenshot as a PNG image. Optionally specify a display number for multi-monitor setups (1 = main display). Requires Screen Recording permission.
+
+### capture_window
+
+Capture a screenshot of the frontmost window. Optionally specify an app name to activate that app first and capture its window. Requires Screen Recording permission.
+
+### capture_area
+
+Capture a screenshot of a specific rectangular region of the screen. Coordinates are in screen pixels with origin at top-left. Requires Screen Recording permission.
+
+### list_windows
+
+List all visible windows across all running applications. Returns JSON with each window's app name, bundle ID, title, position, and size. Requires Accessibility permissions.
+
+### record_screen
+
+Record the screen for a specified duration (1-60 seconds). Returns the recording as a .mov file path. Requires Screen Recording permission.
+
+## Semantic Search
+
+### semantic_index
+
+Index data from enabled Apple apps (Notes, Calendar, Reminders, Mail) into the local vector store 
+
+### semantic_search
+
+Search across Apple app data by meaning, not just keywords. 
+
+### find_related
+
+Given a note, event, reminder, or email ID, find semantically related items across all indexed Apple apps. 
+
+### semantic_status
+
+Show the current state of the semantic vector index -- total entries, breakdown by source.
+
+## Setup
+
+### setup_permissions
+
+Trigger macOS permission prompts for all Apple apps used by AirMCP. Run this once after installation to grant all permissions at once. Each app will show a one-time macOS permission dialog.
+
+## Shortcuts
+
+### list_shortcuts
+
+List all available Siri Shortcuts on this Mac.
+
+### run_shortcut
+
+Run a Siri Shortcut by name. Optionally provide text input. Returns the shortcut's output. Note: shortcuts may trigger UI prompts or perform system actions.
+
+### search_shortcuts
+
+Search Siri Shortcuts by name keyword.
+
+### get_shortcut_detail
+
+Get details about a Siri Shortcut including its actions.
+
+### create_shortcut
+
+Create a new Siri Shortcut by name. Uses UI automation to open the Shortcuts app and create a new empty shortcut. The shortcut must be further configured in the Shortcuts app.
+
+### delete_shortcut
+
+Delete a Siri Shortcut by name. Uses the macOS shortcuts CLI (macOS 13+). This action is permanent and cannot be undone.
+
+### export_shortcut
+
+Export a Siri Shortcut to a .shortcut file. Uses the macOS shortcuts CLI to save the shortcut to the specified output path.
+
+### import_shortcut
+
+Import a .shortcut file into Siri Shortcuts. Uses the macOS shortcuts CLI to import the shortcut from the specified file path.
+
+### duplicate_shortcut
+
+Duplicate an existing Siri Shortcut. Exports the shortcut to a temporary file and re-imports it with a new name.
+
+### edit_shortcut
+
+Open a Siri Shortcut in the Shortcuts app for manual editing. Uses UI automation (System Events) to activate the app, search for the shortcut, and open it. The user can then edit the shortcut in the Shortcuts app UI.
+
+### Prompts
+
+- **shortcut-automation**: 
+- **shortcut-discovery**: 
+- **shortcut-troubleshooting**: 
+
+## System
+
+### get_clipboard
+
+Read the current text content of the system clipboard.
+
+### set_clipboard
+
+Write text to the system clipboard, replacing its current content.
+
+### get_volume
+
+Get the current system output volume level and mute state.
+
+### set_volume
+
+Set the system output volume (0-100) and/or mute state.
+
+### toggle_dark_mode
+
+Toggle macOS appearance between dark mode and light mode.
+
+### get_frontmost_app
+
+Get the name, bundle identifier, and PID of the currently active (frontmost) application.
+
+### list_running_apps
+
+List all running applications with name, bundle identifier, PID, and visibility.
+
+### get_screen_info
+
+Get display information including resolution, pixel dimensions, and Retina status.
+
+### show_notification
+
+Display a macOS system notification with optional title, subtitle, and sound.
+
+### capture_screenshot
+
+Take a screenshot and save to the specified path. Supports full screen, window, or selection capture.
+
+### get_wifi_status
+
+Get the current WiFi status including connected network name, signal strength, and channel.
+
+### toggle_wifi
+
+Turn WiFi on or off.
+
+### list_bluetooth_devices
+
+List paired Bluetooth devices with their connection status.
+
+### get_battery_status
+
+Get battery percentage, charging state, power source, and estimated time remaining.
+
+### get_brightness
+
+Get the current display brightness level.
+
+### set_brightness
+
+Set the display brightness level. Requires the 'brightness' CLI tool (brew install brightness).
+
+### toggle_focus_mode
+
+Toggle Do Not Disturb (Focus mode) on or off.
+
+### system_sleep
+
+Put the Mac to sleep.
+
+### prevent_sleep
+
+Prevent the Mac from sleeping for a specified duration using caffeinate. Returns the process PID for cancellation.
+
+### system_power
+
+Shutdown or restart the Mac. Use with caution.
+
+### launch_app
+
+Launch an application by name. Lightweight — just activates the app without reading its accessibility tree.
+
+### quit_app
+
+Quit a running application by name. May cause unsaved work to be lost.
+
+### is_app_running
+
+Check whether an application is currently running. Returns process details if found.
+
+### list_all_windows
+
+List windows across all running applications with title, size, position, app name, and PID.
+
+### move_window
+
+Move a window to a specific position on screen.
+
+### resize_window
+
+Resize a window to specific dimensions.
+
+### minimize_window
+
+Minimize or restore a window.
+
+## TV
+
+### tv_list_playlists
+
+List all playlists (libraries) in Apple TV app.
+
+### tv_list_tracks
+
+List movies/episodes in a TV playlist.
+
+### tv_now_playing
+
+Get currently playing content in Apple TV app.
+
+### tv_playback_control
+
+Control Apple TV playback: play, pause, next, previous.
+
+### tv_search
+
+Search movies and TV shows by name or show title.
+
+### tv_play
+
+Play a movie or episode by name.
+
+## UI Automation
+
+### ui_open_app
+
+Open an application by name or bundle ID and return an accessibility tree summary of its windows and top-level UI elements. Requires Accessibility permissions.
+
+### ui_click
+
+Click a UI element either by exact screen coordinates (x, y) or by searching for an element containing the given text. Optionally filter by accessibility role (e.g. 'AXButton', 'AXMenuItem', 'AXTextField'). Requires Accessibility permissions.
+
+### ui_type
+
+Type text into the currently focused field using simulated keystrokes via System Events. Optionally activate a specific app first. Requires Accessibility permissions.
+
+### ui_press_key
+
+Send a key or key combination (e.g. Return, Cmd+S, Ctrl+C). Supports modifier keys: command/cmd, shift, option/alt, control/ctrl. Special keys: return, enter, tab, space, delete, escape, arrow keys (up/down/left/right), F1-F12, home, end, pageup, pagedown. Requires Accessibility permissions.
+
+### ui_scroll
+
+Scroll in the specified direction within the frontmost window. Uses arrow key simulation for cross-app compatibility. Requires Accessibility permissions.
+
+### ui_read
+
+Read the accessibility tree of the frontmost app (or specified app). Returns structured data about all visible UI elements including their roles, names, values, positions, and hierarchy. Use this to understand what UI elements are available before interacting with them. Requires Accessibility permissions.
+
+### ui_accessibility_query
+
+Search for UI elements by accessibility attributes (role, title, value, description, identifier). 
+
+### ui_perform_action
+
+Find a UI element by locator (role + title/value) and perform an accessibility action on it. 
+
+### ui_traverse
+
+Breadth-first traversal of the accessibility tree. Returns a flat list of all UI elements 
+
+### ui_diff
+
+Compare the current UI state against a previous snapshot to detect changes. 
+
+## Weather
+
+### get_current_weather
+
+Get current weather conditions for a location using coordinates.
+
+### get_daily_forecast
+
+Get daily weather forecast for a location.
+
+### get_hourly_forecast
+
+Get hourly weather forecast for a location.
+

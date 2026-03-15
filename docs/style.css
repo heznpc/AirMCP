@@ -275,7 +275,7 @@ button{font:inherit;cursor:pointer;border:0;background:0 0}
 .modal-example{margin-bottom:20px}
 .modal-prompt{
   background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);
-  border-radius:12px;padding:14px 18px;font-size:.875rem;font-style:italic;opacity:.6;line-height:1.6;
+  border-radius:12px;padding:14px 18px;font-size:.9rem;font-style:italic;opacity:.75;line-height:1.6;
 }
 [data-theme="light"] .modal-prompt{background:rgba(0,0,0,.03);border-color:rgba(0,0,0,.06)}
 
@@ -289,11 +289,11 @@ button{font:inherit;cursor:pointer;border:0;background:0 0}
 .modal-tool-item:hover{background:rgba(255,255,255,.07)}
 [data-theme="light"] .modal-tool-item{background:rgba(0,0,0,.02);border-color:rgba(0,0,0,.04)}
 [data-theme="light"] .modal-tool-item:hover{background:rgba(0,0,0,.05)}
-.modal-tool-name{font-family:'JetBrains Mono',monospace;font-size:.75rem;opacity:.7;white-space:nowrap}
-.modal-tool-desc{font-size:.72rem;opacity:.35;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.modal-tool-name{font-family:'JetBrains Mono',monospace;font-size:.8rem;opacity:.85;white-space:nowrap}
+.modal-tool-desc{font-size:.78rem;opacity:.55;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .modal-tool-badge{
-  font-size:.6rem;padding:2px 7px;border-radius:6px;font-weight:500;white-space:nowrap;
-  opacity:.7;
+  font-size:.65rem;padding:2px 7px;border-radius:6px;font-weight:500;white-space:nowrap;
+  opacity:.85;
 }
 .modal-tool-badge--read{background:rgba(45,212,191,.15);color:rgb(45,212,191)}
 .modal-tool-badge--write{background:rgba(251,191,36,.15);color:rgb(251,191,36)}

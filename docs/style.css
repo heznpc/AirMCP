@@ -70,7 +70,7 @@ button{font:inherit;cursor:pointer;border:0;background:0 0}
 
 /* === Buttons === */
 .lg-btn{
-  display:inline-flex;align-items:center;
+  display:inline-flex;align-items:center;gap:8px;
   padding:12px 28px;border-radius:14px;
   font-size:.88rem;font-weight:600;
   background:rgba(255,255,255,.08);

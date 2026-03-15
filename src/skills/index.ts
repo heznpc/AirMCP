@@ -17,7 +17,7 @@ export async function registerSkillEngine(server: McpServer): Promise<void> {
   }
 
   const { prompts, tools } = registerSkills(server, merged);
-  console.error(`[AirMCP] Skills engine: ${builtins.length} built-in, ${user.length} user skills loaded (${prompts} prompts, ${tools} tools)`);
+  // Log suppressed — banner.ts displays skills info
 
   // Watch user skills directory for changes — log only, hot-reload requires server restart
   watchUserSkills(() => {

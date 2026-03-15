@@ -312,16 +312,16 @@ async function main() {
 
     // Create one server just for banner info + initial tool count
     const { bannerInfo: bi } = await createServer();
-    app.listen(port, () => {
+    app.listen(port, async () => {
       bi.transport = "http";
       bi.port = port;
-      printBanner(bi);
+      await printBanner(bi);
     });
   } else {
     const { server, bannerInfo } = await createServer();
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    printBanner(bannerInfo);
+    await printBanner(bannerInfo);
   }
 }
 

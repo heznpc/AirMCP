@@ -22,7 +22,7 @@ async function resolveGwsBinary(): Promise<string> {
 
   // Try direct binary first
   try {
-    await execFileAsync("gws", ["--version"], { timeout: 5_000 });
+    await execFileAsync("gws", ["--version"], { timeout: TIMEOUT.CLI_PROBE });
     gwsBinary = "gws";
     return gwsBinary;
   } catch {

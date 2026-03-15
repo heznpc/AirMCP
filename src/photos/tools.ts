@@ -4,6 +4,7 @@ import { runJxa } from "../shared/jxa.js";
 import { runSwift } from "../shared/swift.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import { ok, err } from "../shared/result.js";
+import { zFilePath } from "../shared/validate.js";
 import {
   listAlbumsScript,
   listPhotosScript,
@@ -118,7 +119,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
       description:
         "Import a photo from a file path into Photos library. Optionally add to an existing album. Requires macOS 26+ Swift bridge.",
       inputSchema: {
-        filePath: z.string().min(1).describe("Absolute file path to the image file to import"),
+        filePath: zFilePath.describe("Absolute file path to the image file to import"),
         albumName: z.string().optional().describe("Album to add the imported photo to (must already exist)"),
       },
       annotations: {

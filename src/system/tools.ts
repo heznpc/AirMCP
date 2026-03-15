@@ -3,6 +3,7 @@ import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import { ok, toolError } from "../shared/result.js";
+import { zFilePath } from "../shared/validate.js";
 import {
   getClipboardScript,
   setClipboardScript,
@@ -257,7 +258,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       title: "Capture Screenshot",
       description: "Take a screenshot and save to the specified path. Supports full screen, window, or selection capture.",
       inputSchema: {
-        path: z.string().min(1).describe("Absolute file path to save the screenshot (e.g. '/tmp/screenshot.png')"),
+        path: zFilePath.describe("Absolute file path to save the screenshot (e.g. '/tmp/screenshot.png')"),
         region: z.enum(["fullscreen", "window", "selection"]).optional().default("fullscreen").describe("Capture region: fullscreen (default), window, or selection"),
       },
       annotations: {

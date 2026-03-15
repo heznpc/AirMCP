@@ -5,6 +5,8 @@ import { promisify } from "node:util";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import { ok, toolError } from "../shared/result.js";
+import { TIMEOUT } from "../shared/constants.js";
+import { zFilePath } from "../shared/validate.js";
 import {
   listShortcutsScript,
   runShortcutScript,
@@ -112,7 +114,7 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
     description: "Export a Siri Shortcut to a .shortcut file. Uses the macOS shortcuts CLI to save the shortcut to the specified output path.",
     inputSchema: {
       name: z.string().describe("Shortcut name to export (exact match)"),
-      outputPath: z.string().describe("File path to export the .shortcut file to (e.g. ~/Desktop/MyShortcut.shortcut)"),
+      outputPath: zFilePath.describe("File path to export the .shortcut file to (e.g. ~/Desktop/MyShortcut.shortcut)"),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   }, async ({ name, outputPath }) => {
@@ -124,7 +126,7 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
     title: "Import Shortcut",
     description: "Import a .shortcut file into Siri Shortcuts. Uses the macOS shortcuts CLI to import the shortcut from the specified file path.",
     inputSchema: {
-      filePath: z.string().describe("Path to the .shortcut file to import"),
+      filePath: zFilePath.describe("Path to the .shortcut file to import"),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   }, async ({ filePath }) => {
@@ -165,7 +167,7 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
 export async function registerDynamicShortcutTools(server: McpServer): Promise<number> {
   let output: string;
   try {
-    const result = await execFileAsync("shortcuts", ["list"], { timeout: 10_000 });
+    const result = await execFileAsync("shortcuts", ["list"], { timeout: TIMEOUT.SHORTCUTS_LIST });
     output = result.stdout;
   } catch (e) {
     console.error(`[AirMCP] Failed to list shortcuts for dynamic registration: ${e instanceof Error ? e.message : String(e)}`);

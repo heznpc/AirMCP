@@ -5,6 +5,8 @@ import { promisify } from "util";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import { ok, err } from "../shared/result.js";
+import { TIMEOUT } from "../shared/constants.js";
+import { zFilePath } from "../shared/validate.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -12,7 +14,7 @@ const execFileAsync = promisify(execFile);
 async function runScript<T>(script: string): Promise<T> {
   if (script.startsWith("applescript:")) {
     const as = script.slice("applescript:".length);
-    const { stdout } = await execFileAsync("osascript", ["-e", as], { timeout: 15_000 });
+    const { stdout } = await execFileAsync("osascript", ["-e", as], { timeout: TIMEOUT.MESSAGE_SEND });
     // Strip control chars that AppleScript may inject
     // eslint-disable-next-line no-control-regex
     const clean = stdout.trim().replace(/[\x00-\x1f\x7f]/g, (c) => c === "\n" || c === "\r" || c === "\t" ? "" : "");
@@ -117,10 +119,7 @@ export function registerMessagesTools(server: McpServer, config: AirMcpConfig): 
       description: "Send a file attachment via iMessage/SMS. Requires absolute file path and recipient handle.",
       inputSchema: {
         target: z.string().min(1).describe("Recipient handle (phone number or email)"),
-        filePath: z.string().min(1)
-          .refine((p) => p.startsWith("/"), "File path must be absolute")
-          .refine((p) => !p.includes(".."), "Path traversal is not allowed")
-          .describe("Absolute file path to send"),
+        filePath: zFilePath.describe("Absolute file path to send"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },

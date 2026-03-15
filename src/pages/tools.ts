@@ -3,6 +3,7 @@ import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import { ok, toolError } from "../shared/result.js";
+import { zFilePath } from "../shared/validate.js";
 import {
   listDocumentsScript,
   openDocumentScript,
@@ -37,7 +38,7 @@ export function registerPagesTools(server: McpServer, _config: AirMcpConfig): vo
       title: "Open Pages Document",
       description: "Open a Pages document from a file path.",
       inputSchema: {
-        path: z.string().describe("Absolute file path to the .pages document"),
+        path: zFilePath.describe("Absolute file path to the .pages document"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
@@ -113,7 +114,7 @@ export function registerPagesTools(server: McpServer, _config: AirMcpConfig): vo
       description: "Export an open Pages document to PDF.",
       inputSchema: {
         document: z.string().describe("Document name"),
-        outputPath: z.string().describe("Absolute output path for the PDF file"),
+        outputPath: zFilePath.describe("Absolute output path for the PDF file"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },

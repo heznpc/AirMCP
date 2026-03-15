@@ -73,6 +73,8 @@ export const TIMEOUT = {
   MESSAGE_SEND:     15_000,
   /** GWS CLI default timeout */
   GWS:              envInt("AIRMCP_TIMEOUT_GWS", 15_000),
+  /** Quick CLI binary availability probe */
+  CLI_PROBE:        5_000,
   /** Shortcuts list enumeration */
   SHORTCUTS_LIST:   10_000,
   /** HTTP session idle TTL */

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import { ok, toolError } from "../shared/result.js";
+import { zFilePath } from "../shared/validate.js";
 import {
   listDocumentsScript,
   createDocumentScript,
@@ -136,7 +137,7 @@ export function registerKeynoteTools(server: McpServer, _config: AirMcpConfig): 
       description: "Export a Keynote presentation to PDF.",
       inputSchema: {
         document: z.string().describe("Document name"),
-        outputPath: z.string().describe("Absolute output path for the PDF file"),
+        outputPath: zFilePath.describe("Absolute output path for the PDF file"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },

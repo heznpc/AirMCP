@@ -3,6 +3,7 @@ import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import { ok, err } from "../shared/result.js";
+import { zFilePath } from "../shared/validate.js";
 import {
   searchFilesScript,
   getFileInfoScript,
@@ -42,7 +43,7 @@ export function registerFinderTools(server: McpServer, _config: AirMcpConfig): v
       title: "Get File Info",
       description: "Get detailed file information including size, dates, kind, and tags.",
       inputSchema: {
-        path: z.string().min(1).describe("Absolute file path"),
+        path: zFilePath.describe("Absolute file path"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
@@ -61,7 +62,7 @@ export function registerFinderTools(server: McpServer, _config: AirMcpConfig): v
       title: "Set File Tags",
       description: "Set Finder tags on a file. Replaces all existing tags.",
       inputSchema: {
-        path: z.string().min(1).describe("Absolute file path"),
+        path: zFilePath.describe("Absolute file path"),
         tags: z.array(z.string()).describe("Array of tag names to set"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -102,7 +103,7 @@ export function registerFinderTools(server: McpServer, _config: AirMcpConfig): v
       title: "List Directory",
       description: "List files and folders in a directory with metadata (kind, size, modification date).",
       inputSchema: {
-        path: z.string().min(1).describe("Absolute directory path"),
+        path: zFilePath.describe("Absolute directory path"),
         limit: z.number().int().min(1).max(500).optional().default(100).describe("Max items to return (default: 100)"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -122,8 +123,8 @@ export function registerFinderTools(server: McpServer, _config: AirMcpConfig): v
       title: "Move File",
       description: "Move or rename a file or folder to a new location.",
       inputSchema: {
-        source: z.string().min(1).describe("Absolute path of the file or folder to move"),
-        destination: z.string().min(1).describe("Absolute destination path"),
+        source: zFilePath.describe("Absolute path of the file or folder to move"),
+        destination: zFilePath.describe("Absolute destination path"),
       },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     },
@@ -142,7 +143,7 @@ export function registerFinderTools(server: McpServer, _config: AirMcpConfig): v
       title: "Trash File",
       description: "Move a file or folder to the Trash using Finder.",
       inputSchema: {
-        path: z.string().min(1).describe("Absolute path of the file or folder to trash"),
+        path: zFilePath.describe("Absolute path of the file or folder to trash"),
       },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
@@ -161,7 +162,7 @@ export function registerFinderTools(server: McpServer, _config: AirMcpConfig): v
       title: "Create Directory",
       description: "Create a new directory (and intermediate directories if needed).",
       inputSchema: {
-        path: z.string().min(1).describe("Absolute path of the folder to create"),
+        path: zFilePath.describe("Absolute path of the folder to create"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },

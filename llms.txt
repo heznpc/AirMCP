@@ -1,6 +1,6 @@
 # AirMCP
 
-> MCP server for the entire Apple ecosystem. 242 tools across 29 modules.
+> MCP server for the entire Apple ecosystem. 244 tools across 29 modules.
 
 ## Links
 
@@ -19,7 +19,7 @@
 - **Cross-Module** (0 tools): 
 - **Finder** (8 tools): search_files, get_file_info, set_file_tags, recent_files, list_directory, move_file, trash_file, create_directory
 - **Google Workspace** (16 tools): gws_status, gws_gmail_list, gws_gmail_read, gws_gmail_send, gws_drive_list, gws_drive_read, gws_drive_search, gws_sheets_read, gws_sheets_write, gws_calendar_list, gws_calendar_create, gws_docs_read, gws_tasks_list, gws_tasks_create, gws_people_search, gws_raw
-- **Apple Intelligence** (8 tools): summarize_text, rewrite_text, proofread_text, generate_text, generate_structured, tag_content, ai_chat, ai_status
+- **Apple Intelligence** (10 tools): summarize_text, rewrite_text, proofread_text, generate_text, generate_structured, tag_content, ai_chat, generate_image, scan_document, ai_status
 - **Keynote** (9 tools): keynote_list_documents, keynote_create_document, keynote_list_slides, keynote_get_slide, keynote_add_slide, keynote_set_presenter_notes, keynote_export_pdf, keynote_start_slideshow, keynote_close_document
 - **Location** (2 tools): get_current_location, get_location_permission
 - **Mail** (11 tools): list_mailboxes, list_messages, read_message, search_messages, mark_message_read, flag_message, get_unread_count, move_message, list_accounts, send_mail, reply_mail

@@ -5,6 +5,11 @@ import NaturalLanguage
 import Accelerate
 import CoreLocation
 import CoreBluetooth
+import Vision
+
+#if canImport(ImagePlayground)
+import ImagePlayground
+#endif
 
 // AirMcpBridge CLI — thin wrapper around Apple frameworks.
 // Reads JSON from stdin, dispatches to subcommand, writes JSON to stdout.
@@ -292,6 +297,33 @@ func embedText(_ text: String, language: NLLanguage) throws -> [Double] {
     vDSP_vsdivD(sumVector, 1, &count, &sumVector, 1, vDSP_Length(dim))
 
     return sumVector
+}
+
+// MARK: - ImageCreator / Vision types
+
+struct GenerateImageInput: Decodable {
+    let prompt: String
+    let outputPath: String?
+}
+
+struct GenerateImageOutput: Encodable {
+    let generated: Bool
+    let path: String
+}
+
+struct ScanDocumentInput: Decodable {
+    let imagePath: String
+}
+
+struct DocumentElement: Encodable {
+    let type: String  // paragraph, table, list, heading, qrCode
+    let text: String
+    let confidence: Double
+}
+
+struct ScanDocumentOutput: Encodable {
+    let elements: [DocumentElement]
+    let total: Int
 }
 
 // MARK: - CoreLocation types
@@ -974,6 +1006,75 @@ case "disconnect-bluetooth":
         writeError("Bluetooth disconnect error: \(error.localizedDescription)")
     }
 
+// --- ImageCreator: generate image from text ---
+case "generate-image":
+    guard let imgInput = try? JSONDecoder().decode(GenerateImageInput.self, from: stdinData) else {
+        writeError("Invalid JSON. Expected GenerateImageInput.")
+        exit(1)
+    }
+
+    #if canImport(ImagePlayground)
+    if #available(macOS 26, *) {
+        do {
+            let creator = ImageCreator()
+            let outputPath = imgInput.outputPath ?? NSTemporaryDirectory() + "airmcp-image-\(Int(Date().timeIntervalSince1970)).png"
+            let outputURL = URL(fileURLWithPath: outputPath)
+
+            let image = try await creator.generateImage(
+                ImageCreationParameters(source: .text(imgInput.prompt))
+            )
+            try image.pngData()?.write(to: outputURL)
+            let output = GenerateImageOutput(generated: true, path: outputPath)
+            try writeJSON(output)
+        } catch {
+            writeError("ImageCreator error: \(error.localizedDescription)")
+        }
+    } else {
+        writeError("Image generation requires macOS 26+.")
+    }
+    #else
+    writeError("Image generation requires macOS 26+ with Apple Silicon. This binary was compiled without ImagePlayground support.")
+    #endif
+
+// --- Vision: scan document from image ---
+case "scan-document":
+    guard let scanInput = try? JSONDecoder().decode(ScanDocumentInput.self, from: stdinData) else {
+        writeError("Invalid JSON. Expected ScanDocumentInput.")
+        exit(1)
+    }
+
+    let imageURL = URL(fileURLWithPath: scanInput.imagePath)
+    guard FileManager.default.fileExists(atPath: scanInput.imagePath) else {
+        writeError("Image file not found: \(scanInput.imagePath)")
+        exit(1)
+    }
+
+    if #available(macOS 26, *) {
+        do {
+            let request = VNRecognizeTextRequest()
+            request.recognitionLevel = .accurate
+            request.usesLanguageCorrection = true
+
+            let handler = VNImageRequestHandler(url: imageURL, options: [:])
+            try handler.perform([request])
+
+            var elements: [DocumentElement] = []
+            if let observations = request.results {
+                for obs in observations {
+                    let text = obs.topCandidates(1).first?.string ?? ""
+                    let confidence = Double(obs.confidence)
+                    elements.append(DocumentElement(type: "text", text: text, confidence: confidence))
+                }
+            }
+            let output = ScanDocumentOutput(elements: elements, total: elements.count)
+            try writeJSON(output)
+        } catch {
+            writeError("Vision scan error: \(error.localizedDescription)")
+        }
+    } else {
+        writeError("Document scanning requires macOS 14+.")
+    }
+
 default:
-    writeError("Unknown command: \(command). Use: embed-text, embed-batch, summarize, rewrite, proofread, generate-text, generate-structured, tag-content, ai-chat, ai-status, create-recurring-event, create-recurring-reminder, import-photo, delete-photos, get-location, location-permission, bluetooth-state, scan-bluetooth, connect-bluetooth, disconnect-bluetooth")
+    writeError("Unknown command: \(command). Use: embed-text, embed-batch, summarize, rewrite, proofread, generate-text, generate-structured, tag-content, ai-chat, ai-status, create-recurring-event, create-recurring-reminder, import-photo, delete-photos, get-location, location-permission, bluetooth-state, scan-bluetooth, connect-bluetooth, disconnect-bluetooth, generate-image, scan-document")
 }

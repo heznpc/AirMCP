@@ -1,6 +1,6 @@
 # AirMCP — Full Tool Reference
 
-> 242 tools, 29 prompts across 29 modules.
+> 244 tools, 29 prompts across 29 modules.
 > Auto-generated from source by scripts/gen-llms-txt.mjs
 
 ## Bluetooth
@@ -267,6 +267,14 @@ Classify and tag content using Apple's on-device Foundation Model. Returns confi
 ### ai_chat
 
 Send a message to an on-device AI session using Apple Foundation Models. Note: each call creates a fresh session — sessionName is for caller-side tracking only, not server-side persistence. Requires macOS 26+.
+
+### generate_image
+
+Generate an image from a text description using Apple Intelligence on-device image generation (Image Playground). 
+
+### scan_document
+
+Extract text and structure from an image file using Apple Vision framework OCR. 
 
 ### ai_status
 

@@ -124,7 +124,11 @@ export function sendMessageScript(
   const jsonTarget = target.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   const jsonText = text.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n").replace(/\r/g, "\\r").substring(0, 80);
   return `applescript:tell application "Messages"
+try
 set targetService to 1st service whose service type = iMessage
+on error
+set targetService to 1st service
+end try
 set targetBuddy to buddy "${t}" of targetService
 send "${m}" to targetBuddy
 end tell
@@ -140,7 +144,11 @@ export function sendFileScript(
   const jsonTarget = target.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   const jsonPath = filePath.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   return `applescript:tell application "Messages"
+try
 set targetService to 1st service whose service type = iMessage
+on error
+set targetService to 1st service
+end try
 set targetBuddy to buddy "${t}" of targetService
 send POSIX file "${p}" to targetBuddy
 end tell

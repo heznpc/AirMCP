@@ -31,7 +31,7 @@ src/
 │   └── tools.ts
 ├── shortcuts/            # Shortcuts (11 tools, 3 prompts)
 │   ├── tools.ts, scripts.ts, prompts.ts
-├── intelligence/         # Apple Intelligence (8 tools, macOS 26+)
+├── intelligence/         # Apple Intelligence (10 tools, macOS 26+)
 │   └── tools.ts
 ├── tv/                   # Apple TV (6 tools)
 │   ├── tools.ts, scripts.ts
@@ -83,7 +83,7 @@ tests/                    # Script generator tests
 
 ## Stats
 
-- **244 tools** across 25 modules (+ dynamic shortcut tools at runtime)
+- **246 tools** across 25 modules (+ dynamic shortcut tools at runtime)
 - **30 prompts** (per-module + cross-module + YAML skills)
 - **11 MCP resources** (Notes, Calendar, Reminders, Music, Mail, System, Context Snapshot)
 

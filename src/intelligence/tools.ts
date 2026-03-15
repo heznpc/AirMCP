@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { AirMcpConfig } from "../shared/config.js";
 import { ok, toolError } from "../shared/result.js";
 import { runSwift } from "../shared/swift.js";
+import { zFilePath } from "../shared/validate.js";
 
 interface TextResult {
   output: string;
@@ -29,6 +30,16 @@ interface AiStatusResult {
   macOSVersion: string;
   hasAppleSilicon: boolean;
   foundationModelsSupported: boolean;
+}
+
+interface GenerateImageResult {
+  generated: boolean;
+  path: string;
+}
+
+interface ScanDocumentResult {
+  elements: Array<{ type: string; text: string; confidence: number }>;
+  total: number;
 }
 
 export function registerIntelligenceTools(server: McpServer, _config: AirMcpConfig): void {
@@ -263,6 +274,73 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
       }
     },
   );
+
+  // --- Image Generation (ImageCreator API, macOS 26+) ---
+
+  server.registerTool(
+    "generate_image",
+    {
+      title: "Generate Image",
+      description:
+        "Generate an image from a text description using Apple Intelligence on-device image generation (Image Playground). " +
+        "Returns the file path to the generated PNG. Requires macOS 26+ with Apple Silicon.",
+      inputSchema: {
+        prompt: z.string().min(1).describe("Text description of the image to generate"),
+        outputPath: zFilePath.optional().describe("Optional output path for the image (defaults to /tmp)"),
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+    },
+    async ({ prompt, outputPath }) => {
+      try {
+        const result = await runSwift<GenerateImageResult>(
+          "generate-image",
+          JSON.stringify({ prompt, outputPath }),
+        );
+        return ok(result);
+      } catch (e) {
+        return toolError("generate image", e);
+      }
+    },
+  );
+
+  // --- Document Scanning (Vision framework, macOS 14+) ---
+
+  server.registerTool(
+    "scan_document",
+    {
+      title: "Scan Document",
+      description:
+        "Extract text and structure from an image file using Apple Vision framework OCR. " +
+        "Returns recognized text elements with confidence scores. Works with photos of documents, receipts, whiteboards, etc.",
+      inputSchema: {
+        imagePath: zFilePath.describe("Absolute path to the image file to scan"),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async ({ imagePath }) => {
+      try {
+        const result = await runSwift<ScanDocumentResult>(
+          "scan-document",
+          JSON.stringify({ imagePath }),
+        );
+        return ok(result);
+      } catch (e) {
+        return toolError("scan document", e);
+      }
+    },
+  );
+
+  // --- AI Status ---
 
   server.registerTool(
     "ai_status",

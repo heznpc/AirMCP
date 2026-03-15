@@ -19,8 +19,7 @@ import {
 } from "./scripts.js";
 
 const execFileAsync = promisify(execFile);
-
-const MAX_DYNAMIC_SHORTCUTS = 50;
+import { LIMITS } from "../shared/constants.js";
 
 /**
  * Sanitize a shortcut name into a valid MCP tool name.
@@ -176,11 +175,11 @@ export async function registerDynamicShortcutTools(server: McpServer): Promise<n
   const names = output.split("\n").filter((n) => n.trim().length > 0);
   if (names.length === 0) return 0;
 
-  if (names.length > MAX_DYNAMIC_SHORTCUTS) {
-    console.error(`[AirMCP] Found ${names.length} shortcuts, registering first ${MAX_DYNAMIC_SHORTCUTS} (limit reached)`);
+  if (names.length > LIMITS.DYNAMIC_SHORTCUTS) {
+    console.error(`[AirMCP] Found ${names.length} shortcuts, registering first ${LIMITS.DYNAMIC_SHORTCUTS} (limit reached)`);
   }
 
-  const toRegister = names.slice(0, MAX_DYNAMIC_SHORTCUTS);
+  const toRegister = names.slice(0, LIMITS.DYNAMIC_SHORTCUTS);
   const seen = new Set<string>();
   let count = 0;
 

@@ -40,6 +40,7 @@ import { HitlClient } from "./shared/hitl.js";
 import { installHitlGuard } from "./shared/hitl-guard.js";
 import { setShareGuardHitlClient } from "./shared/share-guard.js";
 import { printBanner, type BannerInfo } from "./shared/banner.js";
+import { LIMITS, TIMEOUT, IDENTITY } from "./shared/constants.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(join(__dirname, "..", "package.json"), "utf-8")) as { version: string };
@@ -191,7 +192,7 @@ async function createServer(): Promise<{ server: McpServer; bannerInfo: BannerIn
 const args = process.argv.slice(2);
 const httpMode = args.includes("--http");
 const portIdx = args.indexOf("--port");
-const port = portIdx !== -1 && args[portIdx + 1] ? parseInt(args[portIdx + 1], 10) : 3847;
+const port = portIdx !== -1 && args[portIdx + 1] ? parseInt(args[portIdx + 1], 10) : IDENTITY.HTTP_PORT;
 
 async function main() {
   if (httpMode) {
@@ -200,21 +201,19 @@ async function main() {
     app.use(express.json());
 
     const transports = new Map<string, StreamableHTTPServerTransport>();
-    const MAX_SESSIONS = 50;
-    const SESSION_IDLE_TTL = 5 * 60 * 1000; // 5 minutes — orphaned/idle session cleanup
     const sessionActivity = new Map<string, number>();
 
     const cleanupInterval = setInterval(() => {
       const now = Date.now();
       for (const [id, lastActive] of sessionActivity) {
-        if (now - lastActive > SESSION_IDLE_TTL) {
+        if (now - lastActive > TIMEOUT.SESSION_IDLE) {
           const transport = transports.get(id);
           if (transport) transport.close?.();
           transports.delete(id);
           sessionActivity.delete(id);
         }
       }
-    }, 1 * 60 * 1000); // cleanup every 1 minute
+    }, TIMEOUT.SESSION_CLEANUP);
 
     process.on("exit", () => clearInterval(cleanupInterval));
 
@@ -252,7 +251,7 @@ async function main() {
           return;
         }
 
-        if (transports.size >= MAX_SESSIONS) {
+        if (transports.size >= LIMITS.HTTP_SESSIONS) {
           res.status(503).json({
             jsonrpc: "2.0",
             error: { code: -32000, message: "Too many concurrent sessions. Try again later." },

@@ -1,0 +1,58 @@
+name: Feature Request
+description: Suggest a new feature or improvement
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What problem does this solve? Why do you need it?
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: How should this work? Which tools/prompts/resources would it add?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: module
+    attributes:
+      label: Related module
+      options:
+        - notes
+        - reminders
+        - calendar
+        - contacts
+        - mail
+        - messages
+        - music
+        - finder
+        - safari
+        - system
+        - photos
+        - shortcuts
+        - intelligence
+        - tv
+        - ui
+        - screen
+        - maps
+        - podcasts
+        - weather
+        - pages
+        - numbers
+        - keynote
+        - location
+        - bluetooth
+        - google
+        - new module
+        - cross-module
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any workarounds or alternative approaches you've thought of?

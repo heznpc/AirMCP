@@ -1,12 +1,12 @@
-# Contributing to iConnect
+# Contributing to AirMCP
 
-Thanks for your interest in contributing to iConnect! This guide covers everything you need to get started.
+Thanks for your interest in contributing to AirMCP! This guide covers everything you need to get started.
 
 ## Development Setup
 
 ```bash
-git clone https://github.com/heznpc/iConnect.git
-cd iConnect
+git clone https://github.com/heznpc/AirMCP.git
+cd AirMCP
 npm install
 npm run build
 ```
@@ -215,4 +215,4 @@ refactor: extract shared pagination logic
 
 ## Questions?
 
-Open an [issue](https://github.com/heznpc/iConnect/issues) for bugs, feature requests, or questions.
+Open an [issue](https://github.com/heznpc/AirMCP/issues) for bugs, feature requests, or questions.

@@ -11,8 +11,7 @@ import {
   listWindowsScript,
   recordScreenScript,
 } from "./scripts.js";
-
-const MAX_CAPTURE_SIZE = 5 * 1024 * 1024; // 5MB
+import { BUFFER } from "../shared/constants.js";
 
 /**
  * Run a JXA capture script that returns { path: string },
@@ -24,7 +23,7 @@ async function captureAndReturn(script: string) {
   const filePath = result.path;
   try {
     const { size } = await stat(filePath);
-    if (size > MAX_CAPTURE_SIZE) {
+    if (size > BUFFER.CAPTURE) {
       throw new Error("Screenshot too large (>5MB). Use capture_area for a smaller region or reduce resolution.");
     }
     const buffer = await readFile(filePath);
@@ -203,7 +202,7 @@ export function registerScreenTools(server: McpServer, _config: AirMcpConfig): v
 
         const result = await recordPromise;
         const { size } = await stat(result.path);
-        if (size > MAX_CAPTURE_SIZE) {
+        if (size > BUFFER.CAPTURE) {
           try { await unlink(result.path); } catch { /* ignore */ }
           throw new Error("Recording too large (>5MB). Use a shorter duration or smaller region.");
         }

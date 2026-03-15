@@ -77,7 +77,8 @@
     "typecheck": "tsc --noEmit",
     "version:patch": "npm version patch --no-git-tag-version && node -e \"let s=require('./server.json');s.version=s.packages[0].version=require('./package.json').version;require('fs').writeFileSync('server.json',JSON.stringify(s,null,2)+'\\n')\"",
     "version:minor": "npm version minor --no-git-tag-version && node -e \"let s=require('./server.json');s.version=s.packages[0].version=require('./package.json').version;require('fs').writeFileSync('server.json',JSON.stringify(s,null,2)+'\\n')\"",
-    "version:major": "npm version major --no-git-tag-version && node -e \"let s=require('./server.json');s.version=s.packages[0].version=require('./package.json').version;require('fs').writeFileSync('server.json',JSON.stringify(s,null,2)+'\\n')\""
+    "version:major": "npm version major --no-git-tag-version && node -e \"let s=require('./server.json');s.version=s.packages[0].version=require('./package.json').version;require('fs').writeFileSync('server.json',JSON.stringify(s,null,2)+'\\n')\"",
+    "prepare": "husky"
   },
   "dependencies": {
     "@modelcontextprotocol/ext-apps": "^1.2.2",
@@ -93,7 +94,9 @@
     "@types/node": "^22.0.0",
     "eslint": "^10.0.3",
     "globals": "^16.0.0",
+    "husky": "^9.1.7",
     "jest": "^30.3.0",
+    "lint-staged": "^16.4.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.20.0"
@@ -103,5 +106,11 @@
   },
   "os": [
     "darwin"
-  ]
+  ],
+  "lint-staged": {
+    "src/**/*.ts": [
+      "eslint --fix",
+      "tsc --noEmit --skipLibCheck"
+    ]
+  }
 }

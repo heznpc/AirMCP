@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://github.com/heznpc/AirMCP#readme
+    about: Check the README before opening an issue
+  - name: Diagnostics
+    url: https://github.com/heznpc/AirMCP#troubleshooting
+    about: Run `npx airmcp doctor` to diagnose common issues

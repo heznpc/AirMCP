@@ -1,18 +1,17 @@
 // JXA scripts for macOS system automation.
 
 import { esc, escJxaShell } from "../shared/esc.js";
+import { BUFFER } from "../shared/constants.js";
 
 export function getClipboardScript(): string {
-  // Limit clipboard content to avoid exceeding osascript stdout maxBuffer (10 MB).
-  const MAX_CHARS = 5_000_000; // ~5 MB of text, safe margin below 10 MB buffer
   return `
     const app = Application.currentApplication();
     app.includeStandardAdditions = true;
     let text;
     try { text = app.theClipboard(); } catch(e) { text = ''; }
     let content = (typeof text === 'object') ? JSON.stringify(text) : String(text);
-    const truncated = content.length > ${MAX_CHARS};
-    if (truncated) content = content.substring(0, ${MAX_CHARS});
+    const truncated = content.length > ${BUFFER.CLIPBOARD};
+    if (truncated) content = content.substring(0, ${BUFFER.CLIPBOARD});
     JSON.stringify({content: content, length: content.length, truncated: truncated});
   `;
 }

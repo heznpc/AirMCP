@@ -1,0 +1,12 @@
+# Default — all changes require maintainer review
+* @heznpc
+
+# Core infrastructure
+/src/shared/ @heznpc
+/src/index.ts @heznpc
+
+# CLI
+/src/cli/ @heznpc
+
+# CI/CD & GitHub config
+/.github/ @heznpc

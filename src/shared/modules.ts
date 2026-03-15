@@ -89,9 +89,15 @@ export async function loadModuleRegistry(): Promise<ModuleRegistration[]> {
 /** Find the first exported function whose name starts with "register". */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function findRegisterFn(mod: Record<string, any>): ((...args: any[]) => any) | undefined {
+  // Prefer registerXxxTools over registerDynamicXxx (dynamic tools are registered separately)
+  let fallback: ((...args: any[]) => any) | undefined;
   for (const [key, val] of Object.entries(mod)) {
-    if (typeof val === "function" && key.startsWith("register")) return val;
+    if (typeof val === "function" && key.startsWith("register")) {
+      if (key.includes("Dynamic")) { fallback = fallback ?? val; continue; }
+      return val;
+    }
   }
+  return fallback;
   return undefined;
 }
 

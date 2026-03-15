@@ -4,6 +4,12 @@
 
 # AirMCP
 
+[![CI](https://github.com/heznpc/AirMCP/actions/workflows/ci.yml/badge.svg)](https://github.com/heznpc/AirMCP/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/airmcp)](https://www.npmjs.com/package/airmcp)
+[![npm downloads](https://img.shields.io/npm/dm/airmcp)](https://www.npmjs.com/package/airmcp)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Node >= 18](https://img.shields.io/badge/node-%3E%3D18-green)](https://nodejs.org/)
+
 MCP server for the entire Apple ecosystem — Notes, Reminders, Calendar, Contacts, Mail, Messages, Music, Finder, Safari, System, Photos, Shortcuts, Apple Intelligence, TV, Screen Capture, Maps, Podcasts, Weather, Pages, Numbers, Keynote, Location, and Bluetooth. Connect any AI to your Mac.
 
 > Available in multiple languages at the [project landing page](https://heznpc.github.io/AirMCP/).
@@ -801,6 +807,18 @@ Modules with OS requirements (e.g., Intelligence requires macOS 26+) are automat
 - **GUI .app distribution** — Code Signing + Notarization, Homebrew Cask
 - **Marketplace listings** — mcp.so, Smithery, and other MCP directories
 - **iOS / visionOS exploration** (v3.0+)
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, code style, and PR guidelines.
+
+First-time contributors: look for issues labeled [`good first issue`](https://github.com/heznpc/AirMCP/labels/good%20first%20issue).
+
+## Community
+
+- [GitHub Discussions](https://github.com/heznpc/AirMCP/discussions) — Questions, ideas, show & tell
+- [Issues](https://github.com/heznpc/AirMCP/issues) — Bug reports and feature requests
+- [Changelog](CHANGELOG.md) — Release history
 
 ## License
 

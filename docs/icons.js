@@ -76,6 +76,14 @@ const ModIcons = (() => {
       '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/><circle cx="7" cy="6" r=".5" fill="currentColor"/><circle cx="5" cy="6" r=".5" fill="currentColor"/>',
       '#FF9500'
     ),
+    location: s(
+      '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',
+      '#FF6961'
+    ),
+    bluetooth: s(
+      '<polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"/>',
+      '#007AFF'
+    ),
   };
 
   // Intelligence uses a gradient — patch its SVG

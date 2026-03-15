@@ -11,6 +11,13 @@ import {
   uiScrollScript,
   uiReadScript,
 } from "./scripts.js";
+import {
+  axQueryScript,
+  axPerformScript,
+  axTraverseScript,
+  axDiffScript,
+  type AXLocator,
+} from "./ax-query.js";
 
 export function registerUiTools(server: McpServer, _config: AirMcpConfig): void {
   server.registerTool(
@@ -177,6 +184,132 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
         return ok(await runJxa(uiReadScript(appName, maxDepth, maxElements)));
       } catch (e) {
         return toolError("read UI", e);
+      }
+    },
+  );
+
+  // ══════════════════════════════════════════════════════════════════
+  // Phase 1: Accessibility Query (steipete pattern)
+  // ══════════════════════════════════════════════════════════════════
+
+  server.registerTool(
+    "ui_accessibility_query",
+    {
+      title: "Query UI Elements",
+      description:
+        "Search for UI elements by accessibility attributes (role, title, value, description, identifier). " +
+        "More precise than ui_read — returns only matching elements with full attribute data. " +
+        "Works on any app, including those without AppleScript support. Requires Accessibility permissions.",
+      inputSchema: {
+        app: z.string().optional().describe("App name to search in. If omitted, uses frontmost app."),
+        role: z.string().optional().describe("AX role filter (e.g. 'AXButton', 'AXTextField', 'AXMenuItem', 'AXStaticText', 'AXCheckBox', 'AXPopUpButton')"),
+        title: z.string().optional().describe("Title text to match (substring, case-insensitive)"),
+        value: z.string().optional().describe("Value text to match (substring, case-insensitive)"),
+        description: z.string().optional().describe("Description text to match (substring)"),
+        identifier: z.string().optional().describe("AXIdentifier to match (exact)"),
+        label: z.string().optional().describe("General label search — matches across name, title, value, and description"),
+        maxResults: z.number().int().min(1).max(100).optional().default(20).describe("Max results to return (default: 20)"),
+        maxDepth: z.number().int().min(1).max(15).optional().default(8).describe("Max tree depth to search (default: 8)"),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    },
+    async ({ app, role, title, value, description, identifier, label, maxResults, maxDepth }) => {
+      try {
+        if (!role && !title && !value && !description && !identifier && !label) {
+          return err("At least one search criterion (role, title, value, description, identifier, or label) is required.");
+        }
+        const locator: AXLocator = { app, role, title, value, description, identifier, label };
+        return ok(await runJxa(axQueryScript(locator, maxResults, maxDepth)));
+      } catch (e) {
+        return toolError("accessibility query", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "ui_perform_action",
+    {
+      title: "Perform Action on UI Element",
+      description:
+        "Find a UI element by locator (role + title/value) and perform an accessibility action on it. " +
+        "Actions: press (click), pick (select), confirm, setValue, raise (focus), showMenu. " +
+        "Combines query + action in one step. Requires Accessibility permissions.",
+      inputSchema: {
+        app: z.string().optional().describe("App name"),
+        role: z.string().optional().describe("AX role filter"),
+        title: z.string().optional().describe("Title text to match"),
+        value: z.string().optional().describe("Value text to match"),
+        description: z.string().optional().describe("Description text to match"),
+        identifier: z.string().optional().describe("AXIdentifier exact match"),
+        label: z.string().optional().describe("General label search"),
+        action: z.enum(["press", "click", "pick", "select", "confirm", "setValue", "set", "raise", "focus", "showMenu", "AXPress", "AXPick", "AXConfirm", "AXSetValue", "AXRaise", "AXShowMenu"]).describe("Action to perform"),
+        actionValue: z.string().optional().describe("Value to set (for setValue action)"),
+        index: z.number().int().min(0).optional().default(0).describe("If multiple matches, act on element at this index (default: 0)"),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    },
+    async ({ app, role, title, value, description, identifier, label, action, actionValue, index }) => {
+      try {
+        if (!role && !title && !value && !description && !identifier && !label) {
+          return err("At least one search criterion is required to locate the element.");
+        }
+        const locator: AXLocator = { app, role, title, value, description, identifier, label };
+        return ok(await runJxa(axPerformScript(locator, action, actionValue, index)));
+      } catch (e) {
+        return toolError("perform action", e);
+      }
+    },
+  );
+
+  // ══════════════════════════════════════════════════════════════════
+  // Phase 2: BFS Traverse + Diff (mediar-ai pattern)
+  // ══════════════════════════════════════════════════════════════════
+
+  server.registerTool(
+    "ui_traverse",
+    {
+      title: "BFS Traverse UI Tree",
+      description:
+        "Breadth-first traversal of the accessibility tree. Returns a flat list of all UI elements " +
+        "with parent-child relationships, positions, sizes, and states. Supports PID targeting and " +
+        "visible-only filtering. More thorough than ui_read. Requires Accessibility permissions.",
+      inputSchema: {
+        app: z.string().optional().describe("App name to traverse. If omitted, uses frontmost app."),
+        pid: z.number().int().optional().describe("Process ID for precise targeting (overrides app name lookup)"),
+        maxDepth: z.number().int().min(1).max(15).optional().default(5).describe("Max traversal depth (default: 5)"),
+        maxElements: z.number().int().min(1).max(2000).optional().default(500).describe("Max elements to collect (default: 500)"),
+        onlyVisible: z.boolean().optional().default(false).describe("Only include elements with visible position/size"),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    },
+    async ({ app, pid, maxDepth, maxElements, onlyVisible }) => {
+      try {
+        return ok(await runJxa(axTraverseScript(app, pid, maxDepth, maxElements, onlyVisible)));
+      } catch (e) {
+        return toolError("traverse UI", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "ui_diff",
+    {
+      title: "Compare UI State",
+      description:
+        "Compare the current UI state against a previous snapshot to detect changes. " +
+        "Pass the 'elements' array from a previous ui_traverse result as beforeSnapshot. " +
+        "Returns added, removed, and changed elements. Useful for verifying action results.",
+      inputSchema: {
+        beforeSnapshot: z.string().min(1).describe("JSON string of previous UI tree snapshot (elements array from ui_traverse)"),
+        app: z.string().optional().describe("App name to compare against"),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    },
+    async ({ beforeSnapshot, app }) => {
+      try {
+        return ok(await runJxa(axDiffScript(beforeSnapshot, app)));
+      } catch (e) {
+        return toolError("UI diff", e);
       }
     },
   );

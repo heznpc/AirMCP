@@ -6,7 +6,7 @@ MCP server for the entire Apple ecosystem — Notes, Reminders, Calendar, Contac
 
 ## Features
 
-- **242 tools** (25 modules) — Apple app CRUD + system control + Apple Intelligence + UI Automation + Screen Capture + Maps + Podcasts + Weather + iWork (Pages/Numbers/Keynote) + Google Workspace + dynamic shortcuts
+- **252 tools** (25 modules) — Apple app CRUD + system control + Apple Intelligence + UI Automation + Screen Capture + Maps + Podcasts + Weather + iWork (Pages/Numbers/Keynote) + Google Workspace + dynamic shortcuts
 - **31 prompts** — per-app workflows (notes, calendar, reminders, shortcuts) + cross-module + developer workflows + YAML skills
 - **12 MCP resources** — Notes, Calendar, Reminders, Music, Mail, System live data URIs
 - **JXA + Swift bridge** — JXA for basic automation, EventKit/PhotoKit for advanced features
@@ -392,7 +392,7 @@ Useful for running a Mac Mini as an "always-on AI hub."
 | `edit_shortcut` | Open shortcut in Shortcuts app for editing | write |
 | `duplicate_shortcut` | Duplicate an existing shortcut | write |
 
-### UI Automation (6 tools)
+### UI Automation (10 tools)
 
 | Tool | Description | Type |
 |------|-------------|------|
@@ -402,6 +402,10 @@ Useful for running a Mac Mini as an "always-on AI hub."
 | `ui_press_key` | Send key combinations | write |
 | `ui_scroll` | Scroll in direction | write |
 | `ui_read` | Read app accessibility tree | read |
+| `ui_accessibility_query` | Query UI elements by role/title/value/identifier | read |
+| `ui_perform_action` | Find element by locator + perform AX action | write |
+| `ui_traverse` | BFS traverse with PID targeting + visible filter | read |
+| `ui_diff` | Compare UI state before/after an action | read |
 
 ### Apple Intelligence (8 tools)
 

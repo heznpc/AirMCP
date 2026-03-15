@@ -16,8 +16,7 @@ export async function registerSkillEngine(server: McpServer): Promise<void> {
     return;
   }
 
-  const { prompts, tools } = registerSkills(server, merged);
-  // Log suppressed — banner.ts displays skills info
+  registerSkills(server, merged);
 
   // Watch user skills directory for changes — log only, hot-reload requires server restart
   watchUserSkills(() => {

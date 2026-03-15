@@ -6,11 +6,11 @@
  * 3. Auto-detect and patch MCP client configs (Claude Desktop, Cursor, Windsurf, etc.)
  */
 
-import { createInterface } from "node:readline";
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { MODULE_NAMES, STARTER_MODULES, NPM_PACKAGE_NAME } from "../shared/config.js";
 import { LOGO_LINES, typeLine, sleep, writeOut } from "../shared/banner.js";
+import { selectOne, selectMulti, type SelectOption, type MultiOption } from "./select.js";
 
 const HOME = process.env.HOME ?? process.env.USERPROFILE ?? "";
 
@@ -137,10 +137,6 @@ const PRESETS: Record<string, { desc: string; modules: string[] }> = {
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-function ask(rl: ReturnType<typeof createInterface>, question: string): Promise<string> {
-  return new Promise((resolve) => rl.question(question, resolve));
-}
-
 const DIM = "\x1b[2m";
 const RESET = "\x1b[0m";
 const BOLD = "\x1b[1m";
@@ -148,32 +144,7 @@ const WHITE = "\x1b[97m";
 const GREEN = "\x1b[32m";
 const YELLOW = "\x1b[33m";
 
-function printModules(enabled: Set<string>): void {
-  const cols = 3;
-  const mods = [...MODULE_NAMES];
-  const rows = Math.ceil(mods.length / cols);
-
-  console.log("");
-  for (let r = 0; r < rows; r++) {
-    const parts: string[] = [];
-    for (let c = 0; c < cols; c++) {
-      const idx = r + c * rows;
-      if (idx >= mods.length) break;
-      const mod = mods[idx];
-      const num = String(idx + 1).padStart(2, " ");
-      const check = enabled.has(mod) ? `${GREEN}✓${RESET}` : " ";
-      const meta = MODULE_META[mod];
-      const label = meta?.label ?? mod;
-      const star = STARTER_MODULES.has(mod) ? `${DIM}★${RESET}` : " ";
-      parts.push(`  [${num}] ${check}${star}${label.padEnd(17)}`);
-    }
-    console.log(parts.join(""));
-  }
-  console.log("");
-}
-
 export async function runInit(): Promise<void> {
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
 
   // Animated logo
   writeOut("\n");
@@ -185,86 +156,38 @@ export async function runInit(): Promise<void> {
   writeOut("\n");
   await sleep(200);
 
-  // --- Step 0: Language selection ---
-  console.log(`  ${BOLD}Choose language:${RESET}\n`);
-  for (let i = 0; i < LANGUAGES.length; i++) {
-    const l = LANGUAGES[i];
-    const num = String(i + 1).padStart(2, " ");
-    const marker = l.code === "en" ? ` ${DIM}(default)${RESET}` : "";
-    console.log(`  [${num}] ${l.flag}  ${l.label}${marker}`);
-  }
-  console.log("");
-
-  const langInput = (await ask(rl, `  ${WHITE}>${RESET} ${DIM}(1-${LANGUAGES.length} / Enter = English)${RESET} `)).trim();
-  let lang: LangCode = "en";
-  const langNum = parseInt(langInput, 10);
-  if (langNum >= 1 && langNum <= LANGUAGES.length) {
-    lang = LANGUAGES[langNum - 1].code;
-  }
-  const picked = LANGUAGES.find((l) => l.code === lang)!;
-  console.log(`  ${GREEN}✓${RESET} ${picked.flag}  ${picked.label}\n`);
+  // --- Step 0: Language selection (arrow keys) ---
+  const langOptions: SelectOption[] = LANGUAGES.map((l) => ({
+    label: `${l.flag}  ${l.label}`,
+    value: l.code,
+    hint: l.code === "en" ? "(default)" : undefined,
+  }));
+  const langCode = await selectOne(t("choose_lang", "en"), langOptions, 0) as LangCode;
+  const lang: LangCode = LANGUAGES.some((l) => l.code === langCode) ? langCode : "en";
 
   await typeLine(`  ${DIM}${t("wizard_sub", lang)}${RESET}`, 5, "stdout");
   writeOut("\n");
 
-  // --- Step 1: Module selection ---
-  const enabled = new Set<string>(STARTER_MODULES);
+  // --- Step 1: Module selection (arrow keys + space toggle) ---
+  const moduleOptions: MultiOption[] = MODULE_NAMES.map((name) => {
+    const meta = MODULE_META[name];
+    return {
+      label: meta?.label ?? name,
+      value: name,
+      checked: STARTER_MODULES.has(name),
+      hint: meta?.desc,
+      star: STARTER_MODULES.has(name),
+    };
+  });
 
-  console.log(`  ${BOLD}${t("choose_modules", lang)}${RESET}`);
-  console.log("");
-  console.log(`  ${DIM}${t("commands", lang)}:${RESET}`);
-  console.log(`    ${BOLD}number${RESET}  ${DIM}${t("toggle_hint", lang)}${RESET}`);
-  console.log(`    ${BOLD}all${RESET}     ${DIM}${t("all_modules", lang)}${RESET}`);
-  console.log(`    ${BOLD}starter${RESET} ${DIM}${t("starter_hint", lang)}${RESET}`);
-  console.log(`    ${BOLD}prod${RESET}    ${DIM}${t("prod_hint", lang)}${RESET}`);
-  console.log(`    ${BOLD}Enter${RESET}   ${DIM}${t("enter_save", lang)}${RESET}`);
-  console.log("");
-  console.log(`  ${DIM}${t("recommended", lang)}${RESET}`);
+  const presetMap = {
+    all: [...MODULE_NAMES],
+    starter: [...STARTER_MODULES],
+    productivity: PRESETS.productivity.modules,
+  };
 
-  printModules(enabled);
-
-  for (;;) {
-    const input = (await ask(rl, `  ${WHITE}>${RESET} ${DIM}(${t("prompt_hint", lang)})${RESET} `)).trim().toLowerCase();
-
-    if (input === "") break;
-
-    if (input === "all") {
-      for (const m of MODULE_NAMES) enabled.add(m);
-      console.log(`  ${GREEN}✓${RESET} All modules enabled`);
-      printModules(enabled);
-      continue;
-    }
-    if (input === "starter") {
-      enabled.clear();
-      for (const m of STARTER_MODULES) enabled.add(m);
-      console.log(`  ${GREEN}✓${RESET} Reset to starter preset (7 modules)`);
-      printModules(enabled);
-      continue;
-    }
-    if (input === "prod" || input === "productivity") {
-      for (const m of PRESETS.productivity.modules) enabled.add(m);
-      console.log(`  ${GREEN}✓${RESET} Productivity modules enabled`);
-      printModules(enabled);
-      continue;
-    }
-
-    const num = parseInt(input, 10);
-    if (num >= 1 && num <= MODULE_NAMES.length) {
-      const mod = MODULE_NAMES[num - 1];
-      const meta = MODULE_META[mod];
-      if (enabled.has(mod)) {
-        enabled.delete(mod);
-        console.log(`  ${YELLOW}−${RESET} ${meta?.label ?? mod} disabled`);
-      } else {
-        enabled.add(mod);
-        console.log(`  ${GREEN}+${RESET} ${meta?.label ?? mod} enabled ${DIM}(${meta?.desc})${RESET}`);
-      }
-      printModules(enabled);
-      continue;
-    }
-
-    console.log(`  ${YELLOW}?${RESET} Type a number (1-${MODULE_NAMES.length}), "all", "starter", "prod", or ${BOLD}Enter${RESET} to continue.`);
-  }
+  const selectedModules = await selectMulti(t("choose_modules", lang), moduleOptions, presetMap);
+  const enabled = new Set<string>(selectedModules);
 
   // --- Step 2: Write config.json ---
   const disabledModules = MODULE_NAMES.filter((m) => !enabled.has(m));
@@ -341,5 +264,4 @@ export async function runInit(): Promise<void> {
   console.log(`    ${DIM}•${RESET} Use ${BOLD}npx airmcp --full${RESET} to enable all modules temporarily`);
   console.log("");
 
-  rl.close();
 }

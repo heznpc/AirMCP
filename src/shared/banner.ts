@@ -7,7 +7,6 @@ const DIM = "\x1b[2m";
 const RESET = "\x1b[0m";
 const BOLD = "\x1b[1m";
 const WHITE = "\x1b[97m";  // bright white
-const GREEN = "\x1b[32m";
 const YELLOW = "\x1b[33m";
 
 export const LOGO_LINES = [
@@ -46,6 +45,7 @@ export const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 export async function typeLine(line: string, charDelay: number, target: "stderr" | "stdout" = "stderr"): Promise<void> {
   const w = target === "stdout" ? writeOut : write;
   // Split into ANSI escape sequences and visible characters
+  // eslint-disable-next-line no-control-regex
   const parts = line.split(/(\x1b\[[0-9;]*m)/);
   for (const part of parts) {
     if (part.startsWith("\x1b[")) {

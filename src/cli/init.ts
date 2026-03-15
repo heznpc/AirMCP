@@ -137,12 +137,7 @@ const PRESETS: Record<string, { desc: string; modules: string[] }> = {
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-const DIM = "\x1b[2m";
-const RESET = "\x1b[0m";
-const BOLD = "\x1b[1m";
-const WHITE = "\x1b[97m";
-const GREEN = "\x1b[32m";
-const YELLOW = "\x1b[33m";
+import { DIM, RESET, BOLD, WHITE, GREEN, YELLOW } from "./style.js";
 
 export async function runInit(): Promise<void> {
 

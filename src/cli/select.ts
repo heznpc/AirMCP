@@ -3,16 +3,10 @@
  * Arrow keys to navigate, Space to toggle, Enter to confirm.
  */
 import { emitKeypressEvents } from "node:readline";
-
-const DIM = "\x1b[2m";
-const RESET = "\x1b[0m";
-const BOLD = "\x1b[1m";
-const WHITE = "\x1b[97m";
-const GREEN = "\x1b[32m";
-const HIDE_CURSOR = "\x1b[?25l";
-const SHOW_CURSOR = "\x1b[?25h";
-const CLEAR_LINE = "\x1b[2K\r";
-const MOVE_UP = (n: number) => `\x1b[${n}A`;
+import {
+  DIM, RESET, BOLD, WHITE, GREEN,
+  HIDE_CURSOR, SHOW_CURSOR, CLEAR_LINE, MOVE_UP,
+} from "./style.js";
 
 // ── Single select (language picker) ──────────────────────────────────
 

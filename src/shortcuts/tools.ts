@@ -203,7 +203,7 @@ export async function registerDynamicShortcutTools(server: McpServer): Promise<n
       inputSchema: {
         input: z.string().optional().describe("Optional text input for the shortcut"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     }, async ({ input }) => {
       try { return ok(await runJxa(runShortcutScript(name, input))); }
       catch (e) { return toolError(`run shortcut "${name}"`, e); }

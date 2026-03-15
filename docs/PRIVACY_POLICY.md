@@ -51,6 +51,16 @@ The vector store (`vectors.json`) contains text previews of your personal data. 
 rm -rf ~/.airmcp
 ```
 
+## Sensitive Data in MCP Tool Results
+
+All data returned by AirMCP tools is sent to the connected MCP client (AI model). This includes:
+
+- **Safari**: `read_page_content` returns full HTML from open tabs (up to 50KB), which may include authenticated web content (banking, email, medical portals). `run_javascript` executes arbitrary JavaScript in browser tabs and returns the result — it can access any DOM data, cookies, or session information from open pages.
+- **Screen capture**: `capture_screen`, `capture_window`, and `capture_area` return full screenshots as images. Anything visible on screen (passwords, financial data, private conversations) will be sent to the AI model.
+- **Notes, Mail, Messages, Contacts, Calendar, Photos**: Tool results include the full content of these items. Notes may contain passwords or sensitive records. Emails may contain financial or medical information. Photos metadata may include GPS coordinates.
+
+**You are responsible for reviewing what data your AI model can access.** Disable modules you don't want exposed via `npx airmcp init` or the config file.
+
 ## Safety Controls
 
 - **Sending email/messages** is disabled by default (`allowSendMail: false`, `allowSendMessages: false`). You must explicitly enable these in config or via environment variables.

@@ -417,9 +417,9 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
     async ({ service, resource, method, params, body }) => {
-      if (method === "delete" || (service === "gmail" && method === "send")) {
-        if (!allowSendMail && service === "gmail" && method === "send") {
-          return err("Sending mail is disabled. Set AIRMCP_ALLOW_SEND_MAIL=true.");
+      if (service === "gmail" && (method === "send" || method === "delete" || method === "trash")) {
+        if (!allowSendMail) {
+          return err("Gmail send/delete is disabled. Set AIRMCP_ALLOW_SEND_MAIL=true.");
         }
       }
       try {

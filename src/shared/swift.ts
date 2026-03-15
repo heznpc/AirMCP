@@ -32,7 +32,8 @@ export async function runSwift<T>(command: string, input: string): Promise<T> {
   await semaphore.acquire();
 
   return new Promise<T>((resolve, reject) => {
-    const releaseSemaphore = () => semaphore.release();
+    let released = false;
+    const releaseSemaphore = () => { if (!released) { released = true; semaphore.release(); } };
     const child = spawn(BINARY_PATH, [command], {
       timeout: TIMEOUT.SWIFT,
     });

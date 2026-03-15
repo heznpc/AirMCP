@@ -162,8 +162,8 @@ export async function runInit(): Promise<void> {
     locale: lang,
     disabledModules,
     includeShared: false,
-    allowSendMessages: true,
-    allowSendMail: true,
+    allowSendMessages: false,
+    allowSendMail: false,
   };
   writeFileSync(PATHS.CONFIG, JSON.stringify(configPayload, null, 2) + "\n");
   console.log(` ${GREEN}\u2713${RESET} ${PATHS.CONFIG}`);

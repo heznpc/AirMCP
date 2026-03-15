@@ -108,9 +108,9 @@ export interface AirMcpConfig {
   disabledModules: Set<string>;
   /** Set of module names that require share approval */
   shareApprovalModules: Set<string>;
-  /** Allow sending messages via Messages app. Default: true */
+  /** Allow sending messages via Messages app. Default: false */
   allowSendMessages: boolean;
-  /** Allow sending emails via Mail app. Default: true */
+  /** Allow sending emails via Mail app. Default: false */
   allowSendMail: boolean;
   /** Human-in-the-loop confirmation config */
   hitl: HitlConfig;

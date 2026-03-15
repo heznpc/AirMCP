@@ -767,8 +767,8 @@ Modules with OS requirements (e.g., Intelligence requires macOS 26+) are automat
 
 ### v2.1 (Current)
 
+- **Gemini Embedding upgrade** — Apple Intelligence의 Gemini 채택에 맞춰 `text-embedding-004`로 업그레이드. on-device Swift bridge + cloud Gemini 하이브리드 provider 지원. Apple이 Foundation Models에 Gemini를 도입하면서 AirMCP도 동일 생태계로 확장 — on-device 처리와 클라우드 임베딩을 자동 전환
 - **Google Workspace** — Gmail, Drive, Sheets, Calendar, Docs, Tasks, People via `@googleworkspace/cli`
-- **Gemini Embedding 2** — Upgraded to `text-embedding-004`, hybrid provider (on-device + cloud), configurable model/dimension
 - **Dynamic module loading** — New modules = 1 line in MANIFEST (no import boilerplate)
 - **Centralized constants** — All API URLs, timeouts, buffer sizes in `src/shared/constants.ts` with env var overrides
 

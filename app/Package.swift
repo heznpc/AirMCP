@@ -3,12 +3,12 @@
 import PackageDescription
 
 let package = Package(
-    name: "iConnectApp",
+    name: "AirMCPApp",
     platforms: [.macOS(.v14)],
     targets: [
         .executableTarget(
-            name: "iConnectApp",
-            path: "Sources/iConnectApp",
+            name: "AirMCPApp",
+            path: "Sources/AirMCPApp",
             resources: [
                 .copy("Resources")
             ]

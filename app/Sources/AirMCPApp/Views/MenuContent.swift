@@ -276,7 +276,7 @@ struct MenuContent: View {
         Divider()
 
         Button("Open Documentation") {
-            if let url = URL(string: "https://github.com/heznpc/iConnect") {
+            if let url = URL(string: "https://github.com/heznpc/AirMCP") {
                 NSWorkspace.shared.open(url)
             }
         }

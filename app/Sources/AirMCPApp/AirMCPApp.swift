@@ -3,7 +3,7 @@ import UserNotifications
 import AppKit
 
 @main
-struct iConnectApp: App {
+struct AirMCPApp: App {
     @State private var serverManager = ServerManager()
     @State private var permissionManager = PermissionManager()
     @State private var configManager = ConfigManager()

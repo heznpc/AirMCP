@@ -145,7 +145,7 @@ final class ConfigManager {
         // Check typical dev checkout via npx package cache
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         // Common dev location
-        let devPath = home + "/IdeaProjects/iConnect/swift/.build/release/AirMcpBridge"
+        let devPath = home + "/IdeaProjects/airmcp/swift/.build/release/AirMcpBridge"
         if FileManager.default.isExecutableFile(atPath: devPath) {
             return devPath
         }

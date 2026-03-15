@@ -155,12 +155,14 @@ export function registerSemanticTools(server: McpServer, config: AirMcpConfig): 
     },
   );
 
-  // -- Clear: delete all vector store data --
+  // -- Clear: delete all vector store data + Spotlight entries --
   server.registerTool(
     "semantic_clear",
     {
       title: "Clear Semantic Index",
-      description: "Delete all indexed data from the local vector store. Use for privacy or to force a fresh re-index.",
+      description:
+        "Delete all indexed data from the local vector store AND remove corresponding entries from macOS Spotlight. " +
+        "Use for privacy or to force a fresh re-index. Requires Swift bridge for Spotlight cleanup.",
       inputSchema: {},
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
@@ -168,9 +170,39 @@ export function registerSemanticTools(server: McpServer, config: AirMcpConfig): 
       try {
         const before = await service.status();
         await service.clear();
-        return ok({ cleared: before.total, message: "Vector store cleared successfully." });
+        // Also clear Spotlight entries if Swift bridge is available
+        const swiftErr = await checkSwiftBridge();
+        if (!swiftErr) {
+          try {
+            await runSwift("spotlight-clear", "{}");
+          } catch {
+            // Spotlight clear is best-effort
+          }
+        }
+        return ok({ cleared: before.total, spotlightCleared: !swiftErr, message: "Vector store and Spotlight index cleared." });
       } catch (e) {
         return toolError("clear index", e);
+      }
+    },
+  );
+
+  // -- Spotlight Clear: remove only Spotlight entries (keep vector store) --
+  server.registerTool(
+    "spotlight_clear",
+    {
+      title: "Clear Spotlight Index",
+      description: "Remove all AirMCP entries from macOS Spotlight without clearing the local vector store. Requires Swift bridge.",
+      inputSchema: {},
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    },
+    async () => {
+      try {
+        const swiftErr = await checkSwiftBridge();
+        if (swiftErr) return err(swiftErr);
+        const result = await runSwift<{ cleared: boolean }>("spotlight-clear", "{}");
+        return ok(result);
+      } catch (e) {
+        return toolError("spotlight clear", e);
       }
     },
   );

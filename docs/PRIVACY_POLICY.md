@@ -44,12 +44,33 @@ AirMCP stores the following data on disk:
 |------|---------|---------|
 | `~/.config/airmcp/config.json` | Module preferences, HITL settings | User configuration |
 | `~/.airmcp/vectors.json` | Text excerpts + embedding vectors from notes, email, calendar, reminders | Semantic search index |
+| macOS Spotlight Index | Note titles, email subjects, reminder names, calendar event titles | System-wide Spotlight/Siri discoverability (opt-in via `spotlight_sync` tool) |
 
 The vector store (`vectors.json`) contains text previews of your personal data. It is not encrypted. You can delete it at any time:
 
 ```bash
 rm -rf ~/.airmcp
 ```
+
+To also clear Spotlight entries, run the `semantic_clear` tool (which clears both) or `spotlight_clear` (Spotlight only).
+
+## Apple Intelligence / Foundation Models
+
+AirMCP's intelligence tools (`summarize_text`, `rewrite_text`, `proofread_text`, `generate_text`, `generate_structured`, `tag_content`, `ai_chat`, `generate_plan`, `generate_image`) process user-provided text through Apple's on-device Foundation Model (~3B parameters, running on Apple Silicon Neural Engine).
+
+- **On-device by default**: All Foundation Model processing runs locally on your Mac.
+- **Private Cloud Compute**: Apple may route complex requests to its Private Cloud Compute servers. AirMCP does not explicitly opt out of PCC. Apple states that PCC data is not retained or accessible to Apple.
+- **`summarize_context` fallback**: When MCP Sampling is unavailable, this tool sends a context snapshot (calendar events, reminders, note previews, clipboard contents, mail metadata) to the on-device model.
+- **`generate_image`**: Prompts are processed by Apple's on-device Image Playground model.
+- **`scan_document`**: Images are processed locally via Apple Vision OCR. No network involvement.
+
+## Siri / App Intents
+
+AirMCP's companion app registers App Intents (Search Notes, Daily Briefing, Check Calendar, Create Reminder) accessible via Siri and Shortcuts.
+
+- Results from Siri invocations may flow through Apple's Siri infrastructure depending on system configuration.
+- Apple's own privacy policy governs how Siri processes this data.
+- Spotlight-synced data becomes visible in macOS Spotlight search UI.
 
 ## Sensitive Data in MCP Tool Results
 

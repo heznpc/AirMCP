@@ -1040,7 +1040,11 @@ case "generate-image":
             let image = try await creator.generateImage(
                 ImageCreationParameters(source: .text(imgInput.prompt))
             )
-            try image.pngData()?.write(to: outputURL)
+            guard let pngData = image.pngData() else {
+                writeError("Image generation succeeded but PNG conversion failed")
+                exit(1)
+            }
+            try pngData.write(to: outputURL)
             let output = GenerateImageOutput(generated: true, path: outputPath)
             try writeJSON(output)
         } catch {
@@ -1079,6 +1083,16 @@ case "spotlight-index":
         try writeJSON(output)
     } catch {
         writeError("Spotlight indexing error: \(error.localizedDescription)")
+    }
+
+// --- Core Spotlight: clear indexed items ---
+case "spotlight-clear":
+    do {
+        let domains = ["com.airmcp.notes", "com.airmcp.calendar", "com.airmcp.reminders", "com.airmcp.mail"]
+        try await CSSearchableIndex.default().deleteSearchableItems(withDomainIdentifiers: domains)
+        try writeJSON(["cleared": true, "domains": domains])
+    } catch {
+        writeError("Spotlight clear error: \(error.localizedDescription)")
     }
 
 // --- Vision: scan document from image ---

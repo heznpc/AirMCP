@@ -9,7 +9,7 @@ describe('swift bridge', () => {
       // Binary was built — no error
       expect(result).toBeNull();
     } else {
-      expect(result).toContain('Swift bridge binary not found');
+      expect(result).toContain('Swift bridge not found');
       expect(result).toContain('swift-build');
     }
   });

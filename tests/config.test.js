@@ -48,8 +48,8 @@ function clearConfigEnv() {
 /* ================================================================== */
 
 describe('MODULE_NAMES', () => {
-  test('contains exactly 24 modules', () => {
-    expect(MODULE_NAMES).toHaveLength(24);
+  test('contains exactly 25 modules', () => {
+    expect(MODULE_NAMES).toHaveLength(25);
   });
 
   test('includes the "tv" module', () => {
@@ -72,21 +72,22 @@ describe('MODULE_NAMES', () => {
 /* ================================================================== */
 
 describe('STARTER_MODULES', () => {
-  test('has exactly 5 core modules', () => {
-    expect(STARTER_MODULES.size).toBe(5);
+  test('has exactly 7 core modules', () => {
+    expect(STARTER_MODULES.size).toBe(7);
   });
 
-  test('contains notes, reminders, calendar, shortcuts, system', () => {
-    const expected = ['notes', 'reminders', 'calendar', 'shortcuts', 'system'];
+  test('contains notes, reminders, calendar, shortcuts, system, finder, weather', () => {
+    const expected = ['notes', 'reminders', 'calendar', 'shortcuts', 'system', 'finder', 'weather'];
     for (const mod of expected) {
       expect(STARTER_MODULES.has(mod)).toBe(true);
     }
   });
 
   test('does not contain non-core modules', () => {
-    const nonStarter = ['contacts', 'mail', 'messages', 'music', 'finder',
+    const nonStarter = ['contacts', 'mail', 'messages', 'music',
                         'safari', 'photos', 'intelligence', 'tv', 'ui',
-                        'screen', 'maps', 'podcasts'];
+                        'screen', 'maps', 'podcasts', 'pages',
+                        'numbers', 'keynote', 'location', 'bluetooth', 'google'];
     for (const mod of nonStarter) {
       expect(STARTER_MODULES.has(mod)).toBe(false);
     }

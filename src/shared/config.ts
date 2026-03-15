@@ -168,7 +168,7 @@ export function parseConfig(): AirMcpConfig {
     const envVal = process.env[envKey];
     if (envVal === "true") {
       disabledModules.add(mod);
-    } else if (envVal === undefined && fileDisabled.has(mod)) {
+    } else if (envVal === undefined && !fullMode && fileDisabled.has(mod)) {
       disabledModules.add(mod);
     } else if (envVal === undefined && !fileExists && !fullMode && !STARTER_MODULES.has(mod)) {
       // No config.json & not --full: apply starter preset

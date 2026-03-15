@@ -8,26 +8,26 @@ on:
   schedule:
     - cron: "0 6 * * 1"
 
+permissions:
+  contents: read
+  security-events: write
+
 jobs:
   analyze:
     name: Analyze
     runs-on: macos-latest
-    permissions:
-      security-events: write
-      actions: read
-      contents: read
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
-      - uses: github/codeql-action/init@v3
+      - uses: github/codeql-action/init@9792ccaef0455e446c567163589397e8c3ac2e0d # v3
         with:
           languages: javascript-typescript
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
         with:
           node-version: 22
           cache: npm
 
       - run: npm ci
 
-      - uses: github/codeql-action/analyze@v3
+      - uses: github/codeql-action/analyze@9792ccaef0455e446c567163589397e8c3ac2e0d # v3

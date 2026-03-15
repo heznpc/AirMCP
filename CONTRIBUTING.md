@@ -189,7 +189,7 @@ refactor: extract shared pagination logic
    - `readOnlyHint: true` for read operations
    - `destructiveHint: true` for delete/update operations
 3. Add tests for script generators in `tests/<module>-scripts.test.js`
-4. Update tool count in `README.md`, `README.ko.md`, and `docs/index.html`
+4. Run `npm run stats` to verify counts, then update `docs/index.html` if needed
 
 ## Adding a New Module
 

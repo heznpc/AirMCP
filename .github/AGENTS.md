@@ -9,74 +9,83 @@ src/
 ├── index.ts              # Server entry — registers all modules
 ├── notes/                # Apple Notes (12 tools, 3 prompts)
 │   ├── tools.ts, scripts.ts, prompts.ts
-├── reminders/            # Apple Reminders (7 tools, 2 prompts)
+├── reminders/            # Apple Reminders (11 tools, 2 prompts)
 │   ├── tools.ts, scripts.ts, prompts.ts
-├── calendar/             # Apple Calendar (7 tools, 2 prompts)
+├── calendar/             # Apple Calendar (10 tools, 2 prompts)
 │   ├── tools.ts, scripts.ts, prompts.ts
-├── contacts/             # Apple Contacts (7 tools)
+├── contacts/             # Apple Contacts (10 tools)
 │   ├── tools.ts, scripts.ts
-├── mail/                 # Apple Mail (5 tools)
+├── mail/                 # Apple Mail (11 tools)
 │   ├── tools.ts, scripts.ts
 ├── music/                # Apple Music (17 tools)
 │   ├── tools.ts, scripts.ts
-├── finder/               # Finder (4 tools)
+├── finder/               # Finder (8 tools)
 │   ├── tools.ts, scripts.ts
-├── safari/               # Safari (5 tools)
+├── safari/               # Safari (12 tools)
 │   ├── tools.ts, scripts.ts
-├── messages/             # Messages (3 tools)
+├── messages/             # Messages (6 tools)
 │   ├── tools.ts, scripts.ts
-├── system/               # System (23 tools)
+├── system/               # System (27 tools)
 │   ├── tools.ts, scripts.ts
-├── photos/               # Photos (3 tools, macOS 26+ Swift)
+├── photos/               # Photos (9 tools, macOS 26+ Swift)
 │   └── tools.ts
-├── shortcuts/            # Shortcuts (4 tools, 1 prompt)
+├── shortcuts/            # Shortcuts (11 tools, 3 prompts)
 │   ├── tools.ts, scripts.ts, prompts.ts
 ├── intelligence/         # Apple Intelligence (8 tools, macOS 26+)
 │   └── tools.ts
-├── tv/                   # Apple TV (7 tools)
+├── tv/                   # Apple TV (6 tools)
 │   ├── tools.ts, scripts.ts
-├── screen/               # Screen Capture (3 tools)
-│   └── tools.ts
-├── maps/                 # Maps (5 tools)
+├── ui/                   # UI Automation (10 tools)
+│   ├── tools.ts, scripts.ts, ax-query.ts
+├── screen/               # Screen Capture (5 tools)
 │   ├── tools.ts, scripts.ts
+├── maps/                 # Maps (8 tools)
+│   ├── tools.ts, scripts.ts, api.ts
 ├── podcasts/             # Podcasts (6 tools, broken on macOS 26)
 │   ├── tools.ts, scripts.ts
 ├── weather/              # Weather (3 tools)
-│   └── tools.ts
-├── pages/                # Pages (6 tools)
+│   ├── tools.ts, api.ts
+├── pages/                # Pages (7 tools)
 │   ├── tools.ts, scripts.ts
-├── numbers/              # Numbers (7 tools)
+├── numbers/              # Numbers (9 tools)
 │   ├── tools.ts, scripts.ts
-├── keynote/              # Keynote (8 tools)
+├── keynote/              # Keynote (9 tools)
 │   ├── tools.ts, scripts.ts
 ├── location/             # Location (2 tools, Swift)
 │   └── tools.ts
-├── bluetooth/            # Bluetooth (2 tools, Swift)
+├── bluetooth/            # Bluetooth (4 tools, Swift)
+│   └── tools.ts
+├── google/               # Google Workspace (16 tools)
+│   ├── tools.ts, gws.ts
+├── semantic/             # Semantic search (4 tools)
+│   ├── tools.ts, service.ts, embeddings.ts, store.ts
+├── apps/                 # App management (calendar-week, music-player UIs)
 │   └── tools.ts
 ├── cross/                # Cross-module prompts (19 prompts)
-│   └── prompts.ts
+│   ├── prompts.ts, tools.ts
 ├── skills/               # YAML skill engine (3 built-in skills)
-│   ├── engine.ts, loader.ts
+│   ├── executor.ts, loader.ts, register.ts
 │   └── builtins/
 └── shared/
+    ├── constants.ts      # All magic numbers, API URLs, timeouts, buffer sizes
     ├── jxa.ts            # JXA execution (osascript wrapper, circuit breaker, retry)
     ├── swift.ts          # Swift bridge (Foundation Models, EventKit, PhotoKit)
     ├── esc.ts            # String escaping for JXA injection prevention
     ├── result.ts         # ok()/err() MCP response helpers
-    ├── config.ts         # Environment variable parsing, OS version detection
+    ├── config.ts         # Config parsing, module registry, MCP client paths
     ├── iwork.ts          # Shared iWork helpers (bundle ID mapping)
-    ├── modules.ts        # MODULE_REGISTRY (24 modules)
-    └── resources.ts      # MCP resource registration (12 resources)
+    ├── modules.ts        # MODULE_REGISTRY (25 modules)
+    └── resources.ts      # MCP resource registration (11 resources)
 swift/                    # Swift package for Apple Intelligence + EventKit + PhotoKit
-scripts/                  # QA test runner (qa-test.mjs)
+scripts/                  # QA test runner + stats counter
 tests/                    # Script generator tests
 ```
 
 ## Stats
 
-- **226 tools** across 24 modules
-- **31 prompts** (per-module + cross-module + YAML skills)
-- **12 MCP resources** (Notes, Calendar, Reminders, Music, Mail, System, Context Snapshot)
+- **244 tools** across 25 modules (+ dynamic shortcut tools at runtime)
+- **30 prompts** (per-module + cross-module + YAML skills)
+- **11 MCP resources** (Notes, Calendar, Reminders, Music, Mail, System, Context Snapshot)
 
 ## Module Pattern
 
@@ -95,6 +104,7 @@ Each module follows: `scripts.ts` (JXA generators) + `tools.ts` (MCP registratio
 - **stdio only**: `console.log()` breaks MCP — use `console.error()` for debug
 - **Circuit breaker**: 3 failures → 60s auto-disable per app (in `jxa.ts`)
 - **Clipboard**: Content truncated to 5MB to stay within osascript maxBuffer
+- **Centralized constants**: All timeouts, buffer sizes, limits in `shared/constants.ts`
 
 ## Do NOT Modify
 

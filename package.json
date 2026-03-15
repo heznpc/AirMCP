@@ -78,6 +78,8 @@
     "version:patch": "npm version patch --no-git-tag-version && node -e \"let s=require('./server.json');s.version=s.packages[0].version=require('./package.json').version;require('fs').writeFileSync('server.json',JSON.stringify(s,null,2)+'\\n')\"",
     "version:minor": "npm version minor --no-git-tag-version && node -e \"let s=require('./server.json');s.version=s.packages[0].version=require('./package.json').version;require('fs').writeFileSync('server.json',JSON.stringify(s,null,2)+'\\n')\"",
     "version:major": "npm version major --no-git-tag-version && node -e \"let s=require('./server.json');s.version=s.packages[0].version=require('./package.json').version;require('fs').writeFileSync('server.json',JSON.stringify(s,null,2)+'\\n')\"",
+    "stats": "node scripts/count-stats.mjs",
+    "stats:check": "node scripts/count-stats.mjs --check",
     "prepare": "husky"
   },
   "dependencies": {
@@ -88,6 +90,8 @@
     "zod": "^3.24.0"
   },
   "devDependencies": {
+    "@commitlint/cli": "^20.4.4",
+    "@commitlint/config-conventional": "^20.4.4",
     "@eslint/js": "^10.0.1",
     "@jest/globals": "^29.7.0",
     "@types/express": "^5.0.6",

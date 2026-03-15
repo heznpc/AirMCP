@@ -188,7 +188,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
         "Update reminder properties. Only specified fields are changed. Set dueDate to null to clear it. Recurrence rules cannot be modified via automation.",
       inputSchema: {
         id: z.string().describe("Reminder ID"),
-        name: z.string().optional().describe("New title"),
+        title: z.string().optional().describe("New title"),
         body: z.string().optional().describe("New notes/body text"),
         dueDate: z.string().nullable().optional().describe("New due date (ISO 8601, e.g. '2026-03-15T10:00:00Z') or null to clear"),
         priority: z.number().int().min(0).max(9).optional().describe("New priority (0-9)"),
@@ -201,10 +201,10 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
         openWorldHint: false,
       },
     },
-    async ({ id, name, body, dueDate, priority, flagged }) => {
+    async ({ id, title, body, dueDate, priority, flagged }) => {
       try {
         const result = await runJxa<MutationResult>(
-          updateReminderScript(id, { name, body, dueDate, priority, flagged }),
+          updateReminderScript(id, { name: title, body, dueDate, priority, flagged }),
         );
         return ok(result);
       } catch (e) {

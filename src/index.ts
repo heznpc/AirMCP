@@ -212,6 +212,7 @@ async function main() {
     app.use(express.json());
 
     const transports = new Map<string, StreamableHTTPServerTransport>();
+    const servers = new Map<string, McpServer>();
     const sessionActivity = new Map<string, number>();
 
     const cleanupInterval = setInterval(() => {
@@ -220,7 +221,10 @@ async function main() {
         if (now - lastActive > TIMEOUT.SESSION_IDLE) {
           const transport = transports.get(id);
           if (transport) transport.close?.();
+          const srv = servers.get(id);
+          if (srv) srv.close?.();
           transports.delete(id);
+          servers.delete(id);
           sessionActivity.delete(id);
         }
       }
@@ -279,12 +283,18 @@ async function main() {
           },
           onsessionclosed: (id) => {
             transports.delete(id);
+            const srv = servers.get(id);
+            if (srv) srv.close?.();
+            servers.delete(id);
             sessionActivity.delete(id);
           },
         });
 
         const { server } = await createServer();
         await server.connect(transport);
+        // Track server for cleanup once session ID is assigned
+        const sid = [...transports.entries()].find(([, t]) => t === transport)?.[0];
+        if (sid) servers.set(sid, server);
         await transport.handleRequest(req, res, req.body);
       } catch (err) {
         console.error("POST /mcp error:", err);
@@ -326,8 +336,9 @@ async function main() {
       }
     });
 
-    // Create one server just for banner info + initial tool count
-    const { bannerInfo: bi } = await createServer();
+    // Pre-warm module registry + shortcuts cache (avoids per-session subprocess)
+    const { bannerInfo: bi, server: warmupServer } = await createServer();
+    warmupServer.close?.();
     app.listen(port, async () => {
       bi.transport = "http";
       bi.port = port;

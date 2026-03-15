@@ -46,7 +46,10 @@ const MANIFEST: Array<{
  * Each module's tools.ts exports a single register function.
  * Only the first exported function is used (convention over configuration).
  */
+let cache: ModuleRegistration[] | null = null;
+
 export async function loadModuleRegistry(): Promise<ModuleRegistration[]> {
+  if (cache) return cache;
   const registry: ModuleRegistration[] = [];
 
   const importPromises = MANIFEST.map(async (def) => {
@@ -77,6 +80,8 @@ export async function loadModuleRegistry(): Promise<ModuleRegistration[]> {
   for (const mod of results) {
     if (mod) registry.push(mod);
   }
+
+  cache = registry;
 
   return registry;
 }

@@ -7,6 +7,8 @@ import { registerSkills } from "./register.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BUILTINS_DIR = join(__dirname, "builtins");
 
+let watcherStarted = false;
+
 export async function registerSkillEngine(server: McpServer): Promise<void> {
   const { builtins, user } = loadAllSkills(BUILTINS_DIR);
   const merged = mergeSkills(builtins, user);
@@ -18,8 +20,11 @@ export async function registerSkillEngine(server: McpServer): Promise<void> {
 
   registerSkills(server, merged);
 
-  // Watch user skills directory for changes — log only, hot-reload requires server restart
-  watchUserSkills(() => {
-    console.error("[AirMCP] User skills changed. Restart server to apply changes.");
-  });
+  // Watch user skills directory for changes — only once per process
+  if (!watcherStarted) {
+    watcherStarted = true;
+    watchUserSkills(() => {
+      console.error("[AirMCP] User skills changed. Restart server to apply changes.");
+    });
+  }
 }

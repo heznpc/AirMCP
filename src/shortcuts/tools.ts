@@ -164,24 +164,27 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
  * Discover user's Siri Shortcuts at startup and register each as an individual MCP tool.
  * Returns the number of dynamic tools registered. Gracefully returns 0 on failure.
  */
-export async function registerDynamicShortcutTools(server: McpServer): Promise<number> {
-  let output: string;
+let cachedShortcutNames: string[] | null = null;
+
+async function discoverShortcuts(): Promise<string[]> {
+  if (cachedShortcutNames) return cachedShortcutNames;
   try {
     const result = await execFileAsync("shortcuts", ["list"], { timeout: TIMEOUT.SHORTCUTS_LIST });
-    output = result.stdout;
+    const names = result.stdout.split("\n").filter((n) => n.trim().length > 0);
+    if (names.length > LIMITS.DYNAMIC_SHORTCUTS) {
+      console.error(`[AirMCP] Found ${names.length} shortcuts, registering first ${LIMITS.DYNAMIC_SHORTCUTS} (limit reached)`);
+    }
+    cachedShortcutNames = names.slice(0, LIMITS.DYNAMIC_SHORTCUTS);
   } catch (e) {
     console.error(`[AirMCP] Failed to list shortcuts for dynamic registration: ${e instanceof Error ? e.message : String(e)}`);
-    return 0;
+    cachedShortcutNames = [];
   }
+  return cachedShortcutNames;
+}
 
-  const names = output.split("\n").filter((n) => n.trim().length > 0);
-  if (names.length === 0) return 0;
-
-  if (names.length > LIMITS.DYNAMIC_SHORTCUTS) {
-    console.error(`[AirMCP] Found ${names.length} shortcuts, registering first ${LIMITS.DYNAMIC_SHORTCUTS} (limit reached)`);
-  }
-
-  const toRegister = names.slice(0, LIMITS.DYNAMIC_SHORTCUTS);
+export async function registerDynamicShortcutTools(server: McpServer): Promise<number> {
+  const toRegister = await discoverShortcuts();
+  if (toRegister.length === 0) return 0;
   const seen = new Set<string>();
   let count = 0;
 

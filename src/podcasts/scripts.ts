@@ -1,123 +1,106 @@
-// JXA scripts for Apple Podcasts automation.
+// Podcasts scripts — SQLite for reading, Shortcuts for playback.
+//
+// Apple Podcasts has NO AppleScript/JXA scripting dictionary.
+// The previous JXA-based scripts never worked.
+//
+// New approach:
+// - Read operations: query the Podcasts SQLite database directly
+// - Playback: use `shortcuts run` or `open podcasts://` URL scheme
 
-import { esc } from "../shared/esc.js";
+import { escJxaShell } from "../shared/esc.js";
+
+const PODCASTS_DB = "~/Library/Group\\\\ Containers/243LU875E5.groups.com.apple.podcasts/Documents/MTLibrary.sqlite";
+
+function sqliteQuery(sql: string): string {
+  return `
+    const app = Application.currentApplication();
+    app.includeStandardAdditions = true;
+    try {
+      const raw = app.doShellScript('sqlite3 -json ${PODCASTS_DB} "${sql}"');
+      JSON.stringify(JSON.parse(raw));
+    } catch(e) {
+      JSON.stringify({error: e.message, hint: "Podcasts database may require Full Disk Access. Check System Settings > Privacy > Full Disk Access."});
+    }
+  `;
+}
 
 export function listShowsScript(): string {
-  return `
-    const Podcasts = Application('Podcasts');
-    const shows = Podcasts.shows();
-    const result = [];
-    for (let i = 0; i < shows.length; i++) {
-      result.push({name: shows[i].name(), author: shows[i].author(), episodeCount: shows[i].episodes.length});
-    }
-    JSON.stringify(result);
-  `;
+  return sqliteQuery(
+    "SELECT ZTITLE as name, ZAUTHOR as author, " +
+    "(SELECT COUNT(*) FROM ZMTEPISODE WHERE ZMTEPISODE.ZPODCAST = ZMTPODCAST.Z_PK) as episodeCount " +
+    "FROM ZMTPODCAST ORDER BY ZTITLE"
+  );
 }
 
 export function listEpisodesScript(showName: string, limit: number): string {
-  return `
-    const Podcasts = Application('Podcasts');
-    const shows = Podcasts.shows.whose({name: '${esc(showName)}'})();
-    if (shows.length === 0) throw new Error('Show not found: ${esc(showName)}');
-    const episodes = shows[0].episodes();
-    const count = Math.min(episodes.length, ${limit});
-    const result = [];
-    for (let i = 0; i < count; i++) {
-      const ep = episodes[i];
-      result.push({
-        title: ep.name(),
-        date: ep.releaseDate() ? ep.releaseDate().toISOString() : null,
-        duration: ep.duration(),
-        played: ep.played()
-      });
-    }
-    JSON.stringify({total: episodes.length, returned: count, episodes: result});
-  `;
-}
-
-export function nowPlayingScript(): string {
-  return `
-    const Podcasts = Application('Podcasts');
-    const state = Podcasts.playerState();
-    if (state === 'stopped') {
-      JSON.stringify({playerState: 'stopped', episode: null});
-    } else {
-      const t = Podcasts.currentTrack;
-      JSON.stringify({
-        playerState: state,
-        episode: {
-          name: t.name(),
-          show: t.show(),
-          duration: t.duration(),
-          playerPosition: Podcasts.playerPosition()
-        }
-      });
-    }
-  `;
-}
-
-const ALLOWED_ACTIONS = new Set(["play", "pause", "nextTrack", "previousTrack"]);
-
-export function playbackControlScript(action: string): string {
-  if (!ALLOWED_ACTIONS.has(action)) {
-    throw new Error(`Invalid playback action: ${action}`);
-  }
-  return `
-    const Podcasts = Application('Podcasts');
-    Podcasts.${action}();
-    const state = Podcasts.playerState();
-    JSON.stringify({action: '${action}', playerState: state});
-  `;
-}
-
-export function playEpisodeScript(episodeName: string, showName?: string): string {
-  if (showName) {
-    return `
-      const Podcasts = Application('Podcasts');
-      const shows = Podcasts.shows.whose({name: '${esc(showName)}'})();
-      if (shows.length === 0) throw new Error('Show not found: ${esc(showName)}');
-      const episodes = shows[0].episodes.whose({name: '${esc(episodeName)}'})();
-      if (episodes.length === 0) throw new Error('Episode not found: ${esc(episodeName)}');
-      episodes[0].play();
-      JSON.stringify({playing: true, episode: episodes[0].name(), show: '${esc(showName)}'});
-    `;
-  }
-  return `
-    const Podcasts = Application('Podcasts');
-    const shows = Podcasts.shows();
-    let found = null;
-    for (let i = 0; i < shows.length && !found; i++) {
-      const episodes = shows[i].episodes.whose({name: '${esc(episodeName)}'})();
-      if (episodes.length > 0) found = episodes[0];
-    }
-    if (!found) throw new Error('Episode not found: ${esc(episodeName)}');
-    found.play();
-    JSON.stringify({playing: true, episode: found.name(), show: found.show()});
-  `;
+  const safe = showName.replace(/'/g, "''");
+  return sqliteQuery(
+    `SELECT e.ZTITLE as title, e.ZPUBDATE as date, e.ZDURATION as duration, e.ZPLAYCOUNT as playCount ` +
+    `FROM ZMTEPISODE e JOIN ZMTPODCAST p ON e.ZPODCAST = p.Z_PK ` +
+    `WHERE p.ZTITLE = '${safe}' ORDER BY e.ZPUBDATE DESC LIMIT ${limit}`
+  );
 }
 
 export function searchEpisodesScript(query: string, limit: number): string {
+  const safe = query.replace(/'/g, "''");
+  return sqliteQuery(
+    `SELECT e.ZTITLE as title, p.ZTITLE as show, e.ZPUBDATE as date, e.ZDURATION as duration ` +
+    `FROM ZMTEPISODE e JOIN ZMTPODCAST p ON e.ZPODCAST = p.Z_PK ` +
+    `WHERE e.ZTITLE LIKE '%${safe}%' OR e.ZITEMDESCRIPTION LIKE '%${safe}%' ` +
+    `ORDER BY e.ZPUBDATE DESC LIMIT ${limit}`
+  );
+}
+
+export function nowPlayingScript(): string {
+  // Use System Events to check if Podcasts is running and get now-playing info
   return `
-    const Podcasts = Application('Podcasts');
-    const shows = Podcasts.shows();
-    const q = '${esc(query)}'.toLowerCase();
-    const result = [];
-    for (let s = 0; s < shows.length && result.length < ${limit}; s++) {
-      const episodes = shows[s].episodes();
-      for (let i = 0; i < episodes.length && result.length < ${limit}; i++) {
-        const name = episodes[i].name() || '';
-        const desc = episodes[i].description() || '';
-        if (name.toLowerCase().includes(q) || desc.toLowerCase().includes(q)) {
-          result.push({
-            title: name,
-            show: shows[s].name(),
-            date: episodes[i].releaseDate() ? episodes[i].releaseDate().toISOString() : null,
-            duration: episodes[i].duration(),
-            played: episodes[i].played()
-          });
-        }
+    const se = Application('System Events');
+    const running = se.applicationProcesses.whose({name: 'Podcasts'})().length > 0;
+    if (!running) {
+      JSON.stringify({playerState: 'stopped', episode: null, hint: 'Podcasts app is not running'});
+    } else {
+      const app = Application.currentApplication();
+      app.includeStandardAdditions = true;
+      try {
+        const raw = app.doShellScript('sqlite3 -json ${PODCASTS_DB} "SELECT e.ZTITLE as title, p.ZTITLE as show, e.ZDURATION as duration FROM ZMTEPISODE e JOIN ZMTPODCAST p ON e.ZPODCAST = p.Z_PK WHERE e.ZLASTDATEPLAYED IS NOT NULL ORDER BY e.ZLASTDATEPLAYED DESC LIMIT 1"');
+        const episodes = JSON.parse(raw);
+        JSON.stringify({playerState: 'running', lastPlayed: episodes[0] || null});
+      } catch(e) {
+        JSON.stringify({playerState: 'running', error: e.message});
       }
     }
-    JSON.stringify({returned: result.length, episodes: result});
+  `;
+}
+
+export function playbackControlScript(action: string): string {
+  // Use System Events keyboard simulation for playback control
+  const keyMap: Record<string, string> = {
+    play: "space",
+    pause: "space",
+    nextTrack: "using {command down}, \"right arrow\"",
+    previousTrack: "using {command down}, \"left arrow\"",
+  };
+  const key = keyMap[action];
+  if (!key) throw new Error(`Invalid playback action: ${action}`);
+
+  return `
+    const se = Application('System Events');
+    const procs = se.applicationProcesses.whose({name: 'Podcasts'})();
+    if (procs.length === 0) throw new Error('Podcasts app is not running. Launch it first.');
+    Application('Podcasts').activate();
+    delay(0.3);
+    se.keystroke(${action === "play" || action === "pause" ? '" "' : ""}, ${key.includes("command") ? `{${key}}` : ""});
+    JSON.stringify({action: '${action}', sent: true});
+  `;
+}
+
+export function playEpisodeScript(episodeName: string, _showName?: string): string {
+  // Open the Podcasts app and use URL scheme to search
+  const q = encodeURIComponent(episodeName);
+  return `
+    const app = Application.currentApplication();
+    app.includeStandardAdditions = true;
+    app.openLocation('podcasts://search?term=${q}');
+    JSON.stringify({action: 'openSearch', query: '${escJxaShell(episodeName)}', hint: 'Opened Podcasts search. Select and play the episode manually.'});
   `;
 }

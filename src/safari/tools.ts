@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, toolError } from "../shared/result.js";
+import { ok, err, toolError } from "../shared/result.js";
 import {
   listTabsScript,
   readPageContentScript,
@@ -13,7 +13,6 @@ import {
   runJavascriptScript,
   searchTabsScript,
   listBookmarksScript,
-  addBookmarkScript,
   listReadingListScript,
   addToReadingListScript,
 } from "./scripts.js";
@@ -193,21 +192,21 @@ export function registerSafariTools(server: McpServer, _config: AirMcpConfig): v
   server.registerTool(
     "add_bookmark",
     {
-      title: "Add Bookmark",
-      description: "Add a bookmark to Safari. Optionally specify a folder name; defaults to Favorites/BookmarksBar.",
+      title: "Add Bookmark (Deprecated)",
+      description:
+        "DEPRECATED: Safari removed bookmark scripting in macOS 26. This tool will return an error. " +
+        "Use add_to_reading_list instead, which still works.",
       inputSchema: {
         url: z.string().url().describe("URL to bookmark"),
         title: z.string().describe("Bookmark title"),
-        folder: z.string().optional().describe("Target bookmark folder name (default: Favorites or BookmarksBar)"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
-    async ({ url, title, folder }) => {
-      try {
-        return ok(await runJxa(addBookmarkScript(url, title, folder)));
-      } catch (e) {
-        return toolError("add bookmark", e);
-      }
+    async () => {
+      return err(
+        "add_bookmark is deprecated — Safari removed bookmark scripting in macOS 26. " +
+        "Use add_to_reading_list instead."
+      );
     },
   );
 

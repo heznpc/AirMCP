@@ -153,6 +153,44 @@ struct ReminderOutput: Encodable {
 
 // MARK: - PhotoKit input/output types
 
+struct PhotoQueryInput: Decodable {
+    let mediaType: String?     // image, video, audio
+    let startDate: String?     // ISO 8601
+    let endDate: String?       // ISO 8601
+    let favorites: Bool?
+    let limit: Int?
+}
+
+struct PhotoQueryOutput: Encodable {
+    let photos: [PhotoInfo]
+    let total: Int
+}
+
+struct PhotoInfo: Encodable {
+    let identifier: String
+    let filename: String?
+    let creationDate: String?
+    let mediaType: String
+    let isFavorite: Bool
+    let width: Int
+    let height: Int
+}
+
+struct ClassifyImageInput: Decodable {
+    let imagePath: String
+    let maxResults: Int?
+}
+
+struct ClassifyImageOutput: Encodable {
+    let labels: [ImageLabel]
+    let total: Int
+}
+
+struct ImageLabel: Encodable {
+    let identifier: String
+    let confidence: Double
+}
+
 struct ImportPhotoInput: Decodable {
     let filePath: String
     let albumName: String?
@@ -636,6 +674,86 @@ case "create-recurring-reminder":
 
     let output = ReminderOutput(id: reminder.calendarItemIdentifier, title: reminder.title ?? "", recurring: true)
     try writeJSON(output)
+
+// --- PhotoKit: Advanced Query ---
+case "query-photos":
+    guard let queryInput = try? JSONDecoder().decode(PhotoQueryInput.self, from: stdinData) else {
+        writeError("Invalid JSON. Expected PhotoQueryInput.")
+        exit(1)
+    }
+
+    let fetchOptions = PHFetchOptions()
+    var predicates: [NSPredicate] = []
+
+    if let mediaType = queryInput.mediaType {
+        let type: PHAssetMediaType = mediaType == "video" ? .video : mediaType == "audio" ? .audio : .image
+        predicates.append(NSPredicate(format: "mediaType = %d", type.rawValue))
+    }
+    if let startStr = queryInput.startDate, let start = parseISO8601(startStr) {
+        predicates.append(NSPredicate(format: "creationDate >= %@", start as NSDate))
+    }
+    if let endStr = queryInput.endDate, let end = parseISO8601(endStr) {
+        predicates.append(NSPredicate(format: "creationDate <= %@", end as NSDate))
+    }
+    if let fav = queryInput.favorites, fav {
+        predicates.append(NSPredicate(format: "isFavorite = YES"))
+    }
+
+    if !predicates.isEmpty {
+        fetchOptions.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
+    }
+    fetchOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+    let limit = queryInput.limit ?? 50
+    fetchOptions.fetchLimit = limit
+
+    let assets = PHAsset.fetchAssets(with: fetchOptions)
+    var photos: [PhotoInfo] = []
+    let formatter = ISO8601DateFormatter()
+    assets.enumerateObjects { asset, _, _ in
+        let typeStr = asset.mediaType == .video ? "video" : asset.mediaType == .audio ? "audio" : "image"
+        photos.append(PhotoInfo(
+            identifier: asset.localIdentifier,
+            filename: PHAssetResource.assetResources(for: asset).first?.originalFilename,
+            creationDate: asset.creationDate.map { formatter.string(from: $0) },
+            mediaType: typeStr,
+            isFavorite: asset.isFavorite,
+            width: asset.pixelWidth,
+            height: asset.pixelHeight
+        ))
+    }
+    let queryOutput = PhotoQueryOutput(photos: photos, total: photos.count)
+    try writeJSON(queryOutput)
+
+// --- Vision: Classify Image ---
+case "classify-image":
+    guard let classInput = try? JSONDecoder().decode(ClassifyImageInput.self, from: stdinData) else {
+        writeError("Invalid JSON. Expected ClassifyImageInput.")
+        exit(1)
+    }
+
+    let imageURL = URL(fileURLWithPath: classInput.imagePath)
+    guard FileManager.default.fileExists(atPath: classInput.imagePath) else {
+        writeError("Image file not found: \(classInput.imagePath)")
+        exit(1)
+    }
+
+    do {
+        let request = VNClassifyImageRequest()
+        let handler = VNImageRequestHandler(url: imageURL, options: [:])
+        try handler.perform([request])
+
+        let maxResults = classInput.maxResults ?? 10
+        let observations = (request.results ?? [])
+            .filter { $0.confidence > 0.1 }
+            .sorted { $0.confidence > $1.confidence }
+            .prefix(maxResults)
+
+        let labels = observations.map { ImageLabel(identifier: $0.identifier, confidence: Double($0.confidence)) }
+        let output = ClassifyImageOutput(labels: Array(labels), total: labels.count)
+        try writeJSON(output)
+    } catch {
+        writeError("Vision classify error: \(error.localizedDescription)")
+    }
 
 // --- PhotoKit: Import ---
 case "import-photo":

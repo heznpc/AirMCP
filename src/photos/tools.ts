@@ -170,4 +170,61 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
       }
     },
   );
+
+  // --- Advanced Photo Queries (PhotoKit via Swift bridge) ---
+
+  server.registerTool(
+    "query_photos",
+    {
+      title: "Query Photos",
+      description:
+        "Query the Photos library with filters: media type, date range, favorites. " +
+        "Returns photo metadata (identifier, filename, date, dimensions). Requires Swift bridge.",
+      inputSchema: {
+        mediaType: z.enum(["image", "video", "audio"]).optional().describe("Filter by media type"),
+        startDate: z.string().optional().describe("Start date (ISO 8601)"),
+        endDate: z.string().optional().describe("End date (ISO 8601)"),
+        favorites: z.boolean().optional().describe("Only favorites"),
+        limit: z.number().int().min(1).max(200).optional().default(50).describe("Max results (default: 50)"),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ mediaType, startDate, endDate, favorites, limit }) => {
+      try {
+        const result = await runSwift<{ photos: unknown[]; total: number }>(
+          "query-photos",
+          JSON.stringify({ mediaType, startDate, endDate, favorites, limit }),
+        );
+        return ok(result);
+      } catch (e) {
+        return err(`Failed to query photos: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    },
+  );
+
+  server.registerTool(
+    "classify_image",
+    {
+      title: "Classify Image",
+      description:
+        "Classify an image using Apple Vision framework. Returns labels with confidence scores " +
+        "(e.g. 'dog', 'outdoor', 'food'). Works on any image file. Requires Swift bridge.",
+      inputSchema: {
+        imagePath: zFilePath.describe("Absolute path to the image file"),
+        maxResults: z.number().int().min(1).max(50).optional().default(10).describe("Max labels (default: 10)"),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ imagePath, maxResults }) => {
+      try {
+        const result = await runSwift<{ labels: unknown[]; total: number }>(
+          "classify-image",
+          JSON.stringify({ imagePath, maxResults }),
+        );
+        return ok(result);
+      } catch (e) {
+        return err(`Failed to classify image: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    },
+  );
 }

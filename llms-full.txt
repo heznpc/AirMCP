@@ -1,6 +1,6 @@
 # AirMCP — Full Tool Reference
 
-> 247 tools, 29 prompts across 29 modules.
+> 250 tools, 29 prompts across 29 modules.
 > Auto-generated from source by scripts/gen-llms-txt.mjs
 
 ## Bluetooth
@@ -276,9 +276,9 @@ Generate an image from a text description using Apple Intelligence on-device ima
 
 Extract text and structure from an image file using Apple Vision framework OCR. 
 
-### ai_plan
+### generate_plan
 
-Use Apple's on-device Foundation Model to analyze context and generate a plan of AirMCP tool calls. 
+Use Apple's on-device Foundation Model to analyze a goal and generate a suggested plan of AirMCP tool calls. 
 
 ### ai_status
 
@@ -670,6 +670,14 @@ Import a photo from a file path into Photos library. Optionally add to an existi
 
 Delete photos by local identifier. Shows macOS confirmation dialog for user approval. Requires macOS 26+ Swift bridge.
 
+### query_photos
+
+Query the Photos library with filters: media type, date range, favorites. 
+
+### classify_image
+
+Classify an image using Apple Vision framework. Returns labels with confidence scores 
+
 ## Podcasts
 
 ### list_podcast_shows
@@ -787,7 +795,7 @@ List all Safari bookmarks across all folders, including subfolder paths.
 
 ### add_bookmark
 
-Add a bookmark to Safari. Optionally specify a folder name; defaults to Favorites/BookmarksBar.
+DEPRECATED: Safari removed bookmark scripting in macOS 26. This tool will return an error. 
 
 ### list_reading_list
 
@@ -839,7 +847,11 @@ Push semantically indexed data to macOS Core Spotlight, making it discoverable v
 
 ### semantic_clear
 
-Delete all indexed data from the local vector store. Use for privacy or to force a fresh re-index.
+Delete all indexed data from the local vector store AND remove corresponding entries from macOS Spotlight. 
+
+### spotlight_clear
+
+Remove all AirMCP entries from macOS Spotlight without clearing the local vector store. Requires Swift bridge.
 
 ### semantic_status
 

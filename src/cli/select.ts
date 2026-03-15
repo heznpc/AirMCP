@@ -142,9 +142,10 @@ export function selectMulti(
     out.write(`  ${BOLD}${title}${RESET}\n\n`);
     out.write(HIDE_CURSOR);
     render(true);
+    let confirmed = false;
     const hintText = presets
-      ? `↑↓←→ move · Space toggle · a=all · s=starter · p=prod · Enter done`
-      : `↑↓←→ move · Space toggle · Enter done`;
+      ? `↑↓←→ move · Space ✓/✗ · a=all · s=starter · p=prod · Enter done`
+      : `↑↓←→ move · Space ✓/✗ · Enter done`;
     out.write(`\n${CLEAR_LINE}  ${DIM}${hintText}${RESET}`);
 
     const stdin = process.stdin;
@@ -189,6 +190,16 @@ export function selectMulti(
         for (const o of options) o.checked = o.checked || set.has(o.value);
         needRender = true;
       } else if (key.name === "return") {
+        if (!confirmed) {
+          // First Enter: show confirmation hint
+          confirmed = true;
+          const count = options.filter((o) => o.checked).length;
+          out.write(MOVE_UP(1));
+          render();
+          out.write(`\n${CLEAR_LINE}  ${WHITE}${count} modules selected — Enter again to confirm${RESET}`);
+          return;
+        }
+        // Second Enter: done
         cleanup();
         const selected = options.filter((o) => o.checked);
         out.write(`\r${CLEAR_LINE}`);
@@ -197,6 +208,7 @@ export function selectMulti(
       }
 
       if (needRender) {
+        confirmed = false; // reset confirmation on any change
         out.write(MOVE_UP(1)); // above hint
         render();
         out.write(`\n${CLEAR_LINE}  ${DIM}${hintText}${RESET}`);

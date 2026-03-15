@@ -1,5 +1,5 @@
 import { runSwift, checkSwiftBridge } from "../shared/swift.js";
-import { API, MODELS, TIMEOUT } from "../shared/constants.js";
+import { API, MODELS, TIMEOUT, LIMITS } from "../shared/constants.js";
 
 interface EmbedTextResult {
   vector: number[];
@@ -62,9 +62,9 @@ export async function detectProvider(): Promise<EmbeddingProvider> {
 
 async function geminiEmbed(text: string): Promise<number[]> {
   const apiKey = process.env.GEMINI_API_KEY!;
-  const res = await fetch(`${GEMINI_EMBED_URL}?key=${apiKey}`, {
+  const res = await fetch(GEMINI_EMBED_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
     body: JSON.stringify({
       content: { parts: [{ text }] },
       taskType: "SEMANTIC_SIMILARITY",
@@ -87,16 +87,16 @@ async function geminiBatchEmbed(texts: string[]): Promise<number[][]> {
 
   // Gemini batch API: max 100 per request
   const chunks: string[][] = [];
-  for (let i = 0; i < texts.length; i += 100) {
-    chunks.push(texts.slice(i, i + 100));
+  for (let i = 0; i < texts.length; i += LIMITS.EMBED_BATCH_SIZE) {
+    chunks.push(texts.slice(i, i + LIMITS.EMBED_BATCH_SIZE));
   }
 
   const allVectors: number[][] = [];
 
   for (const chunk of chunks) {
-    const res = await fetch(`${GEMINI_BATCH_URL}?key=${apiKey}`, {
+    const res = await fetch(GEMINI_BATCH_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify({
         requests: chunk.map((text) => ({
           model: `models/${GEMINI_MODEL}`,

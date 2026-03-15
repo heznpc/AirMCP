@@ -117,7 +117,10 @@ export function registerMessagesTools(server: McpServer, config: AirMcpConfig): 
       description: "Send a file attachment via iMessage/SMS. Requires absolute file path and recipient handle.",
       inputSchema: {
         target: z.string().min(1).describe("Recipient handle (phone number or email)"),
-        filePath: z.string().min(1).describe("Absolute file path to send"),
+        filePath: z.string().min(1)
+          .refine((p) => p.startsWith("/"), "File path must be absolute")
+          .refine((p) => !p.includes(".."), "Path traversal is not allowed")
+          .describe("Absolute file path to send"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },

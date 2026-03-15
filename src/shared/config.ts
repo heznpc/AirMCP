@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { release } from "node:os";
+import { HOME, PATHS } from "./constants.js";
 
 /**
  * Return the macOS major version number.
@@ -87,6 +88,19 @@ export const STARTER_MODULES: ReadonlySet<string> = new Set([
 
 export type ModuleName = (typeof MODULE_NAMES)[number];
 
+export interface McpClient {
+  name: string;
+  configPath: string;
+  serversKey: string;
+}
+
+export const MCP_CLIENTS: McpClient[] = [
+  { name: "Claude Desktop", configPath: join(HOME, "Library", "Application Support", "Claude", "claude_desktop_config.json"), serversKey: "mcpServers" },
+  { name: "Claude Code", configPath: join(HOME, ".claude", "mcp.json"), serversKey: "mcpServers" },
+  { name: "Cursor", configPath: join(HOME, ".cursor", "mcp.json"), serversKey: "mcpServers" },
+  { name: "Windsurf", configPath: join(HOME, ".codeium", "windsurf", "mcp_config.json"), serversKey: "mcpServers" },
+];
+
 export interface AirMcpConfig {
   /** Include shared notes/folders in results. Default: false */
   includeShared: boolean;
@@ -119,9 +133,7 @@ interface LoadResult {
 
 function loadFileConfig(): LoadResult {
   try {
-    const home = process.env.HOME ?? process.env.USERPROFILE ?? "";
-    const file = join(home, ".config", "airmcp", "config.json");
-    const data = readFileSync(file, "utf-8");
+    const data = readFileSync(PATHS.CONFIG, "utf-8");
     return { config: JSON.parse(data) as FileConfig, fileExists: true };
   } catch {
     return { config: {}, fileExists: false };
@@ -188,14 +200,13 @@ export function parseConfig(): AirMcpConfig {
   const allowSendMail = envBool("AIRMCP_ALLOW_SEND_MAIL", file.allowSendMail, true);
 
   // HITL config: env var > JSON > default
-  const home = process.env.HOME ?? process.env.USERPROFILE ?? "";
   const hitlLevelRaw = process.env.AIRMCP_HITL_LEVEL ?? file.hitl?.level ?? "off";
   const hitlLevel: HitlLevel = HITL_LEVELS.includes(hitlLevelRaw)
     ? (hitlLevelRaw as HitlLevel)
     : "off";
   const hitlWhitelist = new Set<string>(file.hitl?.whitelist ?? []);
   const hitlTimeout = file.hitl?.timeout ?? 30;
-  const hitlSocketPath = join(home, ".config", "airmcp", "hitl.sock");
+  const hitlSocketPath = PATHS.HITL_SOCKET;
 
   const hitl: HitlConfig = {
     level: hitlLevel,

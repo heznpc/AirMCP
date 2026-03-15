@@ -2,12 +2,10 @@ import { spawn } from "node:child_process";
 import { access } from "node:fs/promises";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-
-const TIMEOUT_MS = 60_000; // 60s — LLM inference can be slow
-const MAX_BUFFER = 10 * 1024 * 1024; // 10 MB
+import { TIMEOUT, BUFFER, PATHS } from "./constants.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const BINARY_PATH = resolve(__dirname, "../../swift/.build/release/AirMcpBridge");
+const BINARY_PATH = resolve(__dirname, PATHS.SWIFT_BRIDGE);
 
 let bridgeChecked = false;
 let bridgeError: string | null = null;
@@ -18,7 +16,7 @@ export async function checkSwiftBridge(): Promise<string | null> {
     await access(BINARY_PATH);
     bridgeError = null;
   } catch {
-    bridgeError = `Apple Intelligence requires macOS 26+ with Apple Silicon. Swift bridge binary not found at: ${BINARY_PATH}. Run 'npm run swift-build' to compile.`;
+    bridgeError = "Apple Intelligence requires macOS 26+ with Apple Silicon. Swift bridge not found. Run 'npm run swift-build' to compile.";
   }
   bridgeChecked = true;
   return bridgeError;
@@ -30,7 +28,7 @@ export async function runSwift<T>(command: string, input: string): Promise<T> {
 
   return new Promise<T>((resolve, reject) => {
     const child = spawn(BINARY_PATH, [command], {
-      timeout: TIMEOUT_MS,
+      timeout: TIMEOUT.SWIFT,
     });
 
     let stdout = "";
@@ -39,9 +37,9 @@ export async function runSwift<T>(command: string, input: string): Promise<T> {
 
     child.stdout.on("data", (chunk: Buffer) => {
       size += chunk.length;
-      if (size > MAX_BUFFER) {
+      if (size > BUFFER.SWIFT) {
         child.kill("SIGTERM");
-        reject(new Error(`Swift bridge output exceeded ${MAX_BUFFER} bytes`));
+        reject(new Error(`Swift bridge output exceeded ${BUFFER.SWIFT} bytes`));
         return;
       }
       stdout += chunk.toString();
@@ -53,7 +51,7 @@ export async function runSwift<T>(command: string, input: string): Promise<T> {
 
     child.on("close", (code, signal) => {
       if (signal === "SIGTERM") {
-        reject(new Error(`Swift bridge timed out after ${TIMEOUT_MS / 1000}s`));
+        reject(new Error(`Swift bridge timed out after ${TIMEOUT.SWIFT / 1000}s`));
         return;
       }
       if (code !== 0) {

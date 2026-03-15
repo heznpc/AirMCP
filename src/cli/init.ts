@@ -8,43 +8,10 @@
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { MODULE_NAMES, STARTER_MODULES, NPM_PACKAGE_NAME } from "../shared/config.js";
+import { MODULE_NAMES, STARTER_MODULES, NPM_PACKAGE_NAME, MCP_CLIENTS } from "../shared/config.js";
+import { PATHS } from "../shared/constants.js";
 import { LOGO_LINES, typeLine, sleep, writeOut } from "../shared/banner.js";
 import { selectOne, selectMulti, type SelectOption, type MultiOption } from "./select.js";
-
-const HOME = process.env.HOME ?? process.env.USERPROFILE ?? "";
-
-interface McpClient {
-  name: string;
-  configPath: string;
-  serversKey: string;
-}
-
-const MCP_CLIENTS: McpClient[] = [
-  {
-    name: "Claude Desktop",
-    configPath: join(HOME, "Library", "Application Support", "Claude", "claude_desktop_config.json"),
-    serversKey: "mcpServers",
-  },
-  {
-    name: "Claude Code",
-    configPath: join(HOME, ".claude", "mcp.json"),
-    serversKey: "mcpServers",
-  },
-  {
-    name: "Cursor",
-    configPath: join(HOME, ".cursor", "mcp.json"),
-    serversKey: "mcpServers",
-  },
-  {
-    name: "Windsurf",
-    configPath: join(HOME, ".codeium", "windsurf", "mcp_config.json"),
-    serversKey: "mcpServers",
-  },
-];
-
-const AIRMCP_CONFIG_DIR = join(HOME, ".config", "airmcp");
-const AIRMCP_CONFIG_PATH = join(AIRMCP_CONFIG_DIR, "config.json");
 
 // ── Module metadata ──────────────────────────────────────────────────
 
@@ -85,35 +52,35 @@ const MODULE_META: Record<string, ModuleMeta> = {
 // ── CLI i18n ─────────────────────────────────────────────────────────
 
 const LANGUAGES = [
-  { code: "en", label: "English",    flag: "🇺🇸" },
-  { code: "ko", label: "한국어",      flag: "🇰🇷" },
-  { code: "ja", label: "日本語",      flag: "🇯🇵" },
-  { code: "zh-CN", label: "简体中文", flag: "🇨🇳" },
-  { code: "zh-TW", label: "繁體中文", flag: "🇹🇼" },
-  { code: "es", label: "Español",    flag: "🇪🇸" },
-  { code: "fr", label: "Français",   flag: "🇫🇷" },
-  { code: "de", label: "Deutsch",    flag: "🇩🇪" },
-  { code: "pt", label: "Português",  flag: "🇧🇷" },
+  { code: "en", label: "English",    flag: "\u{1F1FA}\u{1F1F8}" },
+  { code: "ko", label: "\uD55C\uAD6D\uC5B4",      flag: "\u{1F1F0}\u{1F1F7}" },
+  { code: "ja", label: "\u65E5\u672C\u8A9E",      flag: "\u{1F1EF}\u{1F1F5}" },
+  { code: "zh-CN", label: "\u7B80\u4F53\u4E2D\u6587", flag: "\u{1F1E8}\u{1F1F3}" },
+  { code: "zh-TW", label: "\u7E41\u9AD4\u4E2D\u6587", flag: "\u{1F1F9}\u{1F1FC}" },
+  { code: "es", label: "Espa\u00F1ol",    flag: "\u{1F1EA}\u{1F1F8}" },
+  { code: "fr", label: "Fran\u00E7ais",   flag: "\u{1F1EB}\u{1F1F7}" },
+  { code: "de", label: "Deutsch",    flag: "\u{1F1E9}\u{1F1EA}" },
+  { code: "pt", label: "Portugu\u00EAs",  flag: "\u{1F1E7}\u{1F1F7}" },
 ] as const;
 
 type LangCode = (typeof LANGUAGES)[number]["code"];
 
 const I18N: Record<string, Record<LangCode, string>> = {
-  wizard_title:   { en: "AirMCP Setup Wizard", ko: "AirMCP 설정 마법사", ja: "AirMCP セットアップ", "zh-CN": "AirMCP 设置向导", "zh-TW": "AirMCP 設定精靈", es: "Asistente de AirMCP", fr: "Assistant AirMCP", de: "AirMCP Einrichtung", pt: "Assistente AirMCP" },
-  wizard_sub:     { en: "Connect your Mac to any AI via MCP", ko: "MCP로 Mac을 AI에 연결하세요", ja: "MCPでMacをAIに接続", "zh-CN": "通过MCP将Mac连接到AI", "zh-TW": "透過MCP將Mac連接到AI", es: "Conecta tu Mac a cualquier IA", fr: "Connectez votre Mac à toute IA", de: "Verbinde deinen Mac mit KI", pt: "Conecte seu Mac a qualquer IA" },
-  choose_lang:    { en: "Choose language", ko: "언어를 선택하세요", ja: "言語を選択", "zh-CN": "选择语言", "zh-TW": "選擇語言", es: "Elige idioma", fr: "Choisir la langue", de: "Sprache wählen", pt: "Escolha o idioma" },
-  choose_modules: { en: "Which modules would you like to enable?", ko: "어떤 모듈을 활성화할까요?", ja: "有効にするモジュールを選んでください", "zh-CN": "要启用哪些模块？", "zh-TW": "要啟用哪些模組？", es: "¿Qué módulos quieres habilitar?", fr: "Quels modules activer ?", de: "Welche Module aktivieren?", pt: "Quais módulos ativar?" },
-  commands:       { en: "Commands", ko: "명령어", ja: "コマンド", "zh-CN": "命令", "zh-TW": "指令", es: "Comandos", fr: "Commandes", de: "Befehle", pt: "Comandos" },
-  toggle_hint:    { en: "Toggle a module (e.g. \"6\" to toggle Messages)", ko: "모듈 전환 (예: \"6\"으로 Messages 전환)", ja: "モジュール切替（例：\"6\"でMessages）", "zh-CN": "切换模块（如 \"6\" 切换 Messages）", "zh-TW": "切換模組（如 \"6\" 切換 Messages）", es: "Alternar módulo (ej. \"6\")", fr: "Basculer un module (ex. \"6\")", de: "Modul umschalten (z.B. \"6\")", pt: "Alternar módulo (ex. \"6\")" },
-  all_modules:    { en: "Enable all 25 modules", ko: "25개 모듈 전부 활성화", ja: "全25モジュール有効化", "zh-CN": "启用全部25个模块", "zh-TW": "啟用全部25個模組", es: "Habilitar los 25 módulos", fr: "Activer les 25 modules", de: "Alle 25 Module aktivieren", pt: "Ativar todos os 25 módulos" },
-  starter_hint:   { en: "Reset to recommended 7 modules ★", ko: "추천 7개 모듈로 초기화 ★", ja: "推奨7モジュールにリセット ★", "zh-CN": "重置为推荐的7个模块 ★", "zh-TW": "重置為推薦的7個模組 ★", es: "Restablecer a 7 módulos recomendados ★", fr: "Réinitialiser aux 7 modules recommandés ★", de: "Auf empfohlene 7 Module zurücksetzen ★", pt: "Redefinir para 7 módulos recomendados ★" },
-  prod_hint:      { en: "Enable all productivity modules", ko: "생산성 모듈 전부 활성화", ja: "生産性モジュール全て有効化", "zh-CN": "启用所有生产力模块", "zh-TW": "啟用所有生產力模組", es: "Habilitar módulos de productividad", fr: "Activer les modules de productivité", de: "Alle Produktivitätsmodule aktivieren", pt: "Ativar módulos de produtividade" },
-  enter_save:     { en: "Done — save and continue", ko: "완료 — 저장 후 계속", ja: "完了 — 保存して続行", "zh-CN": "完成 — 保存并继续", "zh-TW": "完成 — 儲存並繼續", es: "Listo — guardar y continuar", fr: "Terminé — sauvegarder", de: "Fertig — speichern", pt: "Pronto — salvar e continuar" },
-  recommended:    { en: "★ = recommended for new users", ko: "★ = 처음 사용자 추천", ja: "★ = 初心者におすすめ", "zh-CN": "★ = 新用户推荐", "zh-TW": "★ = 新使用者推薦", es: "★ = recomendado para nuevos usuarios", fr: "★ = recommandé pour les débutants", de: "★ = empfohlen für neue Nutzer", pt: "★ = recomendado para novos usuários" },
-  prompt_hint:    { en: "number / all / starter / prod / Enter to save", ko: "번호 / all / starter / prod / Enter 저장", ja: "番号 / all / starter / prod / Enterで保存", "zh-CN": "数字 / all / starter / prod / Enter保存", "zh-TW": "數字 / all / starter / prod / Enter儲存", es: "número / all / starter / prod / Enter guardar", fr: "numéro / all / starter / prod / Entrée sauver", de: "Nummer / all / starter / prod / Enter speichern", pt: "número / all / starter / prod / Enter salvar" },
-  writing_config: { en: "Writing config...", ko: "설정 저장 중...", ja: "設定を保存中...", "zh-CN": "正在保存配置...", "zh-TW": "正在儲存設定...", es: "Guardando configuración...", fr: "Enregistrement...", de: "Konfiguration wird gespeichert...", pt: "Salvando configuração..." },
-  setup_complete: { en: "Setup complete!", ko: "설정 완료!", ja: "セットアップ完了！", "zh-CN": "设置完成！", "zh-TW": "設定完成！", es: "¡Configuración completa!", fr: "Configuration terminée !", de: "Einrichtung abgeschlossen!", pt: "Configuração concluída!" },
-  next_steps:     { en: "Next steps", ko: "다음 단계", ja: "次のステップ", "zh-CN": "下一步", "zh-TW": "下一步", es: "Próximos pasos", fr: "Étapes suivantes", de: "Nächste Schritte", pt: "Próximos passos" },
+  wizard_title:   { en: "AirMCP Setup Wizard", ko: "AirMCP \uC124\uC815 \uB9C8\uBC95\uC0AC", ja: "AirMCP \u30BB\u30C3\u30C8\u30A2\u30C3\u30D7", "zh-CN": "AirMCP \u8BBE\u7F6E\u5411\u5BFC", "zh-TW": "AirMCP \u8A2D\u5B9A\u7CBE\u9748", es: "Asistente de AirMCP", fr: "Assistant AirMCP", de: "AirMCP Einrichtung", pt: "Assistente AirMCP" },
+  wizard_sub:     { en: "Connect your Mac to any AI via MCP", ko: "MCP\uB85C Mac\uC744 AI\uC5D0 \uC5F0\uACB0\uD558\uC138\uC694", ja: "MCP\u3067Mac\u3092AI\u306B\u63A5\u7D9A", "zh-CN": "\u901A\u8FC7MCP\u5C06Mac\u8FDE\u63A5\u5230AI", "zh-TW": "\u900F\u904EMCP\u5C07Mac\u9023\u63A5\u5230AI", es: "Conecta tu Mac a cualquier IA", fr: "Connectez votre Mac \u00E0 toute IA", de: "Verbinde deinen Mac mit KI", pt: "Conecte seu Mac a qualquer IA" },
+  choose_lang:    { en: "Choose language", ko: "\uC5B8\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694", ja: "\u8A00\u8A9E\u3092\u9078\u629E", "zh-CN": "\u9009\u62E9\u8BED\u8A00", "zh-TW": "\u9078\u64C7\u8A9E\u8A00", es: "Elige idioma", fr: "Choisir la langue", de: "Sprache w\u00E4hlen", pt: "Escolha o idioma" },
+  choose_modules: { en: "Which modules would you like to enable?", ko: "\uC5B4\uB5A4 \uBAA8\uB4C8\uC744 \uD65C\uC131\uD654\uD560\uAE4C\uC694?", ja: "\u6709\u52B9\u306B\u3059\u308B\u30E2\u30B8\u30E5\u30FC\u30EB\u3092\u9078\u3093\u3067\u304F\u3060\u3055\u3044", "zh-CN": "\u8981\u542F\u7528\u54EA\u4E9B\u6A21\u5757\uFF1F", "zh-TW": "\u8981\u555F\u7528\u54EA\u4E9B\u6A21\u7D44\uFF1F", es: "\u00BFQu\u00E9 m\u00F3dulos quieres habilitar?", fr: "Quels modules activer ?", de: "Welche Module aktivieren?", pt: "Quais m\u00F3dulos ativar?" },
+  commands:       { en: "Commands", ko: "\uBA85\uB839\uC5B4", ja: "\u30B3\u30DE\u30F3\u30C9", "zh-CN": "\u547D\u4EE4", "zh-TW": "\u6307\u4EE4", es: "Comandos", fr: "Commandes", de: "Befehle", pt: "Comandos" },
+  toggle_hint:    { en: "Toggle a module (e.g. \"6\" to toggle Messages)", ko: "\uBAA8\uB4C8 \uC804\uD658 (\uC608: \"6\"\uC73C\uB85C Messages \uC804\uD658)", ja: "\u30E2\u30B8\u30E5\u30FC\u30EB\u5207\u66FF\uFF08\u4F8B\uFF1A\"6\"\u3067Messages\uFF09", "zh-CN": "\u5207\u6362\u6A21\u5757\uFF08\u5982 \"6\" \u5207\u6362 Messages\uFF09", "zh-TW": "\u5207\u63DB\u6A21\u7D44\uFF08\u5982 \"6\" \u5207\u63DB Messages\uFF09", es: "Alternar m\u00F3dulo (ej. \"6\")", fr: "Basculer un module (ex. \"6\")", de: "Modul umschalten (z.B. \"6\")", pt: "Alternar m\u00F3dulo (ex. \"6\")" },
+  all_modules:    { en: "Enable all 25 modules", ko: "25\uAC1C \uBAA8\uB4C8 \uC804\uBD80 \uD65C\uC131\uD654", ja: "\u516825\u30E2\u30B8\u30E5\u30FC\u30EB\u6709\u52B9\u5316", "zh-CN": "\u542F\u7528\u5168\u90E825\u4E2A\u6A21\u5757", "zh-TW": "\u555F\u7528\u5168\u90E825\u500B\u6A21\u7D44", es: "Habilitar los 25 m\u00F3dulos", fr: "Activer les 25 modules", de: "Alle 25 Module aktivieren", pt: "Ativar todos os 25 m\u00F3dulos" },
+  starter_hint:   { en: "Reset to recommended 7 modules \u2605", ko: "\uCD94\uCC9C 7\uAC1C \uBAA8\uB4C8\uB85C \uCD08\uAE30\uD654 \u2605", ja: "\u63A8\u59687\u30E2\u30B8\u30E5\u30FC\u30EB\u306B\u30EA\u30BB\u30C3\u30C8 \u2605", "zh-CN": "\u91CD\u7F6E\u4E3A\u63A8\u8350\u76847\u4E2A\u6A21\u5757 \u2605", "zh-TW": "\u91CD\u7F6E\u70BA\u63A8\u85A6\u76847\u500B\u6A21\u7D44 \u2605", es: "Restablecer a 7 m\u00F3dulos recomendados \u2605", fr: "R\u00E9initialiser aux 7 modules recommand\u00E9s \u2605", de: "Auf empfohlene 7 Module zur\u00FCcksetzen \u2605", pt: "Redefinir para 7 m\u00F3dulos recomendados \u2605" },
+  prod_hint:      { en: "Enable all productivity modules", ko: "\uC0DD\uC0B0\uC131 \uBAA8\uB4C8 \uC804\uBD80 \uD65C\uC131\uD654", ja: "\u751F\u7523\u6027\u30E2\u30B8\u30E5\u30FC\u30EB\u5168\u3066\u6709\u52B9\u5316", "zh-CN": "\u542F\u7528\u6240\u6709\u751F\u4EA7\u529B\u6A21\u5757", "zh-TW": "\u555F\u7528\u6240\u6709\u751F\u7522\u529B\u6A21\u7D44", es: "Habilitar m\u00F3dulos de productividad", fr: "Activer les modules de productivit\u00E9", de: "Alle Produktivit\u00E4tsmodule aktivieren", pt: "Ativar m\u00F3dulos de produtividade" },
+  enter_save:     { en: "Done \u2014 save and continue", ko: "\uC644\uB8CC \u2014 \uC800\uC7A5 \uD6C4 \uACC4\uC18D", ja: "\u5B8C\u4E86 \u2014 \u4FDD\u5B58\u3057\u3066\u7D9A\u884C", "zh-CN": "\u5B8C\u6210 \u2014 \u4FDD\u5B58\u5E76\u7EE7\u7EED", "zh-TW": "\u5B8C\u6210 \u2014 \u5132\u5B58\u4E26\u7E7C\u7E8C", es: "Listo \u2014 guardar y continuar", fr: "Termin\u00E9 \u2014 sauvegarder", de: "Fertig \u2014 speichern", pt: "Pronto \u2014 salvar e continuar" },
+  recommended:    { en: "\u2605 = recommended for new users", ko: "\u2605 = \uCC98\uC74C \uC0AC\uC6A9\uC790 \uCD94\uCC9C", ja: "\u2605 = \u521D\u5FC3\u8005\u306B\u304A\u3059\u3059\u3081", "zh-CN": "\u2605 = \u65B0\u7528\u6237\u63A8\u8350", "zh-TW": "\u2605 = \u65B0\u4F7F\u7528\u8005\u63A8\u85A6", es: "\u2605 = recomendado para nuevos usuarios", fr: "\u2605 = recommand\u00E9 pour les d\u00E9butants", de: "\u2605 = empfohlen f\u00FCr neue Nutzer", pt: "\u2605 = recomendado para novos usu\u00E1rios" },
+  prompt_hint:    { en: "number / all / starter / prod / Enter to save", ko: "\uBC88\uD638 / all / starter / prod / Enter \uC800\uC7A5", ja: "\u756A\u53F7 / all / starter / prod / Enter\u3067\u4FDD\u5B58", "zh-CN": "\u6570\u5B57 / all / starter / prod / Enter\u4FDD\u5B58", "zh-TW": "\u6578\u5B57 / all / starter / prod / Enter\u5132\u5B58", es: "n\u00FAmero / all / starter / prod / Enter guardar", fr: "num\u00E9ro / all / starter / prod / Entr\u00E9e sauver", de: "Nummer / all / starter / prod / Enter speichern", pt: "n\u00FAmero / all / starter / prod / Enter salvar" },
+  writing_config: { en: "Writing config...", ko: "\uC124\uC815 \uC800\uC7A5 \uC911...", ja: "\u8A2D\u5B9A\u3092\u4FDD\u5B58\u4E2D...", "zh-CN": "\u6B63\u5728\u4FDD\u5B58\u914D\u7F6E...", "zh-TW": "\u6B63\u5728\u5132\u5B58\u8A2D\u5B9A...", es: "Guardando configuraci\u00F3n...", fr: "Enregistrement...", de: "Konfiguration wird gespeichert...", pt: "Salvando configura\u00E7\u00E3o..." },
+  setup_complete: { en: "Setup complete!", ko: "\uC124\uC815 \uC644\uB8CC!", ja: "\u30BB\u30C3\u30C8\u30A2\u30C3\u30D7\u5B8C\u4E86\uFF01", "zh-CN": "\u8BBE\u7F6E\u5B8C\u6210\uFF01", "zh-TW": "\u8A2D\u5B9A\u5B8C\u6210\uFF01", es: "\u00A1Configuraci\u00F3n completa!", fr: "Configuration termin\u00E9e !", de: "Einrichtung abgeschlossen!", pt: "Configura\u00E7\u00E3o conclu\u00EDda!" },
+  next_steps:     { en: "Next steps", ko: "\uB2E4\uC74C \uB2E8\uACC4", ja: "\u6B21\u306E\u30B9\u30C6\u30C3\u30D7", "zh-CN": "\u4E0B\u4E00\u6B65", "zh-TW": "\u4E0B\u4E00\u6B65", es: "Pr\u00F3ximos pasos", fr: "\u00C9tapes suivantes", de: "N\u00E4chste Schritte", pt: "Pr\u00F3ximos passos" },
 };
 
 function t(key: string, lang: LangCode): string {
@@ -122,7 +89,7 @@ function t(key: string, lang: LangCode): string {
 
 const PRESETS: Record<string, { desc: string; modules: string[] }> = {
   starter: {
-    desc: "Core essentials (7 modules) — Notes, Calendar, Reminders, System, Shortcuts, Finder, Weather",
+    desc: "Core essentials (7 modules) \u2014 Notes, Calendar, Reminders, System, Shortcuts, Finder, Weather",
     modules: [...STARTER_MODULES],
   },
   productivity: {
@@ -190,7 +157,7 @@ export async function runInit(): Promise<void> {
   console.log("");
   process.stdout.write(`  ${t("writing_config", lang)}`);
 
-  mkdirSync(AIRMCP_CONFIG_DIR, { recursive: true });
+  mkdirSync(PATHS.CONFIG_DIR, { recursive: true });
   const configPayload = {
     locale: lang,
     disabledModules,
@@ -198,8 +165,8 @@ export async function runInit(): Promise<void> {
     allowSendMessages: true,
     allowSendMail: true,
   };
-  writeFileSync(AIRMCP_CONFIG_PATH, JSON.stringify(configPayload, null, 2) + "\n");
-  console.log(` ${GREEN}✓${RESET} ${AIRMCP_CONFIG_PATH}`);
+  writeFileSync(PATHS.CONFIG, JSON.stringify(configPayload, null, 2) + "\n");
+  console.log(` ${GREEN}\u2713${RESET} ${PATHS.CONFIG}`);
 
   // --- Step 3: Auto-detect and patch MCP client configs ---
   const airmcpEntry = {
@@ -232,15 +199,15 @@ export async function runInit(): Promise<void> {
 
       mkdirSync(join(client.configPath, ".."), { recursive: true });
       writeFileSync(client.configPath, JSON.stringify(existing, null, 2) + "\n");
-      console.log(` ${GREEN}✓${RESET}`);
+      console.log(` ${GREEN}\u2713${RESET}`);
       patchedClients++;
     } catch (e) {
-      console.log(` ${YELLOW}⚠${RESET} ${e instanceof Error ? e.message : String(e)}`);
+      console.log(` ${YELLOW}\u26A0${RESET} ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
   if (detectedClients.length === 0) {
-    console.log(`  ${YELLOW}⚠${RESET} No MCP clients detected.`);
+    console.log(`  ${YELLOW}\u26A0${RESET} No MCP clients detected.`);
     console.log("");
     console.log("  Add this to your MCP client config manually:");
     console.log(`  ${DIM}${JSON.stringify({ mcpServers: { airmcp: airmcpEntry } }, null, 2)}${RESET}`);
@@ -248,15 +215,15 @@ export async function runInit(): Promise<void> {
 
   // --- Done ---
   console.log("");
-  console.log(`  ${GREEN}✓${RESET} ${t("setup_complete", lang)} ${BOLD}${enabled.size} modules${RESET} enabled, ${patchedClients} client(s) configured.`);
+  console.log(`  ${GREEN}\u2713${RESET} ${t("setup_complete", lang)} ${BOLD}${enabled.size} modules${RESET} enabled, ${patchedClients} client(s) configured.`);
   if (detectedClients.length > 0) {
     console.log(`  ${DIM}Restart ${detectedClients.join(", ")} to connect AirMCP.${RESET}`);
   }
   console.log("");
   console.log(`  ${DIM}${t("next_steps", lang)}:${RESET}`);
-  console.log(`    ${DIM}•${RESET} Run ${BOLD}npx airmcp doctor${RESET} to check everything is working`);
-  console.log(`    ${DIM}•${RESET} Re-run ${BOLD}npx airmcp init${RESET} anytime to change modules`);
-  console.log(`    ${DIM}•${RESET} Use ${BOLD}npx airmcp --full${RESET} to enable all modules temporarily`);
+  console.log(`    ${DIM}\u2022${RESET} Run ${BOLD}npx airmcp doctor${RESET} to check everything is working`);
+  console.log(`    ${DIM}\u2022${RESET} Re-run ${BOLD}npx airmcp init${RESET} anytime to change modules`);
+  console.log(`    ${DIM}\u2022${RESET} Use ${BOLD}npx airmcp --full${RESET} to enable all modules temporarily`);
   console.log("");
 
 }

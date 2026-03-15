@@ -1,7 +1,7 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { homedir } from "node:os";
 import { cosineSimilarity } from "./embeddings.js";
+import { PATHS, TIMEOUT } from "../shared/constants.js";
 
 export interface VectorEntry {
   id: string;        // e.g. "note:x-coredata://..." or "event:ABC123"
@@ -18,8 +18,6 @@ interface VectorStoreData {
   entries: Record<string, VectorEntry>;
 }
 
-const STALE_MS = 30 * 60 * 1000; // 30 minutes
-
 export interface SearchResult {
   id: string;
   source: string;
@@ -27,7 +25,7 @@ export interface SearchResult {
   similarity: number;
 }
 
-const STORE_DIR = join(homedir(), ".airmcp");
+const STORE_DIR = PATHS.VECTOR_STORE;
 const STORE_PATH = join(STORE_DIR, "vectors.json");
 
 /** Search a store data object by cosine similarity to a query vector. */
@@ -98,7 +96,7 @@ export class VectorStore {
     const store = await this.load();
     if (Object.keys(store.entries).length === 0) return true;
     if (!store.indexedAt) return true;
-    return Date.now() - new Date(store.indexedAt).getTime() > STALE_MS;
+    return Date.now() - new Date(store.indexedAt).getTime() > TIMEOUT.VECTOR_STALE;
   }
 
   /** Remove entries by ID prefix (e.g. "note:" removes all notes). */

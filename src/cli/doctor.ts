@@ -7,29 +7,14 @@
 
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { execSync } from "node:child_process";
-import { MODULE_NAMES, STARTER_MODULES, NPM_PACKAGE_NAME } from "../shared/config.js";
+import { execFileSync } from "node:child_process";
+import { MODULE_NAMES, STARTER_MODULES, NPM_PACKAGE_NAME, MCP_CLIENTS } from "../shared/config.js";
+import { HOME, PATHS } from "../shared/constants.js";
 import { LOGO_LINES, typeLine } from "../shared/banner.js";
 import {
   RESET, BOLD, DIM, WHITE, GREEN,
   SYM, heading, line, divider, spinner, sleep,
 } from "./style.js";
-
-const HOME = process.env.HOME ?? process.env.USERPROFILE ?? "";
-
-interface McpClient {
-  name: string;
-  configPath: string;
-  serversKey: string;
-}
-
-const MCP_CLIENTS: McpClient[] = [
-  { name: "Claude Desktop", configPath: join(HOME, "Library", "Application Support", "Claude", "claude_desktop_config.json"), serversKey: "mcpServers" },
-  { name: "Claude Code", configPath: join(HOME, ".claude", "mcp.json"), serversKey: "mcpServers" },
-  { name: "Cursor", configPath: join(HOME, ".cursor", "mcp.json"), serversKey: "mcpServers" },
-  { name: "Windsurf", configPath: join(HOME, ".codeium", "windsurf", "mcp_config.json"), serversKey: "mcpServers" },
-];
-const AIRMCP_CONFIG_PATH = join(HOME, ".config", "airmcp", "config.json");
 
 interface FileConfig {
   locale?: string;
@@ -76,7 +61,7 @@ export async function runDoctor(): Promise<void> {
   // macOS version
   if (platform === "darwin") {
     try {
-      const ver = execSync("sw_vers -productVersion", { encoding: "utf8", timeout: 3000 }).trim();
+      const ver = execFileSync("sw_vers", ["-productVersion"], { encoding: "utf8", timeout: 3000 }).trim();
       ok("macOS Version", ver);
     } catch {
       meh("macOS Version", "Could not detect");
@@ -85,7 +70,7 @@ export async function runDoctor(): Promise<void> {
 
   // npm version check
   try {
-    const latest = execSync(`npm view ${NPM_PACKAGE_NAME} version`, { encoding: "utf8", timeout: 5000 }).trim();
+    const latest = execFileSync("npm", ["view", NPM_PACKAGE_NAME, "version"], { encoding: "utf8", timeout: 5000 }).trim();
     const pkgPath = join(__dirname, "..", "package.json");
     let current = "unknown";
     try { current = JSON.parse(readFileSync(pkgPath, "utf-8")).version; } catch { /* ignore */ }
@@ -99,13 +84,13 @@ export async function runDoctor(): Promise<void> {
   console.log(heading("Configuration"));
 
   let fileConfig: FileConfig | null = null;
-  if (existsSync(AIRMCP_CONFIG_PATH)) {
+  if (existsSync(PATHS.CONFIG)) {
     try {
-      fileConfig = JSON.parse(readFileSync(AIRMCP_CONFIG_PATH, "utf-8")) as FileConfig;
-      ok("Config file", AIRMCP_CONFIG_PATH.replace(HOME, "~"));
+      fileConfig = JSON.parse(readFileSync(PATHS.CONFIG, "utf-8")) as FileConfig;
+      ok("Config file", PATHS.CONFIG.replace(HOME, "~"));
       if (fileConfig.locale) ok("Language", fileConfig.locale);
     } catch {
-      meh("Config file", `${AIRMCP_CONFIG_PATH} (parse error)`);
+      meh("Config file", `${PATHS.CONFIG} (parse error)`);
     }
   } else {
     meh("Config file", `Not found — using starter preset`);
@@ -194,8 +179,9 @@ export async function runDoctor(): Promise<void> {
       const appName = APP_MAP[mod];
       if (!appName) continue;
       try {
-        execSync(
-          `osascript -l JavaScript -e "Application('${appName}'); JSON.stringify({ok:true})"`,
+        execFileSync(
+          "osascript",
+          ["-l", "JavaScript", "-e", `Application('${appName}'); JSON.stringify({ok:true})`],
           { timeout: 5000, stdio: "pipe" },
         );
         permResults.push({ app: appName, ok: true });
@@ -224,11 +210,11 @@ export async function runDoctor(): Promise<void> {
 
   // GWS CLI
   try {
-    execSync("which gws", { stdio: "pipe", timeout: 3000 });
+    execFileSync("which", ["gws"], { stdio: "pipe", timeout: 3000 });
     ok("Google Workspace CLI", "installed");
   } catch {
     try {
-      execSync("npx -y @googleworkspace/cli --version", { stdio: "pipe", timeout: 10000 });
+      execFileSync("npx", ["-y", "@googleworkspace/cli", "--version"], { stdio: "pipe", timeout: 10000 });
       ok("Google Workspace CLI", "available via npx");
     } catch {
       meh("Google Workspace CLI", `not installed — npm i -g @googleworkspace/cli`);

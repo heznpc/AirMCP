@@ -7,7 +7,11 @@
  * When APIs or models change versions, update ONLY this file.
  */
 
+import { join } from "node:path";
+
 // ── Helper ───────────────────────────────────────────────────────────
+
+export const HOME = process.env.HOME ?? process.env.USERPROFILE ?? "";
 
 function envInt(key: string, fallback: number): number {
   const v = process.env[key];
@@ -16,6 +20,10 @@ function envInt(key: string, fallback: number): number {
 
 function envStr(key: string, fallback: string): string {
   return process.env[key] || fallback;
+}
+
+function resolveTilde(p: string): string {
+  return p.startsWith("~/") ? join(HOME, p.slice(2)) : p;
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -146,12 +154,14 @@ export const IDENTITY = {
 // ══════════════════════════════════════════════════════════════════════
 
 export const PATHS = {
+  /** Config directory */
+  CONFIG_DIR:       join(HOME, ".config", "airmcp"),
   /** User config file */
-  CONFIG:           envStr("AIRMCP_CONFIG_PATH", "~/.config/airmcp/config.json"),
+  CONFIG:           resolveTilde(envStr("AIRMCP_CONFIG_PATH", "~/.config/airmcp/config.json")),
   /** HITL socket */
-  HITL_SOCKET:      "~/.config/airmcp/hitl.sock",
+  HITL_SOCKET:      join(HOME, ".config", "airmcp", "hitl.sock"),
   /** Vector store directory */
-  VECTOR_STORE:     "~/.airmcp",
+  VECTOR_STORE:     join(HOME, ".airmcp"),
   /** Swift bridge binary (relative to project root) */
   SWIFT_BRIDGE:     "../../swift/.build/release/AirMcpBridge",
 } as const;

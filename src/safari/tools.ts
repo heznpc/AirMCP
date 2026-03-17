@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, err, toolError } from "../shared/result.js";
+import { ok, okUntrusted, err, toolError } from "../shared/result.js";
 import {
   listTabsScript,
   readPageContentScript,
@@ -17,7 +17,8 @@ import {
   addToReadingListScript,
 } from "./scripts.js";
 
-export function registerSafariTools(server: McpServer, _config: AirMcpConfig): void {
+export function registerSafariTools(server: McpServer, config: AirMcpConfig): void {
+  const { allowRunJavascript } = config;
   server.registerTool(
     "list_tabs",
     {
@@ -49,7 +50,7 @@ export function registerSafariTools(server: McpServer, _config: AirMcpConfig): v
     },
     async ({ windowIndex, tabIndex, maxLength }) => {
       try {
-        return ok(await runJxa(readPageContentScript(windowIndex, tabIndex, maxLength)));
+        return okUntrusted(await runJxa(readPageContentScript(windowIndex, tabIndex, maxLength)));
       } catch (e) {
         return toolError("read page", e);
       }
@@ -142,9 +143,10 @@ export function registerSafariTools(server: McpServer, _config: AirMcpConfig): v
         windowIndex: z.number().int().min(0).optional().default(0).describe("Window index (default: 0)"),
         tabIndex: z.number().int().min(0).optional().default(0).describe("Tab index (default: 0)"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
     async ({ code, windowIndex, tabIndex }) => {
+      if (!allowRunJavascript) return err("Running JavaScript in Safari is disabled. Set AIRMCP_ALLOW_RUN_JAVASCRIPT=true or allowRunJavascript in config.json.");
       try {
         return ok(await runJxa(runJavascriptScript(code, windowIndex, tabIndex)));
       } catch (e) {

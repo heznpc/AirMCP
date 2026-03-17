@@ -5,12 +5,16 @@ import { esc } from "../shared/esc.js";
 /** Escape for AppleScript double-quoted strings */
 function escAS(str: string): string {
   return str
+    .replace(/\0/g, "")
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\x01-\x08\x0b\x0c\x0e-\x1f]/g, "")
     .replace(/\\/g, "\\\\")
     .replace(/"/g, '\\"')
     .replace(/\n/g, "\\n")
     .replace(/\r/g, "\\r")
     .replace(/\t/g, "\\t");
 }
+
 
 export function listChatsScript(limit: number): string {
   return `
@@ -119,10 +123,10 @@ export function sendMessageScript(
 ): string {
   // macOS 26: JXA services() throws -1708; use AppleScript fallback.
   // Prefixed with "applescript:" so tool handler runs via osascript -e.
+  // NOTE: Do not echo user input back in AppleScript return to avoid
+  // multi-layer escaping issues (AS→JSON). The tool handler has the input.
   const t = escAS(target);
   const m = escAS(text);
-  const jsonTarget = target.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-  const jsonText = text.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n").replace(/\r/g, "\\r").substring(0, 80);
   return `applescript:tell application "Messages"
 try
 set targetService to 1st service whose service type = iMessage
@@ -132,7 +136,7 @@ end try
 set targetBuddy to buddy "${t}" of targetService
 send "${m}" to targetBuddy
 end tell
-return "{\\"sent\\":true,\\"to\\":\\"${jsonTarget}\\",\\"text\\":\\"${jsonText}\\"}"`;
+return "{\\"sent\\":true}"`;
 }
 
 export function sendFileScript(
@@ -141,8 +145,6 @@ export function sendFileScript(
 ): string {
   const t = escAS(target);
   const p = escAS(filePath);
-  const jsonTarget = target.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-  const jsonPath = filePath.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   return `applescript:tell application "Messages"
 try
 set targetService to 1st service whose service type = iMessage
@@ -152,7 +154,7 @@ end try
 set targetBuddy to buddy "${t}" of targetService
 send POSIX file "${p}" to targetBuddy
 end tell
-return "{\\"sent\\":true,\\"to\\":\\"${jsonTarget}\\",\\"file\\":\\"${jsonPath}\\"}"`;
+return "{\\"sent\\":true}"`;
 }
 
 export function listParticipantsScript(chatId: string): string {

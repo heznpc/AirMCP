@@ -21,7 +21,7 @@ export function getDirectionsScript(from: string, to: string, transportType?: st
     const daddr = '${esc(to)}';
     const dirflg = '${flag}';
     app.openLocation('maps://?saddr=' + encodeURIComponent(saddr) + '&daddr=' + encodeURIComponent(daddr) + '&dirflg=' + dirflg);
-    JSON.stringify({ directions: true, from: saddr, to: daddr, transportType: '${transportType ?? "driving"}' });
+    JSON.stringify({ directions: true, from: saddr, to: daddr, transportType: '${esc(transportType ?? "driving")}' });
   `;
 }
 

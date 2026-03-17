@@ -61,7 +61,7 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
       },
       annotations: {
         readOnlyHint: false,
-        destructiveHint: false,
+        destructiveHint: true,
         idempotentHint: false,
         openWorldHint: true,
       },
@@ -93,7 +93,7 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
       },
       annotations: {
         readOnlyHint: false,
-        destructiveHint: false,
+        destructiveHint: true,
         idempotentHint: false,
         openWorldHint: true,
       },
@@ -120,7 +120,7 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
       },
       annotations: {
         readOnlyHint: false,
-        destructiveHint: false,
+        destructiveHint: true,
         idempotentHint: false,
         openWorldHint: true,
       },
@@ -246,7 +246,7 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
         actionValue: z.string().optional().describe("Value to set (for setValue action)"),
         index: z.number().int().min(0).optional().default(0).describe("If multiple matches, act on element at this index (default: 0)"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
     async ({ app, role, title, value, description, identifier, label, action, actionValue, index }) => {
       try {
@@ -300,7 +300,7 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
         "Pass the 'elements' array from a previous ui_traverse result as beforeSnapshot. " +
         "Returns added, removed, and changed elements. Useful for verifying action results.",
       inputSchema: {
-        beforeSnapshot: z.string().min(1).describe("JSON string of previous UI tree snapshot (elements array from ui_traverse)"),
+        beforeSnapshot: z.string().min(1).max(500000).describe("JSON string of previous UI tree snapshot (elements array from ui_traverse)"),
         app: z.string().optional().describe("App name to compare against"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },

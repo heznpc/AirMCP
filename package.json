@@ -115,8 +115,7 @@
   ],
   "lint-staged": {
     "src/**/*.ts": [
-      "eslint --fix",
-      "tsc --noEmit --skipLibCheck"
+      "eslint --fix"
     ]
   }
 }

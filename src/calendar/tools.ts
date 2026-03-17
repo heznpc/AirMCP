@@ -3,7 +3,7 @@ import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import { runSwift } from "../shared/swift.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, err } from "../shared/result.js";
+import { ok, okUntrusted, err } from "../shared/result.js";
 import {
   listCalendarsScript,
   listEventsScript,
@@ -164,7 +164,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
     async ({ id }) => {
       try {
         const result = await runJxa<EventDetail>(readEventScript(id));
-        return ok(result);
+        return okUntrusted(result);
       } catch (e) {
         return err(`Failed to read event: ${e instanceof Error ? e.message : String(e)}`);
       }

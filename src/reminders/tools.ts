@@ -3,7 +3,7 @@ import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import { runSwift } from "../shared/swift.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, err } from "../shared/result.js";
+import { ok, okUntrusted, err } from "../shared/result.js";
 import {
   listReminderListsScript,
   listRemindersScript,
@@ -141,7 +141,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
     async ({ id }) => {
       try {
         const result = await runJxa<ReminderDetail>(readReminderScript(id));
-        return ok(result);
+        return okUntrusted(result);
       } catch (e) {
         return err(`Failed to read reminder: ${e instanceof Error ? e.message : String(e)}`);
       }

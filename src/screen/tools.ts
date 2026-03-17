@@ -176,7 +176,7 @@ export function registerScreenTools(server: McpServer, _config: AirMcpConfig): v
       },
       annotations: {
         readOnlyHint: false,
-        destructiveHint: false,
+        destructiveHint: true,
         idempotentHint: false,
         openWorldHint: true,
       },

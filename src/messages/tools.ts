@@ -4,7 +4,7 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import { runJxa, osascriptSemaphore } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, err } from "../shared/result.js";
+import { ok, okUntrusted, err } from "../shared/result.js";
 import { TIMEOUT } from "../shared/constants.js";
 import { zFilePath } from "../shared/validate.js";
 
@@ -71,7 +71,7 @@ export function registerMessagesTools(server: McpServer, config: AirMcpConfig): 
     },
     async ({ chatId }) => {
       try {
-        return ok(await runJxa(readChatScript(chatId)));
+        return okUntrusted(await runJxa(readChatScript(chatId)));
       } catch (e) {
         return err(`Failed to read chat: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -91,7 +91,7 @@ export function registerMessagesTools(server: McpServer, config: AirMcpConfig): 
     },
     async ({ query, limit }) => {
       try {
-        return ok(await runJxa(searchMessagesScript(query, limit)));
+        return okUntrusted(await runJxa(searchMessagesScript(query, limit)));
       } catch (e) {
         return err(`Failed to search chats: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -107,12 +107,13 @@ export function registerMessagesTools(server: McpServer, config: AirMcpConfig): 
         target: z.string().min(1).describe("Recipient handle (phone number or email, e.g. '+821012345678' or 'user@example.com')"),
         text: z.string().min(1).max(10000).describe("Message text to send"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
     async ({ target, text }) => {
       if (!allowSendMessages) return err("Sending messages is disabled. Set AIRMCP_ALLOW_SEND_MESSAGES=true to enable.");
       try {
-        return ok(await runScript(sendMessageScript(target, text)));
+        await runScript(sendMessageScript(target, text));
+        return ok({ sent: true, to: target, text: text.substring(0, 80) });
       } catch (e) {
         return err(`Failed to send message: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -128,12 +129,13 @@ export function registerMessagesTools(server: McpServer, config: AirMcpConfig): 
         target: z.string().min(1).describe("Recipient handle (phone number or email)"),
         filePath: zFilePath.describe("Absolute file path to send"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
     async ({ target, filePath }) => {
       if (!allowSendMessages) return err("Sending messages is disabled. Set AIRMCP_ALLOW_SEND_MESSAGES=true to enable.");
       try {
-        return ok(await runScript(sendFileScript(target, filePath)));
+        await runScript(sendFileScript(target, filePath));
+        return ok({ sent: true, to: target, file: filePath });
       } catch (e) {
         return err(`Failed to send file: ${e instanceof Error ? e.message : String(e)}`);
       }

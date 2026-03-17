@@ -112,6 +112,8 @@ export interface AirMcpConfig {
   allowSendMessages: boolean;
   /** Allow sending emails via Mail app. Default: false */
   allowSendMail: boolean;
+  /** Allow running arbitrary JavaScript in Safari tabs. Default: false */
+  allowRunJavascript: boolean;
   /** Human-in-the-loop confirmation config */
   hitl: HitlConfig;
 }
@@ -120,9 +122,21 @@ interface FileConfig {
   includeShared?: boolean;
   allowSendMessages?: boolean;
   allowSendMail?: boolean;
+  allowRunJavascript?: boolean;
   disabledModules?: string[];
   shareApproval?: string[];
   hitl?: { level?: string; whitelist?: string[]; timeout?: number };
+  /** Performance tuning — all fields optional, env vars take precedence */
+  performance?: {
+    /** Embedding provider: "gemini" | "swift" | "hybrid" | "none" */
+    embeddingProvider?: string;
+    /** Max parallel JXA processes (default: 3) */
+    jxaConcurrency?: number;
+    /** Circuit breaker: failures before open (default: 3) */
+    circuitBreakerThreshold?: number;
+    /** Circuit breaker: open duration in ms (default: 60000) */
+    circuitBreakerOpenMs?: number;
+  };
 }
 
 interface LoadResult {
@@ -198,12 +212,35 @@ export function parseConfig(): AirMcpConfig {
   const includeShared = envBool("AIRMCP_INCLUDE_SHARED", file.includeShared, false);
   const allowSendMessages = envBool("AIRMCP_ALLOW_SEND_MESSAGES", file.allowSendMessages, false);
   const allowSendMail = envBool("AIRMCP_ALLOW_SEND_MAIL", file.allowSendMail, false);
+  const allowRunJavascript = envBool("AIRMCP_ALLOW_RUN_JAVASCRIPT", file.allowRunJavascript, false);
+
+  // Performance config: write to env vars so constants.ts picks them up.
+  // KNOWN LIMITATION: constants.ts evaluates envInt() at import time (before
+  // parseConfig runs), so JSON config values for jxaConcurrency / CB thresholds
+  // only take effect if set as env vars BEFORE the process starts. The JSON
+  // config path works for embeddingProvider (read lazily) but not for values
+  // baked into the CONCURRENCY object. TODO: refactor to lazy accessors.
+  const perf = file.performance;
+  if (perf) {
+    if (perf.embeddingProvider && !process.env.AIRMCP_EMBEDDING_PROVIDER) {
+      process.env.AIRMCP_EMBEDDING_PROVIDER = perf.embeddingProvider;
+    }
+    if (perf.jxaConcurrency && !process.env.AIRMCP_JXA_CONCURRENCY) {
+      process.env.AIRMCP_JXA_CONCURRENCY = String(perf.jxaConcurrency);
+    }
+    if (perf.circuitBreakerThreshold !== undefined && !process.env.AIRMCP_CB_THRESHOLD) {
+      process.env.AIRMCP_CB_THRESHOLD = String(perf.circuitBreakerThreshold);
+    }
+    if (perf.circuitBreakerOpenMs !== undefined && !process.env.AIRMCP_CB_OPEN_MS) {
+      process.env.AIRMCP_CB_OPEN_MS = String(perf.circuitBreakerOpenMs);
+    }
+  }
 
   // HITL config: env var > JSON > default
-  const hitlLevelRaw = process.env.AIRMCP_HITL_LEVEL ?? file.hitl?.level ?? "off";
+  const hitlLevelRaw = process.env.AIRMCP_HITL_LEVEL ?? file.hitl?.level ?? "destructive-only";
   const hitlLevel: HitlLevel = HITL_LEVELS.includes(hitlLevelRaw)
     ? (hitlLevelRaw as HitlLevel)
-    : "off";
+    : "destructive-only";
   const hitlWhitelist = new Set<string>(file.hitl?.whitelist ?? []);
   const hitlTimeout = file.hitl?.timeout ?? 30;
   const hitlSocketPath = PATHS.HITL_SOCKET;
@@ -221,6 +258,7 @@ export function parseConfig(): AirMcpConfig {
     shareApprovalModules,
     allowSendMessages,
     allowSendMail,
+    allowRunJavascript,
     hitl,
   };
 }

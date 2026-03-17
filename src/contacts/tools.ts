@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, err } from "../shared/result.js";
+import { ok, okUntrusted, err } from "../shared/result.js";
 import {
   listContactsScript,
   searchContactsScript,
@@ -69,7 +69,7 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
     },
     async ({ id }) => {
       try {
-        return ok(await runJxa(readContactScript(id)));
+        return okUntrusted(await runJxa(readContactScript(id)));
       } catch (e) {
         return err(`Failed to read contact: ${e instanceof Error ? e.message : String(e)}`);
       }

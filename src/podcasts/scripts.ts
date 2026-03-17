@@ -7,16 +7,19 @@
 // - Read operations: query the Podcasts SQLite database directly
 // - Playback: use `shortcuts run` or `open podcasts://` URL scheme
 
-import { escJxaShell } from "../shared/esc.js";
+import { esc, escJxaShell } from "../shared/esc.js";
 
 const PODCASTS_DB = "~/Library/Group\\\\ Containers/243LU875E5.groups.com.apple.podcasts/Documents/MTLibrary.sqlite";
 
 function sqliteQuery(sql: string): string {
+  // sql is pre-sanitized (single-quote escaped for SQLite) by callers,
+  // but we must also escape for the shell double-quote and JXA single-quote layers.
+  const shellSafe = escJxaShell(sql);
   return `
     const app = Application.currentApplication();
     app.includeStandardAdditions = true;
     try {
-      const raw = app.doShellScript('sqlite3 -json ${PODCASTS_DB} "${sql}"');
+      const raw = app.doShellScript('sqlite3 -json ${PODCASTS_DB} "${shellSafe}"');
       JSON.stringify(JSON.parse(raw));
     } catch(e) {
       JSON.stringify({error: e.message, hint: "Podcasts database may require Full Disk Access. Check System Settings > Privacy > Full Disk Access."});
@@ -95,12 +98,12 @@ export function playbackControlScript(action: string): string {
 }
 
 export function playEpisodeScript(episodeName: string, _showName?: string): string {
-  // Open the Podcasts app and use URL scheme to search
-  const q = encodeURIComponent(episodeName);
+  // Open the Podcasts app and use URL scheme to search.
+  // Use esc() for JXA single-quote context (encodeURIComponent does NOT escape ').
   return `
     const app = Application.currentApplication();
     app.includeStandardAdditions = true;
-    app.openLocation('podcasts://search?term=${q}');
-    JSON.stringify({action: 'openSearch', query: '${escJxaShell(episodeName)}', hint: 'Opened Podcasts search. Select and play the episode manually.'});
+    app.openLocation('podcasts://search?term=' + encodeURIComponent('${esc(episodeName)}'));
+    JSON.stringify({action: 'openSearch', query: '${esc(episodeName)}', hint: 'Opened Podcasts search. Select and play the episode manually.'});
   `;
 }

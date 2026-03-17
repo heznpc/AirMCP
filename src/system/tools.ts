@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, toolError } from "../shared/result.js";
+import { ok, okUntrusted, toolError } from "../shared/result.js";
 import { zFilePath } from "../shared/validate.js";
 import {
   getClipboardScript,
@@ -59,7 +59,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
     },
     async () => {
       try {
-        return ok(await runJxa<{ content: string }>(getClipboardScript()));
+        return okUntrusted(await runJxa<{ content: string }>(getClipboardScript()));
       } catch (e) {
         return toolError("get clipboard", e);
       }
@@ -311,7 +311,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       },
       annotations: {
         readOnlyHint: false,
-        destructiveHint: false,
+        destructiveHint: true,
         idempotentHint: true,
         openWorldHint: false,
       },
@@ -449,7 +449,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       inputSchema: {},
       annotations: {
         readOnlyHint: false,
-        destructiveHint: false,
+        destructiveHint: true,
         idempotentHint: false,
         openWorldHint: false,
       },

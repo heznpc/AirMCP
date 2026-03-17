@@ -354,7 +354,7 @@ export function axDiffScript(
     }
 
     // Compare with before snapshot
-    const before = JSON.parse('${esc(beforeSnapshot)}');
+    const before = JSON.parse(${JSON.stringify(beforeSnapshot)});
     const changes = [];
 
     function flatten(tree, prefix) {

@@ -7,7 +7,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, err } from "../shared/result.js";
+import { ok, okUntrusted, err } from "../shared/result.js";
 import { runGws, checkGws } from "./gws.js";
 
 export function registerGoogleTools(server: McpServer, config: AirMcpConfig): void {
@@ -68,7 +68,7 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
     },
     async ({ messageId, format }) => {
       try {
-        return ok(await runGws("gmail", "users.messages", "get", { userId: "me", id: messageId, format }));
+        return okUntrusted(await runGws("gmail", "users.messages", "get", { userId: "me", id: messageId, format }));
       } catch (e) {
         return err(`Gmail read failed: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -86,7 +86,7 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
         body: z.string().describe("Email body (plain text)"),
         cc: z.string().optional().describe("CC recipients (comma-separated)"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
     async ({ to, subject, body, cc }) => {
       if (!allowSendMail) return err("Sending mail is disabled. Set AIRMCP_ALLOW_SEND_MAIL=true or allowSendMail in config.json.");
@@ -197,7 +197,7 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
     },
     async ({ spreadsheetId, range }) => {
       try {
-        return ok(await runGws("sheets", "spreadsheets.values", "get", { spreadsheetId, range }));
+        return okUntrusted(await runGws("sheets", "spreadsheets.values", "get", { spreadsheetId, range }));
       } catch (e) {
         return err(`Sheets read failed: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -310,7 +310,7 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
     },
     async ({ documentId }) => {
       try {
-        return ok(await runGws("docs", "documents", "get", { documentId }));
+        return okUntrusted(await runGws("docs", "documents", "get", { documentId }));
       } catch (e) {
         return err(`Docs read failed: ${e instanceof Error ? e.message : String(e)}`);
       }

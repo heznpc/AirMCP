@@ -36,16 +36,18 @@ export function captureWindowScript(appName?: string): string {
   const activateBlock = appName
     ? `Application('${esc(appName)}').activate(); delay(1.0);`
     : "";
-  const targetApp = appName ? `'${esc(appName)}'` : "null";
+  // To avoid JXA→shell→Python multi-layer escaping pitfalls, pass the app name
+  // as a base64 literal. Base64 output is [A-Za-z0-9+/=] only — safe in all layers.
+  const b64 = appName ? Buffer.from(appName).toString("base64") : "";
   return `
     const app = Application.currentApplication();
     app.includeStandardAdditions = true;
     ${activateBlock}
-    // Get window ID via CGWindowListCopyWindowInfo (Python one-liner to avoid JXA limitations)
-    const targetApp = ${targetApp};
-    const pyCmd = targetApp
-      ? 'python3 -c "import Quartz,json;ws=[w for w in Quartz.CGWindowListCopyWindowInfo(Quartz.kCGWindowListOptionOnScreenOnly|Quartz.kCGWindowListExcludeDesktopElements,Quartz.kCGNullWindowID) if w.get(\\"kCGWindowOwnerName\\")==\\"' + targetApp + '\\" and w.get(\\"kCGWindowLayer\\")==0];print(ws[0][\\"kCGWindowNumber\\"] if ws else 0)"'
-      : 'python3 -c "import Quartz;ws=[w for w in Quartz.CGWindowListCopyWindowInfo(Quartz.kCGWindowListOptionOnScreenOnly|Quartz.kCGWindowListExcludeDesktopElements,Quartz.kCGNullWindowID) if w.get(\\"kCGWindowLayer\\")==0];print(ws[0][\\"kCGWindowNumber\\"] if ws else 0)"';
+    // Get window ID via CGWindowListCopyWindowInfo
+    ${appName
+      ? `const pyCmd = 'python3 -c "import Quartz,base64;name=base64.b64decode(\\"${b64}\\").decode();ws=[w for w in Quartz.CGWindowListCopyWindowInfo(Quartz.kCGWindowListOptionOnScreenOnly|Quartz.kCGWindowListExcludeDesktopElements,Quartz.kCGNullWindowID) if w.get(\\"kCGWindowOwnerName\\")==name and w.get(\\"kCGWindowLayer\\")==0];print(ws[0][\\"kCGWindowNumber\\"] if ws else 0)"';`
+      : `const pyCmd = 'python3 -c "import Quartz;ws=[w for w in Quartz.CGWindowListCopyWindowInfo(Quartz.kCGWindowListOptionOnScreenOnly|Quartz.kCGWindowListExcludeDesktopElements,Quartz.kCGNullWindowID) if w.get(\\"kCGWindowLayer\\")==0];print(ws[0][\\"kCGWindowNumber\\"] if ws else 0)"';`
+    }
     const wid = parseInt(app.doShellScript(pyCmd).trim(), 10);
     if (wid > 0) {
       app.doShellScript('screencapture -x -t png -l ' + wid + ' "${filePath}"');

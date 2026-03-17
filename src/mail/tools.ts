@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, err } from "../shared/result.js";
+import { ok, okUntrusted, err } from "../shared/result.js";
 import {
   listMailboxesScript,
   listMessagesScript,
@@ -72,7 +72,7 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
     },
     async ({ id, maxLength }) => {
       try {
-        return ok(await runJxa(readMessageScript(id, maxLength)));
+        return okUntrusted(await runJxa(readMessageScript(id, maxLength)));
       } catch (e) {
         return err(`Failed to read message: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -93,7 +93,7 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
     },
     async ({ query, mailbox, limit }) => {
       try {
-        return ok(await runJxa(searchMessagesScript(query, mailbox, limit)));
+        return okUntrusted(await runJxa(searchMessagesScript(query, mailbox, limit)));
       } catch (e) {
         return err(`Failed to search messages: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -210,7 +210,7 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
         bcc: z.array(z.string().email()).max(LIMITS.MAIL_RECIPIENTS).optional().describe(`BCC recipients (max ${LIMITS.MAIL_RECIPIENTS})`),
         account: z.string().optional().describe("Sender email address (uses default account if omitted)"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
     async ({ to, subject, body, cc, bcc, account }) => {
       if (!allowSendMail) return err("Sending mail is disabled. Set allowSendMail: true in config or AIRMCP_ALLOW_SEND_MAIL=true.");
@@ -232,7 +232,7 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
         body: z.string().describe("Reply body text"),
         replyAll: z.boolean().optional().default(false).describe("Reply to all recipients (default: false)"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
     async ({ id, body, replyAll }) => {
       if (!allowSendMail) return err("Sending mail is disabled. Set allowSendMail: true in config or AIRMCP_ALLOW_SEND_MAIL=true.");

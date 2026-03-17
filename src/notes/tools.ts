@@ -3,7 +3,7 @@ import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import { LIMITS } from "../shared/constants.js";
-import { ok, err } from "../shared/result.js";
+import { ok, okUntrusted, err } from "../shared/result.js";
 import { filterSharedAccess, guardSharedAccess } from "../shared/share-guard.js";
 import {
   listNotesScript,
@@ -144,7 +144,7 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
         const result = await runJxa<{ total: number; returned: number; notes: SearchResult[] }>(searchNotesScript(query, limit));
         result.notes = filterSharedAccess(result.notes, config, "notes");
         result.returned = result.notes.length;
-        return ok(result);
+        return okUntrusted(result);
       } catch (e) {
         return err(`Failed to search notes: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -171,7 +171,7 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
         const result = await runJxa<NoteDetail>(readNoteScript(id));
         const blocked = await guardSharedAccess(result.shared, config, "notes", "read_note", { id });
         if (blocked) return err(blocked);
-        return ok(result);
+        return okUntrusted(result);
       } catch (e) {
         return err(`Failed to read note: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -369,7 +369,7 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
         const result = await runJxa<ScanResult>(scanNotesScript(limit, previewLength, offset, folder));
         result.notes = filterSharedAccess(result.notes, config, "notes");
         result.returned = result.notes.length;
-        return ok(result);
+        return okUntrusted(result);
       } catch (e) {
         return err(`Failed to scan notes: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -405,7 +405,7 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
           const blocked = await guardSharedAccess(true, config, "notes", "compare_notes", { ids });
           if (blocked) return err(blocked);
         }
-        return ok(result);
+        return okUntrusted(result);
       } catch (e) {
         return err(`Failed to compare notes: ${e instanceof Error ? e.message : String(e)}`);
       }

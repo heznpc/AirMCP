@@ -25,6 +25,44 @@ export async function checkSwiftBridge(): Promise<string | null> {
   return bridgeError;
 }
 
+// ── Command discovery ────────────────────────────────────────────────
+
+let swiftCommands: Set<string> | null = null;
+let commandsFetching: Promise<void> | null = null;
+
+/**
+ * Load the set of commands supported by the Swift bridge.
+ * Caches the result so subsequent calls are instant.
+ */
+async function loadSwiftCommands(): Promise<void> {
+  if (swiftCommands !== null) return;
+  if (commandsFetching) return commandsFetching;
+
+  commandsFetching = (async () => {
+    try {
+      const commands = await runSwift<string[]>("list-commands", "{}");
+      swiftCommands = new Set(commands);
+    } catch {
+      swiftCommands = new Set(); // Bridge unavailable — empty set
+    } finally {
+      commandsFetching = null;
+    }
+  })();
+
+  return commandsFetching;
+}
+
+/**
+ * Check whether the Swift bridge supports a specific command.
+ * Returns false if the bridge is not available or the command is unknown.
+ */
+export async function hasSwiftCommand(name: string): Promise<boolean> {
+  const missing = await checkSwiftBridge();
+  if (missing) return false;
+  await loadSwiftCommands();
+  return swiftCommands?.has(name) ?? false;
+}
+
 // ── Persistent process management ────────────────────────────────────
 
 interface PendingRequest {

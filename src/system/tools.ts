@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
+import { runAutomation } from "../shared/automation.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import { ok, okUntrusted, toolError } from "../shared/result.js";
 import { zFilePath } from "../shared/validate.js";
@@ -59,7 +60,12 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
     },
     async () => {
       try {
-        return okUntrusted(await runJxa<{ content: string }>(getClipboardScript()));
+        return okUntrusted(
+          await runAutomation<{ content: string; length: number; truncated: boolean }>({
+            swift: { command: "get-clipboard" },
+            jxa: () => getClipboardScript(),
+          }),
+        );
       } catch (e) {
         return toolError("get clipboard", e);
       }

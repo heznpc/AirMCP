@@ -7,6 +7,7 @@ import CoreLocation
 import CoreBluetooth
 import Vision
 import CoreSpotlight
+import AppKit
 import AirMCPKit
 
 #if canImport(ImagePlayground)
@@ -630,8 +631,66 @@ case "scan-document":
         writeError("Document scanning requires macOS 14+.")
     }
 
+// --- Command discovery ---
+case "list-commands":
+    let commands = [
+        "list-commands",
+        "get-clipboard",
+        "embed-text",
+        "embed-batch",
+        "summarize",
+        "rewrite",
+        "proofread",
+        "generate-text",
+        "generate-structured",
+        "tag-content",
+        "ai-chat",
+        "ai-status",
+        "create-recurring-event",
+        "create-recurring-reminder",
+        "query-photos",
+        "classify-image",
+        "import-photo",
+        "delete-photos",
+        "get-location",
+        "location-permission",
+        "bluetooth-state",
+        "scan-bluetooth",
+        "connect-bluetooth",
+        "disconnect-bluetooth",
+        "generate-image",
+        "spotlight-index",
+        "spotlight-clear",
+        "scan-document",
+    ]
+    do {
+        let data = try JSONSerialization.data(withJSONObject: commands, options: [.sortedKeys])
+        writeRawJSON(data)
+    } catch {
+        writeError("Failed to serialize command list: \(error.localizedDescription)")
+    }
+
+// --- System: clipboard ---
+case "get-clipboard":
+    let pasteboard = NSPasteboard.general
+    let content = pasteboard.string(forType: .string) ?? ""
+    let maxLen = 5_000_000
+    let truncated = content.count > maxLen
+    let clipped = truncated ? String(content.prefix(maxLen)) : content
+    let output: [String: Any] = [
+        "content": clipped,
+        "length": clipped.count,
+        "truncated": truncated,
+    ]
+    do {
+        let outData = try JSONSerialization.data(withJSONObject: output, options: [.sortedKeys])
+        writeRawJSON(outData)
+    } catch {
+        writeError("Failed to serialize clipboard output: \(error.localizedDescription)")
+    }
+
 default:
-    writeError("Unknown command: \(command). Use: embed-text, embed-batch, summarize, rewrite, proofread, generate-text, generate-structured, tag-content, ai-chat, ai-status, create-recurring-event, create-recurring-reminder, import-photo, delete-photos, get-location, location-permission, bluetooth-state, scan-bluetooth, connect-bluetooth, disconnect-bluetooth, generate-image, scan-document")
+    writeError("Unknown command: \(command). Use list-commands to see all available commands.")
 }
 
 } // end handleCommand

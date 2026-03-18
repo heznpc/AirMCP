@@ -6,6 +6,7 @@ import {
   isModuleEnabled,
   needsShareApproval,
 } from '../dist/shared/config.js';
+import { PATHS } from '../dist/shared/constants.js';
 
 /* ------------------------------------------------------------------ */
 /*  Helpers to save / restore env vars touched by tests                */
@@ -21,12 +22,14 @@ const ENV_KEYS = [
 ];
 
 let savedEnv;
+let savedConfigPath;
 
 function saveEnv() {
   savedEnv = {};
   for (const key of ENV_KEYS) {
     savedEnv[key] = process.env[key]; // undefined if unset
   }
+  savedConfigPath = PATHS.CONFIG;
 }
 
 function restoreEnv() {
@@ -37,12 +40,16 @@ function restoreEnv() {
       process.env[key] = savedEnv[key];
     }
   }
+  PATHS.CONFIG = savedConfigPath;
 }
 
 function clearConfigEnv() {
   for (const key of ENV_KEYS) {
     delete process.env[key];
   }
+  // Point config path to non-existent file so tests aren't affected by
+  // the user's local config.json.
+  PATHS.CONFIG = '/tmp/__airmcp_test_nonexistent_config__.json';
 }
 
 /* ================================================================== */
@@ -164,14 +171,14 @@ describe('parseConfig()', () => {
     expect(cfg.includeShared).toBe(false);
   });
 
-  test('allowSendMessages defaults to true', () => {
+  test('allowSendMessages defaults to false', () => {
     const cfg = parseConfig();
-    expect(cfg.allowSendMessages).toBe(true);
+    expect(cfg.allowSendMessages).toBe(false);
   });
 
-  test('allowSendMail defaults to true', () => {
+  test('allowSendMail defaults to false', () => {
     const cfg = parseConfig();
-    expect(cfg.allowSendMail).toBe(true);
+    expect(cfg.allowSendMail).toBe(false);
   });
 
   /* ------ boolean env var overrides ------------------------------ */
@@ -196,9 +203,9 @@ describe('parseConfig()', () => {
 
   /* ------ HITL config defaults ----------------------------------- */
 
-  test('HITL level defaults to "off"', () => {
+  test('HITL level defaults to "destructive-only"', () => {
     const cfg = parseConfig();
-    expect(cfg.hitl.level).toBe('off');
+    expect(cfg.hitl.level).toBe('destructive-only');
   });
 
   test('HITL timeout defaults to 30', () => {
@@ -222,10 +229,10 @@ describe('parseConfig()', () => {
     expect(cfg.hitl.level).toBe('all');
   });
 
-  test('invalid HITL level falls back to "off"', () => {
+  test('invalid HITL level falls back to "destructive-only"', () => {
     process.env.AIRMCP_HITL_LEVEL = 'invalid-value';
     const cfg = parseConfig();
-    expect(cfg.hitl.level).toBe('off');
+    expect(cfg.hitl.level).toBe('destructive-only');
   });
 
   /* ------ share approval via env var ----------------------------- */

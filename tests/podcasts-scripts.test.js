@@ -63,7 +63,7 @@ describe('podcasts script generators (SQLite-based)', () => {
   test('playEpisodeScript uses URL scheme', () => {
     const script = playEpisodeScript('My Episode');
     expect(script).toContain('podcasts://search');
-    expect(script).toContain('My%20Episode');
+    expect(script).toContain("encodeURIComponent('My Episode')");
   });
 
   test('playEpisodeScript with show', () => {
@@ -83,11 +83,14 @@ describe('podcasts script generators (SQLite-based)', () => {
 describe('podcasts SQL injection prevention', () => {
   test('escapes single quotes in show name', () => {
     const script = listEpisodesScript("it's", 10);
-    expect(script).toContain("it''s");
+    // SQL '' escaping is applied, then escJxaShell escapes \ and ' for JXA/shell.
+    // Final output: \'it\'\'s\'
+    expect(script).toContain("\\'it\\'\\'s\\'");
   });
 
   test('escapes single quotes in search query', () => {
     const script = searchEpisodesScript("it's", 10);
-    expect(script).toContain("it''s");
+    // Same layered escaping: SQL '' + escJxaShell
+    expect(script).toContain("\\'%it\\'\\'s%\\'");
   });
 });

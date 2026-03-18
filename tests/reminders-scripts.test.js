@@ -20,7 +20,7 @@ describe('reminders script generators', () => {
   test('listRemindersScript without filters', () => {
     const script = listRemindersScript(200, 0);
     expect(script).toContain("Application('Reminders')");
-    expect(script).toContain("l.reminders()");
+    expect(script).toContain("l.reminders");
     expect(script).not.toContain(".filter");
   });
 
@@ -31,7 +31,7 @@ describe('reminders script generators', () => {
 
   test('listRemindersScript with completed filter', () => {
     const script = listRemindersScript(200, 0, undefined, false);
-    expect(script).toContain("!r.completed()");
+    expect(script).toContain(".whose({completed: false})");
   });
 
   test('listRemindersScript with both filters', () => {

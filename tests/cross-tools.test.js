@@ -6,6 +6,13 @@ jest.unstable_mockModule('../dist/shared/jxa.js', () => ({
   runJxa: mockRunJxa,
 }));
 
+const mockCheckSwiftBridge = jest.fn().mockResolvedValue('Swift bridge not available');
+const mockRunSwift = jest.fn();
+jest.unstable_mockModule('../dist/shared/swift.js', () => ({
+  checkSwiftBridge: mockCheckSwiftBridge,
+  runSwift: mockRunSwift,
+}));
+
 const { registerCrossTools } = await import('../dist/cross/tools.js');
 
 // Minimal McpServer mock

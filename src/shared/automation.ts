@@ -23,8 +23,11 @@ export async function runAutomation<T>(options: {
         options.swift.command,
         JSON.stringify(options.swift.input ?? {}),
       );
-    } catch {
-      // Fall through to JXA
+    } catch (swiftErr) {
+      // Swift bridge failed — fall through to JXA fallback
+      console.error(
+        `[AirMCP] Swift bridge failed for "${options.swift.command}", falling back to JXA: ${swiftErr instanceof Error ? swiftErr.message : String(swiftErr)}`,
+      );
     }
   }
 

@@ -832,16 +832,24 @@ public struct ContactGroupMembersOutput: Encodable, Sendable {
 
 // MARK: - Helpers
 
+/// Thread-safe shared formatters — ISO8601DateFormatter is safe to use from multiple threads.
+nonisolated(unsafe) private let iso8601Formatter: ISO8601DateFormatter = {
+    let f = ISO8601DateFormatter()
+    f.formatOptions = [.withInternetDateTime]
+    return f
+}()
+
+nonisolated(unsafe) private let iso8601FractionalFormatter: ISO8601DateFormatter = {
+    let f = ISO8601DateFormatter()
+    f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    return f
+}()
+
 public func formatISO8601(_ date: Date) -> String {
-    let formatter = ISO8601DateFormatter()
-    formatter.formatOptions = [.withInternetDateTime]
-    return formatter.string(from: date)
+    iso8601Formatter.string(from: date)
 }
 
 public func parseISO8601(_ string: String) -> Date? {
-    let formatter = ISO8601DateFormatter()
-    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    if let date = formatter.date(from: string) { return date }
-    formatter.formatOptions = [.withInternetDateTime]
-    return formatter.date(from: string)
+    if let date = iso8601FractionalFormatter.date(from: string) { return date }
+    return iso8601Formatter.date(from: string)
 }

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { runSwift } from "../shared/swift.js";
 import { runAutomation } from "../shared/automation.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, err } from "../shared/result.js";
+import { ok, toolError } from "../shared/result.js";
 import { zFilePath } from "../shared/validate.js";
 import {
   listAlbumsScript,
@@ -106,7 +106,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
       });
       return ok(result);
     } catch (e) {
-      return err(`Failed to list albums: ${e instanceof Error ? e.message : String(e)}`);
+      return toolError("list albums", e);
     }
   });
 
@@ -130,7 +130,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
       });
       return ok(result);
     } catch (e) {
-      return err(`Failed to list photos: ${e instanceof Error ? e.message : String(e)}`);
+      return toolError("list photos", e);
     }
   });
 
@@ -153,7 +153,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
       });
       return ok(result);
     } catch (e) {
-      return err(`Failed to search photos: ${e instanceof Error ? e.message : String(e)}`);
+      return toolError("search photos", e);
     }
   });
 
@@ -175,7 +175,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
       });
       return ok(result);
     } catch (e) {
-      return err(`Failed to get photo info: ${e instanceof Error ? e.message : String(e)}`);
+      return toolError("get photo info", e);
     }
   });
 
@@ -197,7 +197,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
       });
       return ok(result);
     } catch (e) {
-      return err(`Failed to list favorites: ${e instanceof Error ? e.message : String(e)}`);
+      return toolError("list favorites", e);
     }
   });
 
@@ -219,7 +219,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
       });
       return ok(result);
     } catch (e) {
-      return err(`Failed to create album: ${e instanceof Error ? e.message : String(e)}`);
+      return toolError("create album", e);
     }
   });
 
@@ -242,7 +242,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
       });
       return ok(result);
     } catch (e) {
-      return err(`Failed to add photos to album: ${e instanceof Error ? e.message : String(e)}`);
+      return toolError("add photos to album", e);
     }
   });
 
@@ -271,7 +271,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
         );
         return ok(result);
       } catch (e) {
-        return err(`Failed to import photo: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("import photo", e);
       }
     },
   );
@@ -300,7 +300,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
         );
         return ok(result);
       } catch (e) {
-        return err(`Failed to delete photos: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("delete photos", e);
       }
     },
   );
@@ -331,7 +331,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
         );
         return ok(result);
       } catch (e) {
-        return err(`Failed to query photos: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("query photos", e);
       }
     },
   );
@@ -357,7 +357,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
         );
         return ok(result);
       } catch (e) {
-        return err(`Failed to classify image: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("classify image", e);
       }
     },
   );

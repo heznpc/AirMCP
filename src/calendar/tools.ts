@@ -3,7 +3,7 @@ import { z } from "zod";
 import { runAutomation } from "../shared/automation.js";
 import { runSwift } from "../shared/swift.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okUntrusted, err } from "../shared/result.js";
+import { ok, okUntrusted, toolError } from "../shared/result.js";
 import {
   listCalendarsScript,
   listEventsScript,
@@ -111,7 +111,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
         });
         return ok(result);
       } catch (e) {
-        return err(`Failed to list calendars: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("list calendars", e);
       }
     },
   );
@@ -147,7 +147,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
         });
         return ok(result);
       } catch (e) {
-        return err(`Failed to list events: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("list events", e);
       }
     },
   );
@@ -176,7 +176,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
         });
         return okUntrusted(result);
       } catch (e) {
-        return err(`Failed to read event: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("read event", e);
       }
     },
   );
@@ -214,7 +214,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
         });
         return ok(result);
       } catch (e) {
-        return err(`Failed to create event: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("create event", e);
       }
     },
   );
@@ -251,7 +251,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
         });
         return ok(result);
       } catch (e) {
-        return err(`Failed to update event: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("update event", e);
       }
     },
   );
@@ -279,7 +279,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
         });
         return ok(result);
       } catch (e) {
-        return err(`Failed to delete event: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("delete event", e);
       }
     },
   );
@@ -314,7 +314,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
         });
         return ok(result);
       } catch (e) {
-        return err(`Failed to search events: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("search events", e);
       }
     },
   );
@@ -343,7 +343,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
         });
         return ok(result);
       } catch (e) {
-        return err(`Failed to get upcoming events: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("get upcoming events", e);
       }
     },
   );
@@ -369,7 +369,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
         });
         return ok(result);
       } catch (e) {
-        return err(`Failed to get today's events: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("get today's events", e);
       }
     },
   );
@@ -418,7 +418,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
         );
         return ok(result);
       } catch (e) {
-        return err(`Failed to create recurring event: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("create recurring event", e);
       }
     },
   );

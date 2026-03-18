@@ -443,13 +443,12 @@ case "query-photos":
 
     let assets = PHAsset.fetchAssets(with: fetchOptions)
     var photos: [PhotoInfo] = []
-    let formatter = ISO8601DateFormatter()
     assets.enumerateObjects { asset, _, _ in
         let typeStr = asset.mediaType == .video ? "video" : asset.mediaType == .audio ? "audio" : "image"
         photos.append(PhotoInfo(
             identifier: asset.localIdentifier,
             filename: PHAssetResource.assetResources(for: asset).first?.originalFilename,
-            creationDate: asset.creationDate.map { formatter.string(from: $0) },
+            creationDate: asset.creationDate.map { formatISO8601($0) },
             mediaType: typeStr,
             isFavorite: asset.isFavorite,
             width: asset.pixelWidth,
@@ -563,7 +562,6 @@ case "list-photos":
         return
     }
 
-    let formatter = ISO8601DateFormatter()
     let limit = listInput.limit ?? 50
     let offset = listInput.offset ?? 0
 
@@ -595,7 +593,7 @@ case "list-photos":
             id: asset.localIdentifier,
             filename: PHAssetResource.assetResources(for: asset).first?.originalFilename,
             name: nil,
-            date: asset.creationDate.map { formatter.string(from: $0) },
+            date: asset.creationDate.map { formatISO8601($0) },
             width: asset.pixelWidth,
             height: asset.pixelHeight,
             favorite: asset.isFavorite
@@ -611,7 +609,6 @@ case "search-photos":
         return
     }
 
-    let formatter = ISO8601DateFormatter()
     let searchLimit = searchInput.limit ?? 30
     let query = searchInput.query.lowercased()
 
@@ -631,7 +628,7 @@ case "search-photos":
                 id: asset.localIdentifier,
                 filename: filename,
                 name: nil,
-                date: asset.creationDate.map { formatter.string(from: $0) },
+                date: asset.creationDate.map { formatISO8601($0) },
                 favorite: asset.isFavorite,
                 description: nil
             ))
@@ -653,7 +650,6 @@ case "get-photo-info":
         return
     }
 
-    let formatter = ISO8601DateFormatter()
     let resources = PHAssetResource.assetResources(for: asset)
     let loc = asset.location
     let locationArr: [Double]? = loc.map { [$0.coordinate.latitude, $0.coordinate.longitude] }
@@ -663,7 +659,7 @@ case "get-photo-info":
         filename: resources.first?.originalFilename,
         name: nil,
         description: nil,
-        date: asset.creationDate.map { formatter.string(from: $0) },
+        date: asset.creationDate.map { formatISO8601($0) },
         width: asset.pixelWidth,
         height: asset.pixelHeight,
         altitude: loc?.altitude,
@@ -680,7 +676,6 @@ case "list-favorites":
         return
     }
 
-    let formatter = ISO8601DateFormatter()
     let favLimit = favInput.limit ?? 50
     let favOffset = favInput.offset ?? 0
     let favOptions = PHFetchOptions()
@@ -697,7 +692,7 @@ case "list-favorites":
             id: asset.localIdentifier,
             filename: PHAssetResource.assetResources(for: asset).first?.originalFilename,
             name: nil,
-            date: asset.creationDate.map { formatter.string(from: $0) },
+            date: asset.creationDate.map { formatISO8601($0) },
             width: asset.pixelWidth,
             height: asset.pixelHeight,
             favorite: true
@@ -947,14 +942,13 @@ case "get-location":
     let fetcher = LocationFetcher()
     do {
         let location = try await fetcher.fetch()
-        let formatter = ISO8601DateFormatter()
         let output = LocationOutput(
             latitude: location.coordinate.latitude,
             longitude: location.coordinate.longitude,
             altitude: location.altitude,
             horizontalAccuracy: location.horizontalAccuracy,
             verticalAccuracy: location.verticalAccuracy,
-            timestamp: formatter.string(from: location.timestamp)
+            timestamp: formatISO8601(location.timestamp)
         )
         try writeJSON(output)
     } catch {

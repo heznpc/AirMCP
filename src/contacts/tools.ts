@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { runAutomation } from "../shared/automation.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okUntrusted, err } from "../shared/result.js";
+import { ok, okUntrusted, toolError } from "../shared/result.js";
 import {
   listContactsScript,
   searchContactsScript,
@@ -113,7 +113,7 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
         });
         return ok(result);
       } catch (e) {
-        return err(`Failed to list contacts: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("list contacts", e);
       }
     },
   );
@@ -137,7 +137,7 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
         });
         return ok(result);
       } catch (e) {
-        return err(`Failed to search contacts: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("search contacts", e);
       }
     },
   );
@@ -160,7 +160,7 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
         });
         return okUntrusted(result);
       } catch (e) {
-        return err(`Failed to read contact: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("read contact", e);
       }
     },
   );
@@ -189,7 +189,7 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
         });
         return ok(result);
       } catch (e) {
-        return err(`Failed to create contact: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("create contact", e);
       }
     },
   );
@@ -217,7 +217,7 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
         });
         return ok(result);
       } catch (e) {
-        return err(`Failed to update contact: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("update contact", e);
       }
     },
   );
@@ -240,7 +240,7 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
         });
         return ok(result);
       } catch (e) {
-        return err(`Failed to delete contact: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("delete contact", e);
       }
     },
   );
@@ -261,7 +261,7 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
         });
         return ok(result);
       } catch (e) {
-        return err(`Failed to list groups: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("list groups", e);
       }
     },
   );
@@ -286,7 +286,7 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
         });
         return ok(result);
       } catch (e) {
-        return err(`Failed to add email to contact: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("add email to contact", e);
       }
     },
   );
@@ -311,7 +311,7 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
         });
         return ok(result);
       } catch (e) {
-        return err(`Failed to add phone to contact: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("add phone to contact", e);
       }
     },
   );
@@ -335,7 +335,7 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
         });
         return ok(result);
       } catch (e) {
-        return err(`Failed to list group members: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("list group members", e);
       }
     },
   );

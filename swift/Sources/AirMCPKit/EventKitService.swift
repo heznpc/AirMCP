@@ -45,10 +45,15 @@ public struct EventKitService: Sendable {
         )
     }
 
+    // MARK: - Cached stores (EKEventStore is thread-safe; reuse across calls)
+
+    nonisolated(unsafe) private static let sharedEventStore = EKEventStore()
+    nonisolated(unsafe) private static let sharedReminderStore = EKEventStore()
+
     // MARK: - EventKit authorization helper
 
     private func authorizedEventStore() async throws -> EKEventStore {
-        let store = EKEventStore()
+        let store = Self.sharedEventStore
         let granted: Bool
         if #available(macOS 14.0, iOS 17.0, *) {
             granted = try await store.requestFullAccessToEvents()
@@ -331,7 +336,7 @@ public struct EventKitService: Sendable {
     // MARK: - Reminder authorization helper
 
     private func authorizedReminderStore() async throws -> EKEventStore {
-        let store = EKEventStore()
+        let store = Self.sharedReminderStore
         let granted: Bool
         if #available(macOS 14.0, iOS 17.0, *) {
             granted = try await store.requestFullAccessToReminders()
@@ -359,13 +364,16 @@ public struct EventKitService: Sendable {
     public func listReminderLists() async throws -> [ReminderListInfo] {
         let store = try await authorizedReminderStore()
         let calendars = store.calendars(for: .reminder)
-        var results: [ReminderListInfo] = []
-        for cal in calendars {
-            let predicate = store.predicateForReminders(in: [cal])
-            let reminders = await fetchRemindersAsync(store: store, matching: predicate)
-            results.append(ReminderListInfo(id: cal.calendarIdentifier, name: cal.title, reminderCount: reminders.count))
+
+        // Single fetch for all reminders, then group by calendar to get counts
+        let allPredicate = store.predicateForReminders(in: nil)
+        let all = await fetchRemindersAsync(store: store, matching: allPredicate)
+        let counts = Dictionary(grouping: all, by: { $0.calendar.calendarIdentifier })
+            .mapValues { $0.count }
+
+        return calendars.map { cal in
+            ReminderListInfo(id: cal.calendarIdentifier, name: cal.title, reminderCount: counts[cal.calendarIdentifier] ?? 0)
         }
-        return results
     }
 
     public func listReminders(_ input: ListRemindersInput) async throws -> ReminderListOutput {

@@ -74,6 +74,8 @@ class ToolRegistry {
    * the handler stored here already includes the HITL wrapper).
    */
   installOn(server: McpServer): void {
+    this.tools.clear();
+    this.prompts.clear();
     this.interceptToolRegistration(server);
     this.interceptPromptRegistration(server);
   }

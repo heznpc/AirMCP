@@ -7,10 +7,14 @@ import Foundation
 public struct ContactsService: Sendable {
     public init() {}
 
+    // MARK: - Cached store (CNContactStore is thread-safe; reuse across calls)
+
+    nonisolated(unsafe) private static let sharedStore = CNContactStore()
+
     // MARK: - Authorization helper
 
     private func authorizedStore() throws -> CNContactStore {
-        let store = CNContactStore()
+        let store = Self.sharedStore
         let status = CNContactStore.authorizationStatus(for: .contacts)
         switch status {
         case .authorized:
@@ -36,6 +40,12 @@ public struct ContactsService: Sendable {
         }
     }
 
+    // MARK: - Name formatting helper
+
+    private func contactFullName(_ contact: CNContact) -> String {
+        "\(contact.givenName) \(contact.familyName)".trimmingCharacters(in: .whitespaces)
+    }
+
     // MARK: - List Contacts
 
     public func listContacts(_ input: ListContactsInput) throws -> ContactListOutput {
@@ -54,25 +64,23 @@ public struct ContactsService: Sendable {
         let request = CNContactFetchRequest(keysToFetch: keys)
         request.sortOrder = .givenName
 
-        var allContacts: [ContactSummary] = []
-        try store.enumerateContacts(with: request) { contact, _ in
-            let name = "\(contact.givenName) \(contact.familyName)".trimmingCharacters(in: .whitespaces)
-            let email = contact.emailAddresses.first?.value as String?
-            let phone = contact.phoneNumbers.first?.value.stringValue
-            allContacts.append(ContactSummary(
+        var skipped = 0
+        var results: [ContactSummary] = []
+        var hasMore = false
+        try store.enumerateContacts(with: request) { contact, stop in
+            if skipped < offset { skipped += 1; return }
+            if results.count >= limit { hasMore = true; stop.pointee = true; return }
+            results.append(ContactSummary(
                 id: contact.identifier,
-                name: name,
-                email: email,
-                phone: phone
+                name: contactFullName(contact),
+                email: contact.emailAddresses.first?.value as String?,
+                phone: contact.phoneNumbers.first?.value.stringValue
             ))
         }
 
-        let total = allContacts.count
-        let s = min(offset, total)
-        let e = min(s + limit, total)
-        let slice = Array(allContacts[s..<e])
-
-        return ContactListOutput(total: total, offset: s, returned: slice.count, contacts: slice)
+        // total is a lower-bound estimate since we stop early; accurate when hasMore is false.
+        let estimatedTotal = offset + results.count + (hasMore ? 1 : 0)
+        return ContactListOutput(total: estimatedTotal, offset: offset, returned: results.count, contacts: results)
     }
 
     // MARK: - Search Contacts
@@ -98,7 +106,7 @@ public struct ContactsService: Sendable {
 
         let nameContacts = try store.unifiedContacts(matching: namePredicate, keysToFetch: keys)
         for contact in nameContacts where results.count < limit {
-            let name = "\(contact.givenName) \(contact.familyName)".trimmingCharacters(in: .whitespaces)
+            let name = contactFullName(contact)
             let org = contact.organizationName.isEmpty ? nil : contact.organizationName
             results.append(ContactSearchItem(
                 id: contact.identifier,
@@ -124,7 +132,7 @@ public struct ContactsService: Sendable {
                 let phoneMatch = contact.phoneNumbers.contains { $0.value.stringValue.contains(query) }
 
                 if orgMatch || emailMatch || phoneMatch {
-                    let name = "\(contact.givenName) \(contact.familyName)".trimmingCharacters(in: .whitespaces)
+                    let name = contactFullName(contact)
                     let matchedField = orgMatch ? "organization" : emailMatch ? "email" : "phone"
                     results.append(ContactSearchItem(
                         id: contact.identifier,
@@ -160,7 +168,7 @@ public struct ContactsService: Sendable {
         ]
 
         let contact = try store.unifiedContact(withIdentifier: input.id, keysToFetch: keys)
-        let name = "\(contact.givenName) \(contact.familyName)".trimmingCharacters(in: .whitespaces)
+        let name = contactFullName(contact)
 
         let emails = contact.emailAddresses.map { labeled in
             ContactLabeledValue(value: labeled.value as String, label: CNLabeledValue<NSString>.localizedString(forLabel: labeled.label ?? "other"))
@@ -222,7 +230,7 @@ public struct ContactsService: Sendable {
         saveRequest.add(contact, toContainerWithIdentifier: nil)
         try store.execute(saveRequest)
 
-        let name = "\(contact.givenName) \(contact.familyName)".trimmingCharacters(in: .whitespaces)
+        let name = contactFullName(contact)
         return ContactMutationOutput(id: contact.identifier, name: name)
     }
 
@@ -252,7 +260,7 @@ public struct ContactsService: Sendable {
         saveRequest.update(mutable)
         try store.execute(saveRequest)
 
-        let name = "\(mutable.givenName) \(mutable.familyName)".trimmingCharacters(in: .whitespaces)
+        let name = contactFullName(mutable)
         return ContactMutationOutput(id: mutable.identifier, name: name)
     }
 
@@ -267,7 +275,7 @@ public struct ContactsService: Sendable {
         ]
 
         let contact = try store.unifiedContact(withIdentifier: input.id, keysToFetch: keys)
-        let name = "\(contact.givenName) \(contact.familyName)".trimmingCharacters(in: .whitespaces)
+        let name = contactFullName(contact)
         let mutable = contact.mutableCopy() as! CNMutableContact
 
         let saveRequest = CNSaveRequest()
@@ -309,7 +317,7 @@ public struct ContactsService: Sendable {
         saveRequest.update(mutable)
         try store.execute(saveRequest)
 
-        let name = "\(mutable.givenName) \(mutable.familyName)".trimmingCharacters(in: .whitespaces)
+        let name = contactFullName(mutable)
         return ContactEmailAddedOutput(id: mutable.identifier, name: name, addedEmail: input.email)
     }
 
@@ -335,7 +343,7 @@ public struct ContactsService: Sendable {
         saveRequest.update(mutable)
         try store.execute(saveRequest)
 
-        let name = "\(mutable.givenName) \(mutable.familyName)".trimmingCharacters(in: .whitespaces)
+        let name = contactFullName(mutable)
         return ContactPhoneAddedOutput(id: mutable.identifier, name: name, addedPhone: input.phone)
     }
 
@@ -371,7 +379,7 @@ public struct ContactsService: Sendable {
         let items = slice.map { contact in
             ContactSummary(
                 id: contact.identifier,
-                name: "\(contact.givenName) \(contact.familyName)".trimmingCharacters(in: .whitespaces),
+                name: contactFullName(contact),
                 email: contact.emailAddresses.first?.value as String?,
                 phone: contact.phoneNumbers.first?.value.stringValue
             )

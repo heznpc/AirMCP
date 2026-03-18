@@ -3,7 +3,7 @@ import { z } from "zod";
 import { runAutomation } from "../shared/automation.js";
 import { runSwift } from "../shared/swift.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okUntrusted, err } from "../shared/result.js";
+import { ok, okUntrusted, toolError } from "../shared/result.js";
 import {
   listReminderListsScript,
   listRemindersScript,
@@ -92,7 +92,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
         });
         return ok(result);
       } catch (e) {
-        return err(`Failed to list reminder lists: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("list reminder lists", e);
       }
     },
   );
@@ -127,7 +127,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
         });
         return ok(result);
       } catch (e) {
-        return err(`Failed to list reminders: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("list reminders", e);
       }
     },
   );
@@ -155,7 +155,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
         });
         return okUntrusted(result);
       } catch (e) {
-        return err(`Failed to read reminder: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("read reminder", e);
       }
     },
   );
@@ -191,7 +191,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
         });
         return ok(result);
       } catch (e) {
-        return err(`Failed to create reminder: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("create reminder", e);
       }
     },
   );
@@ -236,7 +236,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
         });
         return ok(result);
       } catch (e) {
-        return err(`Failed to update reminder: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("update reminder", e);
       }
     },
   );
@@ -268,7 +268,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
         });
         return ok(result);
       } catch (e) {
-        return err(`Failed to complete reminder: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("complete reminder", e);
       }
     },
   );
@@ -296,7 +296,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
         });
         return ok(result);
       } catch (e) {
-        return err(`Failed to delete reminder: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("delete reminder", e);
       }
     },
   );
@@ -329,7 +329,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
         });
         return ok(result);
       } catch (e) {
-        return err(`Failed to search reminders: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("search reminders", e);
       }
     },
   );
@@ -360,7 +360,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
         });
         return ok(result);
       } catch (e) {
-        return err(`Failed to create reminder list: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("create reminder list", e);
       }
     },
   );
@@ -391,7 +391,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
         });
         return ok(result);
       } catch (e) {
-        return err(`Failed to delete reminder list: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("delete reminder list", e);
       }
     },
   );
@@ -438,7 +438,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
         );
         return ok(result);
       } catch (e) {
-        return err(`Failed to create recurring reminder: ${e instanceof Error ? e.message : String(e)}`);
+        return toolError("create recurring reminder", e);
       }
     },
   );

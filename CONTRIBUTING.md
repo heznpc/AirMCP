@@ -87,7 +87,16 @@ All four must pass — CI runs them automatically on every PR.
 
 ### 4. Run QA Tests
 
-**Read-only smoke test** — safe, fast, no side effects:
+**Sequential QA (recommended)** — tests each module in isolation, one at a time. Starts a server with only one module enabled, runs its tools, kills the server, then moves to the next. Much lighter on system resources:
+
+```bash
+npm run qa:seq                             # test all modules sequentially
+node scripts/qa-sequential.mjs notes       # test a single module
+node scripts/qa-sequential.mjs notes calendar reminders  # test specific modules
+node scripts/qa-sequential.mjs --out       # save report to file
+```
+
+**Full smoke test** — loads all modules at once (resource-intensive):
 
 ```bash
 npm run qa                         # run all 61 read-only tool tests
@@ -194,10 +203,12 @@ refactor: extract shared pagination logic
 ## Adding a New Module
 
 1. Create `src/<module>/scripts.ts` and `src/<module>/tools.ts`
-2. Add `register<Module>Tools()` to `src/index.ts`
-3. Add prompts if applicable (`src/<module>/prompts.ts`)
-4. Add tests
-5. Update all documentation (README, landing page)
+   - `tools.ts` must export a function named `register<Module>Tools(server, config)`
+2. Add one line to the `MANIFEST` array in `src/shared/modules.ts` — no other imports needed
+3. Add prompts if applicable (`src/<module>/prompts.ts`, set `hasPrompts: true` in MANIFEST)
+4. Add tests in `tests/<module>-scripts.test.js`
+5. Verify with `node scripts/qa-sequential.mjs <module>`
+6. Update all documentation (README, landing page)
 
 ## Code Style
 

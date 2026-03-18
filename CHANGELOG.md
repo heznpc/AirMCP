@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] - 2026-03-19
+
+### Added
+- Sequential QA test runner (`npm run qa:seq`) — tests each module in isolation, one at a time, to avoid overloading the machine
+- Expanded QA coverage: 207/247 tools (84%) across sequential + CRUD tests
+- QA coverage TODO tracking for remaining 40 tools with documented exclusion reasons
+
+### Changed
+- Upgraded `zod` from `~3.24.0` to `~3.25.76` — fixes server startup crash caused by `@modelcontextprotocol/sdk@1.27.1` and `ext-apps@1.2.2` requiring `zod ^3.25 || ^4.0`
+- JXA→Swift dual-path architecture (`runAutomation`) for reminders, photos, contacts, calendar — Swift preferred when available, JXA fallback preserved
+- `index.ts` split into `server/init.ts`, `server/mcp-setup.ts`, `server/http-transport.ts`
+- Build system switched to esbuild (resolves tsc OOM crash)
+- Module registration via dynamic `MANIFEST` in `shared/modules.ts` (no more manual imports)
+- CONTRIBUTING.md updated with sequential test instructions and current module addition guide
+
+### Fixed
+- Race conditions, hangs, and double-resume crashes in server lifecycle
+- TypeScript typecheck OOM resolved with lightweight `McpServer` interface
+- Prompt injection defenses hardened
+- Security fixes for input validation and escaping
+
 ## [2.2.0] - 2026-03-15
 
 ### Added

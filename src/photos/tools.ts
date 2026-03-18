@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { runJxa } from "../shared/jxa.js";
 import { runSwift } from "../shared/swift.js";
+import { runAutomation } from "../shared/automation.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import { ok, err } from "../shared/result.js";
 import { zFilePath } from "../shared/validate.js";
@@ -14,6 +14,73 @@ import {
   createAlbumScript,
   addToAlbumScript,
 } from "./scripts.js";
+
+interface AlbumItem {
+  id: string;
+  name: string;
+  count: number;
+}
+
+interface PhotoListItem {
+  id: string;
+  filename: string | null;
+  name: string | null;
+  date: string | null;
+  width: number;
+  height: number;
+  favorite: boolean;
+}
+
+interface PhotoListResult {
+  total: number;
+  offset: number;
+  returned: number;
+  photos: PhotoListItem[];
+}
+
+interface SearchPhotoItem {
+  id: string;
+  filename: string | null;
+  name: string | null;
+  date: string | null;
+  favorite: boolean;
+  description: string | null;
+}
+
+interface SearchPhotosResult {
+  total: number;
+  photos: SearchPhotoItem[];
+}
+
+interface PhotoDetail {
+  id: string;
+  filename: string | null;
+  name: string | null;
+  description: string | null;
+  date: string | null;
+  width: number;
+  height: number;
+  altitude: number | null;
+  location: number[] | null;
+  favorite: boolean;
+  keywords: string[] | null;
+}
+
+interface FavoritesResult {
+  total: number;
+  returned: number;
+  photos: PhotoListItem[];
+}
+
+interface CreateAlbumResult {
+  id: string;
+  name: string;
+}
+
+interface AddToAlbumResult {
+  added: number;
+  album: string;
+}
 
 interface PhotoImportResult {
   imported: boolean;
@@ -32,8 +99,15 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
     inputSchema: {},
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   }, async () => {
-    try { return ok(await runJxa(listAlbumsScript())); }
-    catch (e) { return err(`Failed to list albums: ${e instanceof Error ? e.message : String(e)}`); }
+    try {
+      const result = await runAutomation<AlbumItem[]>({
+        swift: { command: "list-albums" },
+        jxa: () => listAlbumsScript(),
+      });
+      return ok(result);
+    } catch (e) {
+      return err(`Failed to list albums: ${e instanceof Error ? e.message : String(e)}`);
+    }
   });
 
   server.registerTool("list_photos", {
@@ -46,8 +120,18 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   }, async ({ album, limit, offset }) => {
-    try { return ok(await runJxa(listPhotosScript(album, limit, offset))); }
-    catch (e) { return err(`Failed to list photos: ${e instanceof Error ? e.message : String(e)}`); }
+    try {
+      const result = await runAutomation<PhotoListResult>({
+        swift: {
+          command: "list-photos",
+          input: { albumName: album, limit, offset },
+        },
+        jxa: () => listPhotosScript(album, limit, offset),
+      });
+      return ok(result);
+    } catch (e) {
+      return err(`Failed to list photos: ${e instanceof Error ? e.message : String(e)}`);
+    }
   });
 
   server.registerTool("search_photos", {
@@ -59,8 +143,18 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   }, async ({ query, limit }) => {
-    try { return ok(await runJxa(searchPhotosScript(query, limit))); }
-    catch (e) { return err(`Failed to search photos: ${e instanceof Error ? e.message : String(e)}`); }
+    try {
+      const result = await runAutomation<SearchPhotosResult>({
+        swift: {
+          command: "search-photos",
+          input: { query, limit },
+        },
+        jxa: () => searchPhotosScript(query, limit),
+      });
+      return ok(result);
+    } catch (e) {
+      return err(`Failed to search photos: ${e instanceof Error ? e.message : String(e)}`);
+    }
   });
 
   server.registerTool("get_photo_info", {
@@ -71,8 +165,18 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   }, async ({ id }) => {
-    try { return ok(await runJxa(getPhotoInfoScript(id))); }
-    catch (e) { return err(`Failed to get photo info: ${e instanceof Error ? e.message : String(e)}`); }
+    try {
+      const result = await runAutomation<PhotoDetail>({
+        swift: {
+          command: "get-photo-info",
+          input: { id },
+        },
+        jxa: () => getPhotoInfoScript(id),
+      });
+      return ok(result);
+    } catch (e) {
+      return err(`Failed to get photo info: ${e instanceof Error ? e.message : String(e)}`);
+    }
   });
 
   server.registerTool("list_favorites", {
@@ -83,8 +187,18 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   }, async ({ limit }) => {
-    try { return ok(await runJxa(listFavoritesScript(limit))); }
-    catch (e) { return err(`Failed to list favorites: ${e instanceof Error ? e.message : String(e)}`); }
+    try {
+      const result = await runAutomation<FavoritesResult>({
+        swift: {
+          command: "list-favorites",
+          input: { limit },
+        },
+        jxa: () => listFavoritesScript(limit),
+      });
+      return ok(result);
+    } catch (e) {
+      return err(`Failed to list favorites: ${e instanceof Error ? e.message : String(e)}`);
+    }
   });
 
   server.registerTool("create_album", {
@@ -95,8 +209,18 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   }, async ({ name }) => {
-    try { return ok(await runJxa(createAlbumScript(name))); }
-    catch (e) { return err(`Failed to create album: ${e instanceof Error ? e.message : String(e)}`); }
+    try {
+      const result = await runAutomation<CreateAlbumResult>({
+        swift: {
+          command: "create-album",
+          input: { name },
+        },
+        jxa: () => createAlbumScript(name),
+      });
+      return ok(result);
+    } catch (e) {
+      return err(`Failed to create album: ${e instanceof Error ? e.message : String(e)}`);
+    }
   });
 
   server.registerTool("add_to_album", {
@@ -108,8 +232,18 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   }, async ({ photoIds, albumName }) => {
-    try { return ok(await runJxa(addToAlbumScript(photoIds, albumName))); }
-    catch (e) { return err(`Failed to add photos to album: ${e instanceof Error ? e.message : String(e)}`); }
+    try {
+      const result = await runAutomation<AddToAlbumResult>({
+        swift: {
+          command: "add-to-album",
+          input: { photoIds, albumName },
+        },
+        jxa: () => addToAlbumScript(photoIds, albumName),
+      });
+      return ok(result);
+    } catch (e) {
+      return err(`Failed to add photos to album: ${e instanceof Error ? e.message : String(e)}`);
+    }
   });
 
   server.registerTool(

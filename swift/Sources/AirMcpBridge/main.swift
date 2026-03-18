@@ -5,6 +5,7 @@ import NaturalLanguage
 import Accelerate
 import CoreLocation
 import CoreBluetooth
+import Contacts
 import Vision
 import CoreSpotlight
 import AppKit
@@ -278,6 +279,124 @@ case "create-recurring-event":
         writeError(error.localizedDescription)
     }
 
+// --- EventKit: Reminder CRUD (delegated to AirMCPKit) ---
+case "list-reminder-lists":
+    do {
+        let result = try await EventKitService().listReminderLists()
+        try writeJSON(result)
+    } catch {
+        writeError(error.localizedDescription)
+    }
+
+case "list-reminders":
+    let inputData = stdinData.isEmpty ? Data("{}".utf8) : stdinData
+    guard let input = try? JSONDecoder().decode(ListRemindersInput.self, from: inputData) else {
+        writeError("Invalid JSON. Expected ListRemindersInput.")
+        return
+    }
+    do {
+        let result = try await EventKitService().listReminders(input)
+        try writeJSON(result)
+    } catch {
+        writeError(error.localizedDescription)
+    }
+
+case "read-reminder":
+    guard let input = try? JSONDecoder().decode(ReadReminderInput.self, from: stdinData) else {
+        writeError("Invalid JSON. Expected ReadReminderInput.")
+        return
+    }
+    do {
+        let result = try await EventKitService().readReminder(input)
+        try writeJSON(result)
+    } catch {
+        writeError(error.localizedDescription)
+    }
+
+case "create-reminder":
+    guard let input = try? JSONDecoder().decode(CreateReminderInput.self, from: stdinData) else {
+        writeError("Invalid JSON. Expected CreateReminderInput.")
+        return
+    }
+    do {
+        let result = try await EventKitService().createReminder(input)
+        try writeJSON(result)
+    } catch {
+        writeError(error.localizedDescription)
+    }
+
+case "update-reminder":
+    guard let input = try? JSONDecoder().decode(UpdateReminderInput.self, from: stdinData) else {
+        writeError("Invalid JSON. Expected UpdateReminderInput.")
+        return
+    }
+    do {
+        let result = try await EventKitService().updateReminder(input)
+        try writeJSON(result)
+    } catch {
+        writeError(error.localizedDescription)
+    }
+
+case "complete-reminder":
+    guard let input = try? JSONDecoder().decode(CompleteReminderInput.self, from: stdinData) else {
+        writeError("Invalid JSON. Expected CompleteReminderInput.")
+        return
+    }
+    do {
+        let result = try await EventKitService().completeReminder(input)
+        try writeJSON(result)
+    } catch {
+        writeError(error.localizedDescription)
+    }
+
+case "delete-reminder":
+    guard let input = try? JSONDecoder().decode(DeleteReminderInput.self, from: stdinData) else {
+        writeError("Invalid JSON. Expected DeleteReminderInput.")
+        return
+    }
+    do {
+        let result = try await EventKitService().deleteReminder(input)
+        try writeJSON(result)
+    } catch {
+        writeError(error.localizedDescription)
+    }
+
+case "search-reminders":
+    guard let input = try? JSONDecoder().decode(SearchRemindersInput.self, from: stdinData) else {
+        writeError("Invalid JSON. Expected SearchRemindersInput.")
+        return
+    }
+    do {
+        let result = try await EventKitService().searchReminders(input)
+        try writeJSON(result)
+    } catch {
+        writeError(error.localizedDescription)
+    }
+
+case "create-reminder-list":
+    guard let input = try? JSONDecoder().decode(CreateReminderListInput.self, from: stdinData) else {
+        writeError("Invalid JSON. Expected CreateReminderListInput.")
+        return
+    }
+    do {
+        let result = try await EventKitService().createReminderList(input)
+        try writeJSON(result)
+    } catch {
+        writeError(error.localizedDescription)
+    }
+
+case "delete-reminder-list":
+    guard let input = try? JSONDecoder().decode(DeleteReminderListInput.self, from: stdinData) else {
+        writeError("Invalid JSON. Expected DeleteReminderListInput.")
+        return
+    }
+    do {
+        let result = try await EventKitService().deleteReminderList(input)
+        try writeJSON(result)
+    } catch {
+        writeError(error.localizedDescription)
+    }
+
 // --- EventKit: Recurring Reminders (delegated to AirMCPKit) ---
 case "create-recurring-reminder":
     guard let remInput = try? JSONDecoder().decode(RecurringReminderInput.self, from: stdinData) else {
@@ -338,7 +457,7 @@ case "query-photos":
         ))
     }
     let queryOutput = PhotoQueryOutput(photos: photos, total: photos.count)
-    try writeJSON(queryOutput)
+    do { try writeJSON(queryOutput) } catch { writeError("Photo query error: \(error.localizedDescription)") }
 
 // --- Vision: Classify Image (delegated to AirMCPKit) ---
 case "classify-image":
@@ -367,24 +486,28 @@ case "import-photo":
         return
     }
 
-    var localId: String? = nil
-    try await PHPhotoLibrary.shared().performChanges {
-        let request = PHAssetChangeRequest.creationRequestForAssetFromImage(atFileURL: fileURL)
-        localId = request?.placeholderForCreatedAsset?.localIdentifier
+    do {
+        var localId: String? = nil
+        try await PHPhotoLibrary.shared().performChanges {
+            let request = PHAssetChangeRequest.creationRequestForAssetFromImage(atFileURL: fileURL)
+            localId = request?.placeholderForCreatedAsset?.localIdentifier
 
-        if let albumName = photoInput.albumName {
-            let fetchOptions = PHFetchOptions()
-            fetchOptions.predicate = NSPredicate(format: "title = %@", albumName)
-            let albums = PHAssetCollection.fetchAssetCollections(with: .album, subtype: .any, options: fetchOptions)
-            if let album = albums.firstObject, let placeholder = request?.placeholderForCreatedAsset {
-                let albumRequest = PHAssetCollectionChangeRequest(for: album)
-                albumRequest?.addAssets([placeholder] as NSArray)
+            if let albumName = photoInput.albumName {
+                let fetchOptions = PHFetchOptions()
+                fetchOptions.predicate = NSPredicate(format: "title = %@", albumName)
+                let albums = PHAssetCollection.fetchAssetCollections(with: .album, subtype: .any, options: fetchOptions)
+                if let album = albums.firstObject, let placeholder = request?.placeholderForCreatedAsset {
+                    let albumRequest = PHAssetCollectionChangeRequest(for: album)
+                    albumRequest?.addAssets([placeholder] as NSArray)
+                }
             }
         }
-    }
 
-    let output = PhotoImportOutput(imported: true, identifier: localId)
-    try writeJSON(output)
+        let output = PhotoImportOutput(imported: true, identifier: localId)
+        try writeJSON(output)
+    } catch {
+        writeError("Photo import error: \(error.localizedDescription)")
+    }
 
 // --- PhotoKit: Delete ---
 case "delete-photos":
@@ -404,13 +527,247 @@ case "delete-photos":
         return
     }
 
-    try await PHPhotoLibrary.shared().performChanges {
-        PHAssetChangeRequest.deleteAssets(toDelete as NSArray)
+    do {
+        try await PHPhotoLibrary.shared().performChanges {
+            PHAssetChangeRequest.deleteAssets(toDelete as NSArray)
+        }
+
+        let deletedIds = toDelete.map { $0.localIdentifier }
+        let output = PhotoDeleteOutput(deleted: deletedIds.count, identifiers: deletedIds)
+        try writeJSON(output)
+    } catch {
+        writeError("Photo delete error: \(error.localizedDescription)")
     }
 
-    let deletedIds = toDelete.map { $0.localIdentifier }
-    let output = PhotoDeleteOutput(deleted: deletedIds.count, identifiers: deletedIds)
-    try writeJSON(output)
+// --- PhotoKit: List Albums ---
+case "list-albums":
+    let fetchOptions = PHFetchOptions()
+    fetchOptions.sortDescriptors = [NSSortDescriptor(key: "localizedTitle", ascending: true)]
+    let collections = PHAssetCollection.fetchAssetCollections(with: .album, subtype: .any, options: fetchOptions)
+    var albums: [AlbumInfo] = []
+    collections.enumerateObjects { collection, _, _ in
+        let countOptions = PHFetchOptions()
+        let assetCount = PHAsset.fetchAssets(in: collection, options: countOptions).count
+        albums.append(AlbumInfo(
+            id: collection.localIdentifier,
+            name: collection.localizedTitle ?? "",
+            count: assetCount
+        ))
+    }
+    do { try writeJSON(albums) } catch { writeError("List albums error: \(error.localizedDescription)") }
+
+// --- PhotoKit: List Photos ---
+case "list-photos":
+    guard let listInput = try? JSONDecoder().decode(ListPhotosInput.self, from: stdinData) else {
+        writeError("Invalid JSON. Expected ListPhotosInput.")
+        return
+    }
+
+    let formatter = ISO8601DateFormatter()
+    let limit = listInput.limit ?? 50
+    let offset = listInput.offset ?? 0
+
+    let assets: PHFetchResult<PHAsset>
+    if let albumName = listInput.albumName {
+        let albumOptions = PHFetchOptions()
+        albumOptions.predicate = NSPredicate(format: "title = %@", albumName)
+        let collections = PHAssetCollection.fetchAssetCollections(with: .album, subtype: .any, options: albumOptions)
+        guard let album = collections.firstObject else {
+            writeError("Album not found: \(albumName)")
+            return
+        }
+        let assetOptions = PHFetchOptions()
+        assetOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+        assets = PHAsset.fetchAssets(in: album, options: assetOptions)
+    } else {
+        let assetOptions = PHFetchOptions()
+        assetOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+        assets = PHAsset.fetchAssets(with: assetOptions)
+    }
+
+    let total = assets.count
+    let start = min(offset, total)
+    let end = min(start + limit, total)
+    var photos: [PhotoListItem] = []
+    for i in start..<end {
+        let asset = assets.object(at: i)
+        photos.append(PhotoListItem(
+            id: asset.localIdentifier,
+            filename: PHAssetResource.assetResources(for: asset).first?.originalFilename,
+            name: nil,
+            date: asset.creationDate.map { formatter.string(from: $0) },
+            width: asset.pixelWidth,
+            height: asset.pixelHeight,
+            favorite: asset.isFavorite
+        ))
+    }
+    let listOutput = ListPhotosOutput(total: total, offset: start, returned: photos.count, photos: photos)
+    do { try writeJSON(listOutput) } catch { writeError("List photos error: \(error.localizedDescription)") }
+
+// --- PhotoKit: Search Photos ---
+case "search-photos":
+    guard let searchInput = try? JSONDecoder().decode(SearchPhotosInput.self, from: stdinData) else {
+        writeError("Invalid JSON. Expected SearchPhotosInput.")
+        return
+    }
+
+    let formatter = ISO8601DateFormatter()
+    let searchLimit = searchInput.limit ?? 30
+    let query = searchInput.query.lowercased()
+
+    let fetchOpts = PHFetchOptions()
+    fetchOpts.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+    let allAssets = PHAsset.fetchAssets(with: fetchOpts)
+    var searchResults: [SearchPhotoItem] = []
+    allAssets.enumerateObjects { asset, _, stop in
+        if searchResults.count >= searchLimit {
+            stop.pointee = true
+            return
+        }
+        let resources = PHAssetResource.assetResources(for: asset)
+        let filename = resources.first?.originalFilename ?? ""
+        if filename.lowercased().contains(query) {
+            searchResults.append(SearchPhotoItem(
+                id: asset.localIdentifier,
+                filename: filename,
+                name: nil,
+                date: asset.creationDate.map { formatter.string(from: $0) },
+                favorite: asset.isFavorite,
+                description: nil
+            ))
+        }
+    }
+    let searchOutput = SearchPhotosOutput(total: searchResults.count, photos: searchResults)
+    do { try writeJSON(searchOutput) } catch { writeError("Search photos error: \(error.localizedDescription)") }
+
+// --- PhotoKit: Get Photo Info ---
+case "get-photo-info":
+    guard let infoInput = try? JSONDecoder().decode(GetPhotoInfoInput.self, from: stdinData) else {
+        writeError("Invalid JSON. Expected GetPhotoInfoInput.")
+        return
+    }
+
+    let infoAssets = PHAsset.fetchAssets(withLocalIdentifiers: [infoInput.id], options: nil)
+    guard let asset = infoAssets.firstObject else {
+        writeError("Photo not found: \(infoInput.id)")
+        return
+    }
+
+    let formatter = ISO8601DateFormatter()
+    let resources = PHAssetResource.assetResources(for: asset)
+    let loc = asset.location
+    let locationArr: [Double]? = loc.map { [$0.coordinate.latitude, $0.coordinate.longitude] }
+
+    let infoOutput = PhotoDetailOutput(
+        id: asset.localIdentifier,
+        filename: resources.first?.originalFilename,
+        name: nil,
+        description: nil,
+        date: asset.creationDate.map { formatter.string(from: $0) },
+        width: asset.pixelWidth,
+        height: asset.pixelHeight,
+        altitude: loc?.altitude,
+        location: locationArr,
+        favorite: asset.isFavorite,
+        keywords: nil
+    )
+    do { try writeJSON(infoOutput) } catch { writeError("Photo info error: \(error.localizedDescription)") }
+
+// --- PhotoKit: List Favorites ---
+case "list-favorites":
+    guard let favInput = (try? JSONDecoder().decode(ListFavoritesInput.self, from: stdinData)) ?? ListFavoritesInput(limit: nil, offset: nil) as ListFavoritesInput? else {
+        writeError("Invalid JSON. Expected ListFavoritesInput.")
+        return
+    }
+
+    let formatter = ISO8601DateFormatter()
+    let favLimit = favInput.limit ?? 50
+    let favOffset = favInput.offset ?? 0
+    let favOptions = PHFetchOptions()
+    favOptions.predicate = NSPredicate(format: "isFavorite = YES")
+    favOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+    let favAssets = PHAsset.fetchAssets(with: favOptions)
+    let favTotal = favAssets.count
+    let favStart = min(favOffset, favTotal)
+    let favEnd = min(favStart + favLimit, favTotal)
+    var favPhotos: [PhotoListItem] = []
+    for i in favStart..<favEnd {
+        let asset = favAssets.object(at: i)
+        favPhotos.append(PhotoListItem(
+            id: asset.localIdentifier,
+            filename: PHAssetResource.assetResources(for: asset).first?.originalFilename,
+            name: nil,
+            date: asset.creationDate.map { formatter.string(from: $0) },
+            width: asset.pixelWidth,
+            height: asset.pixelHeight,
+            favorite: true
+        ))
+    }
+    let favOutput = ListFavoritesOutput(total: favTotal, returned: favPhotos.count, photos: favPhotos)
+    do { try writeJSON(favOutput) } catch { writeError("List favorites error: \(error.localizedDescription)") }
+
+// --- PhotoKit: Create Album ---
+case "create-album":
+    guard let createInput = try? JSONDecoder().decode(CreateAlbumInput.self, from: stdinData) else {
+        writeError("Invalid JSON. Expected CreateAlbumInput.")
+        return
+    }
+
+    do {
+        var albumId: String? = nil
+        try await PHPhotoLibrary.shared().performChanges {
+            let request = PHAssetCollectionChangeRequest.creationRequestForAssetCollection(withTitle: createInput.name)
+            albumId = request.placeholderForCreatedAssetCollection.localIdentifier
+        }
+
+        guard let createdId = albumId else {
+            writeError("Failed to create album")
+            return
+        }
+
+        let createOutput = CreateAlbumOutput(id: createdId, name: createInput.name)
+        try writeJSON(createOutput)
+    } catch {
+        writeError("Create album error: \(error.localizedDescription)")
+    }
+
+// --- PhotoKit: Add to Album ---
+case "add-to-album":
+    guard let addInput = try? JSONDecoder().decode(AddToAlbumInput.self, from: stdinData) else {
+        writeError("Invalid JSON. Expected AddToAlbumInput.")
+        return
+    }
+
+    let albumFetchOpts = PHFetchOptions()
+    albumFetchOpts.predicate = NSPredicate(format: "title = %@", addInput.albumName)
+    let albumResults = PHAssetCollection.fetchAssetCollections(with: .album, subtype: .any, options: albumFetchOpts)
+    guard let targetAlbum = albumResults.firstObject else {
+        writeError("Album not found: \(addInput.albumName)")
+        return
+    }
+
+    let assetsToAdd = PHAsset.fetchAssets(withLocalIdentifiers: addInput.photoIds, options: nil)
+    guard assetsToAdd.count > 0 else {
+        writeError("No matching photos found")
+        return
+    }
+
+    var addedAssets: [PHAsset] = []
+    assetsToAdd.enumerateObjects { asset, _, _ in
+        addedAssets.append(asset)
+    }
+
+    do {
+        try await PHPhotoLibrary.shared().performChanges {
+            let albumChangeRequest = PHAssetCollectionChangeRequest(for: targetAlbum)
+            albumChangeRequest?.addAssets(addedAssets as NSArray)
+        }
+
+        let addOutput = AddToAlbumOutput(added: addedAssets.count, album: addInput.albumName)
+        try writeJSON(addOutput)
+    } catch {
+        writeError("Add to album error: \(error.localizedDescription)")
+    }
 
 // --- NLContextualEmbedding: embed text ---
 case "embed-text":
@@ -583,7 +940,7 @@ case "ai-status":
         hasAppleSilicon: hasAppleSilicon,
         foundationModelsSupported: fmSupported
     )
-    try writeJSON(statusOutput)
+    do { try writeJSON(statusOutput) } catch { writeError("AI status error: \(error.localizedDescription)") }
 
 // --- CoreLocation: get current location ---
 case "get-location":
@@ -614,14 +971,14 @@ case "location-permission":
     }
     let authorized = status == .authorizedAlways
     let output = LocationPermissionOutput(status: locationStatusString(status), authorized: authorized)
-    try writeJSON(output)
+    do { try writeJSON(output) } catch { writeError("Location permission error: \(error.localizedDescription)") }
 
 // --- CoreBluetooth: state ---
 case "bluetooth-state":
     let bt = BluetoothManager()
     let state = await bt.initialize()
     let output = BluetoothStateOutput(state: bluetoothStateString(state), powered: state == .poweredOn)
-    try writeJSON(output)
+    do { try writeJSON(output) } catch { writeError("Bluetooth state error: \(error.localizedDescription)") }
 
 // --- CoreBluetooth: scan ---
 case "scan-bluetooth":
@@ -629,8 +986,8 @@ case "scan-bluetooth":
     let duration = scanInput?.duration ?? 5.0
     let bt = BluetoothManager()
     let devices = await bt.scan(duration: min(max(duration, 1), 30))
-    let output = BluetoothScanOutput(total: devices.count, devices: devices)
-    try writeJSON(output)
+    let scanOutput = BluetoothScanOutput(total: devices.count, devices: devices)
+    do { try writeJSON(scanOutput) } catch { writeError("Bluetooth scan error: \(error.localizedDescription)") }
 
 // --- CoreBluetooth: connect ---
 case "connect-bluetooth":
@@ -691,7 +1048,7 @@ case "spotlight-index":
     }
 
     do {
-        try CSSearchableIndex.default().indexSearchableItems(searchableItems)
+        try await CSSearchableIndex.default().indexSearchableItems(searchableItems)
         let output = SpotlightIndexOutput(indexed: searchableItems.count, success: true)
         try writeJSON(output)
     } catch {
@@ -702,7 +1059,7 @@ case "spotlight-index":
 case "spotlight-clear":
     do {
         let domains = ["com.airmcp.notes", "com.airmcp.calendar", "com.airmcp.reminders", "com.airmcp.mail"]
-        try CSSearchableIndex.default().deleteSearchableItems(withDomainIdentifiers: domains)
+        try await CSSearchableIndex.default().deleteSearchableItems(withDomainIdentifiers: domains)
         let clearOutput = SpotlightIndexOutput(indexed: 0, success: true)
         try writeJSON(clearOutput)
     } catch {
@@ -727,6 +1084,120 @@ case "scan-document":
         }
     } else {
         writeError("Document scanning requires macOS 14+.")
+    }
+
+// --- Contacts: CRUD + Groups (delegated to AirMCPKit) ---
+case "list-contacts":
+    let input = (try? JSONDecoder().decode(ListContactsInput.self, from: stdinData)) ?? ListContactsInput(limit: nil, offset: nil)
+    do {
+        let result = try ContactsService().listContacts(input)
+        try writeJSON(result)
+    } catch {
+        writeError(error.localizedDescription)
+    }
+
+case "search-contacts":
+    guard let input = try? JSONDecoder().decode(SearchContactsInput.self, from: stdinData) else {
+        writeError("Invalid JSON. Expected SearchContactsInput.")
+        return
+    }
+    do {
+        let result = try ContactsService().searchContacts(input)
+        try writeJSON(result)
+    } catch {
+        writeError(error.localizedDescription)
+    }
+
+case "read-contact":
+    guard let input = try? JSONDecoder().decode(ReadContactInput.self, from: stdinData) else {
+        writeError("Invalid JSON. Expected ReadContactInput.")
+        return
+    }
+    do {
+        let result = try ContactsService().readContact(input)
+        try writeJSON(result)
+    } catch {
+        writeError(error.localizedDescription)
+    }
+
+case "create-contact":
+    guard let input = try? JSONDecoder().decode(CreateContactInput.self, from: stdinData) else {
+        writeError("Invalid JSON. Expected CreateContactInput.")
+        return
+    }
+    do {
+        let result = try ContactsService().createContact(input)
+        try writeJSON(result)
+    } catch {
+        writeError(error.localizedDescription)
+    }
+
+case "update-contact":
+    guard let input = try? JSONDecoder().decode(UpdateContactInput.self, from: stdinData) else {
+        writeError("Invalid JSON. Expected UpdateContactInput.")
+        return
+    }
+    do {
+        let result = try ContactsService().updateContact(input)
+        try writeJSON(result)
+    } catch {
+        writeError(error.localizedDescription)
+    }
+
+case "delete-contact":
+    guard let input = try? JSONDecoder().decode(DeleteContactInput.self, from: stdinData) else {
+        writeError("Invalid JSON. Expected DeleteContactInput.")
+        return
+    }
+    do {
+        let result = try ContactsService().deleteContact(input)
+        try writeJSON(result)
+    } catch {
+        writeError(error.localizedDescription)
+    }
+
+case "list-groups":
+    do {
+        let result = try ContactsService().listGroups()
+        try writeJSON(result)
+    } catch {
+        writeError(error.localizedDescription)
+    }
+
+case "add-contact-email":
+    guard let input = try? JSONDecoder().decode(AddContactEmailInput.self, from: stdinData) else {
+        writeError("Invalid JSON. Expected AddContactEmailInput.")
+        return
+    }
+    do {
+        let result = try ContactsService().addContactEmail(input)
+        try writeJSON(result)
+    } catch {
+        writeError(error.localizedDescription)
+    }
+
+case "add-contact-phone":
+    guard let input = try? JSONDecoder().decode(AddContactPhoneInput.self, from: stdinData) else {
+        writeError("Invalid JSON. Expected AddContactPhoneInput.")
+        return
+    }
+    do {
+        let result = try ContactsService().addContactPhone(input)
+        try writeJSON(result)
+    } catch {
+        writeError(error.localizedDescription)
+    }
+
+case "list-group-members":
+    guard let input = try? JSONDecoder().decode(ListGroupMembersInput.self, from: stdinData) else {
+        writeError("Invalid JSON. Expected ListGroupMembersInput.")
+        return
+    }
+    do {
+        let result = try ContactsService().listGroupMembers(input)
+        try writeJSON(result)
+    } catch {
+        writeError(error.localizedDescription)
     }
 
 // --- Command discovery ---
@@ -754,7 +1225,24 @@ case "list-commands":
         "get-upcoming-events",
         "today-events",
         "create-recurring-event",
+        "list-reminder-lists",
+        "list-reminders",
+        "read-reminder",
+        "create-reminder",
+        "update-reminder",
+        "complete-reminder",
+        "delete-reminder",
+        "search-reminders",
+        "create-reminder-list",
+        "delete-reminder-list",
         "create-recurring-reminder",
+        "list-albums",
+        "list-photos",
+        "search-photos",
+        "get-photo-info",
+        "list-favorites",
+        "create-album",
+        "add-to-album",
         "query-photos",
         "classify-image",
         "import-photo",
@@ -769,6 +1257,16 @@ case "list-commands":
         "spotlight-index",
         "spotlight-clear",
         "scan-document",
+        "list-contacts",
+        "search-contacts",
+        "read-contact",
+        "create-contact",
+        "update-contact",
+        "delete-contact",
+        "list-groups",
+        "add-contact-email",
+        "add-contact-phone",
+        "list-group-members",
     ]
     do {
         let data = try JSONSerialization.data(withJSONObject: commands, options: [.sortedKeys])

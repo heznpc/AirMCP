@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { runJxa } from "../shared/jxa.js";
+import { runAutomation } from "../shared/automation.js";
 import { runSwift } from "../shared/swift.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import { ok, okUntrusted, err } from "../shared/result.js";
@@ -86,7 +86,10 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
     },
     async () => {
       try {
-        const result = await runJxa<ReminderListItem[]>(listReminderListsScript());
+        const result = await runAutomation<ReminderListItem[]>({
+          swift: { command: "list-reminder-lists" },
+          jxa: () => listReminderListsScript(),
+        });
         return ok(result);
       } catch (e) {
         return err(`Failed to list reminder lists: ${e instanceof Error ? e.message : String(e)}`);
@@ -115,7 +118,13 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
     },
     async ({ list, completed, limit, offset }) => {
       try {
-        const result = await runJxa<{ total: number; offset: number; returned: number; reminders: ReminderItem[] }>(listRemindersScript(limit, offset, list, completed));
+        const result = await runAutomation<{ total: number; offset: number; returned: number; reminders: ReminderItem[] }>({
+          swift: {
+            command: "list-reminders",
+            input: { list, completed, limit, offset },
+          },
+          jxa: () => listRemindersScript(limit, offset, list, completed),
+        });
         return ok(result);
       } catch (e) {
         return err(`Failed to list reminders: ${e instanceof Error ? e.message : String(e)}`);
@@ -140,7 +149,10 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
     },
     async ({ id }) => {
       try {
-        const result = await runJxa<ReminderDetail>(readReminderScript(id));
+        const result = await runAutomation<ReminderDetail>({
+          swift: { command: "read-reminder", input: { id } },
+          jxa: () => readReminderScript(id),
+        });
         return okUntrusted(result);
       } catch (e) {
         return err(`Failed to read reminder: ${e instanceof Error ? e.message : String(e)}`);
@@ -170,9 +182,13 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
     },
     async ({ title, body, dueDate, priority, list }) => {
       try {
-        const result = await runJxa<MutationResult>(
-          createReminderScript(title, { body, dueDate, priority, list }),
-        );
+        const result = await runAutomation<MutationResult>({
+          swift: {
+            command: "create-reminder",
+            input: { title, body, dueDate, priority, list },
+          },
+          jxa: () => createReminderScript(title, { body, dueDate, priority, list }),
+        });
         return ok(result);
       } catch (e) {
         return err(`Failed to create reminder: ${e instanceof Error ? e.message : String(e)}`);
@@ -203,9 +219,21 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
     },
     async ({ id, title, body, dueDate, priority, flagged }) => {
       try {
-        const result = await runJxa<MutationResult>(
-          updateReminderScript(id, { name: title, body, dueDate, priority, flagged }),
-        );
+        const result = await runAutomation<MutationResult>({
+          swift: {
+            command: "update-reminder",
+            input: {
+              id,
+              title,
+              body,
+              dueDate: dueDate === null ? undefined : dueDate,
+              clearDueDate: dueDate === null ? true : undefined,
+              priority,
+              flagged,
+            },
+          },
+          jxa: () => updateReminderScript(id, { name: title, body, dueDate, priority, flagged }),
+        });
         return ok(result);
       } catch (e) {
         return err(`Failed to update reminder: ${e instanceof Error ? e.message : String(e)}`);
@@ -231,7 +259,13 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
     },
     async ({ id, completed }) => {
       try {
-        const result = await runJxa<CompleteResult>(completeReminderScript(id, completed));
+        const result = await runAutomation<CompleteResult>({
+          swift: {
+            command: "complete-reminder",
+            input: { id, completed },
+          },
+          jxa: () => completeReminderScript(id, completed),
+        });
         return ok(result);
       } catch (e) {
         return err(`Failed to complete reminder: ${e instanceof Error ? e.message : String(e)}`);
@@ -256,7 +290,10 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
     },
     async ({ id }) => {
       try {
-        const result = await runJxa<DeleteResult>(deleteReminderScript(id));
+        const result = await runAutomation<DeleteResult>({
+          swift: { command: "delete-reminder", input: { id } },
+          jxa: () => deleteReminderScript(id),
+        });
         return ok(result);
       } catch (e) {
         return err(`Failed to delete reminder: ${e instanceof Error ? e.message : String(e)}`);
@@ -283,7 +320,13 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
     },
     async ({ query, limit }) => {
       try {
-        const result = await runJxa<SearchRemindersResult>(searchRemindersScript(query, limit));
+        const result = await runAutomation<SearchRemindersResult>({
+          swift: {
+            command: "search-reminders",
+            input: { query, limit },
+          },
+          jxa: () => searchRemindersScript(query, limit),
+        });
         return ok(result);
       } catch (e) {
         return err(`Failed to search reminders: ${e instanceof Error ? e.message : String(e)}`);
@@ -308,7 +351,13 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
     },
     async ({ name }) => {
       try {
-        const result = await runJxa<ListMutationResult>(createReminderListScript(name));
+        const result = await runAutomation<ListMutationResult>({
+          swift: {
+            command: "create-reminder-list",
+            input: { name },
+          },
+          jxa: () => createReminderListScript(name),
+        });
         return ok(result);
       } catch (e) {
         return err(`Failed to create reminder list: ${e instanceof Error ? e.message : String(e)}`);
@@ -333,7 +382,13 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
     },
     async ({ name }) => {
       try {
-        const result = await runJxa<DeleteResult>(deleteReminderListScript(name));
+        const result = await runAutomation<DeleteResult>({
+          swift: {
+            command: "delete-reminder-list",
+            input: { name },
+          },
+          jxa: () => deleteReminderListScript(name),
+        });
         return ok(result);
       } catch (e) {
         return err(`Failed to delete reminder list: ${e instanceof Error ? e.message : String(e)}`);

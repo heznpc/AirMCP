@@ -328,7 +328,9 @@ public struct EventKitService: Sendable {
         return EventOutput(id: event.eventIdentifier, title: event.title, recurring: true)
     }
 
-    public func createRecurringReminder(_ input: RecurringReminderInput) async throws -> ReminderOutput {
+    // MARK: - Reminder authorization helper
+
+    private func authorizedReminderStore() async throws -> EKEventStore {
         let store = EKEventStore()
         let granted: Bool
         if #available(macOS 14.0, iOS 17.0, *) {
@@ -337,6 +339,226 @@ public struct EventKitService: Sendable {
             granted = try await store.requestAccess(to: .reminder)
         }
         guard granted else { throw AirMCPKitError.permissionDenied("Reminders access denied") }
+        return store
+    }
+
+    // MARK: - Reminder helpers (fetch)
+
+    /// Wraps the completion-based fetchReminders in an async/await call.
+    private func fetchRemindersAsync(store: EKEventStore, matching predicate: NSPredicate) async -> [EKReminder] {
+        await withCheckedContinuation { continuation in
+            _ = store.fetchReminders(matching: predicate) { reminders in
+                nonisolated(unsafe) let result = reminders ?? []
+                continuation.resume(returning: result)
+            }
+        }
+    }
+
+    // MARK: - Reminder CRUD
+
+    public func listReminderLists() async throws -> [ReminderListInfo] {
+        let store = try await authorizedReminderStore()
+        let calendars = store.calendars(for: .reminder)
+        var results: [ReminderListInfo] = []
+        for cal in calendars {
+            let predicate = store.predicateForReminders(in: [cal])
+            let reminders = await fetchRemindersAsync(store: store, matching: predicate)
+            results.append(ReminderListInfo(id: cal.calendarIdentifier, name: cal.title, reminderCount: reminders.count))
+        }
+        return results
+    }
+
+    public func listReminders(_ input: ListRemindersInput) async throws -> ReminderListOutput {
+        let store = try await authorizedReminderStore()
+        let limit = input.limit ?? 200
+        let offset = input.offset ?? 0
+
+        var calendars: [EKCalendar]? = nil
+        if let listName = input.list {
+            let matches = store.calendars(for: .reminder).filter { $0.title == listName }
+            guard !matches.isEmpty else { throw AirMCPKitError.notFound("List not found: \(listName)") }
+            calendars = matches
+        }
+
+        let predicate = store.predicateForReminders(in: calendars)
+        let allReminders = await fetchRemindersAsync(store: store, matching: predicate)
+
+        let filtered: [EKReminder]
+        if let completed = input.completed {
+            filtered = allReminders.filter { $0.isCompleted == completed }
+        } else {
+            filtered = allReminders
+        }
+
+        let total = filtered.count
+        let s = min(offset, total)
+        let e = min(s + limit, total)
+        let slice = filtered[s..<e]
+
+        let items = slice.map { r in
+            reminderToListItem(r)
+        }
+        return ReminderListOutput(total: total, offset: s, returned: items.count, reminders: items)
+    }
+
+    public func readReminder(_ input: ReadReminderInput) async throws -> ReminderDetail {
+        let store = try await authorizedReminderStore()
+        guard let item = store.calendarItem(withIdentifier: input.id) as? EKReminder else {
+            throw AirMCPKitError.notFound("Reminder not found: \(input.id)")
+        }
+        return ReminderDetail(
+            id: item.calendarItemIdentifier,
+            name: item.title ?? "",
+            body: item.notes ?? "",
+            completed: item.isCompleted,
+            completionDate: item.completionDate.map { formatISO8601($0) },
+            creationDate: item.creationDate.map { formatISO8601($0) } ?? "",
+            modificationDate: item.lastModifiedDate.map { formatISO8601($0) } ?? "",
+            dueDate: dueDateString(item),
+            priority: item.priority,
+            flagged: item.priority > 0, // EKReminder doesn't have a direct "flagged" property; approximate via priority
+            list: item.calendar.title
+        )
+    }
+
+    public func createReminder(_ input: CreateReminderInput) async throws -> ReminderMutationOutput {
+        let store = try await authorizedReminderStore()
+        let reminder = EKReminder(eventStore: store)
+        reminder.title = input.title
+        reminder.notes = input.body
+        if let p = input.priority { reminder.priority = p }
+
+        if let dueDateStr = input.dueDate, let dueDate = parseISO8601(dueDateStr) {
+            reminder.dueDateComponents = Calendar.current.dateComponents(
+                [.year, .month, .day, .hour, .minute, .second], from: dueDate
+            )
+        }
+
+        if let listName = input.list {
+            guard let list = store.calendars(for: .reminder).first(where: { $0.title == listName }) else {
+                throw AirMCPKitError.notFound("List not found: \(listName)")
+            }
+            reminder.calendar = list
+        } else {
+            reminder.calendar = store.defaultCalendarForNewReminders()
+        }
+
+        try store.save(reminder, commit: true)
+        return ReminderMutationOutput(id: reminder.calendarItemIdentifier, name: reminder.title ?? "")
+    }
+
+    public func updateReminder(_ input: UpdateReminderInput) async throws -> ReminderMutationOutput {
+        let store = try await authorizedReminderStore()
+        guard let reminder = store.calendarItem(withIdentifier: input.id) as? EKReminder else {
+            throw AirMCPKitError.notFound("Reminder not found: \(input.id)")
+        }
+        if let title = input.title { reminder.title = title }
+        if let body = input.body { reminder.notes = body }
+        if let clearDue = input.clearDueDate, clearDue {
+            reminder.dueDateComponents = nil
+        } else if let dueDateStr = input.dueDate, let dueDate = parseISO8601(dueDateStr) {
+            reminder.dueDateComponents = Calendar.current.dateComponents(
+                [.year, .month, .day, .hour, .minute, .second], from: dueDate
+            )
+        }
+        if let p = input.priority { reminder.priority = p }
+        if let flagged = input.flagged {
+            // Flagged maps to priority in EventKit: flagged=true sets priority 1 if currently 0
+            if flagged && reminder.priority == 0 { reminder.priority = 1 }
+            else if !flagged { reminder.priority = 0 }
+        }
+
+        try store.save(reminder, commit: true)
+        return ReminderMutationOutput(id: reminder.calendarItemIdentifier, name: reminder.title ?? "")
+    }
+
+    public func completeReminder(_ input: CompleteReminderInput) async throws -> CompleteReminderOutput {
+        let store = try await authorizedReminderStore()
+        guard let reminder = store.calendarItem(withIdentifier: input.id) as? EKReminder else {
+            throw AirMCPKitError.notFound("Reminder not found: \(input.id)")
+        }
+        reminder.isCompleted = input.completed
+        try store.save(reminder, commit: true)
+        return CompleteReminderOutput(
+            id: reminder.calendarItemIdentifier,
+            name: reminder.title ?? "",
+            completed: reminder.isCompleted
+        )
+    }
+
+    public func deleteReminder(_ input: DeleteReminderInput) async throws -> DeleteReminderOutput {
+        let store = try await authorizedReminderStore()
+        guard let reminder = store.calendarItem(withIdentifier: input.id) as? EKReminder else {
+            throw AirMCPKitError.notFound("Reminder not found: \(input.id)")
+        }
+        let name = reminder.title ?? ""
+        try store.remove(reminder, commit: true)
+        return DeleteReminderOutput(deleted: true, name: name)
+    }
+
+    public func searchReminders(_ input: SearchRemindersInput) async throws -> SearchRemindersOutput {
+        let store = try await authorizedReminderStore()
+        let limit = input.limit ?? 30
+        let query = input.query.lowercased()
+
+        let predicate = store.predicateForReminders(in: nil)
+        let allReminders = await fetchRemindersAsync(store: store, matching: predicate)
+
+        var results: [ReminderListItem] = []
+        for r in allReminders {
+            if results.count >= limit { break }
+            let name = (r.title ?? "").lowercased()
+            let body = (r.notes ?? "").lowercased()
+            if name.contains(query) || body.contains(query) {
+                results.append(reminderToListItem(r))
+            }
+        }
+        return SearchRemindersOutput(returned: results.count, reminders: results)
+    }
+
+    public func createReminderList(_ input: CreateReminderListInput) async throws -> ReminderListMutationOutput {
+        let store = try await authorizedReminderStore()
+        let source = store.defaultCalendarForNewReminders()?.source ?? store.sources.first!
+        let newCal = EKCalendar(for: .reminder, eventStore: store)
+        newCal.title = input.name
+        newCal.source = source
+        try store.saveCalendar(newCal, commit: true)
+        return ReminderListMutationOutput(id: newCal.calendarIdentifier, name: newCal.title)
+    }
+
+    public func deleteReminderList(_ input: DeleteReminderListInput) async throws -> DeleteReminderOutput {
+        let store = try await authorizedReminderStore()
+        guard let cal = store.calendars(for: .reminder).first(where: { $0.title == input.name }) else {
+            throw AirMCPKitError.notFound("List not found: \(input.name)")
+        }
+        try store.removeCalendar(cal, commit: true)
+        return DeleteReminderOutput(deleted: true, name: input.name)
+    }
+
+    // MARK: - Reminder helpers
+
+    private func reminderToListItem(_ r: EKReminder) -> ReminderListItem {
+        ReminderListItem(
+            id: r.calendarItemIdentifier,
+            name: r.title ?? "",
+            completed: r.isCompleted,
+            dueDate: dueDateString(r),
+            priority: r.priority,
+            flagged: r.priority > 0,
+            list: r.calendar.title
+        )
+    }
+
+    private func dueDateString(_ r: EKReminder) -> String? {
+        guard let components = r.dueDateComponents,
+              let date = Calendar.current.date(from: components) else { return nil }
+        return formatISO8601(date)
+    }
+
+    // MARK: - Recurring Reminders
+
+    public func createRecurringReminder(_ input: RecurringReminderInput) async throws -> ReminderOutput {
+        let store = try await authorizedReminderStore()
 
         let reminder = EKReminder(eventStore: store)
         reminder.title = input.title

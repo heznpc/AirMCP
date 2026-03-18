@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { runJxa } from "../shared/jxa.js";
+import { runAutomation } from "../shared/automation.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import { ok, okUntrusted, err } from "../shared/result.js";
 import {
@@ -16,6 +16,83 @@ import {
   listGroupMembersScript,
 } from "./scripts.js";
 
+interface ContactSummary {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+}
+
+interface ContactListResult {
+  total: number;
+  offset: number;
+  returned: number;
+  contacts: ContactSummary[];
+}
+
+interface ContactSearchItem {
+  id: string;
+  name: string;
+  organization: string | null;
+  email: string | null;
+  phone: string | null;
+  matchedField: string;
+}
+
+interface ContactSearchResult {
+  total: number;
+  returned: number;
+  contacts: ContactSearchItem[];
+}
+
+interface ContactDetail {
+  id: string;
+  name: string;
+  firstName: string;
+  lastName: string;
+  organization: string | null;
+  jobTitle: string | null;
+  department: string | null;
+  note: string | null;
+  emails: { value: string; label: string }[];
+  phones: { value: string; label: string }[];
+  addresses: { street: string; city: string; state: string; zip: string; country: string; label: string }[];
+}
+
+interface ContactMutationResult {
+  id: string;
+  name: string;
+}
+
+interface ContactDeleteResult {
+  deleted: boolean;
+  name: string;
+}
+
+interface GroupInfo {
+  id: string;
+  name: string;
+}
+
+interface ContactEmailAddedResult {
+  id: string;
+  name: string;
+  addedEmail: string;
+}
+
+interface ContactPhoneAddedResult {
+  id: string;
+  name: string;
+  addedPhone: string;
+}
+
+interface GroupMembersResult {
+  group: string;
+  total: number;
+  returned: number;
+  contacts: ContactSummary[];
+}
+
 export function registerContactTools(server: McpServer, _config: AirMcpConfig): void {
   server.registerTool(
     "list_contacts",
@@ -30,7 +107,11 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
     },
     async ({ limit, offset }) => {
       try {
-        return ok(await runJxa(listContactsScript(limit, offset)));
+        const result = await runAutomation<ContactListResult>({
+          swift: { command: "list-contacts", input: { limit, offset } },
+          jxa: () => listContactsScript(limit, offset),
+        });
+        return ok(result);
       } catch (e) {
         return err(`Failed to list contacts: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -50,7 +131,11 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
     },
     async ({ query, limit }) => {
       try {
-        return ok(await runJxa(searchContactsScript(query, limit)));
+        const result = await runAutomation<ContactSearchResult>({
+          swift: { command: "search-contacts", input: { query, limit } },
+          jxa: () => searchContactsScript(query, limit),
+        });
+        return ok(result);
       } catch (e) {
         return err(`Failed to search contacts: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -69,7 +154,11 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
     },
     async ({ id }) => {
       try {
-        return okUntrusted(await runJxa(readContactScript(id)));
+        const result = await runAutomation<ContactDetail>({
+          swift: { command: "read-contact", input: { id } },
+          jxa: () => readContactScript(id),
+        });
+        return okUntrusted(result);
       } catch (e) {
         return err(`Failed to read contact: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -94,7 +183,11 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
     },
     async ({ firstName, lastName, email, phone, organization, jobTitle, note }) => {
       try {
-        return ok(await runJxa(createContactScript(firstName, lastName, { email, phone, organization, jobTitle, note })));
+        const result = await runAutomation<ContactMutationResult>({
+          swift: { command: "create-contact", input: { firstName, lastName, email, phone, organization, jobTitle, note } },
+          jxa: () => createContactScript(firstName, lastName, { email, phone, organization, jobTitle, note }),
+        });
+        return ok(result);
       } catch (e) {
         return err(`Failed to create contact: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -118,7 +211,11 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
     },
     async ({ id, firstName, lastName, organization, jobTitle, note }) => {
       try {
-        return ok(await runJxa(updateContactScript(id, { firstName, lastName, organization, jobTitle, note })));
+        const result = await runAutomation<ContactMutationResult>({
+          swift: { command: "update-contact", input: { id, firstName, lastName, organization, jobTitle, note } },
+          jxa: () => updateContactScript(id, { firstName, lastName, organization, jobTitle, note }),
+        });
+        return ok(result);
       } catch (e) {
         return err(`Failed to update contact: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -137,7 +234,11 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
     },
     async ({ id }) => {
       try {
-        return ok(await runJxa(deleteContactScript(id)));
+        const result = await runAutomation<ContactDeleteResult>({
+          swift: { command: "delete-contact", input: { id } },
+          jxa: () => deleteContactScript(id),
+        });
+        return ok(result);
       } catch (e) {
         return err(`Failed to delete contact: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -154,7 +255,11 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
     },
     async () => {
       try {
-        return ok(await runJxa(listGroupsScript()));
+        const result = await runAutomation<GroupInfo[]>({
+          swift: { command: "list-groups" },
+          jxa: () => listGroupsScript(),
+        });
+        return ok(result);
       } catch (e) {
         return err(`Failed to list groups: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -175,7 +280,11 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
     },
     async ({ id, email, label }) => {
       try {
-        return ok(await runJxa(addContactEmailScript(id, email, label)));
+        const result = await runAutomation<ContactEmailAddedResult>({
+          swift: { command: "add-contact-email", input: { id, email, label } },
+          jxa: () => addContactEmailScript(id, email, label),
+        });
+        return ok(result);
       } catch (e) {
         return err(`Failed to add email to contact: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -196,7 +305,11 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
     },
     async ({ id, phone, label }) => {
       try {
-        return ok(await runJxa(addContactPhoneScript(id, phone, label)));
+        const result = await runAutomation<ContactPhoneAddedResult>({
+          swift: { command: "add-contact-phone", input: { id, phone, label } },
+          jxa: () => addContactPhoneScript(id, phone, label),
+        });
+        return ok(result);
       } catch (e) {
         return err(`Failed to add phone to contact: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -216,7 +329,11 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
     },
     async ({ groupName, limit }) => {
       try {
-        return ok(await runJxa(listGroupMembersScript(groupName, limit)));
+        const result = await runAutomation<GroupMembersResult>({
+          swift: { command: "list-group-members", input: { groupName, limit } },
+          jxa: () => listGroupMembersScript(groupName, limit),
+        });
+        return ok(result);
       } catch (e) {
         return err(`Failed to list group members: ${e instanceof Error ? e.message : String(e)}`);
       }

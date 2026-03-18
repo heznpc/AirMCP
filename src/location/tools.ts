@@ -1,4 +1,4 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "../shared/mcp.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import { ok, toolError } from "../shared/result.js";
 import { runSwift } from "../shared/swift.js";

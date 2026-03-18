@@ -1,4 +1,5 @@
-import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "./mcp.js";
+import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { runJxa } from "./jxa.js";
 import { listEventsScript, getUpcomingEventsScript } from "../calendar/scripts.js";
 import { listRemindersScript } from "../reminders/scripts.js";

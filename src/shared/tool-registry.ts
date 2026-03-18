@@ -9,7 +9,7 @@
  * registration transparently — no module changes required.
  */
 
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "./mcp.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type AnyFn = (...args: any[]) => any;

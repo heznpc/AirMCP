@@ -3,7 +3,8 @@
  * and banner metadata collection.
  */
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer as SdkMcpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer as LightMcpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { ok, err } from "../shared/result.js";
 import { registerCrossPrompts } from "../cross/prompts.js";
@@ -30,22 +31,24 @@ export interface CreateServerOptions {
 
 export async function createServer(
   options: CreateServerOptions,
-): Promise<{ server: McpServer; bannerInfo: BannerInfo }> {
+): Promise<{ server: SdkMcpServer; bannerInfo: BannerInfo }> {
   const { config, hitlClient, osVersion, pkg } = options;
 
-  const server = new McpServer({
+  const server = new SdkMcpServer({
     name: NPM_PACKAGE_NAME,
     version: pkg.version,
   });
+  // Cast to lightweight McpServer for module registration (avoids heavy generic inference)
+  const lServer = server as unknown as LightMcpServer;
 
   // Install HITL guard before any tool registrations
   if (hitlClient && config.hitl.level !== "off") {
-    installHitlGuard(server, hitlClient, config);
+    installHitlGuard(lServer, hitlClient, config);
   }
 
   // Install tool/prompt registry — intercepts all registrations transparently.
   // Must come after HITL guard so the stored handlers include the HITL wrapper.
-  toolRegistry.installOn(server);
+  toolRegistry.installOn(lServer);
 
   // Dynamic module loading — only imports modules at startup
   const MODULE_REGISTRY = await loadModuleRegistry();
@@ -60,8 +63,8 @@ export async function createServer(
       osBlocked.push(`${mod.name} (requires macOS ${mod.minMacosVersion}+)`);
     } else if (isModuleEnabled(config, mod.name)) {
       try {
-        mod.tools(server, config);
-        mod.prompts?.(server);
+        mod.tools(lServer, config);
+        mod.prompts?.(lServer);
       } catch (e) {
         console.error(`[AirMCP] Failed to register module ${mod.name}: ${e instanceof Error ? e.message : String(e)}`);
         disabled.push(mod.name);
@@ -76,33 +79,33 @@ export async function createServer(
   // Dynamic shortcut tools: auto-discover and register individual shortcuts
   let dynamicShortcutCount = 0;
   if (shortcutsEnabled) {
-    dynamicShortcutCount = await registerDynamicShortcutTools(server);
+    dynamicShortcutCount = await registerDynamicShortcutTools(lServer);
   }
 
   // Cross-module workflows
-  registerCrossPrompts(server);
-  registerCrossTools(server, config);
+  registerCrossPrompts(lServer);
+  registerCrossTools(lServer, config);
 
   // Semantic search (on-device embeddings via Swift bridge)
-  registerSemanticTools(server, config);
+  registerSemanticTools(lServer, config);
 
   // MCP Resources
-  registerResources(server, config);
+  registerResources(lServer, config);
 
   // Setup & diagnostics
-  registerSetupTools(server, config);
+  registerSetupTools(lServer, config);
 
   // Personal Skills Engine (YAML-based workflows)
-  await registerSkillEngine(server);
+  await registerSkillEngine(lServer);
 
   // MCP Apps — interactive UI views (Calendar week, Music player)
-  registerApps(server, {
+  registerApps(lServer, {
     calendar: enabled.includes("calendar"),
     music: enabled.includes("music"),
   });
 
   // get_workflow: expose prompt handlers as a tool for autonomous agents (Cowork, etc.)
-  server.registerTool(
+  lServer.registerTool(
     "get_workflow",
     {
       title: "Get Workflow",

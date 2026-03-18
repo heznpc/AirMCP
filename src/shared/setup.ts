@@ -1,4 +1,4 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "./mcp.js";
 import { runJxa } from "./jxa.js";
 import { ok } from "./result.js";
 import { AirMcpConfig, isModuleEnabled } from "./config.js";

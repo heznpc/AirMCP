@@ -1,4 +1,4 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "../shared/mcp.js";
 import type { SkillDefinition } from "./types.js";
 import { executeSkill } from "./executor.js";
 import { userPrompt } from "../shared/prompt.js";

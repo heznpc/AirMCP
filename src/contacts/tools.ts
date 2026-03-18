@@ -1,4 +1,4 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { runAutomation } from "../shared/automation.js";
 import type { AirMcpConfig } from "../shared/config.js";

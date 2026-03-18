@@ -1,4 +1,4 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "./mcp.js";
 import type { AirMcpConfig, HitlLevel } from "./config.js";
 import type { HitlClient } from "./hitl.js";
 import { err } from "./result.js";

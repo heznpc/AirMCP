@@ -1,6 +1,6 @@
 // MCP Apps — interactive UI views for Calendar and Music.
 
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { registerAppTool, registerAppResource, RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
 import { runJxa } from "../shared/jxa.js";
@@ -112,8 +112,10 @@ export function registerApps(server: McpServer, opts: { calendar: boolean; music
 
   if (opts.calendar) {
   // Calendar Week View
+  // @ts-expect-error ext-apps SDK generics trigger excessive type instantiation depth
   registerAppTool(
-    server,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    server as any,
     "calendar_week_view",
     {
       title: "Calendar Week View",
@@ -141,7 +143,8 @@ export function registerApps(server: McpServer, opts: { calendar: boolean; music
   );
 
   registerAppResource(
-    server,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    server as any,
     "Calendar Week View",
     "ui://airmcp/calendar-week",
     { description: "Interactive calendar week grid" },
@@ -159,7 +162,8 @@ export function registerApps(server: McpServer, opts: { calendar: boolean; music
   if (opts.music) {
   // Music Player
   registerAppTool(
-    server,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    server as any,
     "music_player",
     {
       title: "Music Player",
@@ -180,7 +184,8 @@ export function registerApps(server: McpServer, opts: { calendar: boolean; music
   );
 
   registerAppResource(
-    server,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    server as any,
     "Music Player",
     "ui://airmcp/music-player",
     { description: "Interactive music player view" },

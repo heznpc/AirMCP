@@ -1,4 +1,4 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "../shared/mcp.js";
 import type { SkillDefinition, SkillResult, StepResult } from "./types.js";
 import { toolRegistry } from "../shared/tool-registry.js";
 

@@ -73,7 +73,7 @@
     "qa:crud": "node scripts/qa-crud-test.mjs",
     "qa:e2e": "node scripts/qa-e2e-test.mjs",
     "qa:remaining": "node scripts/qa-remaining-test.mjs",
-    "typecheck": "NODE_OPTIONS='--max-old-space-size=8192' tsc --noEmit --incremental false",
+    "typecheck": "tsc --noEmit",
     "version:patch": "npm version patch --no-git-tag-version && node -e \"let s=require('./server.json');s.version=s.packages[0].version=require('./package.json').version;require('fs').writeFileSync('server.json',JSON.stringify(s,null,2)+'\\n')\"",
     "version:minor": "npm version minor --no-git-tag-version && node -e \"let s=require('./server.json');s.version=s.packages[0].version=require('./package.json').version;require('fs').writeFileSync('server.json',JSON.stringify(s,null,2)+'\\n')\"",
     "version:major": "npm version major --no-git-tag-version && node -e \"let s=require('./server.json');s.version=s.packages[0].version=require('./package.json').version;require('fs').writeFileSync('server.json',JSON.stringify(s,null,2)+'\\n')\"",

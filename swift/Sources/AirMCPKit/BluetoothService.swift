@@ -58,6 +58,18 @@ public class BluetoothManager: NSObject, CBCentralManagerDelegate, @unchecked Se
 
     public override init() { super.init() }
 
+    // MARK: - Safe continuation helpers (prevent double-resume crashes)
+
+    private func resumeConnectOnce(with result: Result<Bool, Error>) {
+        // btQueue context assumed — all callers dispatch on btQueue
+        guard let cont = connectContinuation else { return }
+        connectContinuation = nil
+        switch result {
+        case .success(let v): cont.resume(returning: v)
+        case .failure(let e): cont.resume(throwing: e)
+        }
+    }
+
     public func initialize() async -> CBManagerState {
         await withCheckedContinuation { cont in
             self.stateContinuation = cont
@@ -101,8 +113,9 @@ public class BluetoothManager: NSObject, CBCentralManagerDelegate, @unchecked Se
         let (mgr, peripheral) = try await resolvePeripheral(identifier)
 
         let timeoutItem = DispatchWorkItem { [weak self] in
-            self?.connectContinuation?.resume(throwing: AirMCPKitError.unsupported("Connection timed out after 10 seconds"))
-            self?.connectContinuation = nil
+            self?.resumeConnectOnce(with: .failure(
+                AirMCPKitError.unsupported("Connection timed out after 10 seconds")
+            ))
             mgr.cancelPeripheralConnection(peripheral)
         }
         btQueue.asyncAfter(deadline: .now() + 10, execute: timeoutItem)
@@ -135,14 +148,12 @@ public class BluetoothManager: NSObject, CBCentralManagerDelegate, @unchecked Se
     }
 
     public func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
-        connectContinuation?.resume(returning: true)
-        connectContinuation = nil
+        resumeConnectOnce(with: .success(true))
     }
 
     public func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
         let err = error ?? AirMCPKitError.unsupported("Failed to connect to \(peripheral.identifier)")
-        connectContinuation?.resume(throwing: err)
-        connectContinuation = nil
+        resumeConnectOnce(with: .failure(err))
     }
 }
 

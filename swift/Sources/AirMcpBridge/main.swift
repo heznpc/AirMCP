@@ -26,8 +26,8 @@ import FoundationModels
 
 // MARK: - Persistent mode state
 
-var persistentMode = false
-var currentRequestId: String? = nil
+nonisolated(unsafe) var persistentMode = false
+nonisolated(unsafe) var currentRequestId: String? = nil
 
 // MARK: - Shared types
 
@@ -1084,7 +1084,7 @@ case "scan-document":
 case "list-contacts":
     let input = (try? JSONDecoder().decode(ListContactsInput.self, from: stdinData)) ?? ListContactsInput(limit: nil, offset: nil)
     do {
-        let result = try ContactsService().listContacts(input)
+        let result = try await ContactsService().listContacts(input)
         try writeJSON(result)
     } catch {
         writeError(error.localizedDescription)
@@ -1096,7 +1096,7 @@ case "search-contacts":
         return
     }
     do {
-        let result = try ContactsService().searchContacts(input)
+        let result = try await ContactsService().searchContacts(input)
         try writeJSON(result)
     } catch {
         writeError(error.localizedDescription)
@@ -1108,7 +1108,7 @@ case "read-contact":
         return
     }
     do {
-        let result = try ContactsService().readContact(input)
+        let result = try await ContactsService().readContact(input)
         try writeJSON(result)
     } catch {
         writeError(error.localizedDescription)
@@ -1120,7 +1120,7 @@ case "create-contact":
         return
     }
     do {
-        let result = try ContactsService().createContact(input)
+        let result = try await ContactsService().createContact(input)
         try writeJSON(result)
     } catch {
         writeError(error.localizedDescription)
@@ -1132,7 +1132,7 @@ case "update-contact":
         return
     }
     do {
-        let result = try ContactsService().updateContact(input)
+        let result = try await ContactsService().updateContact(input)
         try writeJSON(result)
     } catch {
         writeError(error.localizedDescription)
@@ -1144,7 +1144,7 @@ case "delete-contact":
         return
     }
     do {
-        let result = try ContactsService().deleteContact(input)
+        let result = try await ContactsService().deleteContact(input)
         try writeJSON(result)
     } catch {
         writeError(error.localizedDescription)
@@ -1152,7 +1152,7 @@ case "delete-contact":
 
 case "list-groups":
     do {
-        let result = try ContactsService().listGroups()
+        let result = try await ContactsService().listGroups()
         try writeJSON(result)
     } catch {
         writeError(error.localizedDescription)
@@ -1164,7 +1164,7 @@ case "add-contact-email":
         return
     }
     do {
-        let result = try ContactsService().addContactEmail(input)
+        let result = try await ContactsService().addContactEmail(input)
         try writeJSON(result)
     } catch {
         writeError(error.localizedDescription)
@@ -1176,7 +1176,7 @@ case "add-contact-phone":
         return
     }
     do {
-        let result = try ContactsService().addContactPhone(input)
+        let result = try await ContactsService().addContactPhone(input)
         try writeJSON(result)
     } catch {
         writeError(error.localizedDescription)
@@ -1188,7 +1188,7 @@ case "list-group-members":
         return
     }
     do {
-        let result = try ContactsService().listGroupMembers(input)
+        let result = try await ContactsService().listGroupMembers(input)
         try writeJSON(result)
     } catch {
         writeError(error.localizedDescription)

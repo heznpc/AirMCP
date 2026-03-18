@@ -13,24 +13,14 @@ public struct ContactsService: Sendable {
 
     // MARK: - Authorization helper
 
-    private func authorizedStore() throws -> CNContactStore {
+    private func authorizedStore() async throws -> CNContactStore {
         let store = Self.sharedStore
         let status = CNContactStore.authorizationStatus(for: .contacts)
         switch status {
         case .authorized:
             return store
         case .notDetermined:
-            // Request access synchronously via semaphore (CNContactStore doesn't have async API)
-            nonisolated(unsafe) var granted = false
-            nonisolated(unsafe) var authError: Error?
-            let semaphore = DispatchSemaphore(value: 0)
-            store.requestAccess(for: .contacts) { ok, err in
-                granted = ok
-                authError = err
-                semaphore.signal()
-            }
-            semaphore.wait()
-            if let authError { throw AirMCPKitError.permissionDenied("Contacts access denied: \(authError.localizedDescription)") }
+            let granted = try await store.requestAccess(for: .contacts)
             guard granted else { throw AirMCPKitError.permissionDenied("Contacts access denied") }
             return store
         case .denied, .restricted:
@@ -48,8 +38,8 @@ public struct ContactsService: Sendable {
 
     // MARK: - List Contacts
 
-    public func listContacts(_ input: ListContactsInput) throws -> ContactListOutput {
-        let store = try authorizedStore()
+    public func listContacts(_ input: ListContactsInput) async throws -> ContactListOutput {
+        let store = try await authorizedStore()
         let limit = input.limit ?? 100
         let offset = input.offset ?? 0
 
@@ -85,8 +75,8 @@ public struct ContactsService: Sendable {
 
     // MARK: - Search Contacts
 
-    public func searchContacts(_ input: SearchContactsInput) throws -> ContactSearchOutput {
-        let store = try authorizedStore()
+    public func searchContacts(_ input: SearchContactsInput) async throws -> ContactSearchOutput {
+        let store = try await authorizedStore()
         let limit = input.limit ?? 50
         let query = input.query.lowercased()
 
@@ -151,8 +141,8 @@ public struct ContactsService: Sendable {
 
     // MARK: - Read Contact
 
-    public func readContact(_ input: ReadContactInput) throws -> ContactDetail {
-        let store = try authorizedStore()
+    public func readContact(_ input: ReadContactInput) async throws -> ContactDetail {
+        let store = try await authorizedStore()
         let keys: [CNKeyDescriptor] = [
             CNContactGivenNameKey as CNKeyDescriptor,
             CNContactFamilyNameKey as CNKeyDescriptor,
@@ -209,8 +199,8 @@ public struct ContactsService: Sendable {
 
     // MARK: - Create Contact
 
-    public func createContact(_ input: CreateContactInput) throws -> ContactMutationOutput {
-        let store = try authorizedStore()
+    public func createContact(_ input: CreateContactInput) async throws -> ContactMutationOutput {
+        let store = try await authorizedStore()
         let contact = CNMutableContact()
         contact.givenName = input.firstName
         contact.familyName = input.lastName
@@ -236,8 +226,8 @@ public struct ContactsService: Sendable {
 
     // MARK: - Update Contact
 
-    public func updateContact(_ input: UpdateContactInput) throws -> ContactMutationOutput {
-        let store = try authorizedStore()
+    public func updateContact(_ input: UpdateContactInput) async throws -> ContactMutationOutput {
+        let store = try await authorizedStore()
         let keys: [CNKeyDescriptor] = [
             CNContactGivenNameKey as CNKeyDescriptor,
             CNContactFamilyNameKey as CNKeyDescriptor,
@@ -266,8 +256,8 @@ public struct ContactsService: Sendable {
 
     // MARK: - Delete Contact
 
-    public func deleteContact(_ input: DeleteContactInput) throws -> ContactDeleteOutput {
-        let store = try authorizedStore()
+    public func deleteContact(_ input: DeleteContactInput) async throws -> ContactDeleteOutput {
+        let store = try await authorizedStore()
         let keys: [CNKeyDescriptor] = [
             CNContactGivenNameKey as CNKeyDescriptor,
             CNContactFamilyNameKey as CNKeyDescriptor,
@@ -287,8 +277,8 @@ public struct ContactsService: Sendable {
 
     // MARK: - List Groups
 
-    public func listGroups() throws -> [ContactGroupInfo] {
-        let store = try authorizedStore()
+    public func listGroups() async throws -> [ContactGroupInfo] {
+        let store = try await authorizedStore()
         let groups = try store.groups(matching: nil)
         return groups.map { group in
             ContactGroupInfo(id: group.identifier, name: group.name)
@@ -297,8 +287,8 @@ public struct ContactsService: Sendable {
 
     // MARK: - Add Contact Email
 
-    public func addContactEmail(_ input: AddContactEmailInput) throws -> ContactEmailAddedOutput {
-        let store = try authorizedStore()
+    public func addContactEmail(_ input: AddContactEmailInput) async throws -> ContactEmailAddedOutput {
+        let store = try await authorizedStore()
         let keys: [CNKeyDescriptor] = [
             CNContactGivenNameKey as CNKeyDescriptor,
             CNContactFamilyNameKey as CNKeyDescriptor,
@@ -323,8 +313,8 @@ public struct ContactsService: Sendable {
 
     // MARK: - Add Contact Phone
 
-    public func addContactPhone(_ input: AddContactPhoneInput) throws -> ContactPhoneAddedOutput {
-        let store = try authorizedStore()
+    public func addContactPhone(_ input: AddContactPhoneInput) async throws -> ContactPhoneAddedOutput {
+        let store = try await authorizedStore()
         let keys: [CNKeyDescriptor] = [
             CNContactGivenNameKey as CNKeyDescriptor,
             CNContactFamilyNameKey as CNKeyDescriptor,
@@ -349,8 +339,8 @@ public struct ContactsService: Sendable {
 
     // MARK: - List Group Members
 
-    public func listGroupMembers(_ input: ListGroupMembersInput) throws -> ContactGroupMembersOutput {
-        let store = try authorizedStore()
+    public func listGroupMembers(_ input: ListGroupMembersInput) async throws -> ContactGroupMembersOutput {
+        let store = try await authorizedStore()
         let limit = input.limit ?? 100
         let offset = input.offset ?? 0
 

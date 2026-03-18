@@ -7,7 +7,7 @@ export default {
     '!dist/cli/**',
     '!dist/skills/builtins/**',
   ],
-  coverageThresholds: {
+  coverageThreshold: {
     global: {
       statements: 30,
       branches: 20,

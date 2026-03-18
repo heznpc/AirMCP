@@ -8,14 +8,14 @@ const GEOCODE_URL = API.GEOCODING;
 const REVERSE_URL = API.REVERSE_GEOCODE;
 
 // Nominatim rate limiter — enforce max 1 request/second.
-// Uses a promise chain to serialize concurrent calls (avoids TOCTOU race).
+// Serializes concurrent calls through a mutex-style promise chain.
 let nominatimGate = Promise.resolve();
 function nominatimThrottle(): Promise<void> {
-  nominatimGate = nominatimGate.then(async () => {
-    await new Promise((r) => setTimeout(r, 1000));
-    nominatimGate = Promise.resolve(); // break chain to avoid unbounded growth
-  });
-  return nominatimGate;
+  const gate = nominatimGate.then(
+    () => new Promise<void>((r) => setTimeout(r, 1000)),
+  );
+  nominatimGate = gate;
+  return gate;
 }
 
 export async function fetchGeocode(query: string, count = 5) {

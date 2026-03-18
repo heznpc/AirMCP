@@ -218,7 +218,11 @@ export async function runSwift<T>(command: string, input: string): Promise<T> {
     });
 
     try {
-      child!.stdin!.write(request + "\n");
+      const ok = child!.stdin!.write(request + "\n");
+      if (!ok) {
+        // Back-pressure: wait for drain before sending more
+        child!.stdin!.once("drain", () => { /* buffer flushed */ });
+      }
     } catch (e) {
       pending.delete(id);
       clearTimeout(timer);

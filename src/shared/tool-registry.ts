@@ -9,11 +9,7 @@
  * registration transparently — no module changes required.
  */
 
-import type { McpServer } from "./mcp.js";
-
-/* eslint-disable @typescript-eslint/no-explicit-any */
-type AnyFn = (...args: any[]) => any;
-/* eslint-enable @typescript-eslint/no-explicit-any */
+import type { McpServer, AnyFn } from "./mcp.js";
 
 interface RegisteredToolEntry {
   handler: AnyFn;

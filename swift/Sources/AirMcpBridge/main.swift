@@ -164,6 +164,8 @@ func runFoundationModels(_ body: () async throws -> Void) async {
 
 // MARK: - Command dispatcher
 
+let sharedContacts = ContactsService()
+
 func handleCommand(command: String, stdinData: Data) async {
 
 switch command {
@@ -1084,7 +1086,7 @@ case "scan-document":
 case "list-contacts":
     let input = (try? JSONDecoder().decode(ListContactsInput.self, from: stdinData)) ?? ListContactsInput(limit: nil, offset: nil)
     do {
-        let result = try await ContactsService().listContacts(input)
+        let result = try await sharedContacts.listContacts(input)
         try writeJSON(result)
     } catch {
         writeError(error.localizedDescription)
@@ -1096,7 +1098,7 @@ case "search-contacts":
         return
     }
     do {
-        let result = try await ContactsService().searchContacts(input)
+        let result = try await sharedContacts.searchContacts(input)
         try writeJSON(result)
     } catch {
         writeError(error.localizedDescription)
@@ -1108,7 +1110,7 @@ case "read-contact":
         return
     }
     do {
-        let result = try await ContactsService().readContact(input)
+        let result = try await sharedContacts.readContact(input)
         try writeJSON(result)
     } catch {
         writeError(error.localizedDescription)
@@ -1120,7 +1122,7 @@ case "create-contact":
         return
     }
     do {
-        let result = try await ContactsService().createContact(input)
+        let result = try await sharedContacts.createContact(input)
         try writeJSON(result)
     } catch {
         writeError(error.localizedDescription)
@@ -1132,7 +1134,7 @@ case "update-contact":
         return
     }
     do {
-        let result = try await ContactsService().updateContact(input)
+        let result = try await sharedContacts.updateContact(input)
         try writeJSON(result)
     } catch {
         writeError(error.localizedDescription)
@@ -1144,7 +1146,7 @@ case "delete-contact":
         return
     }
     do {
-        let result = try await ContactsService().deleteContact(input)
+        let result = try await sharedContacts.deleteContact(input)
         try writeJSON(result)
     } catch {
         writeError(error.localizedDescription)
@@ -1152,7 +1154,7 @@ case "delete-contact":
 
 case "list-groups":
     do {
-        let result = try await ContactsService().listGroups()
+        let result = try await sharedContacts.listGroups()
         try writeJSON(result)
     } catch {
         writeError(error.localizedDescription)
@@ -1164,7 +1166,7 @@ case "add-contact-email":
         return
     }
     do {
-        let result = try await ContactsService().addContactEmail(input)
+        let result = try await sharedContacts.addContactEmail(input)
         try writeJSON(result)
     } catch {
         writeError(error.localizedDescription)
@@ -1176,7 +1178,7 @@ case "add-contact-phone":
         return
     }
     do {
-        let result = try await ContactsService().addContactPhone(input)
+        let result = try await sharedContacts.addContactPhone(input)
         try writeJSON(result)
     } catch {
         writeError(error.localizedDescription)
@@ -1188,7 +1190,7 @@ case "list-group-members":
         return
     }
     do {
-        let result = try await ContactsService().listGroupMembers(input)
+        let result = try await sharedContacts.listGroupMembers(input)
         try writeJSON(result)
     } catch {
         writeError(error.localizedDescription)

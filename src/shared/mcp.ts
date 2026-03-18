@@ -10,18 +10,19 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-type Cb = (...args: any[]) => any;
+/** Generic function type shared with tool-registry.ts. */
+export type AnyFn = (...args: any[]) => any;
 
 /** Minimal McpServer surface used by tool/prompt/resource registration modules. */
 export interface McpServer {
-  tool(name: string, config: any, cb: Cb): void;
-  tool(name: string, description: string, config: any, cb: Cb): void;
-  registerTool(name: string, config: any, cb: Cb): any;
-  prompt(name: string, config: any, cb: Cb): void;
-  prompt(name: string, description: string, config: any, cb: Cb): void;
-  registerPrompt(name: string, config: any, cb: Cb): any;
-  resource(name: string, uri: any, config: any, cb: Cb): void;
-  registerResource(name: string, uri: any, config: any, cb: Cb): any;
+  tool(name: string, config: any, cb: AnyFn): void;
+  tool(name: string, description: string, config: any, cb: AnyFn): void;
+  registerTool(name: string, config: any, cb: AnyFn): any;
+  prompt(name: string, config: any, cb: AnyFn): void;
+  prompt(name: string, description: string, config: any, cb: AnyFn): void;
+  registerPrompt(name: string, config: any, cb: AnyFn): any;
+  resource(name: string, uri: any, config: any, cb: AnyFn): void;
+  registerResource(name: string, uri: any, config: any, cb: AnyFn): any;
   /** Low-level MCP Server for elicitation / sampling. */
   server: any;
 }

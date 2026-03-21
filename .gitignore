@@ -13,5 +13,7 @@ iconnect-test-report-*.md
 .mcpregistry_*
 .smithery/
 TODO.md
+coverage/
+qa-sequential-report-*.md
 docs/site/node_modules/
 docs/site/dist/

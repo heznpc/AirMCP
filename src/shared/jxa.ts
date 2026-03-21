@@ -38,8 +38,11 @@ function scrubPii(msg: string): string {
     .slice(0, MAX_ERR_LEN);
 }
 
-// ── Concurrency semaphore ────────────────────────────────────────────
-const semaphore = new Semaphore(CONCURRENCY.JXA_SLOTS);
+// ── Concurrency semaphore (lazy — created on first use after config is parsed) ──
+let _semaphore: Semaphore | undefined;
+function jxaSemaphore(): Semaphore {
+  return (_semaphore ??= new Semaphore(CONCURRENCY.JXA_SLOTS));
+}
 
 // ── Circuit breaker ──────────────────────────────────────────────────
 interface CircuitState {
@@ -99,6 +102,45 @@ function extractAppName(script: string): string | undefined {
   return m?.[1];
 }
 
+// ── Shared error & parse helpers ─────────────────────────────────────
+
+/** Classify an osascript error and throw a clean, PII-scrubbed Error. */
+function handleOsascriptError(e: unknown, app: string | undefined, timeout: number): never {
+  if (app) recordFailure(app);
+  const error = e as { killed?: boolean; signal?: string; stderr?: string; message?: string };
+  if (error.killed || error.signal === "SIGTERM" || error.signal === "SIGKILL") {
+    throw new Error(`osascript timed out after ${timeout / 1000}s`, { cause: e });
+  }
+  const rawMsg = `${error.stderr ?? ""} ${error.message ?? ""}`.trim();
+  const cleanMsg = scrubPii(rawMsg);
+  const friendly = describeJxaError(rawMsg);
+  throw new Error(friendly ? `osascript error: ${friendly}` : `osascript error: ${cleanMsg}`, { cause: e });
+}
+
+/** Parse osascript stdout → JSON, scrub PII, wrap primitives. */
+function parseOsascriptOutput<T>(stdout: string, app: string | undefined, stripControlChars = false): T {
+  let trimmed = stdout.trim();
+  if (stripControlChars) {
+    // eslint-disable-next-line no-control-regex
+    trimmed = trimmed.replace(/[\x00-\x1f\x7f]/g, (c) => c === "\n" || c === "\r" || c === "\t" ? "" : "");
+  }
+  if (!trimmed) throw new Error("osascript returned empty output");
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    throw new Error(`osascript returned invalid JSON: ${scrubPii(trimmed)}`);
+  }
+
+  if (parsed === null || parsed === undefined || typeof parsed !== "object") {
+    parsed = { value: parsed };
+  }
+
+  if (app) recordSuccess(app);
+  return parsed as T;
+}
+
 // ── SIGKILL fallback helper ──────────────────────────────────────────
 function execOsascript(
   script: string,
@@ -154,11 +196,12 @@ export async function runJxa<T>(script: string, appName?: string): Promise<T> {
 
   if (app) checkCircuit(app);
 
-  await semaphore.acquire();
+  const sem = jxaSemaphore();
+  await sem.acquire();
   try {
     return await runJxaInner<T>(script, app);
   } finally {
-    semaphore.release();
+    sem.release();
   }
 }
 
@@ -171,18 +214,7 @@ async function runJxaInner<T>(script: string, app: string | undefined): Promise<
       break;
     } catch (e: unknown) {
       if (!isTransient(e) || attempt === CONCURRENCY.JXA_RETRIES) {
-        const err = e as { killed?: boolean; signal?: string; stderr?: string; message?: string };
-        if (app) recordFailure(app);
-        if (err.killed || err.signal === "SIGTERM" || err.signal === "SIGKILL") {
-          throw new Error(
-            `osascript timed out after ${TIMEOUT.JXA / 1000}s`,
-            { cause: e },
-          );
-        }
-        const rawMsg = `${err.stderr ?? ""} ${err.message ?? ""}`.trim();
-        const cleanMsg = scrubPii(rawMsg);
-        const friendly = describeJxaError(rawMsg);
-        throw new Error(friendly ? `osascript error: ${friendly}` : `osascript error: ${cleanMsg}`, { cause: e });
+        handleOsascriptError(e, app, TIMEOUT.JXA);
       }
       console.error(`[AirMCP] JXA retry attempt ${attempt + 2}/3`);
       const jitter = Math.floor(Math.random() * 100);
@@ -190,24 +222,7 @@ async function runJxaInner<T>(script: string, app: string | undefined): Promise<
     }
   }
 
-  stdout = stdout!;
-  const trimmed = stdout.trim();
-  if (!trimmed) throw new Error("osascript returned empty output");
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(trimmed);
-  } catch {
-    throw new Error(`osascript returned invalid JSON: ${scrubPii(trimmed)}`);
-  }
-
-  if (parsed === null || parsed === undefined || typeof parsed !== "object") {
-    parsed = { value: parsed };
-  }
-
-  if (app) recordSuccess(app);
-
-  return parsed as T;
+  return parseOsascriptOutput<T>(stdout!, app);
 }
 
 /**
@@ -223,42 +238,17 @@ export async function runAppleScript<T>(
 
   if (app) checkCircuit(app);
 
-  await semaphore.acquire();
+  const sem = jxaSemaphore();
+  await sem.acquire();
   try {
     let stdout: string;
     try {
       stdout = await execOsascript(script, timeout);
     } catch (e: unknown) {
-      if (app) recordFailure(app);
-      const error = e as { killed?: boolean; signal?: string; stderr?: string; message?: string };
-      if (error.killed || error.signal === "SIGTERM" || error.signal === "SIGKILL") {
-        throw new Error(`osascript timed out after ${timeout / 1000}s`, { cause: e });
-      }
-      const rawMsg = `${error.stderr ?? ""} ${error.message ?? ""}`.trim();
-      const cleanMsg = scrubPii(rawMsg);
-      const friendly = describeJxaError(rawMsg);
-      throw new Error(friendly ? `osascript error: ${friendly}` : `osascript error: ${cleanMsg}`, { cause: e });
+      handleOsascriptError(e, app, timeout);
     }
-
-    // Strip control chars that AppleScript may inject
-    // eslint-disable-next-line no-control-regex
-    const clean = stdout.trim().replace(/[\x00-\x1f\x7f]/g, (c) => c === "\n" || c === "\r" || c === "\t" ? "" : "");
-    if (!clean) throw new Error("osascript returned empty output");
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(clean);
-    } catch {
-      throw new Error(`osascript returned invalid JSON: ${scrubPii(clean)}`);
-    }
-
-    if (parsed === null || parsed === undefined || typeof parsed !== "object") {
-      parsed = { value: parsed };
-    }
-
-    if (app) recordSuccess(app);
-    return parsed as T;
+    return parseOsascriptOutput<T>(stdout, app, true);
   } finally {
-    semaphore.release();
+    sem.release();
   }
 }

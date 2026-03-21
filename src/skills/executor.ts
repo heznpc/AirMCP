@@ -204,7 +204,8 @@ function parseExpr(tokens: Token[]): unknown {
 export function evaluateCondition(expr: string, results: Map<string, unknown>): boolean {
   const tokens = tokenize(expr, results);
   if (tokens.length === 0) return false;
-  if (tokens.length === 1 && tokens[0]!.kind === "value") return !!(tokens[0] as { kind: "value"; value: unknown }).value;
+  const first = tokens[0];
+  if (tokens.length === 1 && first?.kind === "value") return !!first.value;
   return !!parseExpr(tokens);
 }
 

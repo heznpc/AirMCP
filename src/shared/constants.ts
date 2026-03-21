@@ -108,23 +108,27 @@ export const BUFFER = {
 // CONCURRENCY & CIRCUIT BREAKER
 // ══════════════════════════════════════════════════════════════════════
 
+let _jxaSlots: number | undefined;
+let _cbThreshold: number | undefined;
+let _cbOpenMs: number | undefined;
+
 export const CONCURRENCY = {
-  /** Max parallel JXA/osascript processes (lazy — reads env after config is parsed) */
-  get JXA_SLOTS() { return envInt("AIRMCP_JXA_CONCURRENCY", 3); },
+  /** Max parallel JXA/osascript processes (lazy-once — deferred until first use so config can set env vars) */
+  get JXA_SLOTS() { return (_jxaSlots ??= envInt("AIRMCP_JXA_CONCURRENCY", 3)); },
   /** Max parallel Swift bridge processes */
-  SWIFT_SLOTS:      2,
+  SWIFT_SLOTS:      2 as const,
   /** Max parallel GWS CLI processes */
-  GWS_SLOTS:        3,
+  GWS_SLOTS:        3 as const,
   /** JXA retry attempts */
-  JXA_RETRIES:      2,
+  JXA_RETRIES:      2 as const,
   /** JXA retry delays (ms) */
   JXA_RETRY_DELAYS: [500, 1000] as readonly number[],
-  /** Circuit breaker: failures before open (lazy — reads env after config is parsed) */
-  get CB_THRESHOLD() { return envInt("AIRMCP_CB_THRESHOLD", 3); },
-  /** Circuit breaker: open duration ms (lazy — reads env after config is parsed) */
-  get CB_OPEN_MS() { return envInt("AIRMCP_CB_OPEN_MS", 60_000); },
+  /** Circuit breaker: failures before open (lazy-once — deferred until first use) */
+  get CB_THRESHOLD() { return (_cbThreshold ??= envInt("AIRMCP_CB_THRESHOLD", 3)); },
+  /** Circuit breaker: open duration ms (lazy-once — deferred until first use) */
+  get CB_OPEN_MS() { return (_cbOpenMs ??= envInt("AIRMCP_CB_OPEN_MS", 60_000)); },
   /** Circuit breaker: max apps tracked */
-  CB_CACHE_SIZE:    50,
+  CB_CACHE_SIZE:    50 as const,
 };
 
 // ══════════════════════════════════════════════════════════════════════

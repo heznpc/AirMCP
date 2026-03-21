@@ -16,8 +16,8 @@ MCP server for the entire Apple ecosystem — Notes, Reminders, Calendar, Contac
 
 ## Features
 
-- **252 tools** (25 modules) — Apple app CRUD + system control + Apple Intelligence + UI Automation + Screen Capture + Maps + Podcasts + Weather + iWork (Pages/Numbers/Keynote) + Google Workspace + dynamic shortcuts
-- **30 prompts** — per-app workflows (notes, calendar, reminders, shortcuts) + cross-module + developer workflows + YAML skills
+- **253 tools** (25 modules) — Apple app CRUD + system control + Apple Intelligence + UI Automation + Screen Capture + Maps + Podcasts + Weather + iWork (Pages/Numbers/Keynote) + Google Workspace + dynamic shortcuts
+- **32 prompts** — per-app workflows (notes, calendar, reminders, shortcuts) + cross-module + developer workflows + YAML skills
 - **11 MCP resources** — Notes, Calendar, Reminders, Music, Mail, System live data URIs
 - **JXA + Swift bridge** — JXA for basic automation, EventKit/PhotoKit for advanced features
 - **Recurring events/reminders** — EventKit recurrence rules (macOS 26+ Swift bridge)
@@ -98,7 +98,7 @@ Once connected, just ask your AI in natural language. Here are some things you c
 - "Check today's meetings, find related notes, and create a prep checklist in Reminders"
 - "Search my files for the Q1 report, read it, and draft a summary email to the team"
 
-These are just starting points — with 252 tools across 25 Apple apps, the combinations are endless.
+These are just starting points — with 253 tools across 25 Apple apps, the combinations are endless.
 
 ---
 
@@ -726,7 +726,7 @@ Modules with OS requirements (e.g., Intelligence requires macOS 26+) are automat
 - **JXA/AppleScript dependency** — Core automation relies on Apple's scripting dictionaries. While these have been stable for 10+ years, macOS updates can theoretically break individual modules. Circuit breaker (3 failures → 60s auto-disable) isolates failures. UI Automation tools (6 tools) are inherently more brittle and separated into their own module.
 - **Read data exposure** — Destructive operations require HITL approval, but read operations (mail, messages, contacts) are not rate-limited. When connected to cloud LLMs, sensitive data passes through the LLM provider. Mitigations: PII scrubbing in logs, pagination limits, sensitive modules (mail, messages) require explicit opt-in.
 - **IPC overhead** — Multi-process path (Client → Node.js → osascript/Swift CLI → macOS app). Each JXA call adds ~50ms overhead. Pagination prevents bulk data transfers. Swift bridge path bypasses JXA for EventKit/PhotoKit operations.
-- **Scope** — 252 tools across 25 modules follow 5 repeating patterns (JXA CRUD, Swift bridge, HTTP API, System Events, CLI wrapper), keeping maintenance proportional to pattern count, not tool count.
+- **Scope** — 253 tools across 25 modules follow 5 repeating patterns (JXA CRUD, Swift bridge, HTTP API, System Events, CLI wrapper), keeping maintenance proportional to pattern count, not tool count.
 
 ### Location & Bluetooth
 

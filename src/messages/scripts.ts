@@ -121,8 +121,7 @@ export function sendMessageScript(
   target: string,
   text: string,
 ): string {
-  // macOS 26: JXA services() throws -1708; use AppleScript fallback.
-  // Prefixed with "applescript:" so tool handler runs via osascript -e.
+  // macOS 26: JXA services() throws -1708; use AppleScript via runAppleScript().
   // NOTE: Do not echo user input back in AppleScript return to avoid
   // multi-layer escaping issues (AS→JSON). The tool handler has the input.
   const t = escAS(target);

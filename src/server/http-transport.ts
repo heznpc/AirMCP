@@ -87,7 +87,7 @@ export async function startHttpServer(options: HttpServerOptions): Promise<void>
     res.json({
       name: NPM_PACKAGE_NAME,
       version: pkg.version,
-      description: "MCP server for the entire Apple ecosystem — 252 tools, 30 prompts across 25 modules. macOS only.",
+      description: "MCP server for the entire Apple ecosystem — 253 tools, 32 prompts across 25 modules. macOS only.",
       transport: { type: "streamable-http", url: "/mcp" },
       capabilities: {
         tools: true,

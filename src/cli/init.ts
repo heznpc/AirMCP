@@ -151,7 +151,34 @@ export async function runInit(): Promise<void> {
   const selectedModules = await selectMulti(t("choose_modules", lang), moduleOptions, presetMap);
   const enabled = new Set<string>(selectedModules);
 
-  // --- Step 2: Write config.json ---
+  // --- Step 2: Security & privacy settings ---
+  console.log("");
+  const securityOptions: SelectOption[] = [
+    { label: "Recommended (destructive actions need approval)", value: "destructive-only", hint: "default" },
+    { label: "Strict (all write operations need approval)", value: "all-writes" },
+    { label: "Maximum (every tool call needs approval)", value: "all" },
+    { label: "Off (no confirmations)", value: "off" },
+  ];
+  const hitlLevel = await selectOne("  Safety level — when should AirMCP ask for confirmation?", securityOptions, 0);
+
+  const permOptions: MultiOption[] = [
+    { label: "Allow sending iMessages", value: "sendMessages", checked: false, hint: "Messages app" },
+    { label: "Allow sending emails", value: "sendMail", checked: false, hint: "Mail app" },
+    { label: "Allow running JavaScript in Safari", value: "runJavascript", checked: false, hint: "Safari tabs" },
+    { label: "Include shared Notes/folders", value: "includeShared", checked: false, hint: "collaborative" },
+  ];
+  const permSelected = new Set(await selectMulti("  Permissions — these are OFF by default for safety:", permOptions));
+
+  // --- Step 3: Intelligence features ---
+  const featureOptions: MultiOption[] = [
+    { label: "Usage pattern learning", value: "usageTracking", checked: true, hint: "tool recommendations" },
+    { label: "Audit log", value: "auditLog", checked: true, hint: "~/.airmcp/audit.jsonl" },
+    { label: "Semantic tool search", value: "semanticToolSearch", checked: true, hint: "requires Gemini API key" },
+    { label: "Proactive suggestions", value: "proactiveContext", checked: true, hint: "time-based context" },
+  ];
+  const featureSelected = new Set(await selectMulti("  Intelligence features — all ON by default, disable what you don't need:", featureOptions));
+
+  // --- Step 4: Write config.json ---
   const disabledModules = MODULE_NAMES.filter((m) => !enabled.has(m));
 
   console.log("");
@@ -161,9 +188,17 @@ export async function runInit(): Promise<void> {
   const configPayload = {
     locale: lang,
     disabledModules,
-    includeShared: false,
-    allowSendMessages: false,
-    allowSendMail: false,
+    includeShared: permSelected.has("includeShared"),
+    allowSendMessages: permSelected.has("sendMessages"),
+    allowSendMail: permSelected.has("sendMail"),
+    allowRunJavascript: permSelected.has("runJavascript"),
+    hitl: { level: hitlLevel },
+    features: {
+      usageTracking: featureSelected.has("usageTracking"),
+      auditLog: featureSelected.has("auditLog"),
+      semanticToolSearch: featureSelected.has("semanticToolSearch"),
+      proactiveContext: featureSelected.has("proactiveContext"),
+    },
   };
   writeFileSync(PATHS.CONFIG, JSON.stringify(configPayload, null, 2) + "\n");
   console.log(` ${GREEN}\u2713${RESET} ${PATHS.CONFIG}`);
@@ -215,7 +250,7 @@ export async function runInit(): Promise<void> {
 
   // --- Done ---
   console.log("");
-  console.log(`  ${GREEN}\u2713${RESET} ${t("setup_complete", lang)} ${BOLD}${enabled.size} modules${RESET} enabled, ${patchedClients} client(s) configured.`);
+  console.log(`  ${GREEN}\u2713${RESET} ${t("setup_complete", lang)} ${BOLD}${enabled.size} modules${RESET}, safety: ${BOLD}${hitlLevel}${RESET}, ${patchedClients} client(s) configured.`);
   if (detectedClients.length > 0) {
     console.log(`  ${DIM}Restart ${detectedClients.join(", ")} to connect AirMCP.${RESET}`);
   }

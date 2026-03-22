@@ -22,9 +22,17 @@ mkdir -p "$BUNDLE_DIR/Contents/Resources"
 # Copy binary
 cp "$BUILD_DIR/AirMCPApp" "$BUNDLE_DIR/Contents/MacOS/AirMCP"
 
-# Copy icon if available
-if [ -f "$APP_DIR/Sources/AirMCPApp/Resources/AppIcon@2x.png" ]; then
-  cp "$APP_DIR/Sources/AirMCPApp/Resources/AppIcon@2x.png" "$BUNDLE_DIR/Contents/Resources/"
+# Copy icons
+for icon in AppIcon@2x.png AppIcon.png MenuBarIcon.png; do
+  if [ -f "$APP_DIR/Sources/AirMCPApp/Resources/$icon" ]; then
+    cp "$APP_DIR/Sources/AirMCPApp/Resources/$icon" "$BUNDLE_DIR/Contents/Resources/"
+  fi
+done
+
+# Also copy the SwiftPM resource bundle (contains Bundle.module resources)
+RESOURCE_BUNDLE="$BUILD_DIR/AirMCPApp_AirMCPApp.bundle"
+if [ -d "$RESOURCE_BUNDLE" ]; then
+  cp -R "$RESOURCE_BUNDLE" "$BUNDLE_DIR/Contents/Resources/"
 fi
 
 # Copy Info.plist with services declarations

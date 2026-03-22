@@ -32,19 +32,17 @@ struct AirMCPApp: App {
         DispatchQueue.main.async {
             UNUserNotificationCenter.current().delegate = delegate
 
-            // Set app icon from bundled resource
             if let iconURL = Bundle.module.url(forResource: "AppIcon@2x", withExtension: "png", subdirectory: "Resources"),
                let icon = NSImage(contentsOf: iconURL) {
                 NSApp?.applicationIconImage = icon
             }
 
-            // Register macOS Services provider (right-click → Services menu)
             NSApp?.servicesProvider = ServicesProvider()
         }
     }
 
     var body: some Scene {
-        MenuBarExtra("AirMCP", systemImage: "apple.terminal") {
+        MenuBarExtra {
             MenuContent(
                 serverManager: serverManager,
                 permissionManager: permissionManager,
@@ -79,6 +77,8 @@ struct AirMCPApp: App {
                 let tool = hitlManager.pendingTools[requestId] ?? "unknown"
                 hitlManager.respond(id: requestId, approved: approved, tool: tool)
             }
+        } label: {
+            Label("AirMCP", systemImage: "a.square.fill")
         }
         .menuBarExtraStyle(.menu)
     }

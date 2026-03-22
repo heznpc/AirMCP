@@ -1,13 +1,13 @@
 {
   "meta_title": "AirMCP — Connect AI to Your Entire Apple Ecosystem",
-  "meta_description": "Open-source MCP server with 253 tools across 25 modules. Connect Claude, Codex, and any MCP client to Apple apps.",
+  "meta_description": "Open-source MCP server with 262 tools across 25 modules. Connect Claude, Codex, and any MCP client to Apple apps.",
   "nav_modules": "Modules",
   "nav_workflows": "Workflows",
   "nav_install": "Install",
   "lang_label": "EN",
   "hero_tag": "npx airmcp init → connected",
   "hero_tagline": "Connect AI to your entire Apple ecosystem.",
-  "hero_sub": "253 tools. 32 prompts. 11 resources. One MCP server.",
+  "hero_sub": "262 tools. 32 prompts. 11 resources. One MCP server.",
   "hero_cta": "Get Started",
   "hero_discussions": "Discussions",
   "stat_modules": "Modules",
@@ -161,6 +161,6 @@
   "tryit_5": "\"Get my current location and show the weather here\"",
   "tryit_6_cat": "Cross-App",
   "tryit_6": "\"Check today's meetings, find related notes, and create a prep checklist in Reminders\"",
-  "tryit_footer": "253 tools. Endless combinations.",
+  "tryit_footer": "262 tools. Endless combinations.",
   "footer_tagline": "Built for Claude Code, Codex, and every MCP client."
 }

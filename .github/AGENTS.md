@@ -83,7 +83,7 @@ tests/                    # Script generator tests
 
 ## Stats
 
-- **253 tools** across 25 modules (+ dynamic shortcut tools at runtime)
+- **262 tools** across 25 modules (+ dynamic shortcut tools at runtime)
 - **32 prompts** (per-module + cross-module + YAML skills)
 - **11 MCP resources** (Notes, Calendar, Reminders, Music, Mail, System, Context Snapshot)
 

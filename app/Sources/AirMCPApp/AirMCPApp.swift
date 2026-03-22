@@ -34,6 +34,9 @@ struct AirMCPApp: App {
            let icon = NSImage(contentsOf: iconURL) {
             NSApp.applicationIconImage = icon
         }
+
+        // Register macOS Services provider (right-click → Services menu)
+        NSApp.servicesProvider = ServicesProvider()
     }
 
     var body: some Scene {

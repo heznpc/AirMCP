@@ -1,33 +1,106 @@
-// AirMCP iOS — SwiftUI app entry point.
-// Phase 1: EventKit, Contacts, Photos, Location, Weather modules.
+// AirMCP iOS — SwiftUI app with embedded MCP server.
 
 import SwiftUI
 import AirMCPKit
+import AirMCPServer
 
 @main
 struct AirMCPiOSApp: App {
+    @State private var serverManager = ServerManager()
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentView(serverManager: serverManager)
+                .task { await serverManager.start() }
         }
     }
 }
 
+// MARK: - Server Manager
+
+@Observable
+@MainActor
+final class ServerManager {
+    private(set) var isRunning = false
+    private(set) var toolCount = 0
+    private(set) var token = ""
+    private(set) var errorMessage: String?
+
+    func start() async {
+        let mcp = MCPServer(name: "airmcp-ios", version: "1.0.0")
+
+        // Register modules
+        let eventKit = EventKitService()
+        await registerCalendarTools(on: mcp, service: eventKit)
+        await registerReminderTools(on: mcp, service: eventKit)
+
+        let contacts = ContactsService()
+        await registerContactsTools(on: mcp, service: contacts)
+
+        await registerLocationTools(on: mcp)
+
+        #if canImport(HealthKit)
+        let health = HealthService()
+        await registerHealthTools(on: mcp, service: health)
+        #endif
+
+        toolCount = await mcp.toolCount
+
+        let server = MCPHTTPServer(mcp: mcp, port: 3847)
+        token = await server.authToken
+
+        isRunning = true
+        do {
+            try await server.start()
+        } catch {
+            isRunning = false
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+// MARK: - Content View
+
 struct ContentView: View {
+    let serverManager: ServerManager
+
     var body: some View {
         NavigationStack {
             List {
+                Section("Server") {
+                    HStack {
+                        Image(systemName: serverManager.isRunning ? "circle.fill" : "circle")
+                            .foregroundStyle(serverManager.isRunning ? .green : .gray)
+                            .font(.caption)
+                        Text(serverManager.isRunning ? "Running" : "Starting...")
+                        Spacer()
+                        Text("\(serverManager.toolCount) tools")
+                            .foregroundStyle(.secondary)
+                    }
+                    if serverManager.isRunning {
+                        LabeledContent("Endpoint") {
+                            Text("localhost:3847/mcp")
+                                .font(.caption.monospaced())
+                        }
+                        LabeledContent("Token") {
+                            Text(serverManager.token.prefix(8) + "...")
+                                .font(.caption.monospaced())
+                        }
+                    }
+                    if let error = serverManager.errorMessage {
+                        Label(error, systemImage: "exclamationmark.triangle")
+                            .foregroundStyle(.red)
+                    }
+                }
+
                 Section("Modules") {
                     Label("Calendar", systemImage: "calendar")
                     Label("Reminders", systemImage: "checklist")
                     Label("Contacts", systemImage: "person.crop.circle")
-                    Label("Photos", systemImage: "photo.on.rectangle")
                     Label("Location", systemImage: "location")
-                    Label("Weather", systemImage: "cloud.sun")
-                }
-                Section("Status") {
-                    Label("MCP Server: Ready", systemImage: "server.rack")
-                        .foregroundStyle(.green)
+                    #if canImport(HealthKit)
+                    Label("Health", systemImage: "heart.fill")
+                    #endif
                 }
             }
             .navigationTitle("AirMCP")

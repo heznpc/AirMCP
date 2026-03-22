@@ -148,8 +148,15 @@ struct ScanDocumentInput: Decodable { let imagePath: String }
 struct DocumentElement: Encodable { let type: String; let text: String; let confidence: Double }
 struct ScanDocumentOutput: Encodable { let elements: [DocumentElement]; let total: Int }
 struct LocationPermissionOutput: Encodable { let status: String; let authorized: Bool }
+struct TranscribeInput: Decodable { let path: String; let language: String? }
+struct SpeechAvailabilityOutput: Encodable { let available: Bool; let supportsOnDevice: Bool }
 
 private let embeddingService = EmbeddingService()
+private let speechService = SpeechService()
+private let pasteboardService = PasteboardService()
+#if canImport(HealthKit)
+private let healthService = HealthService()
+#endif
 
 // MARK: - Foundation Models guard helper
 
@@ -1263,6 +1270,8 @@ case "list-commands":
         "add-contact-email",
         "add-contact-phone",
         "list-group-members",
+        "pasteboard-content",
+        "pasteboard-detect",
     ]
     do {
         let data = try JSONSerialization.data(withJSONObject: commands, options: [.sortedKeys])
@@ -1288,6 +1297,111 @@ case "get-clipboard":
         writeRawJSON(outData)
     } catch {
         writeError("Failed to serialize clipboard output: \(error.localizedDescription)")
+    }
+
+// --- Speech: on-device transcription ---
+case "transcribe-audio":
+    guard let input = try? JSONDecoder().decode(TranscribeInput.self, from: stdinData) else {
+        writeError("Invalid JSON. Expected {\"path\":\"...\", \"language\":\"en-US\"}")
+        return
+    }
+    do {
+        let result = try await speechService.transcribeFile(path: input.path, language: input.language)
+        try writeJSON(result)
+    } catch {
+        writeError(error.localizedDescription)
+    }
+
+case "speech-availability":
+    let result = await speechService.checkAvailability()
+    try? writeJSON(result)
+
+case "pasteboard-content":
+    let pbResult = await pasteboardService.getContent()
+    try? writeJSON(pbResult)
+
+case "pasteboard-detect":
+    let contentType = await pasteboardService.detectContentType()
+    let output: [String: String] = ["type": contentType.rawValue]
+    let data = try! JSONSerialization.data(withJSONObject: output, options: [.sortedKeys])
+    writeRawJSON(data)
+
+// --- HealthKit: aggregated health data (privacy-safe) ---
+
+#if canImport(HealthKit)
+case "health-authorize":
+    do {
+        let authorized = try await healthService.requestAuthorization()
+        try writeJSON(["authorized": authorized])
+    } catch {
+        writeError("HealthKit authorization failed: \(error.localizedDescription)")
+    }
+
+case "health-steps":
+    do {
+        _ = try await healthService.requestAuthorization()
+        let steps = try await healthService.todaySteps()
+        try writeJSON(["stepsToday": steps])
+    } catch {
+        writeError("Failed to get steps: \(error.localizedDescription)")
+    }
+
+case "health-heart-rate":
+    do {
+        _ = try await healthService.requestAuthorization()
+        let avg = try await healthService.recentHeartRate()
+        if let avg {
+            try writeJSON(["heartRateAvg7d": round(avg * 10) / 10])
+        } else {
+            try writeJSON(["heartRateAvg7d": nil as Double?, "message": "No heart rate data for the last 7 days"] as [String: Any?])
+        }
+    } catch {
+        writeError("Failed to get heart rate: \(error.localizedDescription)")
+    }
+
+case "health-sleep":
+    do {
+        _ = try await healthService.requestAuthorization()
+        let dateStr = (try? JSONDecoder().decode([String: String].self, from: stdinData))?["date"]
+        let date: Date
+        if let dateStr, let parsed = parseISO8601(dateStr) {
+            date = parsed
+        } else {
+            date = Date()
+        }
+        let hours = try await healthService.sleepHours(for: date)
+        try writeJSON(["sleepHours": round(hours * 100) / 100])
+    } catch {
+        writeError("Failed to get sleep data: \(error.localizedDescription)")
+    }
+
+case "health-summary":
+    do {
+        _ = try await healthService.requestAuthorization()
+        let summary = try await healthService.healthSummary()
+        try writeJSON(summary)
+    } catch {
+        writeError("Failed to get health summary: \(error.localizedDescription)")
+    }
+#endif
+
+case "pasteboard-smart":
+    let pbContent = await pasteboardService.getContent()
+    let pbType = await pasteboardService.detectContentType()
+    let combined: [String: Any] = [
+        "text": pbContent.text as Any,
+        "hasImage": pbContent.hasImage,
+        "hasURL": pbContent.hasURL,
+        "url": pbContent.url as Any,
+        "types": pbContent.types,
+        "changeCount": pbContent.changeCount,
+        "detectedType": pbType.rawValue,
+    ]
+    do {
+        let smartData = try JSONSerialization.data(withJSONObject: combined, options: [.sortedKeys])
+        writeRawJSON(smartData)
+    } catch {
+        writeError("Failed to serialize pasteboard output: \(error.localizedDescription)")
     }
 
 default:

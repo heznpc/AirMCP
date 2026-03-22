@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>NSServices</key>
+    <array>
+        <dict>
+            <key>NSMenuItem</key>
+            <dict>
+                <key>default</key>
+                <string>AirMCP/Save to Notes</string>
+            </dict>
+            <key>NSMessage</key>
+            <string>saveToNotes</string>
+            <key>NSPortName</key>
+            <string>AirMCPApp</string>
+            <key>NSSendTypes</key>
+            <array>
+                <string>NSStringPboardType</string>
+            </array>
+            <key>NSRequiredContext</key>
+            <dict/>
+        </dict>
+        <dict>
+            <key>NSMenuItem</key>
+            <dict>
+                <key>default</key>
+                <string>AirMCP/Create Reminder</string>
+            </dict>
+            <key>NSMessage</key>
+            <string>createReminder</string>
+            <key>NSPortName</key>
+            <string>AirMCPApp</string>
+            <key>NSSendTypes</key>
+            <array>
+                <string>NSStringPboardType</string>
+            </array>
+            <key>NSRequiredContext</key>
+            <dict/>
+        </dict>
+        <dict>
+            <key>NSMenuItem</key>
+            <dict>
+                <key>default</key>
+                <string>AirMCP/Search</string>
+            </dict>
+            <key>NSMessage</key>
+            <string>searchAirMCP</string>
+            <key>NSPortName</key>
+            <string>AirMCPApp</string>
+            <key>NSSendTypes</key>
+            <array>
+                <string>NSStringPboardType</string>
+            </array>
+            <key>NSRequiredContext</key>
+            <dict/>
+        </dict>
+    </array>
+</dict>
+</plist>

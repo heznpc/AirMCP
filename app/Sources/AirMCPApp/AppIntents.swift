@@ -3,8 +3,10 @@ import Foundation
 
 // MARK: - AirMCP App Intents
 // These make AirMCP actions accessible via Siri, Spotlight, and Shortcuts.
-// When Apple ships the system-level MCP↔App Intents bridge,
+// When Apple ships the system-level MCP↔App Intents bridge (iOS 26.1),
 // these will automatically be available to all MCP clients.
+
+// MARK: - Existing Intents
 
 struct SearchNotesIntent: AppIntent {
     nonisolated(unsafe) static var title: LocalizedStringResource = "Search Notes"
@@ -63,6 +65,68 @@ struct CreateReminderIntent: AppIntent {
     }
 }
 
+// MARK: - MCP Bridge Read-Only Intents
+
+struct SearchContactsIntent: AppIntent {
+    nonisolated(unsafe) static var title: LocalizedStringResource = "Search Contacts"
+    nonisolated(unsafe) static var description = IntentDescription(
+        "Search contacts by name, email, phone, or organization"
+    )
+    nonisolated(unsafe) static var openAppWhenRun: Bool = false
+
+    @Parameter(title: "Search Query")
+    var query: String
+
+    func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await runAirMCPTool("search_contacts", args: ["query": query])
+        return .result(value: result)
+    }
+}
+
+struct DueRemindersIntent: AppIntent {
+    nonisolated(unsafe) static var title: LocalizedStringResource = "Overdue Reminders"
+    nonisolated(unsafe) static var description = IntentDescription(
+        "Show reminders that are past due and not yet completed"
+    )
+    nonisolated(unsafe) static var openAppWhenRun: Bool = false
+
+    func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await runAirMCPTool("list_reminders", args: [
+            "completed": false,
+            "dueBefore": ISO8601DateFormatter().string(from: Date()),
+        ])
+        return .result(value: result)
+    }
+}
+
+struct ListCalendarsIntent: AppIntent {
+    nonisolated(unsafe) static var title: LocalizedStringResource = "List Calendars"
+    nonisolated(unsafe) static var description = IntentDescription(
+        "List all available calendars with their names, colors, and write status"
+    )
+    nonisolated(unsafe) static var openAppWhenRun: Bool = false
+
+    func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await runAirMCPTool("list_calendars", args: [:])
+        return .result(value: result)
+    }
+}
+
+#if canImport(HealthKit)
+struct HealthSummaryIntent: AppIntent {
+    nonisolated(unsafe) static var title: LocalizedStringResource = "Health Summary"
+    nonisolated(unsafe) static var description = IntentDescription(
+        "Get an aggregated health summary including steps, heart rate, sleep, and exercise"
+    )
+    nonisolated(unsafe) static var openAppWhenRun: Bool = false
+
+    func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await runAirMCPTool("health_summary", args: [:])
+        return .result(value: result)
+    }
+}
+#endif
+
 // MARK: - App Shortcuts (Siri trigger phrases)
 
 struct AirMCPShortcuts: AppShortcutsProvider {
@@ -94,6 +158,44 @@ struct AirMCPShortcuts: AppShortcutsProvider {
             shortTitle: "Today's Events",
             systemImageName: "calendar"
         )
+        AppShortcut(
+            intent: SearchContactsIntent(),
+            phrases: [
+                "Search contacts in \(.applicationName)",
+                "Find a contact in \(.applicationName)",
+            ],
+            shortTitle: "Search Contacts",
+            systemImageName: "person.crop.circle"
+        )
+        AppShortcut(
+            intent: DueRemindersIntent(),
+            phrases: [
+                "Show overdue reminders in \(.applicationName)",
+                "What reminders are past due in \(.applicationName)",
+            ],
+            shortTitle: "Overdue Reminders",
+            systemImageName: "exclamationmark.circle"
+        )
+        AppShortcut(
+            intent: ListCalendarsIntent(),
+            phrases: [
+                "List my calendars in \(.applicationName)",
+                "Show all calendars in \(.applicationName)",
+            ],
+            shortTitle: "List Calendars",
+            systemImageName: "calendar.badge.plus"
+        )
+        #if canImport(HealthKit)
+        AppShortcut(
+            intent: HealthSummaryIntent(),
+            phrases: [
+                "Health summary in \(.applicationName)",
+                "How's my health today in \(.applicationName)",
+            ],
+            shortTitle: "Health Summary",
+            systemImageName: "heart.text.square"
+        )
+        #endif
     }
 }
 

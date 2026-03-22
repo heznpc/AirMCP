@@ -150,12 +150,20 @@ struct ScanDocumentOutput: Encodable { let elements: [DocumentElement]; let tota
 struct LocationPermissionOutput: Encodable { let status: String; let authorized: Bool }
 struct TranscribeInput: Decodable { let path: String; let language: String? }
 struct SpeechAvailabilityOutput: Encodable { let available: Bool; let supportsOnDevice: Bool }
+struct CloudSyncInput: Decodable { let frequency: [String: Int]?; let sequences: [String: Int]?; let disabledModules: [String]? }
 
 private let embeddingService = EmbeddingService()
 private let speechService = SpeechService()
 private let pasteboardService = PasteboardService()
+private let cloudSync = CloudSyncService()
 #if canImport(HealthKit)
 private let healthService = HealthService()
+#endif
+private let eventObserver = EventObserver()
+
+#if canImport(FoundationModels)
+@available(macOS 26, iOS 26, *)
+private let foundationBridge = FoundationModelsBridge()
 #endif
 
 // MARK: - Foundation Models guard helper
@@ -1272,6 +1280,8 @@ case "list-commands":
         "list-group-members",
         "pasteboard-content",
         "pasteboard-detect",
+        "start-observer",
+        "stop-observer",
     ]
     do {
         let data = try JSONSerialization.data(withJSONObject: commands, options: [.sortedKeys])
@@ -1402,6 +1412,97 @@ case "pasteboard-smart":
         writeRawJSON(smartData)
     } catch {
         writeError("Failed to serialize pasteboard output: \(error.localizedDescription)")
+    }
+
+// --- Foundation Models: AI Agent (on-device LLM + AirMCP tools) ---
+case "ai-agent":
+    #if canImport(FoundationModels)
+    if #available(macOS 26, iOS 26, *) {
+        guard let input = try? JSONDecoder().decode(Input.self, from: stdinData) else {
+            writeError("Invalid JSON. Expected {\"text\":\"...\"}")
+            return
+        }
+        do {
+            let result = try await foundationBridge.run(prompt: input.text, systemInstruction: input.tone)
+            try writeOutput(Output(output: result))
+        } catch {
+            writeError("Foundation Models agent error: \(error.localizedDescription)")
+        }
+    } else {
+        writeError("Foundation Models require macOS 26+")
+    }
+    #else
+    writeError("Foundation Models not available in this build")
+    #endif
+
+case "start-observer":
+    await eventObserver.start { event in
+        let type: String
+        let data: [String: Any]
+        switch event {
+        case .calendarChanged:
+            type = "calendar_changed"
+            data = ["source": "eventkit"]
+        case .remindersChanged:
+            type = "reminders_changed"
+            data = ["source": "eventkit"]
+        case .pasteboardChanged(let text):
+            type = "pasteboard_changed"
+            data = ["source": "pasteboard", "text": text ?? ""]
+        }
+        let notification: [String: Any] = [
+            "id": "__event__",
+            "event": type,
+            "data": data,
+            "timestamp": ISO8601DateFormatter().string(from: Date()),
+        ]
+        if let jsonData = try? JSONSerialization.data(withJSONObject: notification, options: [.sortedKeys]) {
+            FileHandle.standardOutput.write(jsonData)
+            FileHandle.standardOutput.write(Data("\n".utf8))
+        }
+    }
+    // Don't return — keep observer running in persistent mode
+    try? writeJSON(["status": "observer_started"])
+
+case "stop-observer":
+    await eventObserver.stop()
+    try? writeJSON(["status": "observer_stopped"])
+
+case "cloud-sync-status":
+    let status = await cloudSync.getSyncStatus()
+    try? writeJSON(status)
+
+case "cloud-sync-push":
+    guard let input = try? JSONDecoder().decode(CloudSyncInput.self, from: stdinData) else {
+        writeError("Invalid JSON for cloud sync push")
+        return
+    }
+    if let freq = input.frequency {
+        await cloudSync.syncUsageFrequency(freq)
+    }
+    if let seq = input.sequences {
+        await cloudSync.syncUsageSequences(seq)
+    }
+    if let modules = input.disabledModules {
+        await cloudSync.syncDisabledModules(modules)
+    }
+    await cloudSync.markSynced()
+    try? writeJSON(["status": "synced"])
+
+case "cloud-sync-pull":
+    let frequency = await cloudSync.getUsageFrequency()
+    let sequences = await cloudSync.getUsageSequences()
+    let modules = await cloudSync.getDisabledModules()
+    let result: [String: Any] = [
+        "frequency": frequency,
+        "sequences": sequences,
+        "disabledModules": modules,
+    ]
+    do {
+        let data = try JSONSerialization.data(withJSONObject: result, options: [.sortedKeys])
+        writeRawJSON(data)
+    } catch {
+        writeError("Failed to serialize sync data: \(error.localizedDescription)")
     }
 
 default:

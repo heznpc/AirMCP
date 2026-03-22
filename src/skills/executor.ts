@@ -1,5 +1,5 @@
 import type { McpServer } from "../shared/mcp.js";
-import type { SkillDefinition, SkillResult, StepResult } from "./types.js";
+import type { SkillDefinition, SkillResult, SkillStep, StepResult } from "./types.js";
 import { toolRegistry } from "../shared/tool-registry.js";
 
 const SINGLE_TEMPLATE_RE = /^\{\{([^}]+)\}\}$/;
@@ -233,42 +233,109 @@ function parseToolResponse(response: { content: Array<{ type: string; text: stri
   }
 }
 
+async function executeOneStep(
+  server: McpServer,
+  step: SkillStep,
+  results: Map<string, unknown>,
+): Promise<{ stepResult: StepResult; data: unknown }> {
+  if (step.only_if && !evaluateCondition(step.only_if, results)) {
+    return { stepResult: { id: step.id, status: "skipped" }, data: null };
+  }
+  if (step.skip_if && evaluateCondition(step.skip_if, results)) {
+    return { stepResult: { id: step.id, status: "skipped" }, data: null };
+  }
+
+  if (step.loop) {
+    const items = resolveTemplates(step.loop, results);
+    if (!Array.isArray(items)) {
+      return {
+        stepResult: { id: step.id, status: "error", error: `loop expression did not resolve to an array` },
+        data: null,
+      };
+    }
+
+    const loopResults: unknown[] = [];
+    // Use step-scoped loop variables to avoid clobbering shared results in parallel execution
+    const loopScope = new Map(results);
+    for (let idx = 0; idx < items.length; idx++) {
+      loopScope.set("_item", items[idx]);
+      loopScope.set("_index", idx);
+      const resolvedArgs = (step.args ? resolveTemplates(step.args, loopScope) : {}) as Record<string, unknown>;
+      try {
+        const response = await callTool(server, step.tool, resolvedArgs);
+        loopResults.push(parseToolResponse(response));
+      } catch (e) {
+        return {
+          stepResult: { id: step.id, status: "error", error: e instanceof Error ? e.message : String(e) },
+          data: loopResults,
+        };
+      }
+    }
+    return { stepResult: { id: step.id, status: "ok", data: loopResults }, data: loopResults };
+  }
+
+  const resolvedArgs = (step.args ? resolveTemplates(step.args, results) : {}) as Record<string, unknown>;
+  try {
+    const response = await callTool(server, step.tool, resolvedArgs);
+    const data = parseToolResponse(response);
+    return { stepResult: { id: step.id, status: "ok", data }, data };
+  } catch (e) {
+    const error = e instanceof Error ? e.message : String(e);
+    return { stepResult: { id: step.id, status: "error", error }, data: null };
+  }
+}
+
 export async function executeSkill(
   server: McpServer,
   skill: SkillDefinition,
 ): Promise<SkillResult> {
   const results = new Map<string, unknown>();
   const stepResults: StepResult[] = [];
+  let i = 0;
 
-  for (const step of skill.steps) {
-    // Evaluate only_if / skip_if
-    if (step.only_if) {
-      if (!evaluateCondition(step.only_if, results)) {
-        stepResults.push({ id: step.id, status: "skipped" });
-        continue;
+  while (i < skill.steps.length) {
+    const step = skill.steps[i]!;
+
+    if (step.parallel) {
+      const group: typeof skill.steps = [];
+      while (i < skill.steps.length && skill.steps[i]!.parallel) {
+        group.push(skill.steps[i]!);
+        i++;
       }
-    }
-    if (step.skip_if) {
-      if (evaluateCondition(step.skip_if, results)) {
-        stepResults.push({ id: step.id, status: "skipped" });
-        continue;
+
+      const settled = await Promise.allSettled(
+        group.map((s) => executeOneStep(server, s, results)),
+      );
+
+      let failed = false;
+      for (let j = 0; j < group.length; j++) {
+        const r = settled[j]!;
+        if (r.status === "fulfilled") {
+          const { stepResult, data } = r.value;
+          results.set(group[j]!.id, data);
+          stepResults.push(stepResult);
+          if (stepResult.status === "error") failed = true;
+        } else {
+          const error = r.reason instanceof Error ? r.reason.message : String(r.reason);
+          results.set(group[j]!.id, null);
+          stepResults.push({ id: group[j]!.id, status: "error", error });
+          failed = true;
+        }
       }
+
+      if (failed) return { skill: skill.name, steps: stepResults, success: false };
+      continue;
     }
 
-    // Resolve template variables in args
-    const resolvedArgs = (step.args ? resolveTemplates(step.args, results) : {}) as Record<string, unknown>;
+    const result = await executeOneStep(server, step, results);
+    results.set(step.id, result.data);
+    stepResults.push(result.stepResult);
 
-    try {
-      const response = await callTool(server, step.tool, resolvedArgs);
-      const data = parseToolResponse(response);
-      results.set(step.id, data);
-      stepResults.push({ id: step.id, status: "ok", data });
-    } catch (e) {
-      const error = e instanceof Error ? e.message : String(e);
-      results.set(step.id, null);
-      stepResults.push({ id: step.id, status: "error", error });
+    if (result.stepResult.status === "error") {
       return { skill: skill.name, steps: stepResults, success: false };
     }
+
+    i++;
   }
 
   return { skill: skill.name, steps: stepResults, success: true };

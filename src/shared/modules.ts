@@ -39,6 +39,8 @@ const MANIFEST: Array<{
   { name: "location" },
   { name: "bluetooth" },
   { name: "google" },
+  { name: "speech" },
+  { name: "health" },
 ];
 
 /**

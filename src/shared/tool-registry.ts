@@ -10,10 +10,21 @@
  */
 
 import type { McpServer, AnyFn } from "./mcp.js";
+import { usageTracker } from "./usage-tracker.js";
 
 interface RegisteredToolEntry {
   handler: AnyFn;
   enabled: boolean;
+  title?: string;
+  description?: string;
+  titleLower?: string;
+  descriptionLower?: string;
+}
+
+export interface ToolInfo {
+  name: string;
+  title?: string;
+  description?: string;
 }
 
 interface RegisteredPromptEntry {
@@ -28,6 +39,41 @@ class ToolRegistry {
 
   getToolCount(): number {
     return this.tools.size;
+  }
+
+  /** Get all tool names. */
+  getToolNames(): string[] {
+    return [...this.tools.keys()];
+  }
+
+  /** Search tools by query string (substring match on name, title, description). */
+  searchTools(query: string, limit = 20): ToolInfo[] {
+    const q = query.toLowerCase();
+    const words = q.split(/\s+/).filter(Boolean);
+    const scored: Array<{ info: ToolInfo; score: number }> = [];
+
+    for (const [name, entry] of this.tools) {
+      if (!entry.enabled) continue;
+      let score = 0;
+      for (const w of words) {
+        if (name.includes(w)) score += 3;
+        else if (entry.titleLower?.includes(w)) score += 2;
+        else if (entry.descriptionLower?.includes(w)) score += 1;
+      }
+      if (score > 0) {
+        scored.push({ info: { name, title: entry.title, description: entry.description }, score });
+      }
+    }
+
+    scored.sort((a, b) => b.score - a.score);
+    return scored.slice(0, limit).map((s) => s.info);
+  }
+
+  /** Get tool info by name. */
+  getToolInfo(name: string): ToolInfo | undefined {
+    const entry = this.tools.get(name);
+    if (!entry) return undefined;
+    return { name, title: entry.title, description: entry.description };
   }
 
   /**
@@ -79,18 +125,40 @@ class ToolRegistry {
   private interceptToolRegistration(server: McpServer): void {
     const origRegisterTool = server.registerTool.bind(server);
     const tools = this.tools;
+
+    const wrapHandler = (name: string, handler: AnyFn): AnyFn => {
+      return (async (...args: unknown[]) => {
+        usageTracker.record(name);
+        return handler(...args);
+      }) as AnyFn;
+    };
+
     server.registerTool = ((name: string, ...rest: unknown[]) => {
-      const result = (origRegisterTool as AnyFn)(name, ...rest);
       const callback = rest[rest.length - 1] as AnyFn;
-      tools.set(name, { handler: callback, enabled: true });
+      const wrapped = wrapHandler(name, callback);
+      rest[rest.length - 1] = wrapped;
+      const result = (origRegisterTool as AnyFn)(name, ...rest);
+      const config = rest.length >= 2 ? (rest[0] as Record<string, unknown>) : {};
+      const title = config.title as string | undefined;
+      const description = config.description as string | undefined;
+      tools.set(name, {
+        handler: wrapped, enabled: true,
+        title, description,
+        titleLower: title?.toLowerCase(),
+        descriptionLower: description?.toLowerCase(),
+      });
       return result;
     }) as typeof server.registerTool;
 
     const origTool = server.tool.bind(server);
     server.tool = ((name: string, ...rest: unknown[]) => {
-      const result = (origTool as AnyFn)(name, ...rest);
       const callback = rest[rest.length - 1] as AnyFn;
-      tools.set(name, { handler: callback, enabled: true });
+      const wrapped = wrapHandler(name, callback);
+      rest[rest.length - 1] = wrapped;
+      const result = (origTool as AnyFn)(name, ...rest);
+      // Legacy tool() — description is the 2nd arg if it's a string
+      const desc = typeof rest[0] === "string" ? rest[0] : undefined;
+      tools.set(name, { handler: wrapped, enabled: true, description: desc, descriptionLower: desc?.toLowerCase() });
       return result;
     }) as typeof server.tool;
   }

@@ -649,8 +649,8 @@ Or edit `~/.config/airmcp/config.json` directly:
 | `AIRMCP_FULL` | `false` | Enable all modules (ignores preset) |
 | `AIRMCP_DISABLE_{MODULE}` | — | Disable a specific module (e.g. `AIRMCP_DISABLE_MUSIC=true`) |
 | `GEMINI_API_KEY` | — | Google Gemini API key for cloud embeddings (optional) |
-| `AIRMCP_EMBEDDING_MODEL` | `text-embedding-004` | Gemini embedding model name |
-| `AIRMCP_EMBEDDING_DIM` | `768` | Embedding dimension (768/1024/2048/3072) |
+| `AIRMCP_EMBEDDING_MODEL` | `gemini-embedding-2-preview` | Gemini embedding model name |
+| `AIRMCP_EMBEDDING_DIM` | `3072` | Embedding dimension (256/512/1024/2048/3072) |
 | `AIRMCP_EMBEDDING_PROVIDER` | auto | Force provider: `gemini`, `swift`, `hybrid`, `none` |
 | `AIRMCP_HTTP_TOKEN` | — | Bearer token for HTTP mode authentication |
 
@@ -782,7 +782,7 @@ Modules with OS requirements (e.g., Intelligence requires macOS 26+) are automat
 
 ### v2.1 (Current)
 
-- **Gemini Embedding upgrade** — Apple Intelligence의 Gemini 채택에 맞춰 `text-embedding-004`로 업그레이드. on-device Swift bridge + cloud Gemini 하이브리드 provider 지원. Apple이 Foundation Models에 Gemini를 도입하면서 AirMCP도 동일 생태계로 확장 — on-device 처리와 클라우드 임베딩을 자동 전환
+- **Gemini Embedding 2** — Apple Intelligence의 Gemini 채택에 맞춰 `gemini-embedding-2-preview`로 업그레이드. 네이티브 멀티모달(텍스트/이미지/오디오/비디오) 3072차원 임베딩. on-device Swift bridge + cloud Gemini 하이브리드 provider 지원. Apple이 Foundation Models에 Gemini를 도입하면서 AirMCP도 동일 생태계로 확장
 - **Google Workspace** — Gmail, Drive, Sheets, Calendar, Docs, Tasks, People via `@googleworkspace/cli`
 - **Dynamic module loading** — New modules = 1 line in MANIFEST (no import boilerplate)
 - **Centralized constants** — All API URLs, timeouts, buffer sizes in `src/shared/constants.ts` with env var overrides

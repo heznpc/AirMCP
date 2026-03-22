@@ -1,8 +1,17 @@
+import { withLinks } from "./tool-links.js";
+import { usageTracker } from "./usage-tracker.js";
+
 /** Return a successful MCP tool response with JSON-formatted data. */
 export function ok(data: unknown) {
   return {
     content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
   };
+}
+
+/** Return a successful MCP tool response with _links for tool graph navigation, personalized by usage patterns. */
+export function okLinked(toolName: string, data: unknown) {
+  const usageNext = usageTracker.getNextTools(toolName);
+  return ok(withLinks(toolName, data, usageNext));
 }
 
 /**

@@ -90,7 +90,7 @@ export async function startHttpServer(options: HttpServerOptions): Promise<void>
       description: "MCP server for the entire Apple ecosystem — 253 tools, 32 prompts across 25 modules. macOS only.",
       transport: { type: "streamable-http", url: "/mcp" },
       capabilities: {
-        tools: true,
+        tools: { listChanged: true, filtering: true },
         prompts: true,
         resources: true,
       },

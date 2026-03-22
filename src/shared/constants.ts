@@ -38,7 +38,7 @@ export const API = {
   /** Nominatim reverse geocoding */
   REVERSE_GEOCODE:  envStr("AIRMCP_REVERSE_GEOCODE_API_URL", "https://nominatim.openstreetmap.org/reverse"),
   /** Gemini embedding API base */
-  GEMINI_BASE:      envStr("AIRMCP_GEMINI_API_URL", "https://generativelanguage.googleapis.com/v1/models"),
+  GEMINI_BASE:      envStr("AIRMCP_GEMINI_API_URL", "https://generativelanguage.googleapis.com/v1beta/models"),
 } as const;
 
 // ══════════════════════════════════════════════════════════════════════
@@ -47,9 +47,9 @@ export const API = {
 
 export const MODELS = {
   /** Gemini embedding model name */
-  GEMINI_EMBEDDING: envStr("AIRMCP_EMBEDDING_MODEL", "text-embedding-004"),
-  /** Embedding output dimension (768/1024/2048/3072) */
-  EMBEDDING_DIM:    envInt("AIRMCP_EMBEDDING_DIM", 768),
+  GEMINI_EMBEDDING: envStr("AIRMCP_EMBEDDING_MODEL", "gemini-embedding-2-preview"),
+  /** Embedding output dimension (256/512/1024/2048/3072) */
+  EMBEDDING_DIM:    envInt("AIRMCP_EMBEDDING_DIM", 3072),
 } as const;
 
 // ══════════════════════════════════════════════════════════════════════
@@ -178,6 +178,8 @@ export const PATHS = {
   HITL_SOCKET:      join(HOME, ".config", "airmcp", "hitl.sock"),
   /** Vector store directory */
   VECTOR_STORE:     join(HOME, ".airmcp"),
+  /** Usage profile */
+  USAGE_PROFILE:    join(HOME, ".airmcp", "profile.json"),
   /** Swift bridge binary (relative to project root) */
   SWIFT_BRIDGE:     "../../swift/.build/release/AirMcpBridge",
 } as const;

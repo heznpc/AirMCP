@@ -94,8 +94,8 @@ The default config file location is `~/.config/airmcp/config.json`. You can over
 |----------|-------------|
 | `GEMINI_API_KEY` | Gemini API key for cloud-based embeddings |
 | `AIRMCP_EMBEDDING_PROVIDER` | Provider selection: `auto`, `gemini`, `swift`, `hybrid`, `none` |
-| `AIRMCP_EMBEDDING_MODEL` | Gemini model name (default: `text-embedding-004`) |
-| `AIRMCP_EMBEDDING_DIM` | Embedding dimension (default: `768`) |
+| `AIRMCP_EMBEDDING_MODEL` | Gemini model name (default: `gemini-embedding-2-preview`) |
+| `AIRMCP_EMBEDDING_DIM` | Embedding dimension (default: `3072`) |
 
 ## CLI Flags
 

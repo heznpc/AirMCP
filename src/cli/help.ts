@@ -30,7 +30,7 @@ export function runHelp(): void {
   console.log(`    ${WHITE}AIRMCP_FULL${RESET}=true              ${DIM}Enable all modules (ignores config)${RESET}`);
   console.log(`    ${WHITE}AIRMCP_DISABLE_${RESET}${DIM}<MODULE>${RESET}=true  ${DIM}Disable a specific module${RESET}`);
   console.log(`    ${WHITE}GEMINI_API_KEY${RESET}=${DIM}<key>${RESET}          ${DIM}Enable Gemini embeddings${RESET}`);
-  console.log(`    ${WHITE}AIRMCP_EMBEDDING_MODEL${RESET}=${DIM}...${RESET}    ${DIM}Embedding model (default: text-embedding-004)${RESET}`);
+  console.log(`    ${WHITE}AIRMCP_EMBEDDING_MODEL${RESET}=${DIM}...${RESET}    ${DIM}Embedding model (default: gemini-embedding-2-preview)${RESET}`);
   console.log(`    ${WHITE}AIRMCP_EMBEDDING_PROVIDER${RESET}=${DIM}...${RESET} ${DIM}auto / gemini / swift / hybrid${RESET}`);
   console.log(`    ${WHITE}AIRMCP_HTTP_TOKEN${RESET}=${DIM}<secret>${RESET}       ${DIM}Bearer token for HTTP mode auth${RESET}`);
   console.log("");

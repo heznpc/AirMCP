@@ -11,6 +11,7 @@ import { HitlClient } from "../shared/hitl.js";
 import { setShareGuardHitlClient } from "../shared/share-guard.js";
 import { closeSkillsWatcher } from "../skills/index.js";
 import { closeSwiftBridge } from "../shared/swift.js";
+import { usageTracker } from "../shared/usage-tracker.js";
 
 export interface ServerContext {
   config: AirMcpConfig;
@@ -37,6 +38,8 @@ export function initializeServer(): ServerContext {
 
   // Clean up resources on exit
   function onExit() {
+    usageTracker.stop();
+    usageTracker.flushSync();
     closeSkillsWatcher();
     closeSwiftBridge();
     if (hitlClient) {

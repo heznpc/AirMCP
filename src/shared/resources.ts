@@ -8,6 +8,17 @@ import { getClipboardScript, getFrontmostAppScript } from "../system/scripts.js"
 import { getUnreadCountScript } from "../mail/scripts.js";
 import { AirMcpConfig, isModuleEnabled } from "./config.js";
 import { LIMITS } from "./constants.js";
+import { resourceCache } from "./cache.js";
+
+const CACHE_TTL = {
+  NOTES: 30_000,      // 30s — notes change infrequently during a session
+  CALENDAR: 60_000,   // 60s — events rarely change within a minute
+  REMINDERS: 30_000,  // 30s
+  MUSIC: 5_000,       // 5s — now-playing changes often
+  MAIL: 30_000,       // 30s
+  CLIPBOARD: 2_000,   // 2s — clipboard changes frequently
+  SNAPSHOT: 15_000,   // 15s — composite, refresh more often
+} as const;
 
 // ── Resource registration factory ──
 
@@ -139,7 +150,7 @@ export function registerResources(server: McpServer, config?: AirMcpConfig): voi
   if (enabled("notes")) {
     jsonResource(server, "recent-notes", "notes://recent",
       "10 most recently modified Apple Notes",
-      () => fetchRecentNotes(10));
+      () => resourceCache.getOrSet("notes:recent:10", CACHE_TTL.NOTES, () => fetchRecentNotes(10)));
 
     server.registerResource(
       "recent-notes-count",
@@ -148,8 +159,9 @@ export function registerResources(server: McpServer, config?: AirMcpConfig): voi
       async (uri, variables) => {
         const raw = Array.isArray(variables.count) ? variables.count[0] : variables.count;
         const count = Math.max(1, Math.min(Number(raw) || 10, 50));
+        const notes = await resourceCache.getOrSet(`notes:recent:${count}`, CACHE_TTL.NOTES, () => fetchRecentNotes(count));
         return {
-          contents: [{ uri: uri.href, mimeType: "application/json", text: JSON.stringify(await fetchRecentNotes(count), null, 2) }],
+          contents: [{ uri: uri.href, mimeType: "application/json", text: JSON.stringify(notes, null, 2) }],
         };
       },
     );
@@ -159,49 +171,49 @@ export function registerResources(server: McpServer, config?: AirMcpConfig): voi
   if (enabled("calendar")) {
     jsonResource(server, "today-events", "calendar://today",
       "Today's Apple Calendar events, sorted by start time",
-      fetchTodayEvents);
+      () => resourceCache.getOrSet("calendar:today", CACHE_TTL.CALENDAR, fetchTodayEvents));
 
     jsonResource(server, "upcoming-events", "calendar://upcoming",
       "Upcoming Apple Calendar events for the next 7 days",
-      fetchUpcomingEvents);
+      () => resourceCache.getOrSet("calendar:upcoming", CACHE_TTL.CALENDAR, fetchUpcomingEvents));
   }
 
   // ── Reminders ──
   if (enabled("reminders")) {
     jsonResource(server, "due-reminders", "reminders://due",
       "Apple Reminders that are currently due or overdue",
-      fetchDueReminders);
+      () => resourceCache.getOrSet("reminders:due", CACHE_TTL.REMINDERS, fetchDueReminders));
 
     jsonResource(server, "today-reminders", "reminders://today",
       "Apple Reminders due today (incomplete only)",
-      fetchTodayReminders);
+      () => resourceCache.getOrSet("reminders:today", CACHE_TTL.REMINDERS, fetchTodayReminders));
   }
 
   // ── Music ──
   if (enabled("music")) {
     jsonResource(server, "now-playing", "music://now-playing",
       "Currently playing track in Apple Music",
-      () => runJxa<unknown>(nowPlayingScript()));
+      () => resourceCache.getOrSet("music:now", CACHE_TTL.MUSIC, () => runJxa<unknown>(nowPlayingScript())));
   }
 
   // ── System ──
   if (enabled("system")) {
     jsonResource(server, "clipboard", "system://clipboard",
       "Current macOS clipboard contents",
-      () => runJxa<unknown>(getClipboardScript()));
+      () => resourceCache.getOrSet("system:clipboard", CACHE_TTL.CLIPBOARD, () => runJxa<unknown>(getClipboardScript())));
   }
 
   // ── Mail ──
   if (enabled("mail")) {
     jsonResource(server, "unread-mail", "mail://unread",
       "Unread email count across all mailboxes",
-      () => runJxa<unknown>(getUnreadCountScript()));
+      () => resourceCache.getOrSet("mail:unread", CACHE_TTL.MAIL, () => runJxa<unknown>(getUnreadCountScript())));
   }
 
   // ── Context Snapshot ──
   jsonResource(server, "context-snapshot", "context://snapshot",
     "Unified context from all enabled Apple apps — calendar, reminders, notes, mail, music, system — in a single read. Default depth: standard.",
-    async () => JSON.parse(await buildSnapshot(enabled, DEPTH.standard!)));
+    () => resourceCache.getOrSet("snapshot:standard", CACHE_TTL.SNAPSHOT, async () => JSON.parse(await buildSnapshot(enabled, DEPTH.standard!))));
 
   server.registerResource(
     "context-snapshot-depth",
@@ -214,8 +226,10 @@ export function registerResources(server: McpServer, config?: AirMcpConfig): voi
     async (uri, variables) => {
       const raw = (Array.isArray(variables.depth) ? variables.depth[0] : variables.depth) as string;
       const dc = (DEPTH[raw] ?? DEPTH.standard)!;
+      const depthKey = raw in DEPTH ? raw : "standard";
+      const text = await resourceCache.getOrSet(`snapshot:${depthKey}`, CACHE_TTL.SNAPSHOT, () => buildSnapshot(enabled, dc));
       return {
-        contents: [{ uri: uri.href, mimeType: "application/json", text: await buildSnapshot(enabled, dc) }],
+        contents: [{ uri: uri.href, mimeType: "application/json", text }],
       };
     },
   );

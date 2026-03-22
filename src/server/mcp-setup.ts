@@ -104,6 +104,29 @@ export async function createServer(
     music: enabled.includes("music"),
   });
 
+  // discover_tools: SEP-1821-inspired dynamic tool discovery
+  lServer.registerTool(
+    "discover_tools",
+    {
+      title: "Discover Tools",
+      description:
+        "Search available tools by keyword. Returns matching tools with descriptions. " +
+        "Use this instead of scanning all 250+ tools — describe what you need and get relevant tools.",
+      inputSchema: {
+        query: z.string().min(1).describe("Search query — e.g. 'calendar', 'send email', 'music playback'"),
+        limit: z.number().min(1).max(50).optional().describe("Max results (default 20)"),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ query, limit }) => {
+      const results = toolRegistry.searchTools(query, limit ?? 20);
+      if (results.length === 0) {
+        return ok({ query, matches: [], hint: "Try broader terms or check module names: notes, calendar, reminders, mail, music, contacts, finder, safari, system, photos, messages, shortcuts" });
+      }
+      return ok({ query, matches: results, total: results.length });
+    },
+  );
+
   // get_workflow: expose prompt handlers as a tool for autonomous agents (Cowork, etc.)
   lServer.registerTool(
     "get_workflow",

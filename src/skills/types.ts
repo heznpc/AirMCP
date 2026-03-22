@@ -6,6 +6,8 @@ export const SkillStepSchema = z.object({
   args: z.record(z.unknown()).optional(),
   only_if: z.string().optional(),
   skip_if: z.string().optional(),
+  parallel: z.boolean().optional(),
+  loop: z.string().optional(),
 });
 
 export const SkillDefinitionSchema = z.object({

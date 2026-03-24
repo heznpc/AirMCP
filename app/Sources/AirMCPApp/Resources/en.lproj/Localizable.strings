@@ -154,3 +154,39 @@
 "log.clear" = "Clear";
 "log.empty" = "No log entries yet.";
 "log.emptyHint" = "Start the server to see output here.";
+
+/* Server Status */
+"server.running" = "Server Running";
+"server.stopped" = "Server Stopped";
+"server.checking" = "Checking...";
+
+/* Setup Wizard */
+"setup.step" = "Step %d/3: ";
+"setup.done" = "Ready! Paste config in Claude Desktop to connect.";
+"setup.failed" = "Setup failed: %@";
+"setup.permissions" = "Setting up permissions...";
+"setup.startingServer" = "Starting server...";
+"setup.copyingConfig" = "Copying Claude config...";
+
+/* HITL Notifications */
+"hitl.destructiveAction" = "Destructive Action";
+"hitl.toolConfirmation" = "Tool Confirmation";
+"hitl.toolPrefix" = "Tool: %@";
+"hitl.approve" = "Approve";
+"hitl.deny" = "Deny";
+
+/* Services Menu */
+"services.noText" = "No text selected";
+"services.savedNoteTitle" = "AirMCP \u2014 Saved Text";
+"services.saveNoteFailed" = "Failed to save note";
+"services.searchQuery" = "Search query set: %@...";
+"services.searchTitle" = "AirMCP Search";
+
+/* Onboarding - Permissions */
+"onboarding.permAutomation" = "Automation";
+"onboarding.permAutomationDesc" = "Allow AirMCP to control apps when prompted";
+"onboarding.permAccessibility" = "Accessibility (optional)";
+"onboarding.permAccessibilityDesc" = "Needed for some System module features";
+"onboarding.permNotifications" = "Notifications";
+"onboarding.permNotificationsDesc" = "For approval prompts (HITL confirmation)";
+"onboarding.permRuntimeHint" = "You can also grant permissions as they are requested at runtime.";

@@ -179,9 +179,9 @@ final class ServerManager {
 
     var statusLabel: String {
         switch status {
-        case .running: "Server Running"
-        case .stopped: "Server Stopped"
-        case .checking: "Checking..."
+        case .running: L("server.running")
+        case .stopped: L("server.stopped")
+        case .checking: L("server.checking")
         }
     }
 

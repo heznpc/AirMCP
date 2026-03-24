@@ -297,8 +297,8 @@ final class HitlManager {
 
     private func postNotification(for request: ApprovalRequest) {
         let content = UNMutableNotificationContent()
-        content.title = request.destructive ? "Destructive Action" : "Tool Confirmation"
-        content.body = "Tool: \(request.tool)"
+        content.title = request.destructive ? L("hitl.destructiveAction") : L("hitl.toolConfirmation")
+        content.body = L("hitl.toolPrefix", request.tool)
         if !request.args.isEmpty {
             let argsPreview = request.args
                 .map { "\($0.key): \($0.value)" }
@@ -330,12 +330,12 @@ final class HitlManager {
     static func registerNotificationCategory() {
         let approve = UNNotificationAction(
             identifier: "APPROVE",
-            title: "Approve",
+            title: L("hitl.approve"),
             options: []
         )
         let deny = UNNotificationAction(
             identifier: "DENY",
-            title: "Deny",
+            title: L("hitl.deny"),
             options: [.destructive]
         )
         let category = UNNotificationCategory(

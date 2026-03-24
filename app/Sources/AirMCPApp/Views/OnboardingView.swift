@@ -5,27 +5,28 @@ import AppKit
 
 private struct OnboardingModule: Identifiable {
     let id: String
-    let name: String
     let icon: String
-    let description: String
+
+    var localizedName: String { L("module.\(id)") }
+    var localizedDescription: String { L("module.\(id).desc") }
 }
 
 private let onboardingModules: [OnboardingModule] = [
-    OnboardingModule(id: "notes", name: "Notes", icon: "note.text", description: "Read, create, and search notes"),
-    OnboardingModule(id: "reminders", name: "Reminders", icon: "checklist", description: "Create and manage reminders"),
-    OnboardingModule(id: "calendar", name: "Calendar", icon: "calendar", description: "Events and scheduling"),
-    OnboardingModule(id: "contacts", name: "Contacts", icon: "person.2", description: "Look up and manage contacts"),
-    OnboardingModule(id: "mail", name: "Mail", icon: "envelope", description: "Read, search, and compose mail"),
-    OnboardingModule(id: "messages", name: "Messages", icon: "bubble.left", description: "Read, search, and send messages"),
-    OnboardingModule(id: "music", name: "Music", icon: "music.note", description: "Playback and library control"),
-    OnboardingModule(id: "finder", name: "Finder", icon: "folder", description: "Files and folder management"),
-    OnboardingModule(id: "safari", name: "Safari", icon: "safari", description: "Tabs and bookmarks"),
-    OnboardingModule(id: "system", name: "System", icon: "gearshape", description: "System preferences and clipboard"),
-    OnboardingModule(id: "photos", name: "Photos", icon: "photo", description: "Browse and search photos"),
-    OnboardingModule(id: "shortcuts", name: "Shortcuts", icon: "command", description: "Run and manage shortcuts"),
-    OnboardingModule(id: "ui", name: "UI Automation", icon: "hand.tap", description: "Accessibility-based app control"),
-    OnboardingModule(id: "intelligence", name: "Intelligence", icon: "brain", description: "AI features (macOS 26+)"),
-    OnboardingModule(id: "tv", name: "TV", icon: "tv", description: "Playback and library"),
+    OnboardingModule(id: "notes", icon: "note.text"),
+    OnboardingModule(id: "reminders", icon: "checklist"),
+    OnboardingModule(id: "calendar", icon: "calendar"),
+    OnboardingModule(id: "contacts", icon: "person.2"),
+    OnboardingModule(id: "mail", icon: "envelope"),
+    OnboardingModule(id: "messages", icon: "bubble.left"),
+    OnboardingModule(id: "music", icon: "music.note"),
+    OnboardingModule(id: "finder", icon: "folder"),
+    OnboardingModule(id: "safari", icon: "safari"),
+    OnboardingModule(id: "system", icon: "gearshape"),
+    OnboardingModule(id: "photos", icon: "photo"),
+    OnboardingModule(id: "shortcuts", icon: "command"),
+    OnboardingModule(id: "ui", icon: "hand.tap"),
+    OnboardingModule(id: "intelligence", icon: "brain"),
+    OnboardingModule(id: "tv", icon: "tv"),
 ]
 
 // MARK: - MCP Client
@@ -243,10 +244,10 @@ struct OnboardingView: View {
                     .foregroundStyle(isEnabled ? Color.accentColor : Color.secondary)
 
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(module.name)
+                    Text(module.localizedName)
                         .font(.callout)
                         .fontWeight(.medium)
-                    Text(module.description)
+                    Text(module.localizedDescription)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -292,18 +293,18 @@ struct OnboardingView: View {
             VStack(alignment: .leading, spacing: 10) {
                 permissionRow(
                     icon: "checkmark.shield",
-                    title: "Automation",
-                    detail: "Allow AirMCP to control apps when prompted"
+                    title: L("onboarding.permAutomation"),
+                    detail: L("onboarding.permAutomationDesc")
                 )
                 permissionRow(
                     icon: "accessibility",
-                    title: "Accessibility (optional)",
-                    detail: "Needed for some System module features"
+                    title: L("onboarding.permAccessibility"),
+                    detail: L("onboarding.permAccessibilityDesc")
                 )
                 permissionRow(
                     icon: "bell.badge",
-                    title: "Notifications",
-                    detail: "For approval prompts (HITL confirmation)"
+                    title: L("onboarding.permNotifications"),
+                    detail: L("onboarding.permNotificationsDesc")
                 )
             }
             .padding(.horizontal, 32)
@@ -315,7 +316,7 @@ struct OnboardingView: View {
             }
             .controlSize(.large)
 
-            Text("You can also grant permissions as they are requested at runtime.")
+            Text(L("onboarding.permRuntimeHint"))
                 .font(.caption)
                 .foregroundStyle(.tertiary)
 

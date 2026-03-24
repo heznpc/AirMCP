@@ -45,20 +45,20 @@ final class ServicesProvider: NSObject, @unchecked Sendable {
     /// Save selected text as a new Apple Note.
     @objc func saveToNotes(_ pboard: NSPasteboard, userData: String, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
         guard let text = pboard.string(forType: .string), !text.isEmpty else {
-            error.pointee = "No text selected" as NSString
+            error.pointee = L("services.noText") as NSString
             return
         }
 
         let escaped = escapeForAppleScript(text)
         let script = """
         tell application "Notes"
-            make new note at folder "Notes" with properties {name:"AirMCP — Saved Text", body:"\(escaped)"}
+            make new note at folder "Notes" with properties {name:"\(L("services.savedNoteTitle"))", body:"\(escaped)"}
         end tell
         """
 
         runAppleScript(script) { [weak self] in
             DispatchQueue.main.async {
-                self?.postNotification(title: "AirMCP", body: "Failed to save note")
+                self?.postNotification(title: "AirMCP", body: L("services.saveNoteFailed"))
             }
         }
     }
@@ -66,7 +66,7 @@ final class ServicesProvider: NSObject, @unchecked Sendable {
     /// Create a reminder from selected text.
     @objc func createReminder(_ pboard: NSPasteboard, userData: String, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
         guard let text = pboard.string(forType: .string), !text.isEmpty else {
-            error.pointee = "No text selected" as NSString
+            error.pointee = L("services.noText") as NSString
             return
         }
 
@@ -85,7 +85,7 @@ final class ServicesProvider: NSObject, @unchecked Sendable {
     /// Search AirMCP semantic index with selected text.
     @objc func searchAirMCP(_ pboard: NSPasteboard, userData: String, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
         guard let text = pboard.string(forType: .string), !text.isEmpty else {
-            error.pointee = "No text selected" as NSString
+            error.pointee = L("services.noText") as NSString
             return
         }
 
@@ -93,9 +93,9 @@ final class ServicesProvider: NSObject, @unchecked Sendable {
         pb.clearContents()
         pb.setString("airmcp-search:\(text)", forType: .string)
 
-        let body = "Search query set: \(String(text.prefix(50)))..."
+        let body = L("services.searchQuery", String(text.prefix(50)))
         DispatchQueue.main.async { [weak self] in
-            self?.postNotification(title: "AirMCP Search", body: body)
+            self?.postNotification(title: L("services.searchTitle"), body: body)
         }
     }
 }

@@ -22,9 +22,9 @@ final class SetupManager {
     var progressLabel: String? {
         switch state {
         case .idle: return nil
-        case .step(let n, let msg): return "Step \(n)/3: \(msg)"
-        case .done: return "Ready! Paste config in Claude Desktop to connect."
-        case .failed(let msg): return "Setup failed: \(msg)"
+        case .step(let n, let msg): return L("setup.step", n) + msg
+        case .done: return L("setup.done")
+        case .failed(let msg): return L("setup.failed", msg)
         }
     }
 
@@ -34,7 +34,7 @@ final class SetupManager {
     ) {
         guard !isRunning else { return }
 
-        state = .step(1, "Setting up permissions...")
+        state = .step(1, L("setup.permissions"))
 
         Task { [weak self] in
             // Step 1: Permissions
@@ -47,7 +47,7 @@ final class SetupManager {
 
             // Step 2: Start server
             await MainActor.run {
-                self?.state = .step(2, "Starting server...")
+                self?.state = .step(2, L("setup.startingServer"))
             }
 
             serverManager.startServer()
@@ -62,7 +62,7 @@ final class SetupManager {
 
             // Step 3: Copy config
             await MainActor.run {
-                self?.state = .step(3, "Copying Claude config...")
+                self?.state = .step(3, L("setup.copyingConfig"))
             }
 
             try? await Task.sleep(nanoseconds: 500_000_000)

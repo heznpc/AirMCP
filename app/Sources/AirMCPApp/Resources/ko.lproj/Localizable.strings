@@ -154,3 +154,39 @@
 "log.clear" = "지우기";
 "log.empty" = "로그 항목 없음";
 "log.emptyHint" = "서버를 시작하면 출력이 여기에 표시됩니다.";
+
+/* Server Status */
+"server.running" = "서버 실행 중";
+"server.stopped" = "서버 중지됨";
+"server.checking" = "확인 중...";
+
+/* Setup Wizard */
+"setup.step" = "단계 %d/3: ";
+"setup.done" = "준비 완료! Claude Desktop에 설정을 붙여넣어 연결하세요.";
+"setup.failed" = "설정 실패: %@";
+"setup.permissions" = "권한 설정 중...";
+"setup.startingServer" = "서버 시작 중...";
+"setup.copyingConfig" = "Claude 설정 복사 중...";
+
+/* HITL Notifications */
+"hitl.destructiveAction" = "파괴적 작업";
+"hitl.toolConfirmation" = "도구 확인";
+"hitl.toolPrefix" = "도구: %@";
+"hitl.approve" = "승인";
+"hitl.deny" = "거부";
+
+/* Services Menu */
+"services.noText" = "선택된 텍스트 없음";
+"services.savedNoteTitle" = "AirMCP \u2014 저장된 텍스트";
+"services.saveNoteFailed" = "메모 저장 실패";
+"services.searchQuery" = "검색어 설정: %@...";
+"services.searchTitle" = "AirMCP 검색";
+
+/* Onboarding - Permissions */
+"onboarding.permAutomation" = "자동화";
+"onboarding.permAutomationDesc" = "요청 시 AirMCP가 앱을 제어하도록 허용";
+"onboarding.permAccessibility" = "손쉬운 사용 (선택)";
+"onboarding.permAccessibilityDesc" = "일부 시스템 모듈 기능에 필요";
+"onboarding.permNotifications" = "알림";
+"onboarding.permNotificationsDesc" = "승인 요청(HITL 확인)용";
+"onboarding.permRuntimeHint" = "런타임에 요청될 때 권한을 부여할 수도 있습니다.";

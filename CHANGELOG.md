@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] - 2026-03-26
+
+### Added
+- **Swift 6.2 upgrade** — all 3 packages (AirMCPKit, AirMCPServer, AirMCPApp) bumped to swift-tools-version 6.2
+- **42 unit tests** — XCTest suites for AirMCPKit (Types, ISO8601, EventKit recurrence, errors) and AirMCPServer (JSON-RPC parsing, AnyCodable, MCPServer dispatch)
+- **CI Swift pipeline** — `swift build` + `swift test` for both swift/ and ios/ packages in GitHub Actions
+- **Shared authorization helper** — extracted `authorize(store:flag:request:errorMessage:)` in EventKitService, eliminating copy-paste between event/reminder auth
+
+### Changed
+- **Concurrency safety** — `nonisolated(unsafe) var` authorization flags replaced with `OSAllocatedUnfairLock` for proper thread-safe access
+- **ISO 8601 formatters** — migrated from `nonisolated(unsafe)` `ISO8601DateFormatter` globals to cached `Date.ISO8601FormatStyle` (Sendable value type, no per-call allocation)
+- **ServicesProvider** — `@unchecked Sendable` replaced with `@MainActor` isolation
+- **FoundationModels guard** — `#if canImport(FoundationModels) && compiler(>=6.3)` prevents build failures on toolchains lacking the FoundationModelsMacros plugin
+- **iOS minimum version** — unified from iOS 16 to iOS 17, removing legacy `#available` branches for EventKit authorization
+- **`persistentMode`** — changed from `nonisolated(unsafe) var` to `let` (computed once from CLI args)
+- Safety rationale comments added to all `@unchecked Sendable` types (LocationFetcher, BluetoothManager, AnyCodable, ToolBox)
+
+### Fixed
+- SpeechService `sending` error (Swift 6.2 stricter data race checking)
+- `health-heart-rate` nil output — replaced `[String: Any?]` Encodable error with proper `HeartRateOutput` struct
+- HealthService `var readTypes` → `let` (unused mutation warning)
+
 ## [2.3.1] - 2026-03-21
 
 ### Fixed

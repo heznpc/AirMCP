@@ -4,7 +4,7 @@
 
 import Foundation
 
-#if canImport(FoundationModels)
+#if canImport(FoundationModels) && compiler(>=6.3)
 import FoundationModels
 
 // MARK: - Error types

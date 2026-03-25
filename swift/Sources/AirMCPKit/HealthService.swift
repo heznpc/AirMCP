@@ -53,7 +53,7 @@ public actor HealthService {
             throw AirMCPKitError.unsupported("HealthKit is not available on this device")
         }
 
-        var readTypes: Set<HKObjectType> = [
+        let readTypes: Set<HKObjectType> = [
             HKQuantityType.quantityType(forIdentifier: .stepCount)!,
             HKQuantityType.quantityType(forIdentifier: .heartRate)!,
             HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned)!,

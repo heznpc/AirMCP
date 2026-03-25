@@ -70,3 +70,19 @@ jobs:
 
       - name: Verify i18n
         run: node scripts/check-i18n.mjs
+
+      # Swift builds require Xcode toolchain (not CommandLineTools)
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: Swift — Build AirMCPKit
+        run: cd swift && swift build
+
+      - name: Swift — Test AirMCPKit
+        run: cd swift && swift test
+
+      - name: Swift — Build AirMCPServer (iOS)
+        run: cd ios && swift build
+
+      - name: Swift — Test AirMCPServer
+        run: cd ios && swift test

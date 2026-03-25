@@ -3,6 +3,7 @@
 
 import EventKit
 import Foundation
+import os
 
 public struct EventKitService: Sendable {
     public init() {}
@@ -46,38 +47,29 @@ public struct EventKitService: Sendable {
     }
 
     // MARK: - Cached stores (EKEventStore is thread-safe; reuse across calls)
+    // EKEventStore is documented thread-safe but doesn't conform to Sendable.
+    // nonisolated(unsafe) is the correct escape hatch for Apple framework singletons.
 
     nonisolated(unsafe) private static let sharedEventStore = EKEventStore()
     nonisolated(unsafe) private static let sharedReminderStore = EKEventStore()
 
-    // MARK: - Lazy authorization flags (avoid redundant permission prompts)
+    // MARK: - Thread-safe authorization flags (OSAllocatedUnfairLock)
 
-    /// Cached authorization state so we only prompt the user once per process lifetime.
-    /// EventKit has no read-only API for calendar events (TN3153); `requestFullAccessToEvents()`
-    /// is the minimum required even for read operations. We cache the result to avoid calling
-    /// the system authorization dialog on every operation.
-    nonisolated(unsafe) private static var eventsAuthorized = false
-    nonisolated(unsafe) private static var remindersAuthorized = false
+    /// Cached authorization state — prompt the user once per process lifetime.
+    private static let eventsAuthorized = OSAllocatedUnfairLock(initialState: false)
+    private static let remindersAuthorized = OSAllocatedUnfairLock(initialState: false)
 
-    // MARK: - EventKit authorization helper
+    // MARK: - EventKit authorization helpers
 
     /// Returns the shared event store after ensuring calendar access has been granted.
-    /// Note: EventKit does not offer a read-only access API for calendar events (per Apple
-    /// TN3153, iOS 17+ / macOS 14+). `requestFullAccessToEvents()` is the minimum permission
-    /// level required for both reading and writing calendar data.
+    /// EventKit requires `requestFullAccessToEvents()` even for read operations (TN3153).
     private func authorizedEventStore() async throws -> EKEventStore {
-        let store = Self.sharedEventStore
-        if !Self.eventsAuthorized {
-            let granted: Bool
-            if #available(macOS 14.0, iOS 17.0, *) {
-                granted = try await store.requestFullAccessToEvents()
-            } else {
-                granted = try await store.requestAccess(to: .event)
-            }
-            guard granted else { throw AirMCPKitError.permissionDenied("Calendar access denied") }
-            Self.eventsAuthorized = true
-        }
-        return store
+        try await authorize(
+            store: Self.sharedEventStore,
+            flag: Self.eventsAuthorized,
+            request: { try await $0.requestFullAccessToEvents() },
+            errorMessage: "Calendar access denied"
+        )
     }
 
     // MARK: - Calendar CRUD
@@ -351,20 +343,27 @@ public struct EventKitService: Sendable {
 
     // MARK: - Reminder authorization helper
 
-    /// Returns the shared reminder store after ensuring reminder access has been granted.
-    /// Uses `requestFullAccessToReminders()` on macOS 14+ / iOS 17+ (the only available API),
-    /// with a cached flag to skip redundant authorization requests after the first grant.
     private func authorizedReminderStore() async throws -> EKEventStore {
-        let store = Self.sharedReminderStore
-        if !Self.remindersAuthorized {
-            let granted: Bool
-            if #available(macOS 14.0, iOS 17.0, *) {
-                granted = try await store.requestFullAccessToReminders()
-            } else {
-                granted = try await store.requestAccess(to: .reminder)
-            }
-            guard granted else { throw AirMCPKitError.permissionDenied("Reminders access denied") }
-            Self.remindersAuthorized = true
+        try await authorize(
+            store: Self.sharedReminderStore,
+            flag: Self.remindersAuthorized,
+            request: { try await $0.requestFullAccessToReminders() },
+            errorMessage: "Reminders access denied"
+        )
+    }
+
+    /// Shared authorization logic for EventKit stores.
+    private func authorize(
+        store: EKEventStore,
+        flag: OSAllocatedUnfairLock<Bool>,
+        request: (EKEventStore) async throws -> Bool,
+        errorMessage: String
+    ) async throws -> EKEventStore {
+        let isAuthorized = flag.withLock { $0 }
+        if !isAuthorized {
+            let granted = try await request(store)
+            guard granted else { throw AirMCPKitError.permissionDenied(errorMessage) }
+            flag.withLock { $0 = true }
         }
         return store
     }
@@ -375,6 +374,7 @@ public struct EventKitService: Sendable {
     private func fetchRemindersAsync(store: EKEventStore, matching predicate: NSPredicate) async -> [EKReminder] {
         await withCheckedContinuation { continuation in
             _ = store.fetchReminders(matching: predicate) { reminders in
+                // EKReminder is not Sendable; safe because continuation is resumed once.
                 nonisolated(unsafe) let result = reminders ?? []
                 continuation.resume(returning: result)
             }

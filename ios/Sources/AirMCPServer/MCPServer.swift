@@ -38,6 +38,8 @@ public struct MCPToolResult: Sendable {
 }
 
 // MARK: - Tool Box (type-erased wrapper)
+// @unchecked Sendable: all fields are immutable after init. The `[String: Any]`
+// inputSchema and closure capture prevent automatic Sendable inference.
 
 struct ToolBox: @unchecked Sendable {
     let name: String

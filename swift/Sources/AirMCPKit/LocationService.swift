@@ -3,6 +3,8 @@
 import Foundation
 import CoreLocation
 
+/// @unchecked Sendable is safe: all mutable state (`continuation`, `manager`) is
+/// synchronized through `queue` (serial DispatchQueue). NSObject inheritance prevents actor usage.
 public class LocationFetcher: NSObject, CLLocationManagerDelegate, @unchecked Sendable {
     private var continuation: CheckedContinuation<CLLocation, Error>?
     private var manager: CLLocationManager?

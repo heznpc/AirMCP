@@ -19,11 +19,12 @@ MCP server for the entire Apple ecosystem — Notes, Reminders, Calendar, Contac
 - **262 tools** (25 modules) — Apple app CRUD + system control + Apple Intelligence + UI Automation + Screen Capture + Maps + Podcasts + Weather + iWork (Pages/Numbers/Keynote) + Google Workspace + dynamic shortcuts
 - **32 prompts** — per-app workflows (notes, calendar, reminders, shortcuts) + cross-module + developer workflows + YAML skills
 - **11 MCP resources** — Notes, Calendar, Reminders, Music, Mail, System live data URIs
-- **JXA + Swift bridge** — JXA for basic automation, EventKit/PhotoKit for advanced features
+- **JXA + Swift 6.2 bridge** — JXA for basic automation, Swift 6 strict concurrency with EventKit/PhotoKit for advanced features
 - **Recurring events/reminders** — EventKit recurrence rules (macOS 26+ Swift bridge)
 - **Photo import/delete** — PhotoKit photo management (macOS 26+ Swift bridge)
 - **Apple Intelligence** — On-device summarize, rewrite, proofread (macOS 26+)
 - **Native menubar app** — SwiftUI companion with onboarding wizard, auto-start, log viewer, update notifications, permission setup
+- **42 Swift unit tests** — XCTest suites for AirMCPKit (types, formatting, recurrence) and AirMCPServer (JSON-RPC, MCP dispatch)
 - **One-click setup** — `setup_permissions` tool or menubar app to request all macOS permissions at once
 - **Dual transport** — stdio (default, safe local) + HTTP/SSE (`--http`) for remote agents and registries
 - **Safety annotations** — readOnly/destructive hints on all tools

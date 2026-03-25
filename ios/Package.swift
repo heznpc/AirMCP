@@ -1,4 +1,4 @@
-// swift-tools-version: 6.1
+// swift-tools-version: 6.2
 
 import PackageDescription
 
@@ -28,6 +28,11 @@ let package = Package(
                 "AirMCPServer",
             ],
             path: "Sources/AirMCPiOS"
+        ),
+        .testTarget(
+            name: "AirMCPServerTests",
+            dependencies: ["AirMCPServer"],
+            path: "Tests/AirMCPServerTests"
         ),
     ]
 )

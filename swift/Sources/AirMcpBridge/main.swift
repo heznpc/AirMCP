@@ -20,13 +20,14 @@ import ImagePlayground
 //   Single-shot: AirMcpBridge <command>       (reads JSON from stdin, writes result, exits)
 //   Persistent:  AirMcpBridge --persistent    (newline-delimited JSON-RPC, keeps process alive)
 
-#if canImport(FoundationModels)
+#if canImport(FoundationModels) && compiler(>=6.3)
 import FoundationModels
 #endif
 
 // MARK: - Persistent mode state
 
-nonisolated(unsafe) var persistentMode = false
+let persistentMode = CommandLine.arguments.contains("--persistent")
+/// Mutated per-request in the serial main loop; single-threaded access only.
 nonisolated(unsafe) var currentRequestId: String? = nil
 
 // MARK: - Shared types
@@ -150,6 +151,7 @@ struct ScanDocumentOutput: Encodable { let elements: [DocumentElement]; let tota
 struct LocationPermissionOutput: Encodable { let status: String; let authorized: Bool }
 struct TranscribeInput: Decodable { let path: String; let language: String? }
 struct SpeechAvailabilityOutput: Encodable { let available: Bool; let supportsOnDevice: Bool }
+struct HeartRateOutput: Encodable { let heartRateAvg7d: Double?; let message: String? }
 struct CloudSyncInput: Decodable { let frequency: [String: Int]?; let sequences: [String: Int]?; let disabledModules: [String]? }
 
 private let embeddingService = EmbeddingService()
@@ -161,14 +163,14 @@ private let healthService = HealthService()
 #endif
 private let eventObserver = EventObserver()
 
-#if canImport(FoundationModels)
+#if canImport(FoundationModels) && compiler(>=6.3)
 @available(macOS 26, iOS 26, *)
 private let foundationBridge = FoundationModelsBridge()
 #endif
 
 // MARK: - Foundation Models guard helper
 
-#if canImport(FoundationModels)
+#if canImport(FoundationModels) && compiler(>=6.3)
 /// Execute a closure that requires Foundation Models, with standardized error handling.
 @available(macOS 26, iOS 26, *)
 func runFoundationModels(_ body: () async throws -> Void) async {
@@ -817,7 +819,7 @@ case "summarize", "rewrite", "proofread":
         writeError("Invalid JSON input. Expected: {\"text\": \"...\", \"tone\": \"...\"}")
         return
     }
-    #if canImport(FoundationModels)
+    #if canImport(FoundationModels) && compiler(>=6.3)
     if #available(macOS 26, *) { await runFoundationModels {
         let session = LanguageModelSession()
         let prompt: String
@@ -840,7 +842,7 @@ case "generate-text":
         writeError("Invalid JSON. Expected GenerateTextInput.")
         return
     }
-    #if canImport(FoundationModels)
+    #if canImport(FoundationModels) && compiler(>=6.3)
     if #available(macOS 26, *) { await runFoundationModels {
         let session = LanguageModelSession(instructions: genInput.systemInstruction ?? "You are a helpful assistant.")
         let result = try await session.respond(to: genInput.prompt)
@@ -856,7 +858,7 @@ case "generate-structured":
         writeError("Invalid JSON. Expected GenerateStructuredInput.")
         return
     }
-    #if canImport(FoundationModels)
+    #if canImport(FoundationModels) && compiler(>=6.3)
     if #available(macOS 26, *) { await runFoundationModels {
         let session = LanguageModelSession(instructions: structInput.systemInstruction ?? "You are a helpful assistant. Respond with valid JSON only.")
         let prompt: String
@@ -883,7 +885,7 @@ case "tag-content":
         writeError("Invalid JSON. Expected TagContentInput.")
         return
     }
-    #if canImport(FoundationModels)
+    #if canImport(FoundationModels) && compiler(>=6.3)
     if #available(macOS 26, *) { await runFoundationModels {
         let tagList = tagInput.tags.joined(separator: ", ")
         let session = LanguageModelSession(instructions: "You are a content classification system. Classify text into the provided categories. Respond with ONLY a JSON object mapping each applicable tag to a confidence score between 0.0 and 1.0.")
@@ -904,7 +906,7 @@ case "ai-chat":
         writeError("Invalid JSON. Expected AiChatInput.")
         return
     }
-    #if canImport(FoundationModels)
+    #if canImport(FoundationModels) && compiler(>=6.3)
     if #available(macOS 26, *) { await runFoundationModels {
         let session = LanguageModelSession(instructions: chatInput.systemInstruction ?? "You are a helpful on-device AI assistant.")
         let result = try await session.respond(to: chatInput.message)
@@ -928,7 +930,7 @@ case "ai-status":
     let hasAppleSilicon = false
     #endif
 
-    #if canImport(FoundationModels)
+    #if canImport(FoundationModels) && compiler(>=6.3)
     let fmSupported = true
     let available = hasAppleSilicon && osVersion.majorVersion >= 26
     let message: String
@@ -1363,7 +1365,7 @@ case "health-heart-rate":
         if let avg {
             try writeJSON(["heartRateAvg7d": round(avg * 10) / 10])
         } else {
-            try writeJSON(["heartRateAvg7d": nil as Double?, "message": "No heart rate data for the last 7 days"] as [String: Any?])
+            try writeJSON(HeartRateOutput(heartRateAvg7d: nil, message: "No heart rate data for the last 7 days"))
         }
     } catch {
         writeError("Failed to get heart rate: \(error.localizedDescription)")
@@ -1416,7 +1418,7 @@ case "pasteboard-smart":
 
 // --- Foundation Models: AI Agent (on-device LLM + AirMCP tools) ---
 case "ai-agent":
-    #if canImport(FoundationModels)
+    #if canImport(FoundationModels) && compiler(>=6.3)
     if #available(macOS 26, iOS 26, *) {
         guard let input = try? JSONDecoder().decode(Input.self, from: stdinData) else {
             writeError("Invalid JSON. Expected {\"text\":\"...\"}")
@@ -1515,10 +1517,9 @@ default:
 
 let args = CommandLine.arguments
 
-if args.contains("--persistent") {
+if persistentMode {
     // Persistent mode: read newline-delimited JSON requests, dispatch, respond.
     // Process stays alive — frameworks, models, and caches persist between calls.
-    persistentMode = true
 
     // Signal readiness
     let ready: [String: Any] = ["id": "__ready__", "result": ["status": "ok"]]

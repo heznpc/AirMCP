@@ -64,6 +64,8 @@ public struct JSONRPCError: Encodable, Sendable {
 }
 
 // MARK: - AnyCodable (minimal, type-erased wrapper)
+// @unchecked Sendable: wraps `Any` for JSON-RPC flexibility.
+// Values are immutable after init; the type erasure prevents compiler verification.
 
 public struct AnyCodable: Codable, @unchecked Sendable {
     public let value: Any

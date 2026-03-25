@@ -1,10 +1,10 @@
-// swift-tools-version: 6.1
+// swift-tools-version: 6.2
 
 import PackageDescription
 
 let package = Package(
     name: "AirMcpBridge",
-    platforms: [.macOS(.v14), .iOS(.v16)],
+    platforms: [.macOS(.v14), .iOS(.v17)],
     products: [
         .library(name: "AirMCPKit", targets: ["AirMCPKit"]),
     ],
@@ -17,6 +17,11 @@ let package = Package(
             name: "AirMcpBridge",
             dependencies: ["AirMCPKit"],
             path: "Sources/AirMcpBridge"
+        ),
+        .testTarget(
+            name: "AirMCPKitTests",
+            dependencies: ["AirMCPKit"],
+            path: "Tests/AirMCPKitTests"
         ),
     ]
 )

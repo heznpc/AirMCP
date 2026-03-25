@@ -10,7 +10,7 @@ final class UpdateManager {
 
     private var timer: Timer?
     private static let checkInterval: TimeInterval = 3600 // 1 hour
-    private let currentVersion = "2.4.2"
+    private let currentVersion = "2.5.0"
 
     var currentVersionString: String { currentVersion }
 
@@ -37,7 +37,7 @@ final class UpdateManager {
         Task {
             let latest = await Self.fetchLatestVersion()
             guard let latest else { return }
-            if latest != currentVersion && Self.isNewer(latest, than: currentVersion) {
+            if Self.isNewer(latest, than: currentVersion) {
                 availableVersion = latest
             } else {
                 availableVersion = nil
@@ -130,7 +130,6 @@ final class UpdateManager {
     private static func isNewer(_ a: String, than b: String) -> Bool {
         let aParts = a.split(separator: ".").compactMap { Int($0) }
         let bParts = b.split(separator: ".").compactMap { Int($0) }
-
         for i in 0..<max(aParts.count, bParts.count) {
             let av = i < aParts.count ? aParts[i] : 0
             let bv = i < bParts.count ? bParts[i] : 0

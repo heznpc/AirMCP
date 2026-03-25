@@ -52,7 +52,10 @@ public actor SpeechService {
                     cont.resume(throwing: error)
                 } else if let result = result, result.isFinal {
                     resumed = true
-                    cont.resume(returning: result)
+                    // SFSpeechRecognitionResult is not Sendable; safe here because
+                    // the continuation is only resumed once and the value is consumed immediately.
+                    nonisolated(unsafe) let safeResult = result
+                    cont.resume(returning: safeResult)
                 }
             }
         }

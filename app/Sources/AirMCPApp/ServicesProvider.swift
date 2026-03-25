@@ -4,7 +4,9 @@ import UserNotifications
 
 /// macOS Services provider — adds AirMCP actions to the system-wide Services menu.
 /// Available via right-click → Services in any app when text is selected.
-final class ServicesProvider: NSObject, @unchecked Sendable {
+/// @MainActor because all @objc service callbacks are invoked on the main thread.
+@MainActor
+final class ServicesProvider: NSObject {
 
     /// Escape a string for safe interpolation into an AppleScript string literal.
     private func escapeForAppleScript(_ str: String) -> String {
@@ -23,7 +25,7 @@ final class ServicesProvider: NSObject, @unchecked Sendable {
     }
 
     /// Run an AppleScript string on a background queue.
-    private func runAppleScript(_ source: String, onError: (@Sendable () -> Void)? = nil) {
+    private nonisolated func runAppleScript(_ source: String, onError: (@Sendable () -> Void)? = nil) {
         DispatchQueue.global(qos: .userInitiated).async {
             var appleScriptError: NSDictionary?
             if let appleScript = NSAppleScript(source: source) {

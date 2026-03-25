@@ -49,6 +49,8 @@ public struct BluetoothConnectOutput: Encodable, Sendable {
 
 // MARK: - Manager
 
+/// @unchecked Sendable is safe: all mutable state is synchronized through `btQueue`
+/// (serial DispatchQueue). NSObject + CBCentralManagerDelegate requires class inheritance.
 public class BluetoothManager: NSObject, CBCentralManagerDelegate, @unchecked Sendable {
     private var stateContinuation: CheckedContinuation<CBManagerState, Never>?
     private var connectContinuation: CheckedContinuation<Bool, Error>?

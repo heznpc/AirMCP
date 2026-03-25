@@ -4,7 +4,10 @@
 
 import Foundation
 
-#if canImport(FoundationModels)
+// FoundationModels requires the macro plugin (FoundationModelsMacros) which ships
+// with Xcode 26+/Swift 6.3+. The `compiler(>=6.3)` guard prevents build failures on
+// toolchains that have the SDK headers but lack the macro binary (e.g. Swift 6.2.x).
+#if canImport(FoundationModels) && compiler(>=6.3)
 import FoundationModels
 
 // MARK: - AirMCP Tools for Foundation Models

@@ -15,6 +15,15 @@
       "transport": {
         "type": "stdio"
       }
+    },
+    {
+      "registryType": "npm",
+      "identifier": "airmcp",
+      "version": "2.5.1",
+      "transport": {
+        "type": "http",
+        "args": ["--http"]
+      }
     }
   ]
 }

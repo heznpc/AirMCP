@@ -48,6 +48,9 @@
     "url": "https://github.com/heznpc/AirMCP.git"
   },
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "author": "heznpc",
   "mcpName": "io.github.heznpc/airmcp",
   "type": "module",

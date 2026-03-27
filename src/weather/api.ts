@@ -39,8 +39,15 @@ function describeWeatherCode(code: number): string {
   return WEATHER_CODES[code] ?? `Unknown (code ${code})`;
 }
 
+/** Open-Meteo API response — fields vary by query parameters. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function fetchOpenMeteo(latitude: number, longitude: number, extra: Record<string, string>): Promise<any> {
+type OpenMeteoResponse = Record<string, any>;
+
+async function fetchOpenMeteo(
+  latitude: number,
+  longitude: number,
+  extra: Record<string, string>,
+): Promise<OpenMeteoResponse> {
   const params = new URLSearchParams({
     latitude: String(latitude),
     longitude: String(longitude),
@@ -51,7 +58,7 @@ async function fetchOpenMeteo(latitude: number, longitude: number, extra: Record
     signal: AbortSignal.timeout(TIMEOUT.GEOCODE),
   });
   if (!res.ok) throw new Error(`Open-Meteo API error: ${res.status} ${res.statusText}`);
-  return res.json();
+  return (await res.json()) as OpenMeteoResponse;
 }
 
 export async function fetchCurrentWeather(latitude: number, longitude: number) {

@@ -25,6 +25,16 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
       title: "List Safari Tabs",
       description: "List all open tabs across all Safari windows with title and URL.",
       inputSchema: {},
+      outputSchema: {
+        tabs: z.array(
+          z.object({
+            windowIndex: z.number(),
+            tabIndex: z.number(),
+            title: z.string(),
+            url: z.string(),
+          }),
+        ),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async () => {
@@ -70,6 +80,10 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
       title: "Get Current Tab",
       description: "Get the title and URL of the active Safari tab.",
       inputSchema: {},
+      outputSchema: {
+        title: z.string(),
+        url: z.string(),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async () => {

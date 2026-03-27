@@ -45,6 +45,15 @@ export function registerFinderTools(server: McpServer, _config: AirMcpConfig): v
       inputSchema: {
         path: zFilePath.describe("Absolute file path"),
       },
+      outputSchema: {
+        path: z.string(),
+        name: z.string(),
+        kind: z.string(),
+        size: z.number(),
+        creationDate: z.string(),
+        modificationDate: z.string(),
+        tags: z.array(z.string()),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ path }) => {

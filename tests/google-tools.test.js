@@ -72,3 +72,72 @@ describe('Google Workspace tools registration', () => {
     }
   });
 });
+
+describe('gws_raw security whitelist', () => {
+  let server;
+
+  beforeAll(() => {
+    server = createMockServer();
+    registerGoogleTools(server, { allowSendMail: false });
+  });
+
+  test('rejects unknown service', async () => {
+    const result = await server.callTool('gws_raw', {
+      service: 'malicious_service', resource: 'foo', method: 'list',
+    });
+    expect(result.content[0].text).toContain('Unknown service');
+    expect(result.content[0].text).toContain('malicious_service');
+  });
+
+  test('allows known services', async () => {
+    const { runGws } = await import('../dist/google/gws.js');
+    runGws.mockResolvedValue({ ok: true });
+
+    const result = await server.callTool('gws_raw', {
+      service: 'gmail', resource: 'users.messages', method: 'list',
+    });
+    expect(result.content[0].text).not.toContain('Unknown service');
+  });
+
+  test('blocks destructive methods when allowSendMail is false', async () => {
+    for (const method of ['delete', 'trash', 'remove', 'purge']) {
+      const result = await server.callTool('gws_raw', {
+        service: 'drive', resource: 'files', method,
+      });
+      expect(result.content[0].text).toContain('Destructive method');
+      expect(result.content[0].text).toContain(method);
+    }
+  });
+
+  test('blocks gmail send when allowSendMail is false', async () => {
+    const result = await server.callTool('gws_raw', {
+      service: 'gmail', resource: 'users.messages', method: 'send',
+    });
+    expect(result.content[0].text).toContain('disabled');
+  });
+
+  test('allows destructive methods when allowSendMail is true', async () => {
+    const permissiveServer = createMockServer();
+    registerGoogleTools(permissiveServer, { allowSendMail: true });
+
+    const { runGws } = await import('../dist/google/gws.js');
+    runGws.mockResolvedValue({ deleted: true });
+
+    const result = await permissiveServer.callTool('gws_raw', {
+      service: 'drive', resource: 'files', method: 'delete',
+    });
+    expect(result.content[0].text).not.toContain('Destructive method');
+  });
+
+  test('allows non-destructive methods freely', async () => {
+    const { runGws } = await import('../dist/google/gws.js');
+    runGws.mockResolvedValue({ items: [] });
+
+    for (const method of ['list', 'get', 'create', 'update']) {
+      const result = await server.callTool('gws_raw', {
+        service: 'sheets', resource: 'spreadsheets', method,
+      });
+      expect(result.content[0].text).not.toContain('Destructive method');
+    }
+  });
+});

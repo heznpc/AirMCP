@@ -26,6 +26,15 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
       title: "List Mailboxes",
       description: "List all mailboxes across accounts with unread counts.",
       inputSchema: {},
+      outputSchema: {
+        mailboxes: z.array(
+          z.object({
+            name: z.string(),
+            account: z.string(),
+            unreadCount: z.number(),
+          }),
+        ),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async () => {
@@ -154,6 +163,16 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
       title: "Get Unread Count",
       description: "Get unread message count across all mailboxes.",
       inputSchema: {},
+      outputSchema: {
+        totalUnread: z.number(),
+        mailboxes: z.array(
+          z.object({
+            account: z.string(),
+            mailbox: z.string(),
+            unread: z.number(),
+          }),
+        ),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async () => {

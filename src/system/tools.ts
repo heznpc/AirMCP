@@ -55,6 +55,11 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       title: "Get Clipboard",
       description: "Read the current text content of the system clipboard.",
       inputSchema: {},
+      outputSchema: {
+        content: z.string(),
+        length: z.number(),
+        truncated: z.boolean(),
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -84,6 +89,10 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       inputSchema: {
         text: z.string().describe("Text to copy to the clipboard"),
       },
+      outputSchema: {
+        set: z.boolean(),
+        length: z.number(),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -106,6 +115,11 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       title: "Get Volume",
       description: "Get the current system output volume level and mute state.",
       inputSchema: {},
+      outputSchema: {
+        outputVolume: z.number(),
+        inputVolume: z.number(),
+        outputMuted: z.boolean(),
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -131,6 +145,10 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
         volume: z.number().min(0).max(100).optional().describe("Output volume level (0-100)"),
         muted: z.boolean().optional().describe("Whether to mute output audio"),
       },
+      outputSchema: {
+        outputVolume: z.number(),
+        outputMuted: z.boolean(),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -153,6 +171,9 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       title: "Toggle Dark Mode",
       description: "Toggle macOS appearance between dark mode and light mode.",
       inputSchema: {},
+      outputSchema: {
+        darkMode: z.boolean(),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -175,6 +196,11 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       title: "Get Frontmost App",
       description: "Get the name, bundle identifier, and PID of the currently active (frontmost) application.",
       inputSchema: {},
+      outputSchema: {
+        name: z.string(),
+        bundleIdentifier: z.string(),
+        pid: z.number(),
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,

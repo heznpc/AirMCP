@@ -21,8 +21,7 @@ export async function fetchGeocode(query: string, count = 5) {
   const params = new URLSearchParams({ name: query, count: String(count), language: "en", format: "json" });
   const res = await fetch(`${GEOCODE_URL}?${params}`, { signal: AbortSignal.timeout(TIMEOUT.GEOCODE) });
   if (!res.ok) throw new Error(`Geocoding API error: ${res.status} ${res.statusText}`);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const data: any = await res.json();
+  const data = (await res.json()) as { results?: Record<string, unknown>[] };
   const results = (data.results ?? []).map((r: Record<string, unknown>) => ({
     name: r.name,
     latitude: r.latitude,
@@ -45,8 +44,14 @@ export async function fetchReverseGeocode(latitude: number, longitude: number) {
     signal: AbortSignal.timeout(TIMEOUT.GEOCODE),
   });
   if (!res.ok) throw new Error(`Reverse geocoding error: ${res.status} ${res.statusText}`);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const data: any = await res.json();
+  const data = (await res.json()) as {
+    error?: string;
+    name?: string;
+    display_name?: string;
+    lat: string;
+    lon: string;
+    address?: Record<string, string>;
+  };
   if (data.error) throw new Error(`Reverse geocoding: ${data.error}`);
   const addr = data.address ?? {};
   return {

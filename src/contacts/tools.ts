@@ -93,6 +93,13 @@ interface GroupMembersResult {
   contacts: ContactSummary[];
 }
 
+const zContactSummary = z.object({
+  id: z.string(),
+  name: z.string(),
+  email: z.string().nullable(),
+  phone: z.string().nullable(),
+});
+
 export function registerContactTools(server: McpServer, _config: AirMcpConfig): void {
   server.registerTool(
     "list_contacts",
@@ -102,6 +109,12 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
       inputSchema: {
         limit: z.number().int().min(1).max(1000).optional().default(100).describe("Max contacts (default: 100)"),
         offset: z.number().int().min(0).optional().default(0).describe("Skip N contacts (default: 0)"),
+      },
+      outputSchema: {
+        total: z.number(),
+        offset: z.number(),
+        returned: z.number(),
+        contacts: z.array(zContactSummary),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
@@ -127,6 +140,20 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
         query: z.string().describe("Search keyword (matches name)"),
         limit: z.number().int().min(1).max(500).optional().default(50).describe("Max results (default: 50)"),
       },
+      outputSchema: {
+        total: z.number(),
+        returned: z.number(),
+        contacts: z.array(
+          z.object({
+            id: z.string(),
+            name: z.string(),
+            organization: z.string().nullable(),
+            email: z.string().nullable(),
+            phone: z.string().nullable(),
+            matchedField: z.string(),
+          }),
+        ),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ query, limit }) => {
@@ -149,6 +176,28 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
       description: "Read full details of a contact by ID including all emails, phones, and addresses.",
       inputSchema: {
         id: z.string().describe("Contact ID"),
+      },
+      outputSchema: {
+        id: z.string(),
+        name: z.string(),
+        firstName: z.string(),
+        lastName: z.string(),
+        organization: z.string().nullable(),
+        jobTitle: z.string().nullable(),
+        department: z.string().nullable(),
+        note: z.string().nullable(),
+        emails: z.array(z.object({ value: z.string(), label: z.string() })),
+        phones: z.array(z.object({ value: z.string(), label: z.string() })),
+        addresses: z.array(
+          z.object({
+            street: z.string(),
+            city: z.string(),
+            state: z.string(),
+            zip: z.string(),
+            country: z.string(),
+            label: z.string(),
+          }),
+        ),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
@@ -327,6 +376,12 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
       inputSchema: {
         groupName: z.string().describe("Group name"),
         limit: z.number().int().min(1).max(1000).optional().default(100).describe("Max contacts (default: 100)"),
+      },
+      outputSchema: {
+        group: z.string(),
+        total: z.number(),
+        returned: z.number(),
+        contacts: z.array(zContactSummary),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },

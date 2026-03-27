@@ -67,6 +67,18 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
       title: "Now Playing",
       description: "Get the currently playing track and playback state.",
       inputSchema: {},
+      outputSchema: {
+        playerState: z.string(),
+        track: z
+          .object({
+            name: z.string(),
+            artist: z.string(),
+            album: z.string(),
+            duration: z.number(),
+            playerPosition: z.number(),
+          })
+          .nullable(),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async () => {

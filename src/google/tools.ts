@@ -10,6 +10,24 @@ import type { AirMcpConfig } from "../shared/config.js";
 import { ok, okUntrusted, err } from "../shared/result.js";
 import { runGws, checkGws } from "./gws.js";
 
+// ── Allowed services & methods for gws_raw ──────────────────────────
+const GWS_ALLOWED_SERVICES = new Set([
+  "gmail",
+  "drive",
+  "sheets",
+  "calendar",
+  "docs",
+  "slides",
+  "tasks",
+  "chat",
+  "forms",
+  "keep",
+  "people",
+]);
+
+const GWS_DESTRUCTIVE_METHODS = new Set(["delete", "trash", "remove", "purge"]);
+const GWS_ALLOWED_LIST = [...GWS_ALLOWED_SERVICES].join(", ");
+
 export function registerGoogleTools(server: McpServer, config: AirMcpConfig): void {
   const { allowSendMail } = config;
   // ── Status ─────────────────────────────────────────────────────────
@@ -436,12 +454,7 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
       description:
         "Execute any Google Workspace CLI command. For advanced use when specific tools don't cover your need.",
       inputSchema: {
-        service: z
-          .string()
-          .min(1)
-          .describe(
-            "Service name (e.g. 'gmail', 'drive', 'sheets', 'calendar', 'docs', 'slides', 'tasks', 'chat', 'forms', 'keep')",
-          ),
+        service: z.string().min(1).describe(`Service name. Allowed: ${GWS_ALLOWED_LIST}`),
         resource: z.string().min(1).describe("Resource (e.g. 'users.messages', 'files', 'spreadsheets.values')"),
         method: z.string().min(1).describe("Method (e.g. 'list', 'get', 'create', 'update', 'delete')"),
         params: z.record(z.unknown()).optional().describe("URL/query parameters as JSON"),
@@ -450,11 +463,27 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
     async ({ service, resource, method, params, body }) => {
-      if (service === "gmail" && (method === "send" || method === "delete" || method === "trash")) {
+      // Service whitelist — reject unknown services
+      if (!GWS_ALLOWED_SERVICES.has(service)) {
+        return err(`Unknown service "${service}". Allowed: ${GWS_ALLOWED_LIST}`);
+      }
+
+      // Block destructive methods unless explicitly allowed
+      if (GWS_DESTRUCTIVE_METHODS.has(method)) {
         if (!allowSendMail) {
-          return err("Gmail send/delete is disabled. Set AIRMCP_ALLOW_SEND_MAIL=true.");
+          return err(
+            `Destructive method "${method}" is disabled. Set AIRMCP_ALLOW_SEND_MAIL=true to enable delete/trash operations.`,
+          );
         }
       }
+
+      // "send" is not destructive but still requires opt-in (same gate as mail/messages)
+      if (service === "gmail" && method === "send") {
+        if (!allowSendMail) {
+          return err("Gmail send is disabled. Set AIRMCP_ALLOW_SEND_MAIL=true.");
+        }
+      }
+
       try {
         return ok(await runGws(service, resource, method, params, body));
       } catch (e) {

@@ -32,7 +32,7 @@ jest.unstable_mockModule('../dist/shared/audit.js', () => ({
 jest.unstable_mockModule('../dist/server/mcp-setup.js', () => ({
   createServer: jest.fn(async () => ({
     server: { connect: jest.fn(), close: jest.fn(), sendResourceListChanged: jest.fn() },
-    bannerInfo: { transport: 'http', version: '2.5.2' },
+    bannerInfo: { transport: 'http', version: '2.6.0' },
   })),
 }));
 

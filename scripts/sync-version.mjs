@@ -3,10 +3,12 @@
  * sync-version.mjs — Single source of truth version sync.
  *
  * Reads version from package.json and propagates to:
- *   1. server.json                          (MCP registry manifest)
+ *   1. server.json                          (MCP registry manifest — all packages)
  *   2. app/.../UpdateManager.swift          (menubar app update checker)
  *   3. src/shared/constants.ts              (User-Agent header)
  *   4. scripts/bundle-app.sh               (CFBundleShortVersionString)
+ *   5. docs/PRIVACY_POLICY.md              (version header)
+ *   6. .github/ISSUE_TEMPLATE/bug_report.yml (placeholder version)
  *
  * Usage:
  *   node scripts/sync-version.mjs           # sync all files
@@ -73,9 +75,11 @@ if (existsSync(serverJsonPath)) {
     sj.version = VERSION;
     sjChanged = true;
   }
-  if (sj.packages?.[0]?.version !== VERSION) {
-    sj.packages[0].version = VERSION;
-    sjChanged = true;
+  for (const pkg of sj.packages ?? []) {
+    if (pkg.version !== VERSION) {
+      pkg.version = VERSION;
+      sjChanged = true;
+    }
   }
   if (sjChanged) {
     if (checkMode) {
@@ -114,6 +118,24 @@ syncFile("scripts/bundle-app.sh", [
     pattern: /CFBundleShortVersionString string [\d.]+/,
     replacement: `CFBundleShortVersionString string ${VERSION}`,
     label: "CFBundleShortVersionString",
+  },
+]);
+
+// 5. PRIVACY_POLICY.md — AirMCP vX.Y.Z
+syncFile("docs/PRIVACY_POLICY.md", [
+  {
+    pattern: /AirMCP v[\d.]+/,
+    replacement: `AirMCP v${VERSION}`,
+    label: "privacy policy version",
+  },
+]);
+
+// 6. bug_report.yml — placeholder version
+syncFile(".github/ISSUE_TEMPLATE/bug_report.yml", [
+  {
+    pattern: /placeholder: "[\d.]+"/,
+    replacement: `placeholder: "${VERSION}"`,
+    label: "bug report placeholder",
   },
 ]);
 

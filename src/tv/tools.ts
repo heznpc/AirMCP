@@ -36,7 +36,7 @@ export function registerTvTools(server: McpServer, _config: AirMcpConfig): void 
       title: "List TV Tracks",
       description: "List movies/episodes in a TV playlist.",
       inputSchema: {
-        playlist: z.string().describe("Playlist name (e.g. 'Library', 'Movies')"),
+        playlist: z.string().max(500).describe("Playlist name (e.g. 'Library', 'Movies')"),
         limit: z.number().int().min(1).max(200).optional().default(50).describe("Max items (default: 50)"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -92,7 +92,7 @@ export function registerTvTools(server: McpServer, _config: AirMcpConfig): void 
       title: "Search TV Library",
       description: "Search movies and TV shows by name or show title.",
       inputSchema: {
-        query: z.string().describe("Search keyword"),
+        query: z.string().max(500).describe("Search keyword"),
         limit: z.number().int().min(1).max(100).optional().default(20).describe("Max results (default: 20)"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -112,7 +112,7 @@ export function registerTvTools(server: McpServer, _config: AirMcpConfig): void 
       title: "Play TV Content",
       description: "Play a movie or episode by name.",
       inputSchema: {
-        name: z.string().describe("Movie or episode name"),
+        name: z.string().max(500).describe("Movie or episode name"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },

@@ -122,7 +122,11 @@ export function registerApps(server: McpServer, opts: { calendar: boolean; music
         title: "Calendar Week View",
         description: "Display an interactive calendar week view showing events for a 7-day period.",
         inputSchema: {
-          startDate: z.string().optional().describe("Start date (YYYY-MM-DD). Defaults to current week's Monday."),
+          startDate: z
+            .string()
+            .max(64)
+            .optional()
+            .describe("Start date (YYYY-MM-DD). Defaults to current week's Monday."),
         },
         annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         _meta: { ui: { resourceUri: "ui://airmcp/calendar-week" } },

@@ -20,7 +20,7 @@ export function registerMapsTools(server: McpServer, _config: AirMcpConfig): voi
       title: "Search Location",
       description: "Search for a place or location in Apple Maps.",
       inputSchema: {
-        query: z.string().describe("Location or place to search for"),
+        query: z.string().max(500).describe("Location or place to search for"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
@@ -39,8 +39,8 @@ export function registerMapsTools(server: McpServer, _config: AirMcpConfig): voi
       title: "Get Directions",
       description: "Get directions between two locations in Apple Maps.",
       inputSchema: {
-        from: z.string().describe("Starting location or address"),
-        to: z.string().describe("Destination location or address"),
+        from: z.string().max(500).describe("Starting location or address"),
+        to: z.string().max(500).describe("Destination location or address"),
         transportType: z
           .enum(["driving", "walking", "transit"])
           .optional()
@@ -66,7 +66,7 @@ export function registerMapsTools(server: McpServer, _config: AirMcpConfig): voi
       inputSchema: {
         latitude: z.number().describe("Latitude coordinate"),
         longitude: z.number().describe("Longitude coordinate"),
-        label: z.string().optional().describe("Optional label for the pin"),
+        label: z.string().max(500).optional().describe("Optional label for the pin"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
@@ -85,7 +85,7 @@ export function registerMapsTools(server: McpServer, _config: AirMcpConfig): voi
       title: "Open Address",
       description: "Open a specific address in Apple Maps.",
       inputSchema: {
-        address: z.string().describe("Address to open in Maps"),
+        address: z.string().max(500).describe("Address to open in Maps"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
@@ -105,7 +105,7 @@ export function registerMapsTools(server: McpServer, _config: AirMcpConfig): voi
       description:
         "Search for places near a location in Apple Maps. If no coordinates are given, searches near the current location.",
       inputSchema: {
-        query: z.string().describe("What to search for (e.g. 'coffee shops', 'gas stations')"),
+        query: z.string().max(500).describe("What to search for (e.g. 'coffee shops', 'gas stations')"),
         latitude: z.number().optional().describe("Latitude of the center point"),
         longitude: z.number().optional().describe("Longitude of the center point"),
       },
@@ -128,7 +128,7 @@ export function registerMapsTools(server: McpServer, _config: AirMcpConfig): voi
       inputSchema: {
         latitude: z.number().describe("Latitude coordinate"),
         longitude: z.number().describe("Longitude coordinate"),
-        label: z.string().optional().describe("Optional label for the location"),
+        label: z.string().max(500).optional().describe("Optional label for the location"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },

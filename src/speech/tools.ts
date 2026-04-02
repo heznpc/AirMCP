@@ -12,7 +12,7 @@ export function registerSpeechTools(server: McpServer, _config: AirMcpConfig): v
       description:
         "Transcribe an audio file to text using Apple's on-device speech recognition. Supports most audio formats (m4a, mp3, wav, caf).",
       inputSchema: {
-        path: z.string().describe("Absolute path to the audio file"),
+        path: z.string().max(1000).describe("Absolute path to the audio file"),
         language: z
           .string()
           .optional()

@@ -57,7 +57,11 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
       title: "List Gmail Messages",
       description: "List recent Gmail messages. Supports query filters (e.g. 'from:alice is:unread').",
       inputSchema: {
-        query: z.string().optional().describe("Gmail search query (e.g. 'is:unread', 'from:bob subject:report')"),
+        query: z
+          .string()
+          .max(1000)
+          .optional()
+          .describe("Gmail search query (e.g. 'is:unread', 'from:bob subject:report')"),
         maxResults: z.number().int().min(1).max(100).optional().default(20).describe("Max messages to return"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
@@ -79,7 +83,7 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
       title: "Read Gmail Message",
       description: "Read a Gmail message by ID. Returns subject, from, to, date, and body.",
       inputSchema: {
-        messageId: z.string().min(1).describe("Gmail message ID"),
+        messageId: z.string().min(1).max(500).describe("Gmail message ID"),
         format: z.enum(["full", "metadata", "minimal"]).optional().default("full").describe("Response format"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
@@ -99,10 +103,10 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
       title: "Send Gmail",
       description: "Send an email via Gmail. Encodes the message in RFC 2822 format.",
       inputSchema: {
-        to: z.string().min(1).describe("Recipient email address"),
-        subject: z.string().describe("Email subject"),
-        body: z.string().describe("Email body (plain text)"),
-        cc: z.string().optional().describe("CC recipients (comma-separated)"),
+        to: z.string().min(1).max(500).describe("Recipient email address"),
+        subject: z.string().max(1000).describe("Email subject"),
+        body: z.string().max(50000).describe("Email body (plain text)"),
+        cc: z.string().max(1000).optional().describe("CC recipients (comma-separated)"),
       },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
@@ -142,7 +146,7 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
           .optional()
           .describe("Drive search query (e.g. \"name contains 'report'\" or \"mimeType = 'application/pdf'\")"),
         pageSize: z.number().int().min(1).max(100).optional().default(20).describe("Max files to return"),
-        orderBy: z.string().optional().describe("Sort order (e.g. 'modifiedTime desc', 'name')"),
+        orderBy: z.string().max(500).optional().describe("Sort order (e.g. 'modifiedTime desc', 'name')"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
@@ -167,7 +171,7 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
       title: "Read Drive File Metadata",
       description: "Get metadata for a Google Drive file by ID.",
       inputSchema: {
-        fileId: z.string().min(1).describe("Drive file ID"),
+        fileId: z.string().min(1).max(500).describe("Drive file ID"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
@@ -191,7 +195,7 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
       title: "Search Drive",
       description: "Full-text search across Google Drive files by content or name.",
       inputSchema: {
-        query: z.string().min(1).describe("Search text (searches file names and content)"),
+        query: z.string().min(1).max(500).describe("Search text (searches file names and content)"),
         maxResults: z.number().int().min(1).max(50).optional().default(10),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
@@ -225,8 +229,8 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
       title: "Read Google Sheet",
       description: "Read cell values from a Google Sheets spreadsheet.",
       inputSchema: {
-        spreadsheetId: z.string().min(1).describe("Spreadsheet ID (from URL)"),
-        range: z.string().optional().default("Sheet1").describe("A1 range notation (e.g. 'Sheet1!A1:D10')"),
+        spreadsheetId: z.string().min(1).max(500).describe("Spreadsheet ID (from URL)"),
+        range: z.string().max(1000).optional().default("Sheet1").describe("A1 range notation (e.g. 'Sheet1!A1:D10')"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
@@ -245,8 +249,8 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
       title: "Write to Google Sheet",
       description: "Write values to a Google Sheets range.",
       inputSchema: {
-        spreadsheetId: z.string().min(1).describe("Spreadsheet ID"),
-        range: z.string().min(1).describe("A1 range (e.g. 'Sheet1!A1:B2')"),
+        spreadsheetId: z.string().min(1).max(500).describe("Spreadsheet ID"),
+        range: z.string().min(1).max(1000).describe("A1 range (e.g. 'Sheet1!A1:B2')"),
         values: z.array(z.array(z.string())).min(1).describe("2D array of cell values [[row1col1, row1col2], ...]"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
@@ -283,9 +287,9 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
       description: "List upcoming events from Google Calendar.",
       inputSchema: {
         maxResults: z.number().int().min(1).max(100).optional().default(10),
-        query: z.string().optional().describe("Free-text search within events"),
-        timeMin: z.string().optional().describe("Start time (ISO 8601). Defaults to now."),
-        timeMax: z.string().optional().describe("End time (ISO 8601)"),
+        query: z.string().max(500).optional().describe("Free-text search within events"),
+        timeMin: z.string().max(64).optional().describe("Start time (ISO 8601). Defaults to now."),
+        timeMax: z.string().max(64).optional().describe("End time (ISO 8601)"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
@@ -313,11 +317,11 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
       title: "Create Google Calendar Event",
       description: "Create an event in Google Calendar.",
       inputSchema: {
-        summary: z.string().min(1).describe("Event title"),
-        start: z.string().min(1).describe("Start time (ISO 8601)"),
-        end: z.string().min(1).describe("End time (ISO 8601)"),
-        description: z.string().optional().describe("Event description"),
-        location: z.string().optional().describe("Event location"),
+        summary: z.string().min(1).max(500).describe("Event title"),
+        start: z.string().min(1).max(64).describe("Start time (ISO 8601)"),
+        end: z.string().min(1).max(64).describe("End time (ISO 8601)"),
+        description: z.string().max(5000).optional().describe("Event description"),
+        location: z.string().max(5000).optional().describe("Event location"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },
@@ -347,7 +351,7 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
       title: "Read Google Doc",
       description: "Read the content of a Google Doc by document ID.",
       inputSchema: {
-        documentId: z.string().min(1).describe("Google Docs document ID"),
+        documentId: z.string().min(1).max(500).describe("Google Docs document ID"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
@@ -393,9 +397,9 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
       title: "Create Google Task",
       description: "Create a task in Google Tasks.",
       inputSchema: {
-        title: z.string().min(1).describe("Task title"),
-        notes: z.string().optional().describe("Task notes/description"),
-        due: z.string().optional().describe("Due date (ISO 8601 or YYYY-MM-DD)"),
+        title: z.string().min(1).max(500).describe("Task title"),
+        notes: z.string().max(5000).optional().describe("Task notes/description"),
+        due: z.string().max(64).optional().describe("Due date (ISO 8601 or YYYY-MM-DD)"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },
@@ -423,7 +427,7 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
       title: "Search Google Contacts",
       description: "Search contacts in Google People/Contacts.",
       inputSchema: {
-        query: z.string().min(1).describe("Search query (name, email, phone)"),
+        query: z.string().min(1).max(500).describe("Search query (name, email, phone)"),
         pageSize: z.number().int().min(1).max(30).optional().default(10),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
@@ -454,9 +458,13 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
       description:
         "Execute any Google Workspace CLI command. For advanced use when specific tools don't cover your need.",
       inputSchema: {
-        service: z.string().min(1).describe(`Service name. Allowed: ${GWS_ALLOWED_LIST}`),
-        resource: z.string().min(1).describe("Resource (e.g. 'users.messages', 'files', 'spreadsheets.values')"),
-        method: z.string().min(1).describe("Method (e.g. 'list', 'get', 'create', 'update', 'delete')"),
+        service: z.string().min(1).max(64).describe(`Service name. Allowed: ${GWS_ALLOWED_LIST}`),
+        resource: z
+          .string()
+          .min(1)
+          .max(500)
+          .describe("Resource (e.g. 'users.messages', 'files', 'spreadsheets.values')"),
+        method: z.string().min(1).max(64).describe("Method (e.g. 'list', 'get', 'create', 'update', 'delete')"),
         params: z.record(z.unknown()).optional().describe("URL/query parameters as JSON"),
         body: z.record(z.unknown()).optional().describe("Request body as JSON"),
       },

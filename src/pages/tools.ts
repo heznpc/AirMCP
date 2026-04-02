@@ -74,7 +74,7 @@ export function registerPagesTools(server: McpServer, _config: AirMcpConfig): vo
       title: "Get Pages Body Text",
       description: "Get the body text content of an open Pages document.",
       inputSchema: {
-        document: z.string().describe("Document name (as shown in title bar)"),
+        document: z.string().max(500).describe("Document name (as shown in title bar)"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
@@ -93,8 +93,8 @@ export function registerPagesTools(server: McpServer, _config: AirMcpConfig): vo
       title: "Set Pages Body Text",
       description: "Replace the body text of an open Pages document.",
       inputSchema: {
-        document: z.string().describe("Document name"),
-        text: z.string().describe("New body text content"),
+        document: z.string().max(500).describe("Document name"),
+        text: z.string().max(50000).describe("New body text content"),
       },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
@@ -113,7 +113,7 @@ export function registerPagesTools(server: McpServer, _config: AirMcpConfig): vo
       title: "Export Pages to PDF",
       description: "Export an open Pages document to PDF.",
       inputSchema: {
-        document: z.string().describe("Document name"),
+        document: z.string().max(500).describe("Document name"),
         outputPath: zFilePath.describe("Absolute output path for the PDF file"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
@@ -133,7 +133,7 @@ export function registerPagesTools(server: McpServer, _config: AirMcpConfig): vo
       title: "Close Pages Document",
       description: "Close an open Pages document, optionally saving changes.",
       inputSchema: {
-        document: z.string().describe("Document name"),
+        document: z.string().max(500).describe("Document name"),
         saving: z.boolean().optional().default(true).describe("Save before closing (default: true)"),
       },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },

@@ -57,7 +57,7 @@ export function registerKeynoteTools(server: McpServer, _config: AirMcpConfig): 
       title: "List Keynote Slides",
       description: "List all slides in a Keynote presentation with title, body preview, and presenter notes.",
       inputSchema: {
-        document: z.string().describe("Document name"),
+        document: z.string().max(500).describe("Document name"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
@@ -76,7 +76,7 @@ export function registerKeynoteTools(server: McpServer, _config: AirMcpConfig): 
       title: "Get Keynote Slide",
       description: "Get detailed content of a specific slide including all text items and presenter notes.",
       inputSchema: {
-        document: z.string().describe("Document name"),
+        document: z.string().max(500).describe("Document name"),
         slideNumber: z.number().int().min(1).describe("Slide number (1-based)"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -96,7 +96,7 @@ export function registerKeynoteTools(server: McpServer, _config: AirMcpConfig): 
       title: "Add Keynote Slide",
       description: "Add a new slide to a Keynote presentation.",
       inputSchema: {
-        document: z.string().describe("Document name"),
+        document: z.string().max(500).describe("Document name"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
@@ -115,9 +115,9 @@ export function registerKeynoteTools(server: McpServer, _config: AirMcpConfig): 
       title: "Set Keynote Presenter Notes",
       description: "Set presenter notes on a specific slide.",
       inputSchema: {
-        document: z.string().describe("Document name"),
+        document: z.string().max(500).describe("Document name"),
         slideNumber: z.number().int().min(1).describe("Slide number (1-based)"),
-        notes: z.string().describe("Presenter notes text"),
+        notes: z.string().max(5000).describe("Presenter notes text"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
@@ -136,7 +136,7 @@ export function registerKeynoteTools(server: McpServer, _config: AirMcpConfig): 
       title: "Export Keynote to PDF",
       description: "Export a Keynote presentation to PDF.",
       inputSchema: {
-        document: z.string().describe("Document name"),
+        document: z.string().max(500).describe("Document name"),
         outputPath: zFilePath.describe("Absolute output path for the PDF file"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
@@ -156,7 +156,7 @@ export function registerKeynoteTools(server: McpServer, _config: AirMcpConfig): 
       title: "Start Keynote Slideshow",
       description: "Start playing a Keynote slideshow from a specific slide.",
       inputSchema: {
-        document: z.string().describe("Document name"),
+        document: z.string().max(500).describe("Document name"),
         fromSlide: z.number().int().min(1).optional().default(1).describe("Start from slide number (default: 1)"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
@@ -176,7 +176,7 @@ export function registerKeynoteTools(server: McpServer, _config: AirMcpConfig): 
       title: "Close Keynote Document",
       description: "Close an open Keynote presentation, optionally saving changes.",
       inputSchema: {
-        document: z.string().describe("Document name"),
+        document: z.string().max(500).describe("Document name"),
         saving: z.boolean().optional().default(true).describe("Save before closing (default: true)"),
       },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },

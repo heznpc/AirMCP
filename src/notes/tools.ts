@@ -87,7 +87,7 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
       description:
         "List all notes with title, folder, and dates. Optionally filter by folder name. Supports pagination via limit/offset.",
       inputSchema: {
-        folder: z.string().optional().describe("Filter by folder name"),
+        folder: z.string().max(500).optional().describe("Filter by folder name"),
         limit: z
           .number()
           .int()
@@ -145,7 +145,7 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
       title: "Search Notes",
       description: "Search notes by keyword in title and body. Returns matching notes with a 200-char preview.",
       inputSchema: {
-        query: z.string().min(1).describe("Search keyword"),
+        query: z.string().min(1).max(500).describe("Search keyword"),
         limit: z.number().int().min(1).max(500).optional().default(50).describe("Max results to return (default: 50)"),
         offset: z
           .number()
@@ -197,7 +197,7 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
       title: "Read Note",
       description: "Read the full content of a specific note by its ID. Returns HTML body and plaintext.",
       inputSchema: {
-        id: z.string().describe("Note ID (x-coredata:// format)"),
+        id: z.string().max(500).describe("Note ID (x-coredata:// format)"),
       },
       annotations: {
         readOnlyHint: true,
@@ -225,8 +225,8 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
       description:
         "Create a new note with HTML body. The first line of the body becomes the note title automatically. Optionally specify a target folder.",
       inputSchema: {
-        body: z.string().describe("Note content in HTML (e.g. '<h1>Title</h1><p>Body text</p>')"),
-        folder: z.string().optional().describe("Target folder name"),
+        body: z.string().max(50000).describe("Note content in HTML (e.g. '<h1>Title</h1><p>Body text</p>')"),
+        folder: z.string().max(500).optional().describe("Target folder name"),
       },
       annotations: {
         readOnlyHint: false,
@@ -253,8 +253,8 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
       description:
         "Replace the entire body of an existing note. WARNING: This overwrites all content. Read the note first if you need to preserve parts of it. Attachments may be lost.",
       inputSchema: {
-        id: z.string().describe("Note ID (x-coredata:// format)"),
-        body: z.string().describe("New HTML body to replace existing content"),
+        id: z.string().max(500).describe("Note ID (x-coredata:// format)"),
+        body: z.string().max(50000).describe("New HTML body to replace existing content"),
       },
       annotations: {
         readOnlyHint: false,
@@ -281,7 +281,7 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
       title: "Delete Note",
       description: "Delete a note by ID. The note is moved to Recently Deleted and permanently removed after 30 days.",
       inputSchema: {
-        id: z.string().describe("Note ID (x-coredata:// format)"),
+        id: z.string().max(500).describe("Note ID (x-coredata:// format)"),
       },
       annotations: {
         readOnlyHint: false,
@@ -331,8 +331,8 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
       title: "Create Folder",
       description: "Create a new folder. Optionally specify which account to create it in.",
       inputSchema: {
-        name: z.string().describe("Folder name"),
-        account: z.string().optional().describe("Account name (e.g. 'iCloud'). Defaults to primary account."),
+        name: z.string().max(500).describe("Folder name"),
+        account: z.string().max(500).optional().describe("Account name (e.g. 'iCloud'). Defaults to primary account."),
       },
       annotations: {
         readOnlyHint: false,
@@ -358,8 +358,8 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
       description:
         "Move a note to a different folder. NOTE: Apple Notes has no native move command, so this copies the note body to the target folder and deletes the original. The note will get a new ID and creation date. Attachments (images) will be lost.",
       inputSchema: {
-        id: z.string().describe("Note ID to move"),
-        folder: z.string().describe("Target folder name"),
+        id: z.string().max(500).describe("Note ID to move"),
+        folder: z.string().max(500).describe("Target folder name"),
       },
       annotations: {
         readOnlyHint: false,
@@ -389,7 +389,7 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
       description:
         "Bulk scan notes returning metadata and a text preview for each. Supports pagination via offset. Optionally filter by folder. Use this to get an overview before organizing.",
       inputSchema: {
-        folder: z.string().optional().describe("Filter by folder name. Omit to scan all notes."),
+        folder: z.string().max(500).optional().describe("Filter by folder name. Omit to scan all notes."),
         limit: z
           .number()
           .int()
@@ -473,7 +473,7 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
         "Move multiple notes to a target folder at once. Same limitations as move_note apply to each note (new ID, date reset, attachments lost). Returns per-note success/failure results.",
       inputSchema: {
         ids: z.array(z.string()).min(1).describe("Array of note IDs to move"),
-        folder: z.string().describe("Target folder name"),
+        folder: z.string().max(500).describe("Target folder name"),
       },
       annotations: {
         readOnlyHint: false,

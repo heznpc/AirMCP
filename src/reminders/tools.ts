@@ -90,7 +90,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
       description:
         "List reminders. Optionally filter by list name and/or completion status. Supports pagination via limit/offset.",
       inputSchema: {
-        list: z.string().optional().describe("Filter by list name"),
+        list: z.string().max(500).optional().describe("Filter by list name"),
         completed: z.boolean().optional().describe("Filter by completed status (true/false). Omit to list all."),
         limit: z
           .number()
@@ -158,7 +158,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
       title: "Read Reminder",
       description: "Read the full details of a specific reminder by ID.",
       inputSchema: {
-        id: z.string().describe("Reminder ID"),
+        id: z.string().max(500).describe("Reminder ID"),
       },
       annotations: {
         readOnlyHint: true,
@@ -187,11 +187,11 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
       description:
         "Create a new reminder. Optionally set notes, due date, priority (0=none, 1-4=high, 5=medium, 6-9=low), and target list. Recurrence rules cannot be set via automation.",
       inputSchema: {
-        title: z.string().describe("Reminder title"),
-        body: z.string().optional().describe("Notes/body text"),
-        dueDate: z.string().optional().describe("Due date in ISO 8601 format (e.g. '2026-03-15T10:00:00Z')"),
+        title: z.string().max(500).describe("Reminder title"),
+        body: z.string().max(5000).optional().describe("Notes/body text"),
+        dueDate: z.string().max(64).optional().describe("Due date in ISO 8601 format (e.g. '2026-03-15T10:00:00Z')"),
         priority: z.number().int().min(0).max(9).optional().describe("Priority: 0=none, 1-4=high, 5=medium, 6-9=low"),
-        list: z.string().optional().describe("Target list name. Defaults to the default list."),
+        list: z.string().max(500).optional().describe("Target list name. Defaults to the default list."),
       },
       annotations: {
         readOnlyHint: false,
@@ -223,9 +223,9 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
       description:
         "Update reminder properties. Only specified fields are changed. Set dueDate to null to clear it. Recurrence rules cannot be modified via automation.",
       inputSchema: {
-        id: z.string().describe("Reminder ID"),
-        title: z.string().optional().describe("New title"),
-        body: z.string().optional().describe("New notes/body text"),
+        id: z.string().max(500).describe("Reminder ID"),
+        title: z.string().max(500).optional().describe("New title"),
+        body: z.string().max(5000).optional().describe("New notes/body text"),
         dueDate: z
           .string()
           .nullable()
@@ -271,7 +271,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
       title: "Complete Reminder",
       description: "Mark a reminder as completed or un-complete it.",
       inputSchema: {
-        id: z.string().describe("Reminder ID"),
+        id: z.string().max(500).describe("Reminder ID"),
         completed: z
           .boolean()
           .optional()
@@ -307,7 +307,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
       title: "Delete Reminder",
       description: "Delete a reminder by ID. This action is permanent.",
       inputSchema: {
-        id: z.string().describe("Reminder ID"),
+        id: z.string().max(500).describe("Reminder ID"),
       },
       annotations: {
         readOnlyHint: false,
@@ -335,7 +335,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
       title: "Search Reminders",
       description: "Search reminders by keyword in name or body across all lists (case-insensitive).",
       inputSchema: {
-        query: z.string().describe("Search keyword"),
+        query: z.string().max(500).describe("Search keyword"),
         limit: z.number().int().min(1).max(500).optional().default(30).describe("Max results (default: 30)"),
       },
       outputSchema: {
@@ -381,7 +381,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
       title: "Create Reminder List",
       description: "Create a new reminder list.",
       inputSchema: {
-        name: z.string().describe("Name for the new list"),
+        name: z.string().max(500).describe("Name for the new list"),
       },
       annotations: {
         readOnlyHint: false,
@@ -412,7 +412,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
       title: "Delete Reminder List",
       description: "Delete a reminder list by name. This action is permanent and removes all reminders in the list.",
       inputSchema: {
-        name: z.string().describe("Name of the list to delete"),
+        name: z.string().max(500).describe("Name of the list to delete"),
       },
       annotations: {
         readOnlyHint: false,
@@ -444,16 +444,20 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
       description:
         "Create a recurring reminder via EventKit. Supports daily, weekly, monthly, and yearly recurrence with configurable intervals. Requires macOS 26+ Swift bridge.",
       inputSchema: {
-        title: z.string().describe("Reminder title"),
-        list: z.string().optional().describe("Target reminder list name. Defaults to the default list."),
-        notes: z.string().optional().describe("Reminder notes/body text"),
-        dueDate: z.string().optional().describe("Due date (ISO 8601, e.g. '2026-03-15T10:00:00Z')"),
+        title: z.string().max(500).describe("Reminder title"),
+        list: z.string().max(500).optional().describe("Target reminder list name. Defaults to the default list."),
+        notes: z.string().max(5000).optional().describe("Reminder notes/body text"),
+        dueDate: z.string().max(64).optional().describe("Due date (ISO 8601, e.g. '2026-03-15T10:00:00Z')"),
         priority: z.number().int().min(0).max(9).optional().describe("Priority: 0=none, 1-4=high, 5=medium, 6-9=low"),
         recurrence: z
           .object({
             frequency: z.enum(["daily", "weekly", "monthly", "yearly"]).describe("Recurrence frequency"),
             interval: z.number().int().min(1).describe("Repeat every N frequency units (e.g. 2 = every 2 weeks)"),
-            endDate: z.string().optional().describe("Recurrence end date (ISO 8601, e.g. '2026-12-31T23:59:59Z')"),
+            endDate: z
+              .string()
+              .max(64)
+              .optional()
+              .describe("Recurrence end date (ISO 8601, e.g. '2026-12-31T23:59:59Z')"),
             count: z.number().int().min(1).optional().describe("Number of occurrences (alternative to endDate)"),
             daysOfWeek: z
               .array(z.number().int().min(1).max(7))

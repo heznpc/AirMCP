@@ -102,7 +102,7 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
       description:
         "Type text into the currently focused field using simulated keystrokes via System Events. Optionally activate a specific app first. Requires Accessibility permissions.",
       inputSchema: {
-        text: z.string().min(1).describe("Text to type"),
+        text: z.string().min(1).max(10000).describe("Text to type"),
         appName: z
           .string()
           .optional()
@@ -199,7 +199,7 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
       description:
         "Read the accessibility tree of the frontmost app (or specified app). Returns structured data about all visible UI elements including their roles, names, values, positions, and hierarchy. Use this to understand what UI elements are available before interacting with them. Requires Accessibility permissions.",
       inputSchema: {
-        appName: z.string().optional().describe("App name to read. If omitted, reads the frontmost app."),
+        appName: z.string().max(500).optional().describe("App name to read. If omitted, reads the frontmost app."),
         maxDepth: z
           .number()
           .int()
@@ -246,17 +246,17 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
         "More precise than ui_read — returns only matching elements with full attribute data. " +
         "Works on any app, including those without AppleScript support. Requires Accessibility permissions.",
       inputSchema: {
-        app: z.string().optional().describe("App name to search in. If omitted, uses frontmost app."),
+        app: z.string().max(500).optional().describe("App name to search in. If omitted, uses frontmost app."),
         role: z
           .string()
           .optional()
           .describe(
             "AX role filter (e.g. 'AXButton', 'AXTextField', 'AXMenuItem', 'AXStaticText', 'AXCheckBox', 'AXPopUpButton')",
           ),
-        title: z.string().optional().describe("Title text to match (substring, case-insensitive)"),
-        value: z.string().optional().describe("Value text to match (substring, case-insensitive)"),
-        description: z.string().optional().describe("Description text to match (substring)"),
-        identifier: z.string().optional().describe("AXIdentifier to match (exact)"),
+        title: z.string().max(500).optional().describe("Title text to match (substring, case-insensitive)"),
+        value: z.string().max(10000).optional().describe("Value text to match (substring, case-insensitive)"),
+        description: z.string().max(5000).optional().describe("Description text to match (substring)"),
+        identifier: z.string().max(1000).optional().describe("AXIdentifier to match (exact)"),
         label: z
           .string()
           .optional()
@@ -304,13 +304,13 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
         "Actions: press (click), pick (select), confirm, setValue, raise (focus), showMenu. " +
         "Combines query + action in one step. Requires Accessibility permissions.",
       inputSchema: {
-        app: z.string().optional().describe("App name"),
-        role: z.string().optional().describe("AX role filter"),
-        title: z.string().optional().describe("Title text to match"),
-        value: z.string().optional().describe("Value text to match"),
-        description: z.string().optional().describe("Description text to match"),
-        identifier: z.string().optional().describe("AXIdentifier exact match"),
-        label: z.string().optional().describe("General label search"),
+        app: z.string().max(500).optional().describe("App name"),
+        role: z.string().max(500).optional().describe("AX role filter"),
+        title: z.string().max(500).optional().describe("Title text to match"),
+        value: z.string().max(10000).optional().describe("Value text to match"),
+        description: z.string().max(5000).optional().describe("Description text to match"),
+        identifier: z.string().max(1000).optional().describe("AXIdentifier exact match"),
+        label: z.string().max(500).optional().describe("General label search"),
         action: z
           .enum([
             "press",
@@ -331,7 +331,7 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
             "AXShowMenu",
           ])
           .describe("Action to perform"),
-        actionValue: z.string().optional().describe("Value to set (for setValue action)"),
+        actionValue: z.string().max(10000).optional().describe("Value to set (for setValue action)"),
         index: z
           .number()
           .int()
@@ -368,7 +368,7 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
         "with parent-child relationships, positions, sizes, and states. Supports PID targeting and " +
         "visible-only filtering. More thorough than ui_read. Requires Accessibility permissions.",
       inputSchema: {
-        app: z.string().optional().describe("App name to traverse. If omitted, uses frontmost app."),
+        app: z.string().max(500).optional().describe("App name to traverse. If omitted, uses frontmost app."),
         pid: z.number().int().optional().describe("Process ID for precise targeting (overrides app name lookup)"),
         maxDepth: z.number().int().min(1).max(15).optional().default(5).describe("Max traversal depth (default: 5)"),
         maxElements: z
@@ -406,7 +406,7 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
           .min(1)
           .max(500000)
           .describe("JSON string of previous UI tree snapshot (elements array from ui_traverse)"),
-        app: z.string().optional().describe("App name to compare against"),
+        app: z.string().max(500).optional().describe("App name to compare against"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },

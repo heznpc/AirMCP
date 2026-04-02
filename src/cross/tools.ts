@@ -23,7 +23,11 @@ export function registerCrossTools(mcpServer: McpServer, config: AirMcpConfig): 
         "Collect context from all enabled Apple apps and ask the client's LLM to produce a concise briefing. " +
         "Uses MCP Sampling — works with any LLM the client is using. No API keys required.",
       inputSchema: {
-        focus: z.string().optional().describe("Optional focus area (e.g. 'meetings', 'overdue tasks', 'project X')"),
+        focus: z
+          .string()
+          .max(500)
+          .optional()
+          .describe("Optional focus area (e.g. 'meetings', 'overdue tasks', 'project X')"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
@@ -111,9 +115,9 @@ export function registerCrossTools(mcpServer: McpServer, config: AirMcpConfig): 
         "Generate text using a local Ollama model. Runs entirely on your machine — no data sent to any cloud. " +
         "Requires Ollama running at localhost:11434. Useful for summarization, extraction, and analysis.",
       inputSchema: {
-        prompt: z.string().min(1).describe("The prompt to send to the local LLM"),
-        model: z.string().optional().describe("Ollama model name (default: llama3.2)"),
-        system: z.string().optional().describe("System instruction for the model"),
+        prompt: z.string().min(1).max(10000).describe("The prompt to send to the local LLM"),
+        model: z.string().max(500).optional().describe("Ollama model name (default: llama3.2)"),
+        system: z.string().max(10000).optional().describe("System instruction for the model"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },

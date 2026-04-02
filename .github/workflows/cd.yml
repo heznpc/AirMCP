@@ -51,6 +51,15 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Verify package contents
+        run: |
+          PACK_OUT=$(npm pack --dry-run 2>&1)
+          echo "$PACK_OUT"
+          if echo "$PACK_OUT" | grep -Ev '\.d\.ts$' | grep -qE '\.(map|ts|env|token)$'; then
+            echo "::error::Unexpected files detected in package (source maps, .ts, .env, or token files)!"
+            exit 1
+          fi
+
       - name: Publish with provenance
         run: npm publish --provenance --access public
         env:

@@ -22,7 +22,7 @@ export function registerFinderTools(server: McpServer, _config: AirMcpConfig): v
       title: "Search Files",
       description: "Search files using Spotlight (mdfind). Searches file names and content.",
       inputSchema: {
-        query: z.string().describe("Search query (Spotlight syntax)"),
+        query: z.string().max(500).describe("Search query (Spotlight syntax)"),
         folder: zFilePath.optional().default("~").describe("Folder to search in (default: home)"),
         limit: z.number().int().min(1).max(200).optional().default(50).describe("Max results (default: 50)"),
       },

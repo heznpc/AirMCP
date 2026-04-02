@@ -137,7 +137,7 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
       title: "Search Contacts",
       description: "Search contacts by name, email, phone, or organization.",
       inputSchema: {
-        query: z.string().describe("Search keyword (matches name)"),
+        query: z.string().max(500).describe("Search keyword (matches name)"),
         limit: z.number().int().min(1).max(500).optional().default(50).describe("Max results (default: 50)"),
       },
       outputSchema: {
@@ -175,7 +175,7 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
       title: "Read Contact",
       description: "Read full details of a contact by ID including all emails, phones, and addresses.",
       inputSchema: {
-        id: z.string().describe("Contact ID"),
+        id: z.string().max(500).describe("Contact ID"),
       },
       outputSchema: {
         id: z.string(),
@@ -220,13 +220,13 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
       title: "Create Contact",
       description: "Create a new contact with name and optional email, phone, organization.",
       inputSchema: {
-        firstName: z.string().describe("First name"),
-        lastName: z.string().describe("Last name"),
+        firstName: z.string().max(500).describe("First name"),
+        lastName: z.string().max(500).describe("Last name"),
         email: z.string().email().optional().describe("Email address"),
         phone: z.string().min(1).optional().describe("Phone number"),
-        organization: z.string().optional().describe("Company/organization"),
-        jobTitle: z.string().optional().describe("Job title"),
-        note: z.string().optional().describe("Notes"),
+        organization: z.string().max(1000).optional().describe("Company/organization"),
+        jobTitle: z.string().max(500).optional().describe("Job title"),
+        note: z.string().max(5000).optional().describe("Notes"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
@@ -252,12 +252,12 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
       title: "Update Contact",
       description: "Update contact properties. Only specified fields are changed.",
       inputSchema: {
-        id: z.string().describe("Contact ID"),
-        firstName: z.string().optional().describe("New first name"),
-        lastName: z.string().optional().describe("New last name"),
-        organization: z.string().optional().describe("New organization"),
-        jobTitle: z.string().optional().describe("New job title"),
-        note: z.string().optional().describe("New notes"),
+        id: z.string().max(500).describe("Contact ID"),
+        firstName: z.string().max(500).optional().describe("New first name"),
+        lastName: z.string().max(500).optional().describe("New last name"),
+        organization: z.string().max(1000).optional().describe("New organization"),
+        jobTitle: z.string().max(500).optional().describe("New job title"),
+        note: z.string().max(5000).optional().describe("New notes"),
       },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
@@ -280,7 +280,7 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
       title: "Delete Contact",
       description: "Delete a contact by ID. This action is permanent.",
       inputSchema: {
-        id: z.string().describe("Contact ID"),
+        id: z.string().max(500).describe("Contact ID"),
       },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
@@ -324,9 +324,9 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
       title: "Add Contact Email",
       description: "Add an email address to an existing contact.",
       inputSchema: {
-        id: z.string().describe("Contact ID"),
+        id: z.string().max(500).describe("Contact ID"),
         email: z.string().email().describe("Email address to add"),
-        label: z.string().optional().default("work").describe("Email label (default: work)"),
+        label: z.string().max(500).optional().default("work").describe("Email label (default: work)"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
@@ -349,9 +349,9 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
       title: "Add Contact Phone",
       description: "Add a phone number to an existing contact.",
       inputSchema: {
-        id: z.string().describe("Contact ID"),
-        phone: z.string().min(1).describe("Phone number to add"),
-        label: z.string().optional().default("mobile").describe("Phone label (default: mobile)"),
+        id: z.string().max(500).describe("Contact ID"),
+        phone: z.string().min(1).max(1000).describe("Phone number to add"),
+        label: z.string().max(500).optional().default("mobile").describe("Phone label (default: mobile)"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
@@ -374,7 +374,7 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
       title: "List Group Members",
       description: "List contacts in a specific group.",
       inputSchema: {
-        groupName: z.string().describe("Group name"),
+        groupName: z.string().max(500).describe("Group name"),
         limit: z.number().int().min(1).max(1000).optional().default(100).describe("Max contacts (default: 100)"),
       },
       outputSchema: {

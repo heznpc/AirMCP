@@ -62,8 +62,8 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
       description:
         "Run a Siri Shortcut by name. Optionally provide text input. Returns the shortcut's output. Note: shortcuts may trigger UI prompts or perform system actions.",
       inputSchema: {
-        name: z.string().describe("Shortcut name (exact match)"),
-        input: z.string().optional().describe("Optional text input for the shortcut"),
+        name: z.string().max(500).describe("Shortcut name (exact match)"),
+        input: z.string().max(10000).optional().describe("Optional text input for the shortcut"),
       },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
@@ -82,7 +82,7 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
       title: "Search Shortcuts",
       description: "Search Siri Shortcuts by name keyword.",
       inputSchema: {
-        query: z.string().describe("Search keyword to match against shortcut names"),
+        query: z.string().max(500).describe("Search keyword to match against shortcut names"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
@@ -101,7 +101,7 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
       title: "Get Shortcut Detail",
       description: "Get details about a Siri Shortcut including its actions.",
       inputSchema: {
-        name: z.string().describe("Shortcut name (exact match)"),
+        name: z.string().max(500).describe("Shortcut name (exact match)"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
@@ -121,7 +121,7 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
       description:
         "Create a new Siri Shortcut by name. Uses UI automation to open the Shortcuts app and create a new empty shortcut. The shortcut must be further configured in the Shortcuts app.",
       inputSchema: {
-        name: z.string().describe("Name for the new shortcut"),
+        name: z.string().max(500).describe("Name for the new shortcut"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },
@@ -141,7 +141,7 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
       description:
         "Delete a Siri Shortcut by name. Uses the macOS shortcuts CLI (macOS 13+). This action is permanent and cannot be undone.",
       inputSchema: {
-        name: z.string().describe("Shortcut name to delete (exact match)"),
+        name: z.string().max(500).describe("Shortcut name to delete (exact match)"),
       },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     },
@@ -161,7 +161,7 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
       description:
         "Export a Siri Shortcut to a .shortcut file. Uses the macOS shortcuts CLI to save the shortcut to the specified output path.",
       inputSchema: {
-        name: z.string().describe("Shortcut name to export (exact match)"),
+        name: z.string().max(500).describe("Shortcut name to export (exact match)"),
         outputPath: zFilePath.describe(
           "File path to export the .shortcut file to (e.g. ~/Desktop/MyShortcut.shortcut)",
         ),
@@ -204,8 +204,8 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
       description:
         "Duplicate an existing Siri Shortcut. Exports the shortcut to a temporary file and re-imports it with a new name.",
       inputSchema: {
-        name: z.string().describe("Name of the shortcut to duplicate (exact match)"),
-        newName: z.string().describe("Name for the duplicated shortcut"),
+        name: z.string().max(500).describe("Name of the shortcut to duplicate (exact match)"),
+        newName: z.string().max(500).describe("Name for the duplicated shortcut"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
@@ -225,7 +225,7 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
       description:
         "Open a Siri Shortcut in the Shortcuts app for manual editing. Uses UI automation (System Events) to activate the app, search for the shortcut, and open it. The user can then edit the shortcut in the Shortcuts app UI.",
       inputSchema: {
-        name: z.string().describe("Shortcut name to edit (exact match)"),
+        name: z.string().max(500).describe("Shortcut name to edit (exact match)"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },
@@ -289,7 +289,7 @@ export async function registerDynamicShortcutTools(server: McpServer): Promise<n
         title: `Run: ${name}`,
         description: `Run the "${name}" Siri Shortcut. Optionally provide text input.`,
         inputSchema: {
-          input: z.string().optional().describe("Optional text input for the shortcut"),
+          input: z.string().max(10000).optional().describe("Optional text input for the shortcut"),
         },
         annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
       },

@@ -161,7 +161,7 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
       description:
         "Execute JavaScript in a Safari tab. Use list_tabs to find window/tab indices. Returns the result as a string.",
       inputSchema: {
-        code: z.string().describe("JavaScript to execute"),
+        code: z.string().max(100000).describe("JavaScript to execute"),
         windowIndex: z.number().int().min(0).optional().default(0).describe("Window index (default: 0)"),
         tabIndex: z.number().int().min(0).optional().default(0).describe("Tab index (default: 0)"),
       },
@@ -186,7 +186,7 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
       title: "Search Tabs",
       description: "Search open Safari tabs by title or URL keyword.",
       inputSchema: {
-        query: z.string().describe("Search keyword to match against tab titles and URLs"),
+        query: z.string().max(500).describe("Search keyword to match against tab titles and URLs"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
@@ -225,7 +225,7 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
         "Use add_to_reading_list instead, which still works.",
       inputSchema: {
         url: z.string().url().describe("URL to bookmark"),
-        title: z.string().describe("Bookmark title"),
+        title: z.string().max(500).describe("Bookmark title"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
@@ -261,7 +261,7 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
       description: "Add a URL to Safari's Reading List with an optional title.",
       inputSchema: {
         url: z.string().url().describe("URL to add to Reading List"),
-        title: z.string().optional().describe("Title for the Reading List item"),
+        title: z.string().max(500).optional().describe("Title for the Reading List item"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },

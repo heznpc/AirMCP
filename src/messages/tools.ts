@@ -41,7 +41,7 @@ export function registerMessagesTools(server: McpServer, config: AirMcpConfig): 
       title: "Read Chat",
       description: "Read chat details including participants and last update time by chat ID.",
       inputSchema: {
-        chatId: z.string().describe("Chat ID"),
+        chatId: z.string().max(500).describe("Chat ID"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
@@ -60,7 +60,7 @@ export function registerMessagesTools(server: McpServer, config: AirMcpConfig): 
       title: "Search Chats",
       description: "Search chats by participant name, handle, or chat name.",
       inputSchema: {
-        query: z.string().describe("Search keyword (matches chat name, participant name, or handle)"),
+        query: z.string().max(500).describe("Search keyword (matches chat name, participant name, or handle)"),
         limit: z.number().int().min(1).max(100).optional().default(20).describe("Max results (default: 20)"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -106,7 +106,7 @@ export function registerMessagesTools(server: McpServer, config: AirMcpConfig): 
       title: "Send File",
       description: "Send a file attachment via iMessage/SMS. Requires absolute file path and recipient handle.",
       inputSchema: {
-        target: z.string().min(1).describe("Recipient handle (phone number or email)"),
+        target: z.string().min(1).max(1000).describe("Recipient handle (phone number or email)"),
         filePath: zFilePath.describe("Absolute file path to send"),
       },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
@@ -129,7 +129,7 @@ export function registerMessagesTools(server: McpServer, config: AirMcpConfig): 
       title: "List Chat Participants",
       description: "List all participants in a specific chat.",
       inputSchema: {
-        chatId: z.string().describe("Chat ID"),
+        chatId: z.string().max(500).describe("Chat ID"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },

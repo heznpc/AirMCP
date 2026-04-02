@@ -13,6 +13,7 @@ buildSync({
   platform: "node",
   target: "es2022",
   packages: "external",
+  sourcemap: false,
 });
 
 cpSync("src/skills/builtins", "dist/skills/builtins", { recursive: true });

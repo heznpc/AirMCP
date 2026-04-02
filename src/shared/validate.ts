@@ -12,6 +12,7 @@ import { HOME } from "./constants.js";
 export const zFilePath = z
   .string()
   .min(1)
+  .max(4096)
   .refine((p) => p.startsWith("/") || p.startsWith("~/") || p === "~", "File path must be absolute (use / or ~/)")
   .transform((p) => (p.startsWith("~/") ? `${HOME}${p.slice(1)}` : p === "~" ? HOME : p))
   .refine((p) => !/(^|\/)\.\.($|\/)/.test(p), "Path traversal is not allowed");

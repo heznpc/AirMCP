@@ -36,7 +36,7 @@ export function registerPodcastsTools(server: McpServer, _config: AirMcpConfig):
       title: "List Podcast Episodes",
       description: "List episodes of a podcast show with title, date, duration, and played status.",
       inputSchema: {
-        showName: z.string().describe("Podcast show name"),
+        showName: z.string().max(500).describe("Podcast show name"),
         limit: z.number().int().min(1).max(100).optional().default(20).describe("Max episodes (default: 20)"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -92,8 +92,8 @@ export function registerPodcastsTools(server: McpServer, _config: AirMcpConfig):
       title: "Play Podcast Episode",
       description: "Play a specific podcast episode by name, optionally from a specific show.",
       inputSchema: {
-        episodeName: z.string().describe("Episode name to play"),
-        showName: z.string().optional().describe("Show to search in (searches all shows if omitted)"),
+        episodeName: z.string().max(500).describe("Episode name to play"),
+        showName: z.string().max(500).optional().describe("Show to search in (searches all shows if omitted)"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
@@ -112,7 +112,7 @@ export function registerPodcastsTools(server: McpServer, _config: AirMcpConfig):
       title: "Search Podcast Episodes",
       description: "Search across all podcast episodes by name or description.",
       inputSchema: {
-        query: z.string().describe("Search keyword"),
+        query: z.string().max(500).describe("Search keyword"),
         limit: z.number().int().min(1).max(100).optional().default(20).describe("Max results (default: 20)"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },

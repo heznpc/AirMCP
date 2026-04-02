@@ -69,7 +69,7 @@ export function registerSemanticTools(server: McpServer, config: AirMcpConfig): 
         "Finds related notes, events, reminders, and emails even if they use different words. " +
         "Auto-indexes on first use and refreshes every 30 minutes.",
       inputSchema: {
-        query: z.string().describe("Natural language search query"),
+        query: z.string().max(500).describe("Natural language search query"),
         sources: z
           .array(z.enum(["notes", "calendar", "reminders", "mail"]))
           .optional()
@@ -98,7 +98,7 @@ export function registerSemanticTools(server: McpServer, config: AirMcpConfig): 
         "Given a note, event, reminder, or email ID, find semantically related items across all indexed Apple apps. " +
         "Discovers cross-app connections (e.g., a calendar event related to notes and reminders about the same topic).",
       inputSchema: {
-        id: z.string().describe("Item ID (as stored in the vector index)"),
+        id: z.string().max(500).describe("Item ID (as stored in the vector index)"),
         limit: z.number().int().min(1).max(50).optional().describe("Max results (default 10)"),
         threshold: z.number().min(0).max(1).optional().describe("Minimum similarity (default 0.6)"),
       },

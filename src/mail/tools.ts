@@ -52,8 +52,8 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
       title: "List Messages",
       description: "List recent messages in a mailbox (e.g. 'INBOX'). Returns subject, sender, date, read status.",
       inputSchema: {
-        mailbox: z.string().describe("Mailbox name (e.g. 'INBOX', 'Sent Messages')"),
-        account: z.string().optional().describe("Account name. Defaults to first account."),
+        mailbox: z.string().max(500).describe("Mailbox name (e.g. 'INBOX', 'Sent Messages')"),
+        account: z.string().max(500).optional().describe("Account name. Defaults to first account."),
         limit: z.number().int().min(1).max(200).optional().default(50).describe("Max messages (default: 50)"),
         offset: z.number().int().min(0).optional().default(0).describe("Pagination offset (default: 0)"),
       },
@@ -75,7 +75,7 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
       description:
         "Read full content of an email message by ID. Content length is configurable (default: 5000 chars, max: 100000).",
       inputSchema: {
-        id: z.string().describe("Message ID"),
+        id: z.string().max(500).describe("Message ID"),
         maxLength: z
           .number()
           .int()
@@ -102,8 +102,8 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
       title: "Search Messages",
       description: "Search messages by keyword in subject or sender within a mailbox.",
       inputSchema: {
-        query: z.string().describe("Search keyword"),
-        mailbox: z.string().optional().default("INBOX").describe("Mailbox to search (default: INBOX)"),
+        query: z.string().max(500).describe("Search keyword"),
+        mailbox: z.string().max(500).optional().default("INBOX").describe("Mailbox to search (default: INBOX)"),
         limit: z.number().int().min(1).max(200).optional().default(30).describe("Max results (default: 30)"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -123,7 +123,7 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
       title: "Mark Message Read/Unread",
       description: "Mark an email message as read or unread.",
       inputSchema: {
-        id: z.string().describe("Message ID"),
+        id: z.string().max(500).describe("Message ID"),
         read: z.boolean().optional().default(true).describe("true=read, false=unread (default: true)"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -143,7 +143,7 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
       title: "Flag Message",
       description: "Flag or unflag an email message.",
       inputSchema: {
-        id: z.string().describe("Message ID"),
+        id: z.string().max(500).describe("Message ID"),
         flagged: z.boolean().optional().default(true).describe("true=flag, false=unflag (default: true)"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -190,9 +190,13 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
       title: "Move Message",
       description: "Move a message to another mailbox.",
       inputSchema: {
-        id: z.string().describe("Message ID"),
-        targetMailbox: z.string().describe("Target mailbox name (e.g. 'Archive', 'Trash')"),
-        targetAccount: z.string().optional().describe("Target account name. Searches all accounts if omitted."),
+        id: z.string().max(500).describe("Message ID"),
+        targetMailbox: z.string().max(500).describe("Target mailbox name (e.g. 'Archive', 'Trash')"),
+        targetAccount: z
+          .string()
+          .max(500)
+          .optional()
+          .describe("Target account name. Searches all accounts if omitted."),
       },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     },
@@ -235,8 +239,8 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
           .min(1)
           .max(LIMITS.MAIL_RECIPIENTS)
           .describe(`Recipient email addresses (max ${LIMITS.MAIL_RECIPIENTS})`),
-        subject: z.string().describe("Email subject"),
-        body: z.string().describe("Email body text"),
+        subject: z.string().max(1000).describe("Email subject"),
+        body: z.string().max(50000).describe("Email body text"),
         cc: z
           .array(z.string().email())
           .max(LIMITS.MAIL_RECIPIENTS)
@@ -247,7 +251,7 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
           .max(LIMITS.MAIL_RECIPIENTS)
           .optional()
           .describe(`BCC recipients (max ${LIMITS.MAIL_RECIPIENTS})`),
-        account: z.string().optional().describe("Sender email address (uses default account if omitted)"),
+        account: z.string().max(500).optional().describe("Sender email address (uses default account if omitted)"),
       },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
@@ -268,8 +272,8 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
       title: "Reply to Email",
       description: "Reply to an email message. Requires allowSendMail config.",
       inputSchema: {
-        id: z.string().describe("Original message ID to reply to"),
-        body: z.string().describe("Reply body text"),
+        id: z.string().max(500).describe("Original message ID to reply to"),
+        body: z.string().max(50000).describe("Reply body text"),
         replyAll: z.boolean().optional().default(false).describe("Reply to all recipients (default: false)"),
       },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },

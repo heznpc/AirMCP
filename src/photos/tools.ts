@@ -120,7 +120,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
       title: "List Photos",
       description: "List photos in an album with metadata. Use list_albums to find album names first.",
       inputSchema: {
-        album: z.string().describe("Album name"),
+        album: z.string().max(500).describe("Album name"),
         limit: z.number().int().min(1).max(500).optional().default(50).describe("Max photos (default: 50)"),
         offset: z.number().int().min(0).optional().default(0).describe("Offset for pagination (default: 0)"),
       },
@@ -148,7 +148,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
       title: "Search Photos",
       description: "Search photos by filename, name, or description keyword.",
       inputSchema: {
-        query: z.string().describe("Search keyword"),
+        query: z.string().max(500).describe("Search keyword"),
         limit: z.number().int().min(1).max(200).optional().default(30).describe("Max results (default: 30)"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -175,7 +175,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
       title: "Get Photo Info",
       description: "Get detailed metadata for a specific photo by ID.",
       inputSchema: {
-        id: z.string().describe("Photo media item ID"),
+        id: z.string().max(500).describe("Photo media item ID"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
@@ -227,7 +227,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
       title: "Create Album",
       description: "Create a new photo album.",
       inputSchema: {
-        name: z.string().describe("Album name"),
+        name: z.string().max(500).describe("Album name"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
@@ -254,7 +254,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
       description: "Add photos to an existing album by photo IDs and album name.",
       inputSchema: {
         photoIds: z.array(z.string()).describe("Array of photo media item IDs"),
-        albumName: z.string().describe("Target album name"),
+        albumName: z.string().max(500).describe("Target album name"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
@@ -282,7 +282,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
         "Import a photo from a file path into Photos library. Optionally add to an existing album. Requires macOS 26+ Swift bridge.",
       inputSchema: {
         filePath: zFilePath.describe("Absolute file path to the image file to import"),
-        albumName: z.string().optional().describe("Album to add the imported photo to (must already exist)"),
+        albumName: z.string().max(500).optional().describe("Album to add the imported photo to (must already exist)"),
       },
       annotations: {
         readOnlyHint: false,
@@ -338,8 +338,8 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
         "Returns photo metadata (identifier, filename, date, dimensions). Requires Swift bridge.",
       inputSchema: {
         mediaType: z.enum(["image", "video", "audio"]).optional().describe("Filter by media type"),
-        startDate: z.string().optional().describe("Start date (ISO 8601)"),
-        endDate: z.string().optional().describe("End date (ISO 8601)"),
+        startDate: z.string().max(64).optional().describe("Start date (ISO 8601)"),
+        endDate: z.string().max(64).optional().describe("End date (ISO 8601)"),
         favorites: z.boolean().optional().describe("Only favorites"),
         limit: z.number().int().min(1).max(200).optional().default(50).describe("Max results (default: 50)"),
       },

@@ -47,7 +47,7 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
       title: "List Tracks",
       description: "List tracks in a playlist with name, artist, album, and duration.",
       inputSchema: {
-        playlist: z.string().describe("Playlist name"),
+        playlist: z.string().max(500).describe("Playlist name"),
         limit: z.number().int().min(1).max(500).optional().default(100).describe("Max tracks (default: 100)"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -115,7 +115,7 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
       title: "Search Tracks",
       description: "Search tracks in Music library by name, artist, or album.",
       inputSchema: {
-        query: z.string().describe("Search keyword"),
+        query: z.string().max(500).describe("Search keyword"),
         limit: z.number().int().min(1).max(200).optional().default(30).describe("Max results (default: 30)"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -135,8 +135,8 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
       title: "Play Track",
       description: "Play a specific track by name, optionally from a specific playlist.",
       inputSchema: {
-        trackName: z.string().describe("Track name to play"),
-        playlist: z.string().optional().describe("Playlist to search in (default: Library)"),
+        trackName: z.string().max(500).describe("Track name to play"),
+        playlist: z.string().max(500).optional().describe("Playlist to search in (default: Library)"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
@@ -155,7 +155,7 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
       title: "Play Playlist",
       description: "Start playing a playlist by name, with optional shuffle control.",
       inputSchema: {
-        name: z.string().describe("Playlist name"),
+        name: z.string().max(500).describe("Playlist name"),
         shuffle: z.boolean().optional().describe("Enable or disable shuffle"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
@@ -175,7 +175,7 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
       title: "Get Track Info",
       description: "Get detailed metadata for a specific track by name.",
       inputSchema: {
-        trackName: z.string().describe("Track name to look up"),
+        trackName: z.string().max(500).describe("Track name to look up"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
@@ -214,7 +214,7 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
       title: "Create Playlist",
       description: "Create a new playlist in Music.",
       inputSchema: {
-        name: z.string().describe("Name for the new playlist"),
+        name: z.string().max(500).describe("Name for the new playlist"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
@@ -233,8 +233,8 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
       title: "Add to Playlist",
       description: "Add a track to an existing playlist.",
       inputSchema: {
-        playlistName: z.string().describe("Playlist name"),
-        trackName: z.string().describe("Track name to add"),
+        playlistName: z.string().max(500).describe("Playlist name"),
+        trackName: z.string().max(500).describe("Track name to add"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
@@ -253,8 +253,8 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
       title: "Remove from Playlist",
       description: "Remove a track from a playlist.",
       inputSchema: {
-        playlistName: z.string().describe("Playlist name"),
-        trackName: z.string().describe("Track name to remove"),
+        playlistName: z.string().max(500).describe("Playlist name"),
+        trackName: z.string().max(500).describe("Track name to remove"),
       },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     },
@@ -273,7 +273,7 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
       title: "Delete Playlist",
       description: "Delete an existing playlist from Music.",
       inputSchema: {
-        name: z.string().describe("Playlist name to delete"),
+        name: z.string().max(500).describe("Playlist name to delete"),
       },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     },
@@ -292,7 +292,7 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
       title: "Get Rating",
       description: "Get the rating, favorited, and disliked status for a track.",
       inputSchema: {
-        trackName: z.string().describe("Track name to look up"),
+        trackName: z.string().max(500).describe("Track name to look up"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
@@ -312,7 +312,7 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
       description:
         "Set the star rating (0-100) for a track. Use multiples of 20 for full stars (0, 20, 40, 60, 80, 100).",
       inputSchema: {
-        trackName: z.string().describe("Track name"),
+        trackName: z.string().max(500).describe("Track name"),
         rating: z.number().int().min(0).max(100).describe("Rating value (0-100)"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -332,7 +332,7 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
       title: "Set Favorited",
       description: "Mark or unmark a track as favorited (loved).",
       inputSchema: {
-        trackName: z.string().describe("Track name"),
+        trackName: z.string().max(500).describe("Track name"),
         favorited: z.boolean().describe("Whether to mark as favorited"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -352,7 +352,7 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
       title: "Set Disliked",
       description: "Mark or unmark a track as disliked.",
       inputSchema: {
-        trackName: z.string().describe("Track name"),
+        trackName: z.string().max(500).describe("Track name"),
         disliked: z.boolean().describe("Whether to mark as disliked"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },

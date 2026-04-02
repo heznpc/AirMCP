@@ -50,7 +50,7 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
       description:
         "Summarize text using Apple Intelligence (on-device Foundation Models). Requires macOS 26+ with Apple Silicon.",
       inputSchema: {
-        text: z.string().describe("Text to summarize"),
+        text: z.string().max(10000).describe("Text to summarize"),
       },
       annotations: {
         readOnlyHint: true,
@@ -76,7 +76,7 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
       description:
         "Rewrite text in a specified tone using Apple Intelligence (on-device Foundation Models). Requires macOS 26+ with Apple Silicon.",
       inputSchema: {
-        text: z.string().describe("Text to rewrite"),
+        text: z.string().max(10000).describe("Text to rewrite"),
         tone: z
           .enum(["professional", "friendly", "concise"])
           .optional()
@@ -107,7 +107,7 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
       description:
         "Proofread and correct grammar/spelling using Apple Intelligence (on-device Foundation Models). Requires macOS 26+ with Apple Silicon.",
       inputSchema: {
-        text: z.string().describe("Text to proofread"),
+        text: z.string().max(10000).describe("Text to proofread"),
       },
       annotations: {
         readOnlyHint: true,
@@ -135,8 +135,12 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
       description:
         "Generate text using Apple's on-device Foundation Model with custom system instructions. Runs entirely on-device via Apple Silicon. Requires macOS 26+.",
       inputSchema: {
-        prompt: z.string().describe("The user prompt / instruction for text generation"),
-        systemInstruction: z.string().optional().describe("Optional system instruction to guide the model's behavior"),
+        prompt: z.string().max(10000).describe("The user prompt / instruction for text generation"),
+        systemInstruction: z
+          .string()
+          .max(10000)
+          .optional()
+          .describe("Optional system instruction to guide the model's behavior"),
         temperature: z
           .number()
           .min(0)
@@ -171,13 +175,17 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
       description:
         "Generate structured JSON output from Apple's on-device Foundation Model with optional schema constraints. Useful for extracting structured data from natural language. Requires macOS 26+.",
       inputSchema: {
-        prompt: z.string().describe("The prompt describing what structured data to generate"),
-        systemInstruction: z.string().optional().describe("Optional system instruction to guide output format"),
+        prompt: z.string().max(10000).describe("The prompt describing what structured data to generate"),
+        systemInstruction: z
+          .string()
+          .max(10000)
+          .optional()
+          .describe("Optional system instruction to guide output format"),
         schema: z
           .record(
             z.object({
-              type: z.string().describe("JSON type: string, number, boolean, array, object"),
-              description: z.string().optional().describe("Description of this field"),
+              type: z.string().max(1000).describe("JSON type: string, number, boolean, array, object"),
+              description: z.string().max(5000).optional().describe("Description of this field"),
             }),
           )
           .optional()
@@ -210,7 +218,7 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
       description:
         "Classify and tag content using Apple's on-device Foundation Model. Returns confidence scores for each provided tag/category. Requires macOS 26+.",
       inputSchema: {
-        text: z.string().describe("The text content to classify"),
+        text: z.string().max(10000).describe("The text content to classify"),
         tags: z.array(z.string()).min(1).describe("List of tag/category names to classify the content against"),
       },
       annotations: {
@@ -237,9 +245,12 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
       description:
         "Send a message to an on-device AI session using Apple Foundation Models. Note: each call creates a fresh session — sessionName is for caller-side tracking only, not server-side persistence. Requires macOS 26+.",
       inputSchema: {
-        sessionName: z.string().describe("Name for this chat session (use same name to continue a conversation)"),
-        message: z.string().describe("The message to send to the AI"),
-        systemInstruction: z.string().optional().describe("Optional system instruction for this session"),
+        sessionName: z
+          .string()
+          .max(500)
+          .describe("Name for this chat session (use same name to continue a conversation)"),
+        message: z.string().max(10000).describe("The message to send to the AI"),
+        systemInstruction: z.string().max(10000).optional().describe("Optional system instruction for this session"),
       },
       annotations: {
         readOnlyHint: true,
@@ -271,7 +282,7 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
         "Generate an image from a text description using Apple Intelligence on-device image generation (Image Playground). " +
         "Returns the file path to the generated PNG. Requires macOS 26+ with Apple Silicon.",
       inputSchema: {
-        prompt: z.string().min(1).describe("Text description of the image to generate"),
+        prompt: z.string().min(1).max(5000).describe("Text description of the image to generate"),
         outputPath: zFilePath
           .optional()
           .refine((p) => !p || /\.(png|jpg|jpeg)$/i.test(p), "Output path must end with .png, .jpg, or .jpeg")
@@ -334,7 +345,10 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
         "Returns a JSON array of planned actions for the CALLER to review and execute — this tool does NOT execute anything itself. " +
         "Requires macOS 26+. Works completely offline with no API keys.",
       inputSchema: {
-        goal: z.string().describe("What you want to accomplish (e.g. 'organize my day', 'prepare for meeting')"),
+        goal: z
+          .string()
+          .max(1000)
+          .describe("What you want to accomplish (e.g. 'organize my day', 'prepare for meeting')"),
         context: z
           .string()
           .max(10000)
@@ -436,8 +450,8 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
         "Run a prompt through Apple's on-device Foundation Models with access to AirMCP tools (Calendar, Reminders, Contacts). " +
         "The on-device LLM autonomously decides which tools to call. Requires macOS 26+ with Apple Silicon.",
       inputSchema: {
-        prompt: z.string().min(1).describe("What you want the on-device AI to do with your Apple data"),
-        systemInstruction: z.string().optional().describe("Optional system instruction for the AI agent"),
+        prompt: z.string().min(1).max(10000).describe("What you want the on-device AI to do with your Apple data"),
+        systemInstruction: z.string().max(10000).optional().describe("Optional system instruction for the AI agent"),
       },
       annotations: {
         readOnlyHint: false,

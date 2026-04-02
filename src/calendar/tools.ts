@@ -123,9 +123,9 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
       description:
         "List events within a date range. Requires startDate and endDate (ISO 8601). Optionally filter by calendar name. Supports limit/offset pagination.",
       inputSchema: {
-        startDate: z.string().describe("Start of range (ISO 8601, e.g. '2026-03-01T00:00:00Z')"),
-        endDate: z.string().describe("End of range (ISO 8601, e.g. '2026-03-31T23:59:59Z')"),
-        calendar: z.string().optional().describe("Filter by calendar name"),
+        startDate: z.string().max(64).describe("Start of range (ISO 8601, e.g. '2026-03-01T00:00:00Z')"),
+        endDate: z.string().max(64).describe("End of range (ISO 8601, e.g. '2026-03-31T23:59:59Z')"),
+        calendar: z.string().max(500).optional().describe("Filter by calendar name"),
         limit: z
           .number()
           .int()
@@ -181,7 +181,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
       description:
         "Read full details of a calendar event by ID. Includes attendees (read-only), location, description, and recurrence info.",
       inputSchema: {
-        id: z.string().describe("Event UID"),
+        id: z.string().max(500).describe("Event UID"),
       },
       annotations: {
         readOnlyHint: true,
@@ -210,12 +210,12 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
       description:
         "Create a new calendar event. Recurring events cannot be created via automation. Attendees cannot be added programmatically.",
       inputSchema: {
-        summary: z.string().min(1).describe("Event title"),
-        startDate: z.string().describe("Start date/time (ISO 8601, e.g. '2026-03-15T09:00:00Z')"),
-        endDate: z.string().describe("End date/time (ISO 8601, e.g. '2026-03-15T10:00:00Z')"),
-        location: z.string().optional().describe("Event location"),
-        description: z.string().optional().describe("Event notes/description"),
-        calendar: z.string().optional().describe("Target calendar name. Defaults to first writable calendar."),
+        summary: z.string().min(1).max(500).describe("Event title"),
+        startDate: z.string().max(64).describe("Start date/time (ISO 8601, e.g. '2026-03-15T09:00:00Z')"),
+        endDate: z.string().max(64).describe("End date/time (ISO 8601, e.g. '2026-03-15T10:00:00Z')"),
+        location: z.string().max(5000).optional().describe("Event location"),
+        description: z.string().max(5000).optional().describe("Event notes/description"),
+        calendar: z.string().max(500).optional().describe("Target calendar name. Defaults to first writable calendar."),
         allDay: z.boolean().optional().describe("Set as all-day event"),
       },
       annotations: {
@@ -248,12 +248,16 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
       description:
         "Update event properties. Only specified fields are changed. Attendees and recurrence rules cannot be modified via automation.",
       inputSchema: {
-        id: z.string().describe("Event UID"),
-        summary: z.string().optional().describe("New title"),
-        startDate: z.string().optional().describe("New start date/time (ISO 8601, e.g. '2026-03-15T09:00:00Z')"),
-        endDate: z.string().optional().describe("New end date/time (ISO 8601, e.g. '2026-03-15T10:00:00Z')"),
-        location: z.string().optional().describe("New location"),
-        description: z.string().optional().describe("New notes/description"),
+        id: z.string().max(500).describe("Event UID"),
+        summary: z.string().max(500).optional().describe("New title"),
+        startDate: z
+          .string()
+          .max(64)
+          .optional()
+          .describe("New start date/time (ISO 8601, e.g. '2026-03-15T09:00:00Z')"),
+        endDate: z.string().max(64).optional().describe("New end date/time (ISO 8601, e.g. '2026-03-15T10:00:00Z')"),
+        location: z.string().max(5000).optional().describe("New location"),
+        description: z.string().max(5000).optional().describe("New notes/description"),
       },
       annotations: {
         readOnlyHint: false,
@@ -284,7 +288,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
       title: "Delete Event",
       description: "Delete a calendar event by ID. This action is permanent.",
       inputSchema: {
-        id: z.string().describe("Event UID"),
+        id: z.string().max(500).describe("Event UID"),
       },
       annotations: {
         readOnlyHint: false,
@@ -312,9 +316,9 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
       title: "Search Events",
       description: "Search events by keyword in title or description within a date range.",
       inputSchema: {
-        query: z.string().describe("Search keyword"),
-        startDate: z.string().describe("Start of range (ISO 8601, e.g. '2026-03-01T00:00:00Z')"),
-        endDate: z.string().describe("End of range (ISO 8601, e.g. '2026-03-31T23:59:59Z')"),
+        query: z.string().max(500).describe("Search keyword"),
+        startDate: z.string().max(64).describe("Start of range (ISO 8601, e.g. '2026-03-01T00:00:00Z')"),
+        endDate: z.string().max(64).describe("End of range (ISO 8601, e.g. '2026-03-31T23:59:59Z')"),
         limit: z.number().int().min(1).max(500).optional().default(50).describe("Max results (default: 50)"),
       },
       outputSchema: {
@@ -444,17 +448,21 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
       description:
         "Create a recurring calendar event via EventKit. Supports daily, weekly, monthly, and yearly recurrence with configurable intervals. Requires macOS 26+ Swift bridge.",
       inputSchema: {
-        summary: z.string().min(1).describe("Event title"),
-        startDate: z.string().describe("Start date/time (ISO 8601, e.g. '2026-03-15T09:00:00Z')"),
-        endDate: z.string().describe("End date/time (ISO 8601, e.g. '2026-03-15T10:00:00Z')"),
-        location: z.string().optional().describe("Event location"),
-        description: z.string().optional().describe("Event notes/description"),
-        calendar: z.string().optional().describe("Target calendar name. Defaults to the default calendar."),
+        summary: z.string().min(1).max(500).describe("Event title"),
+        startDate: z.string().max(64).describe("Start date/time (ISO 8601, e.g. '2026-03-15T09:00:00Z')"),
+        endDate: z.string().max(64).describe("End date/time (ISO 8601, e.g. '2026-03-15T10:00:00Z')"),
+        location: z.string().max(5000).optional().describe("Event location"),
+        description: z.string().max(5000).optional().describe("Event notes/description"),
+        calendar: z.string().max(500).optional().describe("Target calendar name. Defaults to the default calendar."),
         recurrence: z
           .object({
             frequency: z.enum(["daily", "weekly", "monthly", "yearly"]).describe("Recurrence frequency"),
             interval: z.number().int().min(1).describe("Repeat every N frequency units (e.g. 2 = every 2 weeks)"),
-            endDate: z.string().optional().describe("Recurrence end date (ISO 8601, e.g. '2026-12-31T23:59:59Z')"),
+            endDate: z
+              .string()
+              .max(64)
+              .optional()
+              .describe("Recurrence end date (ISO 8601, e.g. '2026-12-31T23:59:59Z')"),
             count: z.number().int().min(1).optional().describe("Number of occurrences (alternative to endDate)"),
             daysOfWeek: z
               .array(z.number().int().min(1).max(7))

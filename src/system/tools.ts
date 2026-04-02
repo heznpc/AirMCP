@@ -87,7 +87,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       title: "Set Clipboard",
       description: "Write text to the system clipboard, replacing its current content.",
       inputSchema: {
-        text: z.string().describe("Text to copy to the clipboard"),
+        text: z.string().max(10000).describe("Text to copy to the clipboard"),
       },
       outputSchema: {
         set: z.boolean(),
@@ -267,10 +267,10 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       title: "Show Notification",
       description: "Display a macOS system notification with optional title, subtitle, and sound.",
       inputSchema: {
-        message: z.string().describe("Notification body text"),
-        title: z.string().optional().describe("Notification title"),
-        subtitle: z.string().optional().describe("Notification subtitle"),
-        sound: z.string().optional().describe("Sound name to play (e.g. 'Frog', 'Glass', 'Hero')"),
+        message: z.string().max(5000).describe("Notification body text"),
+        title: z.string().max(500).optional().describe("Notification title"),
+        subtitle: z.string().max(5000).optional().describe("Notification subtitle"),
+        sound: z.string().max(500).optional().describe("Sound name to play (e.g. 'Frog', 'Glass', 'Hero')"),
       },
       annotations: {
         readOnlyHint: false,
@@ -580,7 +580,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       description:
         "Launch an application by name. Lightweight — just activates the app without reading its accessibility tree.",
       inputSchema: {
-        name: z.string().min(1).describe("Application name (e.g. 'Safari', 'Xcode') or bundle ID"),
+        name: z.string().min(1).max(500).describe("Application name (e.g. 'Safari', 'Xcode') or bundle ID"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
@@ -599,7 +599,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       title: "Quit App",
       description: "Quit a running application by name. May cause unsaved work to be lost.",
       inputSchema: {
-        name: z.string().min(1).describe("Application name (e.g. 'Safari')"),
+        name: z.string().min(1).max(500).describe("Application name (e.g. 'Safari')"),
       },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
@@ -618,7 +618,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       title: "Is App Running",
       description: "Check whether an application is currently running. Returns process details if found.",
       inputSchema: {
-        name: z.string().min(1).describe("Application name to check (e.g. 'Safari')"),
+        name: z.string().min(1).max(500).describe("Application name to check (e.g. 'Safari')"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
@@ -656,10 +656,14 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       title: "Move Window",
       description: "Move a window to a specific position on screen.",
       inputSchema: {
-        appName: z.string().min(1).describe("Application name (e.g. 'Safari')"),
+        appName: z.string().min(1).max(500).describe("Application name (e.g. 'Safari')"),
         x: z.number().int().describe("X coordinate for top-left corner"),
         y: z.number().int().describe("Y coordinate for top-left corner"),
-        windowTitle: z.string().optional().describe("Specific window title. If omitted, targets the first window."),
+        windowTitle: z
+          .string()
+          .max(500)
+          .optional()
+          .describe("Specific window title. If omitted, targets the first window."),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
@@ -678,10 +682,14 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       title: "Resize Window",
       description: "Resize a window to specific dimensions.",
       inputSchema: {
-        appName: z.string().min(1).describe("Application name (e.g. 'Safari')"),
+        appName: z.string().min(1).max(500).describe("Application name (e.g. 'Safari')"),
         width: z.number().int().min(1).describe("Window width in pixels"),
         height: z.number().int().min(1).describe("Window height in pixels"),
-        windowTitle: z.string().optional().describe("Specific window title. If omitted, targets the first window."),
+        windowTitle: z
+          .string()
+          .max(500)
+          .optional()
+          .describe("Specific window title. If omitted, targets the first window."),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
@@ -700,13 +708,17 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       title: "Minimize Window",
       description: "Minimize or restore a window.",
       inputSchema: {
-        appName: z.string().min(1).describe("Application name (e.g. 'Safari')"),
+        appName: z.string().min(1).max(500).describe("Application name (e.g. 'Safari')"),
         restore: z
           .boolean()
           .optional()
           .default(false)
           .describe("Set true to restore (un-minimize) instead of minimizing"),
-        windowTitle: z.string().optional().describe("Specific window title. If omitted, targets the first window."),
+        windowTitle: z
+          .string()
+          .max(500)
+          .optional()
+          .describe("Specific window title. If omitted, targets the first window."),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },

@@ -125,7 +125,7 @@ export async function createServer(
         "Search available tools by keyword. Returns matching tools with descriptions. " +
         "Use this instead of scanning all 250+ tools — describe what you need and get relevant tools.",
       inputSchema: {
-        query: z.string().min(1).describe("Search query — e.g. 'calendar', 'send email', 'music playback'"),
+        query: z.string().min(1).max(500).describe("Search query — e.g. 'calendar', 'send email', 'music playback'"),
         limit: z.number().min(1).max(50).optional().describe("Max results (default 20)"),
       },
       outputSchema: {
@@ -195,7 +195,7 @@ export async function createServer(
           "Based on your usage patterns, suggest which tools typically follow a given tool. " +
           "Learns from how you use AirMCP over time. Returns frequently-used tool sequences.",
         inputSchema: {
-          after: z.string().min(1).describe("Tool name to get suggestions for — e.g. 'today_events'"),
+          after: z.string().min(1).max(500).describe("Tool name to get suggestions for — e.g. 'today_events'"),
           limit: z.number().min(1).max(20).optional().describe("Max suggestions (default 5)"),
         },
         outputSchema: {
@@ -387,7 +387,7 @@ export async function createServer(
         "Retrieve a registered MCP prompt by name and return its workflow instructions as text. " +
         "Useful in autonomous/Cowork environments where prompts cannot be invoked directly.",
       inputSchema: {
-        name: z.string().min(1).describe("Prompt name (e.g. 'daily-briefing', 'dev-session')"),
+        name: z.string().min(1).max(500).describe("Prompt name (e.g. 'daily-briefing', 'dev-session')"),
         args: z.record(z.string()).optional().describe("Prompt arguments as key-value pairs"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },

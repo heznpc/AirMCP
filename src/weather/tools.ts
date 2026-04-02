@@ -19,7 +19,7 @@ export function registerWeatherTools(server: McpServer, _config: AirMcpConfig): 
         feelsLike: z.number().describe("Apparent temperature in Celsius"),
         humidity: z.number().describe("Relative humidity percentage"),
         weatherCode: z.number().describe("WMO weather code"),
-        weatherDescription: z.string().describe("Human-readable weather description"),
+        weatherDescription: z.string().max(5000).describe("Human-readable weather description"),
         windSpeed: z.number().describe("Wind speed in km/h"),
         windDirection: z.number().describe("Wind direction in degrees"),
         precipitation: z.number().describe("Precipitation in mm"),

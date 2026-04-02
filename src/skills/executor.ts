@@ -5,6 +5,9 @@ import { toolRegistry } from "../shared/tool-registry.js";
 const SINGLE_TEMPLATE_RE = /^\{\{([^}]+)\}\}$/;
 const EMBEDDED_TEMPLATE_RE = /\{\{([^}]+)\}\}/g;
 
+/** Maximum iterations for a single loop step to prevent DoS. */
+const MAX_LOOP_ITERATIONS = 1000;
+
 /**
  * Resolve `{{stepId.field.path}}` templates against collected step results.
  *
@@ -228,12 +231,17 @@ async function callTool(
   return toolRegistry.callTool(toolName, args);
 }
 
+const MAX_TOOL_RESPONSE_SIZE = 1_048_576; // 1MB
+
 function parseToolResponse(response: { content: Array<{ type: string; text: string }>; isError?: boolean }): unknown {
   if (response.isError) {
     throw new Error(response.content[0]?.text ?? "Tool returned an error");
   }
   const text = response.content[0]?.text;
   if (!text) return null;
+  if (text.length > MAX_TOOL_RESPONSE_SIZE) {
+    return text.slice(0, MAX_TOOL_RESPONSE_SIZE) + `... (truncated, ${text.length} chars total)`;
+  }
   try {
     return JSON.parse(text);
   } catch {
@@ -258,6 +266,17 @@ async function executeOneStep(
     if (!Array.isArray(items)) {
       return {
         stepResult: { id: step.id, status: "error", error: `loop expression did not resolve to an array` },
+        data: null,
+      };
+    }
+
+    if (items.length > MAX_LOOP_ITERATIONS) {
+      return {
+        stepResult: {
+          id: step.id,
+          status: "error",
+          error: `loop has ${items.length} items, exceeding max of ${MAX_LOOP_ITERATIONS}`,
+        },
         data: null,
       };
     }

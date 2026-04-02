@@ -101,6 +101,7 @@
     "@commitlint/cli": "^20.4.4",
     "@commitlint/config-conventional": "^20.4.4",
     "@eslint/js": "^10.0.1",
+    "esbuild": "^0.25.0",
     "@jest/globals": "^30.3.0",
     "@types/express": "^5.0.6",
     "@types/node": "^25.5.0",

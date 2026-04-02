@@ -2,7 +2,7 @@ import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, err, toolError } from "../shared/result.js";
+import { ok, okUntrusted, err, toolError } from "../shared/result.js";
 import {
   uiOpenAppScript,
   uiClickScript,
@@ -226,7 +226,7 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
     },
     async ({ appName, maxDepth, maxElements }) => {
       try {
-        return ok(await runJxa(uiReadScript(appName, maxDepth, maxElements)));
+        return okUntrusted(await runJxa(uiReadScript(appName, maxDepth, maxElements)));
       } catch (e) {
         return toolError("read UI", e);
       }
@@ -288,7 +288,7 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
           );
         }
         const locator: AXLocator = { app, role, title, value, description, identifier, label };
-        return ok(await runJxa(axQueryScript(locator, maxResults, maxDepth)));
+        return okUntrusted(await runJxa(axQueryScript(locator, maxResults, maxDepth)));
       } catch (e) {
         return toolError("accessibility query", e);
       }
@@ -385,7 +385,7 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
     },
     async ({ app, pid, maxDepth, maxElements, onlyVisible }) => {
       try {
-        return ok(await runJxa(axTraverseScript(app, pid, maxDepth, maxElements, onlyVisible)));
+        return okUntrusted(await runJxa(axTraverseScript(app, pid, maxDepth, maxElements, onlyVisible)));
       } catch (e) {
         return toolError("traverse UI", e);
       }
@@ -412,7 +412,7 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
     },
     async ({ beforeSnapshot, app }) => {
       try {
-        return ok(await runJxa(axDiffScript(beforeSnapshot, app)));
+        return okUntrusted(await runJxa(axDiffScript(beforeSnapshot, app)));
       } catch (e) {
         return toolError("UI diff", e);
       }

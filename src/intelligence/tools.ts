@@ -1,7 +1,7 @@
 import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, err, toolError } from "../shared/result.js";
+import { ok, okUntrusted, err, toolError } from "../shared/result.js";
 import { runSwift, checkSwiftBridge } from "../shared/swift.js";
 import { zFilePath } from "../shared/validate.js";
 
@@ -327,7 +327,7 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
     async ({ imagePath }) => {
       try {
         const result = await runSwift<ScanDocumentResult>("scan-document", JSON.stringify({ imagePath }));
-        return ok(result);
+        return okUntrusted(result);
       } catch (e) {
         return toolError("scan document", e);
       }

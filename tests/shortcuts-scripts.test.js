@@ -30,7 +30,7 @@ describe('shortcuts script generators', () => {
 describe('shortcuts escJxaShell() injection prevention', () => {
   test('escapes double quotes in shortcut name', () => {
     const script = runShortcutScript('Say "Hello"');
-    expect(script).toContain('Say \\\\"Hello\\\\"');
+    expect(script).toContain('Say \\\\\\"Hello\\\\\\"');
   });
 
   test('escapes dollar signs in input', () => {

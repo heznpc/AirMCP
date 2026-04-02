@@ -239,9 +239,9 @@ describe('escJxaShell (two-layer: shell + JXA)', () => {
   });
 
   test('double-escapes double quotes', () => {
-    // escShell('"') => '\\"', then JXA re-escapes the backslash => '\\\\"'
+    // " → shell needs \" → JXA escapes both \ and " → \\\"
     const result = escJxaShell('"');
-    expect(result).toBe('\\\\"');
+    expect(result).toBe('\\\\\\"');
   });
 
   test('double-escapes backtick', () => {

@@ -135,7 +135,7 @@ export function registerMessagesTools(server: McpServer, config: AirMcpConfig): 
     },
     async ({ chatId }) => {
       try {
-        return ok(await runJxa(listParticipantsScript(chatId)));
+        return okUntrusted(await runJxa(listParticipantsScript(chatId)));
       } catch (e) {
         return toolError("list participants", e);
       }

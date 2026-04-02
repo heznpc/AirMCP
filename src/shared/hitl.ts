@@ -121,8 +121,17 @@ export class HitlClient {
     });
   }
 
+  private static readonly MAX_BUFFER_SIZE = 1_048_576; // 1MB
+
   private onData(chunk: string): void {
     this.buffer += chunk;
+    // Prevent unbounded buffer growth (DoS protection)
+    if (this.buffer.length > HitlClient.MAX_BUFFER_SIZE) {
+      console.error("[hitl] buffer exceeded 1MB — resetting and denying all pending");
+      this.buffer = "";
+      this.denyAllPending("buffer overflow");
+      return;
+    }
     const lines = this.buffer.split("\n");
     // Keep the last incomplete line in the buffer
     this.buffer = lines.pop() ?? "";

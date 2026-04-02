@@ -2,7 +2,7 @@ import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okLinked, toolError } from "../shared/result.js";
+import { ok, okLinked, okUntrusted, toolError } from "../shared/result.js";
 import {
   searchLocationScript,
   getDirectionsScript,
@@ -51,7 +51,7 @@ export function registerMapsTools(server: McpServer, _config: AirMcpConfig): voi
     },
     async ({ from, to, transportType }) => {
       try {
-        return ok(await runJxa(getDirectionsScript(from, to, transportType)));
+        return okUntrusted(await runJxa(getDirectionsScript(from, to, transportType)));
       } catch (e) {
         return toolError("get directions", e);
       }
@@ -113,7 +113,7 @@ export function registerMapsTools(server: McpServer, _config: AirMcpConfig): voi
     },
     async ({ query, latitude, longitude }) => {
       try {
-        return ok(await runJxa(searchNearbyScript(query, latitude, longitude)));
+        return okUntrusted(await runJxa(searchNearbyScript(query, latitude, longitude)));
       } catch (e) {
         return toolError("search nearby", e);
       }

@@ -26,18 +26,19 @@ export async function indexToolDescriptions(): Promise<number> {
 
   const tools = toolRegistry
     .getToolNames()
-    .map((name) => toolRegistry.getToolInfo(name)!)
-    .filter(Boolean);
+    .map((name) => toolRegistry.getToolInfo(name))
+    .filter((t): t is ToolInfo => t !== undefined);
   const texts = tools.map((t) => `${t.name}: ${t.title ?? ""} ${t.description ?? ""}`);
 
   try {
     const vectors = await embedBatch(texts, provider);
-    toolVectors = tools.map((t, i) => ({
-      name: t.name,
-      title: t.title,
-      description: t.description,
-      vector: vectors[i]!,
-    }));
+    toolVectors = [];
+    for (let i = 0; i < tools.length; i++) {
+      const vec = vectors[i];
+      if (!vec) continue;
+      const t = tools[i]!;
+      toolVectors.push({ name: t.name, title: t.title, description: t.description, vector: vec });
+    }
     indexed = true;
     return toolVectors.length;
   } catch {

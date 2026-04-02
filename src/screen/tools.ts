@@ -22,8 +22,14 @@ async function captureAndReturn(script: string) {
   const result = await runJxa<{ path: string }>(script);
   const filePath = result.path;
   try {
+    // Check file size BEFORE reading into memory to avoid OOM on huge screenshots
     const { size } = await stat(filePath);
     if (size > BUFFER.CAPTURE) {
+      try {
+        await unlink(filePath);
+      } catch {
+        /* ignore */
+      }
       throw new Error("Screenshot too large (>5MB). Use capture_area for a smaller region or reduce resolution.");
     }
     const buffer = await readFile(filePath);
@@ -186,20 +192,32 @@ export function registerScreenTools(server: McpServer, _config: AirMcpConfig): v
         // Send progress updates while recording
         if (progressToken !== undefined) {
           const start = Date.now();
+          let timerCleared = false;
           const timer = setInterval(async () => {
+            if (timerCleared) return;
             const elapsed = Math.min(Math.round((Date.now() - start) / 1000), duration);
-            await extra.sendNotification({
-              method: "notifications/progress",
-              params: {
-                progressToken,
-                progress: elapsed,
-                total: duration,
-                message: `Recording: ${elapsed}/${duration}s`,
-              },
-            });
-            if (elapsed >= duration) clearInterval(timer);
+            try {
+              await extra.sendNotification({
+                method: "notifications/progress",
+                params: {
+                  progressToken,
+                  progress: elapsed,
+                  total: duration,
+                  message: `Recording: ${elapsed}/${duration}s`,
+                },
+              });
+            } catch {
+              /* notification failure is non-fatal */
+            }
+            if (elapsed >= duration) {
+              timerCleared = true;
+              clearInterval(timer);
+            }
           }, 500);
-          recordPromise.finally(() => clearInterval(timer));
+          recordPromise.finally(() => {
+            timerCleared = true;
+            clearInterval(timer);
+          });
         }
 
         const result = await recordPromise;

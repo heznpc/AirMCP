@@ -3,6 +3,7 @@ import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import { ok, okLinked, okUntrusted, err, toolError } from "../shared/result.js";
+import { auditLog } from "../shared/audit.js";
 import {
   listTabsScript,
   readPageContentScript,
@@ -172,9 +173,25 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
         return err(
           "Running JavaScript in Safari is disabled. Set AIRMCP_ALLOW_RUN_JAVASCRIPT=true or allowRunJavascript in config.json.",
         );
+      const start = Date.now();
       try {
-        return ok(await runJxa(runJavascriptScript(code, windowIndex, tabIndex)));
+        const result = await runJxa(runJavascriptScript(code, windowIndex, tabIndex));
+        auditLog({
+          timestamp: new Date().toISOString(),
+          tool: "run_javascript",
+          args: { windowIndex, tabIndex, codeLength: code.length },
+          status: "ok",
+          durationMs: Date.now() - start,
+        });
+        return ok(result);
       } catch (e) {
+        auditLog({
+          timestamp: new Date().toISOString(),
+          tool: "run_javascript",
+          args: { windowIndex, tabIndex, codeLength: code.length },
+          status: "error",
+          durationMs: Date.now() - start,
+        });
         return toolError("run JavaScript", e);
       }
     },

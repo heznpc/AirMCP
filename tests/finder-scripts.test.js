@@ -44,6 +44,6 @@ describe('finder esc() injection prevention', () => {
 
   test('escapes double quotes in query (JXA+shell context)', () => {
     const script = searchFilesScript('~', 'say "hello"', 10);
-    expect(script).toContain('say \\\\"hello\\\\"');
+    expect(script).toContain('say \\\\\\"hello\\\\\\"');
   });
 });

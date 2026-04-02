@@ -6,7 +6,11 @@ export interface AirMCPEvent {
   timestamp: string;
 }
 
-const VALID_EVENT_TYPES = new Set(["calendar_changed", "reminders_changed", "pasteboard_changed"]);
+const VALID_EVENT_TYPES = new Set<AirMCPEvent["type"]>(["calendar_changed", "reminders_changed", "pasteboard_changed"]);
+
+function isValidEventType(value: unknown): value is AirMCPEvent["type"] {
+  return typeof value === "string" && VALID_EVENT_TYPES.has(value as AirMCPEvent["type"]);
+}
 
 class EventBus extends EventEmitter {
   private running = false;
@@ -19,16 +23,18 @@ class EventBus extends EventEmitter {
   /** Process a raw event line from the Swift bridge. */
   processLine(line: string): void {
     try {
-      const parsed = JSON.parse(line);
-      if (parsed.event && VALID_EVENT_TYPES.has(parsed.event)) {
-        const event: AirMCPEvent = {
-          type: parsed.event,
-          data: parsed.data ?? {},
-          timestamp: parsed.timestamp ?? new Date().toISOString(),
-        };
-        this.emit("event", event);
-        this.emit(event.type, event);
-      }
+      const parsed: unknown = JSON.parse(line);
+      if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return;
+      const obj = parsed as Record<string, unknown>;
+      if (!isValidEventType(obj.event)) return;
+      const data =
+        obj.data !== null && typeof obj.data === "object" && !Array.isArray(obj.data)
+          ? (obj.data as Record<string, unknown>)
+          : {};
+      const timestamp = typeof obj.timestamp === "string" ? obj.timestamp : new Date().toISOString();
+      const event: AirMCPEvent = { type: obj.event, data, timestamp };
+      this.emit("event", event);
+      this.emit(event.type, event);
     } catch {
       // Not an event line — ignore
     }

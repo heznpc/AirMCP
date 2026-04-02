@@ -1,12 +1,14 @@
 const OLLAMA_BASE = process.env.AIRMCP_OLLAMA_URL || "http://localhost:11434";
-if (
-  OLLAMA_BASE !== "http://localhost:11434" &&
-  !OLLAMA_BASE.startsWith("http://127.0.0.1") &&
-  !OLLAMA_BASE.startsWith("http://[::1]")
-) {
-  console.error(
-    `[AirMCP] Warning: AIRMCP_OLLAMA_URL points to non-local address: ${OLLAMA_BASE}. Prompts may contain sensitive Apple data.`,
-  );
+try {
+  const parsedUrl = new URL(OLLAMA_BASE);
+  const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
+  if (!LOCAL_HOSTS.has(parsedUrl.hostname)) {
+    console.error(
+      `[AirMCP] Warning: AIRMCP_OLLAMA_URL points to non-local address: ${OLLAMA_BASE}. Prompts may contain sensitive Apple data.`,
+    );
+  }
+} catch {
+  console.error(`[AirMCP] Warning: AIRMCP_OLLAMA_URL is not a valid URL: ${OLLAMA_BASE}`);
 }
 export const DEFAULT_MODEL = process.env.AIRMCP_OLLAMA_MODEL || "llama3.2";
 

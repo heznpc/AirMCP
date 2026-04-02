@@ -3,6 +3,19 @@ import { z } from "zod";
 
 import { userPrompt } from "../shared/prompt.js";
 
+/** Sanitize user input for prompt interpolation — prevent prompt injection. */
+function sanitizePromptInput(input: string): string {
+  // Strip control chars and excessive whitespace
+  // eslint-disable-next-line no-control-regex
+  return input.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, "").trim();
+}
+
+/** Wrap user input in clear delimiters so LLM treats it as data, not instructions. */
+function q(input: string): string {
+  const safe = sanitizePromptInput(input);
+  return `<user_input>${safe}</user_input>`;
+}
+
 export function registerCrossPrompts(server: McpServer): void {
   server.prompt(
     "meeting-notes-to-reminders",
@@ -154,13 +167,13 @@ export function registerCrossPrompts(server: McpServer): void {
     ({ topic }) => {
       return userPrompt(
         "Safari + Notes research workflow: search tabs, read content, compile findings into a note.",
-        `"${topic}" 주제로 리서치를 진행해줘.
+        `${q(topic)} 주제로 리서치를 진행해줘.
 
 다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 
 1. **Safari 탭 검색**: list_tabs로 현재 열린 Safari 탭 목록을 확인해
-2. **관련 탭 읽기**: "${topic}"과 관련된 탭을 찾아서 read_page_content로 페이지 내용을 읽어
-3. **기존 메모 검색**: search_notes로 "${topic}" 관련 기존 메모가 있는지 확인해
+2. **관련 탭 읽기**: ${q(topic)}과 관련된 탭을 찾아서 read_page_content로 페이지 내용을 읽어
+3. **기존 메모 검색**: search_notes로 ${q(topic)} 관련 기존 메모가 있는지 확인해
 4. **리서치 노트 작성**: create_note로 리서치 결과를 정리한 노트를 생성해:
    - 제목: "[리서치] ${topic} - {날짜}"
    - 주요 발견 사항 요약
@@ -228,11 +241,11 @@ export function registerCrossPrompts(server: McpServer): void {
   server.prompt("file-organizer", { directory: z.string().describe("Directory path to organize") }, ({ directory }) => {
     return userPrompt(
       "Finder + Notes file organization: scan directory, apply tags, and create summary note.",
-      `"${directory}" 폴더의 파일을 정리해줘.
+      `${q(directory)} 폴더의 파일을 정리해줘.
 
 다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 
-1. **파일 검색**: search_files로 "${directory}" 내 파일 목록을 확인해
+1. **파일 검색**: search_files로 ${q(directory)} 내 파일 목록을 확인해
 2. **파일 정보 확인**: get_file_info로 주요 파일의 상세 정보(크기, 생성일, 수정일 등)를 확인해
 3. **정리 규칙 확인**: search_notes로 파일 정리 관련 규칙이나 메모가 있는지 검색해
 4. 파일 분석 결과를 보여줘:
@@ -262,14 +275,14 @@ export function registerCrossPrompts(server: McpServer): void {
   server.prompt("dev-session", { projectPath: z.string().describe("Project directory path") }, ({ projectPath }) => {
     return userPrompt(
       "Developer session setup: scan project, check specs, research docs, log to notes.",
-      `"${projectPath}" 프로젝트로 개발 세션을 시작해줘.
+      `${q(projectPath)} 프로젝트로 개발 세션을 시작해줘.
 
 다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 
-1. **프로젝트 구조 파악**: list_directory("${projectPath}")로 프로젝트 루트 확인
+1. **프로젝트 구조 파악**: list_directory(${q(projectPath)})로 프로젝트 루트 확인
    - search_files로 주요 파일 패턴 검색 (package.json, Makefile, README 등)
    - get_file_info로 최근 수정된 파일 확인
-   - recent_files("${projectPath}", days: 1)로 오늘 작업한 파일 추적
+   - recent_files(${q(projectPath)}, days: 1)로 오늘 작업한 파일 추적
 
 2. **스펙/컨텍스트 확인**: search_notes로 프로젝트 관련 메모 검색
    - 프로젝트명, 주요 키워드로 검색
@@ -309,8 +322,8 @@ export function registerCrossPrompts(server: McpServer): void {
       projectPath: z.string().optional().describe("Project directory path"),
     },
     ({ errorMessage, projectPath }) => {
-      const errorCtx = errorMessage ? `\n에러 메시지: "${errorMessage}"` : "";
-      const pathCtx = projectPath ? `\n프로젝트 경로: "${projectPath}"` : "";
+      const errorCtx = errorMessage ? `\n에러 메시지: ${q(errorMessage)}` : "";
+      const pathCtx = projectPath ? `\n프로젝트 경로: ${q(projectPath)}` : "";
       return userPrompt(
         "Debug loop: capture errors, locate code, log bugs, create fix tasks.",
         `디버깅 루프를 시작해줘.${errorCtx}${pathCtx}
@@ -321,9 +334,9 @@ export function registerCrossPrompts(server: McpServer): void {
    - Safari 탭 확인: list_tabs로 열린 탭 중 localhost/개발 서버 탭 찾기
    - 관련 탭이 있으면 run_javascript로 콘솔 에러 캡처:
      \`JSON.stringify(window.__consoleErrors || 'No captured errors')\`
-   - get_clipboard으로 클립보드에 복사된 에러 메시지 확인${projectPath ? `\n   - recent_files("${projectPath}", days: 1)로 최근 수정 파일 확인` : ""}
+   - get_clipboard으로 클립보드에 복사된 에러 메시지 확인${projectPath ? `\n   - recent_files(${q(projectPath)}, days: 1)로 최근 수정 파일 확인` : ""}
 
-2. **코드 위치 특정**:${projectPath ? `\n   - search_files("${projectPath}", 에러 관련 키워드)로 관련 파일 검색` : ""}
+2. **코드 위치 특정**:${projectPath ? `\n   - search_files(${q(projectPath)}, 에러 관련 키워드)로 관련 파일 검색` : ""}
    - 에러 메시지에서 파일명/라인 번호 추출
    - get_file_info로 해당 파일 정보 확인
 
@@ -519,14 +532,14 @@ export function registerCrossPrompts(server: McpServer): void {
     ({ projectPath }) => {
       return userPrompt(
         "Build log analysis: check build output, log errors to Notes, celebrate success with Music.",
-        `"${projectPath}" 빌드 결과를 분석해줘.
+        `${q(projectPath)} 빌드 결과를 분석해줘.
 
 다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 
 1. **빌드 아웃풋 확인**:
-   - list_directory("${projectPath}")로 프로젝트 구조 확인
-   - search_files("${projectPath}", "build")로 빌드 아웃풋 디렉토리 찾기
-   - recent_files("${projectPath}", days: 1)로 방금 생성/수정된 파일 확인
+   - list_directory(${q(projectPath)})로 프로젝트 구조 확인
+   - search_files(${q(projectPath)}, "build")로 빌드 아웃풋 디렉토리 찾기
+   - recent_files(${q(projectPath)}, days: 1)로 방금 생성/수정된 파일 확인
    - get_clipboard으로 클립보드에 빌드 로그가 있는지 확인
 
 2. **결과 분석**:
@@ -705,13 +718,13 @@ export function registerCrossPrompts(server: McpServer): void {
       const today = new Date().toISOString().split("T")[0];
       return userPrompt(
         "Content curation workflow: gather from Safari, summarize, organize in Notes, tag files, set follow-ups.",
-        `"${topic}" 주제로 콘텐츠를 수집하고 정리해줘. (${today})
+        `${q(topic)} 주제로 콘텐츠를 수집하고 정리해줘. (${today})
 
 다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 
 1. **Safari 탭 수집**:
    - list_tabs로 현재 열린 모든 Safari 탭 확인
-   - "${topic}" 관련 탭을 식별
+   - ${q(topic)} 관련 탭을 식별
    - 관련 탭을 read_page_content로 하나씩 읽기
    - list_reading_list에서 관련 항목 확인
    - list_bookmarks에서 관련 북마크 확인
@@ -723,8 +736,8 @@ export function registerCrossPrompts(server: McpServer): void {
    - 사용 불가하면: 직접 핵심 포인트 3-5개로 요약
 
 3. **기존 자료 확인**:
-   - search_notes("${topic}")로 기존 관련 메모 검색
-   - search_files(query: "${topic}")로 관련 파일 검색
+   - search_notes(${q(topic)})로 기존 관련 메모 검색
+   - search_files(query: ${q(topic)})로 관련 파일 검색
    - 기존 자료가 있으면 read_note로 내용 확인하여 중복 방지
 
 4. **Notes에 정리**:
@@ -741,7 +754,7 @@ export function registerCrossPrompts(server: McpServer): void {
 
 5. **파일 태깅**:
    - 관련 파일이 있으면 set_file_tags로 태그 적용:
-     태그 제안: "${topic}", "리서치", "참고자료"
+     태그 제안: ${q(topic)}, "리서치", "참고자료"
    - 태그 적용 전 확인 요청
 
 6. **팔로업 설정**:

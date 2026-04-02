@@ -31,9 +31,19 @@ export function startTriggerListener(server: McpServer): void {
       if (now - binding.lastFired < binding.debounceMs) continue;
       binding.lastFired = now;
 
-      // Fire and forget — don't block the event loop
+      // Fire and forget — don't block the event loop. Retry once on failure.
       executeSkill(server, binding.skill).catch((e) => {
-        console.error(`[AirMCP] Trigger ${binding.skill.name} failed: ${e instanceof Error ? e.message : String(e)}`);
+        console.error(
+          `[AirMCP] Trigger ${binding.skill.name} failed (attempt 1): ${e instanceof Error ? e.message : String(e)}`,
+        );
+        // Single retry after 2s delay
+        setTimeout(() => {
+          executeSkill(server, binding.skill).catch((e2) => {
+            console.error(
+              `[AirMCP] Trigger ${binding.skill.name} failed (attempt 2): ${e2 instanceof Error ? e2.message : String(e2)}`,
+            );
+          });
+        }, 2000);
       });
     }
   });

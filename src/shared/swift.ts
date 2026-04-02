@@ -338,10 +338,13 @@ function runSwiftSingleShot<T>(command: string, input: string): Promise<T> {
         return;
       }
       try {
-        const parsed: unknown = JSON.parse(trimmed);
-        // Prototype pollution guard for single-shot mode
-        const resultStr = JSON.stringify(parsed);
-        if (/__proto__|constructor\s*:|prototype\s*:/.test(resultStr)) {
+        // Prototype pollution guard — use reviver (same as persistent mode)
+        let poisoned = false;
+        const parsed: unknown = JSON.parse(trimmed, (key, value) => {
+          if (DANGEROUS_KEYS.has(key)) poisoned = true;
+          return value;
+        });
+        if (poisoned) {
           reject(new Error("Swift bridge response rejected: suspicious payload"));
           return;
         }

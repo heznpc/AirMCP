@@ -39,12 +39,13 @@ async function collectNotes(): Promise<CollectedItem[]> {
 
 async function collectCalendarEvents(): Promise<CollectedItem[]> {
   const now = new Date();
-  const start = new Date(now.getTime() - 30 * 86400000).toISOString(); // past 30 days
-  const end = new Date(now.getTime() + 30 * 86400000).toISOString(); // next 30 days
+  const startMs = now.getTime() - 30 * 86400000;
+  const endMs = now.getTime() + 30 * 86400000;
+  // Pass timestamps as safe integers instead of string interpolation to prevent injection
   return runJxa<CollectedItem[]>(`
     const Calendar = Application('Calendar');
-    const start = new Date('${start}');
-    const end = new Date('${end}');
+    const start = new Date(${Math.trunc(startMs)});
+    const end = new Date(${Math.trunc(endMs)});
     const cals = Calendar.calendars();
     const result = [];
     for (const cal of cals) {

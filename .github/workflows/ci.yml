@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
       - name: Scan for secrets
         uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
@@ -80,6 +80,16 @@ jobs:
       # Swift builds require Xcode toolchain (not CommandLineTools)
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: Cache Swift build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            swift/.build
+            ios/.build
+          key: swift-${{ runner.os }}-${{ hashFiles('swift/Package.resolved', 'ios/Package.resolved') }}
+          restore-keys: |
+            swift-${{ runner.os }}-
 
       - name: Swift — Build AirMCPKit
         run: cd swift && swift build

@@ -55,8 +55,8 @@ function getCircuit(app: string): CircuitState {
     return c;
   }
   if (circuits.size >= CONCURRENCY.CB_CACHE_SIZE) {
-    const lru = circuits.keys().next().value!;
-    circuits.delete(lru);
+    const lru = circuits.keys().next().value;
+    if (lru !== undefined) circuits.delete(lru);
   }
   c = { failures: 0, state: "closed", openedAt: 0 };
   circuits.set(app, c);

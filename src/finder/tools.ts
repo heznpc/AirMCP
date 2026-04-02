@@ -3,7 +3,7 @@ import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import { ok, okLinked, toolError } from "../shared/result.js";
-import { zFilePath } from "../shared/validate.js";
+import { zFilePath, resolveAndGuard } from "../shared/validate.js";
 import {
   searchFilesScript,
   getFileInfoScript,
@@ -139,6 +139,8 @@ export function registerFinderTools(server: McpServer, _config: AirMcpConfig): v
     },
     async ({ source, destination }) => {
       try {
+        resolveAndGuard(source);
+        resolveAndGuard(destination);
         return ok(await runJxa(moveFileScript(source, destination)));
       } catch (e) {
         return toolError("move file", e);
@@ -158,6 +160,7 @@ export function registerFinderTools(server: McpServer, _config: AirMcpConfig): v
     },
     async ({ path }) => {
       try {
+        resolveAndGuard(path);
         return ok(await runJxa(trashFileScript(path)));
       } catch (e) {
         return toolError("trash file", e);

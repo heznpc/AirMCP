@@ -203,9 +203,10 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
     async ({ query, maxResults }) => {
       try {
         // Drive API query language: single quotes delimit string literals.
-        // Only allow alphanumeric, spaces, and common punctuation to prevent
-        // query-language operator injection (e.g. "x' OR name contains 'y").
-        const safeQuery = query.replace(/[^a-zA-Z0-9\u3131-\uD79D\u4E00-\u9FFF\s.,_\-@#]/g, "");
+        // Strip everything except alphanumeric, CJK, and whitespace to prevent injection.
+        // Single quotes are critical to remove as they delimit API query string literals.
+        const safeQuery = query.replace(/[^a-zA-Z0-9\u3131-\uD79D\u4E00-\u9FFF\s]/g, "").trim();
+        if (!safeQuery) return err("Search query contains no valid characters after sanitization.");
         return ok(
           await runGws("drive", "files", "list", {
             q: `fullText contains '${safeQuery}'`,
@@ -465,8 +466,16 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
           .max(500)
           .describe("Resource (e.g. 'users.messages', 'files', 'spreadsheets.values')"),
         method: z.string().min(1).max(64).describe("Method (e.g. 'list', 'get', 'create', 'update', 'delete')"),
-        params: z.record(z.unknown()).optional().describe("URL/query parameters as JSON"),
-        body: z.record(z.unknown()).optional().describe("Request body as JSON"),
+        params: z
+          .record(z.unknown())
+          .optional()
+          .refine((v) => !v || JSON.stringify(v).length <= 10_000, "params must be under 10KB")
+          .describe("URL/query parameters as JSON"),
+        body: z
+          .record(z.unknown())
+          .optional()
+          .refine((v) => !v || JSON.stringify(v).length <= 100_000, "body must be under 100KB")
+          .describe("Request body as JSON"),
       },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },

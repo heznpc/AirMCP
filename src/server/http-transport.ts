@@ -5,7 +5,7 @@
 
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
-import { randomUUID, timingSafeEqual } from "node:crypto";
+import { randomUUID, timingSafeEqual, randomBytes } from "node:crypto";
 import { NPM_PACKAGE_NAME } from "../shared/config.js";
 import { LIMITS, TIMEOUT } from "../shared/constants.js";
 import { printBanner } from "../shared/banner.js";
@@ -22,12 +22,18 @@ interface RateBucket {
   lastRefill: number;
 }
 
+const MAX_RATE_BUCKETS = 10_000;
 const rateBuckets = new Map<string, RateBucket>();
 
 function checkRateLimit(ip: string): boolean {
   const now = Date.now();
   let bucket = rateBuckets.get(ip);
   if (!bucket) {
+    // Evict oldest bucket if map is at capacity (prevents unbounded growth from IP rotation)
+    if (rateBuckets.size >= MAX_RATE_BUCKETS) {
+      const oldest = rateBuckets.keys().next().value;
+      if (oldest !== undefined) rateBuckets.delete(oldest);
+    }
     bucket = { tokens: RATE_MAX_REQUESTS, lastRefill: now };
     rateBuckets.set(ip, bucket);
   }
@@ -158,12 +164,11 @@ export async function startHttpServer(options: HttpServerOptions): Promise<void>
   process.on("exit", () => clearInterval(cleanupInterval));
 
   // Health check — for load balancers, monitoring, and readiness probes
-  // Note: session counts omitted to prevent information leakage
+  // Note: session counts and uptime omitted to prevent information leakage
   app.get("/health", (_req, res) => {
     res.json({
       status: "ok",
       version: pkg.version,
-      uptime: Math.floor(process.uptime()),
     });
   });
 
@@ -182,6 +187,14 @@ export async function startHttpServer(options: HttpServerOptions): Promise<void>
     },
   };
   app.get("/.well-known/mcp.json", (_req, res) => res.json(serverCard));
+
+  // Request ID middleware for tracing
+  app.use((req, res, next) => {
+    const requestId = (req.headers["x-request-id"] as string) || randomBytes(8).toString("hex");
+    res.set("X-Request-ID", requestId);
+    (req as unknown as Record<string, string>).__requestId = requestId;
+    next();
+  });
 
   app.post("/mcp", async (req, res) => {
     try {

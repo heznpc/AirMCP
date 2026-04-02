@@ -35,17 +35,18 @@ import {
   minimizeWindowScript,
 } from "./scripts.js";
 
-let caffeinatePid: number | null = null;
+const caffeinatePids = new Set<number>();
 
-// Clean up orphaned caffeinate process on server exit
+// Clean up ALL orphaned caffeinate processes on server exit
 process.on("exit", () => {
-  if (caffeinatePid !== null) {
+  for (const pid of caffeinatePids) {
     try {
-      process.kill(caffeinatePid);
+      process.kill(pid);
     } catch {
       /* already exited */
     }
   }
+  caffeinatePids.clear();
 });
 
 export function registerSystemTools(server: McpServer, _config: AirMcpConfig): void {
@@ -529,17 +530,17 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
     },
     async ({ seconds }) => {
       try {
-        // Kill any previous caffeinate process before starting a new one
-        if (caffeinatePid !== null) {
+        // Kill any previous caffeinate processes before starting a new one
+        for (const pid of caffeinatePids) {
           try {
-            process.kill(caffeinatePid);
+            process.kill(pid);
           } catch {
             /* already exited */
           }
-          caffeinatePid = null;
         }
+        caffeinatePids.clear();
         const result = await runJxa<{ action: string; pid: number; seconds: number }>(preventSleepScript(seconds));
-        caffeinatePid = result.pid;
+        caffeinatePids.add(result.pid);
         return ok(result);
       } catch (e) {
         return toolError("prevent sleep", e);

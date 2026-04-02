@@ -17,6 +17,7 @@ import {
   replyMailScript,
 } from "./scripts.js";
 import { LIMITS } from "../shared/constants.js";
+import { auditLog } from "../shared/audit.js";
 
 export function registerMailTools(server: McpServer, config: AirMcpConfig): void {
   const { allowSendMail } = config;
@@ -258,9 +259,25 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
     async ({ to, subject, body, cc, bcc, account }) => {
       if (!allowSendMail)
         return err("Sending mail is disabled. Set allowSendMail: true in config or AIRMCP_ALLOW_SEND_MAIL=true.");
+      const start = Date.now();
       try {
-        return ok(await runJxa(sendMailScript(to, subject, body, cc, bcc, account)));
+        const result = await runJxa(sendMailScript(to, subject, body, cc, bcc, account));
+        auditLog({
+          timestamp: new Date().toISOString(),
+          tool: "send_mail",
+          args: { to, subject, cc, bcc, account },
+          status: "ok",
+          durationMs: Date.now() - start,
+        });
+        return ok(result);
       } catch (e) {
+        auditLog({
+          timestamp: new Date().toISOString(),
+          tool: "send_mail",
+          args: { to, subject, cc, bcc, account },
+          status: "error",
+          durationMs: Date.now() - start,
+        });
         return toolError("send mail", e);
       }
     },
@@ -281,9 +298,25 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
     async ({ id, body, replyAll }) => {
       if (!allowSendMail)
         return err("Sending mail is disabled. Set allowSendMail: true in config or AIRMCP_ALLOW_SEND_MAIL=true.");
+      const start = Date.now();
       try {
-        return ok(await runJxa(replyMailScript(id, body, replyAll)));
+        const result = await runJxa(replyMailScript(id, body, replyAll));
+        auditLog({
+          timestamp: new Date().toISOString(),
+          tool: "reply_mail",
+          args: { id, replyAll },
+          status: "ok",
+          durationMs: Date.now() - start,
+        });
+        return ok(result);
       } catch (e) {
+        auditLog({
+          timestamp: new Date().toISOString(),
+          tool: "reply_mail",
+          args: { id, replyAll },
+          status: "error",
+          durationMs: Date.now() - start,
+        });
         return toolError("reply", e);
       }
     },

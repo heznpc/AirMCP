@@ -108,11 +108,14 @@ export class TtlCache {
     // First pass: remove expired (may free enough space)
     this.prune();
     // Second pass: evict oldest (first in Map = least recently used)
-    const iter = this.store.keys();
-    while (this.store.size > this.maxEntries) {
-      const oldest = iter.next();
-      if (oldest.done) break;
-      this.store.delete(oldest.value);
+    // Use a snapshot of keys to avoid iterator invalidation issues
+    const keys = [...this.store.keys()];
+    let evicted = 0;
+    for (const key of keys) {
+      if (this.store.size <= this.maxEntries) break;
+      this.store.delete(key);
+      evicted++;
+      if (evicted > this.maxEntries) break; // safety guard against infinite loop
     }
   }
 }

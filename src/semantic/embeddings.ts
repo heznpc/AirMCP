@@ -95,11 +95,20 @@ async function geminiEmbed(text: string): Promise<number[]> {
 
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`Gemini API error ${res.status}: ${body.slice(0, 200).replace(/key=[^&\s]*/gi, "key=[REDACTED]")}`);
+    throw new Error(`Gemini API error ${res.status}: ${redactApiResponse(body)}`);
   }
 
   const data = (await res.json()) as GeminiEmbedResponse;
   return data.embedding.values;
+}
+
+/** Redact sensitive data from API error responses. */
+function redactApiResponse(body: string): string {
+  return body
+    .slice(0, 200)
+    .replace(/key=[^&\s]*/gi, "key=[REDACTED]")
+    .replace(/AIza[A-Za-z0-9_-]+/g, "[REDACTED_API_KEY]")
+    .replace(/Bearer\s+[^\s"]+/gi, "Bearer [REDACTED]");
 }
 
 async function geminiBatchEmbedChunk(chunk: string[]): Promise<number[][]> {
@@ -120,9 +129,7 @@ async function geminiBatchEmbedChunk(chunk: string[]): Promise<number[][]> {
 
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(
-      `Gemini batch API error ${res.status}: ${body.slice(0, 200).replace(/key=[^&\s]*/gi, "key=[REDACTED]")}`,
-    );
+    throw new Error(`Gemini batch API error ${res.status}: ${redactApiResponse(body)}`);
   }
 
   const data = (await res.json()) as GeminiBatchEmbedResponse;

@@ -174,7 +174,52 @@ interface LoadResult {
 function loadFileConfig(): LoadResult {
   try {
     const data = readFileSync(PATHS.CONFIG, "utf-8");
-    return { config: JSON.parse(data) as FileConfig, fileExists: true };
+    const raw: unknown = JSON.parse(data);
+    if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+      console.error("[AirMCP] config.json must be a JSON object — using defaults");
+      return { config: {}, fileExists: true };
+    }
+    const obj = raw as Record<string, unknown>;
+    const config: FileConfig = {};
+    if (typeof obj.includeShared === "boolean") config.includeShared = obj.includeShared;
+    if (typeof obj.allowSendMessages === "boolean") config.allowSendMessages = obj.allowSendMessages;
+    if (typeof obj.allowSendMail === "boolean") config.allowSendMail = obj.allowSendMail;
+    if (typeof obj.allowRunJavascript === "boolean") config.allowRunJavascript = obj.allowRunJavascript;
+    if (Array.isArray(obj.disabledModules)) {
+      config.disabledModules = obj.disabledModules.filter((m): m is string => typeof m === "string");
+    }
+    if (Array.isArray(obj.shareApproval)) {
+      config.shareApproval = obj.shareApproval.filter((m): m is string => typeof m === "string");
+    }
+    if (obj.hitl && typeof obj.hitl === "object" && !Array.isArray(obj.hitl)) {
+      const h = obj.hitl as Record<string, unknown>;
+      config.hitl = {
+        level: typeof h.level === "string" ? h.level : undefined,
+        whitelist: Array.isArray(h.whitelist)
+          ? h.whitelist.filter((s): s is string => typeof s === "string")
+          : undefined,
+        timeout: typeof h.timeout === "number" ? h.timeout : undefined,
+      };
+    }
+    if (obj.features && typeof obj.features === "object" && !Array.isArray(obj.features)) {
+      const f = obj.features as Record<string, unknown>;
+      config.features = {
+        auditLog: typeof f.auditLog === "boolean" ? f.auditLog : undefined,
+        usageTracking: typeof f.usageTracking === "boolean" ? f.usageTracking : undefined,
+        semanticToolSearch: typeof f.semanticToolSearch === "boolean" ? f.semanticToolSearch : undefined,
+        proactiveContext: typeof f.proactiveContext === "boolean" ? f.proactiveContext : undefined,
+      };
+    }
+    if (obj.performance && typeof obj.performance === "object" && !Array.isArray(obj.performance)) {
+      const p = obj.performance as Record<string, unknown>;
+      config.performance = {
+        embeddingProvider: typeof p.embeddingProvider === "string" ? p.embeddingProvider : undefined,
+        jxaConcurrency: typeof p.jxaConcurrency === "number" ? p.jxaConcurrency : undefined,
+        circuitBreakerThreshold: typeof p.circuitBreakerThreshold === "number" ? p.circuitBreakerThreshold : undefined,
+        circuitBreakerOpenMs: typeof p.circuitBreakerOpenMs === "number" ? p.circuitBreakerOpenMs : undefined,
+      };
+    }
+    return { config, fileExists: true };
   } catch {
     return { config: {}, fileExists: false };
   }

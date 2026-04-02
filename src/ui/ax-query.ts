@@ -311,6 +311,17 @@ export function axTraverseScript(
 // ── UI Diff Script ───────────────────────────────────────────────────
 
 export function axDiffScript(beforeSnapshot: string, app?: string): string {
+  // Validate beforeSnapshot is valid JSON and enforce size limit to prevent DoS
+  const MAX_SNAPSHOT_SIZE = 512_000; // 500KB
+  if (beforeSnapshot.length > MAX_SNAPSHOT_SIZE) {
+    throw new Error(`beforeSnapshot exceeds ${MAX_SNAPSHOT_SIZE} byte limit`);
+  }
+  // Validate it's valid JSON before embedding
+  try {
+    JSON.parse(beforeSnapshot);
+  } catch {
+    throw new Error("beforeSnapshot must be valid JSON");
+  }
   return `
     const se = Application('System Events');
     ${app ? `Application('${esc(app)}').activate(); delay(0.3);` : ""}

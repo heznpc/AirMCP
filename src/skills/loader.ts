@@ -5,9 +5,15 @@ import { SkillDefinitionSchema, type SkillDefinition } from "./types.js";
 
 const USER_SKILLS_DIR = join(process.env.HOME ?? process.env.USERPROFILE ?? "", ".config", "airmcp", "skills");
 
+const MAX_SKILL_FILE_SIZE = 256_000; // 256KB
+
 export function loadSkillFile(path: string): SkillDefinition | null {
   try {
     const raw = readFileSync(path, "utf-8");
+    if (raw.length > MAX_SKILL_FILE_SIZE) {
+      console.error(`[AirMCP] Skill file too large (${raw.length} bytes, max ${MAX_SKILL_FILE_SIZE}): ${path}`);
+      return null;
+    }
     const parsed = parse(raw);
     const result = SkillDefinitionSchema.safeParse(parsed);
     if (!result.success) {

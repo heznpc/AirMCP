@@ -1,6 +1,6 @@
 {
   "meta_title": "AirMCP — 将AI连接到整个Apple生态系统",
-  "meta_description": "开源MCP服务器，25个模块、262个工具。将Claude、Codex及任何MCP客户端连接到Apple应用。",
+  "meta_description": "开源MCP服务器，27个模块、262个工具。将Claude、Codex及任何MCP客户端连接到Apple应用。",
   "nav_modules": "模块",
   "nav_workflows": "工作流",
   "nav_install": "安装",

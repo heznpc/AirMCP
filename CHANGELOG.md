@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.4] - 2026-04-03
+
+### Fixed
+- **outputSchema/structuredContent consistency** — `okLinkedStructured` now emits `_links` as a separate content block so primary JSON and `structuredContent` both conform to the declared `outputSchema` (#28 follow-up)
+- **JXA batch array safety** — Calendar list/search/upcoming/today scripts guard against sparse arrays from batch property access (`Math.min` + null checks)
+- **Notes createFolder implicit return** — Rewrote if-else to use explicit variable, eliminating JXA implicit-return ambiguity
+- **Mail message ID validation** — Added `regex(/^\d+$/)` to all message ID inputs, preventing `Number(id) = NaN` on non-numeric strings
+- **Mail listMessages array guard** — Batch property access now uses `Math.min` safety bound like calendar
+- **Finder stat parsing** — `trim().split(/\s+/)` with `isNaN` fallbacks for robustness across macOS versions
+- **Error classification** — `toolError` auto-classifies "not found" errors as `[not_found]`; new `errInvalidParams` and `errNotFound` helpers for explicit error typing
+
+### Changed
+- **outputSchema test hardening** — Tests now validate `structuredContent` AND primary text JSON against Zod `outputSchema` via `.safeParse()` (52 new assertions); fixed weather fixture missing `weatherDescription` and `units` fields
+- Module count synced to 27 across all docs, locales (9 languages), landing page, and legal documents
+- TypeScript upgraded to 6.0.2; GitHub Actions dependencies updated (codeql-action 4.35.1, deploy-pages 5)
+
 ## [2.6.3] - 2026-04-02
 
 ### Added

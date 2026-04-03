@@ -76,11 +76,13 @@ export function listEventsScript(
       const eEnds = filtered.endDate();
       const eAllDay = filtered.alldayEvent();
       const calName = cal.name();
-      for (let i = 0; i < count; i++) {
+      const safe = Math.min(count, eUids.length, eSummaries.length, eStarts.length, eEnds.length, eAllDay.length);
+      for (let i = 0; i < safe; i++) {
+        if (eUids[i] == null || eStarts[i] == null || eEnds[i] == null) continue;
         all.push({
-          id: eUids[i], summary: eSummaries[i],
+          id: eUids[i], summary: eSummaries[i] || '',
           startDate: eStarts[i].toISOString(), endDate: eEnds[i].toISOString(),
-          allDay: eAllDay[i], calendar: calName
+          allDay: eAllDay[i] ?? false, calendar: calName
         });
       }
     }
@@ -233,14 +235,16 @@ export function searchEventsScript(query: string, startDate: string, endDate: st
       const eEnds = filtered.endDate();
       const eAllDay = filtered.alldayEvent();
       const calName = cal.name();
-      for (let i = 0; i < count; i++) {
+      const safe = Math.min(count, eUids.length, eSummaries.length, eStarts.length, eEnds.length, eAllDay.length);
+      for (let i = 0; i < safe; i++) {
+        if (eUids[i] == null || eStarts[i] == null || eEnds[i] == null) continue;
         const summary = eSummaries[i] || '';
         const desc = eDescs[i] || '';
         if (summary.toLowerCase().includes(q) || desc.toLowerCase().includes(q)) {
           all.push({
             id: eUids[i], summary: summary,
             startDate: eStarts[i].toISOString(), endDate: eEnds[i].toISOString(),
-            allDay: eAllDay[i], calendar: calName
+            allDay: eAllDay[i] ?? false, calendar: calName
           });
         }
       }
@@ -271,11 +275,13 @@ export function getUpcomingEventsScript(limit: number): string {
       const eAllDay = filtered.alldayEvent();
       const eLocs = filtered.location();
       const calName = cal.name();
-      for (let i = 0; i < count; i++) {
+      const safe = Math.min(count, eUids.length, eSummaries.length, eStarts.length, eEnds.length, eAllDay.length, eLocs.length);
+      for (let i = 0; i < safe; i++) {
+        if (eUids[i] == null || eStarts[i] == null || eEnds[i] == null) continue;
         all.push({
-          id: eUids[i], summary: eSummaries[i],
+          id: eUids[i], summary: eSummaries[i] || '',
           startDate: eStarts[i].toISOString(), endDate: eEnds[i].toISOString(),
-          allDay: eAllDay[i], location: eLocs[i], calendar: calName
+          allDay: eAllDay[i] ?? false, location: eLocs[i] || null, calendar: calName
         });
       }
     }
@@ -306,11 +312,13 @@ export function todayEventsScript(): string {
       const eAllDay = filtered.alldayEvent();
       const eLocs = filtered.location();
       const calName = cal.name();
-      for (let i = 0; i < count; i++) {
+      const safe = Math.min(count, eUids.length, eSummaries.length, eStarts.length, eEnds.length, eAllDay.length, eLocs.length);
+      for (let i = 0; i < safe; i++) {
+        if (eUids[i] == null || eStarts[i] == null || eEnds[i] == null) continue;
         all.push({
-          id: eUids[i], summary: eSummaries[i],
+          id: eUids[i], summary: eSummaries[i] || '',
           startDate: eStarts[i].toISOString(), endDate: eEnds[i].toISOString(),
-          allDay: eAllDay[i], location: eLocs[i], calendar: calName
+          allDay: eAllDay[i] ?? false, location: eLocs[i] || null, calendar: calName
         });
       }
     }

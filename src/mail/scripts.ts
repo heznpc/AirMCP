@@ -34,22 +34,23 @@ export function listMessagesScript(mailbox: string, limit: number, offset: numbe
     const box = boxes[0];
     const total = box.messages.length;
     const start = Math.min(${offset}, total);
-    const count = Math.min(total - start, ${limit});
     const ids = box.messages.id();
     const subjects = box.messages.subject();
     const senders = box.messages.sender();
     const dates = box.messages.dateReceived();
     const reads = box.messages.readStatus();
     const flags = box.messages.flaggedStatus();
+    const safe = Math.min(total, ids.length, subjects.length, senders.length, dates.length, reads.length, flags.length);
+    const count = Math.min(safe - start, ${limit});
     const result = [];
     for (let i = start; i < start + count; i++) {
       result.push({
         id: ids[i],
-        subject: subjects[i],
-        sender: senders[i],
+        subject: subjects[i] || '',
+        sender: senders[i] || '',
         dateReceived: dates[i] ? dates[i].toISOString() : null,
-        read: reads[i],
-        flagged: flags[i]
+        read: reads[i] ?? false,
+        flagged: flags[i] ?? false
       });
     }
     JSON.stringify({total: total, offset: start, returned: count, messages: result});

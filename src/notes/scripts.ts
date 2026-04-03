@@ -243,24 +243,30 @@ export function createFolderScript(name: string, account?: string): string {
       const acct = Notes.accounts.whose({name: '${esc(account)}'})()[0];
       if (!acct) throw new Error('Account not found: ${esc(account)}');
       const existing = acct.folders.whose({name: '${esc(name)}'})();
-      if (existing.length > 0) JSON.stringify({id: existing[0].id(), name: existing[0].name(), existing: true});
-      else {
+      let out;
+      if (existing.length > 0) {
+        out = {id: existing[0].id(), name: existing[0].name(), existing: true};
+      } else {
         const folder = Notes.Folder({name: '${esc(name)}'});
         acct.folders.push(folder);
-        JSON.stringify({id: folder.id(), name: folder.name(), existing: false});
+        out = {id: folder.id(), name: folder.name(), existing: false};
       }
+      JSON.stringify(out);
     `;
   }
   return `
     const Notes = Application('Notes');
     const acct = Notes.defaultAccount();
     const existing = acct.folders.whose({name: '${esc(name)}'})();
-    if (existing.length > 0) JSON.stringify({id: existing[0].id(), name: existing[0].name(), existing: true});
-    else {
+    let out;
+    if (existing.length > 0) {
+      out = {id: existing[0].id(), name: existing[0].name(), existing: true};
+    } else {
       const folder = Notes.Folder({name: '${esc(name)}'});
       acct.folders.push(folder);
-      JSON.stringify({id: folder.id(), name: folder.name(), existing: false});
+      out = {id: folder.id(), name: folder.name(), existing: false};
     }
+    JSON.stringify(out);
   `;
 }
 

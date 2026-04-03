@@ -25,12 +25,13 @@ export function searchFilesScript(folder: string, query: string, limit: number):
     const result = paths.map(p => {
       try {
         const stat = app.doShellScript('stat -f "%z %m" "' + _esc(p) + '"');
-        const parts = stat.split(' ');
-        const size = parseInt(parts[0], 10);
-        const mtime = parseInt(parts[1], 10);
+        const parts = stat.trim().split(/\\s+/);
+        const size = parts[0] ? parseInt(parts[0], 10) : 0;
+        const mtime = parts[1] ? parseInt(parts[1], 10) : 0;
         return {
           path: p, name: p.split('/').pop(),
-          size: size, modificationDate: new Date(mtime * 1000).toISOString()
+          size: isNaN(size) ? 0 : size,
+          modificationDate: isNaN(mtime) ? null : new Date(mtime * 1000).toISOString()
         };
       } catch(e) {
         return {path: p, name: p.split('/').pop()};

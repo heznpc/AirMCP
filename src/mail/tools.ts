@@ -76,7 +76,7 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
       description:
         "Read full content of an email message by ID. Content length is configurable (default: 5000 chars, max: 100000).",
       inputSchema: {
-        id: z.string().max(500).describe("Message ID"),
+        id: z.string().max(500).regex(/^\d+$/, "Message ID must be numeric").describe("Message ID"),
         maxLength: z
           .number()
           .int()
@@ -124,7 +124,7 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
       title: "Mark Message Read/Unread",
       description: "Mark an email message as read or unread.",
       inputSchema: {
-        id: z.string().max(500).describe("Message ID"),
+        id: z.string().max(500).regex(/^\d+$/, "Message ID must be numeric").describe("Message ID"),
         read: z.boolean().optional().default(true).describe("true=read, false=unread (default: true)"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -144,7 +144,7 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
       title: "Flag Message",
       description: "Flag or unflag an email message.",
       inputSchema: {
-        id: z.string().max(500).describe("Message ID"),
+        id: z.string().max(500).regex(/^\d+$/, "Message ID must be numeric").describe("Message ID"),
         flagged: z.boolean().optional().default(true).describe("true=flag, false=unflag (default: true)"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -191,7 +191,7 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
       title: "Move Message",
       description: "Move a message to another mailbox.",
       inputSchema: {
-        id: z.string().max(500).describe("Message ID"),
+        id: z.string().max(500).regex(/^\d+$/, "Message ID must be numeric").describe("Message ID"),
         targetMailbox: z.string().max(500).describe("Target mailbox name (e.g. 'Archive', 'Trash')"),
         targetAccount: z
           .string()
@@ -289,7 +289,11 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
       title: "Reply to Email",
       description: "Reply to an email message. Requires allowSendMail config.",
       inputSchema: {
-        id: z.string().max(500).describe("Original message ID to reply to"),
+        id: z
+          .string()
+          .max(500)
+          .regex(/^\d+$/, "Message ID must be numeric")
+          .describe("Original message ID to reply to"),
         body: z.string().max(50000).describe("Reply body text"),
         replyAll: z.boolean().optional().default(false).describe("Reply to all recipients (default: false)"),
       },

@@ -1,4 +1,4 @@
-import { withLinks } from "./tool-links.js";
+import { getToolLinks, withLinks } from "./tool-links.js";
 import { usageTracker } from "./usage-tracker.js";
 
 /** Return a successful MCP tool response with JSON-formatted data. */
@@ -48,11 +48,25 @@ export function okStructured(data: unknown) {
   };
 }
 
-/** Return a successful MCP tool response with _links and structured content. */
+/**
+ * Return a successful MCP tool response with _links and structured content.
+ *
+ * structuredContent carries only `data` (matching outputSchema).
+ * _links are appended as a separate text content block so that
+ * the primary JSON in both text and structuredContent stays consistent
+ * and conforms to the declared outputSchema.
+ */
 export function okLinkedStructured(toolName: string, data: unknown) {
   const usageNext = usageTracker.getNextTools(toolName);
-  const linked = withLinks(toolName, data, usageNext);
-  return { ...ok(linked), structuredContent: data };
+  const links = getToolLinks(toolName, usageNext);
+  const base = { ...ok(data), structuredContent: data };
+  if (links.length > 0) {
+    base.content.push({
+      type: "text" as const,
+      text: `\n_links: ${JSON.stringify(links)}`,
+    });
+  }
+  return base;
 }
 
 /** Return an MCP tool error response. */
@@ -63,8 +77,25 @@ export function err(message: string) {
   };
 }
 
-/** Standardized catch-block helper for tool handlers. */
+/**
+ * Return an error for invalid/missing tool parameters.
+ * Helps clients distinguish "bad request" from "server error".
+ */
+export function errInvalidParams(message: string) {
+  return err(`[invalid_params] ${message}`);
+}
+
+/** Return an error for a resource that was not found. */
+export function errNotFound(resource: string) {
+  return err(`[not_found] ${resource}`);
+}
+
+/** Standardized catch-block helper for tool handlers. Classifies the error automatically. */
 export function toolError(action: string, e: unknown) {
   const msg = e instanceof Error ? e.message : String(e);
-  return err(`Failed to ${action}: ${msg}`);
+  const lower = msg.toLowerCase();
+  if (lower.includes("not found")) {
+    return err(`[not_found] Failed to ${action}: ${msg}`);
+  }
+  return err(`[internal_error] Failed to ${action}: ${msg}`);
 }

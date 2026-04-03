@@ -1,18 +1,28 @@
 #!/usr/bin/env node
 /**
- * count-stats.mjs — Count tools, prompts, resources, modules from source.
+ * count-stats.mjs — Single source of truth for tool/module/prompt/resource counts.
+ *
+ * Counts are derived from source code, then propagated to all documentation.
  *
  * Usage:
  *   node scripts/count-stats.mjs          # print current counts
  *   node scripts/count-stats.mjs --check  # verify docs match source (CI)
+ *   node scripts/count-stats.mjs --sync   # update all docs to match source
  */
 
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync, writeFileSync, readdirSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = join(ROOT, "src");
+const mode = process.argv.includes("--check")
+  ? "check"
+  : process.argv.includes("--sync")
+    ? "sync"
+    : "print";
+
+// ── Count from source ──────────────────────────────────────────────
 
 function countInDir(dir, pattern) {
   let count = 0;
@@ -31,11 +41,9 @@ function countInDir(dir, pattern) {
   return count;
 }
 
-// Count registrations
 const tools = countInDir(SRC, /server\.registerTool\(/g);
 const prompts = countInDir(SRC, /server\.prompt\(/g);
 
-// Resources: count registrations inside registerResources() only (excludes helper internals)
 const resContent = readFileSync(join(SRC, "shared", "resources.ts"), "utf-8");
 const resLines = resContent.split("\n");
 let resources = 0;
@@ -48,86 +56,174 @@ for (const line of resLines) {
   }
 }
 
-// Modules from MODULE_NAMES array
 const configContent = readFileSync(join(SRC, "shared", "config.ts"), "utf-8");
-const moduleBlock = configContent.match(/export const MODULE_NAMES = \[([\s\S]*?)\] as const/);
-const modules = moduleBlock ? (moduleBlock[1].match(/"/g) || []).length / 2 : 0;
+const moduleBlock = configContent.match(
+  /export const MODULE_NAMES = \[([\s\S]*?)\] as const/,
+);
+const modules = moduleBlock
+  ? (moduleBlock[1].match(/"/g) || []).length / 2
+  : 0;
 
 const stats = { tools, prompts, resources, modules };
 
-if (process.argv.includes("--check")) {
-  let ok = true;
+// ── Print mode ─────────────────────────────────────────────────────
 
-  // Check README
-  const readme = readFileSync(join(ROOT, "README.md"), "utf-8");
-  function checkFile(name, content, patterns) {
-    for (const [label, pattern, expected] of patterns) {
-      const m = content.match(pattern);
-      const found = m ? parseInt(m[1]) : null;
-      if (found !== null && found !== expected) {
-        console.error(`${name}: says ${found} ${label}, source has ${expected}`);
-        ok = false;
-      }
-    }
-  }
-
-  checkFile("README.md", readme, [
-    ["tools", /\*\*(\d+) tools\*\*/, tools],
-    ["modules", /\((\d+) modules\)/, modules],
-  ]);
-
-  // Check AGENTS.md
-  try {
-    const agents = readFileSync(join(ROOT, ".github", "AGENTS.md"), "utf-8");
-    checkFile("AGENTS.md", agents, [
-      ["tools", /\*\*(\d+) tools\*\*/, tools],
-      ["modules", /(\d+) modules/, modules],
-      ["prompts", /\*\*(\d+) prompts\*\*/, prompts],
-      ["resources", /\*\*(\d+) .*resources\*\*/, resources],
-    ]);
-  } catch { /* optional */ }
-
-  // Check docs site and locale files for stale module counts
-  const docsModulePattern = [["modules", /(\d+) modules/, modules]];
-  const docsFiles = [
-    "docs/site/src/content/docs/modules/overview.md",
-    "docs/site/src/content/docs/architecture/overview.md",
-    "docs/site/src/content/docs/getting-started/installation.md",
-    "docs/site/src/content/docs/getting-started/configuration.md",
-    "docs/site/src/content/docs/contributing/testing.md",
-    "docs/skills.md",
-    "docs/TERMS_OF_SERVICE.md",
-  ];
-  for (const rel of docsFiles) {
-    try {
-      const content = readFileSync(join(ROOT, rel), "utf-8");
-      checkFile(rel, content, docsModulePattern);
-    } catch { /* file may not exist */ }
-  }
-
-  // Check locale files (various language patterns for module count)
-  const localeDir = join(ROOT, "docs", "locales");
-  try {
-    for (const f of readdirSync(localeDir).filter((f) => f.endsWith(".json"))) {
-      const content = readFileSync(join(localeDir, f), "utf-8");
-      // Match digits before common module-related words across languages
-      const m = content.match(/(\d+)[\s\u00a0]*(modules?|[모모]듈|モジュール|[模模]块|[模模]組|Modulen|módulos)/);
-      if (m) {
-        const found = parseInt(m[1]);
-        if (found !== modules) {
-          console.error(`docs/locales/${f}: says ${found} modules, source has ${modules}`);
-          ok = false;
-        }
-      }
-    }
-  } catch { /* locales dir may not exist */ }
-
-  if (ok) {
-    console.log(`Stats OK: ${tools} tools, ${prompts} prompts, ${resources} resources, ${modules} modules`);
-  } else {
-    console.log(`\nActual: ${JSON.stringify(stats)}`);
-    process.exit(1);
-  }
-} else {
+if (mode === "print") {
   console.log(JSON.stringify(stats, null, 2));
+  process.exit(0);
+}
+
+// ── Shared helpers for check & sync ────────────────────────────────
+
+let dirty = false;
+
+/**
+ * Apply numeric replacements to a file.
+ *  - check mode: report mismatches
+ *  - sync mode: rewrite file with correct values
+ *
+ * Each replacement: { pattern: RegExp with capture group, value: number }
+ * The pattern MUST have exactly one capture group around the number to replace.
+ */
+function syncFile(relPath, replacements) {
+  const absPath = join(ROOT, relPath);
+  if (!existsSync(absPath)) return;
+
+  let content = readFileSync(absPath, "utf-8");
+  let changed = false;
+
+  for (const { pattern, value, group } of replacements) {
+    const numGroup = group ?? 1; // which capture group holds the number
+    const updated = content.replace(pattern, (...args) => {
+      const match = args[0];
+      const num = args[numGroup];
+      const current = parseInt(num);
+      if (current !== value) {
+        changed = true;
+        return match.replace(num, String(value));
+      }
+      return match;
+    });
+    content = updated;
+  }
+
+  if (changed) {
+    if (mode === "check") {
+      console.error(`  STALE: ${relPath}`);
+      dirty = true;
+    } else {
+      writeFileSync(absPath, content);
+      console.log(`  sync: ${relPath}`);
+    }
+  } else if (mode === "check" || mode === "sync") {
+    console.log(`  ok:   ${relPath}`);
+  }
+}
+
+/**
+ * Sync locale JSON files. Each locale uses different words for "modules",
+ * so we match the number preceding any known module-word.
+ */
+function syncLocales() {
+  const localeDir = join(ROOT, "docs", "locales");
+  if (!existsSync(localeDir)) return;
+
+  const moduleWords =
+    /(\d+)([\s\u00a0]*(?:modules?|개 모듈|モジュール|个模块|個模組|Modulen|módulos))/g;
+
+  for (const f of readdirSync(localeDir).filter((f) => f.endsWith(".json"))) {
+    const absPath = join(localeDir, f);
+    let content = readFileSync(absPath, "utf-8");
+    let changed = false;
+
+    const updated = content.replace(moduleWords, (match, num, rest) => {
+      const current = parseInt(num);
+      if (current !== modules) {
+        changed = true;
+        return `${modules}${rest}`;
+      }
+      return match;
+    });
+    content = updated;
+
+    if (changed) {
+      if (mode === "check") {
+        console.error(`  STALE: docs/locales/${f}`);
+        dirty = true;
+      } else {
+        writeFileSync(absPath, content);
+        console.log(`  sync: docs/locales/${f}`);
+      }
+    } else {
+      console.log(`  ok:   docs/locales/${f}`);
+    }
+  }
+}
+
+// ── Run ────────────────────────────────────────────────────────────
+
+console.log(
+  `\nStats ${mode}: ${tools} tools, ${prompts} prompts, ${resources} resources, ${modules} modules\n`,
+);
+
+// README.md — "**N tools** (N modules)"
+syncFile("README.md", [
+  { pattern: /\*\*(\d+) tools\*\*/, value: tools },
+  { pattern: /(\d+) modules\)/g, value: modules },
+  { pattern: /(\d+) Apple apps/g, value: modules },
+]);
+
+// AGENTS.md
+syncFile(".github/AGENTS.md", [
+  { pattern: /\*\*(\d+) tools\*\*/, value: tools },
+  { pattern: /(\d+) modules/, value: modules },
+  { pattern: /\*\*(\d+) prompts\*\*/, value: prompts },
+  { pattern: /\*\*(\d+) [\w-]*resources\*\*/, value: resources },
+]);
+
+// Docs site pages
+const docsPages = [
+  "docs/site/src/content/docs/modules/overview.md",
+  "docs/site/src/content/docs/architecture/overview.md",
+  "docs/site/src/content/docs/getting-started/installation.md",
+  "docs/site/src/content/docs/getting-started/configuration.md",
+  "docs/site/src/content/docs/contributing/testing.md",
+];
+for (const page of docsPages) {
+  syncFile(page, [{ pattern: /(\d+) modules/g, value: modules }]);
+}
+
+// Other docs
+syncFile("docs/skills.md", [
+  { pattern: /(\d+) tools/g, value: tools },
+  { pattern: /(\d+) modules/g, value: modules },
+]);
+syncFile("docs/TERMS_OF_SERVICE.md", [
+  { pattern: /(\d+) tools/g, value: tools },
+  { pattern: /(\d+) modules/g, value: modules },
+]);
+
+// Landing page — only match aggregate counts in meta tags, hero subtitle, and footer.
+// Per-module "N tools" badges have their own specific counts and must not be touched.
+syncFile("docs/index.html", [
+  { pattern: /with (\d+) tools across/g, value: tools },
+  { pattern: /across (\d+) modules/g, value: modules },
+  { pattern: /(hero_sub">)(\d+)( tools)/g, value: tools, group: 2 },
+  { pattern: /(tryit_footer">)(\d+)( tools)/g, value: tools, group: 2 },
+]);
+
+// Locale files
+syncLocales();
+
+console.log("");
+
+if (mode === "check" && dirty) {
+  console.error(
+    "Stats mismatch detected. Run: node scripts/count-stats.mjs --sync",
+  );
+  process.exit(1);
+}
+
+if (mode === "sync" && !dirty) {
+  console.log("All files already in sync.");
 }

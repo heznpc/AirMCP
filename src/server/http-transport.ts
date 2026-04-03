@@ -132,7 +132,7 @@ export async function startHttpServer(options: HttpServerOptions): Promise<void>
     });
   } else if (bindAll) {
     console.error(
-      "[AirMCP] FATAL: --bind-all requires AIRMCP_HTTP_TOKEN. Refusing to expose 262 tools without authentication.",
+      "[AirMCP] FATAL: --bind-all requires AIRMCP_HTTP_TOKEN. Refusing to expose all tools without authentication.",
     );
     process.exit(1);
   }

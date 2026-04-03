@@ -133,15 +133,15 @@ const I18N: Record<string, Record<LangCode, string>> = {
     pt: 'Alternar m\u00F3dulo (ex. "6")',
   },
   all_modules: {
-    en: "Enable all 25 modules",
-    ko: "25\uAC1C \uBAA8\uB4C8 \uC804\uBD80 \uD65C\uC131\uD654",
-    ja: "\u516825\u30E2\u30B8\u30E5\u30FC\u30EB\u6709\u52B9\u5316",
-    "zh-CN": "\u542F\u7528\u5168\u90E825\u4E2A\u6A21\u5757",
-    "zh-TW": "\u555F\u7528\u5168\u90E825\u500B\u6A21\u7D44",
-    es: "Habilitar los 25 m\u00F3dulos",
-    fr: "Activer les 25 modules",
-    de: "Alle 25 Module aktivieren",
-    pt: "Ativar todos os 25 m\u00F3dulos",
+    en: `Enable all ${MODULE_NAMES.length} modules`,
+    ko: `${MODULE_NAMES.length}\uAC1C \uBAA8\uB4C8 \uC804\uBD80 \uD65C\uC131\uD654`,
+    ja: `\u5168${MODULE_NAMES.length}\u30E2\u30B8\u30E5\u30FC\u30EB\u6709\u52B9\u5316`,
+    "zh-CN": `\u542F\u7528\u5168\u90E8${MODULE_NAMES.length}\u4E2A\u6A21\u5757`,
+    "zh-TW": `\u555F\u7528\u5168\u90E8${MODULE_NAMES.length}\u500B\u6A21\u7D44`,
+    es: `Habilitar los ${MODULE_NAMES.length} m\u00F3dulos`,
+    fr: `Activer les ${MODULE_NAMES.length} modules`,
+    de: `Alle ${MODULE_NAMES.length} Module aktivieren`,
+    pt: `Ativar todos os ${MODULE_NAMES.length} m\u00F3dulos`,
   },
   starter_hint: {
     en: "Reset to recommended 7 modules \u2605",
@@ -258,7 +258,7 @@ const PRESETS: Record<string, { desc: string; modules: string[] }> = {
     ],
   },
   all: {
-    desc: "Everything (25 modules)",
+    desc: `Everything (${MODULE_NAMES.length} modules)`,
     modules: [...MODULE_NAMES],
   },
 };

@@ -212,6 +212,15 @@ syncFile("docs/index.html", [
   { pattern: /(tryit_footer">)(\d+)( tools)/g, value: tools, group: 2 },
 ]);
 
+// Registry metadata files (mcp.json, glama.json, smithery.yaml)
+const registryPattern = [
+  { pattern: /(\d+) tools across/g, value: tools },
+  { pattern: /across (\d+) modules/g, value: modules },
+];
+syncFile("mcp.json", registryPattern);
+syncFile("glama.json", registryPattern);
+syncFile("smithery.yaml", registryPattern);
+
 // Locale files
 syncLocales();
 

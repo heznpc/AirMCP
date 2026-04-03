@@ -75,6 +75,8 @@ export const MODULE_NAMES = [
   "location",
   "bluetooth",
   "google",
+  "speech",
+  "health",
 ] as const;
 
 /** Core modules enabled by default when no config.json exists */

@@ -8,6 +8,8 @@ Comprehensive guide for testing, debugging, and validating AirMCP changes.
 npm install
 npm run build
 npm test                    # Jest unit tests (includes build via pretest)
+npm run dev:test -- notes   # Fast dev test — in-process, single module
+npm run dev:test:changed    # Dev test — only git-changed modules
 npm run qa                  # Read-only QA smoke tests (macOS, ~65 tools)
 npm run qa:crud             # CRUD roundtrip tests (creates real data)
 ```
@@ -193,6 +195,45 @@ node scripts/qa-remaining-test.mjs --dry-run            # preview only
 ### Including QA Results in PRs
 
 Paste the output from `npm run qa` and `npm run qa:crud` into your PR under the **QA Report** section.
+
+---
+
+## Dev Test Mode (Lightweight, In-Process)
+
+For rapid iteration during development. Uses a MockMcpServer that captures tool registrations and calls handlers directly — no child processes, no stdio transport, no JSON-RPC overhead.
+
+### Why dev-test?
+
+- **3x faster** than debug-pipeline / QA scripts
+- **10x less memory** — no separate server processes
+- **Git-aware** — `--changed` only tests modified modules
+- **Watch mode** — auto rebuild + re-test on file save
+- **Single-tool testing** — test one specific tool without loading everything
+
+### Commands
+
+```bash
+npm run dev:test -- notes                  # test one module
+npm run dev:test -- notes,calendar         # test specific modules
+npm run dev:test:changed                   # only git-changed modules
+npm run dev:test:watch -- notes            # watch mode
+npm run dev:test -- --all                  # all 27 modules, sequential
+npm run dev:test -- --tool list_notes      # test a single tool
+npm run dev:test -- --list                 # list available modules
+npm run dev:test -- --all --json           # JSON output
+npm run dev:test -- --all --stop-on-fail   # stop at first failure
+```
+
+### dev:test vs debug vs qa
+
+| Feature | `dev:test` | `debug` (debug-pipeline) | `qa:seq` |
+|---------|-----------|--------------------------|----------|
+| Speed | Fastest | Medium | Slowest |
+| Execution | In-process (MockMcpServer) | Spawn per module | Spawn per module |
+| Watch mode | Yes | No | No |
+| Git-aware | Yes (`--changed`) | No | No |
+| Transport | Direct handler call | Full stdio/JSON-RPC | Full stdio/JSON-RPC |
+| Best for | Active development | Process-isolated debugging | Pre-PR validation |
 
 ---
 

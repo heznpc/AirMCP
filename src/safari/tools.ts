@@ -107,6 +107,26 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
     async ({ url }) => {
+      // Block non-HTTP schemes and internal network addresses to prevent SSRF/exfiltration
+      try {
+        const parsed = new URL(url);
+        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+          return err(`Only http:// and https:// URLs are allowed. Got: ${parsed.protocol}`);
+        }
+        const host = parsed.hostname.toLowerCase();
+        if (
+          host === "localhost" ||
+          host === "127.0.0.1" ||
+          host === "[::1]" ||
+          host.startsWith("192.168.") ||
+          host.startsWith("10.") ||
+          host.endsWith(".local")
+        ) {
+          return err("Opening localhost or internal network URLs is not allowed.");
+        }
+      } catch {
+        return err("Invalid URL format.");
+      }
       try {
         return ok(await runJxa(openUrlScript(url)));
       } catch (e) {

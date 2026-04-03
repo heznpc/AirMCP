@@ -160,6 +160,8 @@ export const LIMITS = {
   NOTES_BULK_SCAN: 500,
   /** Max reminders for context snapshot */
   SNAPSHOT_REMINDERS: 500,
+  /** Embedding cache memory cap in MB (env: AIRMCP_EMBED_CACHE_MAX_MB) */
+  EMBED_CACHE_MAX_MB: envInt("AIRMCP_EMBED_CACHE_MAX_MB", 256),
 } as const;
 
 // ══════════════════════════════════════════════════════════════════════

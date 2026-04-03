@@ -25,7 +25,11 @@ interface GeminiBatchEmbedResponse {
 }
 
 // -- Embedding cache (tool descriptions + repeated queries are immutable per session) --
-const embedCache = new TtlCache({ maxEntries: 1000, autoPruneMs: 10 * 60_000 });
+const embedCache = new TtlCache({
+  maxEntries: 1000,
+  autoPruneMs: 10 * 60_000,
+  maxMemoryBytes: LIMITS.EMBED_CACHE_MAX_MB * 1024 * 1024,
+});
 const EMBED_CACHE_TTL = 60 * 60_000; // 60 minutes — tool descriptions and note titles are quasi-static
 
 /** Hash text for cache key — avoids storing PII/secrets in plaintext cache keys. */

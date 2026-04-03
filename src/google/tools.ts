@@ -70,7 +70,7 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
       try {
         const params: Record<string, unknown> = { userId: "me", maxResults };
         if (query) params.q = query;
-        return ok(await runGws("gmail", "users.messages", "list", params));
+        return okUntrusted(await runGws("gmail", "users.messages", "list", params));
       } catch (e) {
         return err(`Gmail list failed: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -158,7 +158,7 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
         };
         if (query) params.q = query;
         if (orderBy) params.orderBy = orderBy;
-        return ok(await runGws("drive", "files", "list", params));
+        return okUntrusted(await runGws("drive", "files", "list", params));
       } catch (e) {
         return err(`Drive list failed: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -207,7 +207,7 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
         // Single quotes are critical to remove as they delimit API query string literals.
         const safeQuery = query.replace(/[^a-zA-Z0-9\u3131-\uD79D\u4E00-\u9FFF\s]/g, "").trim();
         if (!safeQuery) return err("Search query contains no valid characters after sanitization.");
-        return ok(
+        return okUntrusted(
           await runGws("drive", "files", "list", {
             q: `fullText contains '${safeQuery}'`,
             pageSize: maxResults,
@@ -305,7 +305,7 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
         };
         if (query) params.q = query;
         if (timeMax) params.timeMax = timeMax;
-        return ok(await runGws("calendar", "events", "list", params));
+        return okUntrusted(await runGws("calendar", "events", "list", params));
       } catch (e) {
         return err(`Calendar list failed: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -385,7 +385,7 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
         // Get default task list first
         const lists = await runGws<{ items?: Array<{ id: string }> }>("tasks", "tasklists", "list", { maxResults: 1 });
         const listId = lists.items?.[0]?.id || "@default";
-        return ok(await runGws("tasks", "tasks", "list", { tasklist: listId, maxResults, showCompleted }));
+        return okUntrusted(await runGws("tasks", "tasks", "list", { tasklist: listId, maxResults, showCompleted }));
       } catch (e) {
         return err(`Tasks list failed: ${e instanceof Error ? e.message : String(e)}`);
       }

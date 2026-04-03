@@ -16,7 +16,7 @@ MCP server for the entire Apple ecosystem — Notes, Reminders, Calendar, Contac
 
 ## Features
 
-- **262 tools** (25 modules) — Apple app CRUD + system control + Apple Intelligence + UI Automation + Screen Capture + Maps + Podcasts + Weather + iWork (Pages/Numbers/Keynote) + Google Workspace + dynamic shortcuts
+- **262 tools** (27 modules) — Apple app CRUD + system control + Apple Intelligence + UI Automation + Screen Capture + Maps + Podcasts + Weather + iWork (Pages/Numbers/Keynote) + Google Workspace + dynamic shortcuts
 - **32 prompts** — per-app workflows (notes, calendar, reminders, shortcuts) + cross-module + developer workflows + YAML skills
 - **8 MCP resources** — Notes, Calendar, Reminders, Music, Mail, System live data URIs
 - **JXA + Swift 6.2 bridge** — JXA for basic automation, Swift 6 strict concurrency with EventKit/PhotoKit for advanced features
@@ -171,6 +171,17 @@ npm install
 npm run build
 node dist/index.js
 ```
+
+### Developer Testing
+
+```bash
+npm run dev:test -- notes             # test one module (fast, in-process)
+npm run dev:test:changed              # test only git-changed modules
+npm run dev:test:watch -- notes       # watch mode: auto re-test on save
+npm run dev:test -- --tool list_notes # test a single tool
+```
+
+See [Testing & Debugging Guide](docs/testing.md) for the full testing workflow.
 
 ### Menubar App (Optional)
 

@@ -1,6 +1,6 @@
 {
   "name": "airmcp",
-  "version": "2.6.0",
+  "version": "2.6.3",
   "description": "MCP server for the entire Apple ecosystem — Notes, Reminders, Calendar, Contacts, Mail, Messages, Music, Finder, Safari, System, Photos, Shortcuts, Apple Intelligence, TV, Screen Capture, Maps, and Podcasts. Connect any AI to your Mac.",
   "keywords": [
     "mcp",
@@ -79,6 +79,12 @@
     "qa:e2e": "node scripts/qa-e2e-test.mjs",
     "qa:remaining": "node scripts/qa-remaining-test.mjs",
     "qa:seq": "node scripts/qa-sequential.mjs",
+    "debug": "node scripts/debug-pipeline.mjs",
+    "debug:all": "node scripts/debug-pipeline.mjs --all",
+    "debug:list": "node scripts/debug-pipeline.mjs --list",
+    "dev:test": "node scripts/dev-test.mjs",
+    "dev:test:changed": "node scripts/dev-test.mjs --changed",
+    "dev:test:watch": "node scripts/dev-test.mjs --watch",
     "typecheck": "tsc --noEmit",
     "version:patch": "npm version patch --no-git-tag-version && node scripts/sync-version.mjs",
     "version:minor": "npm version minor --no-git-tag-version && node scripts/sync-version.mjs",
@@ -91,8 +97,8 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "@modelcontextprotocol/ext-apps": "^1.3.1",
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/ext-apps": "1.3.1",
+    "@modelcontextprotocol/sdk": "1.29.0",
     "express": "^5.2.1",
     "yaml": "^2.8.2",
     "zod": "~3.25.76"

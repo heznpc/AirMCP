@@ -6,7 +6,17 @@ const AUDIT_PATH = join(PATHS.VECTOR_STORE, "audit.jsonl");
 const MAX_ARG_LENGTH = 500;
 const MAX_ENTRY_SIZE = 10_000;
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB — rotate after this
-const FLUSH_INTERVAL = 5_000; // flush buffer every 5s
+const DEFAULT_FLUSH_INTERVAL = 30_000; // flush buffer every 30s
+
+/** Read lazily so config.ts can set the env var before first use. */
+function getFlushInterval(): number {
+  const env = process.env.AIRMCP_AUDIT_FLUSH_INTERVAL;
+  if (env !== undefined) {
+    const parsed = parseInt(env, 10);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+  return DEFAULT_FLUSH_INTERVAL;
+}
 
 interface AuditEntry {
   timestamp: string;
@@ -18,7 +28,7 @@ interface AuditEntry {
 
 let initialized = false;
 let buffer: string[] = [];
-let flushTimer: ReturnType<typeof setInterval> | null = null;
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
 
 async function ensureDir(): Promise<void> {
   if (initialized) return;
@@ -26,7 +36,7 @@ async function ensureDir(): Promise<void> {
   initialized = true;
 }
 
-/** Log a tool call to the audit log. Buffered — flushes every 5s. */
+/** Log a tool call to the audit log. Buffered — flushes every 30s (override via AIRMCP_AUDIT_FLUSH_INTERVAL). */
 export function auditLog(entry: AuditEntry): void {
   if (auditDisabled) return;
   const sanitized = entry.args ? sanitizeArgs(entry.args) : undefined;
@@ -40,9 +50,10 @@ export function auditLog(entry: AuditEntry): void {
 
 function ensureFlushTimer(): void {
   if (flushTimer) return;
-  flushTimer = setInterval(() => {
+  flushTimer = setTimeout(() => {
     flushBuffer().catch(() => {});
-  }, FLUSH_INTERVAL);
+    flushTimer = null;
+  }, getFlushInterval());
   if (flushTimer.unref) flushTimer.unref();
 }
 
@@ -74,7 +85,7 @@ async function flushBuffer(): Promise<void> {
       if (consecutiveFlushFailures >= MAX_FLUSH_FAILURES) {
         auditDisabled = true;
         if (flushTimer) {
-          clearInterval(flushTimer);
+          clearTimeout(flushTimer);
           flushTimer = null;
         }
         console.error("[AirMCP Audit] Too many consecutive flush failures — audit logging disabled");
@@ -99,7 +110,8 @@ async function rotateIfNeeded(): Promise<void> {
   }
 }
 
-function sanitizeArgs(args: Record<string, unknown>, depth = 0): Record<string, unknown> {
+/** Exported for testing — sanitize argument keys that match sensitive patterns. */
+export function sanitizeArgs(args: Record<string, unknown>, depth = 0): Record<string, unknown> {
   if (depth > 3) return { _truncated: true };
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(args)) {
@@ -116,4 +128,19 @@ function sanitizeArgs(args: Record<string, unknown>, depth = 0): Record<string, 
     }
   }
   return result;
+}
+
+/** Reset all module-level state and return buffered entries. For testing only. */
+export function _testReset(): string[] {
+  const snapshot = [...buffer];
+  buffer = [];
+  if (flushTimer) {
+    clearTimeout(flushTimer);
+    flushTimer = null;
+  }
+  initialized = false;
+  flushing = false;
+  consecutiveFlushFailures = 0;
+  auditDisabled = false;
+  return snapshot;
 }

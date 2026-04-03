@@ -99,7 +99,7 @@ Once connected, just ask your AI in natural language. Here are some things you c
 - "Check today's meetings, find related notes, and create a prep checklist in Reminders"
 - "Search my files for the Q1 report, read it, and draft a summary email to the team"
 
-These are just starting points — with 262 tools across 25 Apple apps, the combinations are endless.
+These are just starting points — with 262 tools across 27 Apple apps, the combinations are endless.
 
 ---
 
@@ -646,7 +646,7 @@ Or edit `~/.config/airmcp/config.json` directly:
 | `npx airmcp init` | Interactive setup wizard |
 | `npx airmcp doctor` | Diagnose installation issues |
 | `npx airmcp` | Start MCP server (stdio, default) |
-| `npx airmcp --full` | Start with all 25 modules enabled |
+| `npx airmcp --full` | Start with all 27 modules enabled |
 | `npx airmcp --http` | Start as HTTP server (port 3847) |
 
 ## Configuration
@@ -738,7 +738,7 @@ Modules with OS requirements (e.g., Intelligence requires macOS 26+) are automat
 - **JXA/AppleScript dependency** — Core automation relies on Apple's scripting dictionaries. While these have been stable for 10+ years, macOS updates can theoretically break individual modules. Circuit breaker (3 failures → 60s auto-disable) isolates failures. UI Automation tools (6 tools) are inherently more brittle and separated into their own module.
 - **Read data exposure** — Destructive operations require HITL approval, but read operations (mail, messages, contacts) are not rate-limited. When connected to cloud LLMs, sensitive data passes through the LLM provider. Mitigations: PII scrubbing in logs, pagination limits, sensitive modules (mail, messages) require explicit opt-in.
 - **IPC overhead** — Multi-process path (Client → Node.js → osascript/Swift CLI → macOS app). Each JXA call adds ~50ms overhead. Pagination prevents bulk data transfers. Swift bridge path bypasses JXA for EventKit/PhotoKit operations.
-- **Scope** — 262 tools across 25 modules follow 5 repeating patterns (JXA CRUD, Swift bridge, HTTP API, System Events, CLI wrapper), keeping maintenance proportional to pattern count, not tool count.
+- **Scope** — 262 tools across 27 modules follow 5 repeating patterns (JXA CRUD, Swift bridge, HTTP API, System Events, CLI wrapper), keeping maintenance proportional to pattern count, not tool count.
 
 ### Location & Bluetooth
 

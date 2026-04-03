@@ -52,10 +52,22 @@ export function loadAllSkills(builtinsDir: string): { builtins: SkillDefinition[
   return { builtins: builtinsCache, user };
 }
 
+/** Built-in skill names that user skills cannot override. */
+const PROTECTED_SKILL_NAMES = new Set<string>();
+
 export function mergeSkills(builtins: SkillDefinition[], user: SkillDefinition[]): SkillDefinition[] {
   const map = new Map<string, SkillDefinition>();
-  for (const s of builtins) map.set(s.name, s);
-  for (const s of user) map.set(s.name, s); // user overrides builtin
+  for (const s of builtins) {
+    map.set(s.name, s);
+    PROTECTED_SKILL_NAMES.add(s.name);
+  }
+  for (const s of user) {
+    if (PROTECTED_SKILL_NAMES.has(s.name)) {
+      console.error(`[AirMCP] User skill "${s.name}" conflicts with built-in skill — skipping`);
+      continue;
+    }
+    map.set(s.name, s); // user adds new skills only
+  }
   return [...map.values()];
 }
 

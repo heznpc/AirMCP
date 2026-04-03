@@ -2,15 +2,22 @@
  * Generic TTL cache — stores values with per-key expiration.
  * Uses Map insertion order as LRU: accessed keys are moved to the end.
  * Eviction is O(1) — removes the oldest (first) entry in the Map.
+ *
+ * Optional memory cap: when `maxMemoryBytes` is set, the cache tracks
+ * approximate memory usage (JSON-serialized size × 2 for UTF-16) and
+ * evicts oldest entries when the cap is exceeded.
  */
 export class TtlCache {
-  private store = new Map<string, { value: unknown; expiresAt: number }>();
+  private store = new Map<string, { value: unknown; expiresAt: number; sizeBytes: number }>();
   private inflight = new Map<string, Promise<unknown>>();
   private readonly maxEntries: number;
+  private readonly maxMemoryBytes: number;
+  private currentMemoryBytes = 0;
   private pruneTimer: ReturnType<typeof setInterval> | null = null;
 
-  constructor(options?: { maxEntries?: number; autoPruneMs?: number }) {
+  constructor(options?: { maxEntries?: number; autoPruneMs?: number; maxMemoryBytes?: number }) {
     this.maxEntries = options?.maxEntries ?? 500;
+    this.maxMemoryBytes = options?.maxMemoryBytes ?? 0; // 0 = no memory limit
     const autoPruneMs = options?.autoPruneMs ?? 5 * 60_000; // default: 5 min
     if (autoPruneMs > 0) {
       this.pruneTimer = setInterval(() => this.prune(), autoPruneMs);
@@ -23,9 +30,11 @@ export class TtlCache {
     const entry = this.store.get(key);
     if (!entry) return undefined;
     if (Date.now() > entry.expiresAt) {
+      this.currentMemoryBytes -= entry.sizeBytes;
       this.store.delete(key);
       return undefined;
     }
+    // Re-insert to move to end of Map (LRU touch) — sizeBytes unchanged
     this.store.delete(key);
     this.store.set(key, entry);
     return entry.value as T;
@@ -33,8 +42,14 @@ export class TtlCache {
 
   /** Store a value with TTL in milliseconds. */
   set(key: string, value: unknown, ttlMs: number): void {
-    this.store.delete(key);
-    this.store.set(key, { value, expiresAt: Date.now() + ttlMs });
+    const existing = this.store.get(key);
+    if (existing) {
+      this.currentMemoryBytes -= existing.sizeBytes;
+      this.store.delete(key);
+    }
+    const sizeBytes = this.maxMemoryBytes > 0 ? estimateSize(value) : 0;
+    this.store.set(key, { value, expiresAt: Date.now() + ttlMs, sizeBytes });
+    this.currentMemoryBytes += sizeBytes;
     this.evictIfNeeded();
   }
 
@@ -67,7 +82,11 @@ export class TtlCache {
 
   /** Remove a specific key. */
   delete(key: string): void {
-    this.store.delete(key);
+    const entry = this.store.get(key);
+    if (entry) {
+      this.currentMemoryBytes -= entry.sizeBytes;
+      this.store.delete(key);
+    }
   }
 
   /** Remove all expired entries. */
@@ -76,6 +95,7 @@ export class TtlCache {
     let pruned = 0;
     for (const [key, entry] of this.store) {
       if (now > entry.expiresAt) {
+        this.currentMemoryBytes -= entry.sizeBytes;
         this.store.delete(key);
         pruned++;
       }
@@ -92,6 +112,7 @@ export class TtlCache {
   clear(): void {
     this.store.clear();
     this.inflight.clear();
+    this.currentMemoryBytes = 0;
   }
 
   /** Stop the auto-prune timer. */
@@ -102,21 +123,55 @@ export class TtlCache {
     }
   }
 
-  /** Evict LRU entries when cache exceeds maxEntries. O(1) per eviction. */
+  /** Current approximate memory usage in bytes (0 when maxMemoryBytes is not set). */
+  getMemoryUsage(): number {
+    return this.currentMemoryBytes;
+  }
+
+  /** Evict LRU entries when cache exceeds maxEntries or maxMemoryBytes. O(1) per eviction. */
   private evictIfNeeded(): void {
-    if (this.store.size <= this.maxEntries) return;
-    // First pass: remove expired (may free enough space)
+    if (
+      this.store.size <= this.maxEntries &&
+      (this.maxMemoryBytes <= 0 || this.currentMemoryBytes <= this.maxMemoryBytes)
+    )
+      return;
     this.prune();
-    // Second pass: evict oldest (first in Map = least recently used)
-    // Use a snapshot of keys to avoid iterator invalidation issues
-    const keys = [...this.store.keys()];
+    // Re-check after prune — expired entries may have freed enough space
+    if (
+      this.store.size <= this.maxEntries &&
+      (this.maxMemoryBytes <= 0 || this.currentMemoryBytes <= this.maxMemoryBytes)
+    )
+      return;
+    // Evict oldest entries (Map iteration order = insertion order = LRU)
     let evicted = 0;
-    for (const key of keys) {
-      if (this.store.size <= this.maxEntries) break;
+    for (const [key, entry] of this.store) {
+      if (
+        this.store.size <= this.maxEntries &&
+        (this.maxMemoryBytes <= 0 || this.currentMemoryBytes <= this.maxMemoryBytes)
+      )
+        break;
+      this.currentMemoryBytes -= entry.sizeBytes;
       this.store.delete(key);
       evicted++;
-      if (evicted > this.maxEntries) break; // safety guard against infinite loop
+      if (evicted > this.maxEntries) break;
     }
+  }
+}
+
+/**
+ * Estimate the in-memory size of a value in bytes.
+ * Uses JSON.stringify length × 2 (UTF-16 char width) as a practical approximation.
+ * Falls back to a minimal estimate for values that cannot be serialized.
+ */
+function estimateSize(value: unknown): number {
+  // Fast path for numeric arrays (embeddings): 8 bytes per float64 + overhead
+  if (Array.isArray(value) && value.length > 0 && typeof value[0] === "number") {
+    return value.length * 8 + 64;
+  }
+  try {
+    return JSON.stringify(value).length * 2;
+  } catch {
+    return 64;
   }
 }
 

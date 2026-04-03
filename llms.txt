@@ -1,6 +1,6 @@
 # AirMCP
 
-> MCP server for the entire Apple ecosystem. 262 tools across 25 modules.
+> MCP server for the entire Apple ecosystem. 258 tools across 30 modules.
 
 ## Links
 
@@ -15,11 +15,11 @@
 - **Bluetooth** (4 tools): get_bluetooth_state, scan_bluetooth, connect_bluetooth, disconnect_bluetooth
 - **Calendar** (10 tools): list_calendars, list_events, read_event, create_event, update_event, delete_event, search_events, get_upcoming_events, today_events, create_recurring_event
 - **Contacts** (10 tools): list_contacts, search_contacts, read_contact, create_contact, update_contact, delete_contact, list_groups, add_contact_email, add_contact_phone, list_group_members
-- **core** (1 tools): get_workflow
 - **Cross-Module** (0 tools): 
 - **Finder** (8 tools): search_files, get_file_info, set_file_tags, recent_files, list_directory, move_file, trash_file, create_directory
 - **Google Workspace** (16 tools): gws_status, gws_gmail_list, gws_gmail_read, gws_gmail_send, gws_drive_list, gws_drive_read, gws_drive_search, gws_sheets_read, gws_sheets_write, gws_calendar_list, gws_calendar_create, gws_docs_read, gws_tasks_list, gws_tasks_create, gws_people_search, gws_raw
-- **Apple Intelligence** (11 tools): summarize_text, rewrite_text, proofread_text, generate_text, generate_structured, tag_content, ai_chat, generate_image, scan_document, generate_plan, ai_status
+- **health** (5 tools): health_summary, health_today_steps, health_heart_rate, health_sleep, health_authorize
+- **Apple Intelligence** (12 tools): summarize_text, rewrite_text, proofread_text, generate_text, generate_structured, tag_content, ai_chat, generate_image, scan_document, generate_plan, ai_status, ai_agent
 - **Keynote** (9 tools): keynote_list_documents, keynote_create_document, keynote_list_slides, keynote_get_slide, keynote_add_slide, keynote_set_presenter_notes, keynote_export_pdf, keynote_start_slideshow, keynote_close_document
 - **Location** (2 tools): get_current_location, get_location_permission
 - **Mail** (11 tools): list_mailboxes, list_messages, read_message, search_messages, mark_message_read, flag_message, get_unread_count, move_message, list_accounts, send_mail, reply_mail
@@ -37,6 +37,7 @@
 - **Semantic Search** (7 tools): semantic_index, semantic_search, find_related, spotlight_sync, semantic_clear, spotlight_clear, semantic_status
 - **Setup** (1 tools): setup_permissions
 - **Shortcuts** (10 tools): list_shortcuts, run_shortcut, search_shortcuts, get_shortcut_detail, create_shortcut, delete_shortcut, export_shortcut, import_shortcut, duplicate_shortcut, edit_shortcut
+- **speech** (3 tools): transcribe_audio, speech_availability, smart_clipboard
 - **System** (27 tools): get_clipboard, set_clipboard, get_volume, set_volume, toggle_dark_mode, get_frontmost_app, list_running_apps, get_screen_info, show_notification, capture_screenshot, get_wifi_status, toggle_wifi, list_bluetooth_devices, get_battery_status, get_brightness, set_brightness, toggle_focus_mode, system_sleep, prevent_sleep, system_power, launch_app, quit_app, is_app_running, list_all_windows, move_window, resize_window, minimize_window
 - **TV** (6 tools): tv_list_playlists, tv_list_tracks, tv_now_playing, tv_playback_control, tv_search, tv_play
 - **UI Automation** (10 tools): ui_open_app, ui_click, ui_type, ui_press_key, ui_scroll, ui_read, ui_accessibility_query, ui_perform_action, ui_traverse, ui_diff

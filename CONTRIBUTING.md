@@ -118,6 +118,30 @@ CRUD tests create real data (notes, reminders, events, etc.) prefixed with `[Air
 
 Paste the output from both tests into your PR under the **QA Report** section.
 
+### 4a. Dev Test (Recommended During Development)
+
+For rapid iteration while coding, use the lightweight dev-test mode. It runs in-process with a MockMcpServer — no child processes, no stdio transport, 3x faster than QA scripts:
+
+```bash
+npm run dev:test -- notes                  # test one module
+npm run dev:test -- notes,calendar         # test specific modules
+npm run dev:test:changed                   # only git-changed modules
+npm run dev:test:watch -- notes            # watch mode (auto re-test on save)
+npm run dev:test -- --all                  # all modules, sequential
+npm run dev:test -- --tool list_notes      # test a single tool
+npm run dev:test -- --list                 # list available modules
+npm run dev:test -- --all --json           # JSON output for CI
+npm run dev:test -- --all --stop-on-fail   # stop at first failure
+```
+
+**When to use which:**
+
+| Stage | Command | Notes |
+|-------|---------|-------|
+| Active coding | `npm run dev:test` | Fast, in-process, git-aware |
+| Before PR | `npm run qa:seq` | Full validation in isolated servers |
+| CI / comprehensive | `npm run qa` + `npm run qa:crud` | Full coverage |
+
 **Status meanings:**
 
 | Status | Meaning |

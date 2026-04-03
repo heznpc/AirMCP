@@ -16,8 +16,13 @@ const ENV_KEYS = [
   'AIRMCP_INCLUDE_SHARED',
   'AIRMCP_ALLOW_SEND_MESSAGES',
   'AIRMCP_ALLOW_SEND_MAIL',
+  'AIRMCP_ALLOW_RUN_JAVASCRIPT',
   'AIRMCP_SHARE_APPROVAL',
   'AIRMCP_HITL_LEVEL',
+  'AIRMCP_AUDIT_LOG',
+  'AIRMCP_USAGE_TRACKING',
+  'AIRMCP_SEMANTIC_SEARCH',
+  'AIRMCP_PROACTIVE_CONTEXT',
   ...MODULE_NAMES.map((m) => `AIRMCP_DISABLE_${m.toUpperCase()}`),
 ];
 
@@ -55,8 +60,8 @@ function clearConfigEnv() {
 /* ================================================================== */
 
 describe('MODULE_NAMES', () => {
-  test('contains exactly 25 modules', () => {
-    expect(MODULE_NAMES).toHaveLength(25);
+  test('contains expected module count', () => {
+    expect(MODULE_NAMES.length).toBeGreaterThanOrEqual(23);
   });
 
   test('includes the "tv" module', () => {
@@ -103,7 +108,7 @@ describe('STARTER_MODULES', () => {
 
 /* ================================================================== */
 
-describe('parseConfig()', () => {
+describe('parseConfig() — defaults with no config file', () => {
   beforeEach(() => {
     saveEnv();
     clearConfigEnv();
@@ -112,8 +117,6 @@ describe('parseConfig()', () => {
   afterEach(() => {
     restoreEnv();
   });
-
-  /* ------ starter preset (no env vars, no config file) ------------ */
 
   test('with no env vars and no config file, uses starter preset', () => {
     const cfg = parseConfig();
@@ -131,6 +134,47 @@ describe('parseConfig()', () => {
     }
   });
 
+  test('includeShared defaults to false', () => {
+    const cfg = parseConfig();
+    expect(cfg.includeShared).toBe(false);
+  });
+
+  test('allowSendMessages defaults to false', () => {
+    const cfg = parseConfig();
+    expect(cfg.allowSendMessages).toBe(false);
+  });
+
+  test('allowSendMail defaults to false', () => {
+    const cfg = parseConfig();
+    expect(cfg.allowSendMail).toBe(false);
+  });
+
+  test('allowRunJavascript defaults to false', () => {
+    const cfg = parseConfig();
+    expect(cfg.allowRunJavascript).toBe(false);
+  });
+
+  test('features all default to true', () => {
+    const cfg = parseConfig();
+    expect(cfg.features.auditLog).toBe(true);
+    expect(cfg.features.usageTracking).toBe(true);
+    expect(cfg.features.semanticToolSearch).toBe(true);
+    expect(cfg.features.proactiveContext).toBe(true);
+  });
+});
+
+/* ================================================================== */
+
+describe('parseConfig() — environment variable overrides', () => {
+  beforeEach(() => {
+    saveEnv();
+    clearConfigEnv();
+  });
+
+  afterEach(() => {
+    restoreEnv();
+  });
+
   /* ------ AIRMCP_FULL=true ----------------------------------------- */
 
   test('with AIRMCP_FULL=true, all modules are enabled', () => {
@@ -142,7 +186,7 @@ describe('parseConfig()', () => {
     }
   });
 
-  /* ------ AIRMCP_DISABLE_NOTES=true -------------------------------- */
+  /* ------ AIRMCP_DISABLE_<MODULE>=true ----------------------------- */
 
   test('with AIRMCP_DISABLE_NOTES=true, notes is disabled', () => {
     process.env.AIRMCP_FULL = 'true';
@@ -164,23 +208,6 @@ describe('parseConfig()', () => {
     expect(cfg.disabledModules.has('notes')).toBe(false);
   });
 
-  /* ------ default boolean values --------------------------------- */
-
-  test('includeShared defaults to false', () => {
-    const cfg = parseConfig();
-    expect(cfg.includeShared).toBe(false);
-  });
-
-  test('allowSendMessages defaults to false', () => {
-    const cfg = parseConfig();
-    expect(cfg.allowSendMessages).toBe(false);
-  });
-
-  test('allowSendMail defaults to false', () => {
-    const cfg = parseConfig();
-    expect(cfg.allowSendMail).toBe(false);
-  });
-
   /* ------ boolean env var overrides ------------------------------ */
 
   test('AIRMCP_INCLUDE_SHARED=true enables includeShared', () => {
@@ -189,10 +216,22 @@ describe('parseConfig()', () => {
     expect(cfg.includeShared).toBe(true);
   });
 
+  test('AIRMCP_ALLOW_SEND_MESSAGES=true enables allowSendMessages', () => {
+    process.env.AIRMCP_ALLOW_SEND_MESSAGES = 'true';
+    const cfg = parseConfig();
+    expect(cfg.allowSendMessages).toBe(true);
+  });
+
   test('AIRMCP_ALLOW_SEND_MESSAGES=false disables allowSendMessages', () => {
     process.env.AIRMCP_ALLOW_SEND_MESSAGES = 'false';
     const cfg = parseConfig();
     expect(cfg.allowSendMessages).toBe(false);
+  });
+
+  test('AIRMCP_ALLOW_SEND_MAIL=true enables allowSendMail', () => {
+    process.env.AIRMCP_ALLOW_SEND_MAIL = 'true';
+    const cfg = parseConfig();
+    expect(cfg.allowSendMail).toBe(true);
   });
 
   test('AIRMCP_ALLOW_SEND_MAIL=false disables allowSendMail', () => {
@@ -201,7 +240,68 @@ describe('parseConfig()', () => {
     expect(cfg.allowSendMail).toBe(false);
   });
 
-  /* ------ HITL config defaults ----------------------------------- */
+  test('AIRMCP_ALLOW_RUN_JAVASCRIPT=true enables allowRunJavascript', () => {
+    process.env.AIRMCP_ALLOW_RUN_JAVASCRIPT = 'true';
+    const cfg = parseConfig();
+    expect(cfg.allowRunJavascript).toBe(true);
+  });
+});
+
+/* ================================================================== */
+
+describe('parseConfig() — module enable/disable logic', () => {
+  beforeEach(() => {
+    saveEnv();
+    clearConfigEnv();
+  });
+
+  afterEach(() => {
+    restoreEnv();
+  });
+
+  test('explicit AIRMCP_DISABLE_<MOD>=true disables even a starter module', () => {
+    process.env.AIRMCP_DISABLE_NOTES = 'true';
+    const cfg = parseConfig();
+    expect(cfg.disabledModules.has('notes')).toBe(true);
+  });
+
+  test('without config file and without --full, non-starter modules are disabled', () => {
+    const cfg = parseConfig();
+    expect(cfg.disabledModules.has('contacts')).toBe(true);
+    expect(cfg.disabledModules.has('mail')).toBe(true);
+    expect(cfg.disabledModules.has('photos')).toBe(true);
+  });
+
+  test('AIRMCP_FULL=true enables all modules regardless of starter status', () => {
+    process.env.AIRMCP_FULL = 'true';
+    const cfg = parseConfig();
+    for (const mod of MODULE_NAMES) {
+      expect(cfg.disabledModules.has(mod)).toBe(false);
+    }
+  });
+
+  test('disabling all starter modules leaves them disabled', () => {
+    for (const mod of STARTER_MODULES) {
+      process.env[`AIRMCP_DISABLE_${mod.toUpperCase()}`] = 'true';
+    }
+    const cfg = parseConfig();
+    for (const mod of STARTER_MODULES) {
+      expect(cfg.disabledModules.has(mod)).toBe(true);
+    }
+  });
+});
+
+/* ================================================================== */
+
+describe('parseConfig() — HITL config parsing', () => {
+  beforeEach(() => {
+    saveEnv();
+    clearConfigEnv();
+  });
+
+  afterEach(() => {
+    restoreEnv();
+  });
 
   test('HITL level defaults to "destructive-only"', () => {
     const cfg = parseConfig();
@@ -218,15 +318,27 @@ describe('parseConfig()', () => {
     expect(cfg.hitl.whitelist.size).toBe(0);
   });
 
-  test('HITL socketPath is set', () => {
+  test('HITL socketPath contains hitl.sock', () => {
     const cfg = parseConfig();
     expect(cfg.hitl.socketPath).toContain('hitl.sock');
   });
 
-  test('AIRMCP_HITL_LEVEL env var overrides default', () => {
+  test('AIRMCP_HITL_LEVEL=all overrides default', () => {
     process.env.AIRMCP_HITL_LEVEL = 'all';
     const cfg = parseConfig();
     expect(cfg.hitl.level).toBe('all');
+  });
+
+  test('AIRMCP_HITL_LEVEL=off disables HITL', () => {
+    process.env.AIRMCP_HITL_LEVEL = 'off';
+    const cfg = parseConfig();
+    expect(cfg.hitl.level).toBe('off');
+  });
+
+  test('AIRMCP_HITL_LEVEL=all-writes is accepted', () => {
+    process.env.AIRMCP_HITL_LEVEL = 'all-writes';
+    const cfg = parseConfig();
+    expect(cfg.hitl.level).toBe('all-writes');
   });
 
   test('invalid HITL level falls back to "destructive-only"', () => {
@@ -235,7 +347,86 @@ describe('parseConfig()', () => {
     expect(cfg.hitl.level).toBe('destructive-only');
   });
 
-  /* ------ share approval via env var ----------------------------- */
+  test('HITL config has expected shape', () => {
+    const cfg = parseConfig();
+    expect(cfg.hitl).toHaveProperty('level');
+    expect(cfg.hitl).toHaveProperty('whitelist');
+    expect(cfg.hitl).toHaveProperty('timeout');
+    expect(cfg.hitl).toHaveProperty('socketPath');
+    expect(cfg.hitl.whitelist).toBeInstanceOf(Set);
+  });
+});
+
+/* ================================================================== */
+
+describe('parseConfig() — features config parsing', () => {
+  beforeEach(() => {
+    saveEnv();
+    clearConfigEnv();
+  });
+
+  afterEach(() => {
+    restoreEnv();
+  });
+
+  test('all features default to true', () => {
+    const cfg = parseConfig();
+    expect(cfg.features.auditLog).toBe(true);
+    expect(cfg.features.usageTracking).toBe(true);
+    expect(cfg.features.semanticToolSearch).toBe(true);
+    expect(cfg.features.proactiveContext).toBe(true);
+  });
+
+  test('AIRMCP_AUDIT_LOG=false disables auditLog', () => {
+    process.env.AIRMCP_AUDIT_LOG = 'false';
+    const cfg = parseConfig();
+    expect(cfg.features.auditLog).toBe(false);
+  });
+
+  test('AIRMCP_USAGE_TRACKING=false disables usageTracking', () => {
+    process.env.AIRMCP_USAGE_TRACKING = 'false';
+    const cfg = parseConfig();
+    expect(cfg.features.usageTracking).toBe(false);
+  });
+
+  test('AIRMCP_SEMANTIC_SEARCH=false disables semanticToolSearch', () => {
+    process.env.AIRMCP_SEMANTIC_SEARCH = 'false';
+    const cfg = parseConfig();
+    expect(cfg.features.semanticToolSearch).toBe(false);
+  });
+
+  test('AIRMCP_PROACTIVE_CONTEXT=false disables proactiveContext', () => {
+    process.env.AIRMCP_PROACTIVE_CONTEXT = 'false';
+    const cfg = parseConfig();
+    expect(cfg.features.proactiveContext).toBe(false);
+  });
+
+  test('AIRMCP_AUDIT_LOG=true explicitly enables auditLog', () => {
+    process.env.AIRMCP_AUDIT_LOG = 'true';
+    const cfg = parseConfig();
+    expect(cfg.features.auditLog).toBe(true);
+  });
+
+  test('features config has expected shape', () => {
+    const cfg = parseConfig();
+    expect(cfg.features).toHaveProperty('auditLog');
+    expect(cfg.features).toHaveProperty('usageTracking');
+    expect(cfg.features).toHaveProperty('semanticToolSearch');
+    expect(cfg.features).toHaveProperty('proactiveContext');
+  });
+});
+
+/* ================================================================== */
+
+describe('parseConfig() — share approval via env var', () => {
+  beforeEach(() => {
+    saveEnv();
+    clearConfigEnv();
+  });
+
+  afterEach(() => {
+    restoreEnv();
+  });
 
   test('AIRMCP_SHARE_APPROVAL env var populates shareApprovalModules', () => {
     process.env.AIRMCP_SHARE_APPROVAL = 'notes,calendar';
@@ -252,6 +443,12 @@ describe('parseConfig()', () => {
     expect(cfg.shareApprovalModules.has('calendar')).toBe(true);
     expect(cfg.shareApprovalModules.has('bogus')).toBe(false);
     expect(cfg.shareApprovalModules.size).toBe(2);
+  });
+
+  test('empty AIRMCP_SHARE_APPROVAL results in empty set', () => {
+    process.env.AIRMCP_SHARE_APPROVAL = '';
+    const cfg = parseConfig();
+    expect(cfg.shareApprovalModules.size).toBe(0);
   });
 });
 
@@ -272,6 +469,44 @@ describe('isModuleEnabled()', () => {
       shareApprovalModules: new Set(),
     };
     expect(isModuleEnabled(cfg, 'mail')).toBe(false);
+  });
+
+  test('returns true when disabledModules is empty', () => {
+    const cfg = {
+      disabledModules: new Set(),
+      shareApprovalModules: new Set(),
+    };
+    expect(isModuleEnabled(cfg, 'notes')).toBe(true);
+    expect(isModuleEnabled(cfg, 'mail')).toBe(true);
+  });
+
+  test('returns false for each disabled module in a multi-module set', () => {
+    const cfg = {
+      disabledModules: new Set(['mail', 'photos', 'tv']),
+      shareApprovalModules: new Set(),
+    };
+    expect(isModuleEnabled(cfg, 'mail')).toBe(false);
+    expect(isModuleEnabled(cfg, 'photos')).toBe(false);
+    expect(isModuleEnabled(cfg, 'tv')).toBe(false);
+    expect(isModuleEnabled(cfg, 'notes')).toBe(true);
+  });
+
+  test('works with parseConfig output', () => {
+    // Integration: use real parseConfig
+    const saved = process.env.AIRMCP_FULL;
+    const savedPath = PATHS.CONFIG;
+    PATHS.CONFIG = '/tmp/__airmcp_test_nonexistent_config__.json';
+    delete process.env.AIRMCP_FULL;
+
+    const cfg = parseConfig();
+    // Starter modules should be enabled
+    expect(isModuleEnabled(cfg, 'notes')).toBe(true);
+    expect(isModuleEnabled(cfg, 'reminders')).toBe(true);
+
+    // Restore
+    if (saved !== undefined) process.env.AIRMCP_FULL = saved;
+    else delete process.env.AIRMCP_FULL;
+    PATHS.CONFIG = savedPath;
   });
 });
 

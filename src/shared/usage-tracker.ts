@@ -22,7 +22,7 @@ class UsageTracker {
   private lastTool: string | null = null;
   private profile: UsageProfile | null = null;
   private dirty = false;
-  private flushTimer: ReturnType<typeof setInterval> | null = null;
+  private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private loaded: Promise<void> | null = null;
 
   record(toolName: string): void {
@@ -132,7 +132,7 @@ class UsageTracker {
   /** Stop the flush timer (for clean shutdown). */
   stop(): void {
     if (this.flushTimer) {
-      clearInterval(this.flushTimer);
+      clearTimeout(this.flushTimer);
       this.flushTimer = null;
     }
   }
@@ -175,8 +175,9 @@ class UsageTracker {
 
   private ensureFlushTimer(): void {
     if (this.flushTimer) return;
-    this.flushTimer = setInterval(() => {
+    this.flushTimer = setTimeout(() => {
       this.flush().catch(() => {});
+      this.flushTimer = null;
     }, FLUSH_INTERVAL);
     // Don't prevent process exit
     if (this.flushTimer.unref) this.flushTimer.unref();

@@ -5,6 +5,82 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.3] - 2026-04-02
+
+### Added
+- **Dev test mode** — `scripts/dev-test.mjs` lightweight in-process developer testing (`npm run dev:test`); MockMcpServer harness calls tool handlers directly without MCP SDK, stdio transport, or child processes — 3x faster and 10x less memory than debug-pipeline
+- **Git-aware testing** — `npm run dev:test:changed` detects modified modules via `git diff` and tests only those; `src/shared/` changes trigger full test
+- **Watch mode** — `npm run dev:test:watch` rebuilds and re-tests on file changes with ESM cache-busting
+- **Single-tool testing** — `npm run dev:test -- --tool list_notes` finds and tests a single tool across all modules with reverse index lookup
+- **Memory reporting** — dev-test reports per-module heap delta and total memory usage
+
+### Changed
+- Updated CONTRIBUTING.md, docs/testing.md with dev-test workflow documentation
+- Module count corrected to 27 in README.md and server.json (was 25)
+- Regenerated llms.txt / llms-full.txt
+
+## [2.6.2] - 2026-04-02
+
+### Added
+- **Debug pipeline** — `scripts/debug-pipeline.mjs` for module-isolated debugging (`npm run debug -- --module notes`); prevents 262-tool simultaneous load from exhausting memory
+- **Debug env vars** — `AIRMCP_DEBUG_MODULES` (whitelist) and `AIRMCP_DEBUG_SEQUENTIAL` (sequential loading) for targeted module debugging
+- **Embedding cache memory cap** — 256MB default limit with `AIRMCP_EMBED_CACHE_MAX_MB` override; fast-path size estimation for numeric arrays
+- **Audit flush interval config** — `AIRMCP_AUDIT_FLUSH_INTERVAL` env var (default raised from 5s to 30s)
+- **ESLint layer boundaries** — `no-restricted-imports` rules enforce Core → Bridge → Services dependency direction in `src/shared/`
+- **SDK signature validation** — `tool-registry.ts` validates callback position at runtime; logs warning and falls back gracefully on SDK mismatch
+- **57 new tests** — SDK integration tests for tool-registry (12), config parsing (7), audit logging (30), module loading (8); total 773→830
+
+### Fixed
+- **Module list sync** — `config.ts` `MODULE_NAMES` was missing `speech` and `health` modules (disable/enable config had no effect on them)
+- **Idle battery drain** — audit logger and usage tracker converted from `setInterval` to event-driven `setTimeout`; zero CPU wake-ups when no tools are active
+- **Cache eviction efficiency** — `evictIfNeeded()` now re-checks limits after pruning expired entries, avoiding unnecessary key-snapshot allocation
+
+### Changed
+- MCP SDK pinned to exact version `1.29.0` (was `^1.29.0`) to prevent silent monkey-patch breakage
+- `@modelcontextprotocol/ext-apps` pinned to exact `1.3.1`
+- `tool-registry.ts` reclassified from Bridge (Layer 2) to Services (Layer 3) to reflect actual dependencies
+- Validation blocks in tool-registry deduplicated via `validateCallback()` helper
+- `console.warn` standardized to `console.error` in tool-registry (MCP servers use stderr for logging)
+- Audit test helpers consolidated: `_testDrainBuffer` + `_testResetState` → single `_testReset`
+- Regenerated `llms-full.txt`
+
+## [2.6.1] - 2026-04-02
+
+### Security
+- **Swift bridge single-shot** — replace regex-based prototype pollution check with reviver pattern (matches persistent mode)
+- **iWork JXA injection** — add `assertValidAppName()` whitelist to all iWork script generators
+- **SSRF prevention** — `open_url` now blocks `file://`, `javascript://`, localhost, and internal network addresses
+- **Prompt injection defense** — add `okUntrusted()` to 16 additional tools returning user/external content (GWS Gmail/Drive/Calendar/Tasks, Finder, UI, Maps, Intelligence)
+- **Prompt input sanitization** — wrap user inputs in `<user_input>` delimiters in cross-module prompts
+- **Skill shadowing prevention** — built-in skill names are now protected; user skills with conflicting names are skipped
+- **Drive query injection** — strengthen sanitization by removing all punctuation from search queries
+- **HITL socket DoS** — add 1MB buffer size limit on HITL socket data
+- **Symlink traversal** — add `resolveAndGuard()` to `move_file` and `trash_file` operations
+- **Config validation** — add runtime type checking for `config.json` parsing (reject malformed configs safely)
+- **API credential masking** — improve error message redaction for Gemini API key patterns
+- **Ollama URL validation** — use proper URL parsing to prevent localhost check bypass
+
+### Fixed
+- **Event bus type safety** — add proper type guards for parsed event data
+- **Rate limiter memory** — add 10K max bucket limit with LRU eviction to prevent unbounded growth from IP rotation
+- **Screenshot cleanup** — delete temp file before throwing on oversized captures (prevents orphaned files)
+- **Screen recording timer** — fix potential timer leak when recording promise rejects early
+- **Caffeinate tracking** — use `Set<number>` to track all PIDs instead of single variable
+- **Cache eviction** — use key snapshot to prevent iterator invalidation during eviction
+- **Skills executor DoS** — add `MAX_LOOP_ITERATIONS` (1000) and 1MB tool response size limit
+- **YAML skill loading** — add 256KB file size limit
+- **Escaping tests** — fix 3 pre-existing `escJxaShell` test expectations to match correct double-escaping behavior
+
+### Changed
+- HTTP health endpoint no longer exposes `uptime` field (information leakage prevention)
+- HTTP transport adds `X-Request-ID` header for request tracing
+- Audit logging added to `run_javascript`, `send_mail`, `reply_mail` operations
+- Skills trigger failures now retry once after 2s delay
+- Jest coverage thresholds raised: statements 30→35%, branches 20→25%, functions 25→30%, lines 30→35%
+- CI: Swift build artifacts cached, checkout optimized to `fetch-depth: 1`
+- `esbuild` added as explicit devDependency
+- `gws_raw` params/body size-limited (10KB/100KB)
+
 ## [2.6.0] - 2026-03-28
 
 ### Security

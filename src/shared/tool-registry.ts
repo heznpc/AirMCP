@@ -4,9 +4,14 @@
  * (`_registeredTools`, `_registeredPrompts`).
  *
  * Usage: call `toolRegistry.installOn(server)` once before any module
- * registration. The registry monkey-patches `server.tool()`, `server.prompt()`,
+ * registration. The registry wraps `server.tool()`, `server.prompt()`,
  * `server.registerTool()`, and `server.registerPrompt()` to intercept every
  * registration transparently — no module changes required.
+ *
+ * Safety: each wrapper validates the argument structure before interception.
+ * If the MCP SDK changes its method signatures, the wrapper logs a clear
+ * warning and falls through to the original method — the server keeps working,
+ * just without registry tracking / usage instrumentation.
  */
 
 import type { McpServer, AnyFn } from "./mcp.js";
@@ -123,6 +128,29 @@ class ToolRegistry {
     this.interceptPromptRegistration(server);
   }
 
+  /**
+   * Validate that the last argument is a function (the callback).
+   * Returns the callback on success, or null if validation fails (with a warning logged).
+   */
+  private validateCallback(
+    method: string,
+    entityType: string,
+    name: string,
+    rest: unknown[],
+    origFn: AnyFn,
+  ): AnyFn | null {
+    const lastArg = rest[rest.length - 1];
+    if (typeof lastArg !== "function") {
+      console.error(
+        `[AirMCP] WARNING: ${method}() signature mismatch — callback not found at expected position. ` +
+          `SDK may have changed. ${entityType} "${name}" registered without interception.`,
+      );
+      origFn(name, ...rest);
+      return null;
+    }
+    return lastArg as AnyFn;
+  }
+
   private interceptToolRegistration(server: McpServer): void {
     const origRegisterTool = server.registerTool.bind(server);
     const tools = this.tools;
@@ -159,10 +187,21 @@ class ToolRegistry {
     };
 
     server.registerTool = ((name: string, ...rest: unknown[]) => {
-      const callback = rest[rest.length - 1] as AnyFn;
+      const callback = this.validateCallback("registerTool", "Tool", name, rest, origRegisterTool as AnyFn);
+      if (!callback) return;
+
+      // Validate config is an object (expected at rest[0])
+      const hasConfig = rest.length >= 2;
+      if (hasConfig && (typeof rest[0] !== "object" || rest[0] === null)) {
+        console.error(
+          `[AirMCP] WARNING: registerTool() config is not an object (got ${typeof rest[0]}). ` +
+            `Tool "${name}" registered without interception.`,
+        );
+        return (origRegisterTool as AnyFn)(name, ...rest);
+      }
       const wrapped = wrapHandler(name, callback);
       rest[rest.length - 1] = wrapped;
-      const config = rest.length >= 2 ? (rest[0] as Record<string, unknown>) : {};
+      const config = hasConfig ? (rest[0] as Record<string, unknown>) : {};
       const title = config.title as string | undefined;
       const fullDescription = config.description as string | undefined;
       // Compact mode: shorten descriptions sent to clients via SDK
@@ -184,7 +223,8 @@ class ToolRegistry {
 
     const origTool = server.tool.bind(server);
     server.tool = ((name: string, ...rest: unknown[]) => {
-      const callback = rest[rest.length - 1] as AnyFn;
+      const callback = this.validateCallback("tool", "Tool", name, rest, origTool as AnyFn);
+      if (!callback) return;
       const wrapped = wrapHandler(name, callback);
       rest[rest.length - 1] = wrapped;
       // Legacy tool() — description is the 2nd arg if it's a string
@@ -209,17 +249,19 @@ class ToolRegistry {
     const origRegisterPrompt = server.registerPrompt.bind(server);
     const prompts = this.prompts;
     server.registerPrompt = ((name: string, ...rest: unknown[]) => {
+      const cb = this.validateCallback("registerPrompt", "Prompt", name, rest, origRegisterPrompt as AnyFn);
+      if (!cb) return;
       const result = (origRegisterPrompt as AnyFn)(name, ...rest);
-      const callback = rest[rest.length - 1] as AnyFn;
-      prompts.set(name, { callback });
+      prompts.set(name, { callback: cb });
       return result;
     }) as typeof server.registerPrompt;
 
     const origPrompt = server.prompt.bind(server);
     server.prompt = ((name: string, ...rest: unknown[]) => {
+      const cb = this.validateCallback("prompt", "Prompt", name, rest, origPrompt as AnyFn);
+      if (!cb) return;
       const result = (origPrompt as AnyFn)(name, ...rest);
-      const callback = rest[rest.length - 1] as AnyFn;
-      prompts.set(name, { callback });
+      prompts.set(name, { callback: cb });
       return result;
     }) as typeof server.prompt;
   }

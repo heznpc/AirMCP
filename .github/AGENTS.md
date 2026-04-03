@@ -74,7 +74,7 @@ src/
     ├── result.ts         # ok()/err() MCP response helpers
     ├── config.ts         # Config parsing, module registry, MCP client paths
     ├── iwork.ts          # Shared iWork helpers (bundle ID mapping)
-    ├── modules.ts        # MODULE_REGISTRY (25 modules)
+    ├── modules.ts        # MODULE_REGISTRY (27 modules)
     └── resources.ts      # MCP resource registration (8 resources)
 swift/                    # Swift package for Apple Intelligence + EventKit + PhotoKit
 scripts/                  # QA test runner + stats counter
@@ -83,7 +83,7 @@ tests/                    # Script generator tests
 
 ## Stats
 
-- **262 tools** across 25 modules (+ dynamic shortcut tools at runtime)
+- **262 tools** across 27 modules (+ dynamic shortcut tools at runtime)
 - **32 prompts** (per-module + cross-module + YAML skills)
 - **8 MCP resources** (Notes, Calendar, Reminders, Music, Mail, System, Context Snapshot)
 

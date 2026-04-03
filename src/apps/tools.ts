@@ -114,7 +114,6 @@ export function registerApps(server: McpServer, opts: { calendar: boolean; music
 
   if (opts.calendar) {
     // Calendar Week View
-    // @ts-expect-error ext-apps SDK generics trigger excessive type instantiation depth
     registerAppTool(
       s,
       "calendar_week_view",

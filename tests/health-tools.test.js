@@ -82,11 +82,11 @@ describe('health_summary', () => {
     expect(parsed.stepsToday).toBe(8432);
     expect(parsed.heartRateAvg7d).toBe(68.5);
     expect(parsed.sleepHoursLastNight).toBe(7.25);
-    // _links are now in a separate content block (not in the primary JSON)
-    const linksBlock = result.content.find(c => c.text.includes('_links:'));
+    // _links are in a separate content block as proper JSON
+    const linksBlock = result.content.find(c => c.text.includes('_links'));
     expect(linksBlock).toBeDefined();
-    const linksJson = JSON.parse(linksBlock.text.replace(/^\s*_links:\s*/, ''));
-    expect(linksJson.length).toBeGreaterThan(0);
+    const { _links } = JSON.parse(linksBlock.text);
+    expect(_links.length).toBeGreaterThan(0);
   });
 
   test('returns error when swift bridge unavailable', async () => {

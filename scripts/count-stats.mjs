@@ -79,11 +79,7 @@ let dirty = false;
 
 /**
  * Apply numeric replacements to a file.
- *  - check mode: report mismatches
- *  - sync mode: rewrite file with correct values
- *
- * Each replacement: { pattern: RegExp with capture group, value: number }
- * The pattern MUST have exactly one capture group around the number to replace.
+ * Each replacement: { pattern: RegExp with (\d+) capture group, value: number }
  */
 function syncFile(relPath, replacements) {
   const absPath = join(ROOT, relPath);
@@ -92,11 +88,10 @@ function syncFile(relPath, replacements) {
   let content = readFileSync(absPath, "utf-8");
   let changed = false;
 
-  for (const { pattern, value, group } of replacements) {
-    const numGroup = group ?? 1; // which capture group holds the number
-    const updated = content.replace(pattern, (...args) => {
+  for (const { pattern, value } of replacements) {
+    content = content.replace(pattern, (...args) => {
       const match = args[0];
-      const num = args[numGroup];
+      const num = args[1];
       const current = parseInt(num);
       if (current !== value) {
         changed = true;
@@ -104,7 +99,6 @@ function syncFile(relPath, replacements) {
       }
       return match;
     });
-    content = updated;
   }
 
   if (changed) {
@@ -115,48 +109,8 @@ function syncFile(relPath, replacements) {
       writeFileSync(absPath, content);
       console.log(`  sync: ${relPath}`);
     }
-  } else if (mode === "check" || mode === "sync") {
+  } else {
     console.log(`  ok:   ${relPath}`);
-  }
-}
-
-/**
- * Sync locale JSON files. Each locale uses different words for "modules",
- * so we match the number preceding any known module-word.
- */
-function syncLocales() {
-  const localeDir = join(ROOT, "docs", "locales");
-  if (!existsSync(localeDir)) return;
-
-  const moduleWords =
-    /(\d+)([\s\u00a0]*(?:modules?|개 모듈|モジュール|个模块|個模組|Modulen|módulos))/g;
-
-  for (const f of readdirSync(localeDir).filter((f) => f.endsWith(".json"))) {
-    const absPath = join(localeDir, f);
-    let content = readFileSync(absPath, "utf-8");
-    let changed = false;
-
-    const updated = content.replace(moduleWords, (match, num, rest) => {
-      const current = parseInt(num);
-      if (current !== modules) {
-        changed = true;
-        return `${modules}${rest}`;
-      }
-      return match;
-    });
-    content = updated;
-
-    if (changed) {
-      if (mode === "check") {
-        console.error(`  STALE: docs/locales/${f}`);
-        dirty = true;
-      } else {
-        writeFileSync(absPath, content);
-        console.log(`  sync: docs/locales/${f}`);
-      }
-    } else {
-      console.log(`  ok:   docs/locales/${f}`);
-    }
   }
 }
 
@@ -166,7 +120,7 @@ console.log(
   `\nStats ${mode}: ${tools} tools, ${prompts} prompts, ${resources} resources, ${modules} modules\n`,
 );
 
-// README.md — "**N tools** (N modules)"
+// README.md
 syncFile("README.md", [
   { pattern: /\*\*(\d+) tools\*\*/, value: tools },
   { pattern: /(\d+) modules\)/g, value: modules },
@@ -203,16 +157,15 @@ syncFile("docs/TERMS_OF_SERVICE.md", [
   { pattern: /(\d+) modules/g, value: modules },
 ]);
 
-// Landing page — only match aggregate counts in meta tags, hero subtitle, and footer.
-// Per-module "N tools" badges have their own specific counts and must not be touched.
+// Landing page — only match aggregate counts, not per-module badges.
 syncFile("docs/index.html", [
   { pattern: /with (\d+) tools across/g, value: tools },
   { pattern: /across (\d+) modules/g, value: modules },
-  { pattern: /(hero_sub">)(\d+)( tools)/g, value: tools, group: 2 },
-  { pattern: /(tryit_footer">)(\d+)( tools)/g, value: tools, group: 2 },
+  { pattern: /hero_sub">(\d+) tools/g, value: tools },
+  { pattern: /tryit_footer">(\d+) tools/g, value: tools },
 ]);
 
-// Registry metadata files (mcp.json, glama.json, smithery.yaml)
+// Registry metadata
 const registryPattern = [
   { pattern: /(\d+) tools across/g, value: tools },
   { pattern: /across (\d+) modules/g, value: modules },
@@ -221,8 +174,15 @@ syncFile("mcp.json", registryPattern);
 syncFile("glama.json", registryPattern);
 syncFile("smithery.yaml", registryPattern);
 
-// Locale files
-syncLocales();
+// Locale files — each uses different words for "modules"
+const localeDir = join(ROOT, "docs", "locales");
+if (existsSync(localeDir)) {
+  const moduleWords =
+    /(\d+)([\s\u00a0]*(?:modules?|개 모듈|モジュール|个模块|個模組|Modulen|módulos))/g;
+  for (const f of readdirSync(localeDir).filter((f) => f.endsWith(".json"))) {
+    syncFile(`docs/locales/${f}`, [{ pattern: moduleWords, value: modules }]);
+  }
+}
 
 console.log("");
 

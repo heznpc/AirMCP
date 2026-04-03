@@ -235,7 +235,7 @@ export function searchEventsScript(query: string, startDate: string, endDate: st
       const eEnds = filtered.endDate();
       const eAllDay = filtered.alldayEvent();
       const calName = cal.name();
-      const safe = Math.min(count, eUids.length, eSummaries.length, eStarts.length, eEnds.length, eAllDay.length);
+      const safe = Math.min(count, eUids.length, eSummaries.length, eDescs.length, eStarts.length, eEnds.length, eAllDay.length);
       for (let i = 0; i < safe; i++) {
         if (eUids[i] == null || eStarts[i] == null || eEnds[i] == null) continue;
         const summary = eSummaries[i] || '';

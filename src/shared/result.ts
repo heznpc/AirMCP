@@ -63,7 +63,7 @@ export function okLinkedStructured(toolName: string, data: unknown) {
   if (links.length > 0) {
     base.content.push({
       type: "text" as const,
-      text: `\n_links: ${JSON.stringify(links)}`,
+      text: JSON.stringify({ _links: links }, null, 2),
     });
   }
   return base;
@@ -75,19 +75,6 @@ export function err(message: string) {
     content: [{ type: "text" as const, text: message }],
     isError: true,
   };
-}
-
-/**
- * Return an error for invalid/missing tool parameters.
- * Helps clients distinguish "bad request" from "server error".
- */
-export function errInvalidParams(message: string) {
-  return err(`[invalid_params] ${message}`);
-}
-
-/** Return an error for a resource that was not found. */
-export function errNotFound(resource: string) {
-  return err(`[not_found] ${resource}`);
 }
 
 /** Standardized catch-block helper for tool handlers. Classifies the error automatically. */

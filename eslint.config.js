@@ -47,7 +47,6 @@ export default tseslint.config(
       'src/shared/config.ts',
       'src/shared/mcp.ts',
       'src/shared/registry.ts',
-      'src/shared/result.ts',
       'src/shared/icons.ts',
       'src/shared/banner.ts',
     ],
@@ -67,7 +66,6 @@ export default tseslint.config(
       'src/shared/hitl-guard.ts',
       'src/shared/hitl.ts',
       'src/shared/tool-filter.ts',
-      'src/shared/tool-search.ts',
       'src/shared/share-guard.ts',
     ],
     rules: {

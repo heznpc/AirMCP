@@ -82,7 +82,7 @@ jobs:
         run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 
       - name: Cache Swift build artifacts
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             swift/.build

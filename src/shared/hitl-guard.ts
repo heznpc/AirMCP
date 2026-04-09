@@ -11,12 +11,15 @@ interface ToolAnnotations {
 }
 
 /**
- * Clients whose harness already enforces tool-call permissions.
- * When one of these clients is detected, skip MCP elicitation to avoid
- * double-approval UX (harness prompt + elicitation prompt).
+ * Clients where MCP elicitation should be skipped.
+ *
+ * "claude code" / "claude-code" — harness enforces permissions; elicitation = double-approval.
+ * "claude-ai" — Claude Desktop / Cowork / claude.ai; elicitation prompt does not surface
+ *               in agentic contexts (issue #28), causing silent timeout → denial.
+ *
  * Socket-based HITL remains active as it's a separate, explicit channel.
  */
-const MANAGED_CLIENT_NAMES: ReadonlySet<string> = new Set(["claude code", "claude-code"]);
+const MANAGED_CLIENT_NAMES: ReadonlySet<string> = new Set(["claude code", "claude-code", "claude-ai"]);
 
 /**
  * Returns true if the connected MCP client has its own permission management,

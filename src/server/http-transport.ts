@@ -184,19 +184,19 @@ export async function startHttpServer(options: HttpServerOptions): Promise<void>
   });
 
   // MCP Server Card — spec 2025-11-25 .well-known discovery
-  const serverCard: Record<string, unknown> = {
+  const serverCard = {
     name: NPM_PACKAGE_NAME,
     version: pkg.version,
     description: pkg.description,
     websiteUrl: WEBSITE_URL,
     icons: [SERVER_ICON],
-    transport: { type: "streamable-http", url: "/mcp" },
+    transport: { type: "streamable-http" as const, url: "/mcp" },
     capabilities: {
       tools: { listChanged: true },
       prompts: { listChanged: true },
       resources: { listChanged: true },
     },
-    ...(httpToken ? { authorization: { type: "bearer" } } : {}),
+    ...(httpToken ? { authorization: { type: "bearer" as const } } : {}),
   };
   app.get("/.well-known/mcp.json", (_req, res) => res.json(serverCard));
 

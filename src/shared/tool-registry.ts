@@ -187,8 +187,6 @@ class ToolRegistry {
     const origRegisterTool = server.registerTool.bind(server);
     const tools = this.tools;
 
-    const telemetryEnabled = process.env.AIRMCP_TELEMETRY === "true";
-
     const wrapHandler = (name: string, handler: AnyFn): AnyFn => {
       return (async (...args: unknown[]) => {
         if (process.env.AIRMCP_USAGE_TRACKING !== "false") usageTracker.record(name);
@@ -206,9 +204,6 @@ class ToolRegistry {
                 durationMs: Date.now() - start,
               });
             }
-            // Auto-attach _meta size hint for large results (>10 KB).
-            // Prevents Claude Code (and compatible harnesses) from truncating
-            // data-heavy tool responses (list/search/read operations).
             result = autoSizeHint(result);
             return result;
           } catch (e) {
@@ -225,8 +220,9 @@ class ToolRegistry {
           }
         };
 
-        if (telemetryEnabled) {
-          return traceToolCall(name, args[0] as Record<string, unknown>, execute);
+        if (process.env.AIRMCP_TELEMETRY === "true") {
+          const toolArgs = args[0] as Record<string, unknown> | undefined;
+          return traceToolCall(name, toolArgs ? Object.keys(toolArgs).length : 0, execute);
         }
         return execute();
       }) as AnyFn;

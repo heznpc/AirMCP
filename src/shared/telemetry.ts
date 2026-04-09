@@ -22,6 +22,7 @@ type Span = {
 };
 
 let tracer: Tracer | null | undefined; // undefined = not yet loaded
+let tracerLoading: Promise<Tracer | null> | undefined;
 
 // Computed module name bypasses TS module resolution for this optional peer dep.
 const OTEL_MODULE = "@opentelemetry/api";
@@ -35,30 +36,27 @@ async function loadTracer(): Promise<Tracer | null> {
   }
 }
 
-async function getTracer(): Promise<Tracer | null> {
-  if (tracer === undefined) {
-    tracer = await loadTracer();
+function getTracer(): Tracer | null | Promise<Tracer | null> {
+  if (tracer !== undefined) return tracer; // sync fast path — no Promise allocation
+  if (!tracerLoading) {
+    tracerLoading = loadTracer().then((t) => {
+      tracer = t;
+      return t;
+    });
   }
-  return tracer;
+  return tracerLoading;
 }
 
 /**
  * Wrap a tool call with an OTel span. If OTel is unavailable, runs `fn` directly.
  */
-export async function traceToolCall<T>(
-  toolName: string,
-  args: Record<string, unknown> | undefined,
-  fn: () => Promise<T>,
-): Promise<T> {
+export async function traceToolCall<T>(toolName: string, argCount: number, fn: () => Promise<T>): Promise<T> {
   const t = await getTracer();
   if (!t) return fn();
 
   return t.startActiveSpan(`tool.${toolName}`, async (span: Span) => {
     span.setAttribute("mcp.tool.name", toolName);
-    if (args) {
-      const argKeys = Object.keys(args);
-      span.setAttribute("mcp.tool.arg_count", argKeys.length);
-    }
+    span.setAttribute("mcp.tool.arg_count", argCount);
     try {
       const result = await fn();
       span.setStatus({ code: 1 /* OK */ });

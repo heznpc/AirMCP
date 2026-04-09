@@ -40,7 +40,7 @@ export interface CreateServerOptions {
 
 export async function createServer(
   options: CreateServerOptions,
-): Promise<{ server: SdkMcpServer; bannerInfo: BannerInfo }> {
+): Promise<{ server: SdkMcpServer; bannerInfo: BannerInfo; cleanupEventListeners: () => void }> {
   const { config, hitlClient, osVersion, pkg } = options;
 
   const server = new SdkMcpServer({
@@ -260,6 +260,23 @@ export async function createServer(
       },
     );
 
+  // Named event handlers — stored so they can be removed when the server closes
+  // (prevents listener accumulation across HTTP sessions).
+  const SNAPSHOT_KEYS = ["snapshot:standard", "snapshot:brief", "snapshot:full"];
+
+  function invalidateAndNotify(keys: string[]): void {
+    for (const k of keys) resourceCache.delete(k);
+    try {
+      server.sendResourceListChanged();
+    } catch {
+      /* client may not support notifications */
+    }
+  }
+
+  const onCalendarChanged = () => invalidateAndNotify(["calendar:today", "calendar:upcoming", ...SNAPSHOT_KEYS]);
+  const onRemindersChanged = () => invalidateAndNotify(["reminders:due", "reminders:today", ...SNAPSHOT_KEYS]);
+  const onPasteboardChanged = () => invalidateAndNotify(["system:clipboard"]);
+
   // event_subscribe: start real-time event observation
   lServer.registerTool(
     "event_subscribe",
@@ -280,45 +297,15 @@ export async function createServer(
         }
         await runSwift("start-observer", "{}");
         // Remove any existing listeners before re-attaching (idempotent)
-        eventBus.removeAllListeners("calendar_changed");
-        eventBus.removeAllListeners("reminders_changed");
-        eventBus.removeAllListeners("pasteboard_changed");
+        eventBus.off("calendar_changed", onCalendarChanged);
+        eventBus.off("reminders_changed", onRemindersChanged);
+        eventBus.off("pasteboard_changed", onPasteboardChanged);
         eventBus.start();
 
         // Connect events to MCP resource notifications
-        eventBus.on("calendar_changed", () => {
-          resourceCache.delete("calendar:today");
-          resourceCache.delete("calendar:upcoming");
-          resourceCache.delete("snapshot:standard");
-          resourceCache.delete("snapshot:brief");
-          resourceCache.delete("snapshot:full");
-          // Notify MCP clients that resources changed
-          try {
-            server.sendResourceListChanged();
-          } catch {
-            /* client may not support notifications */
-          }
-        });
-        eventBus.on("reminders_changed", () => {
-          resourceCache.delete("reminders:due");
-          resourceCache.delete("reminders:today");
-          resourceCache.delete("snapshot:standard");
-          resourceCache.delete("snapshot:brief");
-          resourceCache.delete("snapshot:full");
-          try {
-            server.sendResourceListChanged();
-          } catch {
-            /* client may not support notifications */
-          }
-        });
-        eventBus.on("pasteboard_changed", () => {
-          resourceCache.delete("system:clipboard");
-          try {
-            server.sendResourceListChanged();
-          } catch {
-            /* client may not support notifications */
-          }
-        });
+        eventBus.on("calendar_changed", onCalendarChanged);
+        eventBus.on("reminders_changed", onRemindersChanged);
+        eventBus.on("pasteboard_changed", onPasteboardChanged);
 
         return ok({ status: "started", monitoring: ["calendar", "reminders", "pasteboard"] });
       } catch (e) {
@@ -438,5 +425,12 @@ export async function createServer(
     compactTools: isCompactMode(),
   };
 
-  return { server, bannerInfo };
+  /** Remove this server's eventBus listeners. Call on session close to prevent listener accumulation. */
+  const cleanupEventListeners = () => {
+    eventBus.off("calendar_changed", onCalendarChanged);
+    eventBus.off("reminders_changed", onRemindersChanged);
+    eventBus.off("pasteboard_changed", onPasteboardChanged);
+  };
+
+  return { server, bannerInfo, cleanupEventListeners };
 }

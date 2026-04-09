@@ -25,7 +25,7 @@ body{font-family:var(--font-sans,system-ui,-apple-system,sans-serif);background:
 <div class="header" id="hdr">Calendar</div>
 <div id="content"><div class="loading">Loading events\u2026</div></div>
 <script type="module">
-import{App}from"https://esm.sh/@modelcontextprotocol/ext-apps@1.2.2";
+import{App}from"https://esm.sh/@modelcontextprotocol/ext-apps@1.5.0";
 const app=new App({name:"AirMCP Calendar",version:"1.0.0"});
 app.onhostcontextchanged=ctx=>{
   if(ctx.styles?.variables)Object.entries(ctx.styles.variables).forEach(([k,v])=>document.documentElement.style.setProperty(k,v));
@@ -69,7 +69,7 @@ body{font-family:var(--font-sans,system-ui,-apple-system,sans-serif);background:
 </style></head><body>
 <div class="player" id="p"><div class="stopped">No track playing</div></div>
 <script type="module">
-import{App}from"https://esm.sh/@modelcontextprotocol/ext-apps@1.2.2";
+import{App}from"https://esm.sh/@modelcontextprotocol/ext-apps@1.5.0";
 const app=new App({name:"AirMCP Music",version:"1.0.0"});
 app.onhostcontextchanged=ctx=>{
   if(ctx.styles?.variables)Object.entries(ctx.styles.variables).forEach(([k,v])=>document.documentElement.style.setProperty(k,v));

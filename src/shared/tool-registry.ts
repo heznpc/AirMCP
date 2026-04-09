@@ -18,6 +18,23 @@ import type { McpServer, AnyFn } from "./mcp.js";
 import { usageTracker } from "./usage-tracker.js";
 import { auditLog } from "./audit.js";
 import { compactDescription } from "./tool-filter.js";
+import { withResultSizeHint } from "./result.js";
+
+/** Threshold in characters above which we auto-attach a result size hint. */
+const SIZE_HINT_THRESHOLD = 10_000;
+
+/** If the tool result's text content exceeds SIZE_HINT_THRESHOLD, attach _meta size hint. */
+function autoSizeHint(result: unknown): unknown {
+  if (!result || typeof result !== "object") return result;
+  const r = result as { content?: Array<{ text?: string }>; _meta?: Record<string, unknown> };
+  if (!Array.isArray(r.content)) return result;
+  // Already has an explicit hint — don't override.
+  if (r._meta?.["anthropic/maxResultSizeChars"] !== undefined) return result;
+  const totalChars = r.content.reduce((sum, c) => sum + (c.text?.length ?? 0), 0);
+  if (totalChars <= SIZE_HINT_THRESHOLD) return result;
+  // Scale hint to 2× actual size (headroom for next call), capped at 500K.
+  return withResultSizeHint(r as Parameters<typeof withResultSizeHint>[0], totalChars * 2);
+}
 
 interface RegisteredToolEntry {
   handler: AnyFn;
@@ -117,15 +134,29 @@ class ToolRegistry {
    * `server.registerTool()`, `server.prompt()`, and `server.registerPrompt()`
    * call automatically tracks the registration in this registry.
    *
-   * Must be called once, before any module registrations. Compatible with
-   * the HITL guard monkey-patch (call this AFTER `installHitlGuard` so that
-   * the handler stored here already includes the HITL wrapper).
+   * Must be called once per server, before any module registrations.
+   * Compatible with the HITL guard monkey-patch (call this AFTER
+   * `installHitlGuard` so that the handler stored here already includes
+   * the HITL wrapper).
+   *
+   * In HTTP mode, multiple sessions create servers and call this method.
+   * Only the first call clears the registry; subsequent calls overwrite
+   * entries so concurrent sessions never see an empty registry during
+   * the async gap between clear and re-registration.
    */
   installOn(server: McpServer): void {
-    this.tools.clear();
-    this.prompts.clear();
+    if (this.tools.size === 0) {
+      this.tools.clear();
+      this.prompts.clear();
+    }
     this.interceptToolRegistration(server);
     this.interceptPromptRegistration(server);
+  }
+
+  /** Reset the registry. For test isolation only. */
+  reset(): void {
+    this.tools.clear();
+    this.prompts.clear();
   }
 
   /**
@@ -160,7 +191,7 @@ class ToolRegistry {
         if (process.env.AIRMCP_USAGE_TRACKING !== "false") usageTracker.record(name);
         const start = Date.now();
         try {
-          const result = await handler(...args);
+          let result = await handler(...args);
           if (process.env.AIRMCP_AUDIT_LOG !== "false") {
             auditLog({
               timestamp: new Date(start).toISOString(),
@@ -170,6 +201,10 @@ class ToolRegistry {
               durationMs: Date.now() - start,
             });
           }
+          // Auto-attach _meta size hint for large results (>10 KB).
+          // Prevents Claude Code (and compatible harnesses) from truncating
+          // data-heavy tool responses (list/search/read operations).
+          result = autoSizeHint(result);
           return result;
         } catch (e) {
           if (process.env.AIRMCP_AUDIT_LOG !== "false") {

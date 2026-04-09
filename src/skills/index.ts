@@ -7,6 +7,8 @@ import { registerSkills } from "./register.js";
 import { registerTrigger, startTriggerListener } from "./triggers.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+// Resolves to dist/skills/builtins/ — works in repo checkout, npm cache, and git worktrees
+// because builtins are copied into dist/ during build (scripts/build.mjs).
 const BUILTINS_DIR = join(__dirname, "builtins");
 
 let skillsWatcher: FSWatcher | null = null;

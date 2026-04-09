@@ -45,6 +45,7 @@ describe('ToolRegistry (mock server)', () => {
   let server;
 
   beforeEach(() => {
+    toolRegistry.reset();
     server = createMockServer();
     toolRegistry.installOn(server);
   });
@@ -161,13 +162,20 @@ describe('ToolRegistry (mock server)', () => {
     expect(toolRegistry.getPromptCallback('nonexistent')).toBeUndefined();
   });
 
-  test('installOn clears previous registrations', () => {
+  test('installOn preserves entries when re-installed (HTTP multi-session safety)', () => {
     server.registerTool('old_tool', { title: 'Old' }, async () => ({}));
     expect(toolRegistry.getToolCount()).toBe(1);
 
-    // Re-install on a new server
+    // Re-install on a new server — entries preserved (no race window)
     const server2 = createMockServer();
     toolRegistry.installOn(server2);
+    expect(toolRegistry.getToolCount()).toBe(1);
+  });
+
+  test('reset() clears all registrations', () => {
+    server.registerTool('old_tool', { title: 'Old' }, async () => ({}));
+    expect(toolRegistry.getToolCount()).toBe(1);
+    toolRegistry.reset();
     expect(toolRegistry.getToolCount()).toBe(0);
   });
 });
@@ -184,6 +192,7 @@ describe('ToolRegistry monkey-patch on real McpServer (SDK integration)', () => 
   let server;
 
   beforeEach(() => {
+    toolRegistry.reset();
     server = new McpServer({ name: 'test-server', version: '0.0.1' });
     toolRegistry.installOn(server);
   });

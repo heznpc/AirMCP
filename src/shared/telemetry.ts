@@ -1,0 +1,74 @@
+/**
+ * Optional OpenTelemetry instrumentation for tool calls.
+ *
+ * Uses dynamic import — when `@opentelemetry/api` is not installed, all
+ * instrumentation is silently skipped (zero overhead). When installed but
+ * no TracerProvider is registered, the OTel API itself returns no-ops.
+ *
+ * Enable: `AIRMCP_TELEMETRY=true` or `config.json → features.telemetry: true`
+ */
+
+import { NPM_PACKAGE_NAME } from "./config.js";
+
+type Tracer = {
+  startActiveSpan: <T>(name: string, fn: (span: Span) => T) => T;
+};
+
+type Span = {
+  setAttribute: (key: string, value: string | number | boolean) => void;
+  setStatus: (status: { code: number; message?: string }) => void;
+  recordException: (error: unknown) => void;
+  end: () => void;
+};
+
+let tracer: Tracer | null | undefined; // undefined = not yet loaded
+
+// Computed module name bypasses TS module resolution for this optional peer dep.
+const OTEL_MODULE = "@opentelemetry/api";
+
+async function loadTracer(): Promise<Tracer | null> {
+  try {
+    const api = await import(/* webpackIgnore: true */ OTEL_MODULE);
+    return api.trace.getTracer(NPM_PACKAGE_NAME);
+  } catch {
+    return null;
+  }
+}
+
+async function getTracer(): Promise<Tracer | null> {
+  if (tracer === undefined) {
+    tracer = await loadTracer();
+  }
+  return tracer;
+}
+
+/**
+ * Wrap a tool call with an OTel span. If OTel is unavailable, runs `fn` directly.
+ */
+export async function traceToolCall<T>(
+  toolName: string,
+  args: Record<string, unknown> | undefined,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const t = await getTracer();
+  if (!t) return fn();
+
+  return t.startActiveSpan(`tool.${toolName}`, async (span: Span) => {
+    span.setAttribute("mcp.tool.name", toolName);
+    if (args) {
+      const argKeys = Object.keys(args);
+      span.setAttribute("mcp.tool.arg_count", argKeys.length);
+    }
+    try {
+      const result = await fn();
+      span.setStatus({ code: 1 /* OK */ });
+      return result;
+    } catch (error) {
+      span.setStatus({ code: 2 /* ERROR */, message: String(error) });
+      span.recordException(error);
+      throw error;
+    } finally {
+      span.end();
+    }
+  });
+}

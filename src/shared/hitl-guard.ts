@@ -13,24 +13,42 @@ interface ToolAnnotations {
 /**
  * Clients where MCP elicitation should be skipped.
  *
- * "claude code" / "claude-code" — harness enforces permissions; elicitation = double-approval.
- * "claude-ai" — Claude Desktop / Cowork / claude.ai; elicitation prompt does not surface
- *               in agentic contexts (issue #28), causing silent timeout → denial.
+ * All Claude products (Desktop, Code, Cowork, Managed Agents, etc.) are detected
+ * via the "claude" prefix on `clientInfo.name`. Non-Claude managed clients can be
+ * added via the `AIRMCP_MANAGED_CLIENTS` env var (comma-separated, case-insensitive).
  *
  * Socket-based HITL remains active as it's a separate, explicit channel.
  */
-const MANAGED_CLIENT_NAMES: ReadonlySet<string> = new Set(["claude code", "claude-code", "claude-ai"]);
+
+let extraManagedClients: ReadonlySet<string> | undefined;
+
+function getExtraManagedClients(): ReadonlySet<string> {
+  if (!extraManagedClients) {
+    const raw = process.env.AIRMCP_MANAGED_CLIENTS ?? "";
+    extraManagedClients = new Set(
+      raw
+        .split(",")
+        .map((s) => s.trim().toLowerCase())
+        .filter(Boolean),
+    );
+  }
+  return extraManagedClients;
+}
 
 /**
  * Returns true if the connected MCP client has its own permission management,
  * making MCP elicitation redundant (would cause double-approval).
- * Checks `clientInfo.name` provided during MCP initialization handshake.
+ *
+ * Detection: "claude" prefix covers all Anthropic clients (Claude Code, Desktop,
+ * Cowork, Managed Agents). `AIRMCP_MANAGED_CLIENTS` env var covers third-party
+ * managed clients in enterprise deployments.
  */
 function isManagedClient(server: McpServer): boolean {
   try {
     const info = server.server?.getClientVersion?.();
     if (!info?.name) return false;
-    return MANAGED_CLIENT_NAMES.has(info.name.toLowerCase());
+    const name = info.name.toLowerCase();
+    return name.startsWith("claude") || getExtraManagedClients().has(name);
   } catch {
     return false;
   }

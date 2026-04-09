@@ -19,6 +19,7 @@ import { usageTracker } from "./usage-tracker.js";
 import { auditLog } from "./audit.js";
 import { compactDescription } from "./tool-filter.js";
 import { withResultSizeHint } from "./result.js";
+import { traceToolCall } from "./telemetry.js";
 
 /** Threshold in characters above which we auto-attach a result size hint. */
 const SIZE_HINT_THRESHOLD = 10_000;
@@ -186,38 +187,48 @@ class ToolRegistry {
     const origRegisterTool = server.registerTool.bind(server);
     const tools = this.tools;
 
+    const telemetryEnabled = process.env.AIRMCP_TELEMETRY === "true";
+
     const wrapHandler = (name: string, handler: AnyFn): AnyFn => {
       return (async (...args: unknown[]) => {
         if (process.env.AIRMCP_USAGE_TRACKING !== "false") usageTracker.record(name);
-        const start = Date.now();
-        try {
-          let result = await handler(...args);
-          if (process.env.AIRMCP_AUDIT_LOG !== "false") {
-            auditLog({
-              timestamp: new Date(start).toISOString(),
-              tool: name,
-              args: args[0] as Record<string, unknown>,
-              status: "ok",
-              durationMs: Date.now() - start,
-            });
+
+        const execute = async () => {
+          const start = Date.now();
+          try {
+            let result = await handler(...args);
+            if (process.env.AIRMCP_AUDIT_LOG !== "false") {
+              auditLog({
+                timestamp: new Date(start).toISOString(),
+                tool: name,
+                args: args[0] as Record<string, unknown>,
+                status: "ok",
+                durationMs: Date.now() - start,
+              });
+            }
+            // Auto-attach _meta size hint for large results (>10 KB).
+            // Prevents Claude Code (and compatible harnesses) from truncating
+            // data-heavy tool responses (list/search/read operations).
+            result = autoSizeHint(result);
+            return result;
+          } catch (e) {
+            if (process.env.AIRMCP_AUDIT_LOG !== "false") {
+              auditLog({
+                timestamp: new Date(start).toISOString(),
+                tool: name,
+                args: args[0] as Record<string, unknown>,
+                status: "error",
+                durationMs: Date.now() - start,
+              });
+            }
+            throw e;
           }
-          // Auto-attach _meta size hint for large results (>10 KB).
-          // Prevents Claude Code (and compatible harnesses) from truncating
-          // data-heavy tool responses (list/search/read operations).
-          result = autoSizeHint(result);
-          return result;
-        } catch (e) {
-          if (process.env.AIRMCP_AUDIT_LOG !== "false") {
-            auditLog({
-              timestamp: new Date(start).toISOString(),
-              tool: name,
-              args: args[0] as Record<string, unknown>,
-              status: "error",
-              durationMs: Date.now() - start,
-            });
-          }
-          throw e;
+        };
+
+        if (telemetryEnabled) {
+          return traceToolCall(name, args[0] as Record<string, unknown>, execute);
         }
+        return execute();
       }) as AnyFn;
     };
 

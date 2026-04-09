@@ -97,6 +97,14 @@
     "llms": "node scripts/gen-llms-txt.mjs",
     "prepare": "husky"
   },
+  "peerDependencies": {
+    "@opentelemetry/api": ">=1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@opentelemetry/api": {
+      "optional": true
+    }
+  },
   "dependencies": {
     "@modelcontextprotocol/ext-apps": "1.5.0",
     "@modelcontextprotocol/sdk": "1.29.0",

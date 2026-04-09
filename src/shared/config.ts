@@ -118,6 +118,8 @@ export interface FeaturesConfig {
   semanticToolSearch: boolean;
   /** Enable proactive context suggestions. Default: true */
   proactiveContext: boolean;
+  /** Enable OpenTelemetry instrumentation (requires @opentelemetry/api). Default: false */
+  telemetry: boolean;
 }
 
 export interface AirMcpConfig {
@@ -153,6 +155,7 @@ interface FileConfig {
     usageTracking?: boolean;
     semanticToolSearch?: boolean;
     proactiveContext?: boolean;
+    telemetry?: boolean;
   };
   /** Performance tuning — all fields optional, env vars take precedence */
   performance?: {
@@ -210,6 +213,7 @@ function loadFileConfig(): LoadResult {
         usageTracking: typeof f.usageTracking === "boolean" ? f.usageTracking : undefined,
         semanticToolSearch: typeof f.semanticToolSearch === "boolean" ? f.semanticToolSearch : undefined,
         proactiveContext: typeof f.proactiveContext === "boolean" ? f.proactiveContext : undefined,
+        telemetry: typeof f.telemetry === "boolean" ? f.telemetry : undefined,
       };
     }
     if (obj.performance && typeof obj.performance === "object" && !Array.isArray(obj.performance)) {
@@ -325,12 +329,13 @@ export function parseConfig(): AirMcpConfig {
     socketPath: hitlSocketPath,
   };
 
-  // Feature toggles: env var > JSON > default (all on by default)
+  // Feature toggles: env var > JSON > default (all on by default, except telemetry)
   const features: FeaturesConfig = {
     auditLog: envBool("AIRMCP_AUDIT_LOG", file.features?.auditLog, true),
     usageTracking: envBool("AIRMCP_USAGE_TRACKING", file.features?.usageTracking, true),
     semanticToolSearch: envBool("AIRMCP_SEMANTIC_SEARCH", file.features?.semanticToolSearch, true),
     proactiveContext: envBool("AIRMCP_PROACTIVE_CONTEXT", file.features?.proactiveContext, true),
+    telemetry: envBool("AIRMCP_TELEMETRY", file.features?.telemetry, false),
   };
 
   return {

@@ -23,6 +23,7 @@ const ENV_KEYS = [
   'AIRMCP_USAGE_TRACKING',
   'AIRMCP_SEMANTIC_SEARCH',
   'AIRMCP_PROACTIVE_CONTEXT',
+  'AIRMCP_TELEMETRY',
   ...MODULE_NAMES.map((m) => `AIRMCP_DISABLE_${m.toUpperCase()}`),
 ];
 
@@ -154,12 +155,13 @@ describe('parseConfig() — defaults with no config file', () => {
     expect(cfg.allowRunJavascript).toBe(false);
   });
 
-  test('features all default to true', () => {
+  test('features all default to true (except telemetry)', () => {
     const cfg = parseConfig();
     expect(cfg.features.auditLog).toBe(true);
     expect(cfg.features.usageTracking).toBe(true);
     expect(cfg.features.semanticToolSearch).toBe(true);
     expect(cfg.features.proactiveContext).toBe(true);
+    expect(cfg.features.telemetry).toBe(false);
   });
 });
 
@@ -401,6 +403,12 @@ describe('parseConfig() — features config parsing', () => {
     expect(cfg.features.proactiveContext).toBe(false);
   });
 
+  test('AIRMCP_TELEMETRY=true enables telemetry', () => {
+    process.env.AIRMCP_TELEMETRY = 'true';
+    const cfg = parseConfig();
+    expect(cfg.features.telemetry).toBe(true);
+  });
+
   test('AIRMCP_AUDIT_LOG=true explicitly enables auditLog', () => {
     process.env.AIRMCP_AUDIT_LOG = 'true';
     const cfg = parseConfig();
@@ -413,6 +421,7 @@ describe('parseConfig() — features config parsing', () => {
     expect(cfg.features).toHaveProperty('usageTracking');
     expect(cfg.features).toHaveProperty('semanticToolSearch');
     expect(cfg.features).toHaveProperty('proactiveContext');
+    expect(cfg.features).toHaveProperty('telemetry');
   });
 });
 

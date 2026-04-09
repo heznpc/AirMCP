@@ -1,19 +1,40 @@
-import { describe, test, expect, beforeEach } from '@jest/globals';
+import { describe, test, expect, beforeEach, jest } from '@jest/globals';
 import { installHitlGuard } from '../dist/shared/hitl-guard.js';
 
 /**
  * Creates a minimal mock McpServer whose registerTool captures registrations.
  * After installHitlGuard patches it, we can inspect what callback was stored
  * (original vs wrapped) to infer whether approval is required.
+ *
+ * @param {{ clientName?: string, withElicitation?: boolean }} [opts]
+ *   clientName — sets `server.server.getClientVersion()` return value.
+ *   withElicitation — adds a mock `elicitInput` that auto-accepts, so tests
+ *     can verify whether elicitation was attempted (managed clients skip it).
  */
-function makeMockServer() {
+function makeMockServer(opts = {}) {
+  const { clientName, withElicitation = false } = typeof opts === 'string'
+    ? { clientName: opts } // backward compat: makeMockServer('claude-ai')
+    : opts;
   const registrations = [];
+  const elicitCalls = [];
+  const inner = {
+    ...(clientName ? { getClientVersion: () => ({ name: clientName, version: '1.0.0' }) } : {}),
+    ...(withElicitation
+      ? {
+          elicitInput: jest.fn(async (req) => {
+            elicitCalls.push(req);
+            return { action: 'accept', content: { approve: true } };
+          }),
+        }
+      : {}),
+  };
   const server = {
     registerTool(name, toolConfig, callback) {
       registrations.push({ name, toolConfig, callback });
     },
+    ...(clientName || withElicitation ? { server: inner } : {}),
   };
-  return { server, registrations };
+  return { server, registrations, elicitCalls };
 }
 
 function makeConfig(level, whitelist = []) {
@@ -201,6 +222,71 @@ describe('whitelist', () => {
     server.registerTool('untrusted_tool', {}, original);
 
     expect(registrations[0].callback).not.toBe(original);
+  });
+});
+
+// ---------- managed client detection (prefix match) ----------
+
+describe('managed client detection', () => {
+  test.each([
+    'claude-ai',
+    'Claude Code',
+    'claude-code',
+    'claude-managed-agent',
+    'Claude-Platform',
+  ])('"%s" is managed → skips elicitation, uses socket HITL', async (clientName) => {
+    const { server, registrations, elicitCalls } = makeMockServer({
+      clientName,
+      withElicitation: true,
+    });
+    const hitl = makeMockHitlClient(true);
+    const config = makeConfig('all');
+
+    installHitlGuard(server, hitl, config);
+
+    const original = () => 'result';
+    server.registerTool('test_tool', { annotations: { destructiveHint: true } }, original);
+    const result = await registrations[0].callback({ key: 'val' });
+
+    expect(elicitCalls).toHaveLength(0); // elicitation skipped
+    expect(hitl.calls).toHaveLength(1);  // socket HITL used
+    expect(result).toBe('result');
+  });
+
+  test('non-Claude client with elicitation support uses elicitation (not managed)', async () => {
+    const { server, registrations, elicitCalls } = makeMockServer({
+      clientName: 'cursor',
+      withElicitation: true,
+    });
+    const hitl = makeMockHitlClient(true);
+    const config = makeConfig('all');
+
+    installHitlGuard(server, hitl, config);
+
+    const original = () => 'result';
+    server.registerTool('test_tool', {}, original);
+    const result = await registrations[0].callback({});
+
+    expect(elicitCalls).toHaveLength(1); // elicitation attempted
+    expect(hitl.calls).toHaveLength(0);  // socket HITL not needed
+    expect(result).toBe('result');
+  });
+
+  test('server without getClientVersion is not treated as managed', async () => {
+    const { server, registrations, elicitCalls } = makeMockServer({
+      withElicitation: true,
+    });
+    const hitl = makeMockHitlClient(true);
+    const config = makeConfig('all');
+
+    installHitlGuard(server, hitl, config);
+
+    const original = () => 'ok';
+    server.registerTool('test_tool', {}, original);
+    await registrations[0].callback({});
+
+    expect(elicitCalls).toHaveLength(1); // not managed → elicitation attempted
+    expect(hitl.calls).toHaveLength(0);
   });
 });
 

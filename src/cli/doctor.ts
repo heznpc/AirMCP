@@ -6,12 +6,17 @@
  */
 
 import { readFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { join, dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import { MODULE_NAMES, STARTER_MODULES, NPM_PACKAGE_NAME, MCP_CLIENTS } from "../shared/config.js";
 import { HOME, PATHS } from "../shared/constants.js";
 import { LOGO_LINES, typeLine } from "../shared/banner.js";
 import { RESET, BOLD, DIM, WHITE, GREEN, SYM, heading, line, divider, spinner, sleep } from "./style.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+/** Package root — works in repo checkout, npm cache, and git worktrees. */
+const PKG_ROOT = resolve(__dirname, "..", "..");
 
 interface FileConfig {
   locale?: string;
@@ -80,7 +85,7 @@ export async function runDoctor(): Promise<void> {
       encoding: "utf8",
       timeout: 5000,
     }).trim();
-    const pkgPath = join(__dirname, "..", "package.json");
+    const pkgPath = join(PKG_ROOT, "package.json");
     let current = "unknown";
     try {
       current = JSON.parse(readFileSync(pkgPath, "utf-8")).version;
@@ -222,7 +227,7 @@ export async function runDoctor(): Promise<void> {
   // ── Swift Bridge ───────────────────────────────────────────────────
   console.log(heading("Optional"));
 
-  const swiftBridgePath = join(process.cwd(), "swift", ".build", "release", "AirMcpBridge");
+  const swiftBridgePath = join(PKG_ROOT, "swift", ".build", "release", "AirMcpBridge");
   if (existsSync(swiftBridgePath)) {
     ok("Swift bridge", "built");
   } else {

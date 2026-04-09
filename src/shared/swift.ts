@@ -3,10 +3,12 @@ import { access } from "node:fs/promises";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
-import { TIMEOUT, BUFFER, PATHS } from "./constants.js";
+import { TIMEOUT, BUFFER } from "./constants.js";
 
+// Package root — works in repo checkout, npm cache, and git worktrees.
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const BINARY_PATH = resolve(__dirname, PATHS.SWIFT_BRIDGE);
+const PKG_ROOT = resolve(__dirname, "..", "..");
+const BINARY_PATH = resolve(PKG_ROOT, "swift", ".build", "release", "AirMcpBridge");
 
 // ── Bridge availability check ────────────────────────────────────────
 

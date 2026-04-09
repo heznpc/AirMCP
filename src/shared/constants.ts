@@ -190,6 +190,4 @@ export const PATHS = {
   VECTOR_STORE: join(HOME, ".airmcp"),
   /** Usage profile */
   USAGE_PROFILE: join(HOME, ".airmcp", "profile.json"),
-  /** Swift bridge binary (relative to project root) */
-  SWIFT_BRIDGE: "../../swift/.build/release/AirMcpBridge",
 } as const;

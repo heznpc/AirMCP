@@ -141,27 +141,38 @@ export async function startHttpServer(options: HttpServerOptions): Promise<void>
     transport: StreamableHTTPServerTransport;
     server: import("@modelcontextprotocol/sdk/server/mcp.js").McpServer;
     lastActive: number;
+    cleanupEventListeners?: () => void;
   }
   const sessions = new Map<string, Session>();
+
+  /** Clean up all resources for a session (transport, server, event listeners). Idempotent. */
+  function destroySession(id: string, s: Session): void {
+    if (!sessions.has(id)) return; // Already destroyed by another async path
+    sessions.delete(id);
+    try {
+      s.cleanupEventListeners?.();
+      s.transport.close?.();
+      s.server.close?.();
+    } catch (e) {
+      console.error(`[AirMCP] Session ${id} cleanup error:`, e);
+    }
+  }
 
   const cleanupInterval = setInterval(() => {
     const now = Date.now();
     for (const id of [...sessions.keys()]) {
       const s = sessions.get(id);
       if (s && now - s.lastActive > TIMEOUT.SESSION_IDLE) {
-        try {
-          s.transport.close?.();
-          s.server.close?.();
-        } catch (e) {
-          console.error(`[AirMCP] Session ${id} cleanup error:`, e);
-        }
-        sessions.delete(id);
+        destroySession(id, s);
       }
     }
   }, TIMEOUT.SESSION_CLEANUP);
   if (cleanupInterval.unref) cleanupInterval.unref();
 
-  process.on("exit", () => clearInterval(cleanupInterval));
+  process.on("exit", () => {
+    clearInterval(cleanupInterval);
+    clearInterval(ratePruneTimer);
+  });
 
   // Health check — for load balancers, monitoring, and readiness probes
   // Note: session counts and uptime omitted to prevent information leakage
@@ -225,22 +236,18 @@ export async function startHttpServer(options: HttpServerOptions): Promise<void>
         return;
       }
 
-      const { server } = await createServer(serverOptions);
+      const { server, cleanupEventListeners } = await createServer(serverOptions);
       let assignedSessionId: string | undefined;
 
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: () => randomUUID(),
         onsessioninitialized: (id) => {
           assignedSessionId = id;
-          sessions.set(id, { transport, server, lastActive: Date.now() });
+          sessions.set(id, { transport, server, lastActive: Date.now(), cleanupEventListeners });
         },
         onsessionclosed: (id) => {
           const s = sessions.get(id);
-          if (s) {
-            s.transport.close?.();
-            s.server.close?.();
-          }
-          sessions.delete(id);
+          if (s) destroySession(id, s);
         },
       });
 
@@ -248,8 +255,7 @@ export async function startHttpServer(options: HttpServerOptions): Promise<void>
       transport.onclose = () => {
         if (assignedSessionId) {
           const s = sessions.get(assignedSessionId);
-          if (s) s.server.close?.();
-          sessions.delete(assignedSessionId);
+          if (s) destroySession(assignedSessionId, s);
         }
       };
 
@@ -258,6 +264,7 @@ export async function startHttpServer(options: HttpServerOptions): Promise<void>
 
       // If session was never initialized (transport rejected), clean up
       if (!assignedSessionId) {
+        transport.onclose = undefined;
         server.close?.();
       }
     } catch (err) {
@@ -286,6 +293,18 @@ export async function startHttpServer(options: HttpServerOptions): Promise<void>
         return;
       }
       s.lastActive = Date.now();
+
+      // For SSE GET streams: clean up immediately when the client disconnects
+      // (don't wait for the 60s cleanup interval). Without this, abrupt disconnects
+      // leave transport buffers + ReadableStream controllers in memory until idle timeout.
+      if (method === "GET" && sessionId) {
+        const sid = sessionId;
+        res.on("close", () => {
+          const entry = sessions.get(sid);
+          if (entry) destroySession(sid, entry);
+        });
+      }
+
       await s.transport.handleRequest(req, res);
     } catch (err) {
       console.error(`${method} /mcp error:`, err);
@@ -296,7 +315,12 @@ export async function startHttpServer(options: HttpServerOptions): Promise<void>
   app.delete("/mcp", (req, res) => handleSessionRequest(req, res, "DELETE"));
 
   // Pre-warm module registry + shortcuts cache (avoids per-session subprocess)
-  const { bannerInfo: bi, server: warmupServer } = await createServer(serverOptions);
+  const {
+    bannerInfo: bi,
+    server: warmupServer,
+    cleanupEventListeners: warmupCleanup,
+  } = await createServer(serverOptions);
+  warmupCleanup();
   warmupServer.close?.();
   const host = bindAll ? "0.0.0.0" : "127.0.0.1";
   app.listen(port, host, async () => {

@@ -69,6 +69,23 @@ export function okLinkedStructured(toolName: string, data: unknown) {
   return base;
 }
 
+/**
+ * Attach `_meta["anthropic/maxResultSizeChars"]` to a tool result.
+ *
+ * Claude Code (and compatible harnesses) use this hint to avoid truncating
+ * large MCP results. The hint is advisory — clients that don't recognise it
+ * simply ignore the field.
+ *
+ * @param maxChars  Maximum result size the client should accept (cap: 500 000).
+ */
+export function withResultSizeHint<T extends { content: unknown[]; _meta?: Record<string, unknown> }>(
+  result: T,
+  maxChars: number,
+): T {
+  const capped = Math.min(Math.max(maxChars, 0), 500_000);
+  return { ...result, _meta: { ...result._meta, "anthropic/maxResultSizeChars": capped } };
+}
+
 /** Return an MCP tool error response. */
 export function err(message: string) {
   return {

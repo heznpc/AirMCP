@@ -10,6 +10,29 @@ interface ToolAnnotations {
   openWorldHint?: boolean;
 }
 
+/**
+ * Clients whose harness already enforces tool-call permissions.
+ * When one of these clients is detected, skip MCP elicitation to avoid
+ * double-approval UX (harness prompt + elicitation prompt).
+ * Socket-based HITL remains active as it's a separate, explicit channel.
+ */
+const MANAGED_CLIENT_NAMES: ReadonlySet<string> = new Set(["claude code", "claude-code"]);
+
+/**
+ * Returns true if the connected MCP client has its own permission management,
+ * making MCP elicitation redundant (would cause double-approval).
+ * Checks `clientInfo.name` provided during MCP initialization handshake.
+ */
+function isManagedClient(server: McpServer): boolean {
+  try {
+    const info = server.server?.getClientVersion?.();
+    if (!info?.name) return false;
+    return MANAGED_CLIENT_NAMES.has(info.name.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
 function shouldRequireApproval(
   level: HitlLevel,
   annotations: ToolAnnotations,
@@ -97,16 +120,19 @@ export function installHitlGuard(server: McpServer, hitlClient: HitlClient, conf
       const toolArgs = (args[0] ?? {}) as Record<string, unknown>;
       const destructive = annotations.destructiveHint ?? false;
 
-      // Try MCP Elicitation first (protocol-native, works everywhere)
-      const elicitResult = await tryElicitApproval(server, name, toolArgs, destructive);
-      if (elicitResult !== undefined) {
-        if (!elicitResult) {
-          return err(`Action denied: "${name}" was rejected via MCP elicitation.`);
+      // Skip MCP elicitation for clients with their own permission system
+      // (e.g. Claude Code) to avoid double-approval UX.
+      if (!isManagedClient(server)) {
+        const elicitResult = await tryElicitApproval(server, name, toolArgs, destructive);
+        if (elicitResult !== undefined) {
+          if (!elicitResult) {
+            return err(`Action denied: "${name}" was rejected via MCP elicitation.`);
+          }
+          return (callback as (...a: unknown[]) => unknown)(...args);
         }
-        return (callback as (...a: unknown[]) => unknown)(...args);
       }
 
-      // Fallback: socket-based HITL
+      // Fallback: socket-based HITL (separate channel — always available)
       const approved = await hitlClient.requestApproval(
         name,
         toolArgs,

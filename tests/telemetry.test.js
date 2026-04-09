@@ -1,5 +1,5 @@
 import { describe, test, expect } from '@jest/globals';
-import { traceToolCall } from '../dist/shared/telemetry.js';
+import { traceToolCall, traceApproval } from '../dist/shared/telemetry.js';
 
 // @opentelemetry/api is NOT installed in this project (optional peer dep),
 // so all tests exercise the no-op / fallback path.
@@ -31,5 +31,29 @@ describe('traceToolCall (no OTel SDK installed)', () => {
     };
     const result = await traceToolCall('complex_tool', 3, async () => expected);
     expect(result).toEqual(expected);
+  });
+});
+
+describe('traceApproval (no OTel SDK installed)', () => {
+  test('resolves without error for approved decision', async () => {
+    await expect(
+      traceApproval('update_note', 'approved', 'socket', { destructive: true, managed: false }),
+    ).resolves.toBeUndefined();
+  });
+
+  test('resolves without error for denied decision', async () => {
+    await expect(
+      traceApproval('delete_note', 'denied', 'elicitation', { destructive: true, managed: false }),
+    ).resolves.toBeUndefined();
+  });
+
+  test('resolves without error for skipped decision', async () => {
+    await expect(
+      traceApproval('read_note', 'skipped', 'socket', { managed: true }),
+    ).resolves.toBeUndefined();
+  });
+
+  test('works without optional attrs', async () => {
+    await expect(traceApproval('any_tool', 'approved', 'socket')).resolves.toBeUndefined();
   });
 });

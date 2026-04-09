@@ -2,6 +2,7 @@ import type { McpServer } from "./mcp.js";
 import type { AirMcpConfig, HitlLevel } from "./config.js";
 import type { HitlClient } from "./hitl.js";
 import { err } from "./result.js";
+import { traceApproval } from "./telemetry.js";
 
 interface ToolAnnotations {
   readOnlyHint?: boolean;
@@ -137,15 +138,21 @@ export function installHitlGuard(server: McpServer, hitlClient: HitlClient, conf
       return original(name, toolConfig as Parameters<typeof original>[1], callback as Parameters<typeof original>[2]);
     }
 
+    const telemetryEnabled = process.env.AIRMCP_TELEMETRY === "true";
+
     const wrapped = async (...args: unknown[]) => {
       const toolArgs = (args[0] ?? {}) as Record<string, unknown>;
       const destructive = annotations.destructiveHint ?? false;
+      const managed = isManagedClient(server);
 
       // Skip MCP elicitation for clients with their own permission system
       // (e.g. Claude Code) to avoid double-approval UX.
-      if (!isManagedClient(server)) {
+      if (!managed) {
         const elicitResult = await tryElicitApproval(server, name, toolArgs, destructive);
         if (elicitResult !== undefined) {
+          if (telemetryEnabled) {
+            traceApproval(name, elicitResult ? "approved" : "denied", "elicitation", { destructive, managed });
+          }
           if (!elicitResult) {
             return err(`Action denied: "${name}" was rejected via MCP elicitation.`);
           }
@@ -160,6 +167,9 @@ export function installHitlGuard(server: McpServer, hitlClient: HitlClient, conf
         destructive,
         annotations.openWorldHint ?? false,
       );
+      if (telemetryEnabled) {
+        traceApproval(name, approved ? "approved" : "denied", "socket", { destructive, managed });
+      }
       if (!approved) {
         return err(`Action denied: "${name}" requires user approval. The user denied or did not respond in time.`);
       }

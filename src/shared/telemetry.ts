@@ -48,6 +48,30 @@ function getTracer(): Tracer | null | Promise<Tracer | null> {
 }
 
 /**
+ * Record a HITL approval decision as an OTel span.
+ * Enterprise SIEM systems (Splunk, Cribl) correlate these with Compliance API records.
+ */
+export async function traceApproval(
+  toolName: string,
+  decision: "approved" | "denied" | "skipped",
+  channel: "elicitation" | "socket",
+  attrs?: { destructive?: boolean; managed?: boolean },
+): Promise<void> {
+  const t = await getTracer();
+  if (!t) return;
+
+  t.startActiveSpan(`tool.approval`, (span: Span) => {
+    span.setAttribute("mcp.tool.name", toolName);
+    span.setAttribute("mcp.approval.decision", decision);
+    span.setAttribute("mcp.approval.channel", channel);
+    if (attrs?.destructive !== undefined) span.setAttribute("mcp.approval.destructive", attrs.destructive);
+    if (attrs?.managed !== undefined) span.setAttribute("mcp.approval.managed_client", attrs.managed);
+    span.setStatus({ code: decision === "denied" ? 2 /* ERROR */ : 1 /* OK */ });
+    span.end();
+  });
+}
+
+/**
  * Wrap a tool call with an OTel span. If OTel is unavailable, runs `fn` directly.
  */
 export async function traceToolCall<T>(toolName: string, argCount: number, fn: () => Promise<T>): Promise<T> {

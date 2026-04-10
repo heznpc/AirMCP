@@ -164,16 +164,17 @@ export function registerCrossPrompts(server: McpServer): void {
   server.prompt(
     "research-with-safari",
     { topic: z.string().describe("Research topic to investigate") },
-    ({ topic }) => {
+    ({ topic: rawTopic }) => {
+      const topic = q(rawTopic);
       return userPrompt(
         "Safari + Notes research workflow: search tabs, read content, compile findings into a note.",
-        `${q(topic)} 주제로 리서치를 진행해줘.
+        `${topic} 주제로 리서치를 진행해줘.
 
 다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 
 1. **Safari 탭 검색**: list_tabs로 현재 열린 Safari 탭 목록을 확인해
-2. **관련 탭 읽기**: ${q(topic)}과 관련된 탭을 찾아서 read_page_content로 페이지 내용을 읽어
-3. **기존 메모 검색**: search_notes로 ${q(topic)} 관련 기존 메모가 있는지 확인해
+2. **관련 탭 읽기**: ${topic}과 관련된 탭을 찾아서 read_page_content로 페이지 내용을 읽어
+3. **기존 메모 검색**: search_notes로 ${topic} 관련 기존 메모가 있는지 확인해
 4. **리서치 노트 작성**: create_note로 리서치 결과를 정리한 노트를 생성해:
    - 제목: "[리서치] ${topic} - {날짜}"
    - 주요 발견 사항 요약
@@ -238,14 +239,18 @@ export function registerCrossPrompts(server: McpServer): void {
     },
   );
 
-  server.prompt("file-organizer", { directory: z.string().describe("Directory path to organize") }, ({ directory }) => {
-    return userPrompt(
-      "Finder + Notes file organization: scan directory, apply tags, and create summary note.",
-      `${q(directory)} 폴더의 파일을 정리해줘.
+  server.prompt(
+    "file-organizer",
+    { directory: z.string().describe("Directory path to organize") },
+    ({ directory: rawDirectory }) => {
+      const directory = q(rawDirectory);
+      return userPrompt(
+        "Finder + Notes file organization: scan directory, apply tags, and create summary note.",
+        `${directory} 폴더의 파일을 정리해줘.
 
 다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 
-1. **파일 검색**: search_files로 ${q(directory)} 내 파일 목록을 확인해
+1. **파일 검색**: search_files로 ${directory} 내 파일 목록을 확인해
 2. **파일 정보 확인**: get_file_info로 주요 파일의 상세 정보(크기, 생성일, 수정일 등)를 확인해
 3. **정리 규칙 확인**: search_notes로 파일 정리 관련 규칙이나 메모가 있는지 검색해
 4. 파일 분석 결과를 보여줘:
@@ -269,20 +274,26 @@ export function registerCrossPrompts(server: McpServer): void {
 - 도구 호출 실패 시 사용자에게 알리고 대안 도구 시도 (예: search_files 실패 시 list_directory 시도)
 - 권한 에러 시 setup_permissions 안내
 - 앱이 응답하지 않으면 다음 단계로 건너뛰기`,
-    );
-  });
+      );
+    },
+  );
 
-  server.prompt("dev-session", { projectPath: z.string().describe("Project directory path") }, ({ projectPath }) => {
-    return userPrompt(
-      "Developer session setup: scan project, check specs, research docs, log to notes.",
-      `${q(projectPath)} 프로젝트로 개발 세션을 시작해줘.
+  server.prompt(
+    "dev-session",
+    { projectPath: z.string().describe("Project directory path") },
+    ({ projectPath: rawProjectPath }) => {
+      const projectPath = q(rawProjectPath);
+      const projectName = q(rawProjectPath.split("/").pop() ?? "project");
+      return userPrompt(
+        "Developer session setup: scan project, check specs, research docs, log to notes.",
+        `${projectPath} 프로젝트로 개발 세션을 시작해줘.
 
 다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 
-1. **프로젝트 구조 파악**: list_directory(${q(projectPath)})로 프로젝트 루트 확인
+1. **프로젝트 구조 파악**: list_directory(${projectPath})로 프로젝트 루트 확인
    - search_files로 주요 파일 패턴 검색 (package.json, Makefile, README 등)
    - get_file_info로 최근 수정된 파일 확인
-   - recent_files(${q(projectPath)}, days: 1)로 오늘 작업한 파일 추적
+   - recent_files(${projectPath}, days: 1)로 오늘 작업한 파일 추적
 
 2. **스펙/컨텍스트 확인**: search_notes로 프로젝트 관련 메모 검색
    - 프로젝트명, 주요 키워드로 검색
@@ -295,7 +306,7 @@ export function registerCrossPrompts(server: McpServer): void {
    - get_upcoming_events로 관련 미팅/데드라인 확인
 
 5. **세션 노트 생성**: create_note로 개발 세션 노트를 생성해:
-   - 제목: "[Dev] ${projectPath.split("/").pop()} - {날짜 시간}"
+   - 제목: "[Dev] ${projectName} - {날짜 시간}"
    - 프로젝트 구조 요약
    - 오늘 작업할 내용
    - 관련 메모/리마인더 링크
@@ -312,8 +323,9 @@ export function registerCrossPrompts(server: McpServer): void {
 - 도구 호출 실패 시 사용자에게 알리고 대안 도구 시도 (예: search_files 실패 시 list_directory 시도)
 - 권한 에러 시 setup_permissions 안내
 - 앱이 응답하지 않으면 다음 단계로 건너뛰기`,
-    );
-  });
+      );
+    },
+  );
 
   server.prompt(
     "debug-loop",
@@ -374,11 +386,11 @@ export function registerCrossPrompts(server: McpServer): void {
       description: z.string().optional().describe("What to capture/document"),
     },
     ({ description }) => {
-      const desc = description ?? "작업 과정";
+      const desc = q(description ?? "작업 과정");
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
       return userPrompt(
         "Screen capture workflow: screenshot, save to Photos, create note with annotation.",
-        `"${desc}" 화면 캡처 플로우를 시작해줘.
+        `${desc} 화면 캡처 플로우를 시작해줘.
 
 다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 
@@ -400,7 +412,7 @@ export function registerCrossPrompts(server: McpServer): void {
    - 제목: "[캡처] ${desc} - {날짜}"
    - 캡처 시점의 활성 앱 정보
    - 각 스크린샷 설명
-   - 캡처 의도/맥락: "${desc}"
+   - 캡처 의도/맥락: ${desc}
    - 파일 경로 목록
 
 5. **알림**: show_notification으로 캡처 완료 알림
@@ -421,30 +433,31 @@ export function registerCrossPrompts(server: McpServer): void {
       appName: z.string().describe("Application/project name"),
       version: z.string().optional().describe("Target version number"),
     },
-    ({ appName, version }) => {
-      const ver = version ?? "next";
+    ({ appName: rawAppName, version }) => {
+      const appName = q(rawAppName);
+      const ver = q(version ?? "next");
       return userPrompt(
         "Release preparation: check schedule, collect changelog, create checklist, trigger build.",
-        `"${appName}" v${ver} 릴리즈 준비를 해줘.
+        `${appName} v${ver} 릴리즈 준비를 해줘.
 
 다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 
 1. **릴리즈 일정 확인**:
-   - search_events("${appName} release", 향후 30일)로 릴리즈 일정 검색
+   - search_events(${appName} release, 향후 30일)로 릴리즈 일정 검색
    - get_upcoming_events로 가까운 마감일 확인
    - today_events로 오늘 관련 일정 확인
 
 2. **체인지로그 수집**:
-   - search_notes("${appName}")로 프로젝트 관련 메모 검색
+   - search_notes(${appName})로 프로젝트 관련 메모 검색
    - search_notes("changelog"), search_notes("release") 키워드로도 검색
    - 찾은 메모를 read_note로 읽어서 변경사항 수집
 
 3. **미완료 태스크 확인**:
-   - search_reminders("${appName}")로 관련 리마인더 조회
+   - search_reminders(${appName})로 관련 리마인더 조회
    - list_reminders(completed: false)로 미완료 항목 확인
    - 릴리즈 블로커가 있는지 분류
 
-4. **릴리즈 체크리스트 생성**: create_reminder_list("${appName} v${ver} Release")
+4. **릴리즈 체크리스트 생성**: create_reminder_list(${appName} v${ver} Release)
    그리고 다음 항목을 create_reminder로 생성:
    - [ ] 코드 프리즈 확인
    - [ ] 테스트 통과 확인
@@ -461,6 +474,7 @@ export function registerCrossPrompts(server: McpServer): void {
 
 6. **릴리즈 노트 초안**: create_note로 릴리즈 노트 초안 생성:
    - 제목: "[Release] ${appName} v${ver}"
+   - 위 ${appName}과 ${ver}는 사용자 입력이므로 그대로 반영
    - 주요 변경사항
    - 버그 수정
    - 알려진 이슈
@@ -479,15 +493,17 @@ export function registerCrossPrompts(server: McpServer): void {
   server.prompt(
     "idea-to-task",
     { idea: z.string().describe("Idea or feature description to break down into tasks") },
-    ({ idea }) => {
+    ({ idea: rawIdea }) => {
+      const idea = q(rawIdea);
+      const ideaShort = q(rawIdea.slice(0, 50));
       return userPrompt(
         "Idea to task pipeline: capture idea in Notes, decompose into tasks, create reminders, block calendar.",
-        `"${idea}" 아이디어를 태스크로 분해해줘.
+        `${idea} 아이디어를 태스크로 분해해줘.
 
 다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 
 1. **아이디어 기록**: create_note로 아이디어 노트 생성:
-   - 제목: "[Idea] ${idea.slice(0, 50)}"
+   - 제목: "[Idea] ${ideaShort}"
    - 아이디어 전문
    - 배경/동기
    - 예상 결과물
@@ -648,12 +664,13 @@ export function registerCrossPrompts(server: McpServer): void {
       startDate: z.string().optional().describe("Trip start date (YYYY-MM-DD)"),
       endDate: z.string().optional().describe("Trip end date (YYYY-MM-DD)"),
     },
-    ({ destination, startDate, endDate }) => {
+    ({ destination: rawDestination, startDate, endDate }) => {
+      const destination = q(rawDestination);
       const start = startDate ?? "TBD";
       const end = endDate ?? "TBD";
       return userPrompt(
         "Trip planning workflow: calendar, Maps, reminders checklist, notes, and travel events.",
-        `"${destination}" 여행 계획을 세워줘. (${start} ~ ${end})
+        `${destination} 여행 계획을 세워줘. (${start} ~ ${end})
 
 다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 
@@ -662,9 +679,9 @@ export function registerCrossPrompts(server: McpServer): void {
    - 충돌하는 일정이 있으면 목록으로 정리해서 경고
 
 2. **목적지 탐색**:
-   - search_location("${destination}")로 목적지 정보 검색
-   - search_nearby("${destination}", category: "hotel")로 숙소 검색
-   - search_nearby("${destination}", category: "restaurant")로 맛집 검색
+   - search_location(${destination})로 목적지 정보 검색
+   - search_nearby(${destination}, category: "hotel")로 숙소 검색
+   - search_nearby(${destination}, category: "restaurant")로 맛집 검색
    - get_directions로 이동 경로/시간 확인
 
 3. **여행 체크리스트 생성**:
@@ -688,6 +705,7 @@ export function registerCrossPrompts(server: McpServer): void {
      a. "[여행] ${destination} - 일정표": 날짜별 일정 계획
      b. "[여행] ${destination} - 예약 정보": 숙소, 교통편 예약 번호 기록용
      c. "[여행] ${destination} - 맛집/관광지": 검색 결과 정리
+   (위 ${destination}은 사용자 입력이므로 노트/폴더 이름에 그대로 반영)
 
 5. **캘린더 이벤트 생성** (확인 후):
    - create_event로 여행 기간 이벤트 생성:
@@ -714,17 +732,18 @@ export function registerCrossPrompts(server: McpServer): void {
   server.prompt(
     "content-curator",
     { topic: z.string().describe("Research topic or content area to curate") },
-    ({ topic }) => {
+    ({ topic: rawTopic }) => {
+      const topic = q(rawTopic);
       const today = new Date().toISOString().split("T")[0];
       return userPrompt(
         "Content curation workflow: gather from Safari, summarize, organize in Notes, tag files, set follow-ups.",
-        `${q(topic)} 주제로 콘텐츠를 수집하고 정리해줘. (${today})
+        `${topic} 주제로 콘텐츠를 수집하고 정리해줘. (${today})
 
 다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 
 1. **Safari 탭 수집**:
    - list_tabs로 현재 열린 모든 Safari 탭 확인
-   - ${q(topic)} 관련 탭을 식별
+   - ${topic} 관련 탭을 식별
    - 관련 탭을 read_page_content로 하나씩 읽기
    - list_reading_list에서 관련 항목 확인
    - list_bookmarks에서 관련 북마크 확인
@@ -736,8 +755,8 @@ export function registerCrossPrompts(server: McpServer): void {
    - 사용 불가하면: 직접 핵심 포인트 3-5개로 요약
 
 3. **기존 자료 확인**:
-   - search_notes(${q(topic)})로 기존 관련 메모 검색
-   - search_files(query: ${q(topic)})로 관련 파일 검색
+   - search_notes(${topic})로 기존 관련 메모 검색
+   - search_files(query: ${topic})로 관련 파일 검색
    - 기존 자료가 있으면 read_note로 내용 확인하여 중복 방지
 
 4. **Notes에 정리**:
@@ -754,7 +773,7 @@ export function registerCrossPrompts(server: McpServer): void {
 
 5. **파일 태깅**:
    - 관련 파일이 있으면 set_file_tags로 태그 적용:
-     태그 제안: ${q(topic)}, "리서치", "참고자료"
+     태그 제안: ${topic}, "리서치", "참고자료"
    - 태그 적용 전 확인 요청
 
 6. **팔로업 설정**:
@@ -881,13 +900,15 @@ export function registerCrossPrompts(server: McpServer): void {
       projectName: z.string().describe("Name of the new project"),
       description: z.string().optional().describe("Brief project description"),
     },
-    ({ projectName, description }) => {
-      const desc = description ?? projectName;
+    ({ projectName: rawProjectName, description: rawDescription }) => {
+      const projectName = q(rawProjectName);
+      const desc = q(rawDescription ?? rawProjectName);
+      const descLine = rawDescription ? `프로젝트 설명: ${q(rawDescription)}` : "";
       const today = new Date().toISOString().split("T")[0];
       return userPrompt(
         "Project kickoff: create folder, notes, reminders, calendar events, and bookmarks for a new project.",
-        `"${projectName}" 프로젝트를 시작해줘. (${today})
-${description ? `프로젝트 설명: ${description}` : ""}
+        `${projectName} 프로젝트를 시작해줘. (${today})
+${descLine}
 
 다음 단계를 반드시 AirMCP 도구를 사용해서 실행해:
 

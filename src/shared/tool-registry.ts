@@ -20,6 +20,7 @@ import { auditLog } from "./audit.js";
 import { compactDescription } from "./tool-filter.js";
 import { withResultSizeHint } from "./result.js";
 import { traceToolCall } from "./telemetry.js";
+import { assertTestMode } from "./errors.js";
 
 /** Threshold in characters above which we auto-attach a result size hint. */
 const SIZE_HINT_THRESHOLD = 10_000;
@@ -157,16 +158,12 @@ class ToolRegistry {
   }
 
   /**
-   * Reset the registry. For test isolation only.
-   *
-   * Refuses to run unless `NODE_ENV === "test"` (set automatically by Jest) or
-   * `AIRMCP_TEST_MODE=1` is set. Without this guard, any code with a reference
-   * to the singleton could wipe every registered tool/prompt at runtime.
+   * Reset the registry. For test isolation only. Guarded by `assertTestMode`
+   * so a production caller with a reference to the singleton cannot wipe every
+   * registered tool/prompt at runtime.
    */
   reset(): void {
-    if (process.env.NODE_ENV !== "test" && process.env.AIRMCP_TEST_MODE !== "1") {
-      throw new Error("ToolRegistry.reset() is only callable when NODE_ENV=test or AIRMCP_TEST_MODE=1");
-    }
+    assertTestMode("ToolRegistry.reset()");
     this.tools.clear();
     this.prompts.clear();
   }

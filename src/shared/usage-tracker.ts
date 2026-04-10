@@ -2,6 +2,7 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { PATHS } from "./constants.js";
+import { formatError } from "./errors.js";
 
 interface UsageProfile {
   version: number;
@@ -112,9 +113,9 @@ class UsageTracker {
       await writeFile(PATHS.USAGE_PROFILE, JSON.stringify(this.profile, null, 2), "utf-8");
       this.dirty = false;
     } catch (e) {
-      // Non-critical — log so users can diagnose disk-full / permission issues
-      // instead of wondering why next-tool suggestions stop improving over time.
-      console.error(`[AirMCP UsageTracker] flush failed: ${e instanceof Error ? e.message : String(e)}`);
+      // Non-critical, but logged so disk-full / permission issues stop hiding
+      // for weeks behind a "why are next-tool suggestions stale" mystery.
+      logErr("flush", e);
     }
   }
 
@@ -127,7 +128,7 @@ class UsageTracker {
       writeFileSync(PATHS.USAGE_PROFILE, JSON.stringify(this.profile, null, 2), "utf-8");
       this.dirty = false;
     } catch (e) {
-      console.error(`[AirMCP UsageTracker] flushSync failed: ${e instanceof Error ? e.message : String(e)}`);
+      logErr("flushSync", e);
     }
   }
 
@@ -143,10 +144,10 @@ class UsageTracker {
     this.profile = { version: 1, frequency: {}, sequences: {}, hourly: {}, updatedAt: "" };
     this.loaded = this.loadFromDisk()
       .catch((e) => {
-        // loadFromDisk() already swallows ENOENT internally; this catch surfaces
-        // anything else (corrupted JSON, permission errors, etc.) so we know why
-        // the merged history is missing instead of silently starting from zero.
-        console.error(`[AirMCP UsageTracker] load failed: ${e instanceof Error ? e.message : String(e)}`);
+        // loadFromDisk swallows ENOENT (expected on first run); everything else
+        // — corrupt JSON, EACCES — reaches stderr so a missing merged history
+        // doesn't silently degrade next-tool suggestions.
+        logErr("load", e);
       })
       .then(() => {
         this.loaded = null;
@@ -158,11 +159,18 @@ class UsageTracker {
     try {
       data = await readFile(PATHS.USAGE_PROFILE, "utf-8");
     } catch (e) {
-      // ENOENT is the expected first-run state — keep silent. Surface anything else.
+      // ENOENT on first run is normal; rethrow anything else for the catch above.
       if ((e as NodeJS.ErrnoException).code === "ENOENT") return;
       throw e;
     }
-    const loaded = JSON.parse(data) as UsageProfile;
+    let loaded: UsageProfile;
+    try {
+      loaded = JSON.parse(data) as UsageProfile;
+    } catch (e) {
+      // Wrap with the file path so the log line points at the corrupt file
+      // instead of just printing "Unexpected token } in JSON at position …".
+      throw new Error(`Corrupt usage profile at ${PATHS.USAGE_PROFILE}: ${formatError(e)}`, { cause: e });
+    }
     if (loaded.version === 1 && this.profile) {
       // Merge disk data with in-memory (in-memory wins for current session)
       for (const [k, v] of Object.entries(loaded.frequency)) {
@@ -186,16 +194,18 @@ class UsageTracker {
   private ensureFlushTimer(): void {
     if (this.flushTimer) return;
     this.flushTimer = setTimeout(() => {
-      this.flush().catch((e) => {
-        // flush() already logs internally, but cover the unexpected throw path
-        // (rejection from outside the inner try, e.g. profile mutation race).
-        console.error(`[AirMCP UsageTracker] flush timer error: ${e instanceof Error ? e.message : String(e)}`);
-      });
+      // flush() handles its own logging; this catch only covers unexpected
+      // throws outside the inner try (e.g. profile mutation race).
+      this.flush().catch((e) => logErr("flush timer", e));
       this.flushTimer = null;
     }, FLUSH_INTERVAL);
     // Don't prevent process exit
     if (this.flushTimer.unref) this.flushTimer.unref();
   }
+}
+
+function logErr(context: string, e: unknown): void {
+  console.error(`[AirMCP UsageTracker] ${context} failed: ${formatError(e)}`);
 }
 
 export const usageTracker = new UsageTracker();

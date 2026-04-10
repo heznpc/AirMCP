@@ -1,6 +1,7 @@
 import { appendFile, chmod, mkdir, stat, rename } from "node:fs/promises";
 import { join } from "node:path";
 import { AUDIT, PATHS } from "./constants.js";
+import { assertTestMode, formatError } from "./errors.js";
 
 const AUDIT_PATH = join(PATHS.VECTOR_STORE, "audit.jsonl");
 
@@ -59,12 +60,11 @@ export function auditLog(entry: AuditEntry): void {
 function ensureFlushTimer(): void {
   if (flushTimer) return;
   flushTimer = setTimeout(() => {
+    // flushBuffer() handles its own retry+logging; this catch only covers
+    // unexpected throws outside the inner try (e.g. ENOSPC during the buffer
+    // swap, ESM/dynamic import failure) so the rejection never goes silent.
     flushBuffer().catch((err) => {
-      // Surface flush errors so silent data loss is impossible.
-      // flushBuffer() already logs at line 102 on retry-failure, but the
-      // top-level promise rejection path here covers any unforeseen throw
-      // (e.g. ENOSPC during the swap, ESM/dynamic import failure, etc).
-      console.error(`[AirMCP Audit] flush timer error: ${err instanceof Error ? err.message : String(err)}`);
+      console.error(`[AirMCP Audit] flush timer error: ${formatError(err)}`);
     });
     flushTimer = null;
   }, AUDIT.FLUSH_INTERVAL);
@@ -147,15 +147,11 @@ export function sanitizeArgs(args: Record<string, unknown>, depth = 0): Record<s
 
 /**
  * Reset all module-level state and return buffered entries. For testing only.
- *
- * Refuses to run unless `NODE_ENV === "test"` (set automatically by Jest) or
- * `AIRMCP_TEST_MODE=1` is exported. Without this guard, an attacker who could
- * import the production module could wipe in-memory audit entries before flush.
+ * Guarded by `assertTestMode` so a production caller with module access cannot
+ * wipe in-memory audit entries before they reach disk.
  */
 export function _testReset(): string[] {
-  if (process.env.NODE_ENV !== "test" && process.env.AIRMCP_TEST_MODE !== "1") {
-    throw new Error("_testReset() is only callable when NODE_ENV=test or AIRMCP_TEST_MODE=1");
-  }
+  assertTestMode("_testReset()");
   const snapshot = [...buffer];
   buffer = [];
   if (flushTimer) {

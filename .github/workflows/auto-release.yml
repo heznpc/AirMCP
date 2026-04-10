@@ -55,7 +55,9 @@ jobs:
       actions: write
     steps:
       - name: Dispatch CD workflow
-        run: |
-          gh workflow run cd.yml --ref main
+        # Pass --repo explicitly so `gh` doesn't try to discover the repo from
+        # a non-existent local git checkout (this job has no actions/checkout
+        # by design — it only needs to fire a workflow_dispatch).
+        run: gh workflow run cd.yml --ref main --repo "$GITHUB_REPOSITORY"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

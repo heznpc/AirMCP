@@ -219,7 +219,11 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
         "Classify and tag content using Apple's on-device Foundation Model. Returns confidence scores for each provided tag/category. Requires macOS 26+.",
       inputSchema: {
         text: z.string().max(10000).describe("The text content to classify"),
-        tags: z.array(z.string()).min(1).describe("List of tag/category names to classify the content against"),
+        tags: z
+          .array(z.string().max(200))
+          .min(1)
+          .max(100)
+          .describe("List of tag/category names to classify the content against"),
       },
       annotations: {
         readOnlyHint: true,
@@ -290,7 +294,7 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
       },
       annotations: {
         readOnlyHint: false,
-        destructiveHint: false,
+        destructiveHint: true,
         idempotentHint: false,
         openWorldHint: false,
       },

@@ -20,6 +20,28 @@ const GWS_MAX_BUFFER = BUFFER.GWS;
 /** Resolved path to gws binary — uses npx as fallback. */
 let gwsBinary: string | null = null;
 
+/**
+ * Build the env passed to gws once at module load. We deliberately don't
+ * forward unrelated process.env entries (ANTHROPIC_API_KEY, GEMINI_API_KEY,
+ * AIRMCP_HTTP_TOKEN, etc.) to a third-party binary. The relevant env vars
+ * (PATH, HOME, GWS_*, GOOGLE_*) are set at startup and don't change at runtime.
+ */
+const SAFE_ENV_KEYS = ["PATH", "HOME", "USER", "LOGNAME", "SHELL", "LANG", "LC_ALL", "TMPDIR", "TZ"];
+const GWS_SAFE_ENV: NodeJS.ProcessEnv = (() => {
+  const env: NodeJS.ProcessEnv = {};
+  for (const key of SAFE_ENV_KEYS) {
+    const v = process.env[key];
+    if (v !== undefined) env[key] = v;
+  }
+  for (const key of Object.keys(process.env)) {
+    if (key.startsWith("GWS_") || key.startsWith("GOOGLE_")) {
+      const v = process.env[key];
+      if (v !== undefined) env[key] = v;
+    }
+  }
+  return env;
+})();
+
 async function resolveGwsBinary(): Promise<string> {
   if (gwsBinary) return gwsBinary;
 
@@ -91,7 +113,7 @@ export async function runGws<T = unknown>(
     const result = await execFileAsync(bin, args, {
       timeout,
       maxBuffer: GWS_MAX_BUFFER,
-      env: { ...process.env },
+      env: GWS_SAFE_ENV,
     });
     stdout = result.stdout;
   } catch (e) {

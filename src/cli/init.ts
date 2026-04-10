@@ -6,11 +6,12 @@
  * 3. Auto-detect and patch MCP client configs (Claude Desktop, Cursor, Windsurf, etc.)
  */
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync, copyFileSync } from "node:fs";
 import { join } from "node:path";
 import { MODULE_NAMES, STARTER_MODULES, NPM_PACKAGE_NAME, MCP_CLIENTS } from "../shared/config.js";
 import { PATHS } from "../shared/constants.js";
 import { LOGO_LINES, typeLine, sleep, writeOut } from "../shared/banner.js";
+import { isPlainObject } from "../shared/validate.js";
 import { selectOne, selectMulti, type SelectOption, type MultiOption } from "./select.js";
 
 // ── Module metadata ──────────────────────────────────────────────────
@@ -347,15 +348,34 @@ export async function runInit(): Promise<void> {
   process.stdout.write(`  ${t("writing_config", lang)}`);
 
   mkdirSync(PATHS.CONFIG_DIR, { recursive: true });
+
+  // Preserve unknown fields from any existing config so a re-run of init
+  // doesn't wipe out hand-edited keys (e.g. hitl.whitelist, future flags).
+  let existingConfig: Record<string, unknown> = {};
+  if (existsSync(PATHS.CONFIG)) {
+    try {
+      const parsed: unknown = JSON.parse(readFileSync(PATHS.CONFIG, "utf-8"));
+      if (isPlainObject(parsed)) {
+        existingConfig = parsed;
+      }
+    } catch {
+      // Corrupt existing config — overwrite from scratch
+    }
+  }
+  const existingHitl = isPlainObject(existingConfig.hitl) ? existingConfig.hitl : {};
+  const existingFeatures = isPlainObject(existingConfig.features) ? existingConfig.features : {};
+
   const configPayload = {
+    ...existingConfig,
     locale: lang,
     disabledModules,
     includeShared: permSelected.has("includeShared"),
     allowSendMessages: permSelected.has("sendMessages"),
     allowSendMail: permSelected.has("sendMail"),
     allowRunJavascript: permSelected.has("runJavascript"),
-    hitl: { level: hitlLevel },
+    hitl: { ...existingHitl, level: hitlLevel },
     features: {
+      ...existingFeatures,
       usageTracking: featureSelected.has("usageTracking"),
       auditLog: featureSelected.has("auditLog"),
       semanticToolSearch: featureSelected.has("semanticToolSearch"),
@@ -387,13 +407,24 @@ export async function runInit(): Promise<void> {
     try {
       let existing: Record<string, unknown> = {};
       if (configExists) {
-        existing = JSON.parse(readFileSync(client.configPath, "utf-8"));
+        const parsed: unknown = JSON.parse(readFileSync(client.configPath, "utf-8"));
+        if (!isPlainObject(parsed)) {
+          throw new Error(`existing config is not a JSON object`);
+        }
+        existing = parsed;
       }
 
-      const servers = (existing[client.serversKey] as Record<string, unknown>) ?? {};
+      const rawServers = existing[client.serversKey];
+      const servers: Record<string, unknown> = isPlainObject(rawServers) ? rawServers : {};
       servers.airmcp = airmcpEntry;
       existing[client.serversKey] = servers;
 
+      // Snapshot the original file before overwriting so users can recover
+      // if the wizard ever produces unexpected output. .bak.<timestamp> keeps
+      // older snapshots from being clobbered on repeated runs.
+      if (configExists) {
+        copyFileSync(client.configPath, `${client.configPath}.bak.${Date.now()}`);
+      }
       mkdirSync(join(client.configPath, ".."), { recursive: true });
       writeFileSync(client.configPath, JSON.stringify(existing, null, 2) + "\n");
       console.log(` ${GREEN}\u2713${RESET}`);

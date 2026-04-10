@@ -35,7 +35,7 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
     },
     async ({ appName }) => {
       try {
-        return ok(await runJxa(uiOpenAppScript(appName)));
+        return okUntrusted(await runJxa(uiOpenAppScript(appName)));
       } catch (e) {
         return toolError("open app", e);
       }

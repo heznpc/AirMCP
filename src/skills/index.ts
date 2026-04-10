@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadAllSkills, mergeSkills, watchUserSkills } from "./loader.js";
 import { registerSkills } from "./register.js";
-import { registerTrigger, startTriggerListener } from "./triggers.js";
+import { registerTrigger, resetTriggers, startTriggerListener } from "./triggers.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // Resolves to dist/skills/builtins/ — works in repo checkout, npm cache, and git worktrees
@@ -24,7 +24,10 @@ export async function registerSkillEngine(server: McpServer): Promise<void> {
 
   registerSkills(server, merged);
 
-  // Register event triggers for skills that have them
+  // Register event triggers for skills that have them. Reset bindings first
+  // because this function is called per createServer (HTTP pre-warm + per-
+  // session) and we must not accumulate duplicate bindings.
+  resetTriggers();
   for (const skill of merged) {
     registerTrigger(skill);
   }

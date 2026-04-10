@@ -1,7 +1,7 @@
 import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, toolError } from "../shared/result.js";
+import { ok, okUntrusted, toolError } from "../shared/result.js";
 import { runSwift } from "../shared/swift.js";
 
 interface BluetoothStateResult {
@@ -64,7 +64,7 @@ export function registerBluetoothTools(server: McpServer, _config: AirMcpConfig)
     },
     async ({ duration }) => {
       try {
-        return ok(await runSwift<BluetoothScanResult>("scan-bluetooth", JSON.stringify({ duration })));
+        return okUntrusted(await runSwift<BluetoothScanResult>("scan-bluetooth", JSON.stringify({ duration })));
       } catch (e) {
         return toolError("scan bluetooth", e);
       }

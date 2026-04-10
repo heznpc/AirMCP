@@ -4,7 +4,7 @@ import { runJxa } from "../shared/jxa.js";
 import { runAutomation } from "../shared/automation.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import { ok, okUntrustedStructured, okStructured, toolError } from "../shared/result.js";
-import { zFilePath } from "../shared/validate.js";
+import { zFilePath, resolveAndGuard } from "../shared/validate.js";
 import {
   getClipboardScript,
   setClipboardScript,
@@ -310,14 +310,15 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
           .describe("Capture region: fullscreen (default), window, or selection"),
       },
       annotations: {
-        readOnlyHint: true,
-        destructiveHint: false,
+        readOnlyHint: false,
+        destructiveHint: true,
         idempotentHint: false,
         openWorldHint: false,
       },
     },
     async ({ path, region }) => {
       try {
+        resolveAndGuard(path);
         return ok(await runJxa(captureScreenshotScript(path, region)));
       } catch (e) {
         return toolError("capture screenshot", e);

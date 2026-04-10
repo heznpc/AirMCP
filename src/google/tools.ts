@@ -177,7 +177,7 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
     },
     async ({ fileId }) => {
       try {
-        return ok(
+        return okUntrusted(
           await runGws("drive", "files", "get", {
             fileId,
             fields: "id,name,mimeType,modifiedTime,size,webViewLink,owners,shared,description",
@@ -435,7 +435,7 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
     },
     async ({ query, pageSize }) => {
       try {
-        return ok(
+        return okUntrusted(
           await runGws("people", "people", "searchContacts", {
             query,
             pageSize,

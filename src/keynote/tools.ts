@@ -2,7 +2,7 @@ import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, toolError } from "../shared/result.js";
+import { ok, okUntrusted, toolError } from "../shared/result.js";
 import { zFilePath } from "../shared/validate.js";
 import {
   listDocumentsScript,
@@ -63,7 +63,7 @@ export function registerKeynoteTools(server: McpServer, _config: AirMcpConfig): 
     },
     async ({ document }) => {
       try {
-        return ok(await runJxa(listSlidesScript(document)));
+        return okUntrusted(await runJxa(listSlidesScript(document)));
       } catch (e) {
         return toolError("list Keynote slides", e);
       }
@@ -83,7 +83,7 @@ export function registerKeynoteTools(server: McpServer, _config: AirMcpConfig): 
     },
     async ({ document, slideNumber }) => {
       try {
-        return ok(await runJxa(getSlideScript(document, slideNumber)));
+        return okUntrusted(await runJxa(getSlideScript(document, slideNumber)));
       } catch (e) {
         return toolError("get Keynote slide", e);
       }

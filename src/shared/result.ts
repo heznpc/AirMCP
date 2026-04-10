@@ -70,6 +70,25 @@ export function okLinkedStructured(toolName: string, data: unknown) {
 }
 
 /**
+ * Like okLinkedStructured, but the primary text block is wrapped with
+ * untrusted-content markers. Use for read tools that return user-generated
+ * data (calendar events, notes, reminders) where content may include
+ * attacker-controlled text from external invitees / collaborators.
+ */
+export function okUntrustedLinkedStructured(toolName: string, data: unknown) {
+  const usageNext = usageTracker.getNextTools(toolName);
+  const links = getToolLinks(toolName, usageNext);
+  const base = { ...okUntrusted(data), structuredContent: data };
+  if (links.length > 0) {
+    base.content.push({
+      type: "text" as const,
+      text: JSON.stringify({ _links: links }),
+    });
+  }
+  return base;
+}
+
+/**
  * Attach `_meta["anthropic/maxResultSizeChars"]` to a tool result.
  *
  * Claude Code (and compatible harnesses) use this hint to avoid truncating

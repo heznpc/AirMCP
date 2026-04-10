@@ -180,6 +180,7 @@ export function registerFinderTools(server: McpServer, _config: AirMcpConfig): v
     },
     async ({ path }) => {
       try {
+        resolveAndGuard(path);
         return ok(await runJxa(createFolderScript(path)));
       } catch (e) {
         return toolError("create folder", e);

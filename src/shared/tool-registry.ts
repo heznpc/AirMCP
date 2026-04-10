@@ -136,9 +136,11 @@ class ToolRegistry {
    * call automatically tracks the registration in this registry.
    *
    * Must be called once per server, before any module registrations.
-   * Compatible with the HITL guard monkey-patch (call this AFTER
-   * `installHitlGuard` so that the handler stored here already includes
-   * the HITL wrapper).
+   * Call this BEFORE `installHitlGuard` — the HITL guard will then become
+   * the outermost wrapper, and the registry's stored handler will be
+   * `audit(HITL(callback))`. This guarantees that calling tools via
+   * `callTool()` (e.g. from the skill executor) still routes through HITL
+   * approval, instead of bypassing it.
    *
    * In HTTP mode, multiple sessions create servers and call this method.
    * Only the first call clears the registry; subsequent calls overwrite

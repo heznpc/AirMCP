@@ -480,7 +480,7 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
       description:
         "Move multiple notes to a target folder at once. Same limitations as move_note apply to each note (new ID, date reset, attachments lost). Returns per-note success/failure results.",
       inputSchema: {
-        ids: z.array(z.string()).min(1).describe("Array of note IDs to move"),
+        ids: z.array(z.string().max(500)).min(1).max(100).describe("Array of note IDs to move (max 100)"),
         folder: z.string().max(500).describe("Target folder name"),
       },
       annotations: {

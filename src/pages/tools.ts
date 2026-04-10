@@ -2,7 +2,7 @@ import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, toolError } from "../shared/result.js";
+import { ok, okUntrusted, toolError } from "../shared/result.js";
 import { zFilePath } from "../shared/validate.js";
 import {
   listDocumentsScript,
@@ -80,7 +80,7 @@ export function registerPagesTools(server: McpServer, _config: AirMcpConfig): vo
     },
     async ({ document }) => {
       try {
-        return ok(await runJxa(getBodyTextScript(document)));
+        return okUntrusted(await runJxa(getBodyTextScript(document)));
       } catch (e) {
         return toolError("get Pages body text", e);
       }

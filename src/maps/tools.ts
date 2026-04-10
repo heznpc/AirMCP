@@ -151,13 +151,14 @@ export function registerMapsTools(server: McpServer, _config: AirMcpConfig): voi
         query: z
           .string()
           .min(1)
+          .max(500)
           .describe("Place name or address (e.g. 'Seoul', 'Tokyo Tower', '1600 Pennsylvania Ave')"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
     async ({ query }) => {
       try {
-        return ok(await fetchGeocode(query));
+        return okUntrusted(await fetchGeocode(query));
       } catch (e) {
         return toolError("geocode", e);
       }
@@ -177,7 +178,7 @@ export function registerMapsTools(server: McpServer, _config: AirMcpConfig): voi
     },
     async ({ latitude, longitude }) => {
       try {
-        return ok(await fetchReverseGeocode(latitude, longitude));
+        return okUntrusted(await fetchReverseGeocode(latitude, longitude));
       } catch (e) {
         return toolError("reverse geocode", e);
       }

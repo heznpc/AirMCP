@@ -2,7 +2,7 @@ import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, toolError } from "../shared/result.js";
+import { ok, okUntrusted, toolError } from "../shared/result.js";
 import {
   listPlaylistsScript,
   listTracksScript,
@@ -23,7 +23,7 @@ export function registerTvTools(server: McpServer, _config: AirMcpConfig): void 
     },
     async () => {
       try {
-        return ok(await runJxa(listPlaylistsScript()));
+        return okUntrusted(await runJxa(listPlaylistsScript()));
       } catch (e) {
         return toolError("list TV playlists", e);
       }
@@ -43,7 +43,7 @@ export function registerTvTools(server: McpServer, _config: AirMcpConfig): void 
     },
     async ({ playlist, limit }) => {
       try {
-        return ok(await runJxa(listTracksScript(playlist, limit)));
+        return okUntrusted(await runJxa(listTracksScript(playlist, limit)));
       } catch (e) {
         return toolError("list TV tracks", e);
       }
@@ -60,7 +60,7 @@ export function registerTvTools(server: McpServer, _config: AirMcpConfig): void 
     },
     async () => {
       try {
-        return ok(await runJxa(nowPlayingScript()));
+        return okUntrusted(await runJxa(nowPlayingScript()));
       } catch (e) {
         return toolError("get TV now playing", e);
       }
@@ -99,7 +99,7 @@ export function registerTvTools(server: McpServer, _config: AirMcpConfig): void 
     },
     async ({ query, limit }) => {
       try {
-        return ok(await runJxa(searchTracksScript(query, limit)));
+        return okUntrusted(await runJxa(searchTracksScript(query, limit)));
       } catch (e) {
         return toolError("search TV", e);
       }

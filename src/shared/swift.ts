@@ -189,6 +189,7 @@ function ensureProcess(): Promise<void> {
       rejectAll(`Swift bridge error: ${err.message}`);
       child = null;
       if (!ready) {
+        clearTimeout(readyTimer);
         launching = null;
         launchFailed = true;
         launchFailedAt = Date.now();
@@ -201,6 +202,7 @@ function ensureProcess(): Promise<void> {
       child = null;
       launching = null;
       if (!ready) {
+        clearTimeout(readyTimer);
         launchFailed = true;
         launchFailedAt = Date.now();
         reject(new Error(`Swift bridge exited during startup with code ${code}`));

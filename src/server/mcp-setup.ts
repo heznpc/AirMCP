@@ -53,14 +53,18 @@ export async function createServer(
   // Cast to lightweight McpServer for module registration (avoids heavy generic inference)
   const lServer = server as unknown as LightMcpServer;
 
-  // Install HITL guard before any tool registrations
+  // Install tool/prompt registry FIRST so its interception runs as the
+  // innermost wrapper. The HITL guard then re-patches registerTool, becoming
+  // the outermost wrapper. Order matters: when a module calls registerTool,
+  // HITL wraps the callback first, then the registry wraps that HITL-wrapped
+  // handler with audit/usage tracking and stores it in its map. This makes
+  // the stored handler `audit(HITL(callback))` so that skill execution via
+  // toolRegistry.callTool() also goes through HITL approval.
+  toolRegistry.installOn(lServer);
+
   if (hitlClient && config.hitl.level !== "off") {
     installHitlGuard(lServer, hitlClient, config);
   }
-
-  // Install tool/prompt registry — intercepts all registrations transparently.
-  // Must come after HITL guard so the stored handlers include the HITL wrapper.
-  toolRegistry.installOn(lServer);
 
   // Dynamic module loading — only imports modules at startup
   const MODULE_REGISTRY = await loadModuleRegistry();

@@ -37,8 +37,13 @@ export function initializeServer(): ServerContext {
     setShareGuardHitlClient(hitlClient);
   }
 
-  // Clean up resources on exit
+  // Clean up resources on exit. Guarded against double-execution because
+  // SIGINT/SIGTERM handlers call onExit() AND then process.exit(0), which
+  // re-fires the "exit" event handler.
+  let exited = false;
   function onExit() {
+    if (exited) return;
+    exited = true;
     usageTracker.stop();
     usageTracker.flushSync();
     closeSkillsWatcher();

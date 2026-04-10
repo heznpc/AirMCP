@@ -3,8 +3,8 @@ import { z } from "zod";
 import { runSwift } from "../shared/swift.js";
 import { runAutomation } from "../shared/automation.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okLinked, toolError } from "../shared/result.js";
-import { zFilePath } from "../shared/validate.js";
+import { ok, okUntrusted, toolError } from "../shared/result.js";
+import { zFilePath, resolveAndGuard } from "../shared/validate.js";
 import {
   listAlbumsScript,
   listPhotosScript,
@@ -107,7 +107,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
           swift: { command: "list-albums" },
           jxa: () => listAlbumsScript(),
         });
-        return okLinked("list_albums", result);
+        return okUntrusted(result);
       } catch (e) {
         return toolError("list albums", e);
       }
@@ -135,7 +135,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
           },
           jxa: () => listPhotosScript(album, limit, offset),
         });
-        return ok(result);
+        return okUntrusted(result);
       } catch (e) {
         return toolError("list photos", e);
       }
@@ -162,7 +162,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
           },
           jxa: () => searchPhotosScript(query, limit),
         });
-        return okLinked("search_photos", result);
+        return okUntrusted(result);
       } catch (e) {
         return toolError("search photos", e);
       }
@@ -188,7 +188,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
           },
           jxa: () => getPhotoInfoScript(id),
         });
-        return ok(result);
+        return okUntrusted(result);
       } catch (e) {
         return toolError("get photo info", e);
       }
@@ -253,7 +253,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
       title: "Add Photos to Album",
       description: "Add photos to an existing album by photo IDs and album name.",
       inputSchema: {
-        photoIds: z.array(z.string()).describe("Array of photo media item IDs"),
+        photoIds: z.array(z.string().max(500)).min(1).max(500).describe("Array of photo media item IDs (max 500)"),
         albumName: z.string().max(500).describe("Target album name"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
@@ -293,6 +293,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
     },
     async ({ filePath, albumName }) => {
       try {
+        resolveAndGuard(filePath);
         const result = await runSwift<PhotoImportResult>("import-photo", JSON.stringify({ filePath, albumName }));
         return ok(result);
       } catch (e) {

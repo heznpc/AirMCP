@@ -2,6 +2,11 @@ import { z } from "zod";
 import { realpathSync } from "node:fs";
 import { HOME } from "./constants.js";
 
+/** Type guard for a plain JSON object (not null, not an array). */
+export function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
 /**
  * Zod schema for file path parameters.
  * Accepts absolute paths (/) and tilde paths (~/).

@@ -115,7 +115,7 @@ function parseOsascriptOutput<T>(stdout: string, app: string | undefined, stripC
   let trimmed = stdout.trim();
   if (stripControlChars) {
     // eslint-disable-next-line no-control-regex
-    trimmed = trimmed.replace(/[\x00-\x1f\x7f]/g, (c) => (c === "\n" || c === "\r" || c === "\t" ? "" : ""));
+    trimmed = trimmed.replace(/[\x00-\x1f\x7f]/g, (c) => (c === "\n" || c === "\r" || c === "\t" ? c : ""));
   }
   if (!trimmed) throw new Error("osascript returned empty output");
 

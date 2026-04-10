@@ -75,9 +75,13 @@ describe('Intelligence tools registration', () => {
     }
   });
 
-  test('no tools are marked destructive', () => {
+  test('only file-writing tools are destructive', () => {
+    // generate_image writes a PNG/JPEG to a user-supplied path and may
+    // overwrite an existing file, so it must be marked destructive so HITL
+    // can prompt the user under the destructive-only policy.
+    const expectedDestructive = new Set(['generate_image']);
     for (const [name, { config }] of server.tools) {
-      expect(config.annotations.destructiveHint).toBe(false);
+      expect(config.annotations.destructiveHint).toBe(expectedDestructive.has(name));
     }
   });
 

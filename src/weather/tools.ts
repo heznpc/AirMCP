@@ -1,7 +1,7 @@
 import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okLinkedStructured, toolError } from "../shared/result.js";
+import { okUntrusted, okUntrustedLinkedStructured, toolError } from "../shared/result.js";
 import { fetchCurrentWeather, fetchDailyForecast, fetchHourlyForecast } from "./api.js";
 
 export function registerWeatherTools(server: McpServer, _config: AirMcpConfig): void {
@@ -37,7 +37,7 @@ export function registerWeatherTools(server: McpServer, _config: AirMcpConfig): 
     async ({ latitude, longitude }) => {
       try {
         const result = await fetchCurrentWeather(latitude, longitude);
-        return okLinkedStructured("get_weather", result);
+        return okUntrustedLinkedStructured("get_current_weather", result);
       } catch (e) {
         return toolError("get current weather", e);
       }
@@ -58,7 +58,7 @@ export function registerWeatherTools(server: McpServer, _config: AirMcpConfig): 
     },
     async ({ latitude, longitude, days }) => {
       try {
-        return ok(await fetchDailyForecast(latitude, longitude, days));
+        return okUntrusted(await fetchDailyForecast(latitude, longitude, days));
       } catch (e) {
         return toolError("get daily forecast", e);
       }
@@ -86,7 +86,7 @@ export function registerWeatherTools(server: McpServer, _config: AirMcpConfig): 
     },
     async ({ latitude, longitude, hours }) => {
       try {
-        return ok(await fetchHourlyForecast(latitude, longitude, hours));
+        return okUntrusted(await fetchHourlyForecast(latitude, longitude, hours));
       } catch (e) {
         return toolError("get hourly forecast", e);
       }

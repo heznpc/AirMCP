@@ -1,6 +1,6 @@
 import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
-import { ok, okLinked, err, toolError } from "../shared/result.js";
+import { ok, okUntrusted, err, toolError } from "../shared/result.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import { SemanticSearchService } from "./service.js";
 import { runSwift, checkSwiftBridge } from "../shared/swift.js";
@@ -21,15 +21,16 @@ export function registerSemanticTools(server: McpServer, config: AirMcpConfig): 
     {
       title: "Build Semantic Index",
       description:
-        "Index data from enabled Apple apps (Notes, Calendar, Reminders, Mail) into the local vector store " +
-        "for semantic search. Run this once, then use semantic_search. Requires Swift bridge (npm run swift-build).",
+        "Index data from enabled Apple apps (Notes, Calendar, Reminders, Mail, Photos, Finder) into the local " +
+        "vector store for semantic search. Run this once, then use semantic_search. Replaces any existing " +
+        "index. Requires Swift bridge (npm run swift-build).",
       inputSchema: {
         sources: z
-          .array(z.enum(["notes", "calendar", "reminders", "mail"]))
+          .array(z.enum(["notes", "calendar", "reminders", "mail", "photos", "finder"]))
           .optional()
           .describe("Which sources to index. Defaults to all enabled modules."),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
     async ({ sources }, extra) => {
       try {
@@ -82,7 +83,7 @@ export function registerSemanticTools(server: McpServer, config: AirMcpConfig): 
     async ({ query, sources, limit, threshold }) => {
       try {
         const result = await service.search(query, { sources, limit, threshold });
-        return okLinked("semantic_search", result);
+        return okUntrusted(result);
       } catch (e) {
         return toolError("semantic search", e);
       }

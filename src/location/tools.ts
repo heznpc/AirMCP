@@ -1,6 +1,6 @@
 import type { McpServer } from "../shared/mcp.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, toolError } from "../shared/result.js";
+import { ok, okUntrusted, toolError } from "../shared/result.js";
 import { runSwift } from "../shared/swift.js";
 
 interface LocationResult {
@@ -35,7 +35,7 @@ export function registerLocationTools(server: McpServer, _config: AirMcpConfig):
     },
     async () => {
       try {
-        return ok(await runSwift<LocationResult>("get-location", "{}"));
+        return okUntrusted(await runSwift<LocationResult>("get-location", "{}"));
       } catch (e) {
         return toolError("get current location", e);
       }

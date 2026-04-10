@@ -5,7 +5,7 @@
 
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
-import { randomUUID, timingSafeEqual, randomBytes } from "node:crypto";
+import { randomUUID, timingSafeEqual, randomBytes, createHash } from "node:crypto";
 import { NPM_PACKAGE_NAME } from "../shared/config.js";
 import { LIMITS, TIMEOUT } from "../shared/constants.js";
 import { printBanner } from "../shared/banner.js";
@@ -109,16 +109,17 @@ export async function startHttpServer(options: HttpServerOptions): Promise<void>
     next();
   });
 
-  // Bearer token auth — required when --bind-all is used, optional otherwise
+  // Bearer token auth — required when --bind-all is used, optional otherwise.
+  // Hash both inputs to a fixed length before timingSafeEqual so the length
+  // comparison itself does not become a timing oracle for the token length.
   if (httpToken) {
+    const expectedHash = createHash("sha256").update(`Bearer ${httpToken}`).digest();
     app.use((req, res, next) => {
       // Skip auth for health/discovery endpoints
       if (req.path === "/health" || req.path === "/.well-known/mcp.json") return next();
-      const auth = req.headers.authorization;
-      const expected = `Bearer ${httpToken}`;
-      const authBuf = Buffer.from(auth ?? "");
-      const expBuf = Buffer.from(expected);
-      if (authBuf.length !== expBuf.length || !timingSafeEqual(authBuf, expBuf)) {
+      const auth = req.headers.authorization ?? "";
+      const authHash = createHash("sha256").update(auth).digest();
+      if (!timingSafeEqual(authHash, expectedHash)) {
         auditLog({
           timestamp: new Date().toISOString(),
           tool: "__auth_failure",
@@ -145,16 +146,26 @@ export async function startHttpServer(options: HttpServerOptions): Promise<void>
   }
   const sessions = new Map<string, Session>();
 
-  /** Clean up all resources for a session (transport, server, event listeners). Idempotent. */
+  /** Clean up all resources for a session (transport, server, event listeners). Idempotent.
+   *  Each cleanup step is wrapped individually so a failure in one step does not
+   *  prevent the remaining steps from running. */
   function destroySession(id: string, s: Session): void {
     if (!sessions.has(id)) return; // Already destroyed by another async path
     sessions.delete(id);
     try {
       s.cleanupEventListeners?.();
+    } catch (e) {
+      console.error(`[AirMCP] Session ${id} listener cleanup error:`, e);
+    }
+    try {
       s.transport.close?.();
+    } catch (e) {
+      console.error(`[AirMCP] Session ${id} transport close error:`, e);
+    }
+    try {
       s.server.close?.();
     } catch (e) {
-      console.error(`[AirMCP] Session ${id} cleanup error:`, e);
+      console.error(`[AirMCP] Session ${id} server close error:`, e);
     }
   }
 
@@ -168,11 +179,6 @@ export async function startHttpServer(options: HttpServerOptions): Promise<void>
     }
   }, TIMEOUT.SESSION_CLEANUP);
   if (cleanupInterval.unref) cleanupInterval.unref();
-
-  process.on("exit", () => {
-    clearInterval(cleanupInterval);
-    clearInterval(ratePruneTimer);
-  });
 
   // Health check — for load balancers, monitoring, and readiness probes
   // Note: session counts and uptime omitted to prevent information leakage
@@ -324,7 +330,7 @@ export async function startHttpServer(options: HttpServerOptions): Promise<void>
   warmupCleanup();
   warmupServer.close?.();
   const host = bindAll ? "0.0.0.0" : "127.0.0.1";
-  app.listen(port, host, async () => {
+  const httpServer = app.listen(port, host, async () => {
     bi.transport = "http";
     bi.port = port;
     await printBanner(bi);
@@ -332,5 +338,13 @@ export async function startHttpServer(options: HttpServerOptions): Promise<void>
       console.error(
         `[AirMCP] Bound to all interfaces (0.0.0.0:${port})${httpToken ? " with token auth" : " — NO AUTH"}`,
       );
+  });
+
+  // Release the listening socket and per-process timers on shutdown so
+  // in-flight requests are not left dangling and the port can be reused.
+  process.on("exit", () => {
+    clearInterval(cleanupInterval);
+    clearInterval(ratePruneTimer);
+    httpServer.close();
   });
 }

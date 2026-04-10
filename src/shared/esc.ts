@@ -65,7 +65,9 @@ export function escJxaShell(str: string): string {
     .replace(/\$/g, "\\\\$") // $ → \\$
     .replace(/'/g, "\\'") // ' → \'
     .replace(/\n/g, "\\n") // newline → \n (JXA interprets as newline char)
-    .replace(/\r/g, "\\r"); // CR → \r (JXA interprets as CR char)
+    .replace(/\r/g, "\\r") // CR → \r (JXA interprets as CR char)
+    .replace(/\u2028/g, "\\u2028") // LS — escape so JXA single-quoted string doesn't break
+    .replace(/\u2029/g, "\\u2029"); // PS — escape so JXA single-quoted string doesn't break
 }
 
 /** Ensure n is a finite integer — prevents shell injection if a non-number leaks through validation. */

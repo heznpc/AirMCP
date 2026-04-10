@@ -3,7 +3,7 @@ import { z } from "zod";
 import { runAutomation } from "../shared/automation.js";
 import { runSwift } from "../shared/swift.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okLinkedStructured, okUntrusted, okStructured, toolError } from "../shared/result.js";
+import { ok, okUntrusted, okUntrustedStructured, okUntrustedLinkedStructured, toolError } from "../shared/result.js";
 import {
   listCalendarsScript,
   listEventsScript,
@@ -167,7 +167,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
           },
           jxa: () => listEventsScript(startDate, endDate, limit, offset, calendar),
         });
-        return okStructured(result);
+        return okUntrustedStructured(result);
       } catch (e) {
         return toolError("list events", e);
       }
@@ -350,7 +350,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
           },
           jxa: () => searchEventsScript(query, startDate, endDate, limit),
         });
-        return okStructured(result);
+        return okUntrustedStructured(result);
       } catch (e) {
         return toolError("search events", e);
       }
@@ -394,7 +394,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
           swift: { command: "get-upcoming-events", input: { limit } },
           jxa: () => getUpcomingEventsScript(limit),
         });
-        return okStructured(result);
+        return okUntrustedStructured(result);
       } catch (e) {
         return toolError("get upcoming events", e);
       }
@@ -434,7 +434,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
           swift: { command: "today-events" },
           jxa: () => todayEventsScript(),
         });
-        return okLinkedStructured("today_events", result);
+        return okUntrustedLinkedStructured("today_events", result);
       } catch (e) {
         return toolError("get today's events", e);
       }

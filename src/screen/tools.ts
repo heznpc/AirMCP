@@ -3,7 +3,7 @@ import { z } from "zod";
 import { readFile, stat, unlink } from "node:fs/promises";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { toolError } from "../shared/result.js";
+import { okUntrusted, toolError } from "../shared/result.js";
 import {
   captureScreenScript,
   captureWindowScript,
@@ -152,10 +152,7 @@ export function registerScreenTools(server: McpServer, _config: AirMcpConfig): v
     },
     async () => {
       try {
-        const windows = await runJxa(listWindowsScript());
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify(windows, null, 2) }],
-        };
+        return okUntrusted(await runJxa(listWindowsScript()));
       } catch (e) {
         return toolError("list windows", e);
       }

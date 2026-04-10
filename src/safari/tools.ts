@@ -2,8 +2,14 @@ import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okLinkedStructured, okUntrusted, okStructured, err, toolError } from "../shared/result.js";
-import { auditLog } from "../shared/audit.js";
+import {
+  ok,
+  okUntrusted,
+  okUntrustedStructured,
+  okUntrustedLinkedStructured,
+  err,
+  toolError,
+} from "../shared/result.js";
 import {
   listTabsScript,
   readPageContentScript,
@@ -40,7 +46,7 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
     },
     async () => {
       try {
-        return okLinkedStructured("list_tabs", await runJxa(listTabsScript()));
+        return okUntrustedLinkedStructured("list_tabs", await runJxa(listTabsScript()));
       } catch (e) {
         return toolError("list tabs", e);
       }
@@ -89,7 +95,7 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
     },
     async () => {
       try {
-        return okStructured(await runJxa(getCurrentTabScript()));
+        return okUntrustedStructured(await runJxa(getCurrentTabScript()));
       } catch (e) {
         return toolError("get current tab", e);
       }
@@ -107,22 +113,35 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
     async ({ url }) => {
-      // Block non-HTTP schemes and internal network addresses to prevent SSRF/exfiltration
+      // Block non-HTTP schemes and internal network addresses to prevent the
+      // LLM caller from using Safari + read_page_content to exfiltrate
+      // private/cloud-internal data through the user's browser.
       try {
         const parsed = new URL(url);
         if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
           return err(`Only http:// and https:// URLs are allowed. Got: ${parsed.protocol}`);
         }
-        const host = parsed.hostname.toLowerCase();
-        if (
-          host === "localhost" ||
-          host === "127.0.0.1" ||
-          host === "[::1]" ||
-          host.startsWith("192.168.") ||
-          host.startsWith("10.") ||
-          host.endsWith(".local")
-        ) {
-          return err("Opening localhost or internal network URLs is not allowed.");
+        const host = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+        // Loopback (entire 127.0.0.0/8 range, IPv6 ::1, "localhost")
+        if (host === "localhost" || host === "::1" || /^127(?:\.\d{1,3}){3}$/.test(host)) {
+          return err("Opening localhost URLs is not allowed.");
+        }
+        // RFC1918 private networks
+        if (host.startsWith("10.") || host.startsWith("192.168.") || /^172\.(1[6-9]|2\d|3[01])\./.test(host)) {
+          return err("Opening internal network URLs is not allowed.");
+        }
+        // Link-local: 169.254.0.0/16 — includes cloud metadata endpoints
+        // (169.254.169.254 on AWS/GCP/Azure) and IPv6 fe80::/10
+        if (host.startsWith("169.254.") || host.startsWith("fe80:") || host.startsWith("fe80::")) {
+          return err("Opening link-local / cloud metadata URLs is not allowed.");
+        }
+        // IPv6 unique local addresses fc00::/7 (fc00:: – fdff::)
+        if (/^f[cd][0-9a-f]{2}:/.test(host)) {
+          return err("Opening IPv6 unique-local URLs is not allowed.");
+        }
+        // Unspecified address / mDNS
+        if (host === "0.0.0.0" || host === "::" || host.endsWith(".local")) {
+          return err("Opening unspecified or mDNS URLs is not allowed.");
         }
       } catch {
         return err("Invalid URL format.");
@@ -193,25 +212,9 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
         return err(
           "Running JavaScript in Safari is disabled. Set AIRMCP_ALLOW_RUN_JAVASCRIPT=true or allowRunJavascript in config.json.",
         );
-      const start = Date.now();
       try {
-        const result = await runJxa(runJavascriptScript(code, windowIndex, tabIndex));
-        auditLog({
-          timestamp: new Date().toISOString(),
-          tool: "run_javascript",
-          args: { windowIndex, tabIndex, codeLength: code.length },
-          status: "ok",
-          durationMs: Date.now() - start,
-        });
-        return ok(result);
+        return okUntrusted(await runJxa(runJavascriptScript(code, windowIndex, tabIndex)));
       } catch (e) {
-        auditLog({
-          timestamp: new Date().toISOString(),
-          tool: "run_javascript",
-          args: { windowIndex, tabIndex, codeLength: code.length },
-          status: "error",
-          durationMs: Date.now() - start,
-        });
         return toolError("run JavaScript", e);
       }
     },
@@ -229,7 +232,7 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
     },
     async ({ query }) => {
       try {
-        return ok(await runJxa(searchTabsScript(query)));
+        return okUntrusted(await runJxa(searchTabsScript(query)));
       } catch (e) {
         return toolError("search tabs", e);
       }
@@ -246,7 +249,7 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
     },
     async () => {
       try {
-        return ok(await runJxa(listBookmarksScript()));
+        return okUntrusted(await runJxa(listBookmarksScript()));
       } catch (e) {
         return toolError("list bookmarks", e);
       }
@@ -284,7 +287,7 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
     },
     async () => {
       try {
-        return ok(await runJxa(listReadingListScript()));
+        return okUntrusted(await runJxa(listReadingListScript()));
       } catch (e) {
         return toolError("list reading list", e);
       }

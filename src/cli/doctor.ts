@@ -12,6 +12,7 @@ import { execFileSync } from "node:child_process";
 import { MODULE_NAMES, STARTER_MODULES, NPM_PACKAGE_NAME, MCP_CLIENTS } from "../shared/config.js";
 import { HOME, PATHS } from "../shared/constants.js";
 import { LOGO_LINES, typeLine } from "../shared/banner.js";
+import { esc } from "../shared/esc.js";
 import { RESET, BOLD, DIM, WHITE, GREEN, SYM, heading, line, divider, spinner, sleep } from "./style.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -206,10 +207,11 @@ export async function runDoctor(): Promise<void> {
       const appName = APP_MAP[mod];
       if (!appName) continue;
       try {
-        execFileSync("osascript", ["-l", "JavaScript", "-e", `Application('${appName}'); JSON.stringify({ok:true})`], {
-          timeout: 5000,
-          stdio: "pipe",
-        });
+        execFileSync(
+          "osascript",
+          ["-l", "JavaScript", "-e", `Application('${esc(appName)}'); JSON.stringify({ok:true})`],
+          { timeout: 5000, stdio: "pipe" },
+        );
         permResults.push({ app: appName, ok: true });
       } catch {
         permResults.push({ app: appName, ok: false });

@@ -26,6 +26,19 @@ interface AuditEntry {
   durationMs?: number;
 }
 
+/**
+ * Tools whose args carry sensitive PII that must NEVER reach the audit log,
+ * even truncated. Matching tool calls get their args replaced with a single
+ * `_redacted` marker. The audit log already lives behind 0600 permissions,
+ * but defense-in-depth: a single accidental share of audit.jsonl shouldn't
+ * leak the user's location coordinates or health metrics.
+ */
+const SENSITIVE_TOOL_PATTERNS: RegExp[] = [/^get_current_location$/, /^get_location_permission$/, /^health_/];
+
+function isSensitiveTool(name: string): boolean {
+  return SENSITIVE_TOOL_PATTERNS.some((re) => re.test(name));
+}
+
 let initialized = false;
 let buffer: string[] = [];
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
@@ -39,7 +52,12 @@ async function ensureDir(): Promise<void> {
 /** Log a tool call to the audit log. Buffered — flushes every 30s (override via AIRMCP_AUDIT_FLUSH_INTERVAL). */
 export function auditLog(entry: AuditEntry): void {
   if (auditDisabled) return;
-  const sanitized = entry.args ? sanitizeArgs(entry.args) : undefined;
+  let sanitized: Record<string, unknown> | undefined;
+  if (isSensitiveTool(entry.tool)) {
+    sanitized = entry.args ? { _redacted: "sensitive_tool" } : undefined;
+  } else if (entry.args) {
+    sanitized = sanitizeArgs(entry.args);
+  }
   let line = JSON.stringify({ ...entry, args: sanitized });
   if (line.length > MAX_ENTRY_SIZE) {
     line = JSON.stringify({ ...entry, args: { _truncated: true }, _note: "entry exceeded 10KB limit" });

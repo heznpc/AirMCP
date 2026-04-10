@@ -283,6 +283,93 @@ describe('auditLog() sanitization integration', () => {
 });
 
 /* ================================================================== */
+/*  auditLog() sensitive-tool full redaction                          */
+/* ================================================================== */
+
+describe('auditLog() sensitive-tool redaction', () => {
+  test('get_current_location args are fully redacted', () => {
+    auditLog({
+      timestamp: 'T1',
+      tool: 'get_current_location',
+      args: { precision: 'high' },
+      status: 'ok',
+    });
+
+    const buf = _testReset();
+    const parsed = JSON.parse(buf[0]);
+    expect(parsed.args).toEqual({ _redacted: 'sensitive_tool' });
+    expect(parsed.tool).toBe('get_current_location');
+  });
+
+  test('get_location_permission args are fully redacted', () => {
+    auditLog({
+      timestamp: 'T1',
+      tool: 'get_location_permission',
+      args: {},
+      status: 'ok',
+    });
+
+    const buf = _testReset();
+    const parsed = JSON.parse(buf[0]);
+    expect(parsed.args).toEqual({ _redacted: 'sensitive_tool' });
+  });
+
+  test('health_* tool args are fully redacted', () => {
+    auditLog({
+      timestamp: 'T1',
+      tool: 'health_sleep',
+      args: { date: '2026-04-11', includeStages: true },
+      status: 'ok',
+    });
+
+    const buf = _testReset();
+    const parsed = JSON.parse(buf[0]);
+    expect(parsed.args).toEqual({ _redacted: 'sensitive_tool' });
+    expect(parsed.tool).toBe('health_sleep');
+  });
+
+  test('other health_ prefixed tools are redacted', () => {
+    auditLog({
+      timestamp: 'T1',
+      tool: 'health_summary',
+      args: { period: '7d' },
+      status: 'ok',
+    });
+
+    const buf = _testReset();
+    const parsed = JSON.parse(buf[0]);
+    expect(parsed.args).toEqual({ _redacted: 'sensitive_tool' });
+  });
+
+  test('non-sensitive tools still get sanitizeArgs treatment', () => {
+    auditLog({
+      timestamp: 'T1',
+      tool: 'list_notes',
+      args: { folder: 'Work', password: 'should_redact' },
+      status: 'ok',
+    });
+
+    const buf = _testReset();
+    const parsed = JSON.parse(buf[0]);
+    expect(parsed.args.folder).toBe('Work');
+    expect(parsed.args.password).toBe('[REDACTED]');
+    expect(parsed.args._redacted).toBeUndefined();
+  });
+
+  test('sensitive tool without args produces undefined args', () => {
+    auditLog({
+      timestamp: 'T1',
+      tool: 'get_current_location',
+      status: 'ok',
+    });
+
+    const buf = _testReset();
+    const parsed = JSON.parse(buf[0]);
+    expect(parsed.args).toBeUndefined();
+  });
+});
+
+/* ================================================================== */
 /*  Timer behavior — event-driven (setTimeout not setInterval)        */
 /* ================================================================== */
 

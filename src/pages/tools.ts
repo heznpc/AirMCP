@@ -3,7 +3,7 @@ import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import { ok, okUntrusted, toolError } from "../shared/result.js";
-import { zFilePath } from "../shared/validate.js";
+import { zFilePath, resolveAndGuard } from "../shared/validate.js";
 import {
   listDocumentsScript,
   openDocumentScript,
@@ -111,15 +111,16 @@ export function registerPagesTools(server: McpServer, _config: AirMcpConfig): vo
     "pages_export_pdf",
     {
       title: "Export Pages to PDF",
-      description: "Export an open Pages document to PDF.",
+      description: "Export an open Pages document to PDF. Will overwrite an existing file at the same path.",
       inputSchema: {
         document: z.string().max(500).describe("Document name"),
         outputPath: zFilePath.describe("Absolute output path for the PDF file"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
     async ({ document, outputPath }) => {
       try {
+        resolveAndGuard(outputPath);
         return ok(await runJxa(exportPdfScript(document, outputPath)));
       } catch (e) {
         return toolError("export Pages to PDF", e);

@@ -111,8 +111,10 @@ class UsageTracker {
       await mkdir(dirname(PATHS.USAGE_PROFILE), { recursive: true });
       await writeFile(PATHS.USAGE_PROFILE, JSON.stringify(this.profile, null, 2), "utf-8");
       this.dirty = false;
-    } catch {
-      // Non-critical — silently ignore write failures
+    } catch (e) {
+      // Non-critical — log so users can diagnose disk-full / permission issues
+      // instead of wondering why next-tool suggestions stop improving over time.
+      console.error(`[AirMCP UsageTracker] flush failed: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
@@ -124,8 +126,8 @@ class UsageTracker {
       mkdirSync(dirname(PATHS.USAGE_PROFILE), { recursive: true });
       writeFileSync(PATHS.USAGE_PROFILE, JSON.stringify(this.profile, null, 2), "utf-8");
       this.dirty = false;
-    } catch {
-      // Non-critical
+    } catch (e) {
+      console.error(`[AirMCP UsageTracker] flushSync failed: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
@@ -140,43 +142,55 @@ class UsageTracker {
   private loadSync(): void {
     this.profile = { version: 1, frequency: {}, sequences: {}, hourly: {}, updatedAt: "" };
     this.loaded = this.loadFromDisk()
-      .catch(() => {})
+      .catch((e) => {
+        // loadFromDisk() already swallows ENOENT internally; this catch surfaces
+        // anything else (corrupted JSON, permission errors, etc.) so we know why
+        // the merged history is missing instead of silently starting from zero.
+        console.error(`[AirMCP UsageTracker] load failed: ${e instanceof Error ? e.message : String(e)}`);
+      })
       .then(() => {
         this.loaded = null;
       });
   }
 
   private async loadFromDisk(): Promise<void> {
+    let data: string;
     try {
-      const data = await readFile(PATHS.USAGE_PROFILE, "utf-8");
-      const loaded = JSON.parse(data) as UsageProfile;
-      if (loaded.version === 1 && this.profile) {
-        // Merge disk data with in-memory (in-memory wins for current session)
-        for (const [k, v] of Object.entries(loaded.frequency)) {
-          this.profile.frequency[k] = (this.profile.frequency[k] || 0) + v;
-        }
-        for (const [k, v] of Object.entries(loaded.sequences)) {
-          this.profile.sequences[k] = (this.profile.sequences[k] || 0) + v;
-        }
-        for (const [k, v] of Object.entries(loaded.hourly)) {
-          if (!this.profile.hourly[k]) {
-            this.profile.hourly[k] = [...v];
-          } else {
-            for (let i = 0; i < 24; i++) {
-              this.profile.hourly[k]![i]! += v[i] || 0;
-            }
+      data = await readFile(PATHS.USAGE_PROFILE, "utf-8");
+    } catch (e) {
+      // ENOENT is the expected first-run state — keep silent. Surface anything else.
+      if ((e as NodeJS.ErrnoException).code === "ENOENT") return;
+      throw e;
+    }
+    const loaded = JSON.parse(data) as UsageProfile;
+    if (loaded.version === 1 && this.profile) {
+      // Merge disk data with in-memory (in-memory wins for current session)
+      for (const [k, v] of Object.entries(loaded.frequency)) {
+        this.profile.frequency[k] = (this.profile.frequency[k] || 0) + v;
+      }
+      for (const [k, v] of Object.entries(loaded.sequences)) {
+        this.profile.sequences[k] = (this.profile.sequences[k] || 0) + v;
+      }
+      for (const [k, v] of Object.entries(loaded.hourly)) {
+        if (!this.profile.hourly[k]) {
+          this.profile.hourly[k] = [...v];
+        } else {
+          for (let i = 0; i < 24; i++) {
+            this.profile.hourly[k]![i]! += v[i] || 0;
           }
         }
       }
-    } catch {
-      // File doesn't exist yet — that's fine
     }
   }
 
   private ensureFlushTimer(): void {
     if (this.flushTimer) return;
     this.flushTimer = setTimeout(() => {
-      this.flush().catch(() => {});
+      this.flush().catch((e) => {
+        // flush() already logs internally, but cover the unexpected throw path
+        // (rejection from outside the inner try, e.g. profile mutation race).
+        console.error(`[AirMCP UsageTracker] flush timer error: ${e instanceof Error ? e.message : String(e)}`);
+      });
       this.flushTimer = null;
     }, FLUSH_INTERVAL);
     // Don't prevent process exit

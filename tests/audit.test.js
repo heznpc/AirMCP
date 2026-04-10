@@ -83,7 +83,8 @@ describe('auditLog()', () => {
 
     const parsed = JSON.parse(buf[0]);
     expect(parsed.args._truncated).toBe(true);
-    expect(parsed._note).toContain('10KB');
+    // _note now reports the dynamic AUDIT.MAX_ENTRY_SIZE limit (10000 chars)
+    expect(parsed._note).toContain('10000 char limit');
     // The truncated entry should be well under 10KB
     expect(buf[0].length).toBeLessThan(10_000);
   });

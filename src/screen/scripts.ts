@@ -1,13 +1,16 @@
 // Scripts and shell command helpers for macOS screen capture and window enumeration.
 
+import { join } from "node:path";
 import { esc } from "../shared/esc.js";
+import { PATHS } from "../shared/constants.js";
 
 /**
  * Build a temp file path for a screenshot.
- * Uses a timestamp to avoid collisions.
+ * Uses a timestamp to avoid collisions. Honors AIRMCP_TEMP_DIR (PATHS.TEMP_DIR)
+ * so sandboxed runtimes can redirect intermediate captures off /tmp.
  */
 function tempScreenshotPath(): string {
-  return `/tmp/airmcp-screenshot-${Date.now()}.png`;
+  return join(PATHS.TEMP_DIR, `airmcp-screenshot-${Date.now()}.png`);
 }
 
 /**
@@ -64,7 +67,7 @@ export function captureWindowScript(appName?: string): string {
  */
 export function recordScreenScript(duration: number, display?: number): string {
   const safeDuration = Math.min(Math.max(Math.floor(duration), 1), 60);
-  const filePath = `/tmp/airmcp-recording-${Date.now()}.mov`;
+  const filePath = join(PATHS.TEMP_DIR, `airmcp-recording-${Date.now()}.mov`);
   const displayFlag = display !== undefined ? ` -D ${Math.floor(display)}` : "";
   return `
     const app = Application.currentApplication();

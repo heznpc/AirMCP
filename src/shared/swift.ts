@@ -145,8 +145,8 @@ function ensureProcess(): Promise<void> {
         const trimmed = line.trim();
         if (!trimmed) continue;
         // Per-line size guard — reject abnormally large single responses
-        if (trimmed.length > 1_048_576) {
-          console.error("[AirMCP Swift] Dropping oversized response line (>1MB)");
+        if (trimmed.length > BUFFER.SWIFT_LINE_MAX) {
+          console.error(`[AirMCP Swift] Dropping oversized response line (>${BUFFER.SWIFT_LINE_MAX} bytes)`);
           continue;
         }
         try {

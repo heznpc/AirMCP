@@ -1,6 +1,8 @@
 // JXA scripts for macOS Shortcuts automation.
 
+import { join } from "node:path";
 import { esc, escJxaShell } from "../shared/esc.js";
+import { PATHS } from "../shared/constants.js";
 
 export function listShortcutsScript(): string {
   return `
@@ -77,11 +79,14 @@ export function importShortcutScript(filePath: string): string {
 
 export function duplicateShortcutScript(name: string, newName: string): string {
   const safeName = escJxaShell(newName).replace(/[^a-zA-Z0-9_-]/g, "_");
+  // Inline a unique temp file path so concurrent duplicates don't collide and
+  // sandboxed runtimes can redirect via AIRMCP_TEMP_DIR.
+  const tempFile = join(PATHS.TEMP_DIR, `${safeName}-${Date.now()}.shortcut`);
   return `
     const app = Application.currentApplication();
     app.includeStandardAdditions = true;
-    app.doShellScript('shortcuts export "${escJxaShell(name)}" -o "/tmp/${safeName}.shortcut" && shortcuts import "/tmp/${safeName}.shortcut"');
-    app.doShellScript('rm -f "/tmp/${safeName}.shortcut"');
+    app.doShellScript('shortcuts export "${escJxaShell(name)}" -o "${tempFile}" && shortcuts import "${tempFile}"');
+    app.doShellScript('rm -f "${tempFile}"');
     JSON.stringify({original: '${esc(name)}', duplicate: '${esc(newName)}', success: true});
   `;
 }

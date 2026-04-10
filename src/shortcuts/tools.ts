@@ -302,6 +302,9 @@ export async function registerDynamicShortcutTools(server: McpServer): Promise<n
       },
     );
 
+    // NOTE: console.error (stderr), not console.log — MCP stdio transport reserves
+    // stdout for protocol traffic. This is an informational message, not an error;
+    // all server-side logging must go to stderr to avoid corrupting the channel.
     console.error(`[AirMCP] Registered dynamic shortcut: ${name}`);
     count++;
   }

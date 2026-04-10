@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.1] - 2026-04-11
+
+### Fixed
+- **Silent error swallowing in usage tracker** — `loadFromDisk`/`flush`/`flushSync`/timer all surfaced via `console.error` instead of empty `catch`. ENOENT on first run is still silenced; everything else (corrupt JSON, ENOSPC, EACCES) now reaches stderr so disk-full / permission issues no longer hide for weeks.
+- **Audit flush timer fire-and-forget** — Added top-level `.catch` logging to cover unforeseen rejections outside the inner retry path (e.g. ESM dynamic import failure during the swap window).
+
+### Changed
+- **Hardcoded constants centralized in `shared/constants.ts`**:
+  - `API.OLLAMA` (was inline default in `local-llm.ts`) — env override `AIRMCP_OLLAMA_URL`
+  - `EXT_APPS.CDN_URL` (was hardcoded `esm.sh` URL in two places in `apps/tools.ts`) — derived `EXT_APPS_ORIGIN` keeps the CSP `resourceDomains` list in sync with the import URL automatically
+  - `BUFFER.SWIFT_LINE_MAX` (was magic `1_048_576` literal in `swift.ts`)
+  - `PATHS.TEMP_DIR` (was hardcoded `/tmp/` in `screen/scripts.ts` and `shortcuts/scripts.ts`) — uses `os.tmpdir()` by default, env override `AIRMCP_TEMP_DIR`. Sandboxed runtimes can now redirect intermediate captures.
+  - `AUDIT.MAX_ARG_LENGTH` / `MAX_ENTRY_SIZE` / `MAX_FILE_SIZE` / `MAX_FLUSH_FAILURES` / `FLUSH_INTERVAL` (was module-local in `audit.ts`)
+
+### Security
+- **Test-only helpers refuse to run in production** — `audit._testReset()` and `toolRegistry.reset()` now throw unless `NODE_ENV=test` or `AIRMCP_TEST_MODE=1` is set. Without this guard, any caller importing the production module could wipe in-memory audit entries before flush, or clear every registered MCP tool/prompt at runtime. Verified at runtime in addition to unit tests.
+
+### Documentation
+- Restored CHANGELOG entries for v2.7.0 and the four follow-up fixes (#49–#52) that landed on main without being recorded.
+
+## [2.7.0] - 2026-04-09
+
+### Added
+- **Claude Managed Agents compatibility** — prefix-match `"claude"` covers all Anthropic clients (Desktop, Code, Cowork, Managed Agents) — no more exact-match maintenance
+- **`AIRMCP_MANAGED_CLIENTS` env var** for third-party managed clients in enterprise deployments
+- **Server card** — `.well-known/mcp.json` exposes `authorization: { type: "bearer" }` when token is configured, enabling Managed Agents auto-discovery
+- **OpenTelemetry instrumentation (optional)** — `@opentelemetry/api` peer dependency, zero overhead when not installed
+  - **Tool execution spans**: `tool.{name}` with `mcp.tool.name`, `mcp.tool.arg_count`
+  - **HITL approval spans**: `tool.approval` with `mcp.approval.{decision,channel,destructive,managed_client}` — correlates with Enterprise Compliance API for SIEM platforms (Splunk, Cribl)
+  - Enable with `AIRMCP_TELEMETRY=true` or `config.json → features.telemetry: true`
+- +16 new tests (874 total): managed client prefix match, telemetry no-op path, approval spans, config telemetry flag
+
+### Fixed
+- **Skip elicitation for Claude Desktop/Cowork** (`claude-ai` client) — fixes silent timeout causing tool denial in agentic contexts (issue #28)
+- **iWork PDF export path guarding** (#52) — mark destructive, validate output path against guard list
+- **Audit redaction for location/health tools** (#51) — fully redact args for `get_current_location`, `get_location_permission`, `health_*` instead of relying on key-name patterns
+- **`cross/prompts.ts` user input quoting** (#50) — wrap user inputs in `q()` consistently to prevent prompt-injection drift
+- **Comprehensive security audit across 35 modules** (#49) — input validation, command injection guards, path traversal protection
+
 ## [2.6.4] - 2026-04-03
 
 ### Fixed

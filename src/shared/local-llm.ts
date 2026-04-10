@@ -1,4 +1,6 @@
-const OLLAMA_BASE = process.env.AIRMCP_OLLAMA_URL || "http://localhost:11434";
+import { API } from "./constants.js";
+
+const OLLAMA_BASE = API.OLLAMA;
 try {
   const parsedUrl = new URL(OLLAMA_BASE);
   const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);

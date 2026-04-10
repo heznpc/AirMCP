@@ -8,6 +8,7 @@
  */
 
 import { join } from "node:path";
+import { tmpdir } from "node:os";
 
 // ── Helper ───────────────────────────────────────────────────────────
 
@@ -41,6 +42,21 @@ export const API = {
   REVERSE_GEOCODE: envStr("AIRMCP_REVERSE_GEOCODE_API_URL", "https://nominatim.openstreetmap.org/reverse"),
   /** Gemini embedding API base */
   GEMINI_BASE: envStr("AIRMCP_GEMINI_API_URL", "https://generativelanguage.googleapis.com/v1beta/models"),
+  /** Local Ollama HTTP API */
+  OLLAMA: envStr("AIRMCP_OLLAMA_URL", "http://localhost:11434"),
+} as const;
+
+// ══════════════════════════════════════════════════════════════════════
+// EXTERNAL CDN DEPENDENCIES — pin versions here, change in one place
+// ══════════════════════════════════════════════════════════════════════
+
+export const EXT_APPS = {
+  /**
+   * CDN URL for the @modelcontextprotocol/ext-apps client library used by
+   * MCP Apps HTML templates. Keep version aligned with the npm dependency
+   * declared in package.json (currently 1.5.0).
+   */
+  CDN_URL: envStr("AIRMCP_EXT_APPS_CDN", "https://esm.sh/@modelcontextprotocol/ext-apps@1.5.0"),
 } as const;
 
 // ══════════════════════════════════════════════════════════════════════
@@ -98,6 +114,8 @@ export const BUFFER = {
   JXA: envInt("AIRMCP_BUFFER_JXA", 10 * 1024 * 1024),
   /** Swift bridge max stdout */
   SWIFT: envInt("AIRMCP_BUFFER_SWIFT", 10 * 1024 * 1024),
+  /** Swift bridge max single response line (NDJSON) — guards against malformed/oversized rows */
+  SWIFT_LINE_MAX: envInt("AIRMCP_BUFFER_SWIFT_LINE", 1024 * 1024),
   /** GWS CLI max stdout */
   GWS: 10 * 1024 * 1024,
   /** Clipboard content max chars */
@@ -190,4 +208,27 @@ export const PATHS = {
   VECTOR_STORE: join(HOME, ".airmcp"),
   /** Usage profile */
   USAGE_PROFILE: join(HOME, ".airmcp", "profile.json"),
+  /** Temp directory for screenshots, recordings, intermediate exports */
+  TEMP_DIR: envStr("AIRMCP_TEMP_DIR", tmpdir()),
 } as const;
+
+// ══════════════════════════════════════════════════════════════════════
+// AUDIT LOG
+// ══════════════════════════════════════════════════════════════════════
+
+let _auditFlushInterval: number | undefined;
+
+export const AUDIT = {
+  /** Max length of a single argument value before truncation in audit log */
+  MAX_ARG_LENGTH: 500,
+  /** Max size of a single audit entry (JSON line) before placeholder substitution */
+  MAX_ENTRY_SIZE: 10_000,
+  /** Max audit log file size before rotation */
+  MAX_FILE_SIZE: 10 * 1024 * 1024,
+  /** Max consecutive flush failures before disabling audit */
+  MAX_FLUSH_FAILURES: 5,
+  /** Buffer flush interval (ms) — lazy-once so config.ts can set env before first read */
+  get FLUSH_INTERVAL() {
+    return (_auditFlushInterval ??= envInt("AIRMCP_AUDIT_FLUSH_INTERVAL", 30_000));
+  },
+};

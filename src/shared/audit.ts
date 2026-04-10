@@ -1,22 +1,8 @@
 import { appendFile, chmod, mkdir, stat, rename } from "node:fs/promises";
 import { join } from "node:path";
-import { PATHS } from "./constants.js";
+import { AUDIT, PATHS } from "./constants.js";
 
 const AUDIT_PATH = join(PATHS.VECTOR_STORE, "audit.jsonl");
-const MAX_ARG_LENGTH = 500;
-const MAX_ENTRY_SIZE = 10_000;
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB — rotate after this
-const DEFAULT_FLUSH_INTERVAL = 30_000; // flush buffer every 30s
-
-/** Read lazily so config.ts can set the env var before first use. */
-function getFlushInterval(): number {
-  const env = process.env.AIRMCP_AUDIT_FLUSH_INTERVAL;
-  if (env !== undefined) {
-    const parsed = parseInt(env, 10);
-    if (Number.isFinite(parsed) && parsed > 0) return parsed;
-  }
-  return DEFAULT_FLUSH_INTERVAL;
-}
 
 interface AuditEntry {
   timestamp: string;
@@ -59,8 +45,12 @@ export function auditLog(entry: AuditEntry): void {
     sanitized = sanitizeArgs(entry.args);
   }
   let line = JSON.stringify({ ...entry, args: sanitized });
-  if (line.length > MAX_ENTRY_SIZE) {
-    line = JSON.stringify({ ...entry, args: { _truncated: true }, _note: "entry exceeded 10KB limit" });
+  if (line.length > AUDIT.MAX_ENTRY_SIZE) {
+    line = JSON.stringify({
+      ...entry,
+      args: { _truncated: true },
+      _note: `entry exceeded ${AUDIT.MAX_ENTRY_SIZE} char limit`,
+    });
   }
   buffer.push(line);
   ensureFlushTimer();
@@ -69,16 +59,21 @@ export function auditLog(entry: AuditEntry): void {
 function ensureFlushTimer(): void {
   if (flushTimer) return;
   flushTimer = setTimeout(() => {
-    flushBuffer().catch(() => {});
+    flushBuffer().catch((err) => {
+      // Surface flush errors so silent data loss is impossible.
+      // flushBuffer() already logs at line 102 on retry-failure, but the
+      // top-level promise rejection path here covers any unforeseen throw
+      // (e.g. ENOSPC during the swap, ESM/dynamic import failure, etc).
+      console.error(`[AirMCP Audit] flush timer error: ${err instanceof Error ? err.message : String(err)}`);
+    });
     flushTimer = null;
-  }, getFlushInterval());
+  }, AUDIT.FLUSH_INTERVAL);
   if (flushTimer.unref) flushTimer.unref();
 }
 
 let flushing = false;
 let consecutiveFlushFailures = 0;
 let auditDisabled = false;
-const MAX_FLUSH_FAILURES = 5;
 
 async function flushBuffer(): Promise<void> {
   if (buffer.length === 0 || flushing || auditDisabled) return;
@@ -99,8 +94,10 @@ async function flushBuffer(): Promise<void> {
       consecutiveFlushFailures = 0;
     } catch (retryErr) {
       consecutiveFlushFailures++;
-      console.error(`[AirMCP Audit] flush failed (${consecutiveFlushFailures}/${MAX_FLUSH_FAILURES}): ${retryErr}`);
-      if (consecutiveFlushFailures >= MAX_FLUSH_FAILURES) {
+      console.error(
+        `[AirMCP Audit] flush failed (${consecutiveFlushFailures}/${AUDIT.MAX_FLUSH_FAILURES}): ${retryErr}`,
+      );
+      if (consecutiveFlushFailures >= AUDIT.MAX_FLUSH_FAILURES) {
         auditDisabled = true;
         if (flushTimer) {
           clearTimeout(flushTimer);
@@ -119,7 +116,7 @@ async function rotateIfNeeded(): Promise<void> {
     const s = await stat(AUDIT_PATH);
     // Ensure owner-only permissions on existing file
     if ((s.mode & 0o777) !== 0o600) await chmod(AUDIT_PATH, 0o600);
-    if (s.size > MAX_FILE_SIZE) {
+    if (s.size > AUDIT.MAX_FILE_SIZE) {
       const rotated = AUDIT_PATH.replace(".jsonl", `.${Date.now()}.jsonl`);
       await rename(AUDIT_PATH, rotated);
     }
@@ -137,8 +134,8 @@ export function sanitizeArgs(args: Record<string, unknown>, depth = 0): Record<s
       result[key] = "[REDACTED]";
       continue;
     }
-    if (typeof value === "string" && value.length > MAX_ARG_LENGTH) {
-      result[key] = value.slice(0, MAX_ARG_LENGTH) + `... (${value.length} chars)`;
+    if (typeof value === "string" && value.length > AUDIT.MAX_ARG_LENGTH) {
+      result[key] = value.slice(0, AUDIT.MAX_ARG_LENGTH) + `... (${value.length} chars)`;
     } else if (value !== null && typeof value === "object" && !Array.isArray(value)) {
       result[key] = sanitizeArgs(value as Record<string, unknown>, depth + 1);
     } else {
@@ -148,8 +145,17 @@ export function sanitizeArgs(args: Record<string, unknown>, depth = 0): Record<s
   return result;
 }
 
-/** Reset all module-level state and return buffered entries. For testing only. */
+/**
+ * Reset all module-level state and return buffered entries. For testing only.
+ *
+ * Refuses to run unless `NODE_ENV === "test"` (set automatically by Jest) or
+ * `AIRMCP_TEST_MODE=1` is exported. Without this guard, an attacker who could
+ * import the production module could wipe in-memory audit entries before flush.
+ */
 export function _testReset(): string[] {
+  if (process.env.NODE_ENV !== "test" && process.env.AIRMCP_TEST_MODE !== "1") {
+    throw new Error("_testReset() is only callable when NODE_ENV=test or AIRMCP_TEST_MODE=1");
+  }
   const snapshot = [...buffer];
   buffer = [];
   if (flushTimer) {

@@ -100,10 +100,14 @@ struct BriefingSmallView: View {
         }
     }
 
-    private var dayString: String {
+    private static let dayFormatter: DateFormatter = {
         let fmt = DateFormatter()
         fmt.dateFormat = "E, MMM d"
-        return fmt.string(from: entry.date)
+        return fmt
+    }()
+
+    private var dayString: String {
+        Self.dayFormatter.string(from: entry.date)
     }
 }
 
@@ -228,10 +232,14 @@ struct BriefingMediumView: View {
             .foregroundStyle(.secondary)
     }
 
-    private var dateString: String {
+    private static let dateFormatter: DateFormatter = {
         let fmt = DateFormatter()
         fmt.dateFormat = "EEEE, MMM d"
-        return fmt.string(from: entry.date)
+        return fmt
+    }()
+
+    private var dateString: String {
+        Self.dateFormatter.string(from: entry.date)
     }
 }
 
@@ -423,16 +431,24 @@ struct BriefingLargeView: View {
         .padding(.leading, 4)
     }
 
+    private static let relativeDateFormatter: RelativeDateTimeFormatter = {
+        let fmt = RelativeDateTimeFormatter()
+        fmt.unitsStyle = .abbreviated
+        return fmt
+    }()
+
     private func relativeDateString(_ date: Date) -> String {
-        let rel = RelativeDateTimeFormatter()
-        rel.unitsStyle = .abbreviated
-        return rel.localizedString(for: date, relativeTo: entry.date)
+        Self.relativeDateFormatter.localizedString(for: date, relativeTo: entry.date)
     }
 
-    private var dateString: String {
+    private static let dateFormatter: DateFormatter = {
         let fmt = DateFormatter()
         fmt.dateFormat = "EEEE, MMM d"
-        return fmt.string(from: entry.date)
+        return fmt
+    }()
+
+    private var dateString: String {
+        Self.dateFormatter.string(from: entry.date)
     }
 }
 

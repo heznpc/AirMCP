@@ -1,8 +1,6 @@
 import WidgetKit
 import SwiftUI
 
-// MARK: - Data models for the Daily Briefing widget
-
 struct BriefingEvent: Sendable {
     let title: String
     let startDate: Date
@@ -12,6 +10,12 @@ struct BriefingEvent: Sendable {
     let calendarColorHex: String?
     let calendarName: String
 
+    private static let timeFormatter: DateFormatter = {
+        let fmt = DateFormatter()
+        fmt.dateFormat = "HH:mm"
+        return fmt
+    }()
+
     var calendarColor: Color {
         guard let hex = calendarColorHex else { return .blue }
         return Color(hex: hex)
@@ -19,15 +23,11 @@ struct BriefingEvent: Sendable {
 
     var timeString: String {
         if isAllDay { return "All day" }
-        let fmt = DateFormatter()
-        fmt.dateFormat = "HH:mm"
-        return fmt.string(from: startDate)
+        return Self.timeFormatter.string(from: startDate)
     }
 
     var endTimeString: String {
-        let fmt = DateFormatter()
-        fmt.dateFormat = "HH:mm"
-        return fmt.string(from: endDate)
+        Self.timeFormatter.string(from: endDate)
     }
 }
 
@@ -48,7 +48,7 @@ struct BriefingEntry: TimelineEntry {
     let hasCalendarAccess: Bool
     let hasReminderAccess: Bool
 
-    static var placeholder: BriefingEntry {
+    static let placeholder: BriefingEntry = {
         let cal = Calendar.current
         let now = Date()
         let h10 = cal.date(bySettingHour: 10, minute: 0, second: 0, of: now)!
@@ -82,19 +82,7 @@ struct BriefingEntry: TimelineEntry {
             hasCalendarAccess: true,
             hasReminderAccess: true
         )
-    }
-
-    static var empty: BriefingEntry {
-        BriefingEntry(
-            date: .now,
-            events: [],
-            reminders: [],
-            overdueCount: 0,
-            tomorrowEvents: [],
-            hasCalendarAccess: true,
-            hasReminderAccess: true
-        )
-    }
+    }()
 }
 
 // MARK: - Color hex extension

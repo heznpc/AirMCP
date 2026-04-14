@@ -462,10 +462,7 @@ struct MenuContent: View {
         }
 
         Button(L("menu.addWidget")) {
-            // Open Notification Center widget gallery
-            if let url = URL(string: "x-apple-widget://add") {
-                NSWorkspace.shared.open(url)
-            }
+            NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Library/CoreServices/NotificationCenter.app"))
         }
 
         Divider()

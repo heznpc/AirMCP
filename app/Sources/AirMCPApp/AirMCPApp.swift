@@ -164,7 +164,7 @@ final class URLSchemeHandler: NSObject {
 
         switch url.host {
         case "briefing":
-            NSWorkspace.shared.open(URL(string: "x-apple-calevent://")!)
+            NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Calendar.app"))
         default:
             NSApp.activate()
         }

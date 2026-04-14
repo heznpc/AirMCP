@@ -94,7 +94,7 @@ function render(d){
     '<div class="name">'+esc(t.name)+'</div>'+
     '<div class="artist">'+esc(t.artist)+'</div>'+
     '<div class="album">'+esc(t.album)+'</div>'+
-    '<div class="state">'+d.playerState+'</div>'+
+    '<div class="state">'+esc(d.playerState)+'</div>'+
     '<div class="bar-wrap"><div class="bar" style="width:'+pct+'%"></div></div>'+
     '<div class="time"><span>'+fmt(t.playerPosition||0)+'</span><span>'+fmt(t.duration||0)+'</span></div>'}
 function esc(s){const d=document.createElement("div");d.textContent=s||"";return d.innerHTML}

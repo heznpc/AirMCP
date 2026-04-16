@@ -131,4 +131,103 @@ describe('EventBus', () => {
     expect(eventBus.listenerCount('event')).toBe(0);
     expect(eventBus.listenerCount('calendar_changed')).toBe(0);
   });
+
+  // ── Data validation edge cases ──────────────────────────────────
+
+  test('processLine defaults data to {} when data is an array', (done) => {
+    eventBus.on('calendar_changed', (evt) => {
+      expect(evt.data).toEqual({});
+      done();
+    });
+    eventBus.processLine(JSON.stringify({ event: 'calendar_changed', data: [1, 2] }));
+  });
+
+  test('processLine defaults data to {} when data is null', (done) => {
+    eventBus.on('calendar_changed', (evt) => {
+      expect(evt.data).toEqual({});
+      done();
+    });
+    eventBus.processLine(JSON.stringify({ event: 'calendar_changed', data: null }));
+  });
+
+  test('processLine defaults data to {} when data is a string', (done) => {
+    eventBus.on('reminders_changed', (evt) => {
+      expect(evt.data).toEqual({});
+      done();
+    });
+    eventBus.processLine(JSON.stringify({ event: 'reminders_changed', data: 'string' }));
+  });
+
+  test('processLine generates ISO timestamp when timestamp is non-string', (done) => {
+    eventBus.on('calendar_changed', (evt) => {
+      expect(typeof evt.timestamp).toBe('string');
+      expect(evt.timestamp).toContain('T'); // ISO format
+      done();
+    });
+    eventBus.processLine(JSON.stringify({ event: 'calendar_changed', timestamp: 12345 }));
+  });
+
+  test('processLine ignores JSON null', () => {
+    let emitted = false;
+    eventBus.on('event', () => { emitted = true; });
+    eventBus.processLine('null');
+    expect(emitted).toBe(false);
+  });
+
+  test('processLine ignores JSON array at top level', () => {
+    let emitted = false;
+    eventBus.on('event', () => { emitted = true; });
+    eventBus.processLine('[1, 2, 3]');
+    expect(emitted).toBe(false);
+  });
+
+  test('processLine ignores JSON string at top level', () => {
+    let emitted = false;
+    eventBus.on('event', () => { emitted = true; });
+    eventBus.processLine('"hello"');
+    expect(emitted).toBe(false);
+  });
+
+  test('processLine ignores event field that is not a string', () => {
+    let emitted = false;
+    eventBus.on('event', () => { emitted = true; });
+    eventBus.processLine(JSON.stringify({ event: 123 }));
+    expect(emitted).toBe(false);
+  });
+
+  // ── Listener management ─────────────────────────────────────────
+
+  test('off() removes a specific listener without affecting others', () => {
+    const callsA = [];
+    const callsB = [];
+    const listenerA = () => callsA.push(1);
+    const listenerB = () => callsB.push(1);
+
+    eventBus.on('calendar_changed', listenerA);
+    eventBus.on('calendar_changed', listenerB);
+
+    eventBus.processLine(JSON.stringify({ event: 'calendar_changed' }));
+    expect(callsA).toHaveLength(1);
+    expect(callsB).toHaveLength(1);
+
+    eventBus.off('calendar_changed', listenerA);
+    eventBus.processLine(JSON.stringify({ event: 'calendar_changed' }));
+    expect(callsA).toHaveLength(1); // not called again
+    expect(callsB).toHaveLength(2); // still called
+  });
+
+  test('different event types do not cross-fire', () => {
+    const calCalls = [];
+    const remCalls = [];
+    eventBus.on('calendar_changed', () => calCalls.push(1));
+    eventBus.on('reminders_changed', () => remCalls.push(1));
+
+    eventBus.processLine(JSON.stringify({ event: 'calendar_changed' }));
+    expect(calCalls).toHaveLength(1);
+    expect(remCalls).toHaveLength(0);
+
+    eventBus.processLine(JSON.stringify({ event: 'reminders_changed' }));
+    expect(calCalls).toHaveLength(1);
+    expect(remCalls).toHaveLength(1);
+  });
 });

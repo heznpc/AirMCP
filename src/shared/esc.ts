@@ -1,3 +1,6 @@
+// eslint-disable-next-line no-control-regex
+const RE_CTRL = /[\x01-\x08\x0b\x0c\x0e-\x1f]/g;
+
 /** Escape a string for safe interpolation inside JXA single-quoted literals. */
 export function esc(str: string): string {
   return (
@@ -8,8 +11,7 @@ export function esc(str: string): string {
       .replace(/\n/g, "\\n")
       .replace(/\r/g, "\\r")
       .replace(/\t/g, "\\t")
-      // eslint-disable-next-line no-control-regex
-      .replace(/[\x01-\x08\x0b\x0c\x0e-\x1f]/g, "")
+      .replace(RE_CTRL, "")
       .replace(/\u2028/g, "\\u2028")
       .replace(/\u2029/g, "\\u2029")
   );
@@ -20,8 +22,7 @@ export function escAS(str: string): string {
   return (
     str
       .replace(/\0/g, "")
-      // eslint-disable-next-line no-control-regex
-      .replace(/[\x01-\x08\x0b\x0c\x0e-\x1f]/g, "")
+      .replace(RE_CTRL, "")
       .replace(/\\/g, "\\\\")
       .replace(/"/g, '\\"')
       .replace(/\n/g, "\\n")
@@ -59,6 +60,7 @@ export function escShell(str: string): string {
 export function escJxaShell(str: string): string {
   return str
     .replace(/\0/g, "")
+    .replace(RE_CTRL, "")
     .replace(/\\/g, "\\\\\\\\") // \ → \\\\ (4 backslashes in source = 2 literal)
     .replace(/"/g, '\\\\\\"') // " → \\\"
     .replace(/`/g, "\\\\`") // ` → \\`

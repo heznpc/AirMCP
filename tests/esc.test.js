@@ -258,6 +258,19 @@ describe('escJxaShell (two-layer: shell + JXA)', () => {
     // Dollar sign must also be escaped
     expect(result).not.toMatch(/(?<!\\)\$/);
   });
+
+  test('strips control characters (consistent with esc/escAS)', () => {
+    expect(escJxaShell('a\x01b\x08c')).toBe('abc');
+    expect(escJxaShell('\x0e\x1f')).toBe('');
+    // \t is not in the stripped range — passes through unchanged
+    expect(escJxaShell('a\tb')).toBe('a\tb');
+    // \n is escaped to literal \n by the newline handler
+    expect(escJxaShell('a\nb')).toBe('a\\nb');
+  });
+
+  test('strips null bytes', () => {
+    expect(escJxaShell('a\0b')).toBe('ab');
+  });
 });
 
 describe('safeInt', () => {

@@ -11,11 +11,14 @@ interface TriggerBinding {
 
 const bindings = new Map<string, TriggerBinding[]>();
 
-/** Reset all registered trigger bindings. Called by registerSkillEngine
- *  before re-registering, so per-session createServer calls don't accumulate
- *  duplicate bindings. */
+/** Reset all registered trigger bindings and listener state. Called by
+ *  registerSkillEngine before re-registering, so per-session createServer
+ *  calls don't accumulate duplicate bindings. Also resets the listener
+ *  flag so triggers survive an eventBus.stop() + restart cycle. */
 export function resetTriggers(): void {
   bindings.clear();
+  listenerInstalled = false;
+  activeServer = null;
 }
 
 /** Register a skill's trigger with the event bus. */

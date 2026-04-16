@@ -96,10 +96,16 @@ export function registerCrossTools(mcpServer: McpServer, config: AirMcpConfig): 
               console.error(`[AirMCP] FM fallback failed: ${fmErr instanceof Error ? fmErr.message : String(fmErr)}`);
             }
           }
+          let snapshot: unknown;
+          try {
+            snapshot = JSON.parse(snapshotText);
+          } catch {
+            snapshot = snapshotText;
+          }
           return ok({
             briefing: null,
             fallback: "Client does not support MCP Sampling and Foundation Models unavailable. Returning raw snapshot.",
-            snapshot: JSON.parse(snapshotText),
+            snapshot,
           });
         }
         return err(`Sampling failed: ${msg}`);

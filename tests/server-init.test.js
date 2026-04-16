@@ -43,4 +43,10 @@ describe('Server init', () => {
     const ctx = initializeServer();
     expect(typeof ctx.pkg.version).toBe('string');
   });
+
+  test('initializeServer pkg version matches semver format', async () => {
+    const { initializeServer } = await import('../dist/server/init.js');
+    const ctx = initializeServer();
+    expect(ctx.pkg.version).toMatch(/^\d+\.\d+\.\d+/);
+  });
 });

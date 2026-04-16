@@ -98,6 +98,10 @@ export function activateTabScript(windowIndex: number, tabIndex: number): string
   `;
 }
 
+/** URL schemes where JavaScript execution is blocked for security. */
+const BLOCKED_URL_SCHEMES = ["file:", "about:", "safari-extension:", "safari-web-extension:", "blob:", "javascript:", "data:"];
+const BLOCKED_URL_SCHEMES_JSON = JSON.stringify(BLOCKED_URL_SCHEMES);
+
 export function runJavascriptScript(code: string, windowIndex: number, tabIndex: number): string {
   return `
     const Safari = Application('Safari');
@@ -105,6 +109,13 @@ export function runJavascriptScript(code: string, windowIndex: number, tabIndex:
     if (${windowIndex} >= wins.length) throw new Error('Window index out of range');
     const tabs = wins[${windowIndex}].tabs();
     if (${tabIndex} >= tabs.length) throw new Error('Tab index out of range');
+    const tabUrl = (tabs[${tabIndex}].url() || '').toLowerCase();
+    const blocked = ${BLOCKED_URL_SCHEMES_JSON};
+    for (const scheme of blocked) {
+      if (tabUrl.startsWith(scheme)) {
+        throw new Error('JavaScript execution blocked on ' + scheme + '// URLs for security');
+      }
+    }
     const result = Safari.doJavaScript('${esc(code)}', {in: tabs[${tabIndex}]});
     JSON.stringify({result: String(result || '')});
   `;

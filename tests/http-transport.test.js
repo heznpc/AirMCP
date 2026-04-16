@@ -41,4 +41,10 @@ describe('HTTP transport module', () => {
     const mod = await import('../dist/server/http-transport.js');
     expect(typeof mod.startHttpServer).toBe('function');
   });
+
+  test('startHttpServer is an async function', async () => {
+    const mod = await import('../dist/server/http-transport.js');
+    // AsyncFunction constructor name check
+    expect(mod.startHttpServer.constructor.name).toBe('AsyncFunction');
+  });
 });

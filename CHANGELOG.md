@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.3] - 2026-04-16
+
+### Added
+- **`--version` / `-v` flag** — prints version and exits
+- **Unknown command rejection** — `npx airmcp typo` now exits with error instead of silently starting stdio server
+- **`NO_COLOR` support** — respects `NO_COLOR` env var across banner, help, doctor, init ([no-color.org](https://no-color.org/))
+- **TTY guard for `init`** — exits with helpful message in non-interactive environments (CI, Docker, pipes)
+- **First-time user hint** — banner shows `"First time? Run: npx airmcp init"` when no config exists
+- **Config validation warnings** — unknown module names, invalid HITL levels, wrong boolean types now logged
+
+### Fixed
+- **Doctor version comparison** — local version ahead of npm no longer falsely shown as "update available"
+- **Config parse errors** — actual JSON error now shown (was silently falling back to defaults)
+- **Init config write** — caught with try/catch, corrupt JSON warned before overwrite
+- **Config double file-read** — eliminated redundant `readFileSync`+`JSON.parse` on startup path
+
+### Changed (Swift app)
+- **Node.js not found** — shows error state with install instructions (was: silent failure)
+- **Server crash detection** — `terminationHandler` with auto-restart (max 3 within 5 minutes)
+- **Graceful shutdown** — polls for server exit up to 5 seconds (was: hardcoded 0.5s)
+- **HITL notification denied** — logs warning when permission denied (was: silently ignored)
+- **Widget "All day"** — now localized via `NSLocalizedString`
+
 ## [2.7.2] - 2026-04-16
 
 ### Security

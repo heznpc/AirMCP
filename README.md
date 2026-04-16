@@ -23,10 +23,11 @@ MCP server for the entire Apple ecosystem — Notes, Reminders, Calendar, Contac
 - **Recurring events/reminders** — EventKit recurrence rules (macOS 26+ Swift bridge)
 - **Photo import/delete** — PhotoKit photo management (macOS 26+ Swift bridge)
 - **Apple Intelligence** — On-device summarize, rewrite, proofread (macOS 26+)
-- **Native menubar app** — SwiftUI companion with onboarding wizard, auto-start, log viewer, update notifications, permission setup
+- **Native menubar app** — SwiftUI companion with onboarding wizard, auto-start, log viewer, update notifications, permission setup, server crash auto-restart
 - **42 Swift unit tests** — XCTest suites for AirMCPKit (types, formatting, recurrence) and AirMCPServer (JSON-RPC, MCP dispatch)
 - **One-click setup** — `setup_permissions` tool or menubar app to request all macOS permissions at once
 - **Dual transport** — stdio (default, safe local) + HTTP/SSE (`--http`) for remote agents and registries
+- **CLI ergonomics** — `--version` flag, `NO_COLOR` support, unknown command rejection, config validation warnings
 - **Safety annotations** — readOnly/destructive hints on all tools
 
 ## Get Started (2 minutes)
@@ -646,6 +647,7 @@ Or edit `~/.config/airmcp/config.json` directly:
 | `npx airmcp init` | Interactive setup wizard |
 | `npx airmcp doctor` | Diagnose installation issues |
 | `npx airmcp` | Start MCP server (stdio, default) |
+| `npx airmcp --version` | Print version and exit |
 | `npx airmcp --full` | Start with all 27 modules enabled |
 | `npx airmcp --http` | Start as HTTP server (port 3847) |
 

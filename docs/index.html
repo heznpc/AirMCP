@@ -10,13 +10,33 @@
   <link rel="icon" type="image/png" sizes="32x32" href="airmcp-icon-32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="airmcp-icon-16.png">
   <link rel="apple-touch-icon" sizes="256x256" href="airmcp-icon-256.png">
-  <meta property="og:title" content="AirMCP — Connect AI to Your Entire Apple Ecosystem">
-  <meta property="og:description" content="Open-source MCP server with 262 tools across 27 modules. Connect Claude, Codex, and any MCP client to Apple apps.">
-  <meta property="og:image" content="airmcp-icon-512.png">
+  <!-- Open Graph -->
+  <meta property="og:title" content="AirMCP — MCP Server for Apple Ecosystem">
+  <meta property="og:description" content="262 tools across 27 Apple modules. Connect your Mac to Claude, Cursor, Windsurf, and any MCP client.">
   <meta property="og:type" content="website">
+  <meta property="og:url" content="https://heznpc.github.io/AirMCP/">
+  <meta property="og:image" content="https://heznpc.github.io/AirMCP/airmcp-icon-512.png">
+  <!-- Twitter Card -->
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="AirMCP — Connect AI to Your Entire Apple Ecosystem">
-  <meta name="twitter:image" content="airmcp-icon-512.png">
+  <meta name="twitter:title" content="AirMCP — MCP Server for Apple Ecosystem">
+  <meta name="twitter:description" content="262 tools, 27 modules. Notes, Calendar, Mail, Safari, Photos, Music, and more.">
+  <meta name="twitter:image" content="https://heznpc.github.io/AirMCP/airmcp-icon-512.png">
+  <!-- Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "AirMCP",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "macOS",
+    "description": "MCP server for the entire Apple ecosystem — 262 tools across 27 modules",
+    "url": "https://heznpc.github.io/AirMCP/",
+    "author": { "@type": "Person", "name": "heznpc" },
+    "license": "https://opensource.org/licenses/MIT",
+    "softwareVersion": "2.7.3",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+  }
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -662,6 +682,74 @@
             </div>
             <h3 class="card-title"><code class="font-mono text-[.85em] opacity-80">event-follow-up</code></h3>
             <p class="card-desc" data-i18n="wf_followup">After a meeting, create follow-up notes and action items automatically.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Why AirMCP? -->
+  <section id="why" class="relative z-[1] py-10 pb-24">
+    <div class="max-w-[860px] mx-auto px-5">
+      <div class="text-center mb-10">
+        <p class="section-label reveal" data-i18n="why_label">Why AirMCP?</p>
+        <h2 class="text-[clamp(2rem,5vw,3rem)] font-bold tracking-tight mt-2 reveal" data-delay="40" data-i18n="why_title">The most complete Apple MCP server.</h2>
+        <p class="mt-3 text-sm opacity-35 max-w-[48ch] mx-auto reveal" data-delay="80" data-i18n="why_sub">See how AirMCP compares to the alternatives.</p>
+      </div>
+
+      <div class="grid gap-4">
+        <div class="glass-card reveal" data-delay="40" style="cursor:default">
+          <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
+          <div class="glass-content flex-row items-start gap-4" style="flex-direction:row">
+            <div class="step-num shrink-0 text-lg" style="width:44px;height:44px;font-size:1.1rem">1</div>
+            <div>
+              <h3 class="card-title" data-i18n="why_1_title">262 tools across 27 modules</h3>
+              <p class="card-desc mt-1" data-i18n="why_1_desc">Others offer 10-15 tools and stop updating. AirMCP covers every major Apple app — and keeps growing.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="glass-card reveal" data-delay="80" style="cursor:default">
+          <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
+          <div class="glass-content flex-row items-start gap-4" style="flex-direction:row">
+            <div class="step-num shrink-0 text-lg" style="width:44px;height:44px;font-size:1.1rem">2</div>
+            <div>
+              <h3 class="card-title" data-i18n="why_2_title">Security by default</h3>
+              <p class="card-desc mt-1" data-i18n="why_2_desc">Human-in-the-loop confirmation, audit logging, and input validation. No silent writes.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="glass-card reveal" data-delay="120" style="cursor:default">
+          <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
+          <div class="glass-content flex-row items-start gap-4" style="flex-direction:row">
+            <div class="step-num shrink-0 text-lg" style="width:44px;height:44px;font-size:1.1rem">3</div>
+            <div>
+              <h3 class="card-title" data-i18n="why_3_title">Works with any MCP client</h3>
+              <p class="card-desc mt-1" data-i18n="why_3_desc">Claude Code, Codex, Cursor, Windsurf, and every client that speaks the MCP protocol.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="glass-card reveal" data-delay="160" style="cursor:default">
+          <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
+          <div class="glass-content flex-row items-start gap-4" style="flex-direction:row">
+            <div class="step-num shrink-0 text-lg" style="width:44px;height:44px;font-size:1.1rem">4</div>
+            <div>
+              <h3 class="card-title" data-i18n="why_4_title">Native Swift bridge</h3>
+              <p class="card-desc mt-1" data-i18n="why_4_desc">EventKit, PhotoKit, HealthKit, and CoreLocation — real framework access, not just AppleScript.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="glass-card reveal" data-delay="200" style="cursor:default">
+          <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
+          <div class="glass-content flex-row items-start gap-4" style="flex-direction:row">
+            <div class="step-num shrink-0 text-lg" style="width:44px;height:44px;font-size:1.1rem">5</div>
+            <div>
+              <h3 class="card-title" data-i18n="why_5_title">Actively maintained</h3>
+              <p class="card-desc mt-1" data-i18n="why_5_desc">Regular releases, community-driven roadmap, and responsive issue triage.</p>
+            </div>
           </div>
         </div>
       </div>

@@ -4,11 +4,11 @@
 
 # AirMCP
 
-[![CI](https://github.com/heznpc/AirMCP/actions/workflows/ci.yml/badge.svg)](https://github.com/heznpc/AirMCP/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/airmcp)](https://www.npmjs.com/package/airmcp)
-[![npm downloads](https://img.shields.io/npm/dm/airmcp)](https://www.npmjs.com/package/airmcp)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Node >= 20](https://img.shields.io/badge/node-%3E%3D20-green)](https://nodejs.org/)
+[![npm version](https://img.shields.io/npm/v/airmcp)](https://www.npmjs.com/package/airmcp)
+[![Tests](https://github.com/heznpc/AirMCP/actions/workflows/ci.yml/badge.svg)](https://github.com/heznpc/AirMCP/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/badge/coverage-47%25-brightgreen)](#testing)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/heznpc/AirMCP)](https://github.com/heznpc/AirMCP/stargazers)
 
 MCP server for the entire Apple ecosystem — Notes, Reminders, Calendar, Contacts, Mail, Messages, Music, Finder, Safari, System, Photos, Shortcuts, Apple Intelligence, TV, Screen Capture, Maps, Podcasts, Weather, Pages, Numbers, Keynote, Location, and Bluetooth. Connect any AI to your Mac.
 
@@ -101,6 +101,22 @@ Once connected, just ask your AI in natural language. Here are some things you c
 - "Search my files for the Q1 report, read it, and draft a summary email to the team"
 
 These are just starting points — with 262 tools across 27 Apple apps, the combinations are endless.
+
+---
+
+## Why AirMCP?
+
+| | Direct AppleScript | Siri Shortcuts | apple-mcp | **AirMCP** |
+|---|---|---|---|---|
+| Tools | Manual scripts | Limited actions | 15 | **262** |
+| Modules | — | — | 5 | **27** |
+| MCP protocol | ❌ | ❌ | ✅ | ✅ |
+| Input validation | ❌ | N/A | ❌ | **Zod on all 268 params** |
+| Security | None | Sandboxed | Basic | **HITL + audit + circuit breaker** |
+| Multi-client | ❌ | ❌ | ✅ | **Claude, Cursor, Windsurf, Copilot** |
+| Swift bridge | ❌ | ❌ | ❌ | **EventKit, PhotoKit, HealthKit, Vision** |
+| i18n | ❌ | ❌ | ❌ | **9 languages** |
+| Maintained | — | Apple | ❌ Archived | **Active (v2.7.3)** |
 
 ---
 

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { release } from "node:os";
 import { HOME, PATHS } from "./constants.js";
 import { formatError } from "./errors.js";
+import { HEALTHKIT_MIN_MACOS, type CompatibilityEnv } from "./compatibility.js";
 
 /**
  * Return the macOS major version number.
@@ -34,6 +35,33 @@ export function getOsVersion(): number {
   // Darwin 25+ → macOS 26+ (version jump); Darwin 20-24 → macOS 11-15
   if (darwinMajor >= 25) return darwinMajor + 1;
   return darwinMajor - 9;
+}
+
+/**
+ * Build a {@link CompatibilityEnv} snapshot for the current process.
+ *
+ * Used by `resolveModuleCompatibility()` (RFC 0004) to decide which modules
+ * register and which get skipped. Calling this in a subprocess or under test
+ * gives a stable, JSON-serialisable snapshot — useful for doctor reports.
+ *
+ * Heuristics:
+ *   - `osVersion` comes from `getOsVersion()` (returns 0 on non-Darwin hosts).
+ *   - `cpu` is `process.arch`.
+ *   - `healthkitAvailable` is a conservative heuristic: HealthKit frameworks
+ *     are only present on Apple devices, and AirMCP's Swift helper needs
+ *     Apple Silicon + modern macOS (≥ HEALTHKIT_MIN_MACOS, which is the
+ *     first macOS with the updated HealthKit framework AirMCP targets).
+ *     Callers that need a more precise probe (e.g. the `health` module's
+ *     bridge) should override `healthkitAvailable` with a live capability check.
+ */
+export function getCompatibilityEnv(): CompatibilityEnv {
+  const osVersion = getOsVersion();
+  const cpu = process.arch;
+  const isAppleSilicon = cpu === "arm64";
+  // Darwin hosts with osVersion 0 (non-Darwin) always report false because
+  // osVersion < HEALTHKIT_MIN_MACOS.
+  const healthkitAvailable = osVersion >= HEALTHKIT_MIN_MACOS && isAppleSilicon;
+  return { osVersion, cpu, healthkitAvailable };
 }
 
 /** npm package name — single source of truth for npx/install references */

@@ -26,7 +26,23 @@ export interface BannerInfo {
   port?: number;
   modulesEnabled: string[];
   modulesDisabled: string[];
+  /**
+   * Modules skipped because the RFC 0004 resolver classified them as
+   * `skip-unsupported` (wrong macOS / hardware). Rendered under "unavailable".
+   */
   modulesOsBlocked: string[];
+  /**
+   * Modules that register but emit a deprecation warning (RFC 0004
+   * `register-with-deprecation`). Optional for back-compat with existing
+   * banners that pre-date the deprecation lifecycle.
+   */
+  modulesDeprecated?: string[];
+  /**
+   * Modules skipped as known-broken on this host (RFC 0004 `skip-broken`).
+   * Distinct from "unavailable" so users can tell "your OS is too old" apart
+   * from "we flagged this module as busted for your point release".
+   */
+  modulesBroken?: string[];
   toolCount: number;
   promptCount?: number;
   dynamicShortcuts: number;
@@ -110,6 +126,12 @@ export async function printBanner(info: BannerInfo): Promise<void> {
   }
   if (info.modulesOsBlocked.length > 0) {
     write(`  ${DIM}├ ${YELLOW}unavailable:${RESET} ${DIM}${info.modulesOsBlocked.join(", ")}${RESET}\n`);
+  }
+  if (info.modulesDeprecated && info.modulesDeprecated.length > 0) {
+    write(`  ${DIM}├ ${YELLOW}deprecated:${RESET} ${DIM}${info.modulesDeprecated.join(", ")}${RESET}\n`);
+  }
+  if (info.modulesBroken && info.modulesBroken.length > 0) {
+    write(`  ${DIM}├ ${YELLOW}broken:${RESET} ${DIM}${info.modulesBroken.join(", ")}${RESET}\n`);
   }
 
   write("\n");

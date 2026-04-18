@@ -78,8 +78,19 @@ const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
 /**
  * Parse a Swift bridge JSON response safely.
+ *
  * Uses a reviver to reject payloads with __proto__, constructor, or prototype
  * keys at any nesting depth, preventing prototype pollution attacks.
+ *
+ * Threat model: the Swift helper speaks JSON over stdout, but the data it
+ * encodes ultimately comes from untrusted user content inside macOS apps
+ * (note titles, reminder names, calendar event descriptions, contact card
+ * fields, etc.). A malicious invitee or collaborator could embed
+ * `{"__proto__": …}` in a field that Swift dumps verbatim — without this
+ * guard a plain `JSON.parse` would mutate `Object.prototype` for the entire
+ * Node process and taint every subsequent tool response. The reviver is
+ * cheap (one Set lookup per key) and runs on both persistent-mode and
+ * single-shot responses, so every bridge path is covered.
  */
 function safeParseBridgeResponse(raw: string): BridgeResponse | null {
   let poisoned = false;

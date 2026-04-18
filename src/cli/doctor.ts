@@ -9,10 +9,12 @@ import { readFileSync, existsSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
-import { MODULE_NAMES, STARTER_MODULES, NPM_PACKAGE_NAME, MCP_CLIENTS } from "../shared/config.js";
+import { MODULE_NAMES, STARTER_MODULES, NPM_PACKAGE_NAME, MCP_CLIENTS, getCompatibilityEnv } from "../shared/config.js";
 import { HOME, PATHS } from "../shared/constants.js";
 import { LOGO_LINES, typeLine } from "../shared/banner.js";
 import { esc } from "../shared/esc.js";
+import { MODULE_MANIFEST } from "../shared/modules.js";
+import { summarizeCompatibility } from "../shared/compatibility.js";
 import { RESET, BOLD, DIM, WHITE, GREEN, SYM, heading, line, divider, spinner, sleep } from "./style.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -179,6 +181,37 @@ export async function runDoctor(): Promise<void> {
       parts.push(`  ${icon} ${label}`.padEnd(on ? 20 : 30));
     }
     console.log(parts.join(""));
+  }
+
+  // ── Compatibility (RFC 0004) ───────────────────────────────────────
+  //
+  // Run the pure resolver against the current host env so users can see
+  // *why* a given module won't register (macOS too old, HealthKit missing,
+  // module flagged broken for this point release, etc.). The section is
+  // intentionally terse — it only surfaces non-trivial outcomes (deprecated
+  // / unsupported / broken). A fully-green host sees a single ok line.
+  console.log(heading("Compatibility"));
+  const compatEnv = getCompatibilityEnv();
+  const compatSummary = summarizeCompatibility(
+    MODULE_MANIFEST.map((m) => ({ name: m.name, compatibility: m.compatibility })),
+    compatEnv,
+  );
+  const envLine =
+    compatEnv.osVersion === 0
+      ? `arch=${compatEnv.cpu}  (non-darwin — version checks bypassed)`
+      : `macOS ${compatEnv.osVersion}  arch=${compatEnv.cpu}  healthkit=${compatEnv.healthkitAvailable ? "yes" : "no"}`;
+  ok("Host env", envLine);
+
+  if (
+    compatSummary.deprecated.length === 0 &&
+    compatSummary.unsupported.length === 0 &&
+    compatSummary.broken.length === 0
+  ) {
+    ok("All modules compatible", `${compatSummary.register.length} register cleanly`);
+  } else {
+    for (const d of compatSummary.deprecated) meh(`⚠ ${d.name}`, d.reason);
+    for (const u of compatSummary.unsupported) meh(`↷ ${u.name}`, u.reason);
+    for (const b of compatSummary.broken) bad(`✖ ${b.name}`, b.reason);
   }
 
   // ── Permissions ────────────────────────────────────────────────────

@@ -1,4 +1,5 @@
 import type { ModuleRegistration } from "./registry.js";
+import type { ModuleCompatibility } from "./compatibility.js";
 
 /**
  * Module manifest — the single source of truth for all AirMCP modules.
@@ -8,12 +9,28 @@ import type { ModuleRegistration } from "./registry.js";
  *   2. Optionally create src/<name>/prompts.ts  (export registerXxxPrompts)
  *   3. Add one line to MANIFEST below
  *   That's it. No other imports needed.
+ *
+ * Compatibility metadata (RFC 0004):
+ *   - `minMacosVersion` is kept top-level for the existing runtime gate.
+ *   - `compatibility` is a richer manifest (status, deprecation, hardware
+ *     requirements, permission list). It is threaded through to the
+ *     ModuleRegistration but currently only used by the doctor / reports.
+ *     Existing registration logic is unchanged.
  */
-const MANIFEST: Array<{
+/** Static manifest entry — the compile-time definition of a module. */
+export interface ModuleManifestEntry {
   name: string;
   hasPrompts?: boolean;
   minMacosVersion?: number;
-}> = [
+  compatibility?: ModuleCompatibility;
+}
+
+/**
+ * Module manifest (read-only). Exported so tools like `airmcp doctor`, the
+ * `print-compat-report` script, and tests can inspect compatibility metadata
+ * without calling `loadModuleRegistry()` (which eagerly imports every module).
+ */
+export const MODULE_MANIFEST: ReadonlyArray<ModuleManifestEntry> = [
   { name: "notes", hasPrompts: true },
   { name: "reminders", hasPrompts: true },
   { name: "calendar", hasPrompts: true },
@@ -26,7 +43,15 @@ const MANIFEST: Array<{
   { name: "photos" },
   { name: "shortcuts", hasPrompts: true },
   { name: "messages" },
-  { name: "intelligence", minMacosVersion: 26 },
+  {
+    name: "intelligence",
+    minMacosVersion: 26,
+    compatibility: {
+      minMacosVersion: 26,
+      status: "beta",
+      requiresHardware: ["apple-silicon"],
+    },
+  },
   { name: "tv" },
   { name: "ui" },
   { name: "screen" },
@@ -40,7 +65,14 @@ const MANIFEST: Array<{
   { name: "bluetooth" },
   { name: "google" },
   { name: "speech" },
-  { name: "health" },
+  {
+    name: "health",
+    compatibility: {
+      status: "stable",
+      requiresHardware: ["apple-silicon", "healthkit"],
+      requiresPermissions: ["healthkit"],
+    },
+  },
 ];
 
 /**
@@ -66,7 +98,7 @@ function getDebugWhitelist(): Set<string> | null {
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
   if (names.length === 0) return null;
-  const valid = new Set(MANIFEST.map((m) => m.name));
+  const valid = new Set(MODULE_MANIFEST.map((m) => m.name));
   const whitelist = new Set<string>();
   for (const n of names) {
     if (valid.has(n)) {
@@ -79,7 +111,7 @@ function getDebugWhitelist(): Set<string> | null {
 }
 
 /** Import a single module definition, returning null on failure. */
-async function importModule(def: (typeof MANIFEST)[number]): Promise<ModuleRegistration | null> {
+async function importModule(def: ModuleManifestEntry): Promise<ModuleRegistration | null> {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const toolsMod: Record<string, any> = await import(`../${def.name}/tools.js`);
@@ -101,6 +133,7 @@ async function importModule(def: (typeof MANIFEST)[number]): Promise<ModuleRegis
       tools: toolsFn,
       prompts: promptsFn,
       minMacosVersion: def.minMacosVersion,
+      compatibility: def.compatibility,
     } as ModuleRegistration;
   } catch (e) {
     console.error(`[AirMCP] Failed to load module ${def.name}: ${e instanceof Error ? e.message : String(e)}`);
@@ -113,7 +146,9 @@ export async function loadModuleRegistry(): Promise<ModuleRegistration[]> {
 
   const whitelist = getDebugWhitelist();
   const sequential = process.env.AIRMCP_DEBUG_SEQUENTIAL === "true";
-  const targets = whitelist ? MANIFEST.filter((m) => whitelist.has(m.name)) : MANIFEST;
+  const targets: ReadonlyArray<ModuleManifestEntry> = whitelist
+    ? MODULE_MANIFEST.filter((m) => whitelist.has(m.name))
+    : MODULE_MANIFEST;
 
   if (whitelist) {
     console.error(
@@ -186,5 +221,5 @@ export function setModuleRegistry(r: ModuleRegistration[]): void {
 
 /** Get module names from manifest (no import needed). */
 export function getModuleNames(): string[] {
-  return MANIFEST.map((m) => m.name);
+  return MODULE_MANIFEST.map((m) => m.name);
 }

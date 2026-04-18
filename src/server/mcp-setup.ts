@@ -15,8 +15,9 @@ import { registerSetupTools } from "../shared/setup.js";
 import { registerSkillEngine } from "../skills/index.js";
 import { getRegisteredTriggers } from "../skills/triggers.js";
 import { registerApps } from "../apps/tools.js";
-import { isModuleEnabled, NPM_PACKAGE_NAME, type AirMcpConfig } from "../shared/config.js";
+import { getCompatibilityEnv, isModuleEnabled, NPM_PACKAGE_NAME, type AirMcpConfig } from "../shared/config.js";
 import { loadModuleRegistry, setModuleRegistry } from "../shared/modules.js";
+import { resolveModuleCompatibility } from "../shared/compatibility.js";
 import { registerDynamicShortcutTools } from "../shortcuts/tools.js";
 import { HitlClient } from "../shared/hitl.js";
 import { installHitlGuard } from "../shared/hitl-guard.js";
@@ -70,26 +71,52 @@ export async function createServer(
   const MODULE_REGISTRY = await loadModuleRegistry();
   setModuleRegistry(MODULE_REGISTRY);
 
+  // RFC 0004: route every module through the compatibility resolver. The
+  // resolver folds in minMacosVersion (legacy gate), maxMacosVersion, brokenOn,
+  // requiresHardware, status:"broken", and deprecation schedules into a single
+  // typed decision. We keep the legacy minMacosVersion field as a fallback for
+  // modules that haven't been annotated yet.
+  const compatEnv = getCompatibilityEnv();
   const enabled: string[] = [];
   const disabled: string[] = [];
   const osBlocked: string[] = [];
+  const deprecated: string[] = [];
+  const broken: string[] = [];
   let shortcutsEnabled = false;
   for (const mod of MODULE_REGISTRY) {
-    if (mod.minMacosVersion && osVersion > 0 && osVersion < mod.minMacosVersion) {
-      osBlocked.push(`${mod.name} (requires macOS ${mod.minMacosVersion}+)`);
-    } else if (isModuleEnabled(config, mod.name)) {
-      try {
-        mod.tools(lServer, config);
-        mod.prompts?.(lServer);
-      } catch (e) {
-        console.error(`[AirMCP] Failed to register module ${mod.name}: ${e instanceof Error ? e.message : String(e)}`);
-        disabled.push(mod.name);
-        continue;
-      }
-      enabled.push(mod.name);
-      if (mod.name === "shortcuts") shortcutsEnabled = true;
-    } else {
+    // Synthesise a manifest when the module only has the legacy field set.
+    const compatManifest =
+      mod.compatibility ?? (mod.minMacosVersion ? { minMacosVersion: mod.minMacosVersion } : undefined);
+    const decision = resolveModuleCompatibility(mod.name, compatManifest, compatEnv);
+
+    if (decision.decision === "skip-unsupported") {
+      osBlocked.push(`${mod.name} (${decision.reason})`);
+      continue;
+    }
+    if (decision.decision === "skip-broken") {
+      broken.push(`${mod.name} (${decision.reason})`);
+      continue;
+    }
+
+    if (!isModuleEnabled(config, mod.name)) {
       disabled.push(mod.name);
+      continue;
+    }
+
+    try {
+      mod.tools(lServer, config);
+      mod.prompts?.(lServer);
+    } catch (e) {
+      console.error(`[AirMCP] Failed to register module ${mod.name}: ${e instanceof Error ? e.message : String(e)}`);
+      disabled.push(mod.name);
+      continue;
+    }
+    enabled.push(mod.name);
+    if (mod.name === "shortcuts") shortcutsEnabled = true;
+
+    if (decision.decision === "register-with-deprecation") {
+      deprecated.push(mod.name);
+      console.error(`[AirMCP] ${decision.reason}`);
     }
   }
   // Dynamic shortcut tools: auto-discover and register individual shortcuts
@@ -416,6 +443,8 @@ export async function createServer(
     modulesEnabled: enabled,
     modulesDisabled: disabled,
     modulesOsBlocked: osBlocked,
+    modulesDeprecated: deprecated,
+    modulesBroken: broken,
     toolCount,
     promptCount,
     dynamicShortcuts: dynamicShortcutCount,

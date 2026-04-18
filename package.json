@@ -89,6 +89,8 @@
     "dev:mcp:watch": "node scripts/dev-mcp.mjs --watch",
     "dev:connect": "node scripts/dev-connect.mjs",
     "compat:report": "node scripts/print-compat-report.mjs",
+    "eval:plans": "node scripts/eval-plans.mjs",
+    "eval:plans:json": "node scripts/eval-plans.mjs --json",
     "typecheck": "tsc --noEmit",
     "version:patch": "npm version patch --no-git-tag-version && node scripts/sync-version.mjs && node scripts/count-stats.mjs --sync",
     "version:minor": "npm version minor --no-git-tag-version && node scripts/sync-version.mjs && node scripts/count-stats.mjs --sync",

@@ -7,9 +7,6 @@ dist/
 .swiftpm/
 *.xcworkspace/xcuserdata/
 xcuserdata/
-iMcp-*.md
-iConnect-*.md
-iconnect-test-report-*.md
 .mcpregistry_*
 .smithery/
 TODO.md

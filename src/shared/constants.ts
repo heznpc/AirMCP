@@ -206,6 +206,10 @@ export const PATHS = {
   HITL_SOCKET: join(HOME, ".config", "airmcp", "hitl.sock"),
   /** Vector store directory */
   VECTOR_STORE: join(HOME, ".airmcp"),
+  /** Context-memory index directory (facts / entities / episodes). */
+  MEMORY_DIR: join(HOME, ".cache", "airmcp"),
+  /** Context-memory JSON store. */
+  MEMORY_STORE: join(HOME, ".cache", "airmcp", "memory.json"),
   /** Usage profile */
   USAGE_PROFILE: join(HOME, ".airmcp", "profile.json"),
   /** Temp directory for screenshots, recordings, intermediate exports */

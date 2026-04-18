@@ -73,6 +73,7 @@ export const MODULE_MANIFEST: ReadonlyArray<ModuleManifestEntry> = [
       requiresPermissions: ["healthkit"],
     },
   },
+  { name: "memory" },
 ];
 
 /**

@@ -9,7 +9,7 @@ import {
   okLinkedStructured,
   okUntrusted,
   okUntrustedStructured,
-  err,
+  errPermission,
   toolError,
 } from "../shared/result.js";
 import { filterSharedAccess, guardSharedAccess } from "../shared/share-guard.js";
@@ -121,6 +121,10 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
             id: z.string(),
             name: z.string(),
             folder: z.string(),
+            // `shared` is always emitted by the JXA runtime (via Shareable) and
+            // is useful signal for clients (e.g. to render a "shared" badge).
+            // Declared here so the outputSchema drift guard can run in strict mode.
+            shared: z.boolean(),
             creationDate: z.string(),
             modificationDate: z.string(),
           }),
@@ -218,7 +222,7 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
       try {
         const result = await runJxa<NoteDetail>(readNoteScript(id));
         const blocked = await guardSharedAccess(result.shared, config, "notes", "read_note", { id });
-        if (blocked) return err(blocked);
+        if (blocked) return errPermission(blocked);
         return okUntrusted(result);
       } catch (e) {
         return toolError("read note", e);
@@ -274,7 +278,7 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
     async ({ id, body }) => {
       try {
         const blocked = await guardShared(id, config, "update_note");
-        if (blocked) return err(blocked);
+        if (blocked) return errPermission(blocked);
         const result = await runJxa<MutationResult>(updateNoteScript(id, body));
         return ok(result);
       } catch (e) {
@@ -301,7 +305,7 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
     async ({ id }) => {
       try {
         const blocked = await guardShared(id, config, "delete_note");
-        if (blocked) return err(blocked);
+        if (blocked) return errPermission(blocked);
         const result = await runJxa<DeleteResult>(deleteNoteScript(id));
         return ok(result);
       } catch (e) {
@@ -379,7 +383,7 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
     async ({ id, folder }) => {
       try {
         const blocked = await guardShared(id, config, "move_note");
-        if (blocked) return err(blocked);
+        if (blocked) return errPermission(blocked);
         const result = await runJxa<MutationResult>(moveNoteScript(id, folder));
         return ok(result);
       } catch (e) {
@@ -464,7 +468,7 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
         if (shared.length > 0) {
           // Check first shared note to determine if access is allowed
           const blocked = await guardSharedAccess(true, config, "notes", "compare_notes", { ids });
-          if (blocked) return err(blocked);
+          if (blocked) return errPermission(blocked);
         }
         return okUntrusted(result);
       } catch (e) {
@@ -496,7 +500,7 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
           const { sharedIds } = await runJxa<{ sharedIds: string[] }>(guardSharedBulkScript(ids));
           if (sharedIds.length > 0) {
             const blocked = await guardSharedAccess(true, config, "notes", "bulk_move_notes", { ids, folder });
-            if (blocked) return err(blocked);
+            if (blocked) return errPermission(blocked);
           }
         }
         const result = await runJxa<unknown>(bulkMoveNotesScript(ids, folder));

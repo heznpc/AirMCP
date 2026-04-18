@@ -252,6 +252,31 @@ describe('read_note', () => {
     expect(result.content[0].text).toContain('shared');
   });
 
+  // RFC 0001 Wave 1 — share-guard denials now emit typed errors.
+  test('share-guard block produces permission_denied structuredContent', async () => {
+    const { server } = setup({ includeShared: false });
+    mockRunJxa.mockResolvedValue({
+      id: FAKE_NOTE_ID,
+      name: 'Shared Note',
+      folder: 'Notes',
+      shared: true,
+      body: '<p>secret</p>',
+      plaintext: 'secret',
+      passwordProtected: false,
+      creationDate: '2024-01-01',
+      modificationDate: '2024-01-02',
+    });
+
+    const result = await server.callTool('read_note', { id: FAKE_NOTE_ID });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text.startsWith('[permission_denied] ')).toBe(true);
+    expect(result.structuredContent?.error).toMatchObject({
+      category: 'permission_denied',
+      retryable: false,
+    });
+  });
+
   test('returns error on JXA failure', async () => {
     const { server } = setup();
     mockRunJxa.mockRejectedValue(new Error('Note not found'));

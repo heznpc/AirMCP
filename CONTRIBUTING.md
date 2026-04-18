@@ -30,6 +30,35 @@ node dist/index.js --http --port 3847
 npm run dev
 ```
 
+### Wiring up an MCP client (Claude Desktop, Claude Code, Cursor…)
+
+To exercise AirMCP end-to-end from a real MCP client against your local checkout:
+
+```bash
+# 1. build + run, ready to be attached over stdio
+npm run dev:mcp                 # builds once, then runs dist/index.js
+npm run dev:mcp:watch           # rebuilds on src/ changes
+
+# HTTP mode (+ port override) — any flag after the npm script name is forwarded
+npm run dev:mcp -- --http --port 4000
+
+# 2. print a ready-to-paste config snippet with the absolute path to this checkout
+npm run dev:connect             # human-readable
+npm run dev:connect -- --json   # machine-readable
+npm run dev:connect -- --name airmcp-local   # use a different server key
+```
+
+The `dev:connect` script does **not** modify anything on your machine. It just
+prints where to paste the snippet. On macOS, the Claude Desktop config lives at:
+
+```
+~/Library/Application Support/Claude/claude_desktop_config.json
+```
+
+After editing, fully quit and relaunch the MCP client — servers are only
+re-read on launch. `dev:mcp:watch` picks up `src/` changes and restarts the
+child process, but most clients still need to be reconnected on restart.
+
 ## Branch Strategy
 
 - **`main`** is the production branch — always deployable

@@ -1,0 +1,30 @@
+name: project-digest
+title: "Project Digest"
+description: >-
+  Semantic-search the user's indexed Apple data for a topic, then loop
+  over each match to pull semantically-related items — effectively a
+  cross-app "everything about this project" view. Demonstrates the
+  Skills DSL's loop construct and conditional execution.
+expose_as: tool
+
+steps:
+  # 1) Seed search: semantic_search returns { query, results[], total, ... }.
+  #    Threshold is permissive so the loop has something to work with even
+  #    on a lightly-indexed corpus.
+  - id: matches
+    tool: semantic_search
+    args:
+      query: "active project work in progress"
+      limit: 8
+      threshold: 0.5
+
+  # 2) Guard: only run the loop if we found anything. Saves a pass over an
+  #    empty array and surfaces a cleaner skipped-step in the trace.
+  - id: related
+    tool: find_related
+    only_if: "{{matches.total}} > 0"
+    loop: "{{matches.results}}"
+    args:
+      id: "{{_item.id}}"
+      limit: 3
+      threshold: 0.6

@@ -1,0 +1,27 @@
+name: focus-guardian
+title: "Focus Mode Guardian"
+description: >-
+  Auto-snapshots today's events and open reminders whenever the system
+  focus mode changes (entering/leaving Do Not Disturb, Work, Personal, etc.)
+  so the AI has fresh context right after you change mode. Showcases the
+  `focus_mode_changed` event trigger plus parallel data gathering.
+expose_as: tool
+trigger:
+  event: focus_mode_changed
+  debounce_ms: 5000
+
+steps:
+  - id: events
+    tool: today_events
+    parallel: true
+
+  - id: reminders
+    tool: list_reminders
+    args:
+      completed: false
+      limit: 15
+    parallel: true
+
+  - id: unread
+    tool: get_unread_count
+    parallel: true

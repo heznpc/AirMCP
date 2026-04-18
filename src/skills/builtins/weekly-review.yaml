@@ -1,0 +1,49 @@
+name: weekly-review
+title: "Weekly Review"
+description: >-
+  Pulls a structured week-in-review in a single pass: upcoming calendar,
+  open reminders, recent notes, mail backlog, and a health snapshot — all
+  gathered in parallel, with a conditional deep-dive when reminders are
+  backlogged. Shows off the Skills DSL's parallel + conditional features.
+expose_as: prompt
+
+steps:
+  # Fan-out: 5 independent read-only tools run concurrently. Failures are
+  # isolated per step — the slow or unavailable ones don't block the rest.
+  - id: events
+    tool: get_upcoming_events
+    args:
+      limit: 15
+    parallel: true
+
+  - id: reminders
+    tool: list_reminders
+    args:
+      completed: false
+      limit: 25
+    parallel: true
+
+  - id: notes
+    tool: scan_notes
+    args:
+      limit: 10
+      previewLength: 150
+    parallel: true
+
+  - id: unread
+    tool: get_unread_count
+    parallel: true
+
+  - id: health
+    tool: health_summary
+    parallel: true
+
+  # Conditional deep-dive: only run the backlog drill-down when there are
+  # open reminders. `only_if` evaluates after the parallel group settles,
+  # so it can reference any step's output.
+  - id: backlog_notes
+    tool: search_notes
+    only_if: "{{reminders.total}} > 5"
+    args:
+      query: "TODO"
+      limit: 10

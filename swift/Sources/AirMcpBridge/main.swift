@@ -1455,6 +1455,12 @@ case "start-observer":
         case .pasteboardChanged(let text):
             type = "pasteboard_changed"
             data = ["source": "pasteboard", "text": text ?? ""]
+        case .focusModeChanged(let state):
+            type = "focus_mode_changed"
+            data = ["source": "distributed_notification", "state": state ?? ""]
+        case .fileModified(let path, let kind):
+            type = "file_modified"
+            data = ["source": "dispatch_source", "path": path, "kind": kind]
         }
         let notification: [String: Any] = [
             "id": "__event__",

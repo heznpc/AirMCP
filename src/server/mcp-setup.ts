@@ -27,6 +27,7 @@ import { isCompactMode } from "../shared/tool-filter.js";
 import { usageTracker } from "../shared/usage-tracker.js";
 import { generateProactiveContext } from "../shared/proactive.js";
 import { eventBus } from "../shared/event-bus.js";
+import { startPollers } from "../shared/pollers.js";
 import { resourceCache } from "../shared/cache.js";
 import { checkSwiftBridge, runSwift } from "../shared/swift.js";
 import type { BannerInfo } from "../shared/banner.js";
@@ -307,6 +308,10 @@ export async function createServer(
   const onCalendarChanged = () => invalidateAndNotify(["calendar:today", "calendar:upcoming", ...SNAPSHOT_KEYS]);
   const onRemindersChanged = () => invalidateAndNotify(["reminders:due", "reminders:today", ...SNAPSHOT_KEYS]);
   const onPasteboardChanged = () => invalidateAndNotify(["system:clipboard"]);
+  const onMailUnreadChanged = () => invalidateAndNotify(["mail:unread", ...SNAPSHOT_KEYS]);
+  const onFocusModeChanged = () => invalidateAndNotify(["system:focus", ...SNAPSHOT_KEYS]);
+  const onNowPlayingChanged = () => invalidateAndNotify(["music:now", ...SNAPSHOT_KEYS]);
+  const onFileModified = () => invalidateAndNotify(["finder:recent"]);
 
   // event_subscribe: start real-time event observation
   lServer.registerTool(
@@ -314,8 +319,9 @@ export async function createServer(
     {
       title: "Subscribe to Events",
       description:
-        "Start real-time monitoring of Apple data changes (calendar updates, reminder changes, clipboard changes). " +
-        "Events are pushed as they happen. Requires the Swift bridge in persistent mode.",
+        "Start real-time monitoring of Apple data changes: calendar, reminders, clipboard, mail unread count, focus mode, now-playing track, and watched file paths. " +
+        "Native observers (calendar/reminders/clipboard/focus/files) are pushed from the Swift bridge; mail and now-playing are polled. " +
+        "Requires the Swift bridge in persistent mode for the native observers.",
       inputSchema: {},
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
@@ -331,14 +337,37 @@ export async function createServer(
         eventBus.off("calendar_changed", onCalendarChanged);
         eventBus.off("reminders_changed", onRemindersChanged);
         eventBus.off("pasteboard_changed", onPasteboardChanged);
+        eventBus.off("mail_unread_changed", onMailUnreadChanged);
+        eventBus.off("focus_mode_changed", onFocusModeChanged);
+        eventBus.off("now_playing_changed", onNowPlayingChanged);
+        eventBus.off("file_modified", onFileModified);
         eventBus.start();
 
         // Connect events to MCP resource notifications
         eventBus.on("calendar_changed", onCalendarChanged);
         eventBus.on("reminders_changed", onRemindersChanged);
         eventBus.on("pasteboard_changed", onPasteboardChanged);
+        eventBus.on("mail_unread_changed", onMailUnreadChanged);
+        eventBus.on("focus_mode_changed", onFocusModeChanged);
+        eventBus.on("now_playing_changed", onNowPlayingChanged);
+        eventBus.on("file_modified", onFileModified);
 
-        return ok({ status: "started", monitoring: ["calendar", "reminders", "pasteboard"] });
+        // Start Node-side pollers for mail unread and now-playing.
+        // Safe to call multiple times (idempotent).
+        startPollers();
+
+        return ok({
+          status: "started",
+          monitoring: [
+            "calendar",
+            "reminders",
+            "pasteboard",
+            "mail_unread",
+            "focus_mode",
+            "now_playing",
+            "file_modified",
+          ],
+        });
       } catch (e) {
         return toolError("start event observer", e);
       }
@@ -365,7 +394,7 @@ export async function createServer(
     {
       title: "List Event Triggers",
       description:
-        "Show all skills with event triggers (calendar_changed, reminders_changed, pasteboard_changed) and their debounce settings.",
+        "Show all skills with event triggers (calendar_changed, reminders_changed, pasteboard_changed, mail_unread_changed, focus_mode_changed, now_playing_changed, file_modified) and their debounce settings.",
       inputSchema: {},
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },

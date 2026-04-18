@@ -17,7 +17,15 @@ export const SkillDefinitionSchema = z.object({
   expose_as: z.enum(["prompt", "tool"]),
   trigger: z
     .object({
-      event: z.enum(["calendar_changed", "reminders_changed", "pasteboard_changed"]),
+      event: z.enum([
+        "calendar_changed",
+        "reminders_changed",
+        "pasteboard_changed",
+        "mail_unread_changed",
+        "focus_mode_changed",
+        "now_playing_changed",
+        "file_modified",
+      ]),
       debounce_ms: z.number().optional(),
     })
     .optional(),

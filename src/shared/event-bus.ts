@@ -1,15 +1,32 @@
 import { EventEmitter } from "node:events";
 
+export type AirMCPEventType =
+  | "calendar_changed"
+  | "reminders_changed"
+  | "pasteboard_changed"
+  | "mail_unread_changed"
+  | "focus_mode_changed"
+  | "now_playing_changed"
+  | "file_modified";
+
 export interface AirMCPEvent {
-  type: "calendar_changed" | "reminders_changed" | "pasteboard_changed";
+  type: AirMCPEventType;
   data: Record<string, unknown>;
   timestamp: string;
 }
 
-const VALID_EVENT_TYPES = new Set<AirMCPEvent["type"]>(["calendar_changed", "reminders_changed", "pasteboard_changed"]);
+const VALID_EVENT_TYPES = new Set<AirMCPEventType>([
+  "calendar_changed",
+  "reminders_changed",
+  "pasteboard_changed",
+  "mail_unread_changed",
+  "focus_mode_changed",
+  "now_playing_changed",
+  "file_modified",
+]);
 
-function isValidEventType(value: unknown): value is AirMCPEvent["type"] {
-  return typeof value === "string" && VALID_EVENT_TYPES.has(value as AirMCPEvent["type"]);
+function isValidEventType(value: unknown): value is AirMCPEventType {
+  return typeof value === "string" && VALID_EVENT_TYPES.has(value as AirMCPEventType);
 }
 
 class EventBus extends EventEmitter {
@@ -17,7 +34,10 @@ class EventBus extends EventEmitter {
 
   constructor() {
     super();
-    this.setMaxListeners(25);
+    // Raised from the default 10 to accommodate 7 typed event names × a
+    // handful of listeners each (skills engine + mcp-setup handlers + the
+    // generic "event" channel). 50 leaves headroom for future triggers.
+    this.setMaxListeners(50);
   }
 
   /** Process a raw event line from the Swift bridge. */
@@ -38,6 +58,19 @@ class EventBus extends EventEmitter {
     } catch {
       // Not an event line — ignore
     }
+  }
+
+  /**
+   * Emit an event from a Node-side source (pollers for mail_unread_changed,
+   * now_playing_changed, etc. that don't have a native observer API).
+   * Uses the same shape as processLine'd events so downstream listeners
+   * (skills triggers, resource invalidation) treat them identically.
+   */
+  emitNodeEvent(type: AirMCPEventType, data: Record<string, unknown> = {}): void {
+    if (!VALID_EVENT_TYPES.has(type)) return;
+    const event: AirMCPEvent = { type, data, timestamp: new Date().toISOString() };
+    this.emit("event", event);
+    this.emit(event.type, event);
   }
 
   /** Check if the event bus is active. */

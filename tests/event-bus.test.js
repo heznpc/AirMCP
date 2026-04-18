@@ -230,4 +230,89 @@ describe('EventBus', () => {
     expect(calCalls).toHaveLength(1);
     expect(remCalls).toHaveLength(1);
   });
+
+  // ── Expanded event types (v2.8+) ────────────────────────────────
+  // 4 new event types: mail_unread_changed, focus_mode_changed,
+  // now_playing_changed, file_modified — bringing the bus from 3 → 7.
+
+  test('processLine emits mail_unread_changed', (done) => {
+    eventBus.on('mail_unread_changed', (evt) => {
+      expect(evt.type).toBe('mail_unread_changed');
+      expect(evt.data.totalUnread).toBe(12);
+      done();
+    });
+    eventBus.processLine(JSON.stringify({
+      event: 'mail_unread_changed',
+      data: { totalUnread: 12, delta: 3 },
+      timestamp: '2026-04-19T10:00:00Z',
+    }));
+  });
+
+  test('processLine emits focus_mode_changed', (done) => {
+    eventBus.on('focus_mode_changed', (evt) => {
+      expect(evt.type).toBe('focus_mode_changed');
+      expect(evt.data.state).toBe('work');
+      done();
+    });
+    eventBus.processLine(JSON.stringify({
+      event: 'focus_mode_changed',
+      data: { source: 'distributed_notification', state: 'work' },
+    }));
+  });
+
+  test('processLine emits now_playing_changed', (done) => {
+    eventBus.on('now_playing_changed', (evt) => {
+      expect(evt.type).toBe('now_playing_changed');
+      expect(evt.data.playerState).toBe('playing');
+      done();
+    });
+    eventBus.processLine(JSON.stringify({
+      event: 'now_playing_changed',
+      data: { playerState: 'playing', trackChanged: true },
+    }));
+  });
+
+  test('processLine emits file_modified', (done) => {
+    eventBus.on('file_modified', (evt) => {
+      expect(evt.type).toBe('file_modified');
+      expect(evt.data.path).toBe('/Users/test/Downloads');
+      expect(evt.data.kind).toBe('write');
+      done();
+    });
+    eventBus.processLine(JSON.stringify({
+      event: 'file_modified',
+      data: { source: 'dispatch_source', path: '/Users/test/Downloads', kind: 'write' },
+    }));
+  });
+
+  test('emitNodeEvent fires the type listener and generic event listener', () => {
+    const typeCalls = [];
+    const genericCalls = [];
+    eventBus.on('mail_unread_changed', (e) => typeCalls.push(e));
+    eventBus.on('event', (e) => genericCalls.push(e));
+
+    eventBus.emitNodeEvent('mail_unread_changed', { totalUnread: 5, delta: -2 });
+
+    expect(typeCalls).toHaveLength(1);
+    expect(genericCalls).toHaveLength(1);
+    expect(typeCalls[0].data.totalUnread).toBe(5);
+    expect(typeCalls[0].timestamp).toBeDefined();
+    expect(typeof typeCalls[0].timestamp).toBe('string');
+  });
+
+  test('emitNodeEvent is a no-op for invalid event types', () => {
+    let emitted = false;
+    eventBus.on('event', () => { emitted = true; });
+    eventBus.emitNodeEvent('not_a_real_event', { foo: 'bar' });
+    expect(emitted).toBe(false);
+  });
+
+  test('emitNodeEvent accepts empty data and stamps a timestamp', (done) => {
+    eventBus.on('now_playing_changed', (evt) => {
+      expect(evt.data).toEqual({});
+      expect(evt.timestamp).toBeDefined();
+      done();
+    });
+    eventBus.emitNodeEvent('now_playing_changed');
+  });
 });

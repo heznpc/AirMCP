@@ -1,4 +1,5 @@
 import type { ModuleRegistration } from "./registry.js";
+import type { ModuleCompatibility } from "./compatibility.js";
 
 /**
  * Module manifest — the single source of truth for all AirMCP modules.
@@ -8,11 +9,19 @@ import type { ModuleRegistration } from "./registry.js";
  *   2. Optionally create src/<name>/prompts.ts  (export registerXxxPrompts)
  *   3. Add one line to MANIFEST below
  *   That's it. No other imports needed.
+ *
+ * Compatibility metadata (RFC 0004):
+ *   - `minMacosVersion` is kept top-level for the existing runtime gate.
+ *   - `compatibility` is a richer manifest (status, deprecation, hardware
+ *     requirements, permission list). It is threaded through to the
+ *     ModuleRegistration but currently only used by the doctor / reports.
+ *     Existing registration logic is unchanged.
  */
 const MANIFEST: Array<{
   name: string;
   hasPrompts?: boolean;
   minMacosVersion?: number;
+  compatibility?: ModuleCompatibility;
 }> = [
   { name: "notes", hasPrompts: true },
   { name: "reminders", hasPrompts: true },
@@ -26,7 +35,15 @@ const MANIFEST: Array<{
   { name: "photos" },
   { name: "shortcuts", hasPrompts: true },
   { name: "messages" },
-  { name: "intelligence", minMacosVersion: 26 },
+  {
+    name: "intelligence",
+    minMacosVersion: 26,
+    compatibility: {
+      minMacosVersion: 26,
+      status: "beta",
+      requiresHardware: ["apple-silicon"],
+    },
+  },
   { name: "tv" },
   { name: "ui" },
   { name: "screen" },
@@ -40,7 +57,14 @@ const MANIFEST: Array<{
   { name: "bluetooth" },
   { name: "google" },
   { name: "speech" },
-  { name: "health" },
+  {
+    name: "health",
+    compatibility: {
+      status: "stable",
+      requiresHardware: ["apple-silicon", "healthkit"],
+      requiresPermissions: ["healthkit"],
+    },
+  },
 ];
 
 /**
@@ -101,6 +125,7 @@ async function importModule(def: (typeof MANIFEST)[number]): Promise<ModuleRegis
       tools: toolsFn,
       prompts: promptsFn,
       minMacosVersion: def.minMacosVersion,
+      compatibility: def.compatibility,
     } as ModuleRegistration;
   } catch (e) {
     console.error(`[AirMCP] Failed to load module ${def.name}: ${e instanceof Error ? e.message : String(e)}`);

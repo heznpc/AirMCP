@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Dev MCP scripts** — `npm run dev:mcp`, `dev:mcp:watch`, `dev:connect` for wiring the local checkout into Claude Desktop / Claude Code / Cursor without hand-editing config paths. (`scripts/dev-mcp.mjs`, `scripts/dev-connect.mjs`, CONTRIBUTING.md "Wiring up an MCP client" section).
+- **release-please workflow (PR-only mode)** — auto-generates `chore(release): v<next>` PRs bumping `package.json` + `CHANGELOG.md` from Conventional Commits, preventing TODO ↔ CHANGELOG drift. Tag creation stays in the existing auto-release + cd.yml chain. (`.github/workflows/release-please.yml`, `release-please-config.json`, `.release-please-manifest.json`).
+- **RFC 0001 foundation** — `src/shared/error-categories.ts` with `ERROR_CATEGORIES` enum + `ToolErrorPayload` + `toolErr()` / `errNotFound()` / `errJxa()` / `errDeprecated()` helpers in `result.ts`. Backward compatible with legacy `err()` / `toolError()`. (21 new unit tests.)
+- **RFC 0004 foundation** — `src/shared/compatibility.ts` with `resolveModuleCompatibility()` + `summarizeCompatibility()`; `ModuleRegistration.compatibility` field threaded through `MANIFEST`. Annotated `intelligence` (beta + apple-silicon) and `health` (apple-silicon + healthkit). Runtime behaviour unchanged; data is informational only for now. (21 new unit tests.)
+- **Release checklist & RFC process docs** — `docs/RELEASE_CHECKLIST.md`, `docs/rfc/README.md`, RFCs 0001/0002/0003/0004 (Draft).
+- **Quality diagnosis report** — `QUALITY_DIAGNOSIS_2026-04-17.md` with maturity snapshot, risk matrix, KPI proposals.
+
+### Changed
+- `TODO.md` re-synced to the v2.7.3 baseline — checked off work completed in v2.7.0–v2.7.3, refreshed coverage numbers (46.9%, gate 46%).
+
 ## [2.7.3] - 2026-04-16
 
 ### Added

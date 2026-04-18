@@ -53,6 +53,13 @@ jobs:
       - name: Security audit
         run: npm audit --audit-level=high
 
+      # RFC 0003 Phase 1 — non-fatal advisory: surface moderate+ findings
+      # in CI logs so reviewers can prioritise upgrades before we ratchet
+      # the hard gate down to `moderate` in Phase 2. Exit code is always 0.
+      - name: Security audit advisory (moderate+)
+        run: node scripts/summarize-audit.mjs
+        continue-on-error: true
+
       - name: Verify npm signatures
         run: npm audit signatures
 

@@ -21,6 +21,7 @@ import { compactDescription } from "./tool-filter.js";
 import { withResultSizeHint } from "./result.js";
 import { traceToolCall } from "./telemetry.js";
 import { assertTestMode } from "./errors.js";
+import { checkRateLimit } from "./rate-limit.js";
 
 /** Threshold in characters above which we auto-attach a result size hint. */
 const SIZE_HINT_THRESHOLD = 10_000;
@@ -45,6 +46,10 @@ interface RegisteredToolEntry {
   description?: string;
   titleLower?: string;
   descriptionLower?: string;
+  /** Captured from `annotations.destructiveHint` at registration time —
+   *  consulted by the rate limiter and audit summaries so we don't
+   *  have to re-parse the opts each call. */
+  destructive?: boolean;
 }
 
 export interface ToolInfo {
@@ -222,6 +227,28 @@ class ToolRegistry {
       return (async (...args: unknown[]) => {
         if (process.env.AIRMCP_USAGE_TRACKING !== "false") usageTracker.record(name);
 
+        // Rate-limit + emergency-stop gate. Runs before the call reaches
+        // the handler so a runaway agent burning through the bucket can
+        // never touch the filesystem/APIs on the denied call. Denials
+        // throw so the error is captured by audit and surfaces to the
+        // caller with the same shape as any other failure.
+        const entry = tools.get(name);
+        const gate = checkRateLimit(entry?.destructive === true);
+        if (!gate.allowed) {
+          const msg = `[rate_limited] ${gate.reason ?? "Rate limit exceeded"}${
+            gate.retryAfterMs ? ` (retry in ~${Math.ceil(gate.retryAfterMs / 1000)}s)` : ""
+          }`;
+          if (process.env.AIRMCP_AUDIT_LOG !== "false") {
+            auditLog({
+              timestamp: new Date().toISOString(),
+              tool: name,
+              args: args[0] as Record<string, unknown>,
+              status: "error",
+            });
+          }
+          throw new Error(msg);
+        }
+
         const execute = async () => {
           const start = Date.now();
           try {
@@ -283,6 +310,7 @@ class ToolRegistry {
       }
       const result = (origRegisterTool as AnyFn)(name, ...rest);
       // Store FULL description in registry for discover_tools / semantic search
+      const annotations = (config as { annotations?: { destructiveHint?: boolean } }).annotations;
       tools.set(name, {
         handler: wrapped,
         enabled: true,
@@ -290,6 +318,7 @@ class ToolRegistry {
         description: fullDescription,
         titleLower: title?.toLowerCase(),
         descriptionLower: fullDescription?.toLowerCase(),
+        destructive: annotations?.destructiveHint === true,
       });
       return result;
     }) as typeof server.registerTool;

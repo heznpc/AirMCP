@@ -1,9 +1,12 @@
-import { appendFile, chmod, mkdir, stat, rename } from "node:fs/promises";
+import { appendFile, chmod, mkdir, readdir, readFile, stat, rename } from "node:fs/promises";
 import { join } from "node:path";
 import { AUDIT, PATHS } from "./constants.js";
 import { assertTestMode, formatError } from "./errors.js";
 
 const AUDIT_PATH = join(PATHS.VECTOR_STORE, "audit.jsonl");
+const AUDIT_DIR = PATHS.VECTOR_STORE;
+const AUDIT_ROTATED_PREFIX = "audit.";
+const AUDIT_ROTATED_SUFFIX = ".jsonl";
 
 interface AuditEntry {
   timestamp: string;
@@ -163,4 +166,143 @@ export function _testReset(): string[] {
   consecutiveFlushFailures = 0;
   auditDisabled = false;
   return snapshot;
+}
+
+// ── Read API (audit_log / audit_summary tools) ───────────────────────
+
+export interface ReadAuditOptions {
+  /** Lower bound on timestamp — ISO 8601 string. Entries older than this
+   *  are filtered out. Defaults to 7 days ago. */
+  since?: string;
+  /** Only return entries for this tool name (exact match). */
+  tool?: string;
+  /** Filter by status. Omit to include both. */
+  status?: "ok" | "error";
+  /** Cap on returned entries. Most recent first. */
+  limit?: number;
+}
+
+export interface ReadAuditResult {
+  entries: AuditEntry[];
+  total: number;
+  returned: number;
+  scannedFiles: number;
+}
+
+/** Yield every JSONL line across the current file + rotated siblings, in
+ *  oldest→newest order. Rotated files are named `audit.<timestamp>.jsonl`
+ *  so we can sort lexicographically by the embedded timestamp. */
+async function* readAllAuditLines(): AsyncGenerator<{ line: string; file: string }> {
+  let files: string[];
+  try {
+    files = await readdir(AUDIT_DIR);
+  } catch {
+    return;
+  }
+  const logFiles = files
+    .filter((f) => f === "audit.jsonl" || (f.startsWith(AUDIT_ROTATED_PREFIX) && f.endsWith(AUDIT_ROTATED_SUFFIX)))
+    .sort((a, b) => {
+      // audit.jsonl is the current (newest) — put it last.
+      if (a === "audit.jsonl") return 1;
+      if (b === "audit.jsonl") return -1;
+      return a.localeCompare(b);
+    });
+  for (const f of logFiles) {
+    let raw: string;
+    try {
+      raw = await readFile(join(AUDIT_DIR, f), "utf-8");
+    } catch {
+      continue;
+    }
+    for (const line of raw.split("\n")) {
+      if (!line) continue;
+      yield { line, file: f };
+    }
+  }
+}
+
+/** Read audit entries with optional filters. Walks every log file so
+ *  rotated history stays queryable; the limit bounds memory at the end,
+ *  not during scan. Buffered entries still in memory are included so a
+ *  user asking for "today" doesn't miss the last 30 seconds. */
+export async function readAuditEntries(opts: ReadAuditOptions = {}): Promise<ReadAuditResult> {
+  const sinceIso = opts.since ?? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const limit = Math.max(1, Math.min(10_000, opts.limit ?? 100));
+  const matched: AuditEntry[] = [];
+  let scannedFiles = 0;
+  const seenFiles = new Set<string>();
+
+  const lineSources: Array<() => AsyncGenerator<{ line: string; file: string }>> = [
+    () =>
+      (async function* () {
+        for (const line of buffer) yield { line, file: "<buffer>" };
+      })(),
+    () => readAllAuditLines(),
+  ];
+
+  for (const source of lineSources) {
+    for await (const { line, file } of source()) {
+      if (!seenFiles.has(file)) {
+        seenFiles.add(file);
+        scannedFiles++;
+      }
+      let entry: AuditEntry;
+      try {
+        entry = JSON.parse(line) as AuditEntry;
+      } catch {
+        continue; // tolerate malformed lines (partial writes, old formats)
+      }
+      if (typeof entry.timestamp !== "string" || typeof entry.tool !== "string") continue;
+      if (entry.timestamp < sinceIso) continue;
+      if (opts.tool && entry.tool !== opts.tool) continue;
+      if (opts.status && entry.status !== opts.status) continue;
+      matched.push(entry);
+    }
+  }
+  // Newest first.
+  matched.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+  const sliced = matched.slice(0, limit);
+  return { entries: sliced, total: matched.length, returned: sliced.length, scannedFiles };
+}
+
+export interface AuditSummary {
+  since: string;
+  total: number;
+  errors: number;
+  errorRate: number;
+  topTools: Array<{ tool: string; count: number; errors: number }>;
+  scannedFiles: number;
+}
+
+/** Aggregate statistics over the audit log: total calls, error rate,
+ *  and the top-N busiest tools. `since` defaults to 7 days. `topN`
+ *  bounds the returned leaderboard (default 10, max 50). */
+export async function summarizeAuditEntries(opts: { since?: string; topN?: number } = {}): Promise<AuditSummary> {
+  const sinceIso = opts.since ?? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const topN = Math.max(1, Math.min(50, opts.topN ?? 10));
+  // Pull everything inside the window — limit set high enough that the
+  // caller gets the real population rather than a truncated sample.
+  const page = await readAuditEntries({ since: sinceIso, limit: 10_000 });
+  const byTool = new Map<string, { count: number; errors: number }>();
+  let errors = 0;
+  for (const e of page.entries) {
+    if (e.status === "error") errors++;
+    const cur = byTool.get(e.tool) ?? { count: 0, errors: 0 };
+    cur.count++;
+    if (e.status === "error") cur.errors++;
+    byTool.set(e.tool, cur);
+  }
+  const topTools = [...byTool.entries()]
+    .map(([tool, v]) => ({ tool, count: v.count, errors: v.errors }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, topN);
+  const total = page.entries.length;
+  return {
+    since: sinceIso,
+    total,
+    errors,
+    errorRate: total > 0 ? Number((errors / total).toFixed(4)) : 0,
+    topTools,
+    scannedFiles: page.scannedFiles,
+  };
 }

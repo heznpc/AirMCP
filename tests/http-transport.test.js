@@ -1,4 +1,4 @@
-import { describe, test, expect, jest } from '@jest/globals';
+import { describe, test, expect, jest, beforeAll } from '@jest/globals';
 
 // Mock all heavy dependencies that would fail in test environment
 jest.unstable_mockModule('@modelcontextprotocol/sdk/server/streamableHttp.js', () => ({
@@ -46,5 +46,114 @@ describe('HTTP transport module', () => {
     const mod = await import('../dist/server/http-transport.js');
     // AsyncFunction constructor name check
     expect(mod.startHttpServer.constructor.name).toBe('AsyncFunction');
+  });
+});
+
+describe('resolveAllowNetwork', () => {
+  let resolveAllowNetwork;
+  beforeAll(async () => {
+    ({ resolveAllowNetwork } = await import('../dist/server/http-transport.js'));
+  });
+
+  test('defaults to loopback-only with no signals', () => {
+    const p = resolveAllowNetwork({ bindAll: false, httpToken: '', allowedOriginsCount: 0 });
+    expect(p).toBe('loopback-only');
+  });
+
+  test('--bind-all without origins maps to with-token', () => {
+    const p = resolveAllowNetwork({ bindAll: true, httpToken: 't', allowedOriginsCount: 0 });
+    expect(p).toBe('with-token');
+  });
+
+  test('--bind-all + origins maps to with-token+origin', () => {
+    const p = resolveAllowNetwork({ bindAll: true, httpToken: 't', allowedOriginsCount: 1 });
+    expect(p).toBe('with-token+origin');
+  });
+
+  test('unsafeNoAuth wins over bindAll but not over explicit', () => {
+    expect(resolveAllowNetwork({ bindAll: true, httpToken: '', allowedOriginsCount: 0, unsafeNoAuth: true }))
+      .toBe('unauthenticated');
+    expect(
+      resolveAllowNetwork({
+        bindAll: true,
+        httpToken: '',
+        allowedOriginsCount: 0,
+        unsafeNoAuth: true,
+        explicit: 'loopback-only',
+      }),
+    ).toBe('loopback-only');
+  });
+
+  test('explicit overrides everything', () => {
+    const p = resolveAllowNetwork({
+      explicit: 'with-token',
+      bindAll: false,
+      httpToken: 't',
+      allowedOriginsCount: 0,
+    });
+    expect(p).toBe('with-token');
+  });
+
+  test('rejects unknown explicit values', () => {
+    expect(() =>
+      resolveAllowNetwork({
+        explicit: 'wide-open',
+        bindAll: false,
+        httpToken: '',
+        allowedOriginsCount: 0,
+      }),
+    ).toThrow(/Invalid allowNetwork/);
+  });
+});
+
+describe('validateNetworkPolicy', () => {
+  let validateNetworkPolicy;
+  beforeAll(async () => {
+    ({ validateNetworkPolicy } = await import('../dist/server/http-transport.js'));
+  });
+
+  test('loopback-only accepts bindAll=false', () => {
+    expect(() =>
+      validateNetworkPolicy({ policy: 'loopback-only', bindAll: false, httpToken: '', allowedOriginsCount: 0 }),
+    ).not.toThrow();
+  });
+
+  test('loopback-only rejects bindAll=true', () => {
+    expect(() =>
+      validateNetworkPolicy({ policy: 'loopback-only', bindAll: true, httpToken: 't', allowedOriginsCount: 0 }),
+    ).toThrow(/conflicts with --bind-all/);
+  });
+
+  test('with-token requires token', () => {
+    expect(() =>
+      validateNetworkPolicy({ policy: 'with-token', bindAll: true, httpToken: '', allowedOriginsCount: 0 }),
+    ).toThrow(/requires AIRMCP_HTTP_TOKEN/);
+  });
+
+  test('with-token passes with token set', () => {
+    expect(() =>
+      validateNetworkPolicy({ policy: 'with-token', bindAll: true, httpToken: 'secret', allowedOriginsCount: 0 }),
+    ).not.toThrow();
+  });
+
+  test('with-token+origin requires both token and origins', () => {
+    expect(() =>
+      validateNetworkPolicy({ policy: 'with-token+origin', bindAll: true, httpToken: '', allowedOriginsCount: 1 }),
+    ).toThrow(/AIRMCP_HTTP_TOKEN/);
+    expect(() =>
+      validateNetworkPolicy({ policy: 'with-token+origin', bindAll: true, httpToken: 't', allowedOriginsCount: 0 }),
+    ).toThrow(/AIRMCP_ALLOWED_ORIGINS/);
+    expect(() =>
+      validateNetworkPolicy({ policy: 'with-token+origin', bindAll: true, httpToken: 't', allowedOriginsCount: 1 }),
+    ).not.toThrow();
+  });
+
+  test('unauthenticated logs a warning but does not throw', () => {
+    const err = jest.spyOn(console, 'error').mockImplementation(() => {});
+    expect(() =>
+      validateNetworkPolicy({ policy: 'unauthenticated', bindAll: true, httpToken: '', allowedOriginsCount: 0 }),
+    ).not.toThrow();
+    expect(err).toHaveBeenCalledWith(expect.stringContaining('unauthenticated'));
+    err.mockRestore();
   });
 });

@@ -61,14 +61,116 @@ if (ratePruneTimer.unref) ratePruneTimer.unref();
 // Compiled once — used in Origin validation middleware
 const LOCALHOST_ORIGIN_RE = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
 
+/**
+ * Declarative network-exposure policy (see docs/rfc/0002-http-allow-network.md).
+ *
+ *   loopback-only       — default; only 127.0.0.1 bindings accepted. Rejects
+ *                         `--bind-all` at startup so a proxy sitting in front
+ *                         of AirMCP cannot silently turn a loopback server
+ *                         into a public one.
+ *   with-token          — external binding allowed; AIRMCP_HTTP_TOKEN required.
+ *   with-token+origin   — external binding + token + explicit Origin allow-list
+ *                         (AIRMCP_ALLOWED_ORIGINS) required.
+ *   unauthenticated     — explicit opt-in danger mode for CI/debug. Emits a
+ *                         loud warning and flags `.well-known/mcp.json` as
+ *                         `security: insecure`. Not a default anyone stumbles
+ *                         into.
+ */
+export type AllowNetwork = "loopback-only" | "with-token" | "with-token+origin" | "unauthenticated";
+
+const ALLOW_NETWORK_VALUES: readonly AllowNetwork[] = [
+  "loopback-only",
+  "with-token",
+  "with-token+origin",
+  "unauthenticated",
+];
+
 export interface HttpServerOptions extends CreateServerOptions {
   port: number;
   bindAll: boolean;
   httpToken: string;
+  /** Overrides the policy inferred from CLI flags / env. When omitted the
+   *  policy is derived: loopback-only unless `--bind-all` or
+   *  `--unsafe-no-auth` is set. */
+  allowNetwork?: AllowNetwork;
+  /** Opt-in to the `unauthenticated` policy via CLI flag. Ignored when
+   *  `allowNetwork` is set explicitly. */
+  unsafeNoAuth?: boolean;
+}
+
+/** Derive the effective policy from explicit overrides + CLI/env signals.
+ *  Exported so `init.ts` / tests can reuse the same resolution logic. */
+export function resolveAllowNetwork(opts: {
+  explicit?: AllowNetwork;
+  bindAll: boolean;
+  httpToken: string;
+  allowedOriginsCount: number;
+  unsafeNoAuth?: boolean;
+}): AllowNetwork {
+  if (opts.explicit) {
+    if (!ALLOW_NETWORK_VALUES.includes(opts.explicit)) {
+      throw new Error(
+        `Invalid allowNetwork value "${opts.explicit}". Expected one of: ${ALLOW_NETWORK_VALUES.join(", ")}`,
+      );
+    }
+    return opts.explicit;
+  }
+  if (opts.unsafeNoAuth) return "unauthenticated";
+  if (opts.bindAll) {
+    return opts.allowedOriginsCount > 0 ? "with-token+origin" : "with-token";
+  }
+  return "loopback-only";
+}
+
+/** Startup invariant check. Throws on misconfiguration so the process
+ *  refuses to start rather than silently exposing the tool surface. */
+export function validateNetworkPolicy(ctx: {
+  policy: AllowNetwork;
+  bindAll: boolean;
+  httpToken: string;
+  allowedOriginsCount: number;
+}): void {
+  switch (ctx.policy) {
+    case "loopback-only":
+      if (ctx.bindAll) {
+        throw new Error(
+          "allowNetwork=loopback-only conflicts with --bind-all. " +
+            'Either drop --bind-all, or set AIRMCP_ALLOW_NETWORK="with-token" ' +
+            "(and provide AIRMCP_HTTP_TOKEN).",
+        );
+      }
+      return;
+    case "with-token":
+      if (!ctx.httpToken) {
+        throw new Error(
+          "allowNetwork=with-token requires AIRMCP_HTTP_TOKEN. " +
+            'Set the token or switch to AIRMCP_ALLOW_NETWORK="loopback-only".',
+        );
+      }
+      return;
+    case "with-token+origin":
+      if (!ctx.httpToken) {
+        throw new Error("allowNetwork=with-token+origin requires AIRMCP_HTTP_TOKEN.");
+      }
+      if (ctx.allowedOriginsCount === 0) {
+        throw new Error(
+          "allowNetwork=with-token+origin requires AIRMCP_ALLOWED_ORIGINS. " +
+            'Example: AIRMCP_ALLOWED_ORIGINS="https://claude.ai,https://cursor.sh"',
+        );
+      }
+      return;
+    case "unauthenticated":
+      // No invariant — but loudly warn so the choice is visible.
+      console.error(
+        "[AirMCP] ⚠️  allowNetwork=unauthenticated — tool surface is exposed without auth. " +
+          "This mode is intended for CI/debug only. Public deployments in this mode are a security incident.",
+      );
+      return;
+  }
 }
 
 export async function startHttpServer(options: HttpServerOptions): Promise<void> {
-  const { port, bindAll, httpToken, ...serverOptions } = options;
+  const { port, bindAll, httpToken, allowNetwork: explicitPolicy, unsafeNoAuth, ...serverOptions } = options;
   const { pkg } = serverOptions;
 
   const express = (await import("express")).default;
@@ -77,6 +179,30 @@ export async function startHttpServer(options: HttpServerOptions): Promise<void>
 
   // Origin validation — MCP spec 2025-11-25 requires 403 for invalid Origin
   const allowedOrigins = new Set<string>((process.env.AIRMCP_ALLOWED_ORIGINS ?? "").split(",").filter(Boolean));
+
+  // Resolve and validate the declarative network policy before touching the
+  // socket. Misconfiguration exits before any routes are mounted, so an
+  // operator's footgun (e.g. `--bind-all` without a token) cannot end up as
+  // a running-but-insecure server.
+  const envPolicy = (process.env.AIRMCP_ALLOW_NETWORK ?? "").trim() as AllowNetwork | "";
+  const allowNetwork = resolveAllowNetwork({
+    explicit: envPolicy || explicitPolicy || undefined,
+    bindAll,
+    httpToken,
+    allowedOriginsCount: allowedOrigins.size,
+    unsafeNoAuth,
+  });
+  try {
+    validateNetworkPolicy({
+      policy: allowNetwork,
+      bindAll,
+      httpToken,
+      allowedOriginsCount: allowedOrigins.size,
+    });
+  } catch (e) {
+    console.error(`[AirMCP] FATAL: ${e instanceof Error ? e.message : String(e)}`);
+    process.exit(1);
+  }
   app.use((req, res, next) => {
     if (req.path !== "/mcp") return next();
     const origin = req.headers.origin;
@@ -132,12 +258,10 @@ export async function startHttpServer(options: HttpServerOptions): Promise<void>
       }
       next();
     });
-  } else if (bindAll) {
-    console.error(
-      "[AirMCP] FATAL: --bind-all requires AIRMCP_HTTP_TOKEN. Refusing to expose all tools without authentication.",
-    );
-    process.exit(1);
   }
+  // The legacy `--bind-all without token` fatal path is now subsumed by
+  // `validateNetworkPolicy` above — we arrive here only after the policy
+  // resolver has confirmed the configuration is internally consistent.
 
   interface Session {
     transport: StreamableHTTPServerTransport;
@@ -204,6 +328,11 @@ export async function startHttpServer(options: HttpServerOptions): Promise<void>
       resources: { listChanged: true },
     },
     ...(httpToken ? { authorization: { type: "bearer" as const } } : {}),
+    // Expose the declarative network policy so Managed Agents / discovery
+    // clients can reason about the exposure before they connect (RFC 0002).
+    network_policy: allowNetwork,
+    ...(allowedOrigins.size > 0 ? { allowed_origins: [...allowedOrigins] } : {}),
+    ...(allowNetwork === "unauthenticated" ? { security: "insecure" as const } : {}),
   };
   app.get("/.well-known/mcp.json", (_req, res) => res.json(serverCard));
 

@@ -7,7 +7,7 @@ body:
     attributes:
       label: AirMCP Version
       description: "Run `npx airmcp --help` to check"
-      placeholder: "2.8.0"
+      placeholder: "2.8.1"
     validations:
       required: true
 

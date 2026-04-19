@@ -105,7 +105,7 @@ fi
 /usr/libexec/PlistBuddy -c "Delete :CFBundlePackageType" "$PLIST" 2>/dev/null || true
 /usr/libexec/PlistBuddy -c "Add :CFBundlePackageType string APPL" "$PLIST"
 /usr/libexec/PlistBuddy -c "Delete :CFBundleShortVersionString" "$PLIST" 2>/dev/null || true
-/usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 2.8.0" "$PLIST"
+/usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 2.8.1" "$PLIST"
 /usr/libexec/PlistBuddy -c "Delete :LSUIElement" "$PLIST" 2>/dev/null || true
 /usr/libexec/PlistBuddy -c "Add :LSUIElement bool true" "$PLIST"
 /usr/libexec/PlistBuddy -c "Delete :NSMicrophoneUsageDescription" "$PLIST" 2>/dev/null || true

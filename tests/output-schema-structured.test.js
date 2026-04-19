@@ -170,6 +170,83 @@ const TOOL_FIXTURES = {
       units: { temperature: '°C', windSpeed: 'km/h', precipitation: 'mm' },
     },
   },
+  // ── Wave 2 additions ──
+  // notes
+  read_note: {
+    args: { id: 'x-coredata://NOTE/1' },
+    mock: {
+      id: 'x-coredata://NOTE/1', name: 'Title', body: '<p>body</p>', plaintext: 'body',
+      creationDate: '2026-01-01T00:00:00Z', modificationDate: '2026-01-02T00:00:00Z',
+      folder: 'Notes', shared: false, passwordProtected: false,
+    },
+  },
+  list_folders: {
+    args: {},
+    mock: [{ id: 'f1', name: 'Notes', account: 'iCloud', noteCount: 0, shared: false }],
+  },
+  // reminders
+  list_reminder_lists: {
+    args: {},
+    mock: [{ id: 'l1', name: 'Reminders', reminderCount: 0 }],
+  },
+  read_reminder: {
+    args: { id: 'r1' },
+    mock: {
+      id: 'r1', name: 'Task', body: '', completed: false, completionDate: null,
+      creationDate: '2026-01-01T00:00:00Z', modificationDate: '2026-01-02T00:00:00Z',
+      dueDate: null, priority: 0, flagged: false, list: 'Reminders',
+    },
+  },
+  // calendar
+  list_calendars: {
+    args: {},
+    mock: [{ id: 'c1', name: 'Work', color: '#ff0000', writable: true }],
+  },
+  read_event: {
+    args: { id: 'e1' },
+    mock: {
+      id: 'e1', summary: 'Meeting', description: null, location: null,
+      startDate: '2026-04-20T09:00:00Z', endDate: '2026-04-20T09:30:00Z',
+      allDay: false, recurrence: null, url: null, calendar: 'Work', attendees: [],
+    },
+  },
+  // mail
+  list_messages: {
+    args: { mailbox: 'INBOX', limit: 50, offset: 0 },
+    mock: { total: 0, offset: 0, returned: 0, messages: [] },
+  },
+  list_accounts: {
+    args: {},
+    mock: [{ name: 'iCloud', fullName: 'Example User', emailAddresses: ['a@icloud.com'] }],
+  },
+  // contacts
+  list_groups: {
+    args: {},
+    mock: [{ id: 'g1', name: 'Family' }],
+  },
+  // safari
+  list_bookmarks: {
+    args: {},
+    mock: { count: 0, bookmarks: [] },
+  },
+  list_reading_list: {
+    args: {},
+    mock: { count: 0, items: [] },
+  },
+  // finder
+  list_directory: {
+    args: { path: '/tmp', limit: 100 },
+    mock: { total: 0, returned: 0, items: [] },
+  },
+  // music
+  list_playlists: {
+    args: {},
+    mock: [{ id: 'p1', name: 'Liked', duration: 3600, trackCount: 10 }],
+  },
+  list_tracks: {
+    args: { playlist: 'Liked', limit: 100 },
+    mock: { total: 0, returned: 0, tracks: [] },
+  },
 };
 
 // ── Test suite ──────────────────────────────────────────────────────

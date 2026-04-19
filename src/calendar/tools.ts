@@ -3,7 +3,7 @@ import { z } from "zod";
 import { runAutomation } from "../shared/automation.js";
 import { runSwift } from "../shared/swift.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okUntrusted, okUntrustedStructured, okUntrustedLinkedStructured, toolError } from "../shared/result.js";
+import { ok, okStructured, okUntrustedStructured, okUntrustedLinkedStructured, toolError } from "../shared/result.js";
 import {
   listCalendarsScript,
   listEventsScript,
@@ -96,6 +96,16 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
       title: "List Calendars",
       description: "List all calendars with name, color, and writable status.",
       inputSchema: {},
+      outputSchema: {
+        calendars: z.array(
+          z.object({
+            id: z.string(),
+            name: z.string(),
+            color: z.string().nullable(),
+            writable: z.boolean(),
+          }),
+        ),
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -109,7 +119,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
           swift: { command: "list-calendars" },
           jxa: () => listCalendarsScript(),
         });
-        return ok(result);
+        return okStructured({ calendars: result });
       } catch (e) {
         return toolError("list calendars", e);
       }
@@ -183,6 +193,25 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
       inputSchema: {
         id: z.string().max(500).describe("Event UID"),
       },
+      outputSchema: {
+        id: z.string(),
+        summary: z.string(),
+        description: z.string().nullable(),
+        location: z.string().nullable(),
+        startDate: z.string(),
+        endDate: z.string(),
+        allDay: z.boolean(),
+        recurrence: z.string().nullable(),
+        url: z.string().nullable(),
+        calendar: z.string(),
+        attendees: z.array(
+          z.object({
+            name: z.string().nullable(),
+            email: z.string().nullable(),
+            status: z.string().nullable(),
+          }),
+        ),
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -196,7 +225,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
           swift: { command: "read-event", input: { id } },
           jxa: () => readEventScript(id),
         });
-        return okUntrusted(result);
+        return okUntrustedStructured(result);
       } catch (e) {
         return toolError("read event", e);
       }

@@ -417,9 +417,10 @@ describe('list_folders', () => {
     const result = await server.callTool('list_folders', {});
 
     expect(result.isError).toBeUndefined();
+    // outputSchema Wave 2 wraps the array under `folders`.
     const parsed = JSON.parse(result.content[0].text);
-    expect(parsed).toHaveLength(2);
-    expect(parsed[0].name).toBe('Notes');
+    expect(parsed.folders).toHaveLength(2);
+    expect(parsed.folders[0].name).toBe('Notes');
   });
 
   test('filters shared folders when includeShared=false', async () => {
@@ -431,8 +432,8 @@ describe('list_folders', () => {
 
     const result = await server.callTool('list_folders', {});
     const parsed = JSON.parse(result.content[0].text);
-    expect(parsed).toHaveLength(1);
-    expect(parsed[0].name).toBe('Notes');
+    expect(parsed.folders).toHaveLength(1);
+    expect(parsed.folders[0].name).toBe('Notes');
   });
 });
 

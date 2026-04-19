@@ -12,10 +12,25 @@
 import type { McpServer } from "../shared/mcp.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import { z } from "zod";
-import { ok, err, toolError } from "../shared/result.js";
+import { okStructured, err, toolError } from "../shared/result.js";
 import { MemoryStore, type MemoryKind } from "./store.js";
 
 const kindSchema = z.enum(["fact", "entity", "episode"]);
+
+// Shared entry shape for outputSchema fields. Keeps put/query output
+// shapes in sync so the Wave 2 drift-guard can assert one schema rather
+// than duplicating the same 9 fields in three places.
+const memoryEntrySchema = z.object({
+  id: z.string(),
+  kind: kindSchema,
+  key: z.string(),
+  value: z.string(),
+  tags: z.array(z.string()),
+  source: z.string().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  expiresAt: z.string().optional(),
+});
 
 export function registerMemoryTools(server: McpServer, _config: AirMcpConfig): void {
   const store = new MemoryStore();
@@ -38,6 +53,9 @@ export function registerMemoryTools(server: McpServer, _config: AirMcpConfig): v
         source: z.string().optional().describe("Originator — tool name, skill id, 'user' …"),
         ttl_ms: z.number().int().positive().optional().describe("Self-expire after N milliseconds"),
       },
+      outputSchema: {
+        stored: memoryEntrySchema,
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -56,7 +74,7 @@ export function registerMemoryTools(server: McpServer, _config: AirMcpConfig): v
           source,
           ttlMs: ttl_ms,
         });
-        return ok({ stored: entry });
+        return okStructured({ stored: entry });
       } catch (e) {
         return toolError("store memory entry", e);
       }
@@ -78,6 +96,10 @@ export function registerMemoryTools(server: McpServer, _config: AirMcpConfig): v
         limit: z.number().int().min(1).max(500).optional().describe("Max rows (default 50, cap 500)"),
         order: z.enum(["desc", "asc"]).optional().describe("Sort by updatedAt (default desc)"),
       },
+      outputSchema: {
+        total: z.number(),
+        entries: z.array(memoryEntrySchema),
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -94,7 +116,7 @@ export function registerMemoryTools(server: McpServer, _config: AirMcpConfig): v
           limit,
           order,
         });
-        return ok({ total: entries.length, entries });
+        return okStructured({ total: entries.length, entries });
       } catch (e) {
         return toolError("query memory entries", e);
       }
@@ -115,6 +137,10 @@ export function registerMemoryTools(server: McpServer, _config: AirMcpConfig): v
         tag: z.string().optional().describe("Delete all entries tagged with this label"),
         kind: kindSchema.optional().describe("Only delete entries of this kind"),
       },
+      outputSchema: {
+        removed: z.array(z.string()),
+        count: z.number(),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: true,
@@ -134,7 +160,7 @@ export function registerMemoryTools(server: McpServer, _config: AirMcpConfig): v
           tag,
           kind: kind as MemoryKind | undefined,
         });
-        return ok({ removed, count: removed.length });
+        return okStructured({ removed, count: removed.length });
       } catch (e) {
         return toolError("forget memory entries", e);
       }
@@ -149,6 +175,14 @@ export function registerMemoryTools(server: McpServer, _config: AirMcpConfig): v
         "Summarize the context-memory store: counts by kind, oldest/newest timestamps, " +
         "and on-disk path. Also sweeps any expired entries as a side-effect.",
       inputSchema: {},
+      outputSchema: {
+        total: z.number(),
+        byKind: z.object({ fact: z.number(), entity: z.number(), episode: z.number() }),
+        oldest: z.string().optional(),
+        newest: z.string().optional(),
+        expiredSwept: z.number(),
+        path: z.string(),
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -159,7 +193,7 @@ export function registerMemoryTools(server: McpServer, _config: AirMcpConfig): v
     async () => {
       try {
         const stats = await store.stats();
-        return ok(stats);
+        return okStructured(stats);
       } catch (e) {
         return toolError("read memory stats", e);
       }

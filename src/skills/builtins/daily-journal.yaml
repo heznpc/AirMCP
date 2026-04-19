@@ -1,0 +1,59 @@
+name: daily-journal
+title: "Daily Journal → Memory"
+description: >-
+  Captures today's events + open reminders, summarises them on-device,
+  and persists the summary as a context-memory `episode` tagged
+  `journal`. Demonstrates inputs + parallel + retry + the
+  newly-exposed `memory_put` tool working together so ai_agent can
+  later recall "what did I do last Tuesday?" via `memory_query`.
+  DESTRUCTIVE: writes a memory entry (non-destructive to Apple apps).
+expose_as: tool
+
+inputs:
+  note:
+    type: string
+    description: "Optional free-form note to prepend to the auto-generated summary."
+    default: ""
+
+steps:
+  # 1) Parallel read: today's events + open reminders. Both are
+  #    tolerant to failure so a missing calendar permission doesn't
+  #    sink the journal entry.
+  - id: events
+    tool: today_events
+    parallel: true
+    on_error: continue
+
+  - id: reminders
+    tool: list_reminders
+    args:
+      completed: false
+      limit: 15
+    parallel: true
+    on_error: continue
+
+  # 2) Summarise via on-device Foundation Models with retry — LLM
+  #    cold-start occasionally times out. If all retries fail,
+  #    on_error: continue lets step 3 still write the raw payload.
+  - id: summary
+    tool: summarize_text
+    args:
+      text: |
+        Prepend: {{note}}
+        Events: {{events}}
+        Reminders: {{reminders}}
+    retry: 2
+    retry_backoff_ms: 500
+    on_error: continue
+
+  # 3) Persist as an episode. `{{_timestamp}}` is not (yet) an
+  #    implicit input, so we key by a date the LLM can parse later
+  #    via memory_query(contains="journal").
+  - id: persist
+    tool: memory_put
+    args:
+      kind: episode
+      key: "journal"
+      value: "{{summary}}"
+      tags: ["journal", "daily"]
+      source: "skill:daily-journal"

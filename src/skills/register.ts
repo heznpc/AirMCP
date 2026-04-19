@@ -65,8 +65,18 @@ function buildSkillInputSchema(inputs: Record<string, SkillInput>): Record<strin
   return schema;
 }
 
-function generatePromptText(skill: SkillDefinition): string {
+function generatePromptText(skill: SkillDefinition, args: Record<string, unknown> = {}): string {
   const lines = [`Execute the following workflow "${skill.title}" using AirMCP tools:`];
+  // When the prompt was called with arguments, surface them so the LLM
+  // knows which inputs are already bound and doesn't re-ask. Keys are
+  // displayed in declaration order (Object.entries is stable).
+  if (Object.keys(args).length > 0) {
+    lines.push("", "Inputs:");
+    for (const [k, v] of Object.entries(args)) {
+      if (v === undefined) continue;
+      lines.push(`  ${k} = ${JSON.stringify(v)}`);
+    }
+  }
   for (let i = 0; i < skill.steps.length; i++) {
     const step = skill.steps[i]!;
     let line = `${i + 1}. [${step.id}] Call \`${step.tool}\``;
@@ -81,9 +91,40 @@ function generatePromptText(skill: SkillDefinition): string {
   return lines.join("\n");
 }
 
+/**
+ * Convert skill `inputs` to a prompt-argument schema. MCP prompt arguments
+ * carry no type information on the wire — every value arrives as a string.
+ * We map each input to a `z.string()` with `.describe()` / `.optional()`
+ * so the client UI renders the right hint, but the skill executor never
+ * sees these values (prompt registration just generates the prompt text).
+ */
+function buildPromptArgsSchema(inputs: Record<string, SkillInput>): Record<string, z.ZodTypeAny> {
+  const out: Record<string, z.ZodTypeAny> = {};
+  for (const [name, spec] of Object.entries(inputs)) {
+    let field: z.ZodString = z.string();
+    if (spec.description) field = field.describe(spec.description);
+    out[name] = spec.required ? field : field.optional();
+  }
+  return out;
+}
+
 function registerAsPrompt(server: McpServer, skill: SkillDefinition): void {
-  const text = generatePromptText(skill);
-  server.prompt(skill.name, skill.description, () => userPrompt(skill.description, text));
+  if (skill.inputs && Object.keys(skill.inputs).length > 0) {
+    // Modern path — typed argsSchema exposed to the client, plus the
+    // generated prompt text includes the bound values as an `Inputs:`
+    // block so the LLM picks them up.
+    const argsSchema = buildPromptArgsSchema(skill.inputs);
+    server.registerPrompt(
+      skill.name,
+      { title: skill.title, description: skill.description, argsSchema },
+      (args: Record<string, unknown> = {}) => userPrompt(skill.description, generatePromptText(skill, args)),
+    );
+    return;
+  }
+  // Legacy path — no inputs, keep the existing single-line registration
+  // so nothing in the wire format changes for built-ins that don't need
+  // arguments yet.
+  server.prompt(skill.name, skill.description, () => userPrompt(skill.description, generatePromptText(skill)));
 }
 
 function registerAsTool(server: McpServer, skill: SkillDefinition): void {

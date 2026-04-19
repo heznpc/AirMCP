@@ -51,6 +51,7 @@ function createMockServer() {
   return {
     registerTool: jest.fn(),
     prompt: jest.fn(),
+    registerPrompt: jest.fn(),
   };
 }
 
@@ -346,5 +347,67 @@ describe('registerSkills — runtime inputs', () => {
     await handler();
 
     expect(mockExecuteSkill).toHaveBeenCalledWith(server, skill, {});
+  });
+});
+
+describe('registerSkills — prompt arguments', () => {
+  let server;
+  beforeEach(() => {
+    server = createMockServer();
+    mockExecuteSkill.mockReset();
+    ok.mockClear();
+    err.mockClear();
+  });
+
+  test('prompt skill without inputs uses the legacy server.prompt() path', () => {
+    const skill = makeSkill({ name: 'legacy-prompt', expose_as: 'prompt' });
+    registerSkills(server, [skill]);
+
+    expect(server.prompt).toHaveBeenCalledTimes(1);
+    expect(server.registerPrompt).not.toHaveBeenCalled();
+  });
+
+  test('prompt skill WITH inputs uses registerPrompt + argsSchema', () => {
+    const skill = makeSkill({
+      name: 'prompt-with-inputs',
+      expose_as: 'prompt',
+      inputs: {
+        query: { type: 'string', description: 'search term', required: true },
+        limit: { type: 'number', description: 'max hits', default: 10 },
+      },
+    });
+    registerSkills(server, [skill]);
+
+    expect(server.registerPrompt).toHaveBeenCalledTimes(1);
+    expect(server.prompt).not.toHaveBeenCalled();
+
+    const [name, config, cb] = server.registerPrompt.mock.calls[0];
+    expect(name).toBe('prompt-with-inputs');
+    expect(config.title).toBe(skill.title);
+    expect(config.description).toBe(skill.description);
+    expect(config.argsSchema).toBeDefined();
+    expect(Object.keys(config.argsSchema).sort()).toEqual(['limit', 'query']);
+    // Prompt args are always string on the wire — the schema should reflect that
+    expect(config.argsSchema.query.safeParse('hello').success).toBe(true);
+    expect(config.argsSchema.query.safeParse(undefined).success).toBe(false); // required
+    expect(config.argsSchema.limit.safeParse(undefined).success).toBe(true); // optional
+
+    // Callback folds args into the generated prompt body
+    const result = cb({ query: 'newsletter', limit: '5' });
+    const text = result.messages[0].content.text;
+    expect(text).toContain('Inputs:');
+    expect(text).toContain('query = "newsletter"');
+  });
+
+  test('registerPrompt callback handles no args (returns text without Inputs block)', () => {
+    const skill = makeSkill({
+      name: 'prompt-args-optional',
+      expose_as: 'prompt',
+      inputs: { query: { type: 'string' } },
+    });
+    registerSkills(server, [skill]);
+    const [, , cb] = server.registerPrompt.mock.calls[0];
+    const text = cb().messages[0].content.text;
+    expect(text).not.toContain('Inputs:');
   });
 });

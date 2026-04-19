@@ -477,7 +477,7 @@ export async function createServer(
     toolCount,
     promptCount,
     dynamicShortcuts: dynamicShortcutCount,
-    skillsBuiltin: 3,
+    skillsBuiltin: 7,
     skillsUser: 0,
     hitlLevel: config.hitl.level,
     macosVersion: osVersion,

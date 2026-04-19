@@ -1,5 +1,5 @@
-name: weekly-review
-title: "Weekly Review"
+name: skills-weekly-review
+title: "Weekly Review (Skills DSL)"
 description: >-
   Pulls a structured week-in-review in a single pass: upcoming calendar,
   open reminders, recent notes, mail backlog, and a health snapshot — all

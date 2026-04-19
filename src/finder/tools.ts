@@ -2,7 +2,7 @@ import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okLinked, okUntrusted, okUntrustedStructured, toolError } from "../shared/result.js";
+import { ok, okLinked, okUntrustedStructured, toolError } from "../shared/result.js";
 import { zFilePath, resolveAndGuard } from "../shared/validate.js";
 import {
   searchFilesScript,
@@ -115,11 +115,23 @@ export function registerFinderTools(server: McpServer, _config: AirMcpConfig): v
         path: zFilePath.describe("Absolute directory path"),
         limit: z.number().int().min(1).max(500).optional().default(100).describe("Max items to return (default: 100)"),
       },
+      outputSchema: {
+        total: z.number(),
+        returned: z.number(),
+        items: z.array(
+          z.object({
+            name: z.string(),
+            kind: z.string(),
+            size: z.number().optional(),
+            modificationDate: z.string().optional(),
+          }),
+        ),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ path, limit }) => {
       try {
-        return okUntrusted(await runJxa(listDirectoryScript(path, limit)));
+        return okUntrustedStructured(await runJxa(listDirectoryScript(path, limit)));
       } catch (e) {
         return toolError("list directory", e);
       }

@@ -2,7 +2,7 @@ import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okLinked, okUntrusted, okStructured, err, toolError } from "../shared/result.js";
+import { ok, okStructured, okUntrusted, okUntrustedLinkedStructured, err, toolError } from "../shared/result.js";
 // Side-effect import: register the mail_unread poller with the shared registry
 // at module load time. The poller itself only starts when startPollers() is
 // invoked by the cross/event observer tool.
@@ -61,11 +61,29 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
         limit: z.number().int().min(1).max(200).optional().default(50).describe("Max messages (default: 50)"),
         offset: z.number().int().min(0).optional().default(0).describe("Pagination offset (default: 0)"),
       },
+      outputSchema: {
+        total: z.number(),
+        offset: z.number(),
+        returned: z.number(),
+        messages: z.array(
+          z.object({
+            id: z.string(),
+            subject: z.string(),
+            sender: z.string(),
+            dateReceived: z.string().nullable(),
+            read: z.boolean(),
+            flagged: z.boolean(),
+          }),
+        ),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ mailbox, account, limit, offset }) => {
       try {
-        return okLinked("list_mail", await runJxa(listMessagesScript(mailbox, limit, offset, account)));
+        return okUntrustedLinkedStructured(
+          "list_mail",
+          await runJxa(listMessagesScript(mailbox, limit, offset, account)),
+        );
       } catch (e) {
         return toolError("list messages", e);
       }
@@ -219,11 +237,24 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
       title: "List Mail Accounts",
       description: "List all mail accounts.",
       inputSchema: {},
+      outputSchema: {
+        accounts: z.array(
+          z.object({
+            name: z.string(),
+            fullName: z.string().nullable(),
+            emailAddresses: z.array(z.string()),
+          }),
+        ),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async () => {
       try {
-        return ok(await runJxa(listAccountsScript()));
+        const accounts =
+          await runJxa<Array<{ name: string; fullName: string | null; emailAddresses: string[] }>>(
+            listAccountsScript(),
+          );
+        return okStructured({ accounts });
       } catch (e) {
         return toolError("list accounts", e);
       }

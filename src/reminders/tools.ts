@@ -3,7 +3,7 @@ import { z } from "zod";
 import { runAutomation } from "../shared/automation.js";
 import { runSwift } from "../shared/swift.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okLinked, okLinkedStructured, okUntrusted, okUntrustedStructured, toolError } from "../shared/result.js";
+import { ok, okLinked, okLinkedStructured, okStructured, okUntrustedStructured, toolError } from "../shared/result.js";
 import type { MutationResult, DeleteResult } from "../shared/types.js";
 import {
   listReminderListsScript,
@@ -63,6 +63,15 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
       title: "List Reminder Lists",
       description: "List all reminder lists with reminder counts.",
       inputSchema: {},
+      outputSchema: {
+        lists: z.array(
+          z.object({
+            id: z.string(),
+            name: z.string(),
+            reminderCount: z.number(),
+          }),
+        ),
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -76,7 +85,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
           swift: { command: "list-reminder-lists" },
           jxa: () => listReminderListsScript(),
         });
-        return ok(result);
+        return okStructured({ lists: result });
       } catch (e) {
         return toolError("list reminder lists", e);
       }
@@ -160,6 +169,19 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
       inputSchema: {
         id: z.string().max(500).describe("Reminder ID"),
       },
+      outputSchema: {
+        id: z.string(),
+        name: z.string(),
+        body: z.string(),
+        completed: z.boolean(),
+        completionDate: z.string().nullable(),
+        creationDate: z.string(),
+        modificationDate: z.string(),
+        dueDate: z.string().nullable(),
+        priority: z.number(),
+        flagged: z.boolean(),
+        list: z.string(),
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -173,7 +195,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
           swift: { command: "read-reminder", input: { id } },
           jxa: () => readReminderScript(id),
         });
-        return okUntrusted(result);
+        return okUntrustedStructured(result);
       } catch (e) {
         return toolError("read reminder", e);
       }

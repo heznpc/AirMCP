@@ -7,6 +7,7 @@ import {
   ok,
   okLinked,
   okLinkedStructured,
+  okStructured,
   okUntrusted,
   okUntrustedStructured,
   errPermission,
@@ -211,6 +212,17 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
       inputSchema: {
         id: z.string().max(500).describe("Note ID (x-coredata:// format)"),
       },
+      outputSchema: {
+        id: z.string(),
+        name: z.string(),
+        body: z.string(),
+        plaintext: z.string(),
+        creationDate: z.string(),
+        modificationDate: z.string(),
+        folder: z.string(),
+        shared: z.boolean(),
+        passwordProtected: z.boolean(),
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -223,7 +235,7 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
         const result = await runJxa<NoteDetail>(readNoteScript(id));
         const blocked = await guardSharedAccess(result.shared, config, "notes", "read_note", { id });
         if (blocked) return errPermission(blocked);
-        return okUntrusted(result);
+        return okUntrustedStructured(result);
       } catch (e) {
         return toolError("read note", e);
       }
@@ -320,6 +332,17 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
       title: "List Folders",
       description: "List all folders across all accounts with note counts.",
       inputSchema: {},
+      outputSchema: {
+        folders: z.array(
+          z.object({
+            id: z.string(),
+            name: z.string(),
+            account: z.string(),
+            noteCount: z.number(),
+            shared: z.boolean(),
+          }),
+        ),
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -330,7 +353,7 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
     async () => {
       try {
         const result = await runJxa<FolderItem[]>(listFoldersScript());
-        return ok(filterSharedAccess(result, config, "notes"));
+        return okStructured({ folders: filterSharedAccess(result, config, "notes") });
       } catch (e) {
         return toolError("list folders", e);
       }

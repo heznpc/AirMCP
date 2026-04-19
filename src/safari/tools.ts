@@ -245,11 +245,21 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
       title: "List Bookmarks",
       description: "List all Safari bookmarks across all folders, including subfolder paths.",
       inputSchema: {},
+      outputSchema: {
+        count: z.number(),
+        bookmarks: z.array(
+          z.object({
+            title: z.string(),
+            url: z.string(),
+            folder: z.string(),
+          }),
+        ),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async () => {
       try {
-        return okUntrusted(await runJxa(listBookmarksScript()));
+        return okUntrustedStructured(await runJxa(listBookmarksScript()));
       } catch (e) {
         return toolError("list bookmarks", e);
       }
@@ -283,11 +293,20 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
       title: "List Reading List",
       description: "List all items in Safari's Reading List.",
       inputSchema: {},
+      outputSchema: {
+        count: z.number(),
+        items: z.array(
+          z.object({
+            title: z.string(),
+            url: z.string(),
+          }),
+        ),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async () => {
       try {
-        return okUntrusted(await runJxa(listReadingListScript()));
+        return okUntrustedStructured(await runJxa(listReadingListScript()));
       } catch (e) {
         return toolError("list reading list", e);
       }

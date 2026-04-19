@@ -2,7 +2,7 @@ import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okLinkedStructured, toolError } from "../shared/result.js";
+import { ok, okLinkedStructured, okStructured, toolError } from "../shared/result.js";
 // Side-effect import: register the now_playing poller with the shared registry
 // at module load time. The poller itself only starts when startPollers() is
 // invoked by the cross/event observer tool.
@@ -34,11 +34,25 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
       title: "List Playlists",
       description: "List all Music playlists with track counts and duration.",
       inputSchema: {},
+      outputSchema: {
+        playlists: z.array(
+          z.object({
+            id: z.string(),
+            name: z.string(),
+            duration: z.number(),
+            trackCount: z.number(),
+          }),
+        ),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async () => {
       try {
-        return ok(await runJxa(listPlaylistsScript()));
+        const playlists =
+          await runJxa<Array<{ id: string; name: string; duration: number; trackCount: number }>>(
+            listPlaylistsScript(),
+          );
+        return okStructured({ playlists });
       } catch (e) {
         return toolError("list playlists", e);
       }
@@ -54,11 +68,27 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
         playlist: z.string().max(500).describe("Playlist name"),
         limit: z.number().int().min(1).max(500).optional().default(100).describe("Max tracks (default: 100)"),
       },
+      outputSchema: {
+        total: z.number(),
+        returned: z.number(),
+        tracks: z.array(
+          z.object({
+            id: z.string(),
+            name: z.string(),
+            artist: z.string().nullable(),
+            album: z.string().nullable(),
+            duration: z.number().nullable(),
+            trackNumber: z.number().nullable(),
+            genre: z.string().nullable(),
+            year: z.number().nullable(),
+          }),
+        ),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ playlist, limit }) => {
       try {
-        return ok(await runJxa(listTracksScript(playlist, limit)));
+        return okStructured(await runJxa(listTracksScript(playlist, limit)));
       } catch (e) {
         return toolError("list tracks", e);
       }

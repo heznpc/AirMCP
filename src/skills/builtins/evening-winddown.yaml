@@ -1,0 +1,61 @@
+name: evening-winddown
+title: "Evening Wind-down"
+description: >-
+  Fires when the screen is locked — drafts a short day-in-review note
+  covering today's events + open reminders so the next unlock (or
+  tomorrow morning) has a fresh snapshot waiting. Showcases the
+  `screen_locked` event trigger combined with `parallel` reads and
+  `retry` on the on-device summariser.
+expose_as: tool
+trigger:
+  event: screen_locked
+  # 5-min debounce because a laptop lid briefly closing during a
+  # meeting should not spawn multiple digests.
+  debounce_ms: 300000
+
+steps:
+  # 1) Pull the day's artefacts in parallel. `on_error: continue` on
+  #    each so a temporarily unavailable source (e.g. Foundation Models
+  #    on Intel) never blocks the rest.
+  - id: events_today
+    tool: today_events
+    parallel: true
+    on_error: continue
+
+  - id: open_reminders
+    tool: list_reminders
+    args:
+      completed: false
+      limit: 15
+    parallel: true
+    on_error: continue
+
+  # 2) One-shot summariser across both sources. `retry: 2` smooths over
+  #    Foundation Models' occasional cold-start timeout; if all three
+  #    attempts fail, `on_error: continue` lets the note still land
+  #    with the raw payload in place of the summary.
+  - id: summary
+    tool: summarize_text
+    only_if: "{{events_today.total}} > 0 || {{open_reminders.total}} > 0"
+    args:
+      text: |
+        Events today: {{events_today}}
+        Open reminders: {{open_reminders}}
+    retry: 2
+    retry_backoff_ms: 800
+    on_error: continue
+
+  # 3) Pin the digest into Notes. Even if the summary step fell back to
+  #    { error }, the note is still useful as a raw capture.
+  - id: note
+    tool: create_note
+    args:
+      body: |
+        <h1>Evening wind-down</h1>
+        <p>Auto-captured at screen lock.</p>
+        <h2>Summary</h2>
+        <p>{{summary}}</p>
+        <h2>Events</h2>
+        <pre>{{events_today}}</pre>
+        <h2>Reminders ({{open_reminders.total}})</h2>
+        <pre>{{open_reminders}}</pre>

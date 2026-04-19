@@ -54,6 +54,8 @@ export const SkillDefinitionSchema = z.object({
         "focus_mode_changed",
         "now_playing_changed",
         "file_modified",
+        "screen_locked",
+        "screen_unlocked",
       ]),
       debounce_ms: z.number().optional(),
     })

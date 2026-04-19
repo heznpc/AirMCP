@@ -312,6 +312,11 @@ export async function createServer(
   const onFocusModeChanged = () => invalidateAndNotify(["system:focus", ...SNAPSHOT_KEYS]);
   const onNowPlayingChanged = () => invalidateAndNotify(["music:now", ...SNAPSHOT_KEYS]);
   const onFileModified = () => invalidateAndNotify(["finder:recent"]);
+  // Screen lock/unlock don't have a dedicated resource cache to invalidate,
+  // but we refresh the snapshot keys so any context a subscriber pulls
+  // after unlocking reflects the current Focus/clipboard state.
+  const onScreenLocked = () => invalidateAndNotify(SNAPSHOT_KEYS);
+  const onScreenUnlocked = () => invalidateAndNotify(SNAPSHOT_KEYS);
 
   // event_subscribe: start real-time event observation
   lServer.registerTool(
@@ -341,6 +346,8 @@ export async function createServer(
         eventBus.off("focus_mode_changed", onFocusModeChanged);
         eventBus.off("now_playing_changed", onNowPlayingChanged);
         eventBus.off("file_modified", onFileModified);
+        eventBus.off("screen_locked", onScreenLocked);
+        eventBus.off("screen_unlocked", onScreenUnlocked);
         eventBus.start();
 
         // Connect events to MCP resource notifications
@@ -351,6 +358,8 @@ export async function createServer(
         eventBus.on("focus_mode_changed", onFocusModeChanged);
         eventBus.on("now_playing_changed", onNowPlayingChanged);
         eventBus.on("file_modified", onFileModified);
+        eventBus.on("screen_locked", onScreenLocked);
+        eventBus.on("screen_unlocked", onScreenUnlocked);
 
         // Start Node-side pollers for mail unread and now-playing.
         // Safe to call multiple times (idempotent).
@@ -366,6 +375,8 @@ export async function createServer(
             "focus_mode",
             "now_playing",
             "file_modified",
+            "screen_locked",
+            "screen_unlocked",
           ],
         });
       } catch (e) {
@@ -394,7 +405,7 @@ export async function createServer(
     {
       title: "List Event Triggers",
       description:
-        "Show all skills with event triggers (calendar_changed, reminders_changed, pasteboard_changed, mail_unread_changed, focus_mode_changed, now_playing_changed, file_modified) and their debounce settings.",
+        "Show all skills with event triggers (calendar_changed, reminders_changed, pasteboard_changed, mail_unread_changed, focus_mode_changed, now_playing_changed, file_modified, screen_locked, screen_unlocked) and their debounce settings.",
       inputSchema: {},
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },

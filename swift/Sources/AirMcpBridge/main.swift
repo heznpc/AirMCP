@@ -1461,6 +1461,12 @@ case "start-observer":
         case .fileModified(let path, let kind):
             type = "file_modified"
             data = ["source": "dispatch_source", "path": path, "kind": kind]
+        case .screenLocked:
+            type = "screen_locked"
+            data = ["source": "distributed_notification"]
+        case .screenUnlocked:
+            type = "screen_unlocked"
+            data = ["source": "distributed_notification"]
         }
         let notification: [String: Any] = [
             "id": "__event__",

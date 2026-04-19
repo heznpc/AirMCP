@@ -13,6 +13,8 @@ public actor EventObserver {
         case pasteboardChanged(String?)
         case focusModeChanged(String?)
         case fileModified(path: String, kind: String)
+        case screenLocked
+        case screenUnlocked
     }
 
     public typealias Handler = @Sendable (Event) -> Void
@@ -27,6 +29,8 @@ public actor EventObserver {
     private var calendarObserver: NSObjectProtocol?
     private var reminderObserver: NSObjectProtocol?
     private var focusObserver: NSObjectProtocol?
+    private var screenLockObserver: NSObjectProtocol?
+    private var screenUnlockObserver: NSObjectProtocol?
     private var pasteboardTimer: Timer?
     private var lastPasteboardCount: Int = 0
 
@@ -81,6 +85,27 @@ public actor EventObserver {
                 ?? (note.userInfo?["mode"] as? String)
             Task { await self.emit(.focusModeChanged(state)) }
         }
+
+        // Screen lock / unlock — public DistributedNotificationCenter
+        // signals that have been stable across macOS 10.x → 26. Used by
+        // the loginwindow process; no TCC/Automation permission needed
+        // because we're only observing, not triggering.
+        screenLockObserver = DistributedNotificationCenter.default().addObserver(
+            forName: Notification.Name("com.apple.screenIsLocked"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            Task { await self.emit(.screenLocked) }
+        }
+        screenUnlockObserver = DistributedNotificationCenter.default().addObserver(
+            forName: Notification.Name("com.apple.screenIsUnlocked"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            Task { await self.emit(.screenUnlocked) }
+        }
         #endif
 
         startFileWatchers()
@@ -100,6 +125,14 @@ public actor EventObserver {
         if let obs = focusObserver {
             DistributedNotificationCenter.default().removeObserver(obs)
             focusObserver = nil
+        }
+        if let obs = screenLockObserver {
+            DistributedNotificationCenter.default().removeObserver(obs)
+            screenLockObserver = nil
+        }
+        if let obs = screenUnlockObserver {
+            DistributedNotificationCenter.default().removeObserver(obs)
+            screenUnlockObserver = nil
         }
         #endif
         pasteboardTimer?.invalidate()

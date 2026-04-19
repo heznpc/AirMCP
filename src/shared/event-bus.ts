@@ -7,7 +7,9 @@ export type AirMCPEventType =
   | "mail_unread_changed"
   | "focus_mode_changed"
   | "now_playing_changed"
-  | "file_modified";
+  | "file_modified"
+  | "screen_locked"
+  | "screen_unlocked";
 
 export interface AirMCPEvent {
   type: AirMCPEventType;
@@ -23,6 +25,8 @@ const VALID_EVENT_TYPES = new Set<AirMCPEventType>([
   "focus_mode_changed",
   "now_playing_changed",
   "file_modified",
+  "screen_locked",
+  "screen_unlocked",
 ]);
 
 function isValidEventType(value: unknown): value is AirMCPEventType {

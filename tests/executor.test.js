@@ -912,6 +912,56 @@ describe('executeSkill – on_error', () => {
   });
 });
 
+describe('executeSkill – runtime inputs', () => {
+  beforeEach(() => {
+    mockCallTool.mockReset();
+  });
+
+  test('seeds declared inputs into the template scope', async () => {
+    mockCallTool.mockResolvedValueOnce(okResponse({ found: 1 }));
+    const skill = {
+      name: 'input-seed',
+      steps: [{ id: 'search', tool: 'do_search', args: { q: '{{query}}' } }],
+    };
+    const result = await executeSkill(fakeServer, skill, { query: 'hello world' });
+
+    expect(result.success).toBe(true);
+    expect(mockCallTool).toHaveBeenCalledWith('do_search', { q: 'hello world' });
+  });
+
+  test('input values are available to later steps alongside prior results', async () => {
+    mockCallTool
+      .mockResolvedValueOnce(okResponse([1, 2]))
+      .mockResolvedValueOnce(okResponse({ a: true }))
+      .mockResolvedValueOnce(okResponse({ b: true }));
+
+    const skill = {
+      name: 'input-plus-step',
+      steps: [
+        { id: 'seed', tool: 'seed', args: {} },
+        { id: 'each', tool: 'worker', loop: '{{seed}}', args: { index: '{{_index}}', tag: '{{tag}}' } },
+      ],
+    };
+    const result = await executeSkill(fakeServer, skill, { tag: 'alpha' });
+
+    expect(result.success).toBe(true);
+    // Loop runs once per seed element; each call gets the input `tag`.
+    expect(mockCallTool).toHaveBeenNthCalledWith(2, 'worker', { index: 0, tag: 'alpha' });
+    expect(mockCallTool).toHaveBeenNthCalledWith(3, 'worker', { index: 1, tag: 'alpha' });
+  });
+
+  test('no inputs given is equivalent to empty inputs (prior behaviour unchanged)', async () => {
+    mockCallTool.mockResolvedValueOnce(okResponse({ ok: true }));
+    const skill = {
+      name: 'no-inputs',
+      steps: [{ id: 'only', tool: 'x', args: {} }],
+    };
+    const result = await executeSkill(fakeServer, skill);
+    expect(result.success).toBe(true);
+    expect(mockCallTool).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('executeSkill – retry', () => {
   beforeEach(() => {
     mockCallTool.mockReset();

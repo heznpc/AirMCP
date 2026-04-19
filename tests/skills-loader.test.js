@@ -164,6 +164,70 @@ steps: []
     expect(result).toBeNull();
   });
 
+  test('accepts a skill with runtime inputs that do not collide with step ids', () => {
+    mockReadFileSync.mockReturnValue(`
+name: with-inputs
+title: With Inputs
+description: Runtime inputs
+expose_as: tool
+inputs:
+  query:
+    type: string
+    description: A search keyword
+    default: newsletter
+  mailbox:
+    type: string
+    default: INBOX
+steps:
+  - id: search
+    tool: search_messages
+    args:
+      q: "{{query}}"
+`);
+    const result = loadSkillFile('/path/to/with-inputs.yaml');
+    expect(result).not.toBeNull();
+    expect(result.inputs.query.default).toBe('newsletter');
+  });
+
+  test('rejects a skill when an input name collides with a step id', () => {
+    mockReadFileSync.mockReturnValue(`
+name: collision
+title: Collision
+description: Input name collides with step id
+expose_as: tool
+inputs:
+  search:
+    type: string
+steps:
+  - id: search
+    tool: some_tool
+    args: {}
+`);
+    const result = loadSkillFile('/path/to/collision.yaml');
+    expect(result).toBeNull();
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining('input name(s) collide with step id(s): search'),
+    );
+  });
+
+  test('rejects invalid input names (uppercase / hyphen)', () => {
+    mockReadFileSync.mockReturnValue(`
+name: bad-input-name
+title: Bad input name
+description: Input name must be lowercase identifier
+expose_as: tool
+inputs:
+  BadName:
+    type: string
+steps:
+  - id: s
+    tool: t
+    args: {}
+`);
+    const result = loadSkillFile('/path/to/bad.yaml');
+    expect(result).toBeNull();
+  });
+
   test('validates step ID must be lowercase alphanumeric with underscores', () => {
     const badStepId = `
 name: bad-step

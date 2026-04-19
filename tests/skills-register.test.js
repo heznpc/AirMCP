@@ -156,7 +156,7 @@ describe('registerAsTool handler', () => {
     const handler = server.registerTool.mock.calls[0][2];
     const response = await handler();
 
-    expect(mockExecuteSkill).toHaveBeenCalledWith(server, skill);
+    expect(mockExecuteSkill).toHaveBeenCalledWith(server, skill, {});
     expect(ok).toHaveBeenCalledWith(skillResult);
     expect(response.isError).toBeUndefined();
   });
@@ -283,5 +283,68 @@ describe('registerAsPrompt handler', () => {
 
     expect(text).toContain('[simple] Call `simple_tool`');
     expect(text).not.toContain('with args:');
+  });
+});
+
+describe('registerSkills — runtime inputs', () => {
+  let server;
+  beforeEach(() => {
+    server = createMockServer();
+    mockExecuteSkill.mockReset();
+    ok.mockClear();
+    err.mockClear();
+  });
+
+  test('builds a Zod inputSchema from the declared inputs', () => {
+    const skill = makeSkill({
+      name: 'with-inputs',
+      expose_as: 'tool',
+      inputs: {
+        query: { type: 'string', description: 'search keyword', default: 'newsletter' },
+        limit: { type: 'number', description: 'max hits', default: 10 },
+        archive: { type: 'boolean', required: true },
+      },
+    });
+
+    registerSkills(server, [skill]);
+
+    // Grab the config passed to server.registerTool — we care about the
+    // fields existing and carrying the right ZodTypes.
+    const [, config] = server.registerTool.mock.calls[0];
+    expect(config.inputSchema).toBeDefined();
+    expect(Object.keys(config.inputSchema).sort()).toEqual(['archive', 'limit', 'query']);
+    // query has a default → safeParse({}) should populate it
+    const parsed = config.inputSchema.query.safeParse(undefined);
+    expect(parsed.success).toBe(true);
+    expect(parsed.data).toBe('newsletter');
+    // archive is required → missing value is a parse error
+    expect(config.inputSchema.archive.safeParse(undefined).success).toBe(false);
+    expect(config.inputSchema.archive.safeParse(true).success).toBe(true);
+  });
+
+  test('forwards call-time arguments to executeSkill', async () => {
+    mockExecuteSkill.mockResolvedValue({ success: true, steps: [], skill: 'with-inputs' });
+    const skill = makeSkill({
+      name: 'with-inputs',
+      expose_as: 'tool',
+      inputs: { query: { type: 'string', default: 'newsletter' } },
+    });
+
+    registerSkills(server, [skill]);
+    const [, , handler] = server.registerTool.mock.calls[0];
+    await handler({ query: 'invoice' });
+
+    expect(mockExecuteSkill).toHaveBeenCalledWith(server, skill, { query: 'invoice' });
+  });
+
+  test('handler without args still works (empty object default)', async () => {
+    mockExecuteSkill.mockResolvedValue({ success: true, steps: [], skill: 'no-inputs' });
+    const skill = makeSkill({ name: 'no-inputs', expose_as: 'tool' });
+
+    registerSkills(server, [skill]);
+    const [, , handler] = server.registerTool.mock.calls[0];
+    await handler();
+
+    expect(mockExecuteSkill).toHaveBeenCalledWith(server, skill, {});
   });
 });

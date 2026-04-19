@@ -395,8 +395,18 @@ async function executeOneStep(
   }
 }
 
-export async function executeSkill(server: McpServer, skill: SkillDefinition): Promise<SkillResult> {
+export async function executeSkill(
+  server: McpServer,
+  skill: SkillDefinition,
+  inputs: Record<string, unknown> = {},
+): Promise<SkillResult> {
   const results = new Map<string, unknown>();
+  // Seed declared inputs into the template scope so steps can reference
+  // them as `{{name}}` identically to prior-step results. Loader has
+  // already verified no input name collides with a step id.
+  for (const [name, value] of Object.entries(inputs)) {
+    results.set(name, value);
+  }
   const stepResults: StepResult[] = [];
   const failedSteps: string[] = [];
   let i = 0;

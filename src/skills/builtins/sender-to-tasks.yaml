@@ -1,14 +1,28 @@
 name: sender-to-tasks
 title: "Sender → Tasks"
 description: >-
-  Scans mail for a keyword (defaults to "newsletter" — edit the skill
-  to point at a specific sender) and turns each hit into a reminder so
-  nothing in the inbox goes unresolved. Loop + `on_error: continue`
-  means the rest of the batch still gets queued even if one
-  reminder-create fails (e.g. Reminders permission not granted yet).
-  DESTRUCTIVE: creates reminders; each insertion is gated by HITL
-  approval.
+  Scans mail for a keyword and turns each hit into a reminder so nothing
+  in the inbox goes unresolved. Accepts runtime inputs so the same skill
+  handles newsletter triage, a specific sender, or any ad-hoc query
+  without editing YAML. Loop + `on_error: continue` means the rest of
+  the batch still gets queued even if one reminder-create fails (HITL
+  denial, Reminders permission, etc.). DESTRUCTIVE: creates reminders;
+  each insertion is gated by HITL approval.
 expose_as: tool
+
+inputs:
+  query:
+    type: string
+    description: "Search keyword in subject/sender (e.g. 'newsletter', 'invoice', 'team@acme.com')."
+    default: "newsletter"
+  mailbox:
+    type: string
+    description: "Mailbox to search."
+    default: "INBOX"
+  limit:
+    type: number
+    description: "Max messages to process per run."
+    default: 10
 
 steps:
   # 1) Find the matching messages. `search_messages` is untrusted (the
@@ -19,9 +33,9 @@ steps:
   - id: hits
     tool: search_messages
     args:
-      query: "newsletter"
-      mailbox: "INBOX"
-      limit: 10
+      query: "{{query}}"
+      mailbox: "{{mailbox}}"
+      limit: "{{limit}}"
     retry: 2
     retry_backoff_ms: 1000
 
@@ -36,4 +50,4 @@ steps:
     on_error: continue
     args:
       title: "Follow up: {{_item.subject}}"
-      body: "From {{_item.sender}} on {{_item.dateReceived}}"
+      body: "From {{_item.sender}} on {{_item.dateReceived}} (matched query: {{query}})"

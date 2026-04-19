@@ -39,11 +39,43 @@ export const SkillStepSchema = z.object({
   retry_backoff_ms: z.number().int().min(0).max(60_000).optional(),
 });
 
+/**
+ * Declarative input schema for a skill. When present, an `expose_as: tool`
+ * skill accepts these named arguments at call time and seeds them into the
+ * template scope so steps can reference them as `{{inputName}}` — just like
+ * inter-step results. Loader enforces that input names do not collide with
+ * any step id.
+ *
+ * Supported types map directly to Zod primitives; no nested objects yet —
+ * keeps the YAML ergonomic and the MCP tool schema predictable.
+ */
+export const SkillInputSchema = z.object({
+  type: z.enum(["string", "number", "boolean"]),
+  description: z.string().max(500).optional(),
+  default: z.unknown().optional(),
+  required: z.boolean().optional(),
+});
+
+export type SkillInput = z.infer<typeof SkillInputSchema>;
+
 export const SkillDefinitionSchema = z.object({
   name: z.string().regex(/^[a-z][a-z0-9-]*$/, "Skill name must be kebab-case"),
   title: z.string().min(1),
   description: z.string().min(1),
   expose_as: z.enum(["prompt", "tool"]),
+  /**
+   * Optional named runtime inputs. Keys must be lowercase identifiers
+   * (same rule as step ids) so they can be used in `{{name}}` templates.
+   * Loader rejects any skill where an input name collides with a step id.
+   * Only meaningful for `expose_as: tool` today — prompts ignore this
+   * field (follow-up RFC).
+   */
+  inputs: z
+    .record(
+      z.string().regex(/^[a-z][a-z0-9_]*$/, "Input name must be lowercase alphanumeric with underscores"),
+      SkillInputSchema,
+    )
+    .optional(),
   trigger: z
     .object({
       event: z.enum([

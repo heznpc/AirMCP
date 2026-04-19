@@ -1,9 +1,69 @@
 import type { McpServer } from "../shared/mcp.js";
-import type { SkillDefinition } from "./types.js";
+import type { SkillDefinition, SkillInput } from "./types.js";
 import { executeSkill } from "./executor.js";
 import { userPrompt } from "../shared/prompt.js";
 import { ok, err } from "../shared/result.js";
 import { toolRegistry } from "../shared/tool-registry.js";
+import { z } from "zod";
+
+/**
+ * Convert a skill's declared `inputs` into a Zod `inputSchema` record that
+ * `server.registerTool` accepts. Mirrors the MCP convention:
+ *   - `required: true`      → non-optional Zod field
+ *   - `default: <value>`    → `.default(value)` (implicitly optional)
+ *   - otherwise             → `.optional()`
+ */
+function buildSkillInputSchema(inputs: Record<string, SkillInput>): Record<string, z.ZodTypeAny> {
+  const schema: Record<string, z.ZodTypeAny> = {};
+  for (const [name, spec] of Object.entries(inputs)) {
+    // Build + finalise each branch independently so TypeScript keeps the
+    // narrowed string|number|boolean type when applying `.default()` —
+    // calling `.default()` on a `ZodString | ZodNumber | ZodBoolean`
+    // union is not valid because the overload signatures diverge per
+    // member, so we resolve the default before widening to ZodTypeAny.
+    let field: z.ZodTypeAny;
+    switch (spec.type) {
+      case "string": {
+        let f = z.string();
+        if (spec.description) f = f.describe(spec.description);
+        if (spec.default !== undefined) {
+          field = f.default(spec.default as string);
+        } else if (!spec.required) {
+          field = f.optional();
+        } else {
+          field = f;
+        }
+        break;
+      }
+      case "number": {
+        let f = z.number();
+        if (spec.description) f = f.describe(spec.description);
+        if (spec.default !== undefined) {
+          field = f.default(spec.default as number);
+        } else if (!spec.required) {
+          field = f.optional();
+        } else {
+          field = f;
+        }
+        break;
+      }
+      case "boolean": {
+        let f = z.boolean();
+        if (spec.description) f = f.describe(spec.description);
+        if (spec.default !== undefined) {
+          field = f.default(spec.default as boolean);
+        } else if (!spec.required) {
+          field = f.optional();
+        } else {
+          field = f;
+        }
+        break;
+      }
+    }
+    schema[name] = field;
+  }
+  return schema;
+}
 
 function generatePromptText(skill: SkillDefinition): string {
   const lines = [`Execute the following workflow "${skill.title}" using AirMCP tools:`];
@@ -27,17 +87,18 @@ function registerAsPrompt(server: McpServer, skill: SkillDefinition): void {
 }
 
 function registerAsTool(server: McpServer, skill: SkillDefinition): void {
+  const inputSchema = skill.inputs ? buildSkillInputSchema(skill.inputs) : {};
   server.registerTool(
     `skill_${skill.name}`,
     {
       title: skill.title,
       description: `[Skill] ${skill.description}`,
-      inputSchema: {},
+      inputSchema,
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async () => {
+    async (args: Record<string, unknown> = {}) => {
       try {
-        const result = await executeSkill(server, skill);
+        const result = await executeSkill(server, skill, args);
         if (!result.success) {
           const failedStep = result.steps.find((s) => s.status === "error");
           return err(`Skill "${skill.name}" failed at step "${failedStep?.id}": ${failedStep?.error}`);

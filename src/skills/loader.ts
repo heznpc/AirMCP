@@ -20,6 +20,20 @@ export function loadSkillFile(path: string): SkillDefinition | null {
       console.error(`[AirMCP] Invalid skill ${path}: ${result.error.issues.map((i) => i.message).join(", ")}`);
       return null;
     }
+    // Inputs share the template namespace with step ids — catching the
+    // collision at load time means `{{name}}` always has an unambiguous
+    // resolution and we never silently prefer the input over a later
+    // step's data.
+    if (result.data.inputs) {
+      const stepIds = new Set(result.data.steps.map((s) => s.id));
+      const collisions = Object.keys(result.data.inputs).filter((name) => stepIds.has(name));
+      if (collisions.length > 0) {
+        console.error(
+          `[AirMCP] Invalid skill ${path}: input name(s) collide with step id(s): ${collisions.join(", ")}`,
+        );
+        return null;
+      }
+    }
     return result.data;
   } catch (e) {
     console.error(`[AirMCP] Failed to load skill ${path}: ${e instanceof Error ? e.message : String(e)}`);

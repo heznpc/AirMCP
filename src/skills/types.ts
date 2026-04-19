@@ -22,6 +22,21 @@ export const SkillStepSchema = z.object({
    * array and execution moves to the next item.
    */
   on_error: z.enum(["abort", "continue", "skip_remaining"]).optional(),
+  /**
+   * Max retries for transient failures. Applied BEFORE `on_error` so a
+   * flaky upstream (weather API, LLM timeout) gets multiple chances
+   * before the policy escalates. Backoff is exponential starting at
+   * `retry_backoff_ms` (default 1000) with ±25% jitter; 0 disables
+   * retries. Capped at 10 so a misconfigured skill can't wedge the
+   * executor.
+   */
+  retry: z.number().int().min(0).max(10).optional(),
+  /**
+   * Base backoff in ms for the first retry. Subsequent retries double
+   * it (exponential). Capped at 60s so the skill doesn't silently
+   * stall for minutes. Only consulted when `retry > 0`.
+   */
+  retry_backoff_ms: z.number().int().min(0).max(60_000).optional(),
 });
 
 export const SkillDefinitionSchema = z.object({

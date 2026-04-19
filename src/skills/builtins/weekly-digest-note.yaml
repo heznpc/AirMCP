@@ -44,11 +44,17 @@ steps:
   # 2) Summarise each section through on-device Foundation Models.
   #    `on_error: continue` means the composed note still renders if
   #    a given section couldn't be summarised (e.g. empty input).
+  # Foundation Models occasionally times out under load. `retry: 2`
+  # gives the on-device LLM three attempts with exponential backoff
+  # before `on_error: continue` lets the composed note render without
+  # the summary section.
   - id: summary_events
     tool: summarize_text
     only_if: "{{events.total}} > 0"
     args:
       text: "Upcoming events: {{events}}"
+    retry: 2
+    retry_backoff_ms: 500
     on_error: continue
 
   - id: summary_reminders
@@ -56,6 +62,8 @@ steps:
     only_if: "{{reminders.total}} > 0"
     args:
       text: "Open reminders: {{reminders}}"
+    retry: 2
+    retry_backoff_ms: 500
     on_error: continue
 
   # 3) Compose the note. Templates pull whichever sections succeeded —

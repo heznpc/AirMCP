@@ -911,3 +911,112 @@ describe('executeSkill – on_error', () => {
     expect(mockCallTool).toHaveBeenNthCalledWith(3, 'post', { from: 'p1 failed' });
   });
 });
+
+describe('executeSkill – retry', () => {
+  beforeEach(() => {
+    mockCallTool.mockReset();
+  });
+
+  test('retries thrown errors up to `retry` times and then succeeds', async () => {
+    mockCallTool
+      .mockRejectedValueOnce(new Error('transient 1'))
+      .mockRejectedValueOnce(new Error('transient 2'))
+      .mockResolvedValueOnce(okResponse({ ok: true }));
+
+    const skill = {
+      name: 'retry-happy',
+      steps: [
+        { id: 'flaky', tool: 'upstream', args: {}, retry: 3, retry_backoff_ms: 0 },
+      ],
+    };
+    const result = await executeSkill(fakeServer, skill);
+
+    expect(result.success).toBe(true);
+    expect(result.steps[0].status).toBe('ok');
+    expect(mockCallTool).toHaveBeenCalledTimes(3);
+  });
+
+  test('retries exhausted → falls back to on_error policy', async () => {
+    mockCallTool
+      .mockRejectedValueOnce(new Error('boom 1'))
+      .mockRejectedValueOnce(new Error('boom 2'))
+      .mockRejectedValueOnce(new Error('boom 3'))
+      .mockResolvedValueOnce(okResponse({ after: true }));
+
+    const skill = {
+      name: 'retry-then-continue',
+      steps: [
+        { id: 'flaky', tool: 'upstream', args: {}, retry: 2, retry_backoff_ms: 0, on_error: 'continue' },
+        { id: 'after', tool: 'post', args: { reason: '{{flaky.error}}' } },
+      ],
+    };
+    const result = await executeSkill(fakeServer, skill);
+
+    // After 1 + 2 attempts (all fail), on_error: continue lets step 2 run.
+    expect(mockCallTool).toHaveBeenCalledTimes(4); // 3 retries + 1 follow-up
+    expect(result.success).toBe(true);
+    expect(result.partial).toBe(true);
+    expect(result.failedSteps).toEqual(['flaky']);
+    expect(mockCallTool).toHaveBeenNthCalledWith(4, 'post', { reason: 'boom 3' });
+  });
+
+  test('isError response is retried like a thrown error', async () => {
+    mockCallTool
+      .mockResolvedValueOnce(errorResponse('still starting'))
+      .mockResolvedValueOnce(okResponse({ ready: true }));
+
+    const skill = {
+      name: 'retry-iserror',
+      steps: [
+        { id: 'boot', tool: 'service_ping', args: {}, retry: 1, retry_backoff_ms: 0 },
+      ],
+    };
+    const result = await executeSkill(fakeServer, skill);
+
+    expect(result.success).toBe(true);
+    expect(mockCallTool).toHaveBeenCalledTimes(2);
+  });
+
+  test('retry=0 is a no-op and fails on the first error (default behaviour unchanged)', async () => {
+    mockCallTool.mockRejectedValueOnce(new Error('one shot'));
+    const skill = {
+      name: 'retry-zero',
+      steps: [{ id: 'only', tool: 'upstream', args: {}, retry: 0, retry_backoff_ms: 0 }],
+    };
+    const result = await executeSkill(fakeServer, skill);
+
+    expect(result.success).toBe(false);
+    expect(mockCallTool).toHaveBeenCalledTimes(1);
+  });
+
+  test('retry applies per-iteration inside a loop', async () => {
+    // seed returns a 2-item array; iteration 0 fails once then succeeds,
+    // iteration 1 succeeds on first try.
+    mockCallTool
+      .mockResolvedValueOnce(okResponse([1, 2])) // seed
+      .mockRejectedValueOnce(new Error('flaky item 0'))
+      .mockResolvedValueOnce(okResponse({ idx: 0 }))
+      .mockResolvedValueOnce(okResponse({ idx: 1 }));
+
+    const skill = {
+      name: 'retry-in-loop',
+      steps: [
+        { id: 'seed', tool: 'seed' },
+        {
+          id: 'each',
+          tool: 'worker',
+          loop: '{{seed}}',
+          args: { i: '{{_index}}' },
+          retry: 2,
+          retry_backoff_ms: 0,
+        },
+      ],
+    };
+    const result = await executeSkill(fakeServer, skill);
+
+    expect(result.success).toBe(true);
+    expect(result.steps[1].data).toHaveLength(2);
+    // seed + (fail + retry success) + success = 4 calls
+    expect(mockCallTool).toHaveBeenCalledTimes(4);
+  });
+});

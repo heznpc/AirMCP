@@ -235,6 +235,60 @@ async function callTool(
   return toolRegistry.callTool(toolName, args);
 }
 
+const DEFAULT_RETRY_BACKOFF_MS = 1000;
+const MAX_RETRY_BACKOFF_MS = 60_000;
+
+/**
+ * Invoke a tool with step-level retry semantics. The step is attempted up
+ * to `1 + step.retry` times; each retry waits `base * 2^(attempt-1)` ms
+ * with ±25% jitter, capped at MAX_RETRY_BACKOFF_MS.
+ *
+ * `isError` responses are treated as failures (same as thrown errors),
+ * so a tool that returns `{ isError: true }` gets the same retry treatment
+ * as one that throws. `parseToolResponse` still throws on isError, so the
+ * retry decision lives here and the post-parse path stays as-is.
+ *
+ * Rate-limit denials (the tool-registry gate throws with "[rate_limited]")
+ * are retryable because the rate limiter surfaces a retry-after hint and
+ * the skill may legitimately outlive the window.
+ */
+async function callToolWithRetry(
+  server: McpServer,
+  toolName: string,
+  args: Record<string, unknown>,
+  step: SkillStep,
+): Promise<{
+  content: Array<{ type: string; text: string }>;
+  isError?: boolean;
+  structuredContent?: unknown;
+}> {
+  const maxRetries = step.retry ?? 0;
+  const baseBackoff = step.retry_backoff_ms ?? DEFAULT_RETRY_BACKOFF_MS;
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await callTool(server, toolName, args);
+      if (response.isError && attempt < maxRetries) {
+        // Tool reported an error as a non-thrown response. Retry with
+        // backoff; if we're out of retries, fall through and return the
+        // isError response so the caller's existing error path fires.
+        lastError = new Error(response.content[0]?.text ?? "Tool returned an error");
+      } else {
+        return response;
+      }
+    } catch (e) {
+      lastError = e;
+      if (attempt >= maxRetries) throw e;
+    }
+    const delay = Math.min(MAX_RETRY_BACKOFF_MS, baseBackoff * 2 ** attempt);
+    const jitter = Math.floor(Math.random() * (delay * 0.25));
+    await new Promise((resolve) => setTimeout(resolve, delay + jitter));
+  }
+  // Exhausted retries on a non-throwing isError — throw so parseToolResponse
+  // / on_error pathways can handle it uniformly.
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
+}
+
 const MAX_TOOL_RESPONSE_SIZE = 1_048_576; // 1MB
 
 function parseToolResponse(response: {
@@ -305,7 +359,7 @@ async function executeOneStep(
       loopScope.set("_index", idx);
       const resolvedArgs = (step.args ? resolveTemplates(step.args, loopScope) : {}) as Record<string, unknown>;
       try {
-        const response = await callTool(server, step.tool, resolvedArgs);
+        const response = await callToolWithRetry(server, step.tool, resolvedArgs, step);
         loopResults.push(parseToolResponse(response));
       } catch (e) {
         const error = e instanceof Error ? e.message : String(e);
@@ -332,7 +386,7 @@ async function executeOneStep(
 
   const resolvedArgs = (step.args ? resolveTemplates(step.args, results) : {}) as Record<string, unknown>;
   try {
-    const response = await callTool(server, step.tool, resolvedArgs);
+    const response = await callToolWithRetry(server, step.tool, resolvedArgs, step);
     const data = parseToolResponse(response);
     return { stepResult: { id: step.id, status: "ok", data }, data };
   } catch (e) {

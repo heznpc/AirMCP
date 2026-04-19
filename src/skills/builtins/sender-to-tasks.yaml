@@ -14,12 +14,16 @@ steps:
   # 1) Find the matching messages. `search_messages` is untrusted (the
   #    body is user content) — we only use the subject/sender fields
   #    below, which are safer to template into a reminder title.
+  #    Mail.app occasionally returns an empty result right after launch
+  #    while it's still indexing; `retry: 2` smooths that over.
   - id: hits
     tool: search_messages
     args:
       query: "newsletter"
       mailbox: "INBOX"
       limit: 10
+    retry: 2
+    retry_backoff_ms: 1000
 
   # 2) For each hit, drop a reminder. Individual failures (HITL denial,
   #    malformed date, etc.) are logged into the loop result via

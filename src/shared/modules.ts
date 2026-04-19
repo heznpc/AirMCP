@@ -74,6 +74,7 @@ export const MODULE_MANIFEST: ReadonlyArray<ModuleManifestEntry> = [
     },
   },
   { name: "memory" },
+  { name: "audit" },
 ];
 
 /**

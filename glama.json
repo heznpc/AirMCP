@@ -1,7 +1,7 @@
 {
   "$schema": "https://glama.ai/mcp/schemas/server.json",
   "name": "AirMCP",
-  "description": "MCP server for the entire Apple ecosystem — 266 tools across 27 modules. Notes, Reminders, Calendar, Contacts, Mail, Messages, Music, Finder, Safari, System, Photos, Shortcuts, Apple Intelligence, and more. Connect any AI to your Mac.",
+  "description": "MCP server for the entire Apple ecosystem — 268 tools across 27 modules. Notes, Reminders, Calendar, Contacts, Mail, Messages, Music, Finder, Safari, System, Photos, Shortcuts, Apple Intelligence, and more. Connect any AI to your Mac.",
   "icon": "https://raw.githubusercontent.com/heznpc/AirMCP/main/icons/airmcp-icon-256.png",
   "category": "automation",
   "maintainers": [

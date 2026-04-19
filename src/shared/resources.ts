@@ -9,6 +9,10 @@ import { getUnreadCountScript } from "../mail/scripts.js";
 import { AirMcpConfig, isModuleEnabled } from "./config.js";
 import { LIMITS } from "./constants.js";
 import { resourceCache } from "./cache.js";
+import { MemoryStore } from "../memory/store.js";
+// Memory reads are cheap (JSON file + in-memory cache) — a single lazy
+// instance shared across all `memory://…` resource requests.
+const memoryStore = new MemoryStore();
 
 const CACHE_TTL = {
   NOTES: 120_000, // 2min — notes change infrequently; event_subscribe invalidates on change
@@ -219,6 +223,23 @@ export function registerResources(server: McpServer, config?: AirMcpConfig): voi
   if (enabled("mail")) {
     jsonResource(server, "unread-mail", "mail://unread", "Unread email count across all mailboxes", () =>
       resourceCache.getOrSet("mail:unread", CACHE_TTL.MAIL, () => runJxa<unknown>(getUnreadCountScript())),
+    );
+  }
+
+  // ── Context Memory ──
+  //
+  // Expose the most recently updated memory entries as a pollable
+  // resource so AI clients can pull recent user context without
+  // explicitly calling `memory_query`. Kept deliberately lean
+  // (default 20 entries, no expiresAt filtering beyond the store's
+  // own sweep) so the payload stays well under any prompt budget.
+  if (enabled("memory")) {
+    jsonResource(server, "recent-memory", "memory://recent", "20 most recently updated context-memory entries", () =>
+      resourceCache.getOrSet("memory:recent", CACHE_TTL.MAIL, async () => {
+        // memoryStore is lazy — no disk read until first call.
+        const entries = await memoryStore.query({ limit: 20, order: "desc" });
+        return { total: entries.length, entries };
+      }),
     );
   }
 

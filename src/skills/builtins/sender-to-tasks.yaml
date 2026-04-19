@@ -1,0 +1,35 @@
+name: sender-to-tasks
+title: "Sender → Tasks"
+description: >-
+  Scans mail for a keyword (defaults to "newsletter" — edit the skill
+  to point at a specific sender) and turns each hit into a reminder so
+  nothing in the inbox goes unresolved. Loop + `on_error: continue`
+  means the rest of the batch still gets queued even if one
+  reminder-create fails (e.g. Reminders permission not granted yet).
+  DESTRUCTIVE: creates reminders; each insertion is gated by HITL
+  approval.
+expose_as: tool
+
+steps:
+  # 1) Find the matching messages. `search_messages` is untrusted (the
+  #    body is user content) — we only use the subject/sender fields
+  #    below, which are safer to template into a reminder title.
+  - id: hits
+    tool: search_messages
+    args:
+      query: "newsletter"
+      mailbox: "INBOX"
+      limit: 10
+
+  # 2) For each hit, drop a reminder. Individual failures (HITL denial,
+  #    malformed date, etc.) are logged into the loop result via
+  #    `on_error: continue` — the skill finishes and reports how many
+  #    succeeded vs. failed in the step result.
+  - id: queue
+    tool: create_reminder
+    only_if: "{{hits}} != null"
+    loop: "{{hits}}"
+    on_error: continue
+    args:
+      title: "Follow up: {{_item.subject}}"
+      body: "From {{_item.sender}} on {{_item.dateReceived}}"

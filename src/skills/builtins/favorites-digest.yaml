@@ -1,0 +1,40 @@
+name: favorites-digest
+title: "Favorites Digest"
+description: >-
+  Pulls the user's starred photos and drops the metadata into a note —
+  a lightweight "recent highlights" journal. Demonstrates `loop` combined
+  with a terminal `create_note` step that consolidates the loop results.
+  The loop iterates inside `favorites` with `on_error: continue` so a
+  single unreadable asset doesn't truncate the digest.
+expose_as: prompt
+
+steps:
+  # 1) Read the user's Favorites album. Keeping `limit: 10` small so the
+  #    downstream note stays readable.
+  - id: favorites
+    tool: list_favorites
+    args:
+      limit: 10
+
+  # 2) For each photo we pull richer metadata. Individual lookups can
+  #    fail if the underlying asset has been deleted / iCloud-evicted —
+  #    `on_error: continue` captures that as `{error: ...}` in the loop
+  #    output so the note still renders the rest.
+  - id: details
+    tool: get_photo_info
+    only_if: "{{favorites.total}} > 0"
+    loop: "{{favorites.photos}}"
+    on_error: continue
+    args:
+      id: "{{_item.id}}"
+
+  # 3) Write the consolidated digest. `details` is an array where each
+  #    entry is either the photo info or `{error: "..."}`.
+  - id: note
+    tool: create_note
+    only_if: "{{favorites.total}} > 0"
+    args:
+      body: |
+        <h1>Favorites digest ({{favorites.total}})</h1>
+        <p>Auto-generated snapshot of the Photos Favorites album.</p>
+        <pre>{{details}}</pre>

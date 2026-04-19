@@ -1,0 +1,76 @@
+name: weekly-digest-note
+title: "Weekly Digest → Note"
+description: >-
+  Gathers a week-in-review snapshot in parallel (upcoming events, open
+  reminders, recent notes, unread mail), asks Apple Intelligence to
+  summarise each track, and drafts a single combined note. Showcases
+  parallel fan-out plus `on_error: continue` — the note still gets
+  written even if summarisation fails for one or two tracks (e.g.
+  Foundation Models unavailable on an Intel Mac).
+expose_as: prompt
+
+steps:
+  # 1) Fan out four independent reads. All parallel, individual failures
+  #    are tolerated so a missing Swift bridge or app-not-running error
+  #    does not sink the whole skill.
+  - id: events
+    tool: get_upcoming_events
+    args:
+      limit: 20
+    parallel: true
+    on_error: continue
+
+  - id: reminders
+    tool: list_reminders
+    args:
+      completed: false
+      limit: 25
+    parallel: true
+    on_error: continue
+
+  - id: notes
+    tool: scan_notes
+    args:
+      limit: 10
+      previewLength: 160
+    parallel: true
+    on_error: continue
+
+  - id: mail
+    tool: get_unread_count
+    parallel: true
+    on_error: continue
+
+  # 2) Summarise each section through on-device Foundation Models.
+  #    `on_error: continue` means the composed note still renders if
+  #    a given section couldn't be summarised (e.g. empty input).
+  - id: summary_events
+    tool: summarize_text
+    only_if: "{{events.total}} > 0"
+    args:
+      text: "Upcoming events: {{events}}"
+    on_error: continue
+
+  - id: summary_reminders
+    tool: summarize_text
+    only_if: "{{reminders.total}} > 0"
+    args:
+      text: "Open reminders: {{reminders}}"
+    on_error: continue
+
+  # 3) Compose the note. Templates pull whichever sections succeeded —
+  #    failed ones resolve to an empty string (via {{stepId.error}}
+  #    fallback) instead of blocking the whole skill.
+  - id: draft
+    tool: create_note
+    args:
+      body: |
+        <h1>Weekly digest</h1>
+        <h2>Events ({{events.total}})</h2>
+        <p>{{summary_events}}</p>
+        <h2>Reminders ({{reminders.total}})</h2>
+        <p>{{summary_reminders}}</p>
+        <h2>Recent notes ({{notes.total}})</h2>
+        <p>{{notes}}</p>
+        <h2>Mail</h2>
+        <p>Unread: {{mail.totalUnread}}</p>

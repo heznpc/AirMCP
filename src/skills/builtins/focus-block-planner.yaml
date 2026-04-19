@@ -1,0 +1,37 @@
+name: focus-block-planner
+title: "Focus Block Planner"
+description: >-
+  Walks today's open reminders and drops a calendar time-block for each
+  one. Uses `loop` with `on_error: continue` so a single failed event
+  creation (e.g. conflicting calendar, missing permission) doesn't abort
+  the rest of the plan — the skill result reports which reminders got
+  blocked and which didn't. DESTRUCTIVE: creates calendar events; each
+  insertion is gated by HITL approval.
+expose_as: tool
+
+steps:
+  # 1) Pull the open-reminder backlog. `limit: 8` keeps the loop small
+  #    enough that HITL prompting stays tolerable.
+  - id: tasks
+    tool: list_reminders
+    args:
+      completed: false
+      limit: 8
+
+  # 2) Guard: skip the planning loop entirely if there's nothing to
+  #    block. Saves a no-op iteration and surfaces a clean skipped
+  #    status in the skill trace.
+  - id: plan
+    tool: create_event
+    only_if: "{{tasks.total}} > 0"
+    loop: "{{tasks.reminders}}"
+    on_error: continue
+    args:
+      summary: "Focus block: {{_item.name}}"
+      # Use each reminder's dueDate when present; otherwise Apple Calendar
+      # rejects the event and on_error: continue moves to the next item.
+      startDate: "{{_item.dueDate}}"
+      endDate: "{{_item.dueDate}}"
+      description: |
+        Time-block auto-generated from reminder "{{_item.name}}"
+        (list: {{_item.list}}, priority: {{_item.priority}}).

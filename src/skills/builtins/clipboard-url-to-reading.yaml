@@ -1,0 +1,30 @@
+name: clipboard-url-to-reading
+title: "Clipboard URL → Reading List"
+description: >-
+  Listens for clipboard changes and, when a URL is on the pasteboard,
+  pushes it into Safari's Reading List. Combines the `pasteboard_changed`
+  event trigger with `on_error: continue` so non-URL clipboard content
+  doesn't spam the user with errors — Safari's validator rejects the
+  non-URL and the skill quietly moves on.
+expose_as: tool
+trigger:
+  event: pasteboard_changed
+  debounce_ms: 3000
+
+steps:
+  # 1) Grab whatever is on the pasteboard. `get_clipboard` truncates by
+  #    default; we take the raw content and hand it to Safari as-is.
+  - id: clip
+    tool: get_clipboard
+
+  # 2) Attempt to add. The Zod `.url()` schema on `add_to_reading_list`
+  #    will reject anything that isn't a URL; `on_error: continue`
+  #    turns that rejection into a noop instead of surfacing as a
+  #    skill failure — exactly what you want for a fire-and-forget
+  #    pasteboard listener.
+  - id: save
+    tool: add_to_reading_list
+    only_if: "{{clip.length}} > 0"
+    on_error: continue
+    args:
+      url: "{{clip.content}}"

@@ -117,6 +117,10 @@
 "module.speech.desc" = "텍스트 음성 변환, 음성 합성";
 "module.health" = "건강";
 "module.health.desc" = "걸음 수, 심박수, 수면, 활동";
+"module.memory" = "맥락 기억";
+"module.memory.desc" = "사실·엔티티·에피소드를 저장해 ai_agent가 기억하도록";
+"module.audit" = "감사 로그";
+"module.audit.desc" = "AirMCP가 실행한 모든 툴 호출을 조회";
 "module.requiresMacOS" = "macOS %d 이상 필요";
 
 /* Onboarding */

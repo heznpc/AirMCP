@@ -11,22 +11,41 @@ private struct OnboardingModule: Identifiable {
     var localizedDescription: String { L("module.\(id).desc") }
 }
 
+// Order matters: the first block is what a typical first-run user wants
+// (Apple's built-in productivity apps), followed by Intelligence/automation
+// since v2.10 surfaced skills + context memory as first-class, and finally
+// the specialised modules that are off by default but worth advertising.
 private let onboardingModules: [OnboardingModule] = [
+    // Everyday productivity
     OnboardingModule(id: "notes", icon: "note.text"),
     OnboardingModule(id: "reminders", icon: "checklist"),
     OnboardingModule(id: "calendar", icon: "calendar"),
     OnboardingModule(id: "contacts", icon: "person.2"),
     OnboardingModule(id: "mail", icon: "envelope"),
     OnboardingModule(id: "messages", icon: "bubble.left"),
-    OnboardingModule(id: "music", icon: "music.note"),
-    OnboardingModule(id: "finder", icon: "folder"),
     OnboardingModule(id: "safari", icon: "safari"),
-    OnboardingModule(id: "system", icon: "gearshape"),
+    OnboardingModule(id: "finder", icon: "folder"),
+    // Media
+    OnboardingModule(id: "music", icon: "music.note"),
     OnboardingModule(id: "photos", icon: "photo"),
+    OnboardingModule(id: "tv", icon: "tv"),
+    OnboardingModule(id: "podcasts", icon: "headphones"),
+    // System + automation
+    OnboardingModule(id: "system", icon: "gearshape"),
     OnboardingModule(id: "shortcuts", icon: "command"),
     OnboardingModule(id: "ui", icon: "hand.tap"),
+    OnboardingModule(id: "screen", icon: "display"),
+    // Intelligence + v2.10 introspection
     OnboardingModule(id: "intelligence", icon: "brain"),
-    OnboardingModule(id: "tv", icon: "tv"),
+    OnboardingModule(id: "memory", icon: "brain.head.profile"),
+    OnboardingModule(id: "audit", icon: "doc.text.magnifyingglass"),
+    // Context sensors
+    OnboardingModule(id: "weather", icon: "cloud.sun"),
+    OnboardingModule(id: "location", icon: "location"),
+    OnboardingModule(id: "maps", icon: "map"),
+    OnboardingModule(id: "bluetooth", icon: "dot.radiowaves.left.and.right"),
+    // Integrations
+    OnboardingModule(id: "google", icon: "at"),
 ]
 
 // MARK: - MCP Client

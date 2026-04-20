@@ -53,7 +53,7 @@ The default config file location is `~/.config/airmcp/config.json`. You can over
 
 | Variable | Description |
 |----------|-------------|
-| `AIRMCP_FULL=true` | Enable all 27 modules (ignores disabledModules) |
+| `AIRMCP_FULL=true` | Enable all 29 modules (ignores disabledModules) |
 | `AIRMCP_DISABLE_<MODULE>=true` | Disable a specific module (e.g. `AIRMCP_DISABLE_TV=true`) |
 | `AIRMCP_CONFIG_PATH` | Override config file path (default: `~/.config/airmcp/config.json`) |
 

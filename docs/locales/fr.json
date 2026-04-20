@@ -1,6 +1,6 @@
 {
   "meta_title": "AirMCP — Better Siri, powered by open source",
-  "meta_description": "Extrayez les tâches des notes de la réunion de la semaine dernière, transférez-les dans Rappels et recevez une alerte à leur achèvement. AirMCP est l'outil open source qui connecte votre écosystème Apple à n'importe quel client IA — 27 modules, 262 outils.",
+  "meta_description": "Extrayez les tâches des notes de la réunion de la semaine dernière, transférez-les dans Rappels et recevez une alerte à leur achèvement. AirMCP est l'outil open source qui connecte votre écosystème Apple à n'importe quel client IA — 29 modules, 262 outils.",
   "nav_modules": "Modules",
   "nav_workflows": "Workflows",
   "nav_install": "Installer",
@@ -123,7 +123,7 @@
   "why_label": "Pourquoi AirMCP ?",
   "why_title": "Le serveur Apple MCP le plus complet.",
   "why_sub": "Decouvrez comment AirMCP se distingue des alternatives.",
-  "why_1_title": "262 outils dans 27 modules",
+  "why_1_title": "262 outils dans 29 modules",
   "why_1_desc": "Les autres offrent 10-15 outils puis cessent les mises a jour. AirMCP couvre toutes les apps Apple principales et continue de croitre.",
   "why_2_title": "Securite par defaut",
   "why_2_desc": "Confirmation humaine, journalisation d'audit et validation des entrees. Aucune ecriture silencieuse.",

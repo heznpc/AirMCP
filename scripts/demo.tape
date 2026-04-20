@@ -3,34 +3,55 @@
 #
 # Usage:  vhs scripts/demo.tape
 # Output: docs/demo.gif
+#
+# Story arc (≈35s):
+#   1. --version / --help  — quick proof it installs and runs
+#   2. doctor              — highlights the new Compatibility + HTTP
+#                            network-policy sections added in v2.10
+#   3. server banner       — shows tool + module + event counts
+#
+# Record with: ./scripts/record-demo.sh
+# Prerequisites: `brew install vhs ffmpeg` and a local `npm run build`.
 
 Output docs/demo.gif
 
 Set FontSize 14
-Set Width 900
-Set Height 600
+Set Width 1000
+Set Height 680
 Set Theme "Catppuccin Mocha"
 Set TypingSpeed 40ms
-Set Padding 20
+Set Padding 24
 
-# --- Version ---
+# ── Version ────────────────────────────────────────────────────────────
 Type "npx airmcp --version"
 Enter
-Sleep 2s
+Sleep 1500ms
 
-# --- Help ---
+# ── Help ───────────────────────────────────────────────────────────────
+Type "clear"
+Enter
 Type "npx airmcp --help"
 Enter
-Sleep 4s
+Sleep 5s
 
-# --- Doctor ---
+# ── Doctor — showcases the new v2.10 HTTP + Compatibility sections ─────
+# The output grew in v2.10 to include:
+#   - [Compatibility]  per-module resolver decisions (RFC 0004)
+#   - [HTTP network policy]  effective allowNetwork + token/origin state
+# Give the viewer ~10s to absorb the full screen.
+Type "clear"
+Enter
 Type "npx airmcp doctor"
 Enter
-Sleep 8s
+Sleep 10s
 
-# --- Start server (show banner, then Ctrl-C) ---
+# ── Banner — tool / module / prompt / skill counts front-and-centre ────
+# Start stdio server briefly so the banner flashes (shows "X tools across
+# Y modules, Z skills, W events"), then Ctrl-C out of it.
+Type "clear"
+Enter
 Type "npx airmcp"
 Enter
-Sleep 3s
+Sleep 4s
 Ctrl+C
 Sleep 1s

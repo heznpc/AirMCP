@@ -1,6 +1,6 @@
 {
   "meta_title": "AirMCP — Better Siri, powered by open source",
-  "meta_description": "從上週的會議備忘錄中擷取待辦事項，放入提醒事項，完成後通知你。AirMCP是將Apple生態系統連接到任何AI用戶端的開源工具——27個模組、262個工具。",
+  "meta_description": "從上週的會議備忘錄中擷取待辦事項，放入提醒事項，完成後通知你。AirMCP是將Apple生態系統連接到任何AI用戶端的開源工具——29個模組、262個工具。",
   "nav_modules": "模組",
   "nav_workflows": "工作流程",
   "nav_install": "安裝",
@@ -123,7 +123,7 @@
   "why_label": "為什麼選擇 AirMCP？",
   "why_title": "最完整的 Apple MCP 伺服器。",
   "why_sub": "了解 AirMCP 與其他方案的差異。",
-  "why_1_title": "27 個模組，262 個工具",
+  "why_1_title": "29 個模組，262 個工具",
   "why_1_desc": "其他專案只提供 10-15 個工具就停止更新。AirMCP 涵蓋所有主要 Apple 應用，並持續成長。",
   "why_2_title": "預設安全",
   "why_2_desc": "人機互動確認、稽核日誌、輸入驗證。沒有靜默寫入。",

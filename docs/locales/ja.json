@@ -1,6 +1,6 @@
 {
   "meta_title": "AirMCP — Better Siri, powered by open source",
-  "meta_description": "先週の会議メモから実行項目を取り出してリマインダーへ、完了したら通知します。AirMCPはAppleエコシステムをあらゆるAIクライアントにつなぐオープンソースツール — 27モジュール、262ツール。",
+  "meta_description": "先週の会議メモから実行項目を取り出してリマインダーへ、完了したら通知します。AirMCPはAppleエコシステムをあらゆるAIクライアントにつなぐオープンソースツール — 29モジュール、262ツール。",
   "nav_modules": "モジュール",
   "nav_workflows": "ワークフロー",
   "nav_install": "インストール",
@@ -123,7 +123,7 @@
   "why_label": "なぜAirMCP？",
   "why_title": "最も完全なApple MCPサーバー。",
   "why_sub": "AirMCPが他の選択肢とどう違うかご覧ください。",
-  "why_1_title": "27モジュール、262ツール",
+  "why_1_title": "29モジュール、262ツール",
   "why_1_desc": "他のプロジェクトは10-15ツールで更新が止まります。AirMCPはすべての主要Appleアプリをカバーし、成長を続けます。",
   "why_2_title": "デフォルトでセキュア",
   "why_2_desc": "ヒューマンインザループ確認、監査ログ、入力バリデーション。サイレント書き込みなし。",

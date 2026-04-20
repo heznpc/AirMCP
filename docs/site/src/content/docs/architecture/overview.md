@@ -18,7 +18,7 @@ AirMCP is a Node.js application that implements the [Model Context Protocol](htt
 ┌─────────────────────▼────────────────────────────────────┐
 │  AirMCP Server (Node.js)                                  │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌─────────────┐ │
-│  │  Notes   │ │ Calendar │ │  System  │ │  27 modules  │ │
+│  │  Notes   │ │ Calendar │ │  System  │ │  29 modules  │ │
 │  └────┬─────┘ └────┬─────┘ └────┬─────┘ └──────┬──────┘ │
 │       │             │            │               │        │
 │  ┌────▼─────────────▼────────────▼───────────────▼────┐  │

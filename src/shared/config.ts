@@ -106,6 +106,8 @@ export const MODULE_NAMES = [
   "google",
   "speech",
   "health",
+  "memory",
+  "audit",
 ] as const;
 
 /** Core modules enabled by default when no config.json exists */

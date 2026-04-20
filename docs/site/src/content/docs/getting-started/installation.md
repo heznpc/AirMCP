@@ -90,7 +90,7 @@ Edit `~/.codeium/windsurf/mcp_config.json`:
 
 ## Enable All Modules
 
-By default, AirMCP enables a starter set of modules (Notes, Reminders, Calendar, Shortcuts, System, Finder, Weather). To enable all 27 modules, use the `--full` flag:
+By default, AirMCP enables a starter set of modules (Notes, Reminders, Calendar, Shortcuts, System, Finder, Weather). To enable all 29 modules, use the `--full` flag:
 
 ```json
 {

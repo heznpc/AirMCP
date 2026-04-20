@@ -3,7 +3,7 @@
     "airmcp": {
       "command": "npx",
       "args": ["-y", "airmcp"],
-      "description": "MCP server for the entire Apple ecosystem — 269 tools across 27 modules. macOS only.",
+      "description": "MCP server for the entire Apple ecosystem — 269 tools across 29 modules. macOS only.",
       "env": {}
     }
   }

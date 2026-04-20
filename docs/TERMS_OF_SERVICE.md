@@ -19,7 +19,7 @@ AirMCP is open-source software released under the [MIT License](../LICENSE). The
 
 You are solely responsible for:
 
-- **AI agent actions.** AirMCP enables AI agents to perform actions on your Mac through 269 tools across 27 modules. Any action an AI agent takes through AirMCP is performed on your behalf and at your direction. You are responsible for the outcomes of those actions.
+- **AI agent actions.** AirMCP enables AI agents to perform actions on your Mac through 269 tools across 29 modules. Any action an AI agent takes through AirMCP is performed on your behalf and at your direction. You are responsible for the outcomes of those actions.
 - **Safety controls.** AirMCP provides a Human-in-the-Loop (HITL) approval system with configurable levels. It is your responsibility to configure an appropriate HITL level for your use case. Running AirMCP with HITL disabled means AI agents can execute destructive actions without confirmation.
 - **HTTP mode security.** If you enable HTTP mode for remote access, you are responsible for securing it. This includes configuring token-based authentication, restricting network access, and ensuring the server is not exposed to untrusted networks.
 - **Legal compliance.** You must comply with all applicable local, state, national, and international laws when using AirMCP. This includes laws governing privacy, electronic communications, data protection, and computer access.

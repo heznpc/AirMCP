@@ -16,19 +16,18 @@ MCP server for the entire Apple ecosystem — Notes, Reminders, Calendar, Contac
 
 ## Features
 
-- **269 tools** (27 modules) — Apple app CRUD + system control + Apple Intelligence + UI Automation + Screen Capture + Maps + Podcasts + Weather + iWork (Pages/Numbers/Keynote) + Google Workspace + dynamic shortcuts
-- **32 prompts** — per-app workflows (notes, calendar, reminders, shortcuts) + cross-module + developer workflows + YAML skills
-- **8 MCP resources** — Notes, Calendar, Reminders, Music, Mail, System live data URIs
-- **JXA + Swift 6.2 bridge** — JXA for basic automation, Swift 6 strict concurrency with EventKit/PhotoKit for advanced features
-- **Recurring events/reminders** — EventKit recurrence rules (macOS 26+ Swift bridge)
-- **Photo import/delete** — PhotoKit photo management (macOS 26+ Swift bridge)
-- **Apple Intelligence** — On-device summarize, rewrite, proofread (macOS 26+)
+- **270+ tools** (29 modules) — Apple app CRUD + system control + Apple Intelligence + UI Automation + Screen Capture + Maps + Podcasts + Weather + iWork (Pages/Numbers/Keynote) + Google Workspace + dynamic shortcuts + context memory + audit introspection
+- **34 prompts + 14 YAML skill built-ins** — per-app workflows + cross-module + developer workflows + Skills DSL (`inputs` / `parallel` / `loop` / `on_error` / `retry` / 9 event triggers)
+- **9 MCP resources** — Notes, Calendar, Reminders, Music, Mail, System, Context Memory + unified `context://snapshot/{depth}`
+- **3 interactive MCP Apps** — `calendar_week_view`, `music_player`, `timeline_today` (fuses events + reminders on one day-axis)
+- **9 event triggers** — calendar, reminders, pasteboard, mail unread, focus mode, now playing, file modified, screen locked/unlocked — skills bind to any of these for automation
+- **Safety first** — HITL approval + audit log + rate limit (60/min + 10 destructive/hr) + emergency stop file + `allowNetwork` declarative HTTP policy (RFC 0002)
+- **JXA + Swift 6.2 bridge** — JXA for basic automation, Swift 6 strict concurrency with EventKit/PhotoKit/HealthKit/Vision/FoundationModels
+- **Apple Intelligence** — On-device summarize / rewrite / proofread / `ai_agent` / `ai_plan_metrics` (planner regression catcher) — all via Foundation Models (macOS 26+)
+- **Context memory** — `memory_put`/`query`/`forget`/`stats` + `memory://recent` resource for facts/entities/episodes, surviving restarts
 - **Native menubar app** — SwiftUI companion with onboarding wizard, auto-start, log viewer, update notifications, permission setup, server crash auto-restart
-- **42 Swift unit tests** — XCTest suites for AirMCPKit (types, formatting, recurrence) and AirMCPServer (JSON-RPC, MCP dispatch)
 - **One-click setup** — `setup_permissions` tool or menubar app to request all macOS permissions at once
-- **Dual transport** — stdio (default, safe local) + HTTP/SSE (`--http`) for remote agents and registries
-- **CLI ergonomics** — `--version` flag, `NO_COLOR` support, unknown command rejection, config validation warnings
-- **Safety annotations** — readOnly/destructive hints on all tools
+- **Dual transport** — stdio (default) + HTTP/SSE (`--http`) with token auth, origin allow-list, and startup invariants that refuse to boot misconfigured servers
 
 ## Get Started (2 minutes)
 
@@ -100,7 +99,7 @@ Once connected, just ask your AI in natural language. Here are some things you c
 - "Check today's meetings, find related notes, and create a prep checklist in Reminders"
 - "Search my files for the Q1 report, read it, and draft a summary email to the team"
 
-These are just starting points — with 262 tools across 27 Apple apps, the combinations are endless.
+These are just starting points — with 262 tools across 29 Apple apps, the combinations are endless.
 
 ---
 
@@ -108,15 +107,70 @@ These are just starting points — with 262 tools across 27 Apple apps, the comb
 
 | | Direct AppleScript | Siri Shortcuts | apple-mcp | **AirMCP** |
 |---|---|---|---|---|
-| Tools | Manual scripts | Limited actions | 15 | **262** |
-| Modules | — | — | 5 | **27** |
+| Tools | Manual scripts | Limited actions | 15 | **270+** |
+| Modules | — | — | 5 | **28** |
 | MCP protocol | ❌ | ❌ | ✅ | ✅ |
-| Input validation | ❌ | N/A | ❌ | **Zod on all 268 params** |
-| Security | None | Sandboxed | Basic | **HITL + audit + circuit breaker** |
-| Multi-client | ❌ | ❌ | ✅ | **Claude, Cursor, Windsurf, Copilot** |
-| Swift bridge | ❌ | ❌ | ❌ | **EventKit, PhotoKit, HealthKit, Vision** |
+| Input validation | ❌ | N/A | ❌ | **Zod + `outputSchema` on ~35% of read tools** |
+| Security | None | Sandboxed | Basic | **HITL + audit log (queryable) + rate limit + emergency stop** |
+| Automations | Hand-wired AppleScripts | `.shortcut` files | ❌ | **14 YAML skills with `parallel`/`loop`/`on_error`/`retry`/inputs + 9 event triggers** |
+| Multi-client | ❌ | ❌ | ✅ | **Claude Desktop/Code/Cowork, Cursor, Windsurf, Copilot** |
+| Swift bridge | ❌ | ❌ | ❌ | **EventKit, PhotoKit, HealthKit, Vision, Foundation Models** |
+| HTTP transport | — | — | ❌ | **Streamable HTTP + declarative `allowNetwork` policy (RFC 0002)** |
 | i18n | ❌ | ❌ | ❌ | **9 languages** |
-| Maintained | — | Apple | ❌ Archived | **Active (v2.7.3)** |
+| Maintained | — | Apple | ❌ Archived | **Active (v2.10)** |
+
+---
+
+## Skills DSL
+
+Declare a multi-step workflow in YAML and expose it as an MCP prompt **or** tool. The executor handles error policy, retries, parallel fan-out, loops, runtime arguments, and event triggers.
+
+```yaml
+name: sender-to-tasks
+title: Sender → Tasks
+expose_as: tool
+
+inputs:
+  query:    { type: string,  default: newsletter }
+  mailbox:  { type: string,  default: INBOX }
+  limit:    { type: number,  default: 10 }
+
+steps:
+  - id: hits
+    tool: search_messages
+    args: { query: "{{query}}", mailbox: "{{mailbox}}", limit: "{{limit}}" }
+    retry: 2
+    retry_backoff_ms: 1000
+
+  - id: queue
+    tool: create_reminder
+    only_if: "{{hits}} != null"
+    loop: "{{hits}}"
+    on_error: continue      # per-iteration: a HITL denial on one item
+                            # doesn't abort the rest of the batch
+    args:
+      title: "Follow up: {{_item.subject}}"
+      body:  "From {{_item.sender}} (query: {{query}})"
+```
+
+**Built-in skills** (14): `morning-briefing`, `calendar-alert`, `inbox-triage`, `meeting-action-items`, `focus-guardian`, `skills-weekly-review`, `project-digest`, `weekly-digest-note`, `focus-block-planner`, `clipboard-url-to-reading`, `favorites-digest`, `sender-to-tasks`, `evening-winddown`, `daily-journal`.
+
+**Event triggers**: `calendar_changed`, `reminders_changed`, `pasteboard_changed`, `mail_unread_changed`, `focus_mode_changed`, `now_playing_changed`, `file_modified`, `screen_locked`, `screen_unlocked`.
+
+User-authored skills land in `~/.config/airmcp/skills/*.yaml` and hot-reload.
+
+---
+
+## Safety & Operations
+
+AirMCP runs with access to 270+ tools on your machine. A few layers keep a buggy agent plan from turning into an incident:
+
+- **HITL approval** — every destructive tool prompts before firing (via MCP Elicitation or a Unix socket fallback). Per-call, per-scope.
+- **Rate limit** — 60 tool calls/minute globally, 10 destructive/hour. Token-bucket so bursts are fine; sustained rate isn't.
+- **Emergency stop** — `touch ~/.config/airmcp/emergency-stop` blocks every destructive tool immediately with a 1-second probe cache. No restart needed. `rm` the file to resume.
+- **Audit log** — every tool call lands in `~/.airmcp/audit.jsonl` with PII-scrubbed args, 0600 perms, 10MB rotation. Query it via `audit_log` / `audit_summary` tools.
+- **HTTP network policy** (RFC 0002) — `AIRMCP_ALLOW_NETWORK` = `loopback-only` (default) / `with-token` / `with-token+origin` / `unauthenticated`. Startup invariant refuses to boot a misconfigured server. Reverse-proxy header detection warns when a `loopback-only` server sees `X-Forwarded-*` so silently-public deploys get caught.
+- **`npx airmcp doctor`** — runs all the above policy + macOS compatibility + permission checks in one command.
 
 ---
 
@@ -446,7 +500,7 @@ Useful for running a Mac Mini as an "always-on AI hub."
 | `ui_traverse` | BFS traverse with PID targeting + visible filter | read |
 | `ui_diff` | Compare UI state before/after an action | read |
 
-### Apple Intelligence (8 tools)
+### Apple Intelligence (13 tools)
 
 Requires macOS 26+ with Apple Silicon.
 
@@ -459,7 +513,32 @@ Requires macOS 26+ with Apple Silicon.
 | `generate_structured` | Generate structured JSON output with schema | read |
 | `tag_content` | Content classification/tagging with confidence | read |
 | `ai_chat` | Named multi-turn on-device AI session | read |
+| `generate_image` | Generate an image on disk via Image Playground | write |
+| `scan_document` | Detect text / tables / forms in an image | read |
+| `generate_plan` | Ask the on-device model for a JSON tool-call plan | read |
+| `ai_plan_metrics` | Run a sampled GOLDEN_PLANS batch and report planner quality | read |
 | `ai_status` | Check Foundation Model availability | read |
+| `ai_agent` | On-device autonomous tool-calling agent | read |
+
+### Context Memory (4 tools)
+
+Durable on-disk store for facts, named entities, and time-anchored episodes. Backed by `~/.cache/airmcp/memory.json`; also exposed as the `memory://recent` MCP resource.
+
+| Tool | Description | Type |
+|------|-------------|------|
+| `memory_put` | Insert or update a fact / entity / episode (idempotent upsert, optional TTL) | write |
+| `memory_query` | Filter by kind / tags / substring, newest-first | read |
+| `memory_forget` | Delete by id / key / tag | destructive |
+| `memory_stats` | Counts by kind + oldest/newest timestamps (sweeps expired as a side-effect) | read |
+
+### Audit (2 tools)
+
+Consumable view of the on-device audit log (populated for every tool call).
+
+| Tool | Description | Type |
+|------|-------------|------|
+| `audit_log` | Paginated recent calls, filterable by tool / status / time window | read |
+| `audit_summary` | Total count, error rate, top-N busiest tools over a window | read |
 
 ### TV (6 tools)
 

@@ -1,6 +1,6 @@
 {
   "meta_title": "AirMCP — Better Siri, powered by open source",
-  "meta_description": "Pull action items from last week's meeting notes, drop them into Reminders, get pinged when they're done. AirMCP is the open-source tool that connects your Apple ecosystem to any AI client — 27 modules, 262 tools.",
+  "meta_description": "Pull action items from last week's meeting notes, drop them into Reminders, get pinged when they're done. AirMCP is the open-source tool that connects your Apple ecosystem to any AI client — 29 modules, 262 tools.",
   "nav_modules": "Modules",
   "nav_workflows": "Workflows",
   "nav_install": "Install",
@@ -123,7 +123,7 @@
   "why_label": "Why AirMCP?",
   "why_title": "The most complete Apple MCP server.",
   "why_sub": "See how AirMCP compares to the alternatives.",
-  "why_1_title": "262 tools across 27 modules",
+  "why_1_title": "262 tools across 29 modules",
   "why_1_desc": "Others offer 10-15 tools and stop updating. AirMCP covers every major Apple app — and keeps growing.",
   "why_2_title": "Security by default",
   "why_2_desc": "Human-in-the-loop confirmation, audit logging, and input validation. No silent writes.",

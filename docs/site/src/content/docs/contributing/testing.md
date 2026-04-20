@@ -118,7 +118,7 @@ QA tests are integration tests that start the full MCP server, send JSON-RPC req
 npm run qa
 ```
 
-Runs `scripts/qa-test.mjs`. Exercises every read-only tool across all 27 modules. Does not modify any data. Safe to run anytime. Outputs a Markdown report with PASS/SKIP/FAIL status per tool.
+Runs `scripts/qa-test.mjs`. Exercises every read-only tool across all 29 modules. Does not modify any data. Safe to run anytime. Outputs a Markdown report with PASS/SKIP/FAIL status per tool.
 
 ### CRUD roundtrip test
 

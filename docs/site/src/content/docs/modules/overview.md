@@ -3,7 +3,7 @@ title: Module Overview
 description: All 25 AirMCP modules with tool counts and capabilities.
 ---
 
-AirMCP ships 27 modules that cover the Apple ecosystem. Each module registers a set of MCP tools that AI assistants can call. The total tool count varies slightly depending on dynamic shortcut registration, but the base set contains approximately 262 tools.
+AirMCP ships 29 modules that cover the Apple ecosystem. Each module registers a set of MCP tools that AI assistants can call. The total tool count varies slightly depending on dynamic shortcut registration, but the base set contains approximately 262 tools.
 
 ## Module Table
 

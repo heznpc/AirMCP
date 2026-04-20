@@ -188,7 +188,7 @@ export const LIMITS = {
 
 export const IDENTITY = {
   /** User-Agent for HTTP requests to external APIs */
-  USER_AGENT: envStr("AIRMCP_USER_AGENT", "AirMCP/2.9 (https://github.com/heznpc/AirMCP)"),
+  USER_AGENT: envStr("AIRMCP_USER_AGENT", "AirMCP/2.10 (https://github.com/heznpc/AirMCP)"),
   /** Default HTTP server port */
   HTTP_PORT: envInt("AIRMCP_HTTP_PORT", 3847),
 } as const;

@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**AirMCP v2.9.0** — MCP Server for the Apple Ecosystem on macOS
+**AirMCP v2.10.0** — MCP Server for the Apple Ecosystem on macOS
 Last updated: 2026-03-28
 
 ## Overview

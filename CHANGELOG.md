@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.10.0] - 2026-04-20
+
 ### Added
 - **Swift menubar onboarding — module coverage + v2.10 surface** — `OnboardingView` module picker grew from 15 to 25 items, reorganised into four readable clusters (Everyday · Media · System + automation · Intelligence + introspection · Context sensors · Integrations) instead of a flat list. The v2.10 introspection modules — **Context Memory** and **Audit** — get dedicated entries so first-run users see them alongside Notes/Calendar instead of having to discover them in config later. Localisable.strings gains `module.memory.*` and `module.audit.*` keys in both English and Korean. Swift build green; no Node-side changes.
 - **Registry submissions tracker + `server.json` refresh** — new `docs/REGISTRY_SUBMISSIONS.md` tracks status across Anthropic MCP Registry, Smithery, Glama, MCP Market, Cline Marketplace, and PulseMCP, with a resubmission checklist that requires `stats:sync` green before any registry UI is touched. `server.json` (Anthropic schema `static.modelcontextprotocol.io/schemas/2025-12-11`) gets a v2.10-era description ("269 tools across 29 modules with YAML skills, context memory, queryable audit log, and declarative HTTP network policy") and joins the `npm run stats:sync` fleet so its counts stay truthful automatically.

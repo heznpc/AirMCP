@@ -117,6 +117,10 @@
 "module.speech.desc" = "Text-to-speech, voice synthesis";
 "module.health" = "Health";
 "module.health.desc" = "Steps, heart rate, sleep, activity";
+"module.memory" = "Context Memory";
+"module.memory.desc" = "Durable facts, entities, episodes — ai_agent's recall";
+"module.audit" = "Audit";
+"module.audit.desc" = "Query the on-device log of every tool call";
 "module.requiresMacOS" = "requires macOS %d+";
 
 /* Onboarding */

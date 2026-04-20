@@ -173,6 +173,12 @@ const registryPattern = [
 syncFile("mcp.json", registryPattern);
 syncFile("glama.json", registryPattern);
 syncFile("smithery.yaml", registryPattern);
+// Anthropic MCP Registry manifest — only the description carries
+// the counts (version/package fields live outside the pattern scope).
+syncFile("server.json", [
+  { pattern: /(\d+) tools across/g, value: tools },
+  { pattern: /across (\d+) modules/g, value: modules },
+]);
 
 // Locale files — each uses different words for "modules"
 const localeDir = join(ROOT, "docs", "locales");

@@ -75,6 +75,21 @@ The default config file location is `~/.config/airmcp/config.json`. You can over
 | `AIRMCP_HTTP_PORT` | HTTP server port (default: `3847`) |
 | `AIRMCP_MAX_SESSIONS` | Max concurrent HTTP sessions (default: `50`) |
 | `AIRMCP_SESSION_IDLE_TTL` | Session idle timeout in ms (default: `300000` / 5 minutes) |
+| `AIRMCP_ALLOW_NETWORK` | Declarative network policy: `loopback-only` (default) / `with-token` / `with-token+origin` / `unauthenticated`. Startup refuses to bind inconsistent combinations. See RFC 0002. |
+| `AIRMCP_ALLOWED_ORIGINS` | Comma-separated Origin allow-list (e.g. `https://claude.ai,https://cursor.sh`). Required for `with-token+origin`. |
+
+### Browser-based MCP clients (Claude in Chrome, etc.)
+
+Extensions cannot spawn stdio subprocesses, so they consume AirMCP over HTTP:
+
+```bash
+export AIRMCP_HTTP_TOKEN=$(openssl rand -hex 32)
+export AIRMCP_ALLOWED_ORIGINS="https://claude.ai"
+export AIRMCP_ALLOW_NETWORK="with-token+origin"
+npx airmcp --http --bind-all --port 3847
+```
+
+In the extension: server URL `http://<host>:3847/mcp`, header `Authorization: Bearer $AIRMCP_HTTP_TOKEN`. `GET /.well-known/mcp.json` returns the server card with the resolved `network_policy`. Kill switch: `touch ~/.config/airmcp/emergency-stop` on the server.
 
 ### Performance Tuning
 

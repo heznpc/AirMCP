@@ -274,11 +274,56 @@ npx airmcp --http --port 3847
 ```
 
 - Endpoint: `POST/GET/DELETE /mcp`
-- Transport: Streamable HTTP + SSE (MCP spec 2024-11-05)
+- Transport: Streamable HTTP + SSE (MCP spec 2025-11-25)
 - Session management via `Mcp-Session-Id` header
 - Default port: 3847
+- Startup policy invariant (RFC 0002): refuses to bind public interfaces without a token — see [Safety & Operations](#safety--operations) above.
 
 Useful for running a Mac Mini as an "always-on AI hub."
+
+### Claude in Chrome & other browser-based MCP clients
+
+Browser extensions — including Anthropic's **Claude in Chrome** — can't spawn stdio subprocesses, so they consume MCP over HTTP. AirMCP's HTTP transport is designed for exactly this case.
+
+**1 · Start AirMCP with a token + origin allow-list:**
+
+```bash
+# Generate a token and keep it — you'll paste it into the Chrome extension.
+export AIRMCP_HTTP_TOKEN=$(openssl rand -hex 32)
+
+# Only accept requests whose Origin matches Claude's web UI:
+export AIRMCP_ALLOWED_ORIGINS="https://claude.ai"
+
+# Declarative policy: external binding, token required, Origin allow-list enforced.
+export AIRMCP_ALLOW_NETWORK="with-token+origin"
+
+npx airmcp --http --bind-all --port 3847
+```
+
+**2 · In the browser extension's MCP settings, add:**
+
+| Field | Value |
+|---|---|
+| Server URL | `http://<your-mac>:3847/mcp` (or `https://…` behind a TLS-terminating proxy) |
+| Auth header | `Authorization: Bearer <AIRMCP_HTTP_TOKEN>` |
+| Transport | Streamable HTTP (SSE) |
+
+**3 · Verify wiring:**
+
+```bash
+# From the same machine — should return the server card JSON:
+curl http://127.0.0.1:3847/.well-known/mcp.json
+```
+
+The response includes `"network_policy": "with-token+origin"` so the client can confirm what it's connecting to before a single tool call.
+
+Running AirMCP on a laptop that suspends? Put the menubar app on your Mac Mini / always-on host, point the browser at that hostname, and leave the token in Chrome's secure storage. Revoke by rotating `AIRMCP_HTTP_TOKEN` and restarting the server.
+
+**Security gotchas** — in order of "most likely to bite":
+
+- Don't put AirMCP behind a proxy that strips `X-Forwarded-*` without also switching to `AIRMCP_ALLOW_NETWORK=with-token`. AirMCP detects proxy headers and warns, but only when it's in `loopback-only` mode — flip the policy first.
+- Don't hand-edit origin lists into `"*"` — the Origin check is your last line of defence if a token leaks from the extension's storage.
+- `touch ~/.config/airmcp/emergency-stop` on the server blocks every destructive call within 1s, no restart needed. Remember this path.
 
 ## Tools
 

@@ -1,8 +1,40 @@
 // JXA scripts for macOS Shortcuts automation.
+//
+// See `src/messages/scripts.ts` header for the contract pattern. The
+// interfaces + EXAMPLE constants here pin the JSON shapes each script
+// produces; `tests/script-shape-contract.test.js` parses each example
+// through its tool's outputSchema so a scripts-side drift breaks the build.
 
 import { join } from "node:path";
 import { esc, escJxaShell } from "../shared/esc.js";
 import { PATHS } from "../shared/constants.js";
+
+// ── Return shapes ───────────────────────────────────────────────────────
+export interface ShortcutsNameList {
+  total: number;
+  shortcuts: string[];
+}
+
+export interface ShortcutsDetail {
+  shortcut: string;
+  detail: string;
+}
+
+// ── Example fixtures ────────────────────────────────────────────────────
+export const LIST_SHORTCUTS_EXAMPLE: ShortcutsNameList = {
+  total: 3,
+  shortcuts: ["Daily Brief", "Morning Routine", "Save to Notes"],
+};
+
+export const SEARCH_SHORTCUTS_EXAMPLE: ShortcutsNameList = {
+  total: 1,
+  shortcuts: ["Daily Brief"],
+};
+
+export const GET_SHORTCUT_DETAIL_EXAMPLE: ShortcutsDetail = {
+  shortcut: "Daily Brief",
+  detail: "Actions: Get Current Weather, Get Today's Calendar Events, Combine Text, Create Note",
+};
 
 export function listShortcutsScript(): string {
   return `

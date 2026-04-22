@@ -18,6 +18,8 @@ import {
   createShortcutScript,
   duplicateShortcutScript,
   editShortcutScript,
+  type ShortcutsNameList,
+  type ShortcutsDetail,
 } from "./scripts.js";
 
 const execFileAsync = promisify(execFile);
@@ -52,7 +54,7 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
     },
     async () => {
       try {
-        return okLinkedStructured("list_shortcuts", await runJxa(listShortcutsScript()));
+        return okLinkedStructured("list_shortcuts", await runJxa<ShortcutsNameList>(listShortcutsScript()));
       } catch (e) {
         return toolError("list shortcuts", e);
       }
@@ -96,7 +98,7 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
     },
     async ({ query }) => {
       try {
-        return okStructured(await runJxa(searchShortcutsScript(query)));
+        return okStructured(await runJxa<ShortcutsNameList>(searchShortcutsScript(query)));
       } catch (e) {
         return toolError("search shortcuts", e);
       }
@@ -119,7 +121,7 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
     },
     async ({ name }) => {
       try {
-        return okStructured(await runJxa(getShortcutDetailScript(name)));
+        return okStructured(await runJxa<ShortcutsDetail>(getShortcutDetailScript(name)));
       } catch (e) {
         return toolError("get shortcut detail", e);
       }

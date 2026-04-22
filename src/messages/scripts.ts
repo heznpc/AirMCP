@@ -1,6 +1,84 @@
 // JXA scripts for Apple Messages automation.
+//
+// Each exported `*Script` function returns a JXA source string whose final
+// expression is `JSON.stringify(...)`. The TypeScript interfaces below pin
+// the shape of that JSON, and the `*_EXAMPLE` constants carry a concrete
+// instance of that shape. Tests in `tests/script-shape-contract.test.js`
+// parse each example through the matching tool's `outputSchema`, so drifting
+// a scripts JSON shape without updating the example (and outputSchema) fails
+// a test — rather than silently passing a tautological mock-in-mock-out
+// check. Example constants and scripts must be kept in lockstep by hand.
 
 import { esc, escAS } from "../shared/esc.js";
+
+// ── Return shapes ───────────────────────────────────────────────────────
+export interface MessagesParticipant {
+  name: string | null;
+  handle: string | null;
+}
+
+export interface MessagesChatSummary {
+  id: string;
+  name: string | null;
+  participants: MessagesParticipant[];
+  updated: string | null;
+}
+
+export interface MessagesListChatsOutput {
+  total: number;
+  returned: number;
+  chats: MessagesChatSummary[];
+}
+
+export type MessagesReadChatOutput = MessagesChatSummary;
+
+export type MessagesSearchChatsOutput = MessagesListChatsOutput;
+
+export interface MessagesListParticipantsOutput {
+  chatId: string;
+  chatName: string | null;
+  participants: MessagesParticipant[];
+}
+
+// ── Example fixtures (hand-maintained; see tests/script-shape-contract) ──
+export const LIST_CHATS_EXAMPLE: MessagesListChatsOutput = {
+  total: 3,
+  returned: 2,
+  chats: [
+    {
+      id: "iMessage;+;alice@example.com",
+      name: "Alice",
+      participants: [{ name: "Alice", handle: "alice@example.com" }],
+      updated: "2026-04-20T10:00:00.000Z",
+    },
+    {
+      id: "iMessage;-;chat123",
+      name: null,
+      participants: [
+        { name: null, handle: "+821012345678" },
+        { name: "Bob", handle: "bob@example.com" },
+      ],
+      updated: null,
+    },
+  ],
+};
+
+export const READ_CHAT_EXAMPLE: MessagesReadChatOutput = LIST_CHATS_EXAMPLE.chats[0]!;
+
+export const SEARCH_CHATS_EXAMPLE: MessagesSearchChatsOutput = {
+  total: 5,
+  returned: 1,
+  chats: [LIST_CHATS_EXAMPLE.chats[0]!],
+};
+
+export const LIST_PARTICIPANTS_EXAMPLE: MessagesListParticipantsOutput = {
+  chatId: "iMessage;+;alice@example.com",
+  chatName: "Alice",
+  participants: [
+    { name: "Alice", handle: "alice@example.com" },
+    { name: null, handle: null },
+  ],
+};
 
 export function listChatsScript(limit: number): string {
   return `

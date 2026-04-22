@@ -19,6 +19,10 @@ import {
   sendMessageScript,
   sendFileScript,
   listParticipantsScript,
+  type MessagesListChatsOutput,
+  type MessagesReadChatOutput,
+  type MessagesSearchChatsOutput,
+  type MessagesListParticipantsOutput,
 } from "./scripts.js";
 
 // Shared sub-schemas for messages outputs.
@@ -40,6 +44,42 @@ const chatListShape = {
   chats: z.array(chatSchema),
 };
 
+const listParticipantsShape = {
+  chatId: z.string(),
+  chatName: z.string().nullable(),
+  participants: z.array(participantSchema),
+};
+
+// Compile-time assertion: the zod-inferred types must be structurally
+// assignable to the hand-written script-return types (and vice versa).
+// If either drifts, tsc fails the build — catching real script/schema
+// mismatches the mock-in-mock-out Wave 3 runtime tests cannot catch.
+type _AssertChatListMatch = [z.infer<z.ZodObject<typeof chatListShape>>, MessagesListChatsOutput] extends [
+  MessagesListChatsOutput,
+  z.infer<z.ZodObject<typeof chatListShape>>,
+]
+  ? true
+  : never;
+type _AssertChatMatch = [z.infer<typeof chatSchema>, MessagesReadChatOutput] extends [
+  MessagesReadChatOutput,
+  z.infer<typeof chatSchema>,
+]
+  ? true
+  : never;
+type _AssertParticipantsMatch = [
+  z.infer<z.ZodObject<typeof listParticipantsShape>>,
+  MessagesListParticipantsOutput,
+] extends [MessagesListParticipantsOutput, z.infer<z.ZodObject<typeof listParticipantsShape>>]
+  ? true
+  : never;
+// Reference the aliases so TS doesn't prune them as unused.
+const _chatListCheck: _AssertChatListMatch = true;
+const _chatCheck: _AssertChatMatch = true;
+const _participantsCheck: _AssertParticipantsMatch = true;
+void _chatListCheck;
+void _chatCheck;
+void _participantsCheck;
+
 export function registerMessagesTools(server: McpServer, config: AirMcpConfig): void {
   const { allowSendMessages } = config;
   server.registerTool(
@@ -55,7 +95,7 @@ export function registerMessagesTools(server: McpServer, config: AirMcpConfig): 
     },
     async ({ limit }) => {
       try {
-        return okLinkedStructured("list_chats", await runJxa(listChatsScript(limit)));
+        return okLinkedStructured("list_chats", await runJxa<MessagesListChatsOutput>(listChatsScript(limit)));
       } catch (e) {
         return toolError("list chats", e);
       }
@@ -75,7 +115,7 @@ export function registerMessagesTools(server: McpServer, config: AirMcpConfig): 
     },
     async ({ chatId }) => {
       try {
-        return okUntrustedLinkedStructured("read_chat", await runJxa(readChatScript(chatId)));
+        return okUntrustedLinkedStructured("read_chat", await runJxa<MessagesReadChatOutput>(readChatScript(chatId)));
       } catch (e) {
         return toolError("read chat", e);
       }
@@ -96,7 +136,10 @@ export function registerMessagesTools(server: McpServer, config: AirMcpConfig): 
     },
     async ({ query, limit }) => {
       try {
-        return okUntrustedLinkedStructured("search_chats", await runJxa(searchMessagesScript(query, limit)));
+        return okUntrustedLinkedStructured(
+          "search_chats",
+          await runJxa<MessagesSearchChatsOutput>(searchMessagesScript(query, limit)),
+        );
       } catch (e) {
         return toolError("search chats", e);
       }
@@ -160,16 +203,12 @@ export function registerMessagesTools(server: McpServer, config: AirMcpConfig): 
       inputSchema: {
         chatId: z.string().max(500).describe("Chat ID"),
       },
-      outputSchema: {
-        chatId: z.string(),
-        chatName: z.string().nullable(),
-        participants: z.array(participantSchema),
-      },
+      outputSchema: listParticipantsShape,
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ chatId }) => {
       try {
-        return okUntrustedStructured(await runJxa(listParticipantsScript(chatId)));
+        return okUntrustedStructured(await runJxa<MessagesListParticipantsOutput>(listParticipantsScript(chatId)));
       } catch (e) {
         return toolError("list participants", e);
       }

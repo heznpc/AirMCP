@@ -38,15 +38,37 @@ if (!existsSync(entry)) {
   process.exit(2);
 }
 
-// AIRMCP_FAKE_OS_VERSION=0 pins the manifest to the os-agnostic baseline:
-// every os-version tool gate (e.g. Safari add_bookmark skipped on macOS 26+)
-// sees osVersion=0 and registers nothing gate-specific. This is what makes
-// docs/tool-manifest.json byte-stable across macOS 15 CI runners and macOS 26
-// dev laptops. Do not set AIRMCP_TEST_MODE here — that flag disables a
-// separate set of paths (test helpers) that are unrelated.
-const server = spawn("node", [entry], {
+// Pin the manifest to a reproducible baseline so docs/tool-manifest.json
+// is byte-stable across heterogeneous hosts and configs.
+//
+//   AIRMCP_FAKE_OS_VERSION=0   getOsVersion() returns 0 ("non-Darwin");
+//                              OS-version tool gates (e.g. Safari
+//                              add_bookmark skipped on macOS 26+) all see
+//                              the same value regardless of host.
+//   AIRMCP_FULL=true           load every module, not just STARTER_MODULES.
+//                              Without this, a fresh machine (no
+//                              ~/.airmcp/config.json) emits only the 7
+//                              starter modules (~111 tools), while a
+//                              developer laptop with a live config emits
+//                              ~120+. The bridge codegen needs the full
+//                              inventory regardless of user preference.
+//
+// Do not set AIRMCP_TEST_MODE — that flag disables a separate set of
+// paths (test helpers) unrelated to tool registration.
+const server = spawn("node", [entry, "--full"], {
   stdio: ["pipe", "pipe", "inherit"],
-  env: { ...process.env, AIRMCP_FAKE_OS_VERSION: "0" },
+  env: {
+    ...process.env,
+    AIRMCP_FAKE_OS_VERSION: "0",
+    AIRMCP_FULL: "true",
+    // Clear any per-module AIRMCP_DISABLE_* set in the developer shell
+    // (belt-and-suspenders with --full).
+    ...Object.fromEntries(
+      Object.keys(process.env)
+        .filter((k) => k.startsWith("AIRMCP_DISABLE_"))
+        .map((k) => [k, ""]),
+    ),
+  },
 });
 
 const rl = createInterface({ input: server.stdout });

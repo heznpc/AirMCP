@@ -8,7 +8,6 @@ description: >-
   blocked and which didn't. DESTRUCTIVE: creates calendar events; each
   insertion is gated by HITL approval.
 expose_as: tool
-
 steps:
   # 1) Pull the open-reminder backlog. `limit: 8` keeps the loop small
   #    enough that HITL prompting stays tolerable.

@@ -3,34 +3,30 @@ const RE_CTRL = /[\x01-\x08\x0b\x0c\x0e-\x1f]/g;
 
 /** Escape a string for safe interpolation inside JXA single-quoted literals. */
 export function esc(str: string): string {
-  return (
-    str
-      .replace(/\0/g, "")
-      .replace(/\\/g, "\\\\")
-      .replace(/'/g, "\\'")
-      .replace(/\n/g, "\\n")
-      .replace(/\r/g, "\\r")
-      .replace(/\t/g, "\\t")
-      .replace(RE_CTRL, "")
-      .replace(/\u2028/g, "\\u2028")
-      .replace(/\u2029/g, "\\u2029")
-  );
+  return str
+    .replace(/\0/g, "")
+    .replace(/\\/g, "\\\\")
+    .replace(/'/g, "\\'")
+    .replace(/\n/g, "\\n")
+    .replace(/\r/g, "\\r")
+    .replace(/\t/g, "\\t")
+    .replace(RE_CTRL, "")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
 }
 
 /** Escape a string for safe interpolation inside AppleScript double-quoted strings. */
 export function escAS(str: string): string {
-  return (
-    str
-      .replace(/\0/g, "")
-      .replace(RE_CTRL, "")
-      .replace(/\\/g, "\\\\")
-      .replace(/"/g, '\\"')
-      .replace(/\n/g, "\\n")
-      .replace(/\r/g, "\\r")
-      .replace(/\t/g, "\\t")
-      .replace(/\u2028/g, "\\u2028")
-      .replace(/\u2029/g, "\\u2029")
-  );
+  return str
+    .replace(/\0/g, "")
+    .replace(RE_CTRL, "")
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, "\\n")
+    .replace(/\r/g, "\\r")
+    .replace(/\t/g, "\\t")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
 }
 
 /** Escape a string for safe interpolation inside shell double-quoted arguments via doShellScript. */

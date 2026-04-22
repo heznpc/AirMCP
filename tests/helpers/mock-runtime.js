@@ -13,8 +13,10 @@ import { jest } from '@jest/globals';
 
 export function setupPlatformMocks() {
   const mockRunJxa = jest.fn();
+  const mockRunAppleScript = jest.fn();
   jest.unstable_mockModule('../../dist/shared/jxa.js', () => ({
     runJxa: mockRunJxa,
+    runAppleScript: mockRunAppleScript,
     osascriptSemaphore: { acquire: jest.fn().mockResolvedValue(undefined), release: jest.fn() },
   }));
 
@@ -36,6 +38,7 @@ export function setupPlatformMocks() {
 
   return {
     mockRunJxa,
+    mockRunAppleScript,
     mockRunSwift,
     mockCheckSwiftBridge,
     mockHasSwiftCommand,

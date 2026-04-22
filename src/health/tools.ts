@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "../shared/mcp.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import { runSwift, checkSwiftBridge } from "../shared/swift.js";
-import { ok, okLinked, okLinkedStructured, err, toolError } from "../shared/result.js";
+import { ok, okLinkedStructured, err, toolError } from "../shared/result.js";
 
 export function registerHealthTools(server: McpServer, _config: AirMcpConfig): void {
   server.registerTool(
@@ -45,6 +45,9 @@ export function registerHealthTools(server: McpServer, _config: AirMcpConfig): v
       title: "Today's Steps",
       description: "Get aggregated step count for today from HealthKit.",
       inputSchema: {},
+      outputSchema: {
+        stepsToday: z.number().describe("Step count today"),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async () => {
@@ -52,7 +55,7 @@ export function registerHealthTools(server: McpServer, _config: AirMcpConfig): v
       if (bridgeErr) return err(`Swift bridge required: ${bridgeErr}`);
       try {
         const result = await runSwift<{ stepsToday: number }>("health-steps", "{}");
-        return okLinked("health_today_steps", result);
+        return okLinkedStructured("health_today_steps", result);
       } catch (e) {
         return toolError("get step count", e);
       }
@@ -65,6 +68,10 @@ export function registerHealthTools(server: McpServer, _config: AirMcpConfig): v
       title: "Recent Heart Rate",
       description: "Get average resting heart rate over the last 7 days (bpm) from HealthKit.",
       inputSchema: {},
+      outputSchema: {
+        heartRateAvg7d: z.number().nullable().describe("7-day average resting heart rate (bpm); null if unavailable"),
+        message: z.string().optional().describe("Explanation when heartRateAvg7d is null (e.g. insufficient data)"),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async () => {
@@ -72,7 +79,7 @@ export function registerHealthTools(server: McpServer, _config: AirMcpConfig): v
       if (bridgeErr) return err(`Swift bridge required: ${bridgeErr}`);
       try {
         const result = await runSwift<{ heartRateAvg7d: number | null; message?: string }>("health-heart-rate", "{}");
-        return okLinked("health_heart_rate", result);
+        return okLinkedStructured("health_heart_rate", result);
       } catch (e) {
         return toolError("get heart rate", e);
       }
@@ -91,6 +98,9 @@ export function registerHealthTools(server: McpServer, _config: AirMcpConfig): v
           .optional()
           .describe("ISO 8601 date (e.g. '2026-03-22'). Defaults to today (last night's sleep)."),
       },
+      outputSchema: {
+        sleepHours: z.number().describe("Total sleep hours (actual sleep stages, not time in bed)"),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ date }: { date?: string }) => {
@@ -99,7 +109,7 @@ export function registerHealthTools(server: McpServer, _config: AirMcpConfig): v
       try {
         const input = date ? JSON.stringify({ date }) : "{}";
         const result = await runSwift<{ sleepHours: number }>("health-sleep", input);
-        return okLinked("health_sleep", result);
+        return okLinkedStructured("health_sleep", result);
       } catch (e) {
         return toolError("get sleep data", e);
       }

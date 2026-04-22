@@ -87,6 +87,7 @@ Draft ──► Proposed ──► Accepted ──► Implemented
 | [0002](./0002-http-allow-network.md) | Declarative HTTP `allowNetwork` Mode | Draft | v2.8.0 → v2.9.0 |
 | [0003](./0003-ci-audit-stepwise.md) | CI npm audit 등급 단계적 상향 | Draft | v2.8.x |
 | [0004](./0004-macos-compat-matrix.md) | macOS 호환성 매트릭스 & 모듈 Manifest 확장 | Draft | v2.8.0 |
+| [0005](./0005-oauth-resource-indicators.md) | OAuth 2.1 + Resource Indicators (MCP 2025-06-18 spec) | Draft | v2.11.0 |
 
 ## 관련 문서
 

@@ -99,7 +99,15 @@ export function activateTabScript(windowIndex: number, tabIndex: number): string
 }
 
 /** URL schemes where JavaScript execution is blocked for security. */
-const BLOCKED_URL_SCHEMES = ["file:", "about:", "safari-extension:", "safari-web-extension:", "blob:", "javascript:", "data:"];
+const BLOCKED_URL_SCHEMES = [
+  "file:",
+  "about:",
+  "safari-extension:",
+  "safari-web-extension:",
+  "blob:",
+  "javascript:",
+  "data:",
+];
 const BLOCKED_URL_SCHEMES_JSON = JSON.stringify(BLOCKED_URL_SCHEMES);
 
 export function runJavascriptScript(code: string, windowIndex: number, tabIndex: number): string {

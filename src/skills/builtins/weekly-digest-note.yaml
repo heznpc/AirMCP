@@ -8,7 +8,6 @@ description: >-
   written even if summarisation fails for one or two tracks (e.g.
   Foundation Models unavailable on an Intel Mac).
 expose_as: prompt
-
 steps:
   # 1) Fan out four independent reads. All parallel, individual failures
   #    are tolerated so a missing Swift bridge or app-not-running error

@@ -33,6 +33,8 @@ const { registerSafariTools } = await import('../dist/safari/tools.js');
 const { registerFinderTools } = await import('../dist/finder/tools.js');
 const { registerMusicTools } = await import('../dist/music/tools.js');
 const { registerHealthTools } = await import('../dist/health/tools.js');
+const { registerMessagesTools } = await import('../dist/messages/tools.js');
+const { registerShortcutsTools } = await import('../dist/shortcuts/tools.js');
 const { registerWeatherTools } = await import('../dist/weather/tools.js');
 const { fetchCurrentWeather } = await import('../dist/weather/api.js');
 
@@ -247,6 +249,50 @@ const TOOL_FIXTURES = {
     args: { playlist: 'Liked', limit: 100 },
     mock: { total: 0, returned: 0, tracks: [] },
   },
+  // ── Wave 3 additions ──
+  // messages
+  list_chats: {
+    args: { limit: 10 },
+    mock: { total: 0, returned: 0, chats: [] },
+  },
+  read_chat: {
+    args: { chatId: 'c1' },
+    mock: { id: 'c1', name: null, participants: [], updated: null },
+  },
+  search_chats: {
+    args: { query: 'test', limit: 10 },
+    mock: { total: 0, returned: 0, chats: [] },
+  },
+  list_participants: {
+    args: { chatId: 'c1' },
+    mock: { chatId: 'c1', chatName: null, participants: [] },
+  },
+  // health
+  health_today_steps: {
+    args: {},
+    mock: { stepsToday: 0 },
+  },
+  health_heart_rate: {
+    args: {},
+    mock: { heartRateAvg7d: null },
+  },
+  health_sleep: {
+    args: {},
+    mock: { sleepHours: 0 },
+  },
+  // shortcuts
+  list_shortcuts: {
+    args: {},
+    mock: { total: 0, shortcuts: [] },
+  },
+  search_shortcuts: {
+    args: { query: 'test' },
+    mock: { total: 0, shortcuts: [] },
+  },
+  get_shortcut_detail: {
+    args: { name: 'Daily' },
+    mock: { shortcut: 'Daily', detail: '' },
+  },
 };
 
 // ── Test suite ──────────────────────────────────────────────────────
@@ -267,6 +313,8 @@ describe('outputSchema → structuredContent contract', () => {
     registerFinderTools(server, config);
     registerMusicTools(server, config);
     registerHealthTools(server, config);
+    registerMessagesTools(server, config);
+    registerShortcutsTools(server, config);
     registerWeatherTools(server, config);
   });
 

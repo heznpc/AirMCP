@@ -9,7 +9,6 @@ description: >-
   denial, Reminders permission, etc.). DESTRUCTIVE: creates reminders;
   each insertion is gated by HITL approval.
 expose_as: tool
-
 inputs:
   query:
     type: string

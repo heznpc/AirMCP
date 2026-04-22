@@ -6,7 +6,6 @@ description: >-
   gathered in parallel, with a conditional deep-dive when reminders are
   backlogged. Shows off the Skills DSL's parallel + conditional features.
 expose_as: prompt
-
 steps:
   # Fan-out: 5 independent read-only tools run concurrently. Failures are
   # isolated per step — the slow or unavailable ones don't block the rest.

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **outputSchema Wave 3** — 10 additional read tools now declare typed `outputSchema` with matching `structuredContent`: `list_chats`, `read_chat`, `search_chats`, `list_participants` (messages), `health_today_steps`, `health_heart_rate`, `health_sleep` (health), `list_shortcuts`, `search_shortcuts`, `get_shortcut_detail` (shortcuts). Brings outputSchema coverage of high-traffic read tools from ~30% to ~40%. Messages tools keep the `okUntrusted*` wrappers so external-content markers still guard against prompt injection, now layered with `structuredContent`. Health tools graduate from `okLinked` to `okLinkedStructured` so the primary text block, `_links`, and the typed payload all round-trip cleanly. `tests/output-schema-wave3.test.js` adds strict-parse drift guards for each new schema, and `output-schema-structured.test.js` picks up the 10 fixtures so the exhaustive coverage check stays green.
+- **RFC 0005 draft — OAuth 2.1 + Resource Indicators** — new RFC targeting v2.11.0 that lays out the migration from the legacy `AIRMCP_HTTP_TOKEN` Bearer path to the MCP 2025-06-18 OAuth 2.1 + RFC 8707 Resource Indicators flow. Covers `with-oauth` / `with-oauth+origin` network policies, `.well-known/oauth-protected-resource` discovery, scope design (`mcp:read`/`mcp:write`/`mcp:destructive`/`mcp:admin`), and a 5-step rollout that keeps the existing Bearer path working until v3.0.
+
+### Changed
+- **`safari.add_bookmark` gated on macOS 26+** — Safari removed bookmark scripting in macOS 26; the tool now skips registration on macOS 26+ instead of registering and returning an error at call time. Agents no longer see a "tool exists but always fails" entry in their plans on Tahoe hosts. Legacy hosts (macOS ≤ 25) keep the tool with the existing deprecation message. Test expectation updated from 12 → 11 registered Safari tools in the non-Darwin test env (`add_bookmark` gated off, other 11 always present).
+- **Prettier run across 9 drifted files** — `src/safari/scripts.ts`, `src/shared/esc.ts`, and the 7 skill built-in YAMLs (`daily-journal`, `favorites-digest`, `focus-block-planner`, `project-digest`, `sender-to-tasks`, `weekly-digest-note`, `weekly-review`). No behaviour change.
+
+### Security
+- **Hono / @hono/node-server overrides** — `package.json` `overrides` forces `hono@^4.12.13` + `@hono/node-server@^1.19.13` to address [CVE-2026-29045](https://advisories.gitlab.com/pkg/npm/hono/CVE-2026-29045/), [CVE-2026-39407](https://advisories.gitlab.com/pkg/npm/hono/CVE-2026-39407/), [CVE-2026-29087](https://advisories.gitlab.com/pkg/npm/@hono/node-server/CVE-2026-29087/), and [CVE-2026-39406](https://advisories.gitlab.com/pkg/npm/@hono/node-server/CVE-2026-39406/) (middleware bypass via repeated slashes + authorization bypass via encoded slashes in `serveStatic`). AirMCP does not use Hono directly — both are transitive via `@modelcontextprotocol/sdk` — but `npm audit --omit=dev` now reports 0 findings instead of 2 moderate.
+
 ## [2.10.0] - 2026-04-20
 
 ### Added

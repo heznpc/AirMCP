@@ -31,8 +31,11 @@ describe('Safari tools registration', () => {
     registerSafariTools(server, {});
   });
 
-  test('registers all 12 safari tools', () => {
-    expect(server.tools.size).toBe(12);
+  test('registers safari tools (add_bookmark gated on macOS < 26)', () => {
+    // add_bookmark is only registered on macOS ≤ 25 — the test runner is
+    // non-Darwin (getOsVersion() = 0), so it is skipped. On older hosts the
+    // size would be 12. The 11 non-gated tools below must always register.
+    expect(server.tools.size).toBe(11);
     const expected = [
       'list_tabs',
       'read_page_content',
@@ -43,13 +46,13 @@ describe('Safari tools registration', () => {
       'run_javascript',
       'search_tabs',
       'list_bookmarks',
-      'add_bookmark',
       'list_reading_list',
       'add_to_reading_list',
     ];
     for (const name of expected) {
       expect(server.tools.has(name)).toBe(true);
     }
+    expect(server.tools.has('add_bookmark')).toBe(false);
   });
 
   test('all tools have titles and descriptions', () => {

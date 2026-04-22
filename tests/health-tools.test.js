@@ -146,13 +146,17 @@ describe('health_today_steps', () => {
     mockCheckSwiftBridge.mockReset();
   });
 
-  test('returns step count with _links', async () => {
+  test('returns step count with structuredContent (and _links as separate block)', async () => {
     mockCheckSwiftBridge.mockResolvedValue(null);
     mockRunSwift.mockResolvedValue({ stepsToday: 12000 });
 
     const result = await server.callTool('health_today_steps');
+    // Primary text block is the typed payload; _links are a separate content block
+    // appended by okLinkedStructured so outputSchema stays strict.
     const parsed = JSON.parse(result.content[0].text);
     expect(parsed.stepsToday).toBe(12000);
-    expect(parsed._links).toBeDefined();
+    expect(result.structuredContent).toEqual({ stepsToday: 12000 });
+    // _links, if any, are in an additional text content block — not a required
+    // field of the primary payload.
   });
 });

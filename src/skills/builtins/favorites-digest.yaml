@@ -7,7 +7,6 @@ description: >-
   The loop iterates inside `favorites` with `on_error: continue` so a
   single unreadable asset doesn't truncate the digest.
 expose_as: prompt
-
 steps:
   # 1) Read the user's Favorites album. Keeping `limit: 10` small so the
   #    downstream note stays readable.

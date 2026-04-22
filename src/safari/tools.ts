@@ -1,7 +1,7 @@
 import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
-import type { AirMcpConfig } from "../shared/config.js";
+import { getOsVersion, type AirMcpConfig } from "../shared/config.js";
 import {
   ok,
   okUntrusted,
@@ -266,26 +266,34 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
     },
   );
 
-  server.registerTool(
-    "add_bookmark",
-    {
-      title: "Add Bookmark (Deprecated)",
-      description:
-        "DEPRECATED: Safari removed bookmark scripting in macOS 26. This tool will return an error. " +
-        "Use add_to_reading_list instead, which still works.",
-      inputSchema: {
-        url: z.string().url().describe("URL to bookmark"),
-        title: z.string().max(500).describe("Bookmark title"),
+  // Safari removed bookmark scripting in macOS 26 (RFC 0004 tool-level gate):
+  // skip registration entirely so agents don't select a tool that cannot work.
+  // Legacy hosts (macOS ≤ 25) keep the tool, but it already returns err() because
+  // the underlying `make new bookmark` call is broken there too in many configs —
+  // the deprecation message steers callers toward add_to_reading_list.
+  const os = getOsVersion();
+  if (os > 0 && os < 26) {
+    server.registerTool(
+      "add_bookmark",
+      {
+        title: "Add Bookmark (Deprecated)",
+        description:
+          "DEPRECATED: Safari removed bookmark scripting in macOS 26. This tool returns an error on unsupported hosts. " +
+          "Use add_to_reading_list instead, which still works.",
+        inputSchema: {
+          url: z.string().url().describe("URL to bookmark"),
+          title: z.string().max(500).describe("Bookmark title"),
+        },
+        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    },
-    async () => {
-      return err(
-        "add_bookmark is deprecated — Safari removed bookmark scripting in macOS 26. " +
-          "Use add_to_reading_list instead.",
-      );
-    },
-  );
+      async () => {
+        return err(
+          "add_bookmark is deprecated — Safari removed bookmark scripting in macOS 26. " +
+            "Use add_to_reading_list instead.",
+        );
+      },
+    );
+  }
 
   server.registerTool(
     "list_reading_list",

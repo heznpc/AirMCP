@@ -2,7 +2,14 @@ import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { runJxa, runAppleScript } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okLinked, okUntrusted, err, toolError } from "../shared/result.js";
+import {
+  ok,
+  okLinkedStructured,
+  okUntrustedLinkedStructured,
+  okUntrustedStructured,
+  err,
+  toolError,
+} from "../shared/result.js";
 import { TIMEOUT } from "../shared/constants.js";
 import { zFilePath } from "../shared/validate.js";
 import {
@@ -14,6 +21,19 @@ import {
   listParticipantsScript,
 } from "./scripts.js";
 
+// Shared sub-schemas for messages outputs.
+const participantSchema = z.object({
+  name: z.string().nullable(),
+  handle: z.string().nullable(),
+});
+
+const chatSchema = z.object({
+  id: z.string(),
+  name: z.string().nullable(),
+  participants: z.array(participantSchema),
+  updated: z.string().nullable(),
+});
+
 export function registerMessagesTools(server: McpServer, config: AirMcpConfig): void {
   const { allowSendMessages } = config;
   server.registerTool(
@@ -24,11 +44,16 @@ export function registerMessagesTools(server: McpServer, config: AirMcpConfig): 
       inputSchema: {
         limit: z.number().int().min(1).max(200).optional().default(50).describe("Max chats to return (default: 50)"),
       },
+      outputSchema: {
+        total: z.number(),
+        returned: z.number(),
+        chats: z.array(chatSchema),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ limit }) => {
       try {
-        return okLinked("list_chats", await runJxa(listChatsScript(limit)));
+        return okLinkedStructured("list_chats", await runJxa(listChatsScript(limit)));
       } catch (e) {
         return toolError("list chats", e);
       }
@@ -43,11 +68,17 @@ export function registerMessagesTools(server: McpServer, config: AirMcpConfig): 
       inputSchema: {
         chatId: z.string().max(500).describe("Chat ID"),
       },
+      outputSchema: {
+        id: z.string(),
+        name: z.string().nullable(),
+        participants: z.array(participantSchema),
+        updated: z.string().nullable(),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ chatId }) => {
       try {
-        return okUntrusted(await runJxa(readChatScript(chatId)));
+        return okUntrustedLinkedStructured("read_chat", await runJxa(readChatScript(chatId)));
       } catch (e) {
         return toolError("read chat", e);
       }
@@ -63,11 +94,16 @@ export function registerMessagesTools(server: McpServer, config: AirMcpConfig): 
         query: z.string().max(500).describe("Search keyword (matches chat name, participant name, or handle)"),
         limit: z.number().int().min(1).max(100).optional().default(20).describe("Max results (default: 20)"),
       },
+      outputSchema: {
+        total: z.number(),
+        returned: z.number(),
+        chats: z.array(chatSchema),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ query, limit }) => {
       try {
-        return okUntrusted(await runJxa(searchMessagesScript(query, limit)));
+        return okUntrustedLinkedStructured("search_chats", await runJxa(searchMessagesScript(query, limit)));
       } catch (e) {
         return toolError("search chats", e);
       }
@@ -131,11 +167,16 @@ export function registerMessagesTools(server: McpServer, config: AirMcpConfig): 
       inputSchema: {
         chatId: z.string().max(500).describe("Chat ID"),
       },
+      outputSchema: {
+        chatId: z.string(),
+        chatName: z.string().nullable(),
+        participants: z.array(participantSchema),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ chatId }) => {
       try {
-        return okUntrusted(await runJxa(listParticipantsScript(chatId)));
+        return okUntrustedStructured(await runJxa(listParticipantsScript(chatId)));
       } catch (e) {
         return toolError("list participants", e);
       }

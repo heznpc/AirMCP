@@ -6,7 +6,6 @@ description: >-
   cross-app "everything about this project" view. Demonstrates the
   Skills DSL's loop construct and conditional execution.
 expose_as: tool
-
 steps:
   # 1) Seed search: semantic_search returns { query, results[], total, ... }.
   #    Threshold is permissive so the loop has something to work with even

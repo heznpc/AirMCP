@@ -4,7 +4,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okLinked, toolError } from "../shared/result.js";
+import { ok, okLinked, okLinkedStructured, okStructured, toolError } from "../shared/result.js";
 import { TIMEOUT } from "../shared/constants.js";
 import { zFilePath } from "../shared/validate.js";
 import {
@@ -44,11 +44,15 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
       title: "List Shortcuts",
       description: "List all available Siri Shortcuts on this Mac.",
       inputSchema: {},
+      outputSchema: {
+        total: z.number(),
+        shortcuts: z.array(z.string()),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async () => {
       try {
-        return okLinked("list_shortcuts", await runJxa(listShortcutsScript()));
+        return okLinkedStructured("list_shortcuts", await runJxa(listShortcutsScript()));
       } catch (e) {
         return toolError("list shortcuts", e);
       }
@@ -84,11 +88,15 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
       inputSchema: {
         query: z.string().max(500).describe("Search keyword to match against shortcut names"),
       },
+      outputSchema: {
+        total: z.number(),
+        shortcuts: z.array(z.string()),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ query }) => {
       try {
-        return ok(await runJxa(searchShortcutsScript(query)));
+        return okStructured(await runJxa(searchShortcutsScript(query)));
       } catch (e) {
         return toolError("search shortcuts", e);
       }
@@ -103,11 +111,15 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
       inputSchema: {
         name: z.string().max(500).describe("Shortcut name (exact match)"),
       },
+      outputSchema: {
+        shortcut: z.string(),
+        detail: z.string(),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ name }) => {
       try {
-        return ok(await runJxa(getShortcutDetailScript(name)));
+        return okStructured(await runJxa(getShortcutDetailScript(name)));
       } catch (e) {
         return toolError("get shortcut detail", e);
       }

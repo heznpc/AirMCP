@@ -8,7 +8,6 @@ description: >-
   later recall "what did I do last Tuesday?" via `memory_query`.
   DESTRUCTIVE: writes a memory entry (non-destructive to Apple apps).
 expose_as: tool
-
 inputs:
   note:
     type: string

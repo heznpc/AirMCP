@@ -78,6 +78,14 @@ jobs:
       - name: Smoke — boot server + tools/list round-trip
         run: npm run smoke
 
+      - name: Verify tool manifest (RFC 0007 A.0)
+        run: |
+          npm run gen:manifest
+          echo "--- diff (should be empty) ---"
+          git --no-pager diff --stat docs/tool-manifest.json || true
+          git --no-pager diff docs/tool-manifest.json | head -200 || true
+          git diff --exit-code docs/tool-manifest.json
+
       - name: Verify stats
         run: node scripts/count-stats.mjs --check
 

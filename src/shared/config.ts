@@ -19,6 +19,16 @@ import { HEALTHKIT_MIN_MACOS, type CompatibilityEnv } from "./compatibility.js";
  * Returns 0 on non-macOS platforms so version checks always pass.
  */
 export function getOsVersion(): number {
+  // Developer/CI override so tool-registration gates produce a reproducible
+  // result across heterogeneous hosts. `scripts/dump-tool-manifest.mjs`
+  // sets this so the checked-in manifest stays identical on macOS 15
+  // runners and macOS 26 laptops. "0" = treat as non-Darwin (the inert
+  // ceiling; every os-version gate passes).
+  const override = process.env.AIRMCP_FAKE_OS_VERSION;
+  if (override !== undefined) {
+    const n = parseInt(override, 10);
+    return Number.isFinite(n) ? n : 0;
+  }
   if (process.platform !== "darwin") return 0;
   try {
     const ver = execFileSync("sw_vers", ["-productVersion"], {

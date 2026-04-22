@@ -3,3 +3,6 @@ coverage/
 node_modules/
 *.mcpb
 package-lock.json
+# RFC 0007 A.0 — generated MCP tool manifest (JSON.stringify output,
+# prettier would reflow short arrays and trip the drift check).
+docs/tool-manifest.json

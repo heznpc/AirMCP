@@ -75,6 +75,8 @@
     "start": "node dist/index.js",
     "test": "node --experimental-vm-modules node_modules/.bin/jest",
     "smoke": "node scripts/smoke-mcp.mjs",
+    "gen:manifest": "node scripts/dump-tool-manifest.mjs",
+    "gen:manifest:check": "node scripts/dump-tool-manifest.mjs --check",
     "qa": "node scripts/qa-test.mjs",
     "qa:crud": "node scripts/qa-crud-test.mjs",
     "qa:e2e": "node scripts/qa-e2e-test.mjs",

@@ -4,33 +4,49 @@
 
 ---
 
-## Current Status (2026-03-16)
-- [x] Architecture document
-- [x] Swift bridge with 19 iOS-compatible commands
-- [x] App Intents sample (4 intents)
+## Current Status (2026-04-23)
+
+- [x] Architecture document (이 문서)
+- [x] Swift bridge with 19+ iOS-compatible commands (`swift/Sources/AirMcpBridge/main.swift`)
+- [x] App Intents sample (4 intents in `app/Sources/AirMCPApp/AppIntents.swift`)
 - [x] macOS menubar app
-- [ ] AirMCPKit shared Swift package
-- [ ] Swift MCP server (Hummingbird)
-- [ ] iOS SwiftUI app
+- [x] AirMCPKit shared Swift package (`swift/Package.swift` — platforms: `macOS(.v14)`, iOS target via `ios/Package.swift`)
+- [x] Swift MCP server (Hummingbird) — `ios/Sources/AirMCPServer/HTTPServer.swift`
+- [x] Package.swift iOS targets (`ios/Package.swift` — `iOS(.v17), macOS(.v14)`)
+- [x] **outputSchema Wave 1/2/3** coverage for high-traffic read tools (60/270+ tools, Dec '25 → Apr '26, PR #95)
+- [x] **Script ↔ outputSchema contract tests** — JXA + Swift-bridge-health both have strict drift guards (PR #97, #98)
+- [x] **MCP smoke boot test** in CI — `scripts/smoke-mcp.mjs` (PR #98)
+- [x] RFC 0005 Draft — OAuth 2.1 + Resource Indicators (MCP 2025-06-18 spec)
+- [x] RFC 0006 Draft — Swift `--dump-example-output` for true schema contract
+- [ ] **RFC 0007 Draft — MCP Tool ↔ App Intent auto-bridge** (next, see §15.2)
+- [ ] iOS SwiftUI app (shell exists, UI in progress)
 - [ ] HealthKit module + legal guardrails
-- [ ] Package.swift iOS targets ← doing now
+- [ ] Interactive Snippets renderer (iOS 26+) — outputSchema → SwiftUI view
+- [ ] FoundationModels host mode (iOS 26 on-device LLM) — offline agent
+- [ ] Liquid Glass UI pass (iOS 26+, likely mandatory iOS 27)
 
 ---
 
 ## 1. Executive Summary
 
-AirMCP iOS는 macOS 버전의 포트가 아니라 **iOS 제약에 최적화된 별도 제품**이다.
+AirMCP iOS는 macOS 버전의 포트가 아니라 **iOS 제약에 최적화된 별도 제품**이다. 그리고 **2026-Q2 시점** 포지션은 아래 세 가지 동시 흐름 덕에 크게 바뀌었다 (§15 참조).
 
-| | macOS (현재) | iOS (신규) |
-|--|-------------|-----------|
-| 핵심 가치 | 모든 앱을 AI로 제어 | PIM 데이터 통합 + on-device AI |
-| 자동화 방식 | JXA (osascript) | 네이티브 프레임워크 직접 호출 |
-| MCP 서버 | Node.js (TypeScript) | Swift (embedded) |
-| 트랜스포트 | stdio + HTTP | HTTP + App Intents (iOS 26.1+) |
-| 도구 수 | 253개 | ~80–100개 (Phase 1: ~40개) |
-| 배포 | npm (`npx airmcp`) | App Store |
+1. **Apple이 iOS 26.1 beta부터 MCP를 App Intents 기반으로 시스템에 내장 중** — AirMCP가 먼저 움직여 있으면 AppStore에서 "유일하게 호환되는 네이티브 MCP 앱"이 된다.
+2. **FoundationModels 프레임워크(iOS 26)** 가 ~3B 온디바이스 LLM을 Swift API로 노출 — **AirMCP iOS 앱이 자체 호스트로 전환하면 Claude 없이도 완전 오프라인 AI-PIM 허브** 가 된다.
+3. **MCP Apps spec(2026-01-26)** 으로 툴이 샌드박스 iframe UI를 반환 — AirMCP는 이미 `@modelcontextprotocol/ext-apps@1.5.0`에 의존 중, **현재 Claude·ChatGPT·VS Code 등에서 가동 중**이고 기술 부채 0.
 
-**핵심 전략**: 공유 Swift Package(`AirMCPKit`)를 추출하여 macOS/iOS 양쪽에서 사용하고, iOS 26.1의 MCP↔App Intents 브릿지가 출시되면 자동으로 시스템 레벨 MCP 도구로 승격.
+|               | macOS (현재)                                        | iOS (2026-Q2 목표)                                         |
+| ------------- | --------------------------------------------------- | ---------------------------------------------------------- |
+| 핵심 가치     | 모든 앱을 AI로 제어                                 | PIM 데이터 통합 + **오프라인 on-device AI** 허브           |
+| 자동화 방식   | JXA (osascript)                                     | 네이티브 프레임워크 직접 호출                              |
+| MCP 서버      | Node.js (TypeScript)                                | Swift (embedded in app)                                    |
+| 트랜스포트    | stdio + HTTP (`with-token`/`with-oauth` — RFC 0005) | HTTP + App Intents + (시스템 MCP, iOS 26.1+)               |
+| UI 표면       | MCP Apps iframes (Claude 등)                        | **MCP Apps iframes + iOS Interactive Snippets SwiftUI 뷰** |
+| 자체 에이전트 | 외부 클라이언트(Claude/ChatGPT) 의존                | **FoundationModels 호스트 모드** 로 오프라인 자율          |
+| 도구 수       | 270+ (run-time 등록 ~125; smoke 기준)               | ~80–100 (Phase 1: ~40, Health 확장 후 ~60)                 |
+| 배포          | npm (`npx airmcp`)                                  | App Store                                                  |
+
+**핵심 전략**: 공유 Swift Package(`AirMCPKit`)를 extract하여 macOS/iOS 양쪽에서 사용. **Phase 2부터는 MCP 툴을 App Intent로 자동 노출** (RFC 0007) → iOS 26.1의 시스템 MCP GA 시점에 AirMCP는 이미 준비 완료. Phase 3에서 **FoundationModels 로 자체 에이전트 루프** 내장.
 
 ---
 
@@ -904,21 +920,21 @@ public final class MCPHTTPServer: Sendable {
 
 ### 7.1 iOS에서 사용 가능한 모듈
 
-| 모듈 | iOS 프레임워크 | 도구 수 | Phase | 비고 |
-|------|---------------|--------|-------|------|
-| **Calendar** | EventKit | 10 | 1 | macOS와 거의 동일 |
-| **Reminders** | EventKit | 11 | 1 | macOS와 거의 동일 |
-| **Contacts** | Contacts.framework | 10 | 1 | macOS와 거의 동일 |
-| **Photos** | PhotoKit | 10 | 1 | macOS와 거의 동일 |
-| **Weather** | Open-Meteo API | 6 | 1 | HTTP API, 플랫폼 무관 |
-| **Location** | CoreLocation | 4 | 1 | iOS에서 더 자연스러움 |
-| **Intelligence** | FoundationModels | 10 | 2 | iOS 18.1+ Apple Silicon |
-| **Bluetooth** | CoreBluetooth | 5 | 2 | iOS에서 동일 |
-| **Vision** | Vision framework | 3 | 2 | 문서 스캔/OCR |
-| **Semantic** | NLEmbedding + VectorStore | 4 | 2 | on-device 임베딩 |
-| **Health** | HealthKit | 8+ | 3 | ★ iOS 전용 신규 모듈 |
-| **Fitness** | HealthKit + WorkoutKit | 5+ | 3 | ★ iOS 전용 신규 모듈 |
-| **Focus** | ManagedSettings | 3 | 3 | 집중 모드 제어 |
+| 모듈             | iOS 프레임워크            | 도구 수 | Phase | 비고                    |
+| ---------------- | ------------------------- | ------- | ----- | ----------------------- |
+| **Calendar**     | EventKit                  | 10      | 1     | macOS와 거의 동일       |
+| **Reminders**    | EventKit                  | 11      | 1     | macOS와 거의 동일       |
+| **Contacts**     | Contacts.framework        | 10      | 1     | macOS와 거의 동일       |
+| **Photos**       | PhotoKit                  | 10      | 1     | macOS와 거의 동일       |
+| **Weather**      | Open-Meteo API            | 6       | 1     | HTTP API, 플랫폼 무관   |
+| **Location**     | CoreLocation              | 4       | 1     | iOS에서 더 자연스러움   |
+| **Intelligence** | FoundationModels          | 10      | 2     | iOS 18.1+ Apple Silicon |
+| **Bluetooth**    | CoreBluetooth             | 5       | 2     | iOS에서 동일            |
+| **Vision**       | Vision framework          | 3       | 2     | 문서 스캔/OCR           |
+| **Semantic**     | NLEmbedding + VectorStore | 4       | 2     | on-device 임베딩        |
+| **Health**       | HealthKit                 | 8+      | 3     | ★ iOS 전용 신규 모듈    |
+| **Fitness**      | HealthKit + WorkoutKit    | 5+      | 3     | ★ iOS 전용 신규 모듈    |
+| **Focus**        | ManagedSettings           | 3       | 3     | 집중 모드 제어          |
 
 **Phase 1 합계: ~51개 도구** / **전체 합계: ~92개 이상**
 
@@ -982,19 +998,19 @@ public actor HealthService {
 
 ### 7.3 macOS 전용 (iOS에서 제외)
 
-| 모듈 | 이유 |
-|------|------|
-| Notes | 프로그래밍 API 없음 (JXA 전용). CloudKit 직접 접근은 private API |
-| Mail | 앱 샌드박싱, `MessageUI`는 compose만 가능 |
-| Messages | 앱 샌드박싱, 보안 제한 |
-| Safari | 웹 확장만 가능, 스크립팅 불가 |
-| Finder | 개념 자체 없음 |
-| Music | MusicKit 있지만 JXA보다 훨씬 제한적 |
-| System | 볼륨/밝기/다크모드 직접 제어 불가 |
-| UI Automation | Accessibility API 서드파티 접근 불가 |
-| TV / Podcasts | 제어 API 없음 |
-| Pages/Numbers/Keynote | Document-based API 제한적 |
-| Screen Capture | 스크린샷 API 없음 |
+| 모듈                  | 이유                                                             |
+| --------------------- | ---------------------------------------------------------------- |
+| Notes                 | 프로그래밍 API 없음 (JXA 전용). CloudKit 직접 접근은 private API |
+| Mail                  | 앱 샌드박싱, `MessageUI`는 compose만 가능                        |
+| Messages              | 앱 샌드박싱, 보안 제한                                           |
+| Safari                | 웹 확장만 가능, 스크립팅 불가                                    |
+| Finder                | 개념 자체 없음                                                   |
+| Music                 | MusicKit 있지만 JXA보다 훨씬 제한적                              |
+| System                | 볼륨/밝기/다크모드 직접 제어 불가                                |
+| UI Automation         | Accessibility API 서드파티 접근 불가                             |
+| TV / Podcasts         | 제어 API 없음                                                    |
+| Pages/Numbers/Keynote | Document-based API 제한적                                        |
+| Screen Capture        | 스크린샷 API 없음                                                |
 
 ---
 
@@ -1159,12 +1175,12 @@ struct MCPSessionAttributes: ActivityAttributes {
 
 macOS의 소켓 기반 HITL 대신 iOS 네이티브 메커니즘:
 
-| | macOS | iOS |
-|--|-------|-----|
-| 읽기 전용 | 통과 | 통과 |
-| 쓰기 | HITL 설정에 따라 | App Intent `parameterSummary`로 요약 표시 |
-| 파괴적 | 소켓으로 승인 요청 | `requestConfirmation()` 시스템 다이얼로그 |
-| 타임아웃 | 30초 → 거부 | 시스템 관리 |
+|           | macOS              | iOS                                       |
+| --------- | ------------------ | ----------------------------------------- |
+| 읽기 전용 | 통과               | 통과                                      |
+| 쓰기      | HITL 설정에 따라   | App Intent `parameterSummary`로 요약 표시 |
+| 파괴적    | 소켓으로 승인 요청 | `requestConfirmation()` 시스템 다이얼로그 |
+| 타임아웃  | 30초 → 거부        | 시스템 관리                               |
 
 ### 10.3 localhost 전용 보안
 
@@ -1220,6 +1236,7 @@ let server = MCPHTTPServer(host: "127.0.0.1", port: 3847)
 ```
 
 Step 4에서 MCP 클라이언트 설정 JSON을 클립보드에 복사:
+
 ```json
 {
   "mcpServers": {
@@ -1254,15 +1271,15 @@ Phase 3 (macOS 앱도 전환):
 
 ### 코드 이동 매핑
 
-| 현재 (swift/.../main.swift) | → AirMCPKit |
-|---|---|
-| EventKit 섹션 (create-recurring-event 등) | CalendarModule/CalendarService.swift |
-| Photos 섹션 (import-photo, delete-photos) | PhotosModule/PhotosService.swift |
-| CoreLocation 섹션 | LocationModule/LocationService.swift |
-| CoreBluetooth 섹션 | BluetoothModule/BluetoothService.swift |
-| FoundationModels 섹션 | IntelligenceModule/IntelligenceService.swift |
-| NLEmbedding 섹션 | SemanticModule/EmbeddingService.swift |
-| Vision 섹션 | VisionModule/DocumentScanner.swift |
+| 현재 (swift/.../main.swift)               | → AirMCPKit                                  |
+| ----------------------------------------- | -------------------------------------------- |
+| EventKit 섹션 (create-recurring-event 등) | CalendarModule/CalendarService.swift         |
+| Photos 섹션 (import-photo, delete-photos) | PhotosModule/PhotosService.swift             |
+| CoreLocation 섹션                         | LocationModule/LocationService.swift         |
+| CoreBluetooth 섹션                        | BluetoothModule/BluetoothService.swift       |
+| FoundationModels 섹션                     | IntelligenceModule/IntelligenceService.swift |
+| NLEmbedding 섹션                          | SemanticModule/EmbeddingService.swift        |
+| Vision 섹션                               | VisionModule/DocumentScanner.swift           |
 
 ---
 
@@ -1272,13 +1289,13 @@ Phase 3 (macOS 앱도 전환):
 
 **목표**: AirMCPKit + iOS 앱 MVP (6 모듈, 51개 도구)
 
-| 주차 | 작업 |
-|------|------|
-| 1–2 | AirMCPKit 기반 (프로토콜, ToolResult) + CalendarModule + RemindersModule |
-| 3–4 | ContactsModule + PhotosModule + LocationModule + WeatherModule |
-| 5–6 | AirMCPServer (MCPCore + Hummingbird HTTP) + 도구 연결 |
-| 7–8 | iOS 앱 UI (온보딩, 대시보드, 서버 매니저, Live Activity) |
-| 9–10 | App Intents 전체 구현 + E2E 테스트 + TestFlight |
+| 주차 | 작업                                                                     |
+| ---- | ------------------------------------------------------------------------ |
+| 1–2  | AirMCPKit 기반 (프로토콜, ToolResult) + CalendarModule + RemindersModule |
+| 3–4  | ContactsModule + PhotosModule + LocationModule + WeatherModule           |
+| 5–6  | AirMCPServer (MCPCore + Hummingbird HTTP) + 도구 연결                    |
+| 7–8  | iOS 앱 UI (온보딩, 대시보드, 서버 매니저, Live Activity)                 |
+| 9–10 | App Intents 전체 구현 + E2E 테스트 + TestFlight                          |
 
 **Deliverable**: TestFlight 빌드
 
@@ -1299,30 +1316,87 @@ Phase 3 (macOS 앱도 전환):
 - FocusModule (ManagedSettings)
 - Cross-module 워크플로우
 - App Store 제출
-- iOS 26.1 MCP↔App Intents 브릿지 대응
+- iOS 26.1 MCP↔App Intents 브릿지 대응 (**RFC 0007** 구현, §15.1)
+- **Interactive Snippets 렌더러** (outputSchema → SwiftUI 뷰, §15.5)
+- **FoundationModels 호스트 모드** (오프라인 에이전트 루프, §15.3)
 
-**Deliverable**: App Store 출시, ~92개 도구
+**Deliverable**: App Store 출시, ~92개 도구, **시스템 MCP 등록 + 오프라인 에이전트**
+
+> Phase 3 범위는 2026-04 리서치 이후 확대되었다. §15 참조. 각 축은 순차적(A→B→C→…)으로 별 PR로 진행한다 — 한 PR에 여러 축을 묶지 않는다.
 
 ---
 
 ## 14. Decision Log
 
-| 결정 | 선택 | 대안 | 이유 |
-|------|------|------|------|
-| HTTP 서버 | Hummingbird 2.x | Vapor, Swifter, GCDWebServer | async/await 네이티브, 경량, iOS 정식 지원 |
-| MCP 구현 | 자체 경량 구현 | swift-sdk (Tier 3) | swift-sdk가 아직 실험적, JSON-RPC가 단순 |
-| 벡터 스토어 | Swift 재구현 (JSON) | SQLite/GRDB | 외부 의존성 최소화, 기존 포맷 호환 |
-| UI | SwiftUI only | UIKit 혼합 | iOS 17+ 타겟이면 SwiftUI 충분 |
-| 배포 | App Store | Ad Hoc / TestFlight only | 일반 사용자 접근, 자동 업데이트 |
-| 최소 iOS | 17.0 | 16.0 / 18.0 | App Intents v2 필요, 18.1이면 Intelligence |
-| 공유 패키지 | SPM (AirMCPKit) | CocoaPods, 별도 repo | 모노레포 유지, 빌드 단순화 |
-| 모노레포 | 기존 airmcp/ 내 | 별도 repo | 코드 공유 용이, 버전 동기화 |
+| 결정                            | 선택                                                                                                           | 대안                                           | 이유                                                               |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------ |
+| HTTP 서버                       | Hummingbird 2.x                                                                                                | Vapor, Swifter, GCDWebServer                   | async/await 네이티브, 경량, iOS 정식 지원                          |
+| MCP 구현                        | 자체 경량 구현                                                                                                 | swift-sdk (Tier 3)                             | swift-sdk가 아직 실험적, JSON-RPC가 단순                           |
+| 벡터 스토어                     | Swift 재구현 (JSON)                                                                                            | SQLite/GRDB                                    | 외부 의존성 최소화, 기존 포맷 호환                                 |
+| UI                              | SwiftUI only                                                                                                   | UIKit 혼합                                     | iOS 17+ 타겟이면 SwiftUI 충분                                      |
+| 배포                            | App Store                                                                                                      | Ad Hoc / TestFlight only                       | 일반 사용자 접근, 자동 업데이트                                    |
+| 최소 iOS                        | 17.0                                                                                                           | 16.0 / 18.0                                    | App Intents v2 필요, 18.1이면 Intelligence                         |
+| 공유 패키지                     | SPM (AirMCPKit)                                                                                                | CocoaPods, 별도 repo                           | 모노레포 유지, 빌드 단순화                                         |
+| 모노레포                        | 기존 airmcp/ 내                                                                                                | 별도 repo                                      | 코드 공유 용이, 버전 동기화                                        |
+| **outputSchema 소스** (2026-04) | zod SSOT + `z.infer`로 TS 타입 도출 + 타입드 `*_EXAMPLE` fixture (hand-maintained mirror of Swift `Encodable`) | Swift side에 JSON Schema 문서 유지             | 한 곳만 수정; drift가 tsc + contract test로 잡힘 (PR #97, #98)     |
+| **App Intent 전략** (2026-04)   | **자동 브릿지**: MCP 툴 메타데이터 → `AppIntent` 프로토콜 어댑터 (RFC 0007 예정)                               | 툴마다 수동 App Intent 복제                    | 270+ 툴을 수동 포팅 불가; 메타데이터 하나로 양쪽 채널 유지         |
+| **자체 LLM 호스트** (2026-04)   | **FoundationModels (iOS 26+)** 로 오프라인 에이전트 — 옵션, 기본은 외부 Claude/ChatGPT                         | 항상 외부 클라이언트 필요 / 자체 MLX 모델 번들 | 무료, HealthKit privacy compliant, 3B 파라미터로 tool-calling 적격 |
+
+---
+
+## 15. 2026-Q2 Ecosystem Update (2026-04-23)
+
+이 섹션은 2026-01–04월에 AirMCP iOS 포지션을 의미 있게 바꾼 외부 이벤트 5개와, 각각에 대한 AirMCP의 응수를 정리한다. 원본 링크는 아래 각 항목 아래 달았다.
+
+### 15.1 Apple이 iOS 26.1 beta부터 MCP를 App Intents 기반으로 시스템에 내장 중
+
+[9to5Mac 2025-09-22](https://9to5mac.com/2025/09/22/macos-tahoe-26-1-beta-1-mcp-integration/) · [AppleInsider 2025-09-22](https://appleinsider.com/articles/25/09/22/ios-26-could-get-a-major-ai-boost-with-the-model-context-protocol) — iOS 26.1·iPadOS 26.1·macOS Tahoe 26.1 개발자 베타에 MCP 통합 코드가 있으며, 베이스는 **App Intents 프레임워크 위에** 구축되었다. 현재 사용자에게는 보이지 않지만 2026년 초 Siri LLM 업그레이드와 함께 GA 전망.
+
+**AirMCP 응수** → **RFC 0007 (다음 작업)**: MCP 툴 메타데이터를 `AppIntent` 프로토콜로 자동 매핑하는 어댑터를 `AirMCPKit`에 추가. iOS 26.1 시스템 MCP가 GA되는 날 AirMCP는 이미 "Shortcuts → Siri → 시스템 MCP" 세 경로 모두에 등장한다. 기존 4개 App Intent 샘플(`app/Sources/AirMCPApp/AppIntents.swift`)은 어댑터 검증용으로 유지.
+
+### 15.2 MCP Apps spec (2026-01-26) — UI 반환 표준
+
+[MCP Blog 2026-01-26](https://blog.modelcontextprotocol.io/posts/2026-01-26-mcp-apps/) — 툴이 `ui://` 스킴으로 **샌드박스 iframe** HTML/JS를 반환, `postMessage`로 호스트와 양방향 통신. 지원 클라이언트: Claude · ChatGPT · Goose · VS Code · JetBrains · AWS Kiro · Google Antigravity.
+
+**AirMCP 응수** → **이미 가동 중**. [`package.json`](../package.json)에서 `@modelcontextprotocol/ext-apps@1.5.0` 의존, `src/apps/`에 MCP App 툴 모듈이 이미 등록되어 있다. iOS 쪽으로는 **Interactive Snippets 렌더러**가 자연스러운 후속 축이다 (§15.5).
+
+### 15.3 FoundationModels 프레임워크 (iOS 26)
+
+[Apple Developer](https://developer.apple.com/documentation/FoundationModels) · [Apple Newsroom 2025-09](https://www.apple.com/newsroom/2025/09/apples-foundation-models-framework-unlocks-new-intelligent-app-experiences/) — ~3B 파라미터 온디바이스 LLM, Swift API, **tool calling · guided generation · structured output 내장**. API 키/인터넷 불필요. Apple Silicon 필요.
+
+**AirMCP 응수** → **Phase 3 축**: AirMCP iOS 앱이 자체적으로 FoundationModels를 호스트, AirMCP 툴을 Foundation Models의 `Tool` 프로토콜로 노출 → **완전 오프라인 에이전트 루프**. 외부 클라이언트 없이도 "내 캘린더 정리해서 오늘 일정 요약해줘"가 작동. HealthKit 법적 제약(§HealthKit Legal Constraints)과도 최적 궁합 — 건강 데이터를 외부 LLM에 보내지 않고 온디바이스에서만 처리.
+
+### 15.4 iOS 26 Shortcuts — 25+ 새 액션 + "Use Model"
+
+[Apple Support 125148](https://support.apple.com/en-us/125148) · [9to5Mac](https://9to5mac.com/2025/12/09/ios-26s-shortcuts-app-adds-25-new-actions-heres-everything-new/) — 핵심은 **"Use Model"** 액션 (Apple Intelligence 또는 ChatGPT를 호출해 결과를 다음 스텝으로 전달) · Visual Intelligence · Image Playground · 확장된 Writing Tools. macOS에서도 전체 personal automation 지원.
+
+**AirMCP 응수** → 두 가지 변화:
+
+1. **대칭적 차별화**: AirMCP의 Skills DSL은 이제 "Shortcuts + Apple Intelligence"와 직접 겹친다. 차별화 축: ① 플랫폼 독립 (Claude Desktop / ChatGPT / VS Code 전부 지원) ② audit 로그 · HITL · rate limit · emergency stop 같은 **운영 안전망** ③ `count-stats` 같은 개발자 도구.
+2. **역방향 통합**: RFC 0007 App Intent 브릿지로 AirMCP 툴이 Shortcuts 앱에서 직접 호출 가능. "Use Model → AirMCP" 체인 또는 "AirMCP_list_notes → Use Model → AirMCP_create_reminder" 체인이 가능. **Skills DSL 유저가 Shortcuts 앱에서도 동일 도구 호출** 이 되면 "AirMCP 는 Shortcuts의 슈퍼셋" 포지션 확보.
+
+### 15.5 App Intents Interactive Snippets (iOS 26)
+
+[Superwall 블로그](https://superwall.com/blog/app-intents-interactive-snippets-in-ios-26/) · [WWDC25 Session 275](https://developer.apple.com/videos/play/wwdc2025/275/) — Intent 결과를 **커스텀 SwiftUI 뷰**로 반환, 체이닝 유지 + 재사용 가능. Spotlight/Siri/Shortcuts 안에서 상호작용 가능한 카드로 렌더링.
+
+**AirMCP 응수** → **Phase 2 축**: 툴의 `outputSchema` (zod shape) + `structuredContent` 페이로드를 Interactive Snippet SwiftUI 뷰로 자동 생성. 예: `list_events`의 구조적 출력이 iOS에서 **탭 가능한 이벤트 카드 리스트**로, `memory_query`는 타임라인 뷰로, `timeline_today`는 6am-10pm 수직 축으로. MCP Apps iframe 경로와 **병행** 유지 — Claude Desktop 같은 데스크톱 호스트는 iframe, iOS 호스트는 네이티브 뷰.
+
+### 15.6 Liquid Glass (iOS 26, iOS 27 mandatory 전망)
+
+[Apple Design Gallery 2026](https://developer.apple.com/design/new-design-gallery-2026/) · [AppleInsider 2026-03-26](https://appleinsider.com/articles/26/03/26/stop-holding-out-hope-liquid-glass-will-be-mandatory-in-ios-27) — 위젯/앱 아이콘/Dock 전체 Liquid Glass 레이어. WWDC 2026(6월)에서 추가 커스터마이즈 API 예상.
+
+**AirMCP 응수** → **별도 트랙(디자인 작업)**: `app/widget/` 위젯과 iOS App UI를 Liquid Glass 재작업. RFC 없이 디자인/구현 PR로 처리. WWDC 2026 이후 추가 API가 나오면 그때 한 번 더.
+
+### 15.7 (Bonus) MCP 2026 Roadmap은 모바일을 **언급하지 않음**
+
+[MCP 2026 Roadmap](https://blog.modelcontextprotocol.io/posts/2026-mcp-roadmap/) — 전송 계층 확장성, 에이전트 통신(Tasks), 거버넌스, 엔터프라이즈가 핵심. 모바일은 커뮤니티 관심 영역으로만 언급. **즉 이 공백을 AirMCP가 레퍼런스 구현으로 채울 기회**.
 
 ---
 
 ## Appendix: Claude Code Mobile 연결 설정
 
 **HTTP (Track A — 즉시)**:
+
 ```json
 {
   "mcpServers": {
@@ -1335,6 +1409,7 @@ Phase 3 (macOS 앱도 전환):
 ```
 
 **App Intents (Track B — iOS 26.1+)**:
+
 ```json
 {
   "mcpServers": {
@@ -1351,15 +1426,18 @@ Phase 3 (macOS 앱도 전환):
 ## HealthKit Legal Constraints
 
 Apple App Store Guideline 5.1.2 requires:
+
 - HealthKit data must NOT be sent to cloud LLMs or external services
 - Only aggregated/summarized data may be returned via MCP tools
 - On-device processing (FoundationModels) is required for health data analysis
 - Raw health records (timestamps, individual samples) must never appear in MCP responses
 
 ### Safe Pattern
+
 `health_summary` → returns { steps_today: 8234, heart_rate_avg: 72, sleep_hours: 7.5 }
 
 ### Unsafe Pattern (REJECTED)
+
 `get_raw_health_data` → returns [{ timestamp, heartRate, bloodOxygen, location, ... }]
 
 For macOS npm distribution: comment + opt-in + disclaimer is sufficient (no App Store review).

@@ -147,6 +147,14 @@ for (const name of APP_SHORTCUTS_TOP) {
 // strings wrap awkwardly.
 const MAX_TITLE_LEN = 80;
 
+// IntentDescription renders in the Shortcuts action picker detail row.
+// Apple doesn't publish a hard cap either, but descriptions that push
+// past ~180 chars overflow the 2-line layout and get visually truncated
+// mid-word. We cap in codegen with an ellipsis so the tail is at least
+// a deliberate "...", not a jagged word break. Full descriptions remain
+// in tool-manifest.json for Node/LLM consumers — this is a UI-only trim.
+const MAX_DESCRIPTION_LEN = 180;
+
 function toPascalCase(snake) {
   // Skills may arrive with dashes (e.g. `skill_focus-guardian`); Swift
   // identifiers require alphanumeric only, so split on any non-word char.
@@ -188,6 +196,22 @@ function intentActionNameFor(toolName) {
  */
 function swiftLit(s) {
   return (s ?? "").replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\r?\n/g, " ").trim();
+}
+
+/**
+ * Trim a description to fit the Shortcuts picker detail row. Preserves
+ * word boundaries — looks backward from the hard cut for the nearest
+ * space so we don't chop mid-word. Returns the original string when it
+ * already fits.
+ */
+function truncateDescription(s) {
+  if (s.length <= MAX_DESCRIPTION_LEN) return s;
+  const hardCut = s.slice(0, MAX_DESCRIPTION_LEN - 1);
+  const lastSpace = hardCut.lastIndexOf(" ");
+  // Keep at least half the budget if no space found near the end,
+  // else back up to the word boundary.
+  const cutAt = lastSpace > MAX_DESCRIPTION_LEN * 0.5 ? lastSpace : MAX_DESCRIPTION_LEN - 1;
+  return s.slice(0, cutAt).trimEnd() + "…";
 }
 
 /**
@@ -578,7 +602,7 @@ function hasTypedOutput(tool) {
 function generateIntent(tool) {
   const structName = intentStructName(tool.name);
   const title = swiftLit(tool.title ?? tool.name);
-  const description = swiftLit(tool.description ?? "");
+  const description = truncateDescription(swiftLit(tool.description ?? ""));
   const props = tool.inputSchema?.properties ?? {};
   const required = new Set(tool.inputSchema?.required ?? []);
 

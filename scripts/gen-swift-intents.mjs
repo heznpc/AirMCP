@@ -658,26 +658,45 @@ ${toolEntries.join("\n")}
 }`;
 }
 
-// ── outputSchema → Interactive Snippet SwiftUI view (A.4.1) ──────────
+// ── outputSchema → Interactive Snippet SwiftUI view (A.4.1 + A.4.3) ──
 //
 // RFC 0007 §3.7 renderer. Produces a small SwiftUI view per codable-safe
 // tool so Interactive Snippets (iOS 26+ / macOS 26+) can display the
 // tool's result inline in Shortcuts / Spotlight / Siri.
 //
-// A.4.1 scope: view struct only. Wiring the view into each AppIntent's
-// `perform()` result (the `.result(value:, view:)` overload) lands in
-// A.4.2 so this PR can't regress the iOS 17-compatible baseline.
-//
 // Shape detection
 //   list-object: outputSchema has exactly one `type: array` property
 //     whose items are `type: object`. Rendered as a ForEach over the
-//     array, each row showing the first string-typed field of the item.
+//     array. If the tool is in FOLLOW_UP_MAP (A.4.3), each row is wrapped
+//     in `Button(intent: ReadFooIntent(id: row.id))` so tapping a list
+//     entry dispatches the follow-up read intent without opening the app
+//     — the Interactive Snippet chain promised in RFC §3.7. Otherwise
+//     the row stays as a plain Text (A.4.1 baseline).
 //   list-string: same but items are `type: string`. Rendered ForEach
 //     with the raw string.
 //   scalar: everything else. Rendered as a VStack of key-value rows.
 //
 // All views gated on `canImport(SwiftUI) && canImport(AppIntents) &&
 // compiler(>=6.3)` + `@available(macOS 26, iOS 26, *)`.
+
+// A.4.3: list → read follow-up map. Tools in this map render each row
+// as `Button(intent: Read<Target>Intent(id: row.id))` so taps dispatch
+// the follow-up AppIntent in-place. Entries validated at load time
+// against the manifest (tool/target must exist; target's @Parameter
+// must be named exactly "id"; list items must carry a matching `id`
+// field). Extending the map is adding one line + re-running codegen.
+const FOLLOW_UP_MAP = {
+  list_events: { target: "read_event", idField: "id" },
+  today_events: { target: "read_event", idField: "id" },
+  get_upcoming_events: { target: "read_event", idField: "id" },
+  search_events: { target: "read_event", idField: "id" },
+  list_notes: { target: "read_note", idField: "id" },
+  search_notes: { target: "read_note", idField: "id" },
+  list_reminders: { target: "read_reminder", idField: "id" },
+  search_reminders: { target: "read_reminder", idField: "id" },
+  list_contacts: { target: "read_contact", idField: "id" },
+  search_contacts: { target: "read_contact", idField: "id" },
+};
 
 function detectSnippetShape(schema) {
   const props = schema.properties ?? {};
@@ -687,8 +706,15 @@ function detectSnippetShape(schema) {
     const arrayKey = arrayKeys[0];
     const items = props[arrayKey].items ?? {};
     if (items.type === "object") {
-      const firstString = Object.keys(items.properties ?? {}).find((k) => items.properties[k].type === "string");
-      return { shape: "list-object", arrayField: arrayKey, primaryField: firstString ?? null };
+      const itemProps = items.properties ?? {};
+      // Prefer a non-id string field for display so list rows show the
+      // human label (summary / name / title) rather than the raw UID.
+      // Fall back to `id` if nothing else is stringly typed — the row
+      // still renders, just less prettily.
+      const stringKeys = Object.keys(itemProps).filter((k) => itemProps[k].type === "string");
+      const primaryField = stringKeys.find((k) => k !== "id") ?? stringKeys[0] ?? null;
+      const hasId = itemProps.id?.type === "string";
+      return { shape: "list-object", arrayField: arrayKey, primaryField, hasId };
     }
     if (items.type === "string") {
       return { shape: "list-string", arrayField: arrayKey };
@@ -696,6 +722,44 @@ function detectSnippetShape(schema) {
   }
   return { shape: "scalar" };
 }
+
+// Validate FOLLOW_UP_MAP against the manifest so a typo or removed tool
+// surfaces at codegen time rather than as a SwiftUI compile error. Also
+// ensures the list's items carry the expected id field and the target's
+// @Parameter shape matches.
+function resolveFollowUpMap() {
+  const resolved = {};
+  for (const [listName, entry] of Object.entries(FOLLOW_UP_MAP)) {
+    const listTool = byName.get(listName);
+    const target = byName.get(entry.target);
+    if (!listTool) {
+      console.error(`[gen-intents] FOLLOW_UP_MAP: list tool missing: ${listName}`);
+      process.exit(2);
+    }
+    if (!target) {
+      console.error(`[gen-intents] FOLLOW_UP_MAP: target tool missing: ${entry.target}`);
+      process.exit(2);
+    }
+    const info = detectSnippetShape(listTool.outputSchema ?? {});
+    if (info.shape !== "list-object" || !info.hasId) {
+      console.error(
+        `[gen-intents] FOLLOW_UP_MAP: ${listName} has no list-object items with \`id\` field (shape=${info.shape}, hasId=${info.hasId})`,
+      );
+      process.exit(2);
+    }
+    const targetParams = Object.keys(target.inputSchema?.properties ?? {});
+    if (!targetParams.includes(entry.idField)) {
+      console.error(
+        `[gen-intents] FOLLOW_UP_MAP: target ${entry.target} has no @Parameter named "${entry.idField}" (params: ${targetParams.join(", ")})`,
+      );
+      process.exit(2);
+    }
+    resolved[listName] = { ...entry, targetIntentName: intentStructName(entry.target) };
+  }
+  return resolved;
+}
+const followUpMap = resolveFollowUpMap();
+const followUpTargets = Array.from(new Set(Object.values(followUpMap).map((e) => e.targetIntentName)));
 
 function snippetViewNameFor(tool) {
   return `MCP${toPascalCase(tool.name)}SnippetView`;
@@ -709,7 +773,25 @@ function renderSnippetView(tool) {
   let body;
   if (info.shape === "list-object") {
     const primaryAccess = info.primaryField ? `row.${swiftIdent(info.primaryField)}` : `"(row)"`;
-    body = `        VStack(alignment: .leading, spacing: 4) {
+    const followUp = followUpMap[tool.name];
+    // A.4.3: wrap the row in Button(intent:) when the tool has a list→read
+    // pairing AND the list items have an `id` field. Uses `id: \.id` for
+    // the ForEach key so SwiftUI diffs correctly across follow-up taps
+    // (the old `id: \.offset` was safe only for static-display rows).
+    if (followUp && info.hasId) {
+      body = `        VStack(alignment: .leading, spacing: 4) {
+            ForEach(data.${swiftIdent(info.arrayField)}, id: \\.id) { row in
+                Button(intent: _mk${followUp.targetIntentName}(id: row.id)) {
+                    Text(${primaryAccess})
+                        .font(.body)
+                        .lineLimit(1)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding()`;
+    } else {
+      body = `        VStack(alignment: .leading, spacing: 4) {
             ForEach(Array(data.${swiftIdent(info.arrayField)}.enumerated()), id: \\.offset) { _, row in
                 Text(${primaryAccess})
                     .font(.body)
@@ -717,6 +799,7 @@ function renderSnippetView(tool) {
             }
         }
         .padding()`;
+    }
   } else if (info.shape === "list-string") {
     body = `        VStack(alignment: .leading, spacing: 4) {
             ForEach(Array(data.${swiftIdent(info.arrayField)}.enumerated()), id: \\.offset) { _, row in
@@ -759,6 +842,20 @@ const outputStructs = typedTools.map((tool) => {
 });
 const snippetViews = typedTools.map((tool) => renderSnippetView(tool));
 
+// A.4.3: one factory per unique follow-up target so the snippet view
+// can construct a parameterized intent instance (AppIntent requires a
+// no-arg init + property set — a plain `Read<Foo>Intent(id:)` call
+// site doesn't compile). File-private keeps the helpers out of the
+// public surface.
+const followUpFactories = followUpTargets.map(
+  (intentName) => `@available(macOS 26, iOS 26, *)
+fileprivate func _mk${intentName}(id: String) -> ${intentName} {
+    var intent = ${intentName}()
+    intent.id = id
+    return intent
+}`,
+);
+
 const header = `// GENERATED — do not edit.
 //
 // Source: docs/tool-manifest.json
@@ -793,7 +890,7 @@ const snippetsHeader = `
 
 #endif
 
-// MARK: - Interactive Snippet views (RFC 0007 §3.7, A.4.1)
+// MARK: - Interactive Snippet views (RFC 0007 §3.7, A.4.1 + A.4.3)
 
 #if canImport(SwiftUI) && canImport(AppIntents) && compiler(>=6.3)
 import SwiftUI
@@ -816,6 +913,7 @@ const source =
   shortcutsHeader +
   appShortcuts +
   snippetsHeader +
+  (followUpFactories.length > 0 ? followUpFactories.join("\n\n") + "\n\n" : "") +
   snippetViews.join("\n\n") +
   footer;
 

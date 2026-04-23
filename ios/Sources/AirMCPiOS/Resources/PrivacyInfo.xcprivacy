@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  AirMCP iOS — Privacy Manifest
+  Required for App Store submission on iOS 17+ per Apple's 2024 privacy
+  manifest mandate. Declares (a) required-reason APIs the app uses,
+  (b) data collection (none), (c) tracking (none).
+
+  AirMCP iOS runs entirely on-device. HealthKit / EventKit / Contacts
+  / Location data never leaves the device. The embedded Hummingbird
+  HTTP server is localhost-only by default; tokens are generated on
+  first launch and stay on the device. FoundationModels inference
+  runs on Apple Silicon locally.
+-->
+<plist version="1.0">
+<dict>
+    <!-- AirMCP does not perform any tracking as defined by App Tracking
+         Transparency. -->
+    <key>NSPrivacyTracking</key>
+    <false/>
+
+    <!-- No third-party analytics, no outbound connections to tracking
+         domains. -->
+    <key>NSPrivacyTrackingDomains</key>
+    <array/>
+
+    <!-- The app does not collect user data. Data stays on-device and
+         is used only to answer the user's own requests. -->
+    <key>NSPrivacyCollectedDataTypes</key>
+    <array/>
+
+    <!-- Required-reason API declarations (Apple's 2024 mandate).
+         Include the reason codes for every API the app calls. -->
+    <key>NSPrivacyAccessedAPITypes</key>
+    <array>
+        <!-- UserDefaults — app preferences, no cloud sync.
+             Reason CA92.1: "Access info from same app, per documentation" -->
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>CA92.1</string>
+            </array>
+        </dict>
+
+        <!-- File timestamps — reading local file metadata for Finder-
+             bridge responses. Reason C617.1: "Display file info to user". -->
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>C617.1</string>
+            </array>
+        </dict>
+
+        <!-- Disk space — doctor tool reports free space; not for
+             advertising. Reason 85F4.1: "Display to user". -->
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryDiskSpace</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>85F4.1</string>
+            </array>
+        </dict>
+
+        <!-- System boot time — used by the embedded HTTP server for
+             rate-limit bucket initialization. Reason 35F9.1: "Measure
+             time since boot for performance / diagnostic purposes in
+             same app". -->
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategorySystemBootTime</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>35F9.1</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>

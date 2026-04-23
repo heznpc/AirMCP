@@ -1,0 +1,1 @@
+MCP,AI assistant,on-device AI,Apple Intelligence,Siri,Shortcuts,Claude,ChatGPT,privacy,Foundation Models,automation,calendar,reminders,notes,productivity

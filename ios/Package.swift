@@ -27,7 +27,14 @@ let package = Package(
                 .product(name: "AirMCPKit", package: "swift"),
                 "AirMCPServer",
             ],
-            path: "Sources/AirMCPiOS"
+            path: "Sources/AirMCPiOS",
+            // Ship PrivacyInfo.xcprivacy inside the bundle so App Store
+            // Connect's privacy-manifest scan picks it up at upload.
+            // Apple requires this file for every iOS 17+ submission
+            // under the 2024 manifest mandate.
+            resources: [
+                .copy("Resources/PrivacyInfo.xcprivacy"),
+            ]
         ),
         .testTarget(
             name: "AirMCPServerTests",

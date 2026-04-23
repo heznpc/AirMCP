@@ -3,8 +3,12 @@ name: CI
 on:
   push:
     branches: [main]
+  # Trigger on every PR regardless of base branch so stacked PRs
+  # (PR targeting another PR's branch — common with chained RFC work)
+  # get full CI feedback before the chain merges sequentially to main.
+  # Without this, only the stack's bottom PR shows checks, and later
+  # regressions only surface after each rebase onto main.
   pull_request:
-    branches: [main]
   workflow_call:
 
 permissions:

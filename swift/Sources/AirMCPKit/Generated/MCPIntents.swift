@@ -759,6 +759,209 @@ public struct MCPToggleDarkModeOutput: Codable, Sendable {
     public let darkMode: Bool
 }
 
+// MARK: - AppEnum types
+
+@available(iOS 16, macOS 13, *)
+public enum AuditLogStatusOption: String, AppEnum {
+    case ok, error
+    nonisolated(unsafe) public static var typeDisplayRepresentation: TypeDisplayRepresentation = "Filter by status. Omit to include both."
+    nonisolated(unsafe) public static var caseDisplayRepresentations: [Self: DisplayRepresentation] = [
+        .ok: "Ok",
+        .error: "Error"
+    ]
+}
+
+@available(iOS 16, macOS 13, *)
+public enum CaptureScreenshotRegionOption: String, AppEnum {
+    case fullscreen, window, selection
+    nonisolated(unsafe) public static var typeDisplayRepresentation: TypeDisplayRepresentation = "Capture region: fullscreen (default), window, or selection"
+    nonisolated(unsafe) public static var caseDisplayRepresentations: [Self: DisplayRepresentation] = [
+        .fullscreen: "Fullscreen",
+        .window: "Window",
+        .selection: "Selection"
+    ]
+}
+
+@available(iOS 16, macOS 13, *)
+public enum GetDirectionsTransporttypeOption: String, AppEnum {
+    case driving, walking, transit
+    nonisolated(unsafe) public static var typeDisplayRepresentation: TypeDisplayRepresentation = "Mode of transport (default: driving)"
+    nonisolated(unsafe) public static var caseDisplayRepresentations: [Self: DisplayRepresentation] = [
+        .driving: "Driving",
+        .walking: "Walking",
+        .transit: "Transit"
+    ]
+}
+
+@available(iOS 16, macOS 13, *)
+public enum GwsGmailReadFormatOption: String, AppEnum {
+    case full, metadata, minimal
+    nonisolated(unsafe) public static var typeDisplayRepresentation: TypeDisplayRepresentation = "Response format"
+    nonisolated(unsafe) public static var caseDisplayRepresentations: [Self: DisplayRepresentation] = [
+        .full: "Full",
+        .metadata: "Metadata",
+        .minimal: "Minimal"
+    ]
+}
+
+@available(iOS 16, macOS 13, *)
+public enum MemoryForgetKindOption: String, AppEnum {
+    case fact, entity, episode
+    nonisolated(unsafe) public static var typeDisplayRepresentation: TypeDisplayRepresentation = "Only delete entries of this kind"
+    nonisolated(unsafe) public static var caseDisplayRepresentations: [Self: DisplayRepresentation] = [
+        .fact: "Fact",
+        .entity: "Entity",
+        .episode: "Episode"
+    ]
+}
+
+@available(iOS 16, macOS 13, *)
+public enum MemoryPutKindOption: String, AppEnum {
+    case fact, entity, episode
+    nonisolated(unsafe) public static var typeDisplayRepresentation: TypeDisplayRepresentation = "Entry category: fact | entity | episode"
+    nonisolated(unsafe) public static var caseDisplayRepresentations: [Self: DisplayRepresentation] = [
+        .fact: "Fact",
+        .entity: "Entity",
+        .episode: "Episode"
+    ]
+}
+
+@available(iOS 16, macOS 13, *)
+public enum MemoryQueryKindOption: String, AppEnum {
+    case fact, entity, episode
+    nonisolated(unsafe) public static var typeDisplayRepresentation: TypeDisplayRepresentation = "Restrict to one kind"
+    nonisolated(unsafe) public static var caseDisplayRepresentations: [Self: DisplayRepresentation] = [
+        .fact: "Fact",
+        .entity: "Entity",
+        .episode: "Episode"
+    ]
+}
+
+@available(iOS 16, macOS 13, *)
+public enum MemoryQueryOrderOption: String, AppEnum {
+    case desc, asc
+    nonisolated(unsafe) public static var typeDisplayRepresentation: TypeDisplayRepresentation = "Sort by updatedAt (default desc)"
+    nonisolated(unsafe) public static var caseDisplayRepresentations: [Self: DisplayRepresentation] = [
+        .desc: "Desc",
+        .asc: "Asc"
+    ]
+}
+
+@available(iOS 16, macOS 13, *)
+public enum PlaybackControlActionOption: String, AppEnum {
+    case play, pause, nextTrack, previousTrack
+    nonisolated(unsafe) public static var typeDisplayRepresentation: TypeDisplayRepresentation = "Playback action"
+    nonisolated(unsafe) public static var caseDisplayRepresentations: [Self: DisplayRepresentation] = [
+        .play: "Play",
+        .pause: "Pause",
+        .nextTrack: "Next Track",
+        .previousTrack: "Previous Track"
+    ]
+}
+
+@available(iOS 16, macOS 13, *)
+public enum PodcastPlaybackControlActionOption: String, AppEnum {
+    case play, pause, nextTrack, previousTrack
+    nonisolated(unsafe) public static var typeDisplayRepresentation: TypeDisplayRepresentation = "Playback action"
+    nonisolated(unsafe) public static var caseDisplayRepresentations: [Self: DisplayRepresentation] = [
+        .play: "Play",
+        .pause: "Pause",
+        .nextTrack: "Next Track",
+        .previousTrack: "Previous Track"
+    ]
+}
+
+@available(iOS 16, macOS 13, *)
+public enum QueryPhotosMediatypeOption: String, AppEnum {
+    case image, video, audio
+    nonisolated(unsafe) public static var typeDisplayRepresentation: TypeDisplayRepresentation = "Filter by media type"
+    nonisolated(unsafe) public static var caseDisplayRepresentations: [Self: DisplayRepresentation] = [
+        .image: "Image",
+        .video: "Video",
+        .audio: "Audio"
+    ]
+}
+
+@available(iOS 16, macOS 13, *)
+public enum RewriteTextToneOption: String, AppEnum {
+    case professional, friendly, concise
+    nonisolated(unsafe) public static var typeDisplayRepresentation: TypeDisplayRepresentation = "Target tone (default: professional)"
+    nonisolated(unsafe) public static var caseDisplayRepresentations: [Self: DisplayRepresentation] = [
+        .professional: "Professional",
+        .friendly: "Friendly",
+        .concise: "Concise"
+    ]
+}
+
+@available(iOS 16, macOS 13, *)
+public enum SetShuffleSongrepeatOption: String, AppEnum {
+    case off, one, all
+    nonisolated(unsafe) public static var typeDisplayRepresentation: TypeDisplayRepresentation = "Repeat mode"
+    nonisolated(unsafe) public static var caseDisplayRepresentations: [Self: DisplayRepresentation] = [
+        .off: "Off",
+        .one: "One",
+        .all: "All"
+    ]
+}
+
+@available(iOS 16, macOS 13, *)
+public enum SystemPowerActionOption: String, AppEnum {
+    case shutdown, restart
+    nonisolated(unsafe) public static var typeDisplayRepresentation: TypeDisplayRepresentation = "Power action: shutdown or restart"
+    nonisolated(unsafe) public static var caseDisplayRepresentations: [Self: DisplayRepresentation] = [
+        .shutdown: "Shutdown",
+        .restart: "Restart"
+    ]
+}
+
+@available(iOS 16, macOS 13, *)
+public enum TvPlaybackControlActionOption: String, AppEnum {
+    case play, pause, nextTrack, previousTrack
+    nonisolated(unsafe) public static var typeDisplayRepresentation: TypeDisplayRepresentation = "Playback action"
+    nonisolated(unsafe) public static var caseDisplayRepresentations: [Self: DisplayRepresentation] = [
+        .play: "Play",
+        .pause: "Pause",
+        .nextTrack: "Next Track",
+        .previousTrack: "Previous Track"
+    ]
+}
+
+@available(iOS 16, macOS 13, *)
+public enum UiPerformActionActionOption: String, AppEnum {
+    case press, click, pick, select, confirm, setValue, set, raise, focus, showMenu, AXPress, AXPick, AXConfirm, AXSetValue, AXRaise, AXShowMenu
+    nonisolated(unsafe) public static var typeDisplayRepresentation: TypeDisplayRepresentation = "Action to perform"
+    nonisolated(unsafe) public static var caseDisplayRepresentations: [Self: DisplayRepresentation] = [
+        .press: "Press",
+        .click: "Click",
+        .pick: "Pick",
+        .select: "Select",
+        .confirm: "Confirm",
+        .setValue: "Set Value",
+        .set: "Set",
+        .raise: "Raise",
+        .focus: "Focus",
+        .showMenu: "Show Menu",
+        .AXPress: "AXPress",
+        .AXPick: "AXPick",
+        .AXConfirm: "AXConfirm",
+        .AXSetValue: "AXSet Value",
+        .AXRaise: "AXRaise",
+        .AXShowMenu: "AXShow Menu"
+    ]
+}
+
+@available(iOS 16, macOS 13, *)
+public enum UiScrollDirectionOption: String, AppEnum {
+    case up, down, left, right
+    nonisolated(unsafe) public static var typeDisplayRepresentation: TypeDisplayRepresentation = "Scroll direction"
+    nonisolated(unsafe) public static var caseDisplayRepresentations: [Self: DisplayRepresentation] = [
+        .up: "Up",
+        .down: "Down",
+        .left: "Left",
+        .right: "Right"
+    ]
+}
+
 // MARK: - AppIntents
 
 // Tool: activate_tab
@@ -1031,8 +1234,8 @@ public struct AuditLogIntent: AppIntent {
     @Parameter(title: "Filter to a single tool name (exact match).")
     public var tool: String?
 
-    @Parameter(title: "Filter by status. Omit to include both. · Allowed: ok, error")
-    public var status: String?
+    @Parameter(title: "Filter by status. Omit to include both.")
+    public var status: AuditLogStatusOption?
 
     @Parameter(title: "Max entries to return (default: 100, max: 1000).", default: 100, inclusiveRange: (1, 1000))
     public var limit: Int
@@ -1041,7 +1244,7 @@ public struct AuditLogIntent: AppIntent {
         var args: [String: any Sendable] = [:]
         if let v = since { args["since"] = ISO8601DateFormatter().string(from: v) }
         if let v = tool { args["tool"] = v }
-        if let v = status { args["status"] = v }
+        if let v = status { args["status"] = v.rawValue }
         args["limit"] = limit
         let result = try await MCPIntentRouter.shared.call(
             tool: "audit_log",
@@ -1200,8 +1403,8 @@ public struct CaptureScreenshotIntent: AppIntent {
     @Parameter(title: "Absolute file path to save the screenshot (e.g. '/tmp/screenshot.png')")
     public var path: String
 
-    @Parameter(title: "Capture region: fullscreen (default), window, or selection · Allowed: fullscreen", default: "fullscreen")
-    public var region: String
+    @Parameter(title: "Capture region: fullscreen (default), window, or selection", default: .fullscreen)
+    public var region: CaptureScreenshotRegionOption
 
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         try await requestConfirmation(
@@ -1210,7 +1413,7 @@ public struct CaptureScreenshotIntent: AppIntent {
         )
         let result = try await MCPIntentRouter.shared.call(
             tool: "capture_screenshot",
-            args: ["path": path, "region": region]
+            args: ["path": path, "region": region.rawValue]
         )
         return .result(value: result)
     }
@@ -2396,13 +2599,13 @@ public struct GetDirectionsIntent: AppIntent {
     @Parameter(title: "Destination location or address")
     public var to: String
 
-    @Parameter(title: "Mode of transport (default: driving) · Allowed: driving, walking, transit", default: "driving")
-    public var transportType: String
+    @Parameter(title: "Mode of transport (default: driving)", default: .driving)
+    public var transportType: GetDirectionsTransporttypeOption
 
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "get_directions",
-            args: ["from": from, "to": to, "transportType": transportType]
+            args: ["from": from, "to": to, "transportType": transportType.rawValue]
         )
         return .result(value: result)
     }
@@ -2918,13 +3121,13 @@ public struct GwsGmailReadIntent: AppIntent {
     @Parameter(title: "Gmail message ID")
     public var messageId: String
 
-    @Parameter(title: "Response format · Allowed: full, metadata, minimal", default: "full")
-    public var format: String
+    @Parameter(title: "Response format", default: .full)
+    public var format: GwsGmailReadFormatOption
 
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "gws_gmail_read",
-            args: ["messageId": messageId, "format": format]
+            args: ["messageId": messageId, "format": format.rawValue]
         )
         return .result(value: result)
     }
@@ -4337,15 +4540,15 @@ public struct MemoryForgetIntent: AppIntent {
     @Parameter(title: "Delete all entries tagged with this label")
     public var tag: String?
 
-    @Parameter(title: "Only delete entries of this kind · Allowed: fact, entity, episode")
-    public var kind: String?
+    @Parameter(title: "Only delete entries of this kind")
+    public var kind: MemoryForgetKindOption?
 
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         if let v = id { args["id"] = v }
         if let v = key { args["key"] = v }
         if let v = tag { args["tag"] = v }
-        if let v = kind { args["kind"] = v }
+        if let v = kind { args["kind"] = v.rawValue }
         try await requestConfirmation(
             actionName: .go,
             dialog: IntentDialog("Run Forget Memory Entries with AirMCP? This action is destructive and cannot be undone.")
@@ -4376,8 +4579,8 @@ public struct MemoryPutIntent: AppIntent {
 
     public init() {}
 
-    @Parameter(title: "Entry category: fact | entity | episode · Allowed: fact, entity, episode")
-    public var kind: String
+    @Parameter(title: "Entry category: fact | entity | episode")
+    public var kind: MemoryPutKindOption
 
     @Parameter(title: "Stable label (e.g. 'favorite_editor', 'person:Ada')")
     public var key: String
@@ -4399,7 +4602,7 @@ public struct MemoryPutIntent: AppIntent {
 
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
-        args["kind"] = kind
+        args["kind"] = kind.rawValue
         args["key"] = key
         args["value"] = value
         if let v = id { args["id"] = v }
@@ -4432,8 +4635,8 @@ public struct MemoryQueryIntent: AppIntent {
 
     public init() {}
 
-    @Parameter(title: "Restrict to one kind · Allowed: fact, entity, episode")
-    public var kind: String?
+    @Parameter(title: "Restrict to one kind")
+    public var kind: MemoryQueryKindOption?
 
     @Parameter(title: "Case-insensitive substring in key or value")
     public var contains: String?
@@ -4444,16 +4647,16 @@ public struct MemoryQueryIntent: AppIntent {
     @Parameter(title: "Max rows (default 50, cap 500)", inclusiveRange: (1, 500))
     public var limit: Int?
 
-    @Parameter(title: "Sort by updatedAt (default desc) · Allowed: desc, asc")
-    public var order: String?
+    @Parameter(title: "Sort by updatedAt (default desc)")
+    public var order: MemoryQueryOrderOption?
 
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
-        if let v = kind { args["kind"] = v }
+        if let v = kind { args["kind"] = v.rawValue }
         if let v = contains { args["contains"] = v }
         if let v = tags { args["tags"] = v }
         if let v = limit { args["limit"] = v }
-        if let v = order { args["order"] = v }
+        if let v = order { args["order"] = v.rawValue }
         let result = try await MCPIntentRouter.shared.call(
             tool: "memory_query",
             args: args
@@ -5202,13 +5405,13 @@ public struct PlaybackControlIntent: AppIntent {
 
     public init() {}
 
-    @Parameter(title: "Playback action · Allowed: play, pause, nextTrack, previousTrack")
-    public var action: String
+    @Parameter(title: "Playback action")
+    public var action: PlaybackControlActionOption
 
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "playback_control",
-            args: ["action": action]
+            args: ["action": action.rawValue]
         )
         return .result(value: result)
     }
@@ -5239,13 +5442,13 @@ public struct PodcastPlaybackControlIntent: AppIntent {
 
     public init() {}
 
-    @Parameter(title: "Playback action · Allowed: play, pause, nextTrack, previousTrack")
-    public var action: String
+    @Parameter(title: "Playback action")
+    public var action: PodcastPlaybackControlActionOption
 
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "podcast_playback_control",
-            args: ["action": action]
+            args: ["action": action.rawValue]
         )
         return .result(value: result)
     }
@@ -5326,8 +5529,8 @@ public struct QueryPhotosIntent: AppIntent {
 
     public init() {}
 
-    @Parameter(title: "Filter by media type · Allowed: image, video, audio")
-    public var mediaType: String?
+    @Parameter(title: "Filter by media type")
+    public var mediaType: QueryPhotosMediatypeOption?
 
     @Parameter(title: "Start date (ISO 8601)")
     public var startDate: String?
@@ -5343,7 +5546,7 @@ public struct QueryPhotosIntent: AppIntent {
 
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
-        if let v = mediaType { args["mediaType"] = v }
+        if let v = mediaType { args["mediaType"] = v.rawValue }
         if let v = startDate { args["startDate"] = v }
         if let v = endDate { args["endDate"] = v }
         if let v = favorites { args["favorites"] = v }
@@ -5764,13 +5967,13 @@ public struct RewriteTextIntent: AppIntent {
     @Parameter(title: "Text to rewrite")
     public var text: String
 
-    @Parameter(title: "Target tone (default: professional) · Allowed: professional, friendly, concise", default: "professional")
-    public var tone: String
+    @Parameter(title: "Target tone (default: professional)", default: .professional)
+    public var tone: RewriteTextToneOption
 
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "rewrite_text",
-            args: ["text": text, "tone": tone]
+            args: ["text": text, "tone": tone.rawValue]
         )
         return .result(value: result)
     }
@@ -6663,13 +6866,13 @@ public struct SetShuffleIntent: AppIntent {
     @Parameter(title: "Enable or disable shuffle")
     public var shuffle: Bool?
 
-    @Parameter(title: "Repeat mode · Allowed: off, one, all")
-    public var songRepeat: String?
+    @Parameter(title: "Repeat mode")
+    public var songRepeat: SetShuffleSongrepeatOption?
 
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         if let v = shuffle { args["shuffle"] = v }
-        if let v = songRepeat { args["songRepeat"] = v }
+        if let v = songRepeat { args["songRepeat"] = v.rawValue }
         let result = try await MCPIntentRouter.shared.call(
             tool: "set_shuffle",
             args: args
@@ -7120,8 +7323,8 @@ public struct SystemPowerIntent: AppIntent {
 
     public init() {}
 
-    @Parameter(title: "Power action: shutdown or restart · Allowed: shutdown, restart")
-    public var action: String
+    @Parameter(title: "Power action: shutdown or restart")
+    public var action: SystemPowerActionOption
 
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         try await requestConfirmation(
@@ -7130,7 +7333,7 @@ public struct SystemPowerIntent: AppIntent {
         )
         let result = try await MCPIntentRouter.shared.call(
             tool: "system_power",
-            args: ["action": action]
+            args: ["action": action.rawValue]
         )
         return .result(value: result)
     }
@@ -7433,13 +7636,13 @@ public struct TvPlaybackControlIntent: AppIntent {
 
     public init() {}
 
-    @Parameter(title: "Playback action · Allowed: play, pause, nextTrack, previousTrack")
-    public var action: String
+    @Parameter(title: "Playback action")
+    public var action: TvPlaybackControlActionOption
 
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "tv_playback_control",
-            args: ["action": action]
+            args: ["action": action.rawValue]
         )
         return .result(value: result)
     }
@@ -7645,8 +7848,8 @@ public struct UiPerformActionIntent: AppIntent {
     @Parameter(title: "General label search")
     public var label: String?
 
-    @Parameter(title: "Action to perform · Allowed: press, click, pick, select, confirm, setValue, set,")
-    public var action: String
+    @Parameter(title: "Action to perform")
+    public var action: UiPerformActionActionOption
 
     @Parameter(title: "Value to set (for setValue action)")
     public var actionValue: String?
@@ -7663,7 +7866,7 @@ public struct UiPerformActionIntent: AppIntent {
         if let v = description { args["description"] = v }
         if let v = identifier { args["identifier"] = v }
         if let v = label { args["label"] = v }
-        args["action"] = action
+        args["action"] = action.rawValue
         if let v = actionValue { args["actionValue"] = v }
         args["index"] = index
         try await requestConfirmation(
@@ -7751,8 +7954,8 @@ public struct UiScrollIntent: AppIntent {
 
     public init() {}
 
-    @Parameter(title: "Scroll direction · Allowed: up, down, left, right")
-    public var direction: String
+    @Parameter(title: "Scroll direction")
+    public var direction: UiScrollDirectionOption
 
     @Parameter(title: "Number of scroll steps (default: 3)", default: 3, inclusiveRange: (1, 100))
     public var amount: Int
@@ -7762,7 +7965,7 @@ public struct UiScrollIntent: AppIntent {
 
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
-        args["direction"] = direction
+        args["direction"] = direction.rawValue
         args["amount"] = amount
         if let v = appName { args["appName"] = v }
         let result = try await MCPIntentRouter.shared.call(

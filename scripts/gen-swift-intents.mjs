@@ -180,12 +180,14 @@ function swiftLit(s) {
 /**
  * Pick the Swift type for a JSON-Schema property.
  * Returns null if the type isn't representable as a single @Parameter.
+ *
+ * String enums are handled at `generateIntent` time (collectEnums),
+ * not here — this function sees the primitive only. If the caller
+ * knows a param maps to an `AppEnum`, it overrides `baseType` after
+ * calling.
  */
 function swiftTypeFor(propSchema) {
   if (propSchema.type === "string") {
-    // Enums stay as String at the @Parameter layer — AppEntity-based
-    // enum rendering needs per-type Swift code we don't codegen yet.
-    // The allowed values are surfaced in the description.
     if (propSchema.format === "date-time") return "Date";
     return "String";
   }
@@ -194,6 +196,84 @@ function swiftTypeFor(propSchema) {
   if (propSchema.type === "boolean") return "Bool";
   if (propSchema.type === "array" && propSchema.items?.type === "string") return "[String]";
   return null;
+}
+
+/**
+ * Swift identifier for an enum case value. JSON-Schema enum values we
+ * currently carry are all pure [A-Za-z_][A-Za-z0-9_]* (verified via the
+ * manifest), so this is a passthrough — the validator below hard-exits
+ * if a future manifest slips in something like "next-track". Avoiding
+ * automatic kebab→camel on the fly keeps the wire contract obvious: the
+ * case name equals the JSON value.
+ */
+function enumCaseName(value) {
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(value)) {
+    console.error(`[gen-intents] enum value "${value}" is not a safe Swift identifier`);
+    process.exit(2);
+  }
+  // Swift reserved words — unlikely but keep the same escape hatch as swiftIdent.
+  return SWIFT_RESERVED.has(value) ? `${value}_` : value;
+}
+
+/**
+ * Human-readable display label for an enum case, shown in the Shortcuts
+ * picker. "nextTrack" → "Next Track", "selection" → "Selection".
+ */
+function enumCaseDisplayLabel(value) {
+  const spaced = value.replace(/([a-z])([A-Z])/g, "$1 $2");
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+function enumTypeName(toolName, paramName) {
+  return `${toPascalCase(toolName)}${toPascalCase(paramName)}Option`;
+}
+
+/**
+ * Scan every picked tool's input schema and collect string enums. Returns
+ * a Map<toolName, Map<paramName, {typeName, values, title}>>. Caller uses
+ * this to override @Parameter types inside generateIntent and to emit the
+ * AppEnum struct block.
+ */
+function collectEnums(tools) {
+  const perTool = new Map();
+  for (const tool of tools) {
+    const props = tool.inputSchema?.properties ?? {};
+    for (const [paramName, schema] of Object.entries(props)) {
+      if (schema.type !== "string" || !Array.isArray(schema.enum) || schema.enum.length === 0) continue;
+      let params = perTool.get(tool.name);
+      if (!params) {
+        params = new Map();
+        perTool.set(tool.name, params);
+      }
+      params.set(paramName, {
+        typeName: enumTypeName(tool.name, paramName),
+        values: schema.enum,
+        title: schema.description ?? paramName,
+      });
+    }
+  }
+  return perTool;
+}
+
+function renderAppEnum(entry) {
+  const { typeName, values, title } = entry;
+  const caseList = values.map(enumCaseName).join(", ");
+  const caseMap = values
+    .map((v) => `        .${enumCaseName(v)}: "${enumCaseDisplayLabel(v)}"`)
+    .join(",\n");
+  // AppEnum's protocol requirements are `static var { get set }` so we
+  // can't use `let`. `nonisolated(unsafe)` matches the pattern used on
+  // generated intent structs — Swift 6 strict concurrency sees the var
+  // as mutable, but in practice AppEnum metadata is set-once-at-load by
+  // the framework and never mutated, so the unsafe annotation is correct.
+  return `@available(iOS 16, macOS 13, *)
+public enum ${typeName}: String, AppEnum {
+    case ${caseList}
+    nonisolated(unsafe) public static var typeDisplayRepresentation: TypeDisplayRepresentation = "${swiftLit(title).slice(0, 80)}"
+    nonisolated(unsafe) public static var caseDisplayRepresentations: [Self: DisplayRepresentation] = [
+${caseMap}
+    ]
+}`;
 }
 
 /**
@@ -216,20 +296,24 @@ function swiftDefaultLiteral(value, baseType) {
  * Non-primitive or composite shapes return null; callers must filter
  * the property out of the generated intent entirely.
  */
-function swiftParamDecl(propName, propSchema, isRequired) {
-  const baseType = swiftTypeFor(propSchema);
+function swiftParamDecl(propName, propSchema, isRequired, enumTypeOverride) {
+  const baseType = enumTypeOverride ?? swiftTypeFor(propSchema);
   if (baseType === null) return null;
 
   const descParts = [];
   if (propSchema.description) descParts.push(propSchema.description);
-  if (Array.isArray(propSchema.enum) && propSchema.enum.length > 0) {
+  // Skip the "Allowed: a, b, c" tail when the param is a real AppEnum —
+  // Shortcuts picker already shows the cases via caseDisplayRepresentations.
+  if (!enumTypeOverride && Array.isArray(propSchema.enum) && propSchema.enum.length > 0) {
     descParts.push(`Allowed: ${propSchema.enum.join(", ")}`);
   }
   const title = descParts.join(" · ") || propName;
   const safeTitle = swiftLit(title.slice(0, MAX_TITLE_LEN));
 
   const optsParts = [`title: "${safeTitle}"`];
-  const defaultLiteral = swiftDefaultLiteral(propSchema.default, baseType);
+  const defaultLiteral = enumTypeOverride
+    ? enumDefaultLiteral(propSchema.default, propSchema.enum)
+    : swiftDefaultLiteral(propSchema.default, baseType);
   if (defaultLiteral !== null) optsParts.push(`default: ${defaultLiteral}`);
 
   if (
@@ -248,13 +332,19 @@ function swiftParamDecl(propName, propSchema, isRequired) {
   return `    @Parameter(${optsParts.join(", ")})\n    public var ${propName}: ${typeName}`;
 }
 
+function enumDefaultLiteral(value, enumValues) {
+  if (typeof value !== "string" || !enumValues?.includes(value)) return null;
+  return `.${enumCaseName(value)}`;
+}
+
 /**
  * Render `varName` as the Swift expression the wire accepts for this
- * param's type (Date → ISO-8601 string, else identity). Keeps the
- * required-path and optional-path of `buildArgsBlock` from duplicating
- * the Date special-case.
+ * param's type (Date → ISO-8601 string, AppEnum → .rawValue, else
+ * identity). Keeps the required-path and optional-path of
+ * `buildArgsBlock` from duplicating the special-cases.
  */
-function wireExpr(type, varName) {
+function wireExpr(type, varName, isEnum) {
+  if (isEnum) return `${varName}.rawValue`;
   return type === "Date" ? `ISO8601DateFormatter().string(from: ${varName})` : varName;
 }
 
@@ -274,16 +364,16 @@ function buildArgsBlock(decls) {
 
   const allRequired = decls.every((d) => !d.optional);
   if (allRequired) {
-    const pairs = decls.map((d) => `"${d.wireName}": ${wireExpr(d.type, d.name)}`).join(", ");
+    const pairs = decls.map((d) => `"${d.wireName}": ${wireExpr(d.type, d.name, d.isEnum)}`).join(", ");
     return { prelude: "", argsExpr: `[${pairs}]` };
   }
 
   const lines = [`var args: [String: any Sendable] = [:]`];
   for (const d of decls) {
     if (!d.optional) {
-      lines.push(`args["${d.wireName}"] = ${wireExpr(d.type, d.name)}`);
+      lines.push(`args["${d.wireName}"] = ${wireExpr(d.type, d.name, d.isEnum)}`);
     } else {
-      lines.push(`if let v = ${d.name} { args["${d.wireName}"] = ${wireExpr(d.type, "v")} }`);
+      lines.push(`if let v = ${d.name} { args["${d.wireName}"] = ${wireExpr(d.type, "v", d.isEnum)} }`);
     }
   }
   return { prelude: lines.map((l) => `        ${l}`).join("\n"), argsExpr: "args" };
@@ -481,23 +571,26 @@ function generateIntent(tool) {
 
   // Collect property decls in a stable order. Skip properties whose type
   // we don't know how to map — the @Parameter layer can't represent them.
+  const toolEnums = enumsByTool.get(tool.name);
   const decls = [];
   for (const wireName of Object.keys(props)) {
     const prop = props[wireName];
-    const baseType = swiftTypeFor(prop);
+    const enumInfo = toolEnums?.get(wireName);
+    const baseType = enumInfo?.typeName ?? swiftTypeFor(prop);
     if (baseType === null) continue; // silently dropped — codegen will still compile
     const isRequired = required.has(wireName);
     decls.push({
       name: swiftIdent(wireName),
       wireName,
       type: baseType,
+      isEnum: Boolean(enumInfo),
       isRequired,
       optional: !isRequired && prop.default === undefined,
     });
   }
 
   const paramDecls = decls
-    .map((d) => swiftParamDecl(d.name, props[d.wireName], d.isRequired))
+    .map((d) => swiftParamDecl(d.name, props[d.wireName], d.isRequired, d.isEnum ? d.type : undefined))
     .filter(Boolean)
     .join("\n\n");
   const { prelude, argsExpr } = buildArgsBlock(decls);
@@ -835,6 +928,18 @@ ${body}
 
 // ── Assemble output ──────────────────────────────────────────────────
 
+// Enum collection must run before generateIntent — per-tool lookup is
+// read there to override @Parameter types. Collected from every picked
+// tool (including destructive); AppEnum structs are iOS 16+/macOS 13+
+// and the @available on each struct matches.
+const enumsByTool = collectEnums(picked);
+const appEnumStructs = [];
+for (const params of enumsByTool.values()) {
+  for (const entry of params.values()) {
+    appEnumStructs.push(renderAppEnum(entry));
+  }
+}
+
 const typedTools = picked.filter(hasTypedOutput);
 const outputStructs = typedTools.map((tool) => {
   const name = outputTypeNameFor(tool);
@@ -884,6 +989,7 @@ import Foundation
 
 `;
 
+const appEnumsHeader = "\n\n// MARK: - AppEnum types\n\n";
 const intentsHeader = "\n\n// MARK: - AppIntents\n\n";
 const shortcutsHeader = "\n\n// MARK: - AppShortcutsProvider\n\n";
 const snippetsHeader = `
@@ -908,6 +1014,7 @@ const footer = `
 const source =
   header +
   outputStructs.join("\n\n") +
+  (appEnumStructs.length > 0 ? appEnumsHeader + appEnumStructs.join("\n\n") : "") +
   intentsHeader +
   intents +
   shortcutsHeader +

@@ -30,6 +30,8 @@ import {
   snippetViewNameFor,
   detectSnippetShape,
   systemImageFor,
+  collectEnums,
+  renderAppEnum,
 } from "../scripts/lib/codegen-helpers.mjs";
 
 describe("toPascalCase", () => {
@@ -491,5 +493,126 @@ describe("systemImageFor", () => {
   test("unknown tool → default catch-all SF Symbol", () => {
     expect(systemImageFor("unknown_tool_name")).toBe("app.connected.to.app.below.fill");
     expect(systemImageFor("")).toBe("app.connected.to.app.below.fill");
+  });
+});
+
+describe("collectEnums", () => {
+  test("picks up a single tool with one enum param", () => {
+    const result = collectEnums([
+      {
+        name: "playback_control",
+        inputSchema: {
+          properties: {
+            action: {
+              type: "string",
+              enum: ["play", "pause", "nextTrack", "previousTrack"],
+              description: "Playback action",
+            },
+          },
+        },
+      },
+    ]);
+    expect(result.size).toBe(1);
+    const params = result.get("playback_control");
+    expect(params.size).toBe(1);
+    const entry = params.get("action");
+    expect(entry.typeName).toBe("PlaybackControlActionOption");
+    expect(entry.values).toEqual(["play", "pause", "nextTrack", "previousTrack"]);
+    expect(entry.title).toBe("Playback action");
+  });
+
+  test("falls back to param name when description is missing", () => {
+    const result = collectEnums([
+      {
+        name: "foo",
+        inputSchema: { properties: { bar: { type: "string", enum: ["a", "b"] } } },
+      },
+    ]);
+    expect(result.get("foo").get("bar").title).toBe("bar");
+  });
+
+  test("non-string params, empty-enum params, and enumless params are skipped", () => {
+    const result = collectEnums([
+      {
+        name: "mix",
+        inputSchema: {
+          properties: {
+            plain: { type: "string" },
+            intEnum: { type: "integer", enum: [1, 2] }, // not type:string — skip
+            emptyEnum: { type: "string", enum: [] },
+            actual: { type: "string", enum: ["x"] },
+          },
+        },
+      },
+    ]);
+    const params = result.get("mix");
+    expect([...params.keys()]).toEqual(["actual"]);
+  });
+
+  test("two tools sharing a param name emit distinct scoped types", () => {
+    const result = collectEnums([
+      { name: "memory_put", inputSchema: { properties: { kind: { type: "string", enum: ["fact"] } } } },
+      { name: "memory_query", inputSchema: { properties: { kind: { type: "string", enum: ["fact"] } } } },
+    ]);
+    expect(result.get("memory_put").get("kind").typeName).toBe("MemoryPutKindOption");
+    expect(result.get("memory_query").get("kind").typeName).toBe("MemoryQueryKindOption");
+  });
+
+  test("tool with no inputSchema is a no-op", () => {
+    const result = collectEnums([{ name: "no_input_tool" }]);
+    expect(result.size).toBe(0);
+  });
+
+  test("empty tool list returns empty map", () => {
+    expect(collectEnums([]).size).toBe(0);
+  });
+});
+
+describe("renderAppEnum", () => {
+  test("emits the expected struct shape with iOS 16 / macOS 13 gate", () => {
+    const swift = renderAppEnum({
+      typeName: "PlaybackControlActionOption",
+      values: ["play", "pause", "nextTrack", "previousTrack"],
+      title: "Playback action",
+    });
+
+    expect(swift).toContain("@available(iOS 16, macOS 13, *)");
+    expect(swift).toContain("public enum PlaybackControlActionOption: String, AppEnum {");
+    expect(swift).toContain("case play, pause, nextTrack, previousTrack");
+    expect(swift).toContain(
+      'nonisolated(unsafe) public static var typeDisplayRepresentation: TypeDisplayRepresentation = "Playback action"',
+    );
+    expect(swift).toContain('.play: "Play"');
+    expect(swift).toContain('.nextTrack: "Next Track"');
+    expect(swift).toContain("caseDisplayRepresentations: [Self: DisplayRepresentation]");
+  });
+
+  test("title > 80 chars is truncated via slice (not ellipsized — matches swiftLit behavior)", () => {
+    const long = "a".repeat(120);
+    const swift = renderAppEnum({ typeName: "X", values: ["v"], title: long });
+    // slice(0, 80) — no "…" suffix at this layer
+    expect(swift).toContain(`TypeDisplayRepresentation = "${"a".repeat(80)}"`);
+    expect(swift).not.toContain("a".repeat(81));
+  });
+
+  test("title escapes quotes / backslashes via swiftLit", () => {
+    const swift = renderAppEnum({
+      typeName: "X",
+      values: ["v"],
+      title: 'label with "quote" and \\ slash',
+    });
+    expect(swift).toContain('TypeDisplayRepresentation = "label with \\"quote\\" and \\\\ slash"');
+  });
+
+  test("throws on unsafe enum value (propagates from enumCaseName)", () => {
+    expect(() =>
+      renderAppEnum({ typeName: "X", values: ["next-track"], title: "bad" }),
+    ).toThrow(/not a safe Swift identifier/);
+  });
+
+  test("single-value enum still renders valid Swift", () => {
+    const swift = renderAppEnum({ typeName: "OneOption", values: ["only"], title: "One" });
+    expect(swift).toContain("case only");
+    expect(swift).toContain('.only: "Only"');
   });
 });

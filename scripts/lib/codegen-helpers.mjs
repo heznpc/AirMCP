@@ -256,3 +256,56 @@ export function systemImageFor(toolName) {
   }
   return "app.connected.to.app.below.fill";
 }
+
+// ── AppEnum collection + rendering ─────────────────────────────────────
+
+// Scan every tool's input schema and collect string enums. Returns
+// Map<toolName, Map<paramName, { typeName, values, title }>>. Caller
+// uses this to override @Parameter types inside generateIntent and to
+// emit the AppEnum struct block.
+export function collectEnums(tools) {
+  const perTool = new Map();
+  for (const tool of tools) {
+    const props = tool.inputSchema?.properties ?? {};
+    for (const [paramName, schema] of Object.entries(props)) {
+      if (schema.type !== "string" || !Array.isArray(schema.enum) || schema.enum.length === 0) continue;
+      let params = perTool.get(tool.name);
+      if (!params) {
+        params = new Map();
+        perTool.set(tool.name, params);
+      }
+      params.set(paramName, {
+        typeName: enumTypeName(tool.name, paramName),
+        values: schema.enum,
+        title: schema.description ?? paramName,
+      });
+    }
+  }
+  return perTool;
+}
+
+// Render one entry from `collectEnums` output as a Swift AppEnum
+// declaration. AppEnum's protocol requirements are `static var { get
+// set }` so we can't use `let`; `nonisolated(unsafe)` matches the
+// pattern on generated intent struct statics — Swift 6 strict
+// concurrency sees the var as mutable, but in practice AppEnum
+// metadata is set-once-at-load framework state.
+//
+// Throws via `enumCaseName` if any value is not a Swift-identifier-safe
+// string. Callers in the CLI path wrap with process.exit(2); tests can
+// assert the exact error.
+export function renderAppEnum(entry) {
+  const { typeName, values, title } = entry;
+  const caseList = values.map(enumCaseName).join(", ");
+  const caseMap = values
+    .map((v) => `        .${enumCaseName(v)}: "${enumCaseDisplayLabel(v)}"`)
+    .join(",\n");
+  return `@available(iOS 16, macOS 13, *)
+public enum ${typeName}: String, AppEnum {
+    case ${caseList}
+    nonisolated(unsafe) public static var typeDisplayRepresentation: TypeDisplayRepresentation = "${swiftLit(title).slice(0, 80)}"
+    nonisolated(unsafe) public static var caseDisplayRepresentations: [Self: DisplayRepresentation] = [
+${caseMap}
+    ]
+}`;
+}

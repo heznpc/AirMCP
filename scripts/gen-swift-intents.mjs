@@ -58,9 +58,11 @@ import {
   snippetViewNameFor,
   detectSnippetShape,
   systemImageFor,
+  collectEnums,
+  renderAppEnum as _renderAppEnum,
 } from "./lib/codegen-helpers.mjs";
 
-// CLI wrapper: the lib throws on invalid enum value so tests can
+// CLI wrappers: the lib throws on invalid enum value so tests can
 // assert the specific error, but the CLI wants the historic process.exit(2)
 // contract (caller expects "codegen failed, stop").
 function enumCaseName(value) {
@@ -68,6 +70,14 @@ function enumCaseName(value) {
     return _enumCaseName(value);
   } catch (e) {
     console.error(`[gen-intents] ${e.message}`);
+    process.exit(2);
+  }
+}
+function renderAppEnum(entry) {
+  try {
+    return _renderAppEnum(entry);
+  } catch (e) {
+    console.error(`[gen-intents] rendering ${entry?.typeName}: ${e.message}`);
     process.exit(2);
   }
 }
@@ -196,47 +206,8 @@ const MAX_TITLE_LEN = 80;
  * this to override @Parameter types inside generateIntent and to emit the
  * AppEnum struct block.
  */
-function collectEnums(tools) {
-  const perTool = new Map();
-  for (const tool of tools) {
-    const props = tool.inputSchema?.properties ?? {};
-    for (const [paramName, schema] of Object.entries(props)) {
-      if (schema.type !== "string" || !Array.isArray(schema.enum) || schema.enum.length === 0) continue;
-      let params = perTool.get(tool.name);
-      if (!params) {
-        params = new Map();
-        perTool.set(tool.name, params);
-      }
-      params.set(paramName, {
-        typeName: enumTypeName(tool.name, paramName),
-        values: schema.enum,
-        title: schema.description ?? paramName,
-      });
-    }
-  }
-  return perTool;
-}
-
-function renderAppEnum(entry) {
-  const { typeName, values, title } = entry;
-  const caseList = values.map(enumCaseName).join(", ");
-  const caseMap = values
-    .map((v) => `        .${enumCaseName(v)}: "${enumCaseDisplayLabel(v)}"`)
-    .join(",\n");
-  // AppEnum's protocol requirements are `static var { get set }` so we
-  // can't use `let`. `nonisolated(unsafe)` matches the pattern used on
-  // generated intent structs — Swift 6 strict concurrency sees the var
-  // as mutable, but in practice AppEnum metadata is set-once-at-load by
-  // the framework and never mutated, so the unsafe annotation is correct.
-  return `@available(iOS 16, macOS 13, *)
-public enum ${typeName}: String, AppEnum {
-    case ${caseList}
-    nonisolated(unsafe) public static var typeDisplayRepresentation: TypeDisplayRepresentation = "${swiftLit(title).slice(0, 80)}"
-    nonisolated(unsafe) public static var caseDisplayRepresentations: [Self: DisplayRepresentation] = [
-${caseMap}
-    ]
-}`;
-}
+// collectEnums imported from scripts/lib/codegen-helpers.mjs.
+// renderAppEnum (CLI wrapper at top) wraps the throwing lib version.
 
 // swiftDefaultLiteral imported from scripts/lib/codegen-helpers.mjs.
 

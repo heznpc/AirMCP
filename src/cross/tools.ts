@@ -1,6 +1,6 @@
 import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
-import { ok, err, toolError } from "../shared/result.js";
+import { ok, errInvalidInput, errUpstream, toolError, toolErr } from "../shared/result.js";
 import { buildSnapshot } from "../shared/resources.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import { isModuleEnabled } from "../shared/config.js";
@@ -37,11 +37,14 @@ export function registerCrossTools(mcpServer: McpServer, config: AirMcpConfig): 
       try {
         snapshotText = await buildSnapshot(enabled, "standard");
       } catch (e) {
-        return err(`Failed to build context snapshot: ${e instanceof Error ? e.message : String(e)}`);
+        return toolErr(
+          "internal_error",
+          `Failed to build context snapshot: ${e instanceof Error ? e.message : String(e)}`,
+        );
       }
 
       if (!snapshotText || snapshotText === "{}") {
-        return err("Context snapshot is empty. Are any modules enabled?");
+        return errInvalidInput("Context snapshot is empty. Are any modules enabled?");
       }
 
       // 2. Use MCP Sampling to ask the client's LLM for a summary
@@ -108,7 +111,7 @@ export function registerCrossTools(mcpServer: McpServer, config: AirMcpConfig): 
             snapshot,
           });
         }
-        return err(`Sampling failed: ${msg}`);
+        return errUpstream(`Sampling failed: ${msg}`);
       }
     },
   );
@@ -129,7 +132,8 @@ export function registerCrossTools(mcpServer: McpServer, config: AirMcpConfig): 
     },
     async ({ prompt, model, system }) => {
       const available = await checkOllama();
-      if (!available) return err("Ollama is not running. Start it with 'ollama serve' or install from ollama.com");
+      if (!available)
+        return errUpstream("Ollama is not running. Start it with 'ollama serve' or install from ollama.com");
       try {
         const response = await ollamaGenerate(prompt, { model, system });
         return ok({ response, model: model ?? DEFAULT_MODEL, local: true });

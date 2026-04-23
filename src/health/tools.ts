@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "../shared/mcp.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import { runSwift, checkSwiftBridge } from "../shared/swift.js";
-import { ok, okLinkedStructured, err, toolError } from "../shared/result.js";
+import { ok, okLinkedStructured, errSwift, toolError } from "../shared/result.js";
 
 // Single source of truth for each Swift bridge payload. The zod shape drives
 // outputSchema validation; z.infer derives the TypeScript type that runSwift
@@ -84,7 +84,7 @@ export function registerHealthTools(server: McpServer, _config: AirMcpConfig): v
     },
     async () => {
       const bridgeErr = await checkSwiftBridge();
-      if (bridgeErr) return err(`Swift bridge required: ${bridgeErr}`);
+      if (bridgeErr) return errSwift(`Swift bridge required: ${bridgeErr}`);
       try {
         const result = await runSwift<HealthSummary>("health-summary", "{}");
         return okLinkedStructured("health_summary", result);
@@ -105,7 +105,7 @@ export function registerHealthTools(server: McpServer, _config: AirMcpConfig): v
     },
     async () => {
       const bridgeErr = await checkSwiftBridge();
-      if (bridgeErr) return err(`Swift bridge required: ${bridgeErr}`);
+      if (bridgeErr) return errSwift(`Swift bridge required: ${bridgeErr}`);
       try {
         const result = await runSwift<HealthSteps>("health-steps", "{}");
         return okLinkedStructured("health_today_steps", result);
@@ -126,7 +126,7 @@ export function registerHealthTools(server: McpServer, _config: AirMcpConfig): v
     },
     async () => {
       const bridgeErr = await checkSwiftBridge();
-      if (bridgeErr) return err(`Swift bridge required: ${bridgeErr}`);
+      if (bridgeErr) return errSwift(`Swift bridge required: ${bridgeErr}`);
       try {
         const result = await runSwift<HealthHeartRate>("health-heart-rate", "{}");
         return okLinkedStructured("health_heart_rate", result);
@@ -153,7 +153,7 @@ export function registerHealthTools(server: McpServer, _config: AirMcpConfig): v
     },
     async ({ date }: { date?: string }) => {
       const bridgeErr = await checkSwiftBridge();
-      if (bridgeErr) return err(`Swift bridge required: ${bridgeErr}`);
+      if (bridgeErr) return errSwift(`Swift bridge required: ${bridgeErr}`);
       try {
         const input = date ? JSON.stringify({ date }) : "{}";
         const result = await runSwift<HealthSleep>("health-sleep", input);
@@ -175,7 +175,7 @@ export function registerHealthTools(server: McpServer, _config: AirMcpConfig): v
     },
     async () => {
       const bridgeErr = await checkSwiftBridge();
-      if (bridgeErr) return err(`Swift bridge required: ${bridgeErr}`);
+      if (bridgeErr) return errSwift(`Swift bridge required: ${bridgeErr}`);
       try {
         const result = await runSwift<{ authorized: boolean }>("health-authorize", "{}");
         return ok(result);

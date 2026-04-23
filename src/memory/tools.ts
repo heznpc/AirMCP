@@ -12,7 +12,7 @@
 import type { McpServer } from "../shared/mcp.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import { z } from "zod";
-import { okStructured, err, toolError } from "../shared/result.js";
+import { okStructured, errInvalidInput, toolError } from "../shared/result.js";
 import { MemoryStore, type MemoryKind } from "./store.js";
 
 const kindSchema = z.enum(["fact", "entity", "episode"]);
@@ -151,7 +151,7 @@ export function registerMemoryTools(server: McpServer, _config: AirMcpConfig): v
     async ({ id, key, tag, kind }) => {
       const provided = [id, key, tag].filter(Boolean).length;
       if (provided !== 1) {
-        return err("Provide exactly one of: id, key, tag.");
+        return errInvalidInput("Provide exactly one of: id, key, tag.");
       }
       try {
         const removed = await store.forget({

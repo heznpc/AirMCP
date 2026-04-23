@@ -7,7 +7,7 @@
 import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okUntrusted, err } from "../shared/result.js";
+import { ok, okUntrusted, errInvalidInput, errPermission, errUpstream } from "../shared/result.js";
 import { runGws, checkGws } from "./gws.js";
 
 // ── Allowed services & methods for gws_raw ──────────────────────────
@@ -42,7 +42,7 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
     },
     async () => {
       const error = await checkGws();
-      if (error) return err(error + "\nInstall: npm install -g @googleworkspace/cli && gws auth setup");
+      if (error) return errUpstream(error + "\nInstall: npm install -g @googleworkspace/cli && gws auth setup");
       return ok({ available: true, message: "Google Workspace CLI is ready." });
     },
   );
@@ -72,7 +72,7 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
         if (query) params.q = query;
         return okUntrusted(await runGws("gmail", "users.messages", "list", params));
       } catch (e) {
-        return err(`Gmail list failed: ${e instanceof Error ? e.message : String(e)}`);
+        return errUpstream(`Gmail list failed: ${e instanceof Error ? e.message : String(e)}`);
       }
     },
   );
@@ -92,7 +92,7 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
       try {
         return okUntrusted(await runGws("gmail", "users.messages", "get", { userId: "me", id: messageId, format }));
       } catch (e) {
-        return err(`Gmail read failed: ${e instanceof Error ? e.message : String(e)}`);
+        return errUpstream(`Gmail read failed: ${e instanceof Error ? e.message : String(e)}`);
       }
     },
   );
@@ -112,7 +112,9 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
     },
     async ({ to, subject, body, cc }) => {
       if (!allowSendMail)
-        return err("Sending mail is disabled. Set AIRMCP_ALLOW_SEND_MAIL=true or allowSendMail in config.json.");
+        return errPermission(
+          "Sending mail is disabled. Set AIRMCP_ALLOW_SEND_MAIL=true or allowSendMail in config.json.",
+        );
       try {
         // Sanitize header fields — strip CR/LF to prevent header injection
         const safeTo = to.replace(/[\r\n]/g, "");
@@ -126,7 +128,7 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
         const encoded = Buffer.from(raw).toString("base64url");
         return ok(await runGws("gmail", "users.messages", "send", { userId: "me" }, { raw: encoded }));
       } catch (e) {
-        return err(`Gmail send failed: ${e instanceof Error ? e.message : String(e)}`);
+        return errUpstream(`Gmail send failed: ${e instanceof Error ? e.message : String(e)}`);
       }
     },
   );
@@ -160,7 +162,7 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
         if (orderBy) params.orderBy = orderBy;
         return okUntrusted(await runGws("drive", "files", "list", params));
       } catch (e) {
-        return err(`Drive list failed: ${e instanceof Error ? e.message : String(e)}`);
+        return errUpstream(`Drive list failed: ${e instanceof Error ? e.message : String(e)}`);
       }
     },
   );
@@ -184,7 +186,7 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
           }),
         );
       } catch (e) {
-        return err(`Drive read failed: ${e instanceof Error ? e.message : String(e)}`);
+        return errUpstream(`Drive read failed: ${e instanceof Error ? e.message : String(e)}`);
       }
     },
   );
@@ -206,7 +208,7 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
         // Strip everything except alphanumeric, CJK, and whitespace to prevent injection.
         // Single quotes are critical to remove as they delimit API query string literals.
         const safeQuery = query.replace(/[^a-zA-Z0-9\u3131-\uD79D\u4E00-\u9FFF\s]/g, "").trim();
-        if (!safeQuery) return err("Search query contains no valid characters after sanitization.");
+        if (!safeQuery) return errInvalidInput("Search query contains no valid characters after sanitization.");
         return okUntrusted(
           await runGws("drive", "files", "list", {
             q: `fullText contains '${safeQuery}'`,
@@ -215,7 +217,7 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
           }),
         );
       } catch (e) {
-        return err(`Drive search failed: ${e instanceof Error ? e.message : String(e)}`);
+        return errUpstream(`Drive search failed: ${e instanceof Error ? e.message : String(e)}`);
       }
     },
   );
@@ -239,7 +241,7 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
       try {
         return okUntrusted(await runGws("sheets", "spreadsheets.values", "get", { spreadsheetId, range }));
       } catch (e) {
-        return err(`Sheets read failed: ${e instanceof Error ? e.message : String(e)}`);
+        return errUpstream(`Sheets read failed: ${e instanceof Error ? e.message : String(e)}`);
       }
     },
   );
@@ -272,7 +274,7 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
           ),
         );
       } catch (e) {
-        return err(`Sheets write failed: ${e instanceof Error ? e.message : String(e)}`);
+        return errUpstream(`Sheets write failed: ${e instanceof Error ? e.message : String(e)}`);
       }
     },
   );
@@ -307,7 +309,7 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
         if (timeMax) params.timeMax = timeMax;
         return okUntrusted(await runGws("calendar", "events", "list", params));
       } catch (e) {
-        return err(`Calendar list failed: ${e instanceof Error ? e.message : String(e)}`);
+        return errUpstream(`Calendar list failed: ${e instanceof Error ? e.message : String(e)}`);
       }
     },
   );
@@ -337,7 +339,7 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
         if (location) body.location = location;
         return ok(await runGws("calendar", "events", "insert", { calendarId: "primary" }, body));
       } catch (e) {
-        return err(`Calendar create failed: ${e instanceof Error ? e.message : String(e)}`);
+        return errUpstream(`Calendar create failed: ${e instanceof Error ? e.message : String(e)}`);
       }
     },
   );
@@ -360,7 +362,7 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
       try {
         return okUntrusted(await runGws("docs", "documents", "get", { documentId }));
       } catch (e) {
-        return err(`Docs read failed: ${e instanceof Error ? e.message : String(e)}`);
+        return errUpstream(`Docs read failed: ${e instanceof Error ? e.message : String(e)}`);
       }
     },
   );
@@ -387,7 +389,7 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
         const listId = lists.items?.[0]?.id || "@default";
         return okUntrusted(await runGws("tasks", "tasks", "list", { tasklist: listId, maxResults, showCompleted }));
       } catch (e) {
-        return err(`Tasks list failed: ${e instanceof Error ? e.message : String(e)}`);
+        return errUpstream(`Tasks list failed: ${e instanceof Error ? e.message : String(e)}`);
       }
     },
   );
@@ -413,7 +415,7 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
         if (due) body.due = due.includes("T") ? due : `${due}T00:00:00.000Z`;
         return ok(await runGws("tasks", "tasks", "insert", { tasklist: listId }, body));
       } catch (e) {
-        return err(`Tasks create failed: ${e instanceof Error ? e.message : String(e)}`);
+        return errUpstream(`Tasks create failed: ${e instanceof Error ? e.message : String(e)}`);
       }
     },
   );
@@ -443,7 +445,7 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
           }),
         );
       } catch (e) {
-        return err(`People search failed: ${e instanceof Error ? e.message : String(e)}`);
+        return errUpstream(`People search failed: ${e instanceof Error ? e.message : String(e)}`);
       }
     },
   );
@@ -482,13 +484,13 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
     async ({ service, resource, method, params, body }) => {
       // Service whitelist — reject unknown services
       if (!GWS_ALLOWED_SERVICES.has(service)) {
-        return err(`Unknown service "${service}". Allowed: ${GWS_ALLOWED_LIST}`);
+        return errInvalidInput(`Unknown service "${service}". Allowed: ${GWS_ALLOWED_LIST}`);
       }
 
       // Block destructive methods unless explicitly allowed
       if (GWS_DESTRUCTIVE_METHODS.has(method)) {
         if (!allowSendMail) {
-          return err(
+          return errPermission(
             `Destructive method "${method}" is disabled. Set AIRMCP_ALLOW_SEND_MAIL=true to enable delete/trash operations.`,
           );
         }
@@ -497,14 +499,14 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
       // "send" is not destructive but still requires opt-in (same gate as mail/messages)
       if (service === "gmail" && method === "send") {
         if (!allowSendMail) {
-          return err("Gmail send is disabled. Set AIRMCP_ALLOW_SEND_MAIL=true.");
+          return errPermission("Gmail send is disabled. Set AIRMCP_ALLOW_SEND_MAIL=true.");
         }
       }
 
       try {
         return ok(await runGws(service, resource, method, params, body));
       } catch (e) {
-        return err(`GWS command failed: ${e instanceof Error ? e.message : String(e)}`);
+        return errUpstream(`GWS command failed: ${e instanceof Error ? e.message : String(e)}`);
       }
     },
   );

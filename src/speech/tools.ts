@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "../shared/mcp.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import { runSwift, checkSwiftBridge } from "../shared/swift.js";
-import { ok, okLinked, err, toolError } from "../shared/result.js";
+import { ok, okLinked, errSwift, toolError } from "../shared/result.js";
 
 export function registerSpeechTools(server: McpServer, _config: AirMcpConfig): void {
   server.registerTool(
@@ -22,7 +22,7 @@ export function registerSpeechTools(server: McpServer, _config: AirMcpConfig): v
     },
     async ({ path, language }: { path: string; language?: string }) => {
       const bridgeErr = await checkSwiftBridge();
-      if (bridgeErr) return err(`Swift bridge required: ${bridgeErr}`);
+      if (bridgeErr) return errSwift(`Swift bridge required: ${bridgeErr}`);
       try {
         const result = await runSwift<{ text: string; segments: unknown[]; language: string; onDevice: boolean }>(
           "transcribe-audio",
@@ -45,7 +45,7 @@ export function registerSpeechTools(server: McpServer, _config: AirMcpConfig): v
     },
     async () => {
       const bridgeErr = await checkSwiftBridge();
-      if (bridgeErr) return err(`Swift bridge required: ${bridgeErr}`);
+      if (bridgeErr) return errSwift(`Swift bridge required: ${bridgeErr}`);
       try {
         const result = await runSwift<{ available: boolean; supportsOnDevice: boolean }>("speech-availability", "{}");
         return ok(result);
@@ -66,7 +66,7 @@ export function registerSpeechTools(server: McpServer, _config: AirMcpConfig): v
     },
     async () => {
       const bridgeErr = await checkSwiftBridge();
-      if (bridgeErr) return err(`Swift bridge required: ${bridgeErr}`);
+      if (bridgeErr) return errSwift(`Swift bridge required: ${bridgeErr}`);
       try {
         const result = await runSwift<{
           text: string | null;

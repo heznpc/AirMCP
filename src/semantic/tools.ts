@@ -1,6 +1,6 @@
 import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
-import { ok, okUntrusted, err, toolError } from "../shared/result.js";
+import { ok, okUntrusted, errNotFound, errUpstream, errSwift, toolError } from "../shared/result.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import { SemanticSearchService } from "./service.js";
 import { runSwift, checkSwiftBridge } from "../shared/swift.js";
@@ -47,7 +47,7 @@ export function registerSemanticTools(server: McpServer, config: AirMcpConfig): 
 
         const { indexed, errors, store } = await service.index(sources, onProgress);
         if (indexed === 0) {
-          return err(`No items to index.${errors.length > 0 ? " Errors: " + errors.join("; ") : ""}`);
+          return errUpstream(`No items to index.${errors.length > 0 ? " Errors: " + errors.join("; ") : ""}`);
         }
         return ok({
           indexed,
@@ -130,11 +130,11 @@ export function registerSemanticTools(server: McpServer, config: AirMcpConfig): 
     async () => {
       try {
         const swiftErr = await checkSwiftBridge();
-        if (swiftErr) return err(swiftErr);
+        if (swiftErr) return errSwift(swiftErr);
 
         const stats = await service.status();
         if (stats.total === 0) {
-          return err("No indexed data. Run semantic_index first.");
+          return errNotFound("No indexed data. Run semantic_index first.");
         }
 
         // Get all entries from the store and push to Spotlight
@@ -205,7 +205,7 @@ export function registerSemanticTools(server: McpServer, config: AirMcpConfig): 
     async () => {
       try {
         const swiftErr = await checkSwiftBridge();
-        if (swiftErr) return err(swiftErr);
+        if (swiftErr) return errSwift(swiftErr);
         const result = await runSwift<{ cleared: boolean }>("spotlight-clear", "{}");
         return ok(result);
       } catch (e) {

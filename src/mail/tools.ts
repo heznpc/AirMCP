@@ -2,7 +2,7 @@ import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okStructured, okUntrustedLinkedStructured, err, toolError } from "../shared/result.js";
+import { ok, okStructured, okUntrustedLinkedStructured, errPermission, toolError } from "../shared/result.js";
 // Side-effect import: register the mail_unread poller with the shared registry
 // at module load time. The poller itself only starts when startPollers() is
 // invoked by the cross/event observer tool.
@@ -318,7 +318,9 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
     },
     async ({ to, subject, body, cc, bcc, account }) => {
       if (!allowSendMail)
-        return err("Sending mail is disabled. Set allowSendMail: true in config or AIRMCP_ALLOW_SEND_MAIL=true.");
+        return errPermission(
+          "Sending mail is disabled. Set allowSendMail: true in config or AIRMCP_ALLOW_SEND_MAIL=true.",
+        );
       try {
         return ok(await runJxa(sendMailScript(to, subject, body, cc, bcc, account)));
       } catch (e) {
@@ -345,7 +347,9 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
     },
     async ({ id, body, replyAll }) => {
       if (!allowSendMail)
-        return err("Sending mail is disabled. Set allowSendMail: true in config or AIRMCP_ALLOW_SEND_MAIL=true.");
+        return errPermission(
+          "Sending mail is disabled. Set allowSendMail: true in config or AIRMCP_ALLOW_SEND_MAIL=true.",
+        );
       try {
         return ok(await runJxa(replyMailScript(id, body, replyAll)));
       } catch (e) {

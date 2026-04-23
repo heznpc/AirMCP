@@ -1,7 +1,7 @@
 import type { McpServer } from "./mcp.js";
 import type { AirMcpConfig, HitlLevel } from "./config.js";
 import type { HitlClient } from "./hitl.js";
-import { err } from "./result.js";
+import { errPermission } from "./result.js";
 import { traceApproval } from "./telemetry.js";
 
 interface ToolAnnotations {
@@ -154,7 +154,7 @@ export function installHitlGuard(server: McpServer, hitlClient: HitlClient, conf
             traceApproval(name, elicitResult ? "approved" : "denied", "elicitation", { destructive, managed });
           }
           if (!elicitResult) {
-            return err(`Action denied: "${name}" was rejected via MCP elicitation.`);
+            return errPermission(`Action denied: "${name}" was rejected via MCP elicitation.`);
           }
           return (callback as (...a: unknown[]) => unknown)(...args);
         }
@@ -171,7 +171,9 @@ export function installHitlGuard(server: McpServer, hitlClient: HitlClient, conf
         traceApproval(name, approved ? "approved" : "denied", "socket", { destructive, managed });
       }
       if (!approved) {
-        return err(`Action denied: "${name}" requires user approval. The user denied or did not respond in time.`);
+        return errPermission(
+          `Action denied: "${name}" requires user approval. The user denied or did not respond in time.`,
+        );
       }
       return (callback as (...a: unknown[]) => unknown)(...args);
     };

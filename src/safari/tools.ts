@@ -7,7 +7,9 @@ import {
   okUntrusted,
   okUntrustedStructured,
   okUntrustedLinkedStructured,
-  err,
+  errInvalidInput,
+  errPermission,
+  errDeprecated,
   toolError,
 } from "../shared/result.js";
 import {
@@ -128,32 +130,32 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
       try {
         const parsed = new URL(url);
         if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-          return err(`Only http:// and https:// URLs are allowed. Got: ${parsed.protocol}`);
+          return errInvalidInput(`Only http:// and https:// URLs are allowed. Got: ${parsed.protocol}`);
         }
         const host = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, "");
         // Loopback (entire 127.0.0.0/8 range, IPv6 ::1, "localhost")
         if (host === "localhost" || host === "::1" || /^127(?:\.\d{1,3}){3}$/.test(host)) {
-          return err("Opening localhost URLs is not allowed.");
+          return errInvalidInput("Opening localhost URLs is not allowed.");
         }
         // RFC1918 private networks
         if (host.startsWith("10.") || host.startsWith("192.168.") || /^172\.(1[6-9]|2\d|3[01])\./.test(host)) {
-          return err("Opening internal network URLs is not allowed.");
+          return errInvalidInput("Opening internal network URLs is not allowed.");
         }
         // Link-local: 169.254.0.0/16 — includes cloud metadata endpoints
         // (169.254.169.254 on AWS/GCP/Azure) and IPv6 fe80::/10
         if (host.startsWith("169.254.") || host.startsWith("fe80:") || host.startsWith("fe80::")) {
-          return err("Opening link-local / cloud metadata URLs is not allowed.");
+          return errInvalidInput("Opening link-local / cloud metadata URLs is not allowed.");
         }
         // IPv6 unique local addresses fc00::/7 (fc00:: – fdff::)
         if (/^f[cd][0-9a-f]{2}:/.test(host)) {
-          return err("Opening IPv6 unique-local URLs is not allowed.");
+          return errInvalidInput("Opening IPv6 unique-local URLs is not allowed.");
         }
         // Unspecified address / mDNS
         if (host === "0.0.0.0" || host === "::" || host.endsWith(".local")) {
-          return err("Opening unspecified or mDNS URLs is not allowed.");
+          return errInvalidInput("Opening unspecified or mDNS URLs is not allowed.");
         }
       } catch {
-        return err("Invalid URL format.");
+        return errInvalidInput("Invalid URL format.");
       }
       try {
         return ok(await runJxa(openUrlScript(url)));
@@ -218,7 +220,7 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
     },
     async ({ code, windowIndex, tabIndex }) => {
       if (!allowRunJavascript)
-        return err(
+        return errPermission(
           "Running JavaScript in Safari is disabled. Set AIRMCP_ALLOW_RUN_JAVASCRIPT=true or allowRunJavascript in config.json.",
         );
       try {
@@ -307,7 +309,7 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
       },
       async () => {
-        return err(
+        return errDeprecated(
           "add_bookmark is deprecated — Safari removed bookmark scripting in macOS 26. " +
             "Use add_to_reading_list instead.",
         );

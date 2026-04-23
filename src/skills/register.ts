@@ -2,7 +2,7 @@ import type { McpServer } from "../shared/mcp.js";
 import type { SkillDefinition, SkillInput } from "./types.js";
 import { executeSkill } from "./executor.js";
 import { userPrompt } from "../shared/prompt.js";
-import { ok, err } from "../shared/result.js";
+import { ok, errUpstream } from "../shared/result.js";
 import { toolRegistry } from "../shared/tool-registry.js";
 import { z } from "zod";
 
@@ -142,11 +142,11 @@ function registerAsTool(server: McpServer, skill: SkillDefinition): void {
         const result = await executeSkill(server, skill, args);
         if (!result.success) {
           const failedStep = result.steps.find((s) => s.status === "error");
-          return err(`Skill "${skill.name}" failed at step "${failedStep?.id}": ${failedStep?.error}`);
+          return errUpstream(`Skill "${skill.name}" failed at step "${failedStep?.id}": ${failedStep?.error}`);
         }
         return ok(result);
       } catch (e) {
-        return err(`Skill "${skill.name}" failed: ${e instanceof Error ? e.message : String(e)}`);
+        return errUpstream(`Skill "${skill.name}" failed: ${e instanceof Error ? e.message : String(e)}`);
       }
     },
   );

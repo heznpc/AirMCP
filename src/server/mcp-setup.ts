@@ -6,7 +6,7 @@
 import { McpServer as SdkMcpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { McpServer as LightMcpServer } from "../shared/mcp.js";
 import { z } from "zod";
-import { ok, okStructured, err, toolError } from "../shared/result.js";
+import { ok, okStructured, errSwift, errNotFound, errUpstream, toolError } from "../shared/result.js";
 import { registerCrossPrompts } from "../cross/prompts.js";
 import { registerCrossTools } from "../cross/tools.js";
 import { registerSemanticTools } from "../semantic/tools.js";
@@ -335,7 +335,7 @@ export async function createServer(
     },
     async () => {
       const bridgeErr = await checkSwiftBridge();
-      if (bridgeErr) return err(`Swift bridge required: ${bridgeErr}`);
+      if (bridgeErr) return errSwift(`Swift bridge required: ${bridgeErr}`);
       try {
         if (eventBus.isRunning) {
           return ok({ status: "already_running", message: "Event observer is already active" });
@@ -429,7 +429,7 @@ export async function createServer(
     },
     async () => {
       const bridgeErr = await checkSwiftBridge();
-      if (bridgeErr) return err(`Swift bridge required: ${bridgeErr}`);
+      if (bridgeErr) return errSwift(`Swift bridge required: ${bridgeErr}`);
       try {
         const result = await runSwift("cloud-sync-status", "{}");
         return ok(result);
@@ -457,14 +457,14 @@ export async function createServer(
       const callback = toolRegistry.getPromptCallback(name);
       if (!callback) {
         const available = toolRegistry.getPromptNames().sort();
-        return err(`Unknown prompt "${name}". Available: ${available.join(", ")}`);
+        return errNotFound(`Unknown prompt "${name}". Available: ${available.join(", ")}`);
       }
       try {
         const result = await callback(args ?? {}, {});
         const text = result?.messages?.[0]?.content?.text ?? JSON.stringify(result);
         return ok({ prompt: name, description: result?.description, workflow: text });
       } catch (e) {
-        return err(`Failed to get workflow: ${e instanceof Error ? e.message : String(e)}`);
+        return errUpstream(`Failed to get workflow: ${e instanceof Error ? e.message : String(e)}`);
       }
     },
   );

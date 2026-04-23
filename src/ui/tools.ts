@@ -2,7 +2,7 @@ import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okUntrusted, err, toolError } from "../shared/result.js";
+import { ok, okUntrusted, errInvalidInput, toolError } from "../shared/result.js";
 import {
   uiOpenAppScript,
   uiClickScript,
@@ -83,10 +83,10 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
     async ({ appName, x, y, text, role, index }) => {
       try {
         if (x === undefined && y === undefined && !text) {
-          return err("Either (x, y) coordinates or text search must be provided");
+          return errInvalidInput("Either (x, y) coordinates or text search must be provided");
         }
         if ((x !== undefined) !== (y !== undefined)) {
-          return err("Both x and y coordinates must be provided together");
+          return errInvalidInput("Both x and y coordinates must be provided together");
         }
         return ok(await runJxa(uiClickScript(appName, x, y, text, role, index)));
       } catch (e) {
@@ -283,7 +283,7 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
     async ({ app, role, title, value, description, identifier, label, maxResults, maxDepth }) => {
       try {
         if (!role && !title && !value && !description && !identifier && !label) {
-          return err(
+          return errInvalidInput(
             "At least one search criterion (role, title, value, description, identifier, or label) is required.",
           );
         }
@@ -345,7 +345,7 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
     async ({ app, role, title, value, description, identifier, label, action, actionValue, index }) => {
       try {
         if (!role && !title && !value && !description && !identifier && !label) {
-          return err("At least one search criterion is required to locate the element.");
+          return errInvalidInput("At least one search criterion is required to locate the element.");
         }
         const locator: AXLocator = { app, role, title, value, description, identifier, label };
         return ok(await runJxa(axPerformScript(locator, action, actionValue, index)));

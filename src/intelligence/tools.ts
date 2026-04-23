@@ -1,7 +1,7 @@
 import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okUntrusted, err, toolError } from "../shared/result.js";
+import { ok, okUntrusted, errSwift, toolError } from "../shared/result.js";
 import { runSwift, checkSwiftBridge } from "../shared/swift.js";
 import { zFilePath } from "../shared/validate.js";
 import {
@@ -463,7 +463,7 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
     },
     async ({ limit, seed }) => {
       const bridgeErr = await checkSwiftBridge();
-      if (bridgeErr) return err(`Swift bridge required: ${bridgeErr}`);
+      if (bridgeErr) return errSwift(`Swift bridge required: ${bridgeErr}`);
 
       try {
         const cases = sampleCases(GOLDEN_PLANS, limit ?? 5, seed);
@@ -570,7 +570,7 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
     },
     async ({ prompt, systemInstruction }) => {
       const bridgeErr = await checkSwiftBridge();
-      if (bridgeErr) return err(`Swift bridge required: ${bridgeErr}`);
+      if (bridgeErr) return errSwift(`Swift bridge required: ${bridgeErr}`);
       try {
         const result = await runSwift<TextResult>(
           "ai-agent",

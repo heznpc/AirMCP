@@ -13,6 +13,11 @@ jest.unstable_mockModule('../dist/skills/executor.js', () => ({
 jest.unstable_mockModule('../dist/shared/result.js', () => ({
   ok: jest.fn((data) => ({ content: [{ type: 'text', text: JSON.stringify(data) }] })),
   err: jest.fn((msg) => ({ content: [{ type: 'text', text: msg }], isError: true })),
+  errUpstream: jest.fn((msg) => ({
+    content: [{ type: 'text', text: `[upstream_error] ${msg}` }],
+    isError: true,
+    structuredContent: { error: { category: 'upstream_error', message: msg } },
+  })),
   withResultSizeHint: jest.fn((result) => result),
 }));
 
@@ -33,7 +38,7 @@ jest.unstable_mockModule('../dist/shared/prompt.js', () => ({
 }));
 
 const { registerSkills } = await import('../dist/skills/register.js');
-const { ok, err } = await import('../dist/shared/result.js');
+const { ok, err, errUpstream } = await import('../dist/shared/result.js');
 
 // ─── Helpers ────────────────────────────────────────────────────────────
 function makeSkill(overrides = {}) {
@@ -176,13 +181,14 @@ describe('registerAsTool handler', () => {
     const handler = server.registerTool.mock.calls[0][2];
     const response = await handler();
 
-    expect(err).toHaveBeenCalledWith(
+    // Wave 2+ (RFC 0001): skill failures classify as `upstream_error`.
+    expect(errUpstream).toHaveBeenCalledWith(
       expect.stringContaining('failed at step "step1"'),
     );
     expect(response.isError).toBe(true);
   });
 
-  test('handler returns err() when executeSkill throws Error', async () => {
+  test('handler returns errUpstream() when executeSkill throws Error', async () => {
     mockExecuteSkill.mockRejectedValue(new Error('execution crashed'));
 
     const skill = makeSkill();
@@ -191,13 +197,13 @@ describe('registerAsTool handler', () => {
     const handler = server.registerTool.mock.calls[0][2];
     const response = await handler();
 
-    expect(err).toHaveBeenCalledWith(
+    expect(errUpstream).toHaveBeenCalledWith(
       expect.stringContaining('execution crashed'),
     );
     expect(response.isError).toBe(true);
   });
 
-  test('handler returns err() when executeSkill throws non-Error', async () => {
+  test('handler returns errUpstream() when executeSkill throws non-Error', async () => {
     mockExecuteSkill.mockRejectedValue('raw string rejection');
 
     const skill = makeSkill();
@@ -206,7 +212,7 @@ describe('registerAsTool handler', () => {
     const handler = server.registerTool.mock.calls[0][2];
     const response = await handler();
 
-    expect(err).toHaveBeenCalledWith(
+    expect(errUpstream).toHaveBeenCalledWith(
       expect.stringContaining('raw string rejection'),
     );
     expect(response.isError).toBe(true);

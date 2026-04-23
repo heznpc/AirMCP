@@ -7,7 +7,7 @@ import {
   okLinkedStructured,
   okUntrustedLinkedStructured,
   okUntrustedStructured,
-  err,
+  errPermission,
   toolError,
 } from "../shared/result.js";
 import { TIMEOUT } from "../shared/constants.js";
@@ -162,7 +162,7 @@ export function registerMessagesTools(server: McpServer, config: AirMcpConfig): 
     },
     async ({ target, text }) => {
       if (!allowSendMessages)
-        return err("Sending messages is disabled. Set AIRMCP_ALLOW_SEND_MESSAGES=true to enable.");
+        return errPermission("Sending messages is disabled. Set AIRMCP_ALLOW_SEND_MESSAGES=true to enable.");
       try {
         await runAppleScript(sendMessageScript(target, text), { app: "Messages", timeout: TIMEOUT.MESSAGE_SEND });
         return ok({ sent: true, to: target, text: text.substring(0, 80) });
@@ -185,7 +185,7 @@ export function registerMessagesTools(server: McpServer, config: AirMcpConfig): 
     },
     async ({ target, filePath }) => {
       if (!allowSendMessages)
-        return err("Sending messages is disabled. Set AIRMCP_ALLOW_SEND_MESSAGES=true to enable.");
+        return errPermission("Sending messages is disabled. Set AIRMCP_ALLOW_SEND_MESSAGES=true to enable.");
       try {
         await runAppleScript(sendFileScript(target, filePath), { app: "Messages", timeout: TIMEOUT.MESSAGE_SEND });
         return ok({ sent: true, to: target, file: filePath });

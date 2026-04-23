@@ -93,6 +93,9 @@ jobs:
       - name: Verify manifest schema contract
         run: node scripts/verify-tool-manifest.mjs
 
+      - name: Verify MCPB extension manifest (Claude Desktop bundle)
+        run: npm run build:mcpb:check
+
       - name: Verify generated Swift intents (RFC 0007 A.1)
         run: |
           npm run gen:intents

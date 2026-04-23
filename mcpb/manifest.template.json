@@ -1,0 +1,75 @@
+{
+  "manifest_version": "0.3",
+  "name": "airmcp",
+  "display_name": "AirMCP",
+  "version": "{{VERSION}}",
+  "description": "{{DESCRIPTION}}",
+  "long_description": "AirMCP connects any MCP-compatible AI client to your Mac — Notes, Reminders, Calendar, Contacts, Mail, Messages, Music, Finder, Safari, Photos, System control, Apple Intelligence, and more. 270+ tools across 29 modules. Runs 100% on-device via native Swift bridges (EventKit, PhotoKit, HealthKit, Vision, Foundation Models).\n\nSafety first: HITL (human-in-the-loop) approval, queryable audit log, rate limiter + emergency stop, declarative HTTP network policy.\n\niOS-ready: 229 auto-generated Apple App Intents expose AirMCP tools to Siri, Shortcuts, and Spotlight once the iOS companion ships.",
+  "author": {
+    "name": "heznpc",
+    "url": "https://github.com/heznpc"
+  },
+  "homepage": "https://github.com/heznpc/AirMCP",
+  "documentation": "https://github.com/heznpc/AirMCP#readme",
+  "support": "https://github.com/heznpc/AirMCP/issues",
+  "license": "MIT",
+  "icon": "icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/heznpc/AirMCP.git"
+  },
+  "keywords": [
+    "mcp",
+    "apple",
+    "macos",
+    "notes",
+    "calendar",
+    "reminders",
+    "contacts",
+    "mail",
+    "siri",
+    "shortcuts",
+    "apple-intelligence"
+  ],
+  "compatibility": {
+    "claude_desktop": ">=0.11.0",
+    "platforms": ["darwin"],
+    "runtimes": {
+      "node": ">=20.0.0"
+    }
+  },
+  "server": {
+    "type": "node",
+    "entry_point": "server/dist/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/server/dist/index.js"],
+      "env": {
+        "GEMINI_API_KEY": "${user_config.gemini_api_key}",
+        "AIRMCP_FULL": "${user_config.load_all_modules}"
+      }
+    }
+  },
+  "user_config": {
+    "gemini_api_key": {
+      "type": "string",
+      "title": "Gemini API Key (optional)",
+      "description": "Enables cloud embeddings for semantic tool search and note search. AirMCP falls back to Apple's on-device NLContextualEmbedding when this is unset — no cloud calls are made without this key.",
+      "required": false,
+      "sensitive": true,
+      "default": ""
+    },
+    "load_all_modules": {
+      "type": "boolean",
+      "title": "Load all 29 modules on startup",
+      "description": "Off by default — only the 7 starter modules load (notes, calendar, reminders, contacts, mail, finder, system) to keep the surface small. Turn on to register all modules (messages, music, safari, photos, shortcuts, apple intelligence, TV, maps, weather, iWork, Google Workspace, health, bluetooth, etc.). Per-module disable can still be done via AIRMCP_DISABLE_<MODULE> env vars in advanced setups.",
+      "required": false,
+      "default": false
+    }
+  },
+  "tools_generated": true,
+  "prompts_generated": true,
+  "privacy_policies": [
+    "https://github.com/heznpc/AirMCP/blob/main/docs/PRIVACY_POLICY.md"
+  ]
+}

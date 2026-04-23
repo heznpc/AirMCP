@@ -77,6 +77,8 @@
     "smoke": "node scripts/smoke-mcp.mjs",
     "gen:manifest": "node scripts/dump-tool-manifest.mjs",
     "gen:manifest:check": "node scripts/dump-tool-manifest.mjs --check",
+    "gen:intents": "node scripts/gen-swift-intents.mjs",
+    "gen:intents:check": "node scripts/gen-swift-intents.mjs --check",
     "qa": "node scripts/qa-test.mjs",
     "qa:crud": "node scripts/qa-crud-test.mjs",
     "qa:e2e": "node scripts/qa-e2e-test.mjs",

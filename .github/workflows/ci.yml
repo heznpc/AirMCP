@@ -86,6 +86,14 @@ jobs:
           git --no-pager diff docs/tool-manifest.json | head -200 || true
           git diff --exit-code docs/tool-manifest.json
 
+      - name: Verify generated Swift intents (RFC 0007 A.1)
+        run: |
+          npm run gen:intents
+          echo "--- diff (should be empty) ---"
+          git --no-pager diff --stat swift/Sources/AirMCPKit/Generated/MCPIntents.swift || true
+          git --no-pager diff swift/Sources/AirMCPKit/Generated/MCPIntents.swift | head -200 || true
+          git diff --exit-code swift/Sources/AirMCPKit/Generated/MCPIntents.swift
+
       - name: Verify stats
         run: node scripts/count-stats.mjs --check
 

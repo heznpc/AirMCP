@@ -48,6 +48,16 @@ import {
   enumCaseDisplayLabel,
   enumTypeName,
   intentActionNameFor,
+  swiftTypeFor,
+  swiftDefaultLiteral,
+  enumDefaultLiteral,
+  wireExpr,
+  isNullableUnion,
+  nonNullType,
+  outputTypeNameFor,
+  snippetViewNameFor,
+  detectSnippetShape,
+  systemImageFor,
 } from "./lib/codegen-helpers.mjs";
 
 // CLI wrapper: the lib throws on invalid enum value so tests can
@@ -176,29 +186,9 @@ const MAX_TITLE_LEN = 80;
 // `enumCaseName` is the top-of-file CLI wrapper that converts the
 // library's thrown error into process.exit(2).
 
-/**
- * Pick the Swift type for a JSON-Schema property.
- * Returns null if the type isn't representable as a single @Parameter.
- *
- * String enums are handled at `generateIntent` time (collectEnums),
- * not here — this function sees the primitive only. If the caller
- * knows a param maps to an `AppEnum`, it overrides `baseType` after
- * calling.
- */
-function swiftTypeFor(propSchema) {
-  if (propSchema.type === "string") {
-    if (propSchema.format === "date-time") return "Date";
-    return "String";
-  }
-  if (propSchema.type === "integer") return "Int";
-  if (propSchema.type === "number") return "Double";
-  if (propSchema.type === "boolean") return "Bool";
-  if (propSchema.type === "array" && propSchema.items?.type === "string") return "[String]";
-  return null;
-}
-
+// swiftTypeFor imported from scripts/lib/codegen-helpers.mjs.
 // enumCaseName (CLI wrapper at top), enumCaseDisplayLabel, enumTypeName
-// imported from scripts/lib/codegen-helpers.mjs.
+// also imported from there.
 
 /**
  * Scan every picked tool's input schema and collect string enums. Returns
@@ -248,18 +238,7 @@ ${caseMap}
 }`;
 }
 
-/**
- * Format a JSON-Schema `default` value as a Swift literal suitable for
- * `@Parameter(default: ...)`. Returns null when the default is absent or
- * doesn't match the target type — caller drops the `default:` clause.
- */
-function swiftDefaultLiteral(value, baseType) {
-  if (value === undefined) return null;
-  if ((baseType === "Int" || baseType === "Double") && typeof value === "number") return String(value);
-  if (baseType === "Bool" && typeof value === "boolean") return String(value);
-  if (baseType === "String" && typeof value === "string") return `"${swiftLit(value)}"`;
-  return null;
-}
+// swiftDefaultLiteral imported from scripts/lib/codegen-helpers.mjs.
 
 /**
  * Map a JSON-Schema property to a Swift `@Parameter` declaration.
@@ -304,21 +283,7 @@ function swiftParamDecl(propName, propSchema, isRequired, enumTypeOverride) {
   return `    @Parameter(${optsParts.join(", ")})\n    public var ${propName}: ${typeName}`;
 }
 
-function enumDefaultLiteral(value, enumValues) {
-  if (typeof value !== "string" || !enumValues?.includes(value)) return null;
-  return `.${enumCaseName(value)}`;
-}
-
-/**
- * Render `varName` as the Swift expression the wire accepts for this
- * param's type (Date → ISO-8601 string, AppEnum → .rawValue, else
- * identity). Keeps the required-path and optional-path of
- * `buildArgsBlock` from duplicating the special-cases.
- */
-function wireExpr(type, varName, isEnum) {
-  if (isEnum) return `${varName}.rawValue`;
-  return type === "Date" ? `ISO8601DateFormatter().string(from: ${varName})` : varName;
-}
+// enumDefaultLiteral, wireExpr imported from scripts/lib/codegen-helpers.mjs.
 
 /**
  * Emit the Swift statements that build the `args` dict for a router call.
@@ -373,14 +338,7 @@ function buildArgsBlock(decls) {
 // Everything else (oneOf, allOf, recursive refs) would require AnyCodable
 // or more elaborate machinery — out of A.2b.2 scope.
 
-function isNullableUnion(schema) {
-  if (!Array.isArray(schema.type)) return false;
-  return schema.type.length === 2 && schema.type.includes("null");
-}
-
-function nonNullType(schema) {
-  return schema.type.find((t) => t !== "null");
-}
+// isNullableUnion, nonNullType imported from scripts/lib/codegen-helpers.mjs.
 
 function isCodableSafe(schema) {
   if (!schema || typeof schema !== "object") return true;
@@ -481,14 +439,7 @@ ${body}
 ${indent.slice(4)}}`;
 }
 
-function outputTypeNameFor(tool) {
-  // Prefix avoids collisions with existing hand-written types in
-  // AirMCPKit (e.g. EventKitService.swift already declares
-  // TodayEventsOutput / SearchEventsOutput / SearchRemindersOutput
-  // as native EventKit-backed shapes). Generated types are a separate
-  // transport layer, not the EventKit-native one.
-  return `MCP${toPascalCase(tool.name)}Output`;
-}
+// outputTypeNameFor imported from scripts/lib/codegen-helpers.mjs.
 
 /**
  * Does this tool ship A.2b.2-level typed output? Requires:
@@ -617,33 +568,14 @@ ${tailBlock}
 }`;
 }
 
+// SYSTEM_IMAGE_BY_PREFIX, systemImageFor imported from scripts/lib/codegen-helpers.mjs.
+
 /**
  * Emit the single AppShortcutsProvider block. Apple caps this at 10.
  * Each phrase uses `\(.applicationName)` so the trigger reads naturally
  * ("list calendars in AirMCP"). systemImage is a stable SF Symbol per
  * tool family — conservative choices that compile against iOS 17+.
  */
-const SYSTEM_IMAGE_BY_PREFIX = [
-  [/^(list|search)_events|today_events|get_upcoming_events/, "calendar"],
-  [/^list_calendars/, "calendar.badge.plus"],
-  [/^(list|search|read)_notes|list_folders/, "note.text"],
-  [/^(list|search|read)_reminders|list_reminder_lists/, "checklist"],
-  [/^(list|search|read)_contacts|list_groups|list_group_members/, "person.crop.circle"],
-  [/^list_accounts|list_messages/, "envelope"],
-  [/^list_chats|list_participants/, "message"],
-  [/^list_shortcuts|search_shortcuts|get_shortcut_detail/, "square.stack.3d.up"],
-  [/^list_bookmarks|list_reading_list|list_tabs/, "safari"],
-  [/^get_current_weather|get_daily_forecast|get_hourly_forecast/, "cloud.sun"],
-  [/^summarize_context|proactive_context/, "sparkles"],
-  [/^recent_files|list_directory|search_files|get_file_info/, "folder"],
-];
-function systemImageFor(toolName) {
-  for (const [re, img] of SYSTEM_IMAGE_BY_PREFIX) {
-    if (re.test(toolName)) return img;
-  }
-  return "app.connected.to.app.below.fill";
-}
-
 function generateAppShortcuts() {
   const toolEntries = appShortcutsPicks.map((tool) => {
     const structName = intentStructName(tool.name);
@@ -798,39 +730,7 @@ function renderScalarRow(key, propSchema) {
             }`;
 }
 
-function detectSnippetShape(schema) {
-  const props = schema.properties ?? {};
-  const keys = Object.keys(props);
-  const arrayKeys = keys.filter((k) => props[k].type === "array");
-  if (arrayKeys.length === 1) {
-    const arrayKey = arrayKeys[0];
-    const items = props[arrayKey].items ?? {};
-    if (items.type === "object") {
-      const itemProps = items.properties ?? {};
-      // Prefer a non-id string field for display so list rows show the
-      // human label (summary / name / title) rather than the raw UID.
-      // Fall back to `id` if nothing else is stringly typed — the row
-      // still renders, just less prettily.
-      //
-      // Schemas may declare `type: ["string", "null"]` for optional
-      // fields; treat those the same as plain strings when picking a
-      // display field. The snippet view handles nil via the Codable
-      // struct's Optional<String> type, so rendering the Optional with
-      // `?? ""` is covered at the SwiftUI layer.
-      const isStringish = (p) =>
-        p != null && (p.type === "string" || (Array.isArray(p.type) && p.type.includes("string")));
-      const stringKeys = Object.keys(itemProps).filter((k) => isStringish(itemProps[k]));
-      const primaryField = stringKeys.find((k) => k !== "id") ?? stringKeys[0] ?? null;
-      const primaryFieldOptional = primaryField ? Array.isArray(itemProps[primaryField].type) : false;
-      const hasId = isStringish(itemProps.id);
-      return { shape: "list-object", arrayField: arrayKey, primaryField, primaryFieldOptional, hasId };
-    }
-    if (items.type === "string") {
-      return { shape: "list-string", arrayField: arrayKey };
-    }
-  }
-  return { shape: "scalar" };
-}
+// detectSnippetShape imported from scripts/lib/codegen-helpers.mjs.
 
 // Validate FOLLOW_UP_MAP against the manifest so a typo or removed tool
 // surfaces at codegen time rather than as a SwiftUI compile error. Also
@@ -890,9 +790,7 @@ const followUpFactorySpecs = Array.from(
   ).values(),
 );
 
-function snippetViewNameFor(tool) {
-  return `MCP${toPascalCase(tool.name)}SnippetView`;
-}
+// snippetViewNameFor imported from scripts/lib/codegen-helpers.mjs.
 
 function renderSnippetView(tool) {
   const viewName = snippetViewNameFor(tool);

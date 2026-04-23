@@ -20,6 +20,16 @@ import {
   enumCaseDisplayLabel,
   enumTypeName,
   intentActionNameFor,
+  swiftTypeFor,
+  swiftDefaultLiteral,
+  enumDefaultLiteral,
+  wireExpr,
+  isNullableUnion,
+  nonNullType,
+  outputTypeNameFor,
+  snippetViewNameFor,
+  detectSnippetShape,
+  systemImageFor,
 } from "../scripts/lib/codegen-helpers.mjs";
 
 describe("toPascalCase", () => {
@@ -195,5 +205,291 @@ describe("intentActionNameFor", () => {
   test("non-destructive names also map (function is only called on destructive, but mapping is pure)", () => {
     expect(intentActionNameFor("list_events")).toBe(".go");
     expect(intentActionNameFor("read_note")).toBe(".go");
+  });
+});
+
+describe("swiftTypeFor", () => {
+  test("primitive scalars", () => {
+    expect(swiftTypeFor({ type: "string" })).toBe("String");
+    expect(swiftTypeFor({ type: "integer" })).toBe("Int");
+    expect(swiftTypeFor({ type: "number" })).toBe("Double");
+    expect(swiftTypeFor({ type: "boolean" })).toBe("Bool");
+  });
+
+  test("date-time format → Date", () => {
+    expect(swiftTypeFor({ type: "string", format: "date-time" })).toBe("Date");
+  });
+
+  test("string array → [String]", () => {
+    expect(swiftTypeFor({ type: "array", items: { type: "string" } })).toBe("[String]");
+  });
+
+  test("composite shapes → null (silently dropped by caller)", () => {
+    expect(swiftTypeFor({ type: "object" })).toBeNull();
+    expect(swiftTypeFor({ type: "array", items: { type: "object" } })).toBeNull();
+    expect(swiftTypeFor({ type: "unknown" })).toBeNull();
+  });
+});
+
+describe("swiftDefaultLiteral", () => {
+  test("numeric defaults round-trip as Swift literals", () => {
+    expect(swiftDefaultLiteral(50, "Int")).toBe("50");
+    expect(swiftDefaultLiteral(3.14, "Double")).toBe("3.14");
+  });
+
+  test("bool defaults render as true/false", () => {
+    expect(swiftDefaultLiteral(true, "Bool")).toBe("true");
+    expect(swiftDefaultLiteral(false, "Bool")).toBe("false");
+  });
+
+  test("string default gets quoted + escaped via swiftLit", () => {
+    expect(swiftDefaultLiteral("hello", "String")).toBe('"hello"');
+    expect(swiftDefaultLiteral('say "hi"', "String")).toBe('"say \\"hi\\""');
+  });
+
+  test("undefined default → null (caller drops default: clause)", () => {
+    expect(swiftDefaultLiteral(undefined, "Int")).toBeNull();
+  });
+
+  test("type mismatch → null (e.g. number default on a Bool field)", () => {
+    expect(swiftDefaultLiteral(1, "Bool")).toBeNull();
+    expect(swiftDefaultLiteral("text", "Int")).toBeNull();
+  });
+});
+
+describe("enumDefaultLiteral", () => {
+  test("returns .caseName when value is in enumValues", () => {
+    expect(enumDefaultLiteral("play", ["play", "pause"])).toBe(".play");
+    expect(enumDefaultLiteral("nextTrack", ["play", "nextTrack"])).toBe(".nextTrack");
+  });
+
+  test("value outside enum → null", () => {
+    expect(enumDefaultLiteral("stop", ["play", "pause"])).toBeNull();
+  });
+
+  test("missing enumValues → null", () => {
+    expect(enumDefaultLiteral("play", undefined)).toBeNull();
+    expect(enumDefaultLiteral("play", null)).toBeNull();
+  });
+
+  test("non-string default → null", () => {
+    expect(enumDefaultLiteral(0, ["play"])).toBeNull();
+  });
+});
+
+describe("wireExpr", () => {
+  test("passthrough for plain types", () => {
+    expect(wireExpr("String", "name", false)).toBe("name");
+    expect(wireExpr("Int", "limit", false)).toBe("limit");
+  });
+
+  test("Date → ISO8601 format call", () => {
+    expect(wireExpr("Date", "startDate", false)).toBe(
+      "ISO8601DateFormatter().string(from: startDate)",
+    );
+  });
+
+  test("enum → .rawValue regardless of underlying type name", () => {
+    expect(wireExpr("PlaybackControlActionOption", "action", true)).toBe("action.rawValue");
+    // isEnum takes precedence over the Date branch (won't happen in practice,
+    // but locks the priority)
+    expect(wireExpr("Date", "v", true)).toBe("v.rawValue");
+  });
+});
+
+describe("isNullableUnion / nonNullType", () => {
+  test("detects type: [X, null] union", () => {
+    expect(isNullableUnion({ type: ["string", "null"] })).toBe(true);
+    expect(isNullableUnion({ type: ["null", "string"] })).toBe(true);
+    expect(isNullableUnion({ type: ["integer", "null"] })).toBe(true);
+  });
+
+  test("plain types are not unions", () => {
+    expect(isNullableUnion({ type: "string" })).toBe(false);
+    expect(isNullableUnion({ type: "integer" })).toBe(false);
+  });
+
+  test("3-way or non-null unions don't count (out of scope)", () => {
+    expect(isNullableUnion({ type: ["string", "integer"] })).toBe(false);
+    expect(isNullableUnion({ type: ["string", "null", "integer"] })).toBe(false);
+  });
+
+  test("nonNullType extracts the non-null member", () => {
+    expect(nonNullType({ type: ["string", "null"] })).toBe("string");
+    expect(nonNullType({ type: ["null", "integer"] })).toBe("integer");
+  });
+
+  test("nonNullType on non-union returns null", () => {
+    expect(nonNullType({ type: "string" })).toBeNull();
+    expect(nonNullType({})).toBeNull();
+  });
+});
+
+describe("outputTypeNameFor / snippetViewNameFor", () => {
+  test("output struct uses MCP prefix + Output suffix", () => {
+    expect(outputTypeNameFor({ name: "list_events" })).toBe("MCPListEventsOutput");
+    expect(outputTypeNameFor({ name: "get_current_weather" })).toBe("MCPGetCurrentWeatherOutput");
+  });
+
+  test("snippet view uses MCP prefix + SnippetView suffix", () => {
+    expect(snippetViewNameFor({ name: "list_events" })).toBe("MCPListEventsSnippetView");
+    expect(snippetViewNameFor({ name: "audit_summary" })).toBe("MCPAuditSummarySnippetView");
+  });
+
+  test("prefixes avoid EventKit collisions (the motivating case)", () => {
+    // AirMCPKit's EventKitService.swift declares plain TodayEventsOutput.
+    // Generated type must not collide.
+    expect(outputTypeNameFor({ name: "today_events" })).toBe("MCPTodayEventsOutput");
+    expect(outputTypeNameFor({ name: "today_events" })).not.toBe("TodayEventsOutput");
+  });
+});
+
+describe("detectSnippetShape", () => {
+  test("list-object when single array property has object items with id", () => {
+    const shape = detectSnippetShape({
+      properties: {
+        events: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              summary: { type: "string" },
+              startDate: { type: "string" },
+            },
+          },
+        },
+      },
+    });
+    expect(shape.shape).toBe("list-object");
+    expect(shape.arrayField).toBe("events");
+    expect(shape.primaryField).toBe("summary"); // first non-id string
+    expect(shape.hasId).toBe(true);
+    expect(shape.primaryFieldOptional).toBe(false);
+  });
+
+  test("primaryField prefers non-id even when id is first", () => {
+    const shape = detectSnippetShape({
+      properties: {
+        items: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: { id: { type: "string" }, name: { type: "string" } },
+          },
+        },
+      },
+    });
+    expect(shape.primaryField).toBe("name");
+  });
+
+  test("nullable-union string fields are valid primaryField candidates", () => {
+    const shape = detectSnippetShape({
+      properties: {
+        chats: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              name: { type: ["string", "null"] },
+            },
+          },
+        },
+      },
+    });
+    expect(shape.primaryField).toBe("name");
+    expect(shape.primaryFieldOptional).toBe(true);
+  });
+
+  test("list-string when single array of strings", () => {
+    const shape = detectSnippetShape({
+      properties: { tags: { type: "array", items: { type: "string" } } },
+    });
+    expect(shape.shape).toBe("list-string");
+    expect(shape.arrayField).toBe("tags");
+  });
+
+  test("scalar when multiple top-level fields", () => {
+    const shape = detectSnippetShape({
+      properties: {
+        temperature: { type: "number" },
+        humidity: { type: "number" },
+      },
+    });
+    expect(shape.shape).toBe("scalar");
+  });
+
+  test("scalar when no array properties", () => {
+    const shape = detectSnippetShape({
+      properties: { value: { type: "string" } },
+    });
+    expect(shape.shape).toBe("scalar");
+  });
+
+  test("scalar when two array properties (multi-array fallthrough)", () => {
+    const shape = detectSnippetShape({
+      properties: {
+        events: { type: "array", items: { type: "object", properties: {} } },
+        reminders: { type: "array", items: { type: "object", properties: {} } },
+      },
+    });
+    expect(shape.shape).toBe("scalar");
+  });
+
+  test("list-object without id field still lands on list-object but hasId false", () => {
+    const shape = detectSnippetShape({
+      properties: {
+        rows: {
+          type: "array",
+          items: { type: "object", properties: { label: { type: "string" } } },
+        },
+      },
+    });
+    expect(shape.shape).toBe("list-object");
+    expect(shape.hasId).toBe(false);
+    expect(shape.primaryField).toBe("label");
+  });
+
+  test("undefined schema → scalar (defensive)", () => {
+    expect(detectSnippetShape(undefined).shape).toBe("scalar");
+    expect(detectSnippetShape(null).shape).toBe("scalar");
+    expect(detectSnippetShape({}).shape).toBe("scalar");
+  });
+});
+
+describe("systemImageFor", () => {
+  test("calendar tools → calendar symbol", () => {
+    expect(systemImageFor("list_events")).toBe("calendar");
+    expect(systemImageFor("today_events")).toBe("calendar");
+    expect(systemImageFor("search_events")).toBe("calendar");
+    expect(systemImageFor("get_upcoming_events")).toBe("calendar");
+  });
+
+  test("list_calendars gets the plus variant (specific before fuzzy)", () => {
+    expect(systemImageFor("list_calendars")).toBe("calendar.badge.plus");
+  });
+
+  test("notes / reminders / contacts mappings", () => {
+    expect(systemImageFor("read_notes")).toBe("note.text");
+    expect(systemImageFor("list_folders")).toBe("note.text");
+    expect(systemImageFor("list_reminders")).toBe("checklist");
+    expect(systemImageFor("list_reminder_lists")).toBe("checklist");
+    expect(systemImageFor("search_contacts")).toBe("person.crop.circle");
+  });
+
+  test("messages / chats / shortcuts / safari / weather / files", () => {
+    expect(systemImageFor("list_messages")).toBe("envelope");
+    expect(systemImageFor("list_chats")).toBe("message");
+    expect(systemImageFor("list_shortcuts")).toBe("square.stack.3d.up");
+    expect(systemImageFor("list_bookmarks")).toBe("safari");
+    expect(systemImageFor("get_current_weather")).toBe("cloud.sun");
+    expect(systemImageFor("recent_files")).toBe("folder");
+    expect(systemImageFor("summarize_context")).toBe("sparkles");
+  });
+
+  test("unknown tool → default catch-all SF Symbol", () => {
+    expect(systemImageFor("unknown_tool_name")).toBe("app.connected.to.app.below.fill");
+    expect(systemImageFor("")).toBe("app.connected.to.app.below.fill");
   });
 });

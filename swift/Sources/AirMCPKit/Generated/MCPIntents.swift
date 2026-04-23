@@ -3,7 +3,7 @@
 // Source: docs/tool-manifest.json
 // Generator: scripts/gen-swift-intents.mjs
 // RFC 0007 Phase A.2b.2 + A.4.1 — 229 auto-selected read-only
-// tools (54 with typed drift-guards + Interactive Snippet
+// tools (61 with typed drift-guards + Interactive Snippet
 // SwiftUI views) + 9 AppShortcutsProvider entries.
 // Run `npm run gen:intents` to refresh after tool metadata changes.
 // CI guards against drift via `npm run gen:intents:check`.
@@ -590,6 +590,31 @@ public struct MCPReadEventOutput: Codable, Sendable {
     public let attendees: [AttendeesItem]
 }
 
+// Output type for: read_message
+public struct MCPReadMessageOutput: Codable, Sendable {
+    public struct ToItem: Codable, Sendable {
+        public let name: String?
+        public let address: String?
+    }
+    public struct CcItem: Codable, Sendable {
+        public let name: String?
+        public let address: String?
+    }
+
+    public let id: String
+    public let subject: String
+    public let sender: String
+    public let to: [ToItem]
+    public let cc: [CcItem]
+    public let dateReceived: String
+    public let dateSent: String?
+    public let read: Bool
+    public let flagged: Bool
+    public let content: String
+    public let mailbox: String
+    public let account: String
+}
+
 // Output type for: read_note
 public struct MCPReadNoteOutput: Codable, Sendable {
     public let id: String
@@ -601,6 +626,14 @@ public struct MCPReadNoteOutput: Codable, Sendable {
     public let folder: String
     public let shared: Bool
     public let passwordProtected: Bool
+}
+
+// Output type for: read_page_content
+public struct MCPReadPageContentOutput: Codable, Sendable {
+    public let title: String
+    public let url: String
+    public let content: String
+    public let truncated: Bool
 }
 
 // Output type for: read_reminder
@@ -616,6 +649,36 @@ public struct MCPReadReminderOutput: Codable, Sendable {
     public let priority: Double
     public let flagged: Bool
     public let list: String
+}
+
+// Output type for: recent_files
+public struct MCPRecentFilesOutput: Codable, Sendable {
+    public struct FilesItem: Codable, Sendable {
+        public let path: String
+        public let name: String
+    }
+
+    public let total: Double
+    public let files: [FilesItem]
+}
+
+// Output type for: scan_notes
+public struct MCPScanNotesOutput: Codable, Sendable {
+    public struct NotesItem: Codable, Sendable {
+        public let id: String
+        public let name: String
+        public let folder: String
+        public let creationDate: String
+        public let modificationDate: String
+        public let preview: String
+        public let charCount: Double
+        public let shared: Bool
+    }
+
+    public let total: Double
+    public let offset: Double
+    public let returned: Double
+    public let notes: [NotesItem]
 }
 
 // Output type for: search_chats
@@ -668,6 +731,33 @@ public struct MCPSearchEventsOutput: Codable, Sendable {
     public let events: [EventsItem]
 }
 
+// Output type for: search_files
+public struct MCPSearchFilesOutput: Codable, Sendable {
+    public struct FilesItem: Codable, Sendable {
+        public let path: String
+        public let name: String
+        public let size: Double?
+        public let modificationDate: String?
+    }
+
+    public let total: Double
+    public let files: [FilesItem]
+}
+
+// Output type for: search_messages
+public struct MCPSearchMessagesOutput: Codable, Sendable {
+    public struct MessagesItem: Codable, Sendable {
+        public let id: String
+        public let subject: String
+        public let sender: String
+        public let dateReceived: String?
+        public let read: Bool
+    }
+
+    public let returned: Double
+    public let messages: [MessagesItem]
+}
+
 // Output type for: search_notes
 public struct MCPSearchNotesOutput: Codable, Sendable {
     public struct NotesItem: Codable, Sendable {
@@ -705,6 +795,19 @@ public struct MCPSearchRemindersOutput: Codable, Sendable {
 public struct MCPSearchShortcutsOutput: Codable, Sendable {
     public let total: Double
     public let shortcuts: [String]
+}
+
+// Output type for: search_tabs
+public struct MCPSearchTabsOutput: Codable, Sendable {
+    public struct TabsItem: Codable, Sendable {
+        public let windowIndex: Double
+        public let tabIndex: Double
+        public let title: String
+        public let url: String
+    }
+
+    public let returned: Double
+    public let tabs: [TabsItem]
 }
 
 // Output type for: set_clipboard
@@ -4919,6 +5022,16 @@ public struct ReadMessageIntent: AppIntent {
             tool: "read_message",
             args: ["id": id, "maxLength": maxLength]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "read_message", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPReadMessageOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPReadMessageSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -4975,6 +5088,16 @@ public struct ReadPageContentIntent: AppIntent {
             tool: "read_page_content",
             args: ["windowIndex": windowIndex, "tabIndex": tabIndex, "maxLength": maxLength]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "read_page_content", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPReadPageContentOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPReadPageContentSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -5031,6 +5154,16 @@ public struct RecentFilesIntent: AppIntent {
             tool: "recent_files",
             args: ["folder": folder, "days": days, "limit": limit]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "recent_files", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPRecentFilesOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPRecentFilesSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -5185,6 +5318,16 @@ public struct ScanNotesIntent: AppIntent {
             tool: "scan_notes",
             args: args
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "scan_notes", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPScanNotesOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPScanNotesSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -5316,6 +5459,16 @@ public struct SearchFilesIntent: AppIntent {
             tool: "search_files",
             args: ["query": query, "folder": folder, "limit": limit]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "search_files", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPSearchFilesOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPSearchFilesSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -5362,6 +5515,16 @@ public struct SearchMessagesIntent: AppIntent {
             tool: "search_messages",
             args: ["query": query, "mailbox": mailbox, "limit": limit]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "search_messages", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPSearchMessagesOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPSearchMessagesSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -5557,6 +5720,16 @@ public struct SearchTabsIntent: AppIntent {
             tool: "search_tabs",
             args: ["query": query]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "search_tabs", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPSearchTabsOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPSearchTabsSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -7807,6 +7980,102 @@ public struct MCPReadEventSnippetView: View {
     }
 }
 
+// Snippet view for: read_message  (shape: scalar)
+@available(macOS 26, iOS 26, *)
+public struct MCPReadMessageSnippetView: View {
+    public let data: MCPReadMessageOutput
+    public init(data: MCPReadMessageOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text("Id")
+                Spacer()
+                Text(data.id)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Subject")
+                Spacer()
+                Text(data.subject)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Sender")
+                Spacer()
+                Text(data.sender)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("To")
+                Spacer()
+                Text(String(describing: data.to))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Cc")
+                Spacer()
+                Text(String(describing: data.cc))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Date Received")
+                Spacer()
+                Text(data.dateReceived)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Date Sent")
+                Spacer()
+                Text((data.dateSent ?? "—"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Read")
+                Spacer()
+                Text((data.read ? "Yes" : "No"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Flagged")
+                Spacer()
+                Text((data.flagged ? "Yes" : "No"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Content")
+                Spacer()
+                Text(data.content)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Mailbox")
+                Spacer()
+                Text(data.mailbox)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Account")
+                Spacer()
+                Text(data.account)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+        }
+        .padding()
+    }
+}
+
 // Snippet view for: read_note  (shape: scalar)
 @available(macOS 26, iOS 26, *)
 public struct MCPReadNoteSnippetView: View {
@@ -7874,6 +8143,46 @@ public struct MCPReadNoteSnippetView: View {
                 Text("Password Protected")
                 Spacer()
                 Text((data.passwordProtected ? "Yes" : "No"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: read_page_content  (shape: scalar)
+@available(macOS 26, iOS 26, *)
+public struct MCPReadPageContentSnippetView: View {
+    public let data: MCPReadPageContentOutput
+    public init(data: MCPReadPageContentOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text("Title")
+                Spacer()
+                Text(data.title)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Url")
+                Spacer()
+                Text(data.url)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Content")
+                Spacer()
+                Text(data.content)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Truncated")
+                Spacer()
+                Text((data.truncated ? "Yes" : "No"))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -7971,6 +8280,40 @@ public struct MCPReadReminderSnippetView: View {
     }
 }
 
+// Snippet view for: recent_files  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPRecentFilesSnippetView: View {
+    public let data: MCPRecentFilesOutput
+    public init(data: MCPRecentFilesOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.files.enumerated()), id: \.offset) { _, row in
+                Text(row.path)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: scan_notes  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPScanNotesSnippetView: View {
+    public let data: MCPScanNotesOutput
+    public init(data: MCPScanNotesOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.notes.enumerated()), id: \.offset) { _, row in
+                Text(row.name)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
 // Snippet view for: search_chats  (shape: list-object)
 @available(macOS 26, iOS 26, *)
 public struct MCPSearchChatsSnippetView: View {
@@ -8031,6 +8374,40 @@ public struct MCPSearchEventsSnippetView: View {
     }
 }
 
+// Snippet view for: search_files  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPSearchFilesSnippetView: View {
+    public let data: MCPSearchFilesOutput
+    public init(data: MCPSearchFilesOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.files.enumerated()), id: \.offset) { _, row in
+                Text(row.path)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: search_messages  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPSearchMessagesSnippetView: View {
+    public let data: MCPSearchMessagesOutput
+    public init(data: MCPSearchMessagesOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.messages.enumerated()), id: \.offset) { _, row in
+                Text(row.subject)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
 // Snippet view for: search_notes  (shape: list-object)
 @available(macOS 26, iOS 26, *)
 public struct MCPSearchNotesSnippetView: View {
@@ -8080,6 +8457,23 @@ public struct MCPSearchShortcutsSnippetView: View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(Array(data.shortcuts.enumerated()), id: \.offset) { _, row in
                 Text(row)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: search_tabs  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPSearchTabsSnippetView: View {
+    public let data: MCPSearchTabsOutput
+    public init(data: MCPSearchTabsOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.tabs.enumerated()), id: \.offset) { _, row in
+                Text(row.title)
                     .font(.body)
                     .lineLimit(1)
             }

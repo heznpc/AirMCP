@@ -2,7 +2,7 @@ import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okStructured, okUntrusted, okUntrustedLinkedStructured, err, toolError } from "../shared/result.js";
+import { ok, okStructured, okUntrustedLinkedStructured, err, toolError } from "../shared/result.js";
 // Side-effect import: register the mail_unread poller with the shared registry
 // at module load time. The poller itself only starts when startPollers() is
 // invoked by the cross/event observer tool.
@@ -107,11 +107,25 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
           .default(5000)
           .describe("Max content length (default: 5000)"),
       },
+      outputSchema: {
+        id: z.string(),
+        subject: z.string(),
+        sender: z.string(),
+        to: z.array(z.object({ name: z.string().nullable(), address: z.string().nullable() })),
+        cc: z.array(z.object({ name: z.string().nullable(), address: z.string().nullable() })),
+        dateReceived: z.string(),
+        dateSent: z.string().nullable(),
+        read: z.boolean(),
+        flagged: z.boolean(),
+        content: z.string(),
+        mailbox: z.string(),
+        account: z.string(),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ id, maxLength }) => {
       try {
-        return okUntrusted(await runJxa(readMessageScript(id, maxLength)));
+        return okUntrustedLinkedStructured("read_mail", await runJxa(readMessageScript(id, maxLength)));
       } catch (e) {
         return toolError("read message", e);
       }
@@ -128,11 +142,23 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
         mailbox: z.string().max(500).optional().default("INBOX").describe("Mailbox to search (default: INBOX)"),
         limit: z.number().int().min(1).max(200).optional().default(30).describe("Max results (default: 30)"),
       },
+      outputSchema: {
+        returned: z.number(),
+        messages: z.array(
+          z.object({
+            id: z.string(),
+            subject: z.string(),
+            sender: z.string(),
+            dateReceived: z.string().nullable(),
+            read: z.boolean(),
+          }),
+        ),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ query, mailbox, limit }) => {
       try {
-        return okUntrusted(await runJxa(searchMessagesScript(query, mailbox, limit)));
+        return okUntrustedLinkedStructured("search_mail", await runJxa(searchMessagesScript(query, mailbox, limit)));
       } catch (e) {
         return toolError("search messages", e);
       }

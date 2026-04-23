@@ -8217,7 +8217,110 @@
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "sender": {
+            "type": "string"
+          },
+          "to": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "address": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "name",
+                "address"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "cc": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "address": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "name",
+                "address"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "dateReceived": {
+            "type": "string"
+          },
+          "dateSent": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "read": {
+            "type": "boolean"
+          },
+          "flagged": {
+            "type": "boolean"
+          },
+          "content": {
+            "type": "string"
+          },
+          "mailbox": {
+            "type": "string"
+          },
+          "account": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "subject",
+          "sender",
+          "to",
+          "cc",
+          "dateReceived",
+          "dateSent",
+          "read",
+          "flagged",
+          "content",
+          "mailbox",
+          "account"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
       "annotations": {
         "readOnlyHint": true,
         "destructiveHint": false,
@@ -8330,7 +8433,31 @@
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "title",
+          "url",
+          "content",
+          "truncated"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
       "annotations": {
         "readOnlyHint": true,
         "destructiveHint": false,
@@ -8459,7 +8586,39 @@
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path",
+                "name"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "total",
+          "files"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
       "annotations": {
         "readOnlyHint": true,
         "destructiveHint": false,
@@ -8872,7 +9031,71 @@
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number"
+          },
+          "offset": {
+            "type": "number"
+          },
+          "returned": {
+            "type": "number"
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "folder": {
+                  "type": "string"
+                },
+                "creationDate": {
+                  "type": "string"
+                },
+                "modificationDate": {
+                  "type": "string"
+                },
+                "preview": {
+                  "type": "string"
+                },
+                "charCount": {
+                  "type": "number"
+                },
+                "shared": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "folder",
+                "creationDate",
+                "modificationDate",
+                "preview",
+                "charCount",
+                "shared"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "total",
+          "offset",
+          "returned",
+          "notes"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
       "annotations": {
         "readOnlyHint": true,
         "destructiveHint": false,
@@ -9216,7 +9439,48 @@
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "size": {
+                  "type": "number"
+                },
+                "modificationDate": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "path",
+                "name"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "total",
+          "files"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
       "annotations": {
         "readOnlyHint": true,
         "destructiveHint": false,
@@ -9287,7 +9551,54 @@
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "returned": {
+            "type": "number"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "subject": {
+                  "type": "string"
+                },
+                "sender": {
+                  "type": "string"
+                },
+                "dateReceived": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "read": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "subject",
+                "sender",
+                "dateReceived",
+                "read"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "returned",
+          "messages"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
       "annotations": {
         "readOnlyHint": true,
         "destructiveHint": false,
@@ -9663,7 +9974,47 @@
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "returned": {
+            "type": "number"
+          },
+          "tabs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "windowIndex": {
+                  "type": "number"
+                },
+                "tabIndex": {
+                  "type": "number"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "windowIndex",
+                "tabIndex",
+                "title",
+                "url"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "returned",
+          "tabs"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
       "annotations": {
         "readOnlyHint": true,
         "destructiveHint": false,

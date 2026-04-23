@@ -2,7 +2,7 @@ import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okLinked, okUntrustedStructured, toolError } from "../shared/result.js";
+import { ok, okLinkedStructured, okStructured, okUntrustedStructured, toolError } from "../shared/result.js";
 import { zFilePath, resolveAndGuard } from "../shared/validate.js";
 import {
   searchFilesScript,
@@ -26,11 +26,26 @@ export function registerFinderTools(server: McpServer, _config: AirMcpConfig): v
         folder: zFilePath.optional().default("~").describe("Folder to search in (default: home)"),
         limit: z.number().int().min(1).max(200).optional().default(50).describe("Max results (default: 50)"),
       },
+      outputSchema: {
+        total: z.number(),
+        // Per-file `size` / `modificationDate` are optional because the
+        // script falls back to a {path, name}-only shape when the per-
+        // file stat() shells out fails (e.g. permission denied on a
+        // nested result).
+        files: z.array(
+          z.object({
+            path: z.string(),
+            name: z.string(),
+            size: z.number().optional(),
+            modificationDate: z.string().nullable().optional(),
+          }),
+        ),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ query, folder, limit }) => {
       try {
-        return okLinked("search_files", await runJxa(searchFilesScript(folder, query, limit)));
+        return okLinkedStructured("search_files", await runJxa(searchFilesScript(folder, query, limit)));
       } catch (e) {
         return toolError("search files", e);
       }
@@ -95,11 +110,20 @@ export function registerFinderTools(server: McpServer, _config: AirMcpConfig): v
         days: z.number().int().min(1).max(365).optional().default(7).describe("Modified within N days (default: 7)"),
         limit: z.number().int().min(1).max(200).optional().default(30).describe("Max results (default: 30)"),
       },
+      outputSchema: {
+        total: z.number(),
+        files: z.array(
+          z.object({
+            path: z.string(),
+            name: z.string(),
+          }),
+        ),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ folder, days, limit }) => {
       try {
-        return ok(await runJxa(recentFilesScript(folder, days, limit)));
+        return okStructured(await runJxa(recentFilesScript(folder, days, limit)));
       } catch (e) {
         return toolError("find recent files", e);
       }

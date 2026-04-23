@@ -70,11 +70,20 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
           .default(10000)
           .describe("Max content length (default: 10000)"),
       },
+      outputSchema: {
+        title: z.string(),
+        url: z.string(),
+        content: z.string(),
+        truncated: z.boolean(),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ windowIndex, tabIndex, maxLength }) => {
       try {
-        return okUntrusted(await runJxa(readPageContentScript(windowIndex, tabIndex, maxLength)));
+        return okUntrustedLinkedStructured(
+          "read_page_content",
+          await runJxa(readPageContentScript(windowIndex, tabIndex, maxLength)),
+        );
       } catch (e) {
         return toolError("read page", e);
       }
@@ -228,11 +237,22 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
       inputSchema: {
         query: z.string().max(500).describe("Search keyword to match against tab titles and URLs"),
       },
+      outputSchema: {
+        returned: z.number(),
+        tabs: z.array(
+          z.object({
+            windowIndex: z.number(),
+            tabIndex: z.number(),
+            title: z.string(),
+            url: z.string(),
+          }),
+        ),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ query }) => {
       try {
-        return okUntrusted(await runJxa(searchTabsScript(query)));
+        return okUntrustedLinkedStructured("search_tabs", await runJxa(searchTabsScript(query)));
       } catch (e) {
         return toolError("search tabs", e);
       }

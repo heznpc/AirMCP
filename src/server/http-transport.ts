@@ -11,8 +11,10 @@ import { LIMITS, TIMEOUT } from "../shared/constants.js";
 import { printBanner } from "../shared/banner.js";
 import { auditLog } from "../shared/audit.js";
 import { SERVER_ICON, WEBSITE_URL } from "../shared/icons.js";
+import { toolRegistry } from "../shared/tool-registry.js";
 import { createServer, type CreateServerOptions } from "./mcp-setup.js";
 import { registerShutdownHook } from "./shutdown.js";
+import { buildServerCard } from "./well-known-card.js";
 
 // ── Per-IP rate limiter (token bucket, no external dependency) ────────
 const RATE_WINDOW_MS = 60_000;
@@ -314,27 +316,34 @@ export async function startHttpServer(options: HttpServerOptions): Promise<void>
     });
   });
 
-  // MCP Server Card — spec 2025-11-25 .well-known discovery
-  const serverCard = {
-    name: NPM_PACKAGE_NAME,
-    version: pkg.version,
-    description: pkg.description,
-    websiteUrl: WEBSITE_URL,
-    icons: [SERVER_ICON],
-    transport: { type: "streamable-http" as const, url: "/mcp" },
-    capabilities: {
-      tools: { listChanged: true },
-      prompts: { listChanged: true },
-      resources: { listChanged: true },
-    },
-    ...(httpToken ? { authorization: { type: "bearer" as const } } : {}),
-    // Expose the declarative network policy so Managed Agents / discovery
-    // clients can reason about the exposure before they connect (RFC 0002).
-    network_policy: allowNetwork,
-    ...(allowedOrigins.size > 0 ? { allowed_origins: [...allowedOrigins] } : {}),
-    ...(allowNetwork === "unauthenticated" ? { security: "insecure" as const } : {}),
-  };
-  app.get("/.well-known/mcp.json", (_req, res) => res.json(serverCard));
+  // MCP Server Card — .well-known discovery for registry crawlers.
+  // Shape + rationale lives in well-known-card.ts; we capture the
+  // enabled-module list via closure so it reflects the live module
+  // selection once `createServer` runs (depends on config + OS gates).
+  let enabledModuleNames: string[] = [];
+  app.get("/.well-known/mcp.json", (_req, res) => {
+    res.json(
+      buildServerCard({
+        name: NPM_PACKAGE_NAME,
+        version: pkg.version,
+        description: pkg.description,
+        license: pkg.license,
+        homepage: pkg.homepage,
+        websiteUrl: WEBSITE_URL,
+        icon: SERVER_ICON,
+        httpToken,
+        allowNetwork,
+        allowedOrigins: [...allowedOrigins],
+        // Read tool inventory at request time so a hot-reload or a
+        // later `listChanged` notification doesn't leave the card stale.
+        tools: {
+          count: toolRegistry.getToolCount(),
+          names: toolRegistry.getToolNames(),
+        },
+        modules: enabledModuleNames,
+      }),
+    );
+  });
 
   // Request ID middleware for tracing
   app.use((req, res, next) => {
@@ -506,6 +515,10 @@ export async function startHttpServer(options: HttpServerOptions): Promise<void>
   } = await createServer(serverOptions);
   warmupCleanup();
   warmupServer.close?.();
+  // Publish the resolved enabled-module list into the .well-known
+  // card's closure so registry crawlers see what's actually loaded
+  // on this host (module enablement depends on config + OS gates).
+  enabledModuleNames = bi.modulesEnabled;
   const host = bindAll ? "0.0.0.0" : "127.0.0.1";
   const httpServer = app.listen(port, host, async () => {
     bi.transport = "http";

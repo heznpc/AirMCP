@@ -37,7 +37,7 @@ export interface CreateServerOptions {
   config: AirMcpConfig;
   hitlClient: HitlClient | null;
   osVersion: number;
-  pkg: { version: string; description?: string };
+  pkg: { version: string; description?: string; license?: string; homepage?: string };
 }
 
 export async function createServer(

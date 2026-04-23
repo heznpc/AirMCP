@@ -32,8 +32,18 @@ jest.unstable_mockModule('../dist/shared/audit.js', () => ({
 jest.unstable_mockModule('../dist/server/mcp-setup.js', () => ({
   createServer: jest.fn(async () => ({
     server: { connect: jest.fn(), close: jest.fn(), sendResourceListChanged: jest.fn() },
-    bannerInfo: { transport: 'http', version: '2.6.0' },
+    bannerInfo: { transport: 'http', version: '2.6.0', modulesEnabled: [] },
   })),
+}));
+// tool-registry's transitive deps (usage-tracker, audit) touch
+// PATHS + FS — not relevant to http-transport's surface tests, so
+// stub the only two methods the .well-known handler reads at request
+// time.
+jest.unstable_mockModule('../dist/shared/tool-registry.js', () => ({
+  toolRegistry: {
+    getToolCount: () => 0,
+    getToolNames: () => [],
+  },
 }));
 
 describe('HTTP transport module', () => {

@@ -1,11 +1,12 @@
 # RFC 0007 — MCP Tool ↔ App Intent Auto-Bridge (2-phase)
 
-- **Status**: Draft (amended 2026-04-23 · iOS 26.4.2 research pass)
+- **Status**: Draft (amended 2026-04-23 · iOS 26.4.2 research pass · axis-6 landed)
 - **Author**: heznpc + Claude
 - **Created**: 2026-04-23
 - **Target**: v2.13.0 (Phase A) · Apple-API-dependent (Phase B)
 - **Amendment history**:
   - 2026-04-23 — §R2 updated with confirmed `requestConfirmation(actionName:snippetIntent:)` API; §3.7 Interactive Snippets renderer added; rollout split into A.2a/A.2b/A.3 to match landed PRs #101-#103 and Interactive Snippets availability.
+  - 2026-04-23 (afternoon) — Axis 6 `AskAirMCPIntent` lands ahead of schedule: natural-language FoundationModels agent pinned as the first `AirMCPGeneratedShortcuts` entry on iOS 26+/macOS 26+ (gated by `#if canImport(FoundationModels) && compiler(>=6.3)`). Rollout row "Ax.6" added.
 - **Related**: [docs/ios-architecture.md §15.1](../ios-architecture.md), `app/Sources/AirMCPApp/AppIntents.swift`, `swift/Sources/AirMCPKit/`, `ios/Sources/AirMCPServer/`, RFC 0001 (error categories), RFC 0006 (Swift schema dump)
 
 ---
@@ -215,7 +216,9 @@ Phase B is a line of Xcode config, not a refactor.
 | A.0     | `scripts/dump-tool-manifest.mjs` + `scripts/gen-swift-intents.mjs` + `tool-manifest.json` codegen + CI drift check. **No Swift build change yet.**                                                                                                                                  | v2.13.0             |
 | A.1     | `MCPIntentRouter` + macOS route (execFile). **10 hand-picked read-only tools** (notes/calendar/reminders/contacts list+read). App builds + `swift test` passes.                                                                                                                     | v2.13.0             |
 | A.2a    | `MCPIntentRouter` handler-injection + macOS execFile handler + iOS in-process `MCPServer.callToolText` handler. Same 10 tools as A.1.                                                                                                                                               | v2.13.0             |
-| A.2b    | Broaden to all read-only eligible tools (~150 of 282). Typed `ReturnsValue<T>` from outputSchema codegen. AppShortcutsProvider top-10 (usage-based).                                                                                                                                | v2.14.0             |
+| A.2b.1  | Broaden to all read-only eligible tools (~154 of 282). Auto-filter + AppShortcutsProvider top-10.                                                                                                                                                                                   | v2.13.0 (PR #105)   |
+| A.2b.2  | Codable output structs as drift guards. `ReturnsValue<T>` deferred (AppIntent requires `_IntentValue`; AppEntity wrapper separate phase).                                                                                                                                           | v2.13.0 (PR #106)   |
+| Ax.6    | `AskAirMCPIntent` natural-language agent via `FoundationModelsBridge`. Pinned first in `AirMCPGeneratedShortcuts` on iOS 26+/macOS 26+.                                                                                                                                             | v2.13.0             |
 | A.3     | Destructive-tool support via iOS 26 `requestConfirmation(actionName:snippetIntent:)`. Codegen emits a confirmation-snippet branch for `destructiveHint: true` tools. **Write tools with `destructiveHint: false`** (~60) land in the same phase since they don't need confirmation. | v2.14.0             |
 | A.4     | **Write tools with `destructiveHint: true`** gated behind explicit config opt-in.                                                                                                                                                                                                   | v2.15.0             |
 | **B.1** | Inject `NSAppIntentsMCPExposure` (or whatever Apple ships) via `AIRMCP_EXPOSE_AS_MCP` build flag. **Triggered by Apple release note.**                                                                                                                                              | Apple-API-dependent |

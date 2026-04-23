@@ -4,7 +4,7 @@
 // Generator: scripts/gen-swift-intents.mjs
 // RFC 0007 Phase A.2b.2 — 154 auto-selected read-only tools
 // (50 with typed ReturnsValue<T> from outputSchema; the
-// rest stay on ReturnsValue<String>) + 10
+// rest stay on ReturnsValue<String>) + 9
 // AppShortcutsProvider entries (Apple's 10-entry cap).
 // Run `npm run gen:intents` to refresh after tool metadata changes.
 // CI guards against drift via `npm run gen:intents:check`.
@@ -4308,7 +4308,20 @@ public struct UiTraverseIntent: AppIntent {
 // MARK: - AppShortcutsProvider
 
 public struct AirMCPGeneratedShortcuts: AppShortcutsProvider {
-    public static var appShortcuts: [AppShortcut] {
+    @AppShortcutsBuilder public static var appShortcuts: [AppShortcut] {
+        #if canImport(FoundationModels) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            AppShortcut(
+                intent: AskAirMCPIntent(),
+                phrases: [
+                    "Ask \(.applicationName)",
+                    "Ask \(.applicationName) about my day",
+                ],
+                shortTitle: "Ask AirMCP",
+                systemImageName: "brain.head.profile"
+            )
+        }
+        #endif
         AppShortcut(
             intent: TodayEventsIntent(),
             phrases: [
@@ -4389,15 +4402,6 @@ public struct AirMCPGeneratedShortcuts: AppShortcutsProvider {
             ],
             shortTitle: "Summarize Context",
             systemImageName: "sparkles"
-        )
-        AppShortcut(
-            intent: RecentFilesIntent(),
-            phrases: [
-                "Recent Files in \(.applicationName)",
-                "recent files with \(.applicationName)",
-            ],
-            shortTitle: "Recent Files",
-            systemImageName: "folder"
         )
     }
 }

@@ -1,9 +1,9 @@
 # RFC 0001 — Error Categories & Tool Error Contract
 
-- **Status**: Draft
+- **Status**: Accepted — Foundation + Waves 0/1 shipped in v2.10.0; remaining module migration (Wave 2+) in progress
 - **Author**: 두콩 + Claude
 - **Created**: 2026-04-17
-- **Target**: v2.8.0
+- **Target**: v2.8.0 (foundation) · v2.12.0+ (remaining modules)
 - **Related**: `src/shared/result.ts`, `src/shared/jxa.ts`, `src/shared/swift.ts`, MCP SDK `outputSchema`
 
 ---

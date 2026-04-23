@@ -85,6 +85,20 @@ npm test           # Jest tests
 
 All four must pass — CI runs them automatically on every PR.
 
+Additional drift guards enforced by CI (run locally before touching docs or manifests):
+
+```bash
+npm run stats:check         # tool/module/prompt/resource counts vs README + manifests
+npm run gen:manifest:check  # docs/tool-manifest.json reflects current src/
+npm run gen:intents:check   # Generated/MCPIntents.swift matches manifest
+```
+
+Auto-fix the corresponding sources with `npm run stats:sync`, `npm run gen:manifest`, `npm run gen:intents`.
+
+### OAuth local development
+
+RFC 0005 OAuth 2.1 flow (HTTP mode with `with-oauth*` policy) needs an authorization server. `npm run dev:oauth` spins up a pinned Keycloak 26 devcontainer with a pre-seeded `airmcp` realm (user `dev/dev`, scopes `mcp:read`/`mcp:write`/`mcp:destructive`/`mcp:admin`). Follow the banner: export `AIRMCP_OAUTH_ISSUER` + `AIRMCP_OAUTH_AUDIENCE`, mint a token with the printed curl snippet, then call `/.well-known/oauth-protected-resource` to verify discovery. Legacy Bearer (`AIRMCP_HTTP_TOKEN`) remains the recommended path for everyday local dev.
+
 ### 4. Run QA Tests
 
 **Sequential QA (recommended)** — tests each module in isolation, one at a time. Starts a server with only one module enabled, runs its tools, kills the server, then moves to the next. Much lighter on system resources:

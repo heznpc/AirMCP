@@ -1,6 +1,6 @@
 # RFC 0005 — OAuth 2.1 + Resource Indicators (MCP 2025-06-18 spec)
 
-- **Status**: Draft
+- **Status**: Accepted — Steps 1 (discovery, [#138](https://github.com/heznpc/AirMCP/pull/138)) + 2 (JWT verifier + scope gate, [#139](https://github.com/heznpc/AirMCP/pull/139)) shipped in v2.11.0. Step 3 (browser PKCE guide) in progress; Steps 4-5 (`AIRMCP_HTTP_TOKEN` deprecation + removal) target v2.13.0 / v3.0.0.
 - **Author**: heznpc + Claude
 - **Created**: 2026-04-23
 - **Target**: v2.11.0

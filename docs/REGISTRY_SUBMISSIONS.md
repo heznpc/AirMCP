@@ -2,16 +2,17 @@
 
 Internal tracking doc for AirMCP's public-registry presence. Update the status column on every change; use the checklist to prepare a resubmission.
 
-## Status (as of 2026-04-23 — v2.10 shipping + iOS roadmap in flight)
+## Status (as of 2026-04-24 — v2.11.0 shipped · OAuth 2.1 + `.mcpb` + notarize live)
 
-| Registry                       | Status                                           | Last action                               | Next step                                                                                                                           |
-| ------------------------------ | ------------------------------------------------ | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| **Anthropic MCP Registry**     | Pending (submitted via Google Form, no response) | 2026-03-28                                | **Resubmit this week** with the v2.10 description below + cite `supermemoryai/apple-mcp` archival as the reference-slot opportunity |
-| **Smithery.ai**                | Listed (`airmcp`)                                | Manifest auto-tracked via `smithery.yaml` | Request featured placement — npm now has v2.10, the "only Apple-native production-grade MCP" angle is fresh                         |
-| **Glama**                      | Listed (`AirMCP`)                                | `glama.json` present                      | Verify icon + category render on the live detail page; ask for category "Apple / macOS" pin                                         |
-| **MCP Market (mcpmarket.com)** | Not submitted                                    | —                                         | **Submit this week** — see section below for the pitch                                                                              |
-| **Cline MCP Marketplace**      | Not submitted                                    | —                                         | Low priority — distribution overlap with the above three                                                                            |
-| **PulseMCP**                   | Auto-indexed (GitHub crawl)                      | Passive                                   | No action needed; listing follows the README metadata                                                                               |
+| Registry                       | Status                                           | Last action                               | Next step                                                                                                                                                                   |
+| ------------------------------ | ------------------------------------------------ | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Anthropic MCP Registry**     | Pending (submitted via Google Form, no response) | 2026-03-28                                | **Resubmit now** with the v2.11 description below — new differentiators: `.mcpb` one-click install, OAuth 2.1 + Resource Indicators, notarized macOS app, 229 AppIntents    |
+| **Smithery.ai**                | Listed (`airmcp`)                                | Manifest auto-tracked via `smithery.yaml` | Request featured placement — v2.11 adds `.mcpb` + OAuth so the "only Apple-native production-grade MCP" angle is stronger than at v2.10                                     |
+| **Glama**                      | Listed (`AirMCP`)                                | `glama.json` present                      | Verify icon + category render on the live detail page; ask for category "Apple / macOS" pin                                                                                 |
+| **MCP Market (mcpmarket.com)** | Not submitted                                    | —                                         | **Submit this week** — see section below for the pitch (v2.11 headline)                                                                                                     |
+| **Cline MCP Marketplace**      | Not submitted                                    | —                                         | Low priority — distribution overlap with the above three                                                                                                                    |
+| **PulseMCP**                   | Auto-indexed (GitHub crawl)                      | Passive                                   | No action needed; listing follows the README metadata                                                                                                                       |
+| **Claude Desktop Extensions directory** | `.mcpb` bundle built (v2.11)           | 2026-04-24                                | **Submit now** via Anthropic's review path — first Apple-native `.mcpb` submission opportunity                                                                              |
 
 ### 2026-04-23 research recap (use in every submission)
 
@@ -39,7 +40,7 @@ When the counts or headline features change, walk this list before you touch any
 
 - [ ] `npm run stats:sync` shows **no** remaining diffs (zero "sync:" lines)
 - [ ] `server.json` `version` matches `package.json` version
-- [ ] `server.json` `description` reflects current headline features (skills / memory / audit / allowNetwork for v2.10)
+- [ ] `server.json` `description` reflects current headline features (v2.11: `.mcpb` one-click, OAuth 2.1, notarized app, 229 AppIntents, skills, memory, audit, allowNetwork)
 - [ ] `README.md` Features block mirrors the description — catches the case where one was updated without the other
 - [ ] `docs/index.html` hero + `tryit_footer` counts match the registry description
 - [ ] `CHANGELOG.md` `[Unreleased]` block names every user-visible change since the last registry ping

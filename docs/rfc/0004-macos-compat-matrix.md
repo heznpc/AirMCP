@@ -1,6 +1,6 @@
 # RFC 0004 — macOS 호환성 매트릭스 & 모듈 Manifest 확장
 
-- **Status**: Draft
+- **Status**: Accepted — runtime activation (`resolveModuleCompatibility`, `print-compat-report`, `doctor` integration, Safari `add_bookmark` gated) shipped in v2.10.0
 - **Author**: 두콩 + Claude
 - **Created**: 2026-04-17
 - **Target**: v2.8.0

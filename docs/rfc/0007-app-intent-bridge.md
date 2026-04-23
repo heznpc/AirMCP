@@ -1,12 +1,13 @@
 # RFC 0007 — MCP Tool ↔ App Intent Auto-Bridge (2-phase)
 
-- **Status**: Draft (amended 2026-04-23 · iOS 26.4.2 research pass · axis-6 landed)
+- **Status**: Phase A Accepted (shipped in v2.10-v2.11 across PRs #101-#137). Phase B (stateful multi-step / Apple-API-dependent intents) deferred.
 - **Author**: heznpc + Claude
 - **Created**: 2026-04-23
-- **Target**: v2.13.0 (Phase A) · Apple-API-dependent (Phase B)
+- **Target**: v2.13.0 (Phase A — shipped ahead of target) · Apple-API-dependent (Phase B)
 - **Amendment history**:
   - 2026-04-23 — §R2 updated with confirmed `requestConfirmation(actionName:snippetIntent:)` API; §3.7 Interactive Snippets renderer added; rollout split into A.2a/A.2b/A.3 to match landed PRs #101-#103 and Interactive Snippets availability.
   - 2026-04-23 (afternoon) — Axis 6 `AskAirMCPIntent` lands ahead of schedule: natural-language FoundationModels agent pinned as the first `AirMCPGeneratedShortcuts` entry on iOS 26+/macOS 26+ (gated by `#if canImport(FoundationModels) && compiler(>=6.3)`). Rollout row "Ax.6" added.
+  - 2026-04-24 — Phase A closed. Final tally: 229 auto-generated AppIntents, 50 Interactive Snippet views, 17 AppEnum pickers, destructive HITL via `requestConfirmation`, follow-up taps for list tools, codegen helpers extracted to `scripts/lib/codegen-helpers.mjs` with 134 unit tests + golden-sample regression check.
 - **Related**: [docs/ios-architecture.md §15.1](../ios-architecture.md), `app/Sources/AirMCPApp/AppIntents.swift`, `swift/Sources/AirMCPKit/`, `ios/Sources/AirMCPServer/`, RFC 0001 (error categories), RFC 0006 (Swift schema dump)
 
 ---

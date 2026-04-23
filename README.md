@@ -29,34 +29,31 @@ MCP server for the entire Apple ecosystem — Notes, Reminders, Calendar, Contac
 - **One-click setup** — `setup_permissions` tool or menubar app to request all macOS permissions at once
 - **Dual transport** — stdio (default) + HTTP/SSE (`--http`) with token auth, origin allow-list, and startup invariants that refuse to boot misconfigured servers
 
-## Get Started (2 minutes)
+## Get Started
 
-### 1. Install Node.js
+Two paths. Claude Desktop users get one-click install via `.mcpb`. Everyone else uses the CLI wizard.
 
-If you don't have Node.js, install it first:
+### Option A — Claude Desktop one-click install (recommended for non-devs)
 
-```bash
-# Using Homebrew (recommended)
-brew install node
+1. Download `airmcp-<version>.mcpb` from [Releases](https://github.com/heznpc/AirMCP/releases).
+2. Drag it onto Claude Desktop, or **Settings → Extensions → Install from file…**.
+3. Fill in the config form (Gemini API key optional; modules toggle). Click Install.
 
-# Or download from https://nodejs.org (LTS version)
-```
+Full walkthrough: **[docs/mcpb.md](docs/mcpb.md)**.
 
-### 2. Run the Setup Wizard
+### Option B — CLI wizard (2 minutes)
+
+**1. Install Node.js** — `brew install node` or [nodejs.org](https://nodejs.org).
+
+**2. Run the Setup Wizard**:
 
 ```bash
 npx airmcp init
 ```
 
-This will:
+Picks the modules to enable, writes the MCP-client config, saves preferences to `~/.config/airmcp/config.json`.
 
-- Let you choose which Apple apps to connect (Notes, Calendar, Reminders, etc.)
-- Automatically configure your MCP client
-- Save your preferences to `~/.config/airmcp/config.json`
-
-### 3. Restart Your MCP Client
-
-That's it! Your AI can now read your notes, manage reminders, check your calendar, and more.
+**3. Restart your MCP client.** Your AI can now read notes, manage reminders, check your calendar, and more.
 
 ### Troubleshooting
 
@@ -343,7 +340,7 @@ npx airmcp --http --bind-all --port 3847
 curl http://127.0.0.1:3847/.well-known/mcp.json
 ```
 
-The response includes `"network_policy": "with-token+origin"` so the client can confirm what it's connecting to before a single tool call.
+The response includes `"network_policy": "with-token+origin"` so the client can confirm what it's connecting to before a single tool call. Registry crawlers (Anthropic MCP Registry, Smithery, PulseMCP, Glama) use the same endpoint to build their catalog without connecting live — it carries the full tool inventory (`tools.count`, `tools.names`), enabled modules, license, and homepage, so a crawler can surface "AirMCP: 270+ tools across calendar, notes, mail, …" without opening a session. MCP spec version pinned via `schema_version: "2025-11-25"`.
 
 Running AirMCP on a laptop that suspends? Put the menubar app on your Mac Mini / always-on host, point the browser at that hostname, and leave the token in Chrome's secure storage. Revoke by rotating `AIRMCP_HTTP_TOKEN` and restarting the server.
 

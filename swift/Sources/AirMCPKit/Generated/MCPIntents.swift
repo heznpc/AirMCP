@@ -2,10 +2,9 @@
 //
 // Source: docs/tool-manifest.json
 // Generator: scripts/gen-swift-intents.mjs
-// RFC 0007 Phase A.2b.2 — 154 auto-selected read-only tools
-// (50 with typed ReturnsValue<T> from outputSchema; the
-// rest stay on ReturnsValue<String>) + 9
-// AppShortcutsProvider entries (Apple's 10-entry cap).
+// RFC 0007 Phase A.2b.2 + A.4.1 — 154 auto-selected read-only
+// tools (50 with typed drift-guards + Interactive Snippet
+// SwiftUI views) + 9 AppShortcutsProvider entries.
 // Run `npm run gen:intents` to refresh after tool metadata changes.
 // CI guards against drift via `npm run gen:intents:check`.
 //
@@ -13,6 +12,11 @@
 // iOS in-process MCPServer.callToolText. Every generated intent's
 // `perform()` hits that router. Typed intents additionally decode the
 // router's String result through JSONDecoder.
+//
+// Snippet views (§3.7) are SwiftUI View structs matching each typed
+// output shape. A.4.1 ships the views; A.4.2 will plug them into the
+// intents' `.result(value:, view:)` overloads. Kept in a separate
+// #if so iOS 17 builds stay green.
 
 #if canImport(AppIntents)
 import AppIntents
@@ -4403,6 +4407,868 @@ public struct AirMCPGeneratedShortcuts: AppShortcutsProvider {
             shortTitle: "Summarize Context",
             systemImageName: "sparkles"
         )
+    }
+}
+
+#endif
+
+// MARK: - Interactive Snippet views (RFC 0007 §3.7, A.4.1)
+
+#if canImport(SwiftUI) && canImport(AppIntents) && compiler(>=6.3)
+import SwiftUI
+
+// Snippet view for: ai_plan_metrics  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPAiPlanMetricsSnippetView: View {
+    public let data: MCPAiPlanMetricsOutput
+    public init(data: MCPAiPlanMetricsOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.perCase.enumerated()), id: \.offset) { _, row in
+                Text(row.name)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: audit_summary  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPAuditSummarySnippetView: View {
+    public let data: MCPAuditSummaryOutput
+    public init(data: MCPAuditSummaryOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.topTools.enumerated()), id: \.offset) { _, row in
+                Text(row.tool)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: discover_tools  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPDiscoverToolsSnippetView: View {
+    public let data: MCPDiscoverToolsOutput
+    public init(data: MCPDiscoverToolsOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.matches.enumerated()), id: \.offset) { _, row in
+                Text(row.name)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: get_clipboard  (shape: scalar)
+@available(macOS 26, iOS 26, *)
+public struct MCPGetClipboardSnippetView: View {
+    public let data: MCPGetClipboardOutput
+    public init(data: MCPGetClipboardOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack { Text("content"); Spacer(); Text(String(describing: data.content)) }
+            HStack { Text("length"); Spacer(); Text(String(describing: data.length)) }
+            HStack { Text("truncated"); Spacer(); Text(String(describing: data.truncated)) }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: get_current_tab  (shape: scalar)
+@available(macOS 26, iOS 26, *)
+public struct MCPGetCurrentTabSnippetView: View {
+    public let data: MCPGetCurrentTabOutput
+    public init(data: MCPGetCurrentTabOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack { Text("title"); Spacer(); Text(String(describing: data.title)) }
+            HStack { Text("url"); Spacer(); Text(String(describing: data.url)) }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: get_current_weather  (shape: scalar)
+@available(macOS 26, iOS 26, *)
+public struct MCPGetCurrentWeatherSnippetView: View {
+    public let data: MCPGetCurrentWeatherOutput
+    public init(data: MCPGetCurrentWeatherOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack { Text("temperature"); Spacer(); Text(String(describing: data.temperature)) }
+            HStack { Text("feelsLike"); Spacer(); Text(String(describing: data.feelsLike)) }
+            HStack { Text("humidity"); Spacer(); Text(String(describing: data.humidity)) }
+            HStack { Text("weatherCode"); Spacer(); Text(String(describing: data.weatherCode)) }
+            HStack { Text("weatherDescription"); Spacer(); Text(String(describing: data.weatherDescription)) }
+            HStack { Text("windSpeed"); Spacer(); Text(String(describing: data.windSpeed)) }
+            HStack { Text("windDirection"); Spacer(); Text(String(describing: data.windDirection)) }
+            HStack { Text("precipitation"); Spacer(); Text(String(describing: data.precipitation)) }
+            HStack { Text("cloudCover"); Spacer(); Text(String(describing: data.cloudCover)) }
+            HStack { Text("units"); Spacer(); Text(String(describing: data.units)) }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: get_file_info  (shape: list-string)
+@available(macOS 26, iOS 26, *)
+public struct MCPGetFileInfoSnippetView: View {
+    public let data: MCPGetFileInfoOutput
+    public init(data: MCPGetFileInfoOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.tags.enumerated()), id: \.offset) { _, row in
+                Text(row)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: get_frontmost_app  (shape: scalar)
+@available(macOS 26, iOS 26, *)
+public struct MCPGetFrontmostAppSnippetView: View {
+    public let data: MCPGetFrontmostAppOutput
+    public init(data: MCPGetFrontmostAppOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack { Text("name"); Spacer(); Text(String(describing: data.name)) }
+            HStack { Text("bundleIdentifier"); Spacer(); Text(String(describing: data.bundleIdentifier)) }
+            HStack { Text("pid"); Spacer(); Text(String(describing: data.pid)) }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: get_shortcut_detail  (shape: scalar)
+@available(macOS 26, iOS 26, *)
+public struct MCPGetShortcutDetailSnippetView: View {
+    public let data: MCPGetShortcutDetailOutput
+    public init(data: MCPGetShortcutDetailOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack { Text("shortcut"); Spacer(); Text(String(describing: data.shortcut)) }
+            HStack { Text("detail"); Spacer(); Text(String(describing: data.detail)) }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: get_unread_count  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPGetUnreadCountSnippetView: View {
+    public let data: MCPGetUnreadCountOutput
+    public init(data: MCPGetUnreadCountOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.mailboxes.enumerated()), id: \.offset) { _, row in
+                Text(row.account)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: get_upcoming_events  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPGetUpcomingEventsSnippetView: View {
+    public let data: MCPGetUpcomingEventsOutput
+    public init(data: MCPGetUpcomingEventsOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.events.enumerated()), id: \.offset) { _, row in
+                Text(row.id)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: get_volume  (shape: scalar)
+@available(macOS 26, iOS 26, *)
+public struct MCPGetVolumeSnippetView: View {
+    public let data: MCPGetVolumeOutput
+    public init(data: MCPGetVolumeOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack { Text("outputVolume"); Spacer(); Text(String(describing: data.outputVolume)) }
+            HStack { Text("inputVolume"); Spacer(); Text(String(describing: data.inputVolume)) }
+            HStack { Text("outputMuted"); Spacer(); Text(String(describing: data.outputMuted)) }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: list_accounts  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPListAccountsSnippetView: View {
+    public let data: MCPListAccountsOutput
+    public init(data: MCPListAccountsOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.accounts.enumerated()), id: \.offset) { _, row in
+                Text(row.name)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: list_bookmarks  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPListBookmarksSnippetView: View {
+    public let data: MCPListBookmarksOutput
+    public init(data: MCPListBookmarksOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.bookmarks.enumerated()), id: \.offset) { _, row in
+                Text(row.title)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: list_calendars  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPListCalendarsSnippetView: View {
+    public let data: MCPListCalendarsOutput
+    public init(data: MCPListCalendarsOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.calendars.enumerated()), id: \.offset) { _, row in
+                Text(row.id)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: list_chats  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPListChatsSnippetView: View {
+    public let data: MCPListChatsOutput
+    public init(data: MCPListChatsOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.chats.enumerated()), id: \.offset) { _, row in
+                Text(row.id)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: list_contacts  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPListContactsSnippetView: View {
+    public let data: MCPListContactsOutput
+    public init(data: MCPListContactsOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.contacts.enumerated()), id: \.offset) { _, row in
+                Text(row.id)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: list_directory  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPListDirectorySnippetView: View {
+    public let data: MCPListDirectoryOutput
+    public init(data: MCPListDirectoryOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.items.enumerated()), id: \.offset) { _, row in
+                Text(row.name)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: list_events  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPListEventsSnippetView: View {
+    public let data: MCPListEventsOutput
+    public init(data: MCPListEventsOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.events.enumerated()), id: \.offset) { _, row in
+                Text(row.id)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: list_folders  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPListFoldersSnippetView: View {
+    public let data: MCPListFoldersOutput
+    public init(data: MCPListFoldersOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.folders.enumerated()), id: \.offset) { _, row in
+                Text(row.id)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: list_group_members  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPListGroupMembersSnippetView: View {
+    public let data: MCPListGroupMembersOutput
+    public init(data: MCPListGroupMembersOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.contacts.enumerated()), id: \.offset) { _, row in
+                Text(row.id)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: list_groups  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPListGroupsSnippetView: View {
+    public let data: MCPListGroupsOutput
+    public init(data: MCPListGroupsOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.groups.enumerated()), id: \.offset) { _, row in
+                Text(row.id)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: list_mailboxes  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPListMailboxesSnippetView: View {
+    public let data: MCPListMailboxesOutput
+    public init(data: MCPListMailboxesOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.mailboxes.enumerated()), id: \.offset) { _, row in
+                Text(row.name)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: list_messages  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPListMessagesSnippetView: View {
+    public let data: MCPListMessagesOutput
+    public init(data: MCPListMessagesOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.messages.enumerated()), id: \.offset) { _, row in
+                Text(row.id)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: list_notes  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPListNotesSnippetView: View {
+    public let data: MCPListNotesOutput
+    public init(data: MCPListNotesOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.notes.enumerated()), id: \.offset) { _, row in
+                Text(row.id)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: list_participants  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPListParticipantsSnippetView: View {
+    public let data: MCPListParticipantsOutput
+    public init(data: MCPListParticipantsOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.participants.enumerated()), id: \.offset) { _, row in
+                Text("(row)")
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: list_playlists  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPListPlaylistsSnippetView: View {
+    public let data: MCPListPlaylistsOutput
+    public init(data: MCPListPlaylistsOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.playlists.enumerated()), id: \.offset) { _, row in
+                Text(row.id)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: list_reading_list  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPListReadingListSnippetView: View {
+    public let data: MCPListReadingListOutput
+    public init(data: MCPListReadingListOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.items.enumerated()), id: \.offset) { _, row in
+                Text(row.title)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: list_reminder_lists  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPListReminderListsSnippetView: View {
+    public let data: MCPListReminderListsOutput
+    public init(data: MCPListReminderListsOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.lists.enumerated()), id: \.offset) { _, row in
+                Text(row.id)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: list_reminders  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPListRemindersSnippetView: View {
+    public let data: MCPListRemindersOutput
+    public init(data: MCPListRemindersOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.reminders.enumerated()), id: \.offset) { _, row in
+                Text(row.id)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: list_shortcuts  (shape: list-string)
+@available(macOS 26, iOS 26, *)
+public struct MCPListShortcutsSnippetView: View {
+    public let data: MCPListShortcutsOutput
+    public init(data: MCPListShortcutsOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.shortcuts.enumerated()), id: \.offset) { _, row in
+                Text(row)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: list_tabs  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPListTabsSnippetView: View {
+    public let data: MCPListTabsOutput
+    public init(data: MCPListTabsOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.tabs.enumerated()), id: \.offset) { _, row in
+                Text(row.title)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: list_tracks  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPListTracksSnippetView: View {
+    public let data: MCPListTracksOutput
+    public init(data: MCPListTracksOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.tracks.enumerated()), id: \.offset) { _, row in
+                Text(row.id)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: memory_query  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPMemoryQuerySnippetView: View {
+    public let data: MCPMemoryQueryOutput
+    public init(data: MCPMemoryQueryOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.entries.enumerated()), id: \.offset) { _, row in
+                Text(row.id)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: memory_stats  (shape: scalar)
+@available(macOS 26, iOS 26, *)
+public struct MCPMemoryStatsSnippetView: View {
+    public let data: MCPMemoryStatsOutput
+    public init(data: MCPMemoryStatsOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack { Text("total"); Spacer(); Text(String(describing: data.total)) }
+            HStack { Text("byKind"); Spacer(); Text(String(describing: data.byKind)) }
+            HStack { Text("oldest"); Spacer(); Text(String(describing: data.oldest)) }
+            HStack { Text("newest"); Spacer(); Text(String(describing: data.newest)) }
+            HStack { Text("expiredSwept"); Spacer(); Text(String(describing: data.expiredSwept)) }
+            HStack { Text("path"); Spacer(); Text(String(describing: data.path)) }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: now_playing  (shape: scalar)
+@available(macOS 26, iOS 26, *)
+public struct MCPNowPlayingSnippetView: View {
+    public let data: MCPNowPlayingOutput
+    public init(data: MCPNowPlayingOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack { Text("playerState"); Spacer(); Text(String(describing: data.playerState)) }
+            HStack { Text("track"); Spacer(); Text(String(describing: data.track)) }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: proactive_context  (shape: scalar)
+@available(macOS 26, iOS 26, *)
+public struct MCPProactiveContextSnippetView: View {
+    public let data: MCPProactiveContextOutput
+    public init(data: MCPProactiveContextOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack { Text("timeContext"); Spacer(); Text(String(describing: data.timeContext)) }
+            HStack { Text("suggestedTools"); Spacer(); Text(String(describing: data.suggestedTools)) }
+            HStack { Text("suggestedWorkflows"); Spacer(); Text(String(describing: data.suggestedWorkflows)) }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: read_chat  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPReadChatSnippetView: View {
+    public let data: MCPReadChatOutput
+    public init(data: MCPReadChatOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.participants.enumerated()), id: \.offset) { _, row in
+                Text("(row)")
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: read_contact  (shape: scalar)
+@available(macOS 26, iOS 26, *)
+public struct MCPReadContactSnippetView: View {
+    public let data: MCPReadContactOutput
+    public init(data: MCPReadContactOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack { Text("id"); Spacer(); Text(String(describing: data.id)) }
+            HStack { Text("name"); Spacer(); Text(String(describing: data.name)) }
+            HStack { Text("firstName"); Spacer(); Text(String(describing: data.firstName)) }
+            HStack { Text("lastName"); Spacer(); Text(String(describing: data.lastName)) }
+            HStack { Text("organization"); Spacer(); Text(String(describing: data.organization)) }
+            HStack { Text("jobTitle"); Spacer(); Text(String(describing: data.jobTitle)) }
+            HStack { Text("department"); Spacer(); Text(String(describing: data.department)) }
+            HStack { Text("note"); Spacer(); Text(String(describing: data.note)) }
+            HStack { Text("emails"); Spacer(); Text(String(describing: data.emails)) }
+            HStack { Text("phones"); Spacer(); Text(String(describing: data.phones)) }
+            HStack { Text("addresses"); Spacer(); Text(String(describing: data.addresses)) }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: read_event  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPReadEventSnippetView: View {
+    public let data: MCPReadEventOutput
+    public init(data: MCPReadEventOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.attendees.enumerated()), id: \.offset) { _, row in
+                Text("(row)")
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: read_note  (shape: scalar)
+@available(macOS 26, iOS 26, *)
+public struct MCPReadNoteSnippetView: View {
+    public let data: MCPReadNoteOutput
+    public init(data: MCPReadNoteOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack { Text("id"); Spacer(); Text(String(describing: data.id)) }
+            HStack { Text("name"); Spacer(); Text(String(describing: data.name)) }
+            HStack { Text("body"); Spacer(); Text(String(describing: data.body)) }
+            HStack { Text("plaintext"); Spacer(); Text(String(describing: data.plaintext)) }
+            HStack { Text("creationDate"); Spacer(); Text(String(describing: data.creationDate)) }
+            HStack { Text("modificationDate"); Spacer(); Text(String(describing: data.modificationDate)) }
+            HStack { Text("folder"); Spacer(); Text(String(describing: data.folder)) }
+            HStack { Text("shared"); Spacer(); Text(String(describing: data.shared)) }
+            HStack { Text("passwordProtected"); Spacer(); Text(String(describing: data.passwordProtected)) }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: read_reminder  (shape: scalar)
+@available(macOS 26, iOS 26, *)
+public struct MCPReadReminderSnippetView: View {
+    public let data: MCPReadReminderOutput
+    public init(data: MCPReadReminderOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack { Text("id"); Spacer(); Text(String(describing: data.id)) }
+            HStack { Text("name"); Spacer(); Text(String(describing: data.name)) }
+            HStack { Text("body"); Spacer(); Text(String(describing: data.body)) }
+            HStack { Text("completed"); Spacer(); Text(String(describing: data.completed)) }
+            HStack { Text("completionDate"); Spacer(); Text(String(describing: data.completionDate)) }
+            HStack { Text("creationDate"); Spacer(); Text(String(describing: data.creationDate)) }
+            HStack { Text("modificationDate"); Spacer(); Text(String(describing: data.modificationDate)) }
+            HStack { Text("dueDate"); Spacer(); Text(String(describing: data.dueDate)) }
+            HStack { Text("priority"); Spacer(); Text(String(describing: data.priority)) }
+            HStack { Text("flagged"); Spacer(); Text(String(describing: data.flagged)) }
+            HStack { Text("list"); Spacer(); Text(String(describing: data.list)) }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: search_chats  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPSearchChatsSnippetView: View {
+    public let data: MCPSearchChatsOutput
+    public init(data: MCPSearchChatsOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.chats.enumerated()), id: \.offset) { _, row in
+                Text(row.id)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: search_contacts  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPSearchContactsSnippetView: View {
+    public let data: MCPSearchContactsOutput
+    public init(data: MCPSearchContactsOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.contacts.enumerated()), id: \.offset) { _, row in
+                Text(row.id)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: search_events  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPSearchEventsSnippetView: View {
+    public let data: MCPSearchEventsOutput
+    public init(data: MCPSearchEventsOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.events.enumerated()), id: \.offset) { _, row in
+                Text(row.id)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: search_notes  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPSearchNotesSnippetView: View {
+    public let data: MCPSearchNotesOutput
+    public init(data: MCPSearchNotesOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.notes.enumerated()), id: \.offset) { _, row in
+                Text(row.id)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: search_reminders  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPSearchRemindersSnippetView: View {
+    public let data: MCPSearchRemindersOutput
+    public init(data: MCPSearchRemindersOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.reminders.enumerated()), id: \.offset) { _, row in
+                Text(row.id)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: search_shortcuts  (shape: list-string)
+@available(macOS 26, iOS 26, *)
+public struct MCPSearchShortcutsSnippetView: View {
+    public let data: MCPSearchShortcutsOutput
+    public init(data: MCPSearchShortcutsOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.shortcuts.enumerated()), id: \.offset) { _, row in
+                Text(row)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: suggest_next_tools  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPSuggestNextToolsSnippetView: View {
+    public let data: MCPSuggestNextToolsOutput
+    public init(data: MCPSuggestNextToolsOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.suggestions.enumerated()), id: \.offset) { _, row in
+                Text(row.tool)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: today_events  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPTodayEventsSnippetView: View {
+    public let data: MCPTodayEventsOutput
+    public init(data: MCPTodayEventsOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.events.enumerated()), id: \.offset) { _, row in
+                Text(row.id)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
     }
 }
 

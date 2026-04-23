@@ -600,6 +600,98 @@ ${toolEntries.join("\n")}
 }`;
 }
 
+// ── outputSchema → Interactive Snippet SwiftUI view (A.4.1) ──────────
+//
+// RFC 0007 §3.7 renderer. Produces a small SwiftUI view per codable-safe
+// tool so Interactive Snippets (iOS 26+ / macOS 26+) can display the
+// tool's result inline in Shortcuts / Spotlight / Siri.
+//
+// A.4.1 scope: view struct only. Wiring the view into each AppIntent's
+// `perform()` result (the `.result(value:, view:)` overload) lands in
+// A.4.2 so this PR can't regress the iOS 17-compatible baseline.
+//
+// Shape detection
+//   list-object: outputSchema has exactly one `type: array` property
+//     whose items are `type: object`. Rendered as a ForEach over the
+//     array, each row showing the first string-typed field of the item.
+//   list-string: same but items are `type: string`. Rendered ForEach
+//     with the raw string.
+//   scalar: everything else. Rendered as a VStack of key-value rows.
+//
+// All views gated on `canImport(SwiftUI) && canImport(AppIntents) &&
+// compiler(>=6.3)` + `@available(macOS 26, iOS 26, *)`.
+
+function detectSnippetShape(schema) {
+  const props = schema.properties ?? {};
+  const keys = Object.keys(props);
+  const arrayKeys = keys.filter((k) => props[k].type === "array");
+  if (arrayKeys.length === 1) {
+    const arrayKey = arrayKeys[0];
+    const items = props[arrayKey].items ?? {};
+    if (items.type === "object") {
+      const firstString = Object.keys(items.properties ?? {}).find((k) => items.properties[k].type === "string");
+      return { shape: "list-object", arrayField: arrayKey, primaryField: firstString ?? null };
+    }
+    if (items.type === "string") {
+      return { shape: "list-string", arrayField: arrayKey };
+    }
+  }
+  return { shape: "scalar" };
+}
+
+function snippetViewNameFor(tool) {
+  return `MCP${toPascalCase(tool.name)}SnippetView`;
+}
+
+function renderSnippetView(tool) {
+  const viewName = snippetViewNameFor(tool);
+  const outputType = outputTypeNameFor(tool);
+  const info = detectSnippetShape(tool.outputSchema);
+
+  let body;
+  if (info.shape === "list-object") {
+    const primaryAccess = info.primaryField ? `row.${swiftIdent(info.primaryField)}` : `"(row)"`;
+    body = `        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.${swiftIdent(info.arrayField)}.enumerated()), id: \\.offset) { _, row in
+                Text(${primaryAccess})
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()`;
+  } else if (info.shape === "list-string") {
+    body = `        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.${swiftIdent(info.arrayField)}.enumerated()), id: \\.offset) { _, row in
+                Text(row)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()`;
+  } else {
+    // scalar: show every top-level string/number field as key-value rows.
+    const props = tool.outputSchema.properties ?? {};
+    const rows = Object.keys(props).map((k) => {
+      const ident = swiftIdent(k);
+      return `            HStack { Text("${k}"); Spacer(); Text(String(describing: data.${ident})) }`;
+    });
+    body = `        VStack(alignment: .leading, spacing: 2) {
+${rows.join("\n")}
+        }
+        .padding()`;
+  }
+
+  return `// Snippet view for: ${tool.name}  (shape: ${info.shape})
+@available(macOS 26, iOS 26, *)
+public struct ${viewName}: View {
+    public let data: ${outputType}
+    public init(data: ${outputType}) { self.data = data }
+    public var body: some View {
+${body}
+    }
+}`;
+}
+
 // ── Assemble output ──────────────────────────────────────────────────
 
 const typedTools = picked.filter(hasTypedOutput);
@@ -607,15 +699,15 @@ const outputStructs = typedTools.map((tool) => {
   const name = outputTypeNameFor(tool);
   return `// Output type for: ${tool.name}\n${renderStruct(name, tool.outputSchema)}`;
 });
+const snippetViews = typedTools.map((tool) => renderSnippetView(tool));
 
 const header = `// GENERATED — do not edit.
 //
 // Source: docs/tool-manifest.json
 // Generator: scripts/gen-swift-intents.mjs
-// RFC 0007 Phase A.2b.2 — ${picked.length} auto-selected read-only tools
-// (${typedTools.length} with typed ReturnsValue<T> from outputSchema; the
-// rest stay on ReturnsValue<String>) + ${appShortcutsPicks.length}
-// AppShortcutsProvider entries (Apple's 10-entry cap).
+// RFC 0007 Phase A.2b.2 + A.4.1 — ${picked.length} auto-selected read-only
+// tools (${typedTools.length} with typed drift-guards + Interactive Snippet
+// SwiftUI views) + ${appShortcutsPicks.length} AppShortcutsProvider entries.
 // Run \`npm run gen:intents\` to refresh after tool metadata changes.
 // CI guards against drift via \`npm run gen:intents:check\`.
 //
@@ -623,6 +715,11 @@ const header = `// GENERATED — do not edit.
 // iOS in-process MCPServer.callToolText. Every generated intent's
 // \`perform()\` hits that router. Typed intents additionally decode the
 // router's String result through JSONDecoder.
+//
+// Snippet views (§3.7) are SwiftUI View structs matching each typed
+// output shape. A.4.1 ships the views; A.4.2 will plug them into the
+// intents' \`.result(value:, view:)\` overloads. Kept in a separate
+// #if so iOS 17 builds stay green.
 
 #if canImport(AppIntents)
 import AppIntents
@@ -634,6 +731,16 @@ import Foundation
 
 const intentsHeader = "\n\n// MARK: - AppIntents\n\n";
 const shortcutsHeader = "\n\n// MARK: - AppShortcutsProvider\n\n";
+const snippetsHeader = `
+
+#endif
+
+// MARK: - Interactive Snippet views (RFC 0007 §3.7, A.4.1)
+
+#if canImport(SwiftUI) && canImport(AppIntents) && compiler(>=6.3)
+import SwiftUI
+
+`;
 
 const intents = picked.map(generateIntent).join("\n\n");
 const appShortcuts = generateAppShortcuts();
@@ -643,7 +750,16 @@ const footer = `
 #endif
 `;
 
-const source = header + outputStructs.join("\n\n") + intentsHeader + intents + shortcutsHeader + appShortcuts + footer;
+const source =
+  header +
+  outputStructs.join("\n\n") +
+  intentsHeader +
+  intents +
+  shortcutsHeader +
+  appShortcuts +
+  snippetsHeader +
+  snippetViews.join("\n\n") +
+  footer;
 
 // ── Write / check ────────────────────────────────────────────────────
 

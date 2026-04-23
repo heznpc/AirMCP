@@ -46,6 +46,13 @@ final class ServerManager {
 
         toolCount = await mcp.toolCount
 
+        // RFC 0007 A.2a: route generated AppIntents directly into this
+        // in-process MCPServer. No HTTP hop; Siri / Shortcuts / Spotlight
+        // invocations become actor calls.
+        await MCPIntentRouter.shared.setHandler { [mcp] tool, args in
+            return try await mcp.callToolText(name: tool, args: args)
+        }
+
         let server = MCPHTTPServer(mcp: mcp, port: 3847)
         token = await server.authToken
 

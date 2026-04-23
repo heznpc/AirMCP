@@ -27,7 +27,7 @@ public struct ListCalendarsIntent: AppIntent {
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_calendars",
-            args: [:]
+            args: [String: any Sendable]()
         )
         return .result(value: result)
     }
@@ -44,7 +44,7 @@ public struct TodayEventsIntent: AppIntent {
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "today_events",
-            args: [:]
+            args: [String: any Sendable]()
         )
         return .result(value: result)
     }
@@ -61,7 +61,7 @@ public struct ListReminderListsIntent: AppIntent {
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_reminder_lists",
-            args: [:]
+            args: [String: any Sendable]()
         )
         return .result(value: result)
     }
@@ -78,7 +78,7 @@ public struct ListFoldersIntent: AppIntent {
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_folders",
-            args: [:]
+            args: [String: any Sendable]()
         )
         return .result(value: result)
     }
@@ -95,7 +95,7 @@ public struct ListShortcutsIntent: AppIntent {
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_shortcuts",
-            args: [:]
+            args: [String: any Sendable]()
         )
         return .result(value: result)
     }
@@ -112,7 +112,7 @@ public struct ListAccountsIntent: AppIntent {
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_accounts",
-            args: [:]
+            args: [String: any Sendable]()
         )
         return .result(value: result)
     }
@@ -129,7 +129,7 @@ public struct ListBookmarksIntent: AppIntent {
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_bookmarks",
-            args: [:]
+            args: [String: any Sendable]()
         )
         return .result(value: result)
     }
@@ -186,7 +186,7 @@ public struct GetUpcomingEventsIntent: AppIntent {
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "get_upcoming_events",
-            args: [:]
+            args: [String: any Sendable]()
         )
         return .result(value: result)
     }

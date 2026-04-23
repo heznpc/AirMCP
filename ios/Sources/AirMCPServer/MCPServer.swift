@@ -170,4 +170,31 @@ public actor MCPServer {
             ] as [String: Any])
         }
     }
+
+    // MARK: - Direct call (RFC 0007 Phase A.2a)
+
+    /// Invoke a registered tool without the JSON-RPC envelope and return
+    /// the primary text content. Used by `MCPIntentRouter` on iOS so
+    /// code-generated AppIntents can reach tools in-process (no HTTP hop).
+    ///
+    /// Throws `MCPIntentCallError` if the tool is absent or reports an
+    /// error. Non-throwing success returns the first text content block,
+    /// or empty string if the tool returns non-text-only content.
+    public func callToolText(name: String, args: [String: any Sendable]) async throws -> String {
+        guard let tool = tools[name] else {
+            throw MCPIntentCallError.unknownTool(name)
+        }
+        let anyArgs: [String: Any] = args.reduce(into: [:]) { acc, kv in acc[kv.key] = kv.value }
+        let result = try await tool.execute(anyArgs)
+        if result.isError {
+            let msg = result.content.first?.text ?? "tool returned isError with no content"
+            throw MCPIntentCallError.toolFailed(name: name, message: msg)
+        }
+        return result.content.first?.text ?? ""
+    }
+}
+
+public enum MCPIntentCallError: Error, Sendable {
+    case unknownTool(String)
+    case toolFailed(name: String, message: String)
 }

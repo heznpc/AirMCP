@@ -29,6 +29,12 @@ struct AirMCPApp: App {
         }
         self.notificationDelegate = delegate
 
+        // RFC 0007 Phase A.2a: route generated AppIntents through the
+        // existing stdio bridge. Must run before any AppIntent fires,
+        // but AppIntents are resolved lazily by the system so this init
+        // location is early enough.
+        installMCPIntentRouterForMacOS()
+
         // Defer NSApp-dependent setup to after the application is fully initialized
         DispatchQueue.main.async {
             UNUserNotificationCenter.current().delegate = delegate

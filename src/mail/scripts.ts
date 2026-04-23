@@ -71,7 +71,7 @@ export function readMessageScript(id: string, maxLength: number): string {
           const toRecips = m.toRecipients();
           const ccRecips = m.ccRecipients();
           found = {
-            id: m.id(),
+            id: String(m.id()),
             subject: m.subject(),
             sender: m.sender(),
             to: toRecips.map(r => ({name: r.name(), address: r.address()})),
@@ -114,7 +114,7 @@ export function searchMessagesScript(query: string, mailbox: string, limit: numb
         const sender = senders[i] || '';
         if (subj.toLowerCase().includes(q) || sender.toLowerCase().includes(q)) {
           result.push({
-            id: ids[i],
+            id: String(ids[i]),
             subject: subj,
             sender: sender,
             dateReceived: dates[i] ? dates[i].toISOString() : null,

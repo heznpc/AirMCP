@@ -293,6 +293,52 @@ const TOOL_FIXTURES = {
     args: { name: 'Daily' },
     mock: { shortcut: 'Daily', detail: '' },
   },
+  // ── Wave 4 additions ──
+  // mail
+  read_message: {
+    args: { id: '123', maxLength: 5000 },
+    mock: {
+      id: '123',
+      subject: 's',
+      sender: 'a',
+      to: [],
+      cc: [],
+      dateReceived: '2026-04-24T10:00:00Z',
+      dateSent: null,
+      read: false,
+      flagged: false,
+      content: '',
+      mailbox: 'INBOX',
+      account: 'Personal',
+    },
+  },
+  search_messages: {
+    args: { query: 'x', mailbox: 'INBOX', limit: 30 },
+    mock: { returned: 0, messages: [] },
+  },
+  // finder
+  search_files: {
+    args: { query: 'x', folder: '~', limit: 50 },
+    mock: { total: 0, files: [] },
+  },
+  recent_files: {
+    args: { folder: '~', days: 7, limit: 30 },
+    mock: { total: 0, files: [] },
+  },
+  // safari
+  read_page_content: {
+    args: { windowIndex: 0, tabIndex: 0, maxLength: 10000 },
+    mock: { title: 't', url: 'https://example/', content: '', truncated: false },
+  },
+  search_tabs: {
+    args: { query: 'x' },
+    mock: { returned: 0, tabs: [] },
+  },
+  // notes
+  scan_notes: {
+    args: { limit: 100, offset: 0, previewLength: 300 },
+    mock: { total: 0, offset: 0, returned: 0, notes: [] },
+  },
 };
 
 // ── Test suite ──────────────────────────────────────────────────────

@@ -10,6 +10,7 @@ import {
   okStructured,
   okUntrusted,
   okUntrustedStructured,
+  okUntrustedLinkedStructured,
   errPermission,
   toolError,
 } from "../shared/result.js";
@@ -449,6 +450,23 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
           .default(300)
           .describe("Preview text length in characters (default: 300)"),
       },
+      outputSchema: {
+        total: z.number(),
+        offset: z.number(),
+        returned: z.number(),
+        notes: z.array(
+          z.object({
+            id: z.string(),
+            name: z.string(),
+            folder: z.string(),
+            creationDate: z.string(),
+            modificationDate: z.string(),
+            preview: z.string(),
+            charCount: z.number(),
+            shared: z.boolean(),
+          }),
+        ),
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -461,7 +479,7 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
         const result = await runJxa<ScanResult>(scanNotesScript(limit, previewLength, offset, folder));
         result.notes = filterSharedAccess(result.notes, config, "notes");
         result.returned = result.notes.length;
-        return okUntrusted(result);
+        return okUntrustedLinkedStructured("scan_notes", result);
       } catch (e) {
         return toolError("scan notes", e);
       }

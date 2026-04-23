@@ -98,6 +98,9 @@ jobs:
           git --no-pager diff swift/Sources/AirMCPKit/Generated/MCPIntents.swift | head -200 || true
           git diff --exit-code swift/Sources/AirMCPKit/Generated/MCPIntents.swift
 
+      - name: Verify golden-sample intents (RFC 0007 §3.6)
+        run: node scripts/verify-golden-intents.mjs
+
       - name: Verify stats
         run: node scripts/count-stats.mjs --check
 

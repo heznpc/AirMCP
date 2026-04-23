@@ -140,7 +140,10 @@ function swiftParamDecl(propName, propSchema) {
 
 function buildArgsDict(properties) {
   const keys = Object.keys(properties);
-  if (keys.length === 0) return "[:]";
+  // Empty-dict literal `[:]` is inferred as `[Never: Never]` in some
+  // contexts and can't satisfy `[String: any Sendable]`; spell out the
+  // type for the zero-param case.
+  if (keys.length === 0) return "[String: any Sendable]()";
   const entries = keys.map((k) => `"${k}": ${k}`).join(", ");
   return `[${entries}]`;
 }

@@ -1,5 +1,6 @@
 import AppIntents
 import Foundation
+import AirMCPKit
 
 // MARK: - AirMCP App Intents
 // These make AirMCP actions accessible via Siri, Spotlight, and Shortcuts.
@@ -196,6 +197,27 @@ struct AirMCPShortcuts: AppShortcutsProvider {
             systemImageName: "heart.text.square"
         )
         #endif
+    }
+}
+
+// MARK: - MCPIntentRouter wiring (RFC 0007 Phase A.2a)
+
+/// Install the macOS transport handler on `MCPIntentRouter.shared`. Called
+/// once from `AirMCPApp.init()` so every code-generated AppIntent in
+/// `swift/Sources/AirMCPKit/Generated/MCPIntents.swift` lands on the same
+/// execFile stdio bridge the hand-written intents already use.
+///
+/// Re-calling is safe — the router replaces the prior handler rather than
+/// stacking. Tests that swap in a fake can call `setHandler` again.
+func installMCPIntentRouterForMacOS() {
+    Task.detached(priority: .utility) {
+        await MCPIntentRouter.shared.setHandler { tool, args in
+            // Cast from [String: any Sendable] → [String: Any] for the
+            // existing runAirMCPTool(args:) signature. All inbound values
+            // come from @Parameter-wrapped primitives so the cast is safe.
+            let anyArgs: [String: Any] = args.reduce(into: [:]) { acc, kv in acc[kv.key] = kv.value }
+            return try await runAirMCPTool(tool, args: anyArgs)
+        }
     }
 }
 

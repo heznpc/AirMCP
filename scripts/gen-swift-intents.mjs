@@ -61,6 +61,13 @@ const SKIP_NAMES = new Set([]);
 // usage-tracker-derived data because the tracker runs on the user's
 // laptop and isn't available at codegen time. A future pass can read a
 // checked-in top-N hint file that's refreshed nightly from usage data.
+//
+// AskAirMCPIntent (natural-language agent, axis 6) is pinned as the
+// first entry on iOS 26+/macOS 26+ — it's the most prominent surface
+// AirMCP has on those OS versions. The codegen emits the rest of the
+// 10-slot cap from APP_SHORTCUTS_TOP, so a max of 9 tool-based entries
+// co-exist with it. The hand-written intent lives in
+// swift/Sources/AirMCPKit/AskAirMCPIntent.swift.
 const APP_SHORTCUTS_TOP = [
   "today_events",
   "list_calendars",
@@ -71,7 +78,6 @@ const APP_SHORTCUTS_TOP = [
   "list_bookmarks",
   "get_current_weather",
   "summarize_context",
-  "recent_files",
 ];
 
 // ── Load manifest ────────────────────────────────────────────────────
@@ -548,7 +554,7 @@ function systemImageFor(toolName) {
 }
 
 function generateAppShortcuts() {
-  const entries = appShortcutsPicks.map((tool) => {
+  const toolEntries = appShortcutsPicks.map((tool) => {
     const structName = intentStructName(tool.name);
     const title = swiftLit(tool.title ?? tool.name);
     const img = systemImageFor(tool.name);
@@ -566,9 +572,30 @@ function generateAppShortcuts() {
             systemImageName: "${img}"
         )`;
   });
+
+  // AskAirMCPIntent is the natural-language agent entry (axis 6 /
+  // FoundationModelsBridge). Pinned as the first Shortcuts suggestion
+  // on iOS 26+/macOS 26+ where FoundationModels is available. The
+  // #if guard matches AskAirMCPIntent.swift's availability conditions
+  // so the provider stays compileable on older SDKs.
+  const askShortcut = `        #if canImport(FoundationModels) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            AppShortcut(
+                intent: AskAirMCPIntent(),
+                phrases: [
+                    "Ask \\(.applicationName)",
+                    "Ask \\(.applicationName) about my day",
+                ],
+                shortTitle: "Ask AirMCP",
+                systemImageName: "brain.head.profile"
+            )
+        }
+        #endif`;
+
   return `public struct AirMCPGeneratedShortcuts: AppShortcutsProvider {
-    public static var appShortcuts: [AppShortcut] {
-${entries.join("\n")}
+    @AppShortcutsBuilder public static var appShortcuts: [AppShortcut] {
+${askShortcut}
+${toolEntries.join("\n")}
     }
 }`;
 }

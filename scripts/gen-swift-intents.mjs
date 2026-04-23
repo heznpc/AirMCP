@@ -64,6 +64,10 @@ import {
   buildArgsBlock,
   resolveFollowUpMap as _resolveFollowUpMap,
   deriveFollowUpFactorySpecs,
+  isCodableSafe,
+  swiftOutputType,
+  renderStruct,
+  hasTypedOutput,
 } from "./lib/codegen-helpers.mjs";
 
 // CLI wrappers: the lib throws on invalid enum value so tests can
@@ -236,120 +240,9 @@ for (const name of APP_SHORTCUTS_TOP) {
 // Everything else (oneOf, allOf, recursive refs) would require AnyCodable
 // or more elaborate machinery — out of A.2b.2 scope.
 
-// isNullableUnion, nonNullType imported from scripts/lib/codegen-helpers.mjs.
-
-function isCodableSafe(schema) {
-  if (!schema || typeof schema !== "object") return true;
-  if (schema.type === "object") {
-    if (schema.additionalProperties === true) return false;
-    if (
-      schema.additionalProperties &&
-      typeof schema.additionalProperties === "object" &&
-      Object.keys(schema.additionalProperties).length === 0
-    ) {
-      return false;
-    }
-    for (const p of Object.values(schema.properties ?? {})) {
-      if (!isCodableSafe(p)) return false;
-    }
-    return true;
-  }
-  if (schema.type === "array") return isCodableSafe(schema.items);
-  return true;
-}
-
-/**
- * Map a JSON-Schema node to a Swift type expression, recording any
- * inline-nested object as a sub-struct declaration on `nested`.
- *
- * `path` is the PascalCased path from the outer struct down to this
- * node — used to name nested structs deterministically.
- */
-function swiftOutputType(schema, path, nested) {
-  if (isNullableUnion(schema)) {
-    const inner = nonNullType(schema);
-    return swiftOutputType({ ...schema, type: inner }, path, nested) + "?";
-  }
-  if (schema.type === "string") return "String";
-  if (schema.type === "number") return "Double";
-  if (schema.type === "integer") return "Int";
-  if (schema.type === "boolean") return "Bool";
-  if (schema.type === "array") {
-    const itemSchema = schema.items ?? {};
-    const itemName = `${path}Item`;
-    const itemType = swiftOutputType(itemSchema, itemName, nested);
-    return `[${itemType}]`;
-  }
-  if (schema.type === "object") {
-    nested.push({ name: path, schema });
-    return path;
-  }
-  // Fallback — shouldn't occur for codable-safe schemas.
-  return "String";
-}
-
-/**
- * Render an object-typed schema into a Swift struct declaration.
- * Nested object fields are rendered as inner structs (Swift doesn't
- * require forward declarations, so order within the file doesn't matter).
- */
-function renderStruct(name, schema, indent = "    ") {
-  const props = schema.properties ?? {};
-  const required = new Set(schema.required ?? []);
-  const nested = [];
-  const fieldLines = [];
-
-  for (const wireName of Object.keys(props)) {
-    const fieldSchema = props[wireName];
-    const fieldName = swiftIdent(wireName);
-    const pascal = toPascalCase(wireName);
-    let fieldType = swiftOutputType(fieldSchema, pascal, nested);
-    if (!required.has(wireName) && !fieldType.endsWith("?")) {
-      fieldType += "?";
-    }
-    fieldLines.push(`${indent}public let ${fieldName}: ${fieldType}`);
-  }
-
-  const nestedLines = nested.map((n) => renderStruct(n.name, n.schema, indent + "    ")).join("\n");
-
-  // Swift synthesizes CodingKeys from property names unless we override.
-  // We override only when at least one wire key had to be escaped (e.g.
-  // `class` → `class_`); in that case *every* key must be listed or the
-  // compiler rejects the partial enum.
-  const anyKeyEscaped = Object.keys(props).some((k) => swiftIdent(k) !== k);
-  const codingKeysBlock = anyKeyEscaped
-    ? `\n${indent}enum CodingKeys: String, CodingKey {\n` +
-      Object.keys(props)
-        .map((k) => {
-          const ident = swiftIdent(k);
-          return `${indent}    case ${ident}${ident !== k ? ` = "${k}"` : ""}`;
-        })
-        .join("\n") +
-      `\n${indent}}`
-    : "";
-
-  const body = [nestedLines ? nestedLines + "\n" : "", fieldLines.join("\n"), codingKeysBlock]
-    .filter(Boolean)
-    .join("\n");
-
-  return `${indent.slice(4)}public struct ${name}: Codable, Sendable {
-${body}
-${indent.slice(4)}}`;
-}
-
-// outputTypeNameFor imported from scripts/lib/codegen-helpers.mjs.
-
-/**
- * Does this tool ship A.2b.2-level typed output? Requires:
- *   • outputSchema present
- *   • top-level is `type: object` (everything else is too free-form)
- *   • no record-like additionalProperties anywhere in the tree
- */
-function hasTypedOutput(tool) {
-  const s = tool.outputSchema;
-  if (!s || s.type !== "object") return false;
-  return isCodableSafe(s);
-}
+// isNullableUnion, nonNullType, isCodableSafe, swiftOutputType,
+// renderStruct, hasTypedOutput, outputTypeNameFor all imported from
+// scripts/lib/codegen-helpers.mjs.
 
 function generateIntent(tool) {
   const structName = intentStructName(tool.name);

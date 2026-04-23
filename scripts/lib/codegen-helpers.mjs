@@ -257,6 +257,131 @@ export function systemImageFor(toolName) {
   return "app.connected.to.app.below.fill";
 }
 
+// ── outputSchema → Swift Codable struct codegen ────────────────────────
+//
+// Walks an outputSchema JSON and produces a Swift `Codable, Sendable`
+// struct hierarchy. Rules:
+//   • String / Int / Double / Bool → primitive
+//   • Nullable union {type: [X, "null"]} → Optional<SwiftX>
+//   • array → [Element] (Element recursively mapped)
+//   • nested object → nested Swift struct (named by the PascalCased
+//     path from the outer struct — `ListCalendarsOutput.CalendarsItem`)
+//   • additionalProperties: true OR {} → the tool is flagged not-
+//     codable-safe and falls back to ReturnsValue<String>
+//
+// Everything else (oneOf, allOf, recursive refs) would require
+// AnyCodable or more elaborate machinery — out of A.2b.2 scope.
+
+// Is this schema tree fully expressible as Swift Codable types?
+// Rejects record-shaped schemas (additionalProperties: true or {})
+// anywhere in the tree.
+export function isCodableSafe(schema) {
+  if (!schema || typeof schema !== "object") return true;
+  if (schema.type === "object") {
+    if (schema.additionalProperties === true) return false;
+    if (
+      schema.additionalProperties &&
+      typeof schema.additionalProperties === "object" &&
+      Object.keys(schema.additionalProperties).length === 0
+    ) {
+      return false;
+    }
+    for (const p of Object.values(schema.properties ?? {})) {
+      if (!isCodableSafe(p)) return false;
+    }
+    return true;
+  }
+  if (schema.type === "array") return isCodableSafe(schema.items);
+  return true;
+}
+
+// Map a JSON-Schema node to a Swift type expression, recording any
+// inline-nested object as a sub-struct declaration on `nested`.
+//
+// `path` is the PascalCased path from the outer struct down to this
+// node — used to name nested structs deterministically.
+export function swiftOutputType(schema, path, nested) {
+  if (isNullableUnion(schema)) {
+    const inner = nonNullType(schema);
+    return swiftOutputType({ ...schema, type: inner }, path, nested) + "?";
+  }
+  if (schema.type === "string") return "String";
+  if (schema.type === "number") return "Double";
+  if (schema.type === "integer") return "Int";
+  if (schema.type === "boolean") return "Bool";
+  if (schema.type === "array") {
+    const itemSchema = schema.items ?? {};
+    const itemName = `${path}Item`;
+    const itemType = swiftOutputType(itemSchema, itemName, nested);
+    return `[${itemType}]`;
+  }
+  if (schema.type === "object") {
+    nested.push({ name: path, schema });
+    return path;
+  }
+  // Fallback — shouldn't occur for codable-safe schemas.
+  return "String";
+}
+
+// Render an object-typed schema into a Swift `public struct Name:
+// Codable, Sendable { … }`. Nested object fields are rendered as
+// inner structs (Swift doesn't require forward declarations, so
+// order within the file doesn't matter).
+//
+// CodingKeys are synthesized automatically unless at least one wire
+// key needed Swift-identifier escaping (e.g. `class` → `class_`); in
+// that case *every* key must be listed or the compiler rejects the
+// partial enum.
+export function renderStruct(name, schema, indent = "    ") {
+  const props = schema.properties ?? {};
+  const required = new Set(schema.required ?? []);
+  const nested = [];
+  const fieldLines = [];
+
+  for (const wireName of Object.keys(props)) {
+    const fieldSchema = props[wireName];
+    const fieldName = swiftIdent(wireName);
+    const pascal = toPascalCase(wireName);
+    let fieldType = swiftOutputType(fieldSchema, pascal, nested);
+    if (!required.has(wireName) && !fieldType.endsWith("?")) {
+      fieldType += "?";
+    }
+    fieldLines.push(`${indent}public let ${fieldName}: ${fieldType}`);
+  }
+
+  const nestedLines = nested.map((n) => renderStruct(n.name, n.schema, indent + "    ")).join("\n");
+
+  const anyKeyEscaped = Object.keys(props).some((k) => swiftIdent(k) !== k);
+  const codingKeysBlock = anyKeyEscaped
+    ? `\n${indent}enum CodingKeys: String, CodingKey {\n` +
+      Object.keys(props)
+        .map((k) => {
+          const ident = swiftIdent(k);
+          return `${indent}    case ${ident}${ident !== k ? ` = "${k}"` : ""}`;
+        })
+        .join("\n") +
+      `\n${indent}}`
+    : "";
+
+  const body = [nestedLines ? nestedLines + "\n" : "", fieldLines.join("\n"), codingKeysBlock]
+    .filter(Boolean)
+    .join("\n");
+
+  return `${indent.slice(4)}public struct ${name}: Codable, Sendable {
+${body}
+${indent.slice(4)}}`;
+}
+
+// Does this tool ship A.2b.2-level typed output? Requires:
+//   • outputSchema present
+//   • top-level is `type: object` (everything else is too free-form)
+//   • no record-like additionalProperties anywhere in the tree
+export function hasTypedOutput(tool) {
+  const s = tool.outputSchema;
+  if (!s || s.type !== "object") return false;
+  return isCodableSafe(s);
+}
+
 // ── @Parameter declaration + args dict synthesis ───────────────────────
 
 // Keep @Parameter titles short enough to render well in Shortcuts

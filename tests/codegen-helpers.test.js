@@ -37,6 +37,10 @@ import {
   buildArgsBlock,
   resolveFollowUpMap,
   deriveFollowUpFactorySpecs,
+  isCodableSafe,
+  swiftOutputType,
+  renderStruct,
+  hasTypedOutput,
 } from "../scripts/lib/codegen-helpers.mjs";
 
 // Helper for resolveFollowUpMap tests: build a minimal manifest tool
@@ -979,5 +983,265 @@ describe("deriveFollowUpFactorySpecs", () => {
 
   test("empty resolved map → empty specs", () => {
     expect(deriveFollowUpFactorySpecs({})).toEqual([]);
+  });
+});
+
+describe("isCodableSafe", () => {
+  test("primitives are always safe", () => {
+    expect(isCodableSafe({ type: "string" })).toBe(true);
+    expect(isCodableSafe({ type: "integer" })).toBe(true);
+    expect(isCodableSafe({ type: "number" })).toBe(true);
+    expect(isCodableSafe({ type: "boolean" })).toBe(true);
+  });
+
+  test("object with constrained properties is safe", () => {
+    expect(
+      isCodableSafe({
+        type: "object",
+        properties: { name: { type: "string" }, age: { type: "integer" } },
+      }),
+    ).toBe(true);
+  });
+
+  test("additionalProperties: true rejects the schema", () => {
+    expect(
+      isCodableSafe({ type: "object", properties: {}, additionalProperties: true }),
+    ).toBe(false);
+  });
+
+  test("additionalProperties: {} (empty object) rejects the schema — record shape", () => {
+    expect(
+      isCodableSafe({ type: "object", properties: {}, additionalProperties: {} }),
+    ).toBe(false);
+  });
+
+  test("additionalProperties: { type: 'string' } is accepted (constrained map)", () => {
+    expect(
+      isCodableSafe({
+        type: "object",
+        properties: {},
+        additionalProperties: { type: "string" },
+      }),
+    ).toBe(true);
+  });
+
+  test("recurses into nested object properties", () => {
+    expect(
+      isCodableSafe({
+        type: "object",
+        properties: {
+          payload: {
+            type: "object",
+            properties: {},
+            additionalProperties: true, // nested record — still rejects
+          },
+        },
+      }),
+    ).toBe(false);
+  });
+
+  test("recurses into array items", () => {
+    expect(
+      isCodableSafe({
+        type: "array",
+        items: {
+          type: "object",
+          properties: {},
+          additionalProperties: true,
+        },
+      }),
+    ).toBe(false);
+  });
+
+  test("null / undefined schema is treated as safe (no-op node)", () => {
+    expect(isCodableSafe(null)).toBe(true);
+    expect(isCodableSafe(undefined)).toBe(true);
+  });
+});
+
+describe("swiftOutputType", () => {
+  test("primitives map to Swift built-ins", () => {
+    const nested = [];
+    expect(swiftOutputType({ type: "string" }, "Path", nested)).toBe("String");
+    expect(swiftOutputType({ type: "integer" }, "Path", nested)).toBe("Int");
+    expect(swiftOutputType({ type: "number" }, "Path", nested)).toBe("Double");
+    expect(swiftOutputType({ type: "boolean" }, "Path", nested)).toBe("Bool");
+    expect(nested).toEqual([]); // primitives don't accumulate nested structs
+  });
+
+  test("nullable union adds Optional ?", () => {
+    const nested = [];
+    expect(swiftOutputType({ type: ["string", "null"] }, "Path", nested)).toBe("String?");
+    expect(swiftOutputType({ type: ["null", "integer"] }, "Path", nested)).toBe("Int?");
+  });
+
+  test("array wraps element type", () => {
+    const nested = [];
+    expect(
+      swiftOutputType({ type: "array", items: { type: "string" } }, "Tags", nested),
+    ).toBe("[String]");
+  });
+
+  test("array-of-object records nested struct named `<Path>Item`", () => {
+    const nested = [];
+    const result = swiftOutputType(
+      {
+        type: "array",
+        items: { type: "object", properties: { id: { type: "string" } } },
+      },
+      "Events",
+      nested,
+    );
+    expect(result).toBe("[EventsItem]");
+    expect(nested).toHaveLength(1);
+    expect(nested[0].name).toBe("EventsItem");
+  });
+
+  test("object records nested struct + returns the path as type", () => {
+    const nested = [];
+    const result = swiftOutputType(
+      { type: "object", properties: { foo: { type: "string" } } },
+      "Payload",
+      nested,
+    );
+    expect(result).toBe("Payload");
+    expect(nested).toHaveLength(1);
+    expect(nested[0].name).toBe("Payload");
+  });
+
+  test("unknown type falls back to String", () => {
+    const nested = [];
+    expect(swiftOutputType({ type: "mystery" }, "Path", nested)).toBe("String");
+  });
+});
+
+describe("renderStruct", () => {
+  test("flat struct with one required string field", () => {
+    const swift = renderStruct("FooOutput", {
+      type: "object",
+      properties: { name: { type: "string" } },
+      required: ["name"],
+    });
+    expect(swift).toContain("public struct FooOutput: Codable, Sendable {");
+    expect(swift).toContain("public let name: String");
+    expect(swift).not.toContain("CodingKeys"); // no escaping needed
+  });
+
+  test("unrequired field → Optional<T>", () => {
+    const swift = renderStruct("FooOutput", {
+      type: "object",
+      properties: { name: { type: "string" } },
+      // no `required` → every field is optional
+    });
+    expect(swift).toContain("public let name: String?");
+  });
+
+  test("nullable union field doesn't double-? (already Optional via swiftOutputType)", () => {
+    const swift = renderStruct("FooOutput", {
+      type: "object",
+      properties: { name: { type: ["string", "null"] } },
+    });
+    // Wrong behavior would be `String??`; correct is single `?`.
+    expect(swift).toContain("public let name: String?");
+    expect(swift).not.toContain("String??");
+  });
+
+  test("nested object emits inner struct", () => {
+    const swift = renderStruct("ListEventsOutput", {
+      type: "object",
+      properties: {
+        events: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: { id: { type: "string" }, summary: { type: "string" } },
+            required: ["id", "summary"],
+          },
+        },
+      },
+      required: ["events"],
+    });
+    expect(swift).toContain("public struct ListEventsOutput: Codable, Sendable {");
+    expect(swift).toContain("public struct EventsItem: Codable, Sendable {");
+    expect(swift).toContain("public let events: [EventsItem]");
+    expect(swift).toContain("public let id: String");
+  });
+
+  test("reserved-word field triggers full CodingKeys enum", () => {
+    const swift = renderStruct("FooOutput", {
+      type: "object",
+      properties: {
+        class: { type: "string" },
+        id: { type: "string" },
+      },
+      required: ["class", "id"],
+    });
+    expect(swift).toContain("public let class_: String");
+    expect(swift).toContain("public let id: String");
+    // CodingKeys enum required because `class` was escaped
+    expect(swift).toContain("enum CodingKeys: String, CodingKey {");
+    expect(swift).toContain('case class_ = "class"');
+    // Non-escaped keys must also be listed (Swift rejects partial enums)
+    expect(swift).toContain("case id");
+    expect(swift).not.toContain('case id = "id"'); // identity mapping — no rawValue
+  });
+
+  test("empty properties → well-formed empty struct", () => {
+    const swift = renderStruct("EmptyOutput", { type: "object", properties: {}, required: [] });
+    expect(swift).toContain("public struct EmptyOutput: Codable, Sendable {");
+  });
+
+  test("indent param controls nested indentation depth", () => {
+    const swift = renderStruct(
+      "Inner",
+      { type: "object", properties: { x: { type: "string" } }, required: ["x"] },
+      "        ", // 8-space indent (nested inside another struct)
+    );
+    // Outer line uses `indent.slice(4)` = 4 spaces for the struct itself,
+    // fields use the full 8-space indent.
+    expect(swift).toContain("    public struct Inner:");
+    expect(swift).toContain("        public let x: String");
+  });
+});
+
+describe("hasTypedOutput", () => {
+  test("true when outputSchema is a codable-safe object", () => {
+    expect(
+      hasTypedOutput({
+        outputSchema: {
+          type: "object",
+          properties: { count: { type: "integer" } },
+        },
+      }),
+    ).toBe(true);
+  });
+
+  test("false when outputSchema is absent", () => {
+    expect(hasTypedOutput({})).toBe(false);
+    expect(hasTypedOutput({ outputSchema: null })).toBe(false);
+  });
+
+  test("false when top-level is not an object (free-form)", () => {
+    expect(hasTypedOutput({ outputSchema: { type: "string" } })).toBe(false);
+    expect(hasTypedOutput({ outputSchema: { type: "array", items: {} } })).toBe(false);
+  });
+
+  test("false when any node has additionalProperties:true (audit_log case)", () => {
+    expect(
+      hasTypedOutput({
+        outputSchema: {
+          type: "object",
+          properties: {
+            entries: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: { args: { type: "object", additionalProperties: true } },
+              },
+            },
+          },
+        },
+      }),
+    ).toBe(false);
   });
 });

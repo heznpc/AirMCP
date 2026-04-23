@@ -390,3 +390,84 @@ ${caseMap}
     ]
 }`;
 }
+
+// ── Follow-up intent resolution (RFC 0007 §3.7 / A.4.3) ────────────────
+
+// Validate a FOLLOW_UP_MAP config against the manifest and produce a
+// resolved map keyed by list tool. Throws on any invariant violation so
+// codegen fails fast with a specific error; CLI callers wrap with
+// process.exit(2).
+//
+//   config    = { [listToolName]: { target, itemField, targetParam } }
+//   byName    = Map<toolName, manifestToolEntry>
+//
+// Returns `{ [listToolName]: { target, itemField, targetParam,
+//   targetIntentName, factoryKey } }` where `factoryKey` is the dedupe
+// key for per-`(target, targetParam)` SwiftUI Button factories.
+//
+// Invariants checked:
+//   • list tool exists in manifest
+//   • target tool exists
+//   • list's output schema is a list-object shape (via detectSnippetShape)
+//   • list items have a string field named `itemField`
+//   • target tool has an @Parameter named `targetParam`
+export function resolveFollowUpMap(config, byName) {
+  const resolved = {};
+  for (const [listName, entry] of Object.entries(config)) {
+    const listTool = byName.get(listName);
+    if (!listTool) {
+      throw new Error(`FOLLOW_UP_MAP: list tool missing: ${listName}`);
+    }
+    const target = byName.get(entry.target);
+    if (!target) {
+      throw new Error(`FOLLOW_UP_MAP: target tool missing: ${entry.target}`);
+    }
+
+    const info = detectSnippetShape(listTool.outputSchema ?? {});
+    if (info.shape !== "list-object") {
+      throw new Error(
+        `FOLLOW_UP_MAP: ${listName} is not a list-object shape (got ${info.shape})`,
+      );
+    }
+
+    const itemProps = listTool.outputSchema?.properties?.[info.arrayField]?.items?.properties ?? {};
+    if (itemProps[entry.itemField]?.type !== "string") {
+      throw new Error(
+        `FOLLOW_UP_MAP: ${listName} items have no string field "${entry.itemField}" (fields: ${Object.keys(itemProps).join(", ")})`,
+      );
+    }
+
+    const targetParams = Object.keys(target.inputSchema?.properties ?? {});
+    if (!targetParams.includes(entry.targetParam)) {
+      throw new Error(
+        `FOLLOW_UP_MAP: target ${entry.target} has no @Parameter named "${entry.targetParam}" (params: ${targetParams.join(", ")})`,
+      );
+    }
+
+    const targetIntentName = intentStructName(entry.target);
+    resolved[listName] = {
+      ...entry,
+      targetIntentName,
+      // Factory key by (target, targetParam). Two list tools pointing
+      // at the same read target with the same param share one factory;
+      // two list tools pointing at the same target via different params
+      // (unlikely but possible) each get their own.
+      factoryKey: `${targetIntentName}_${entry.targetParam}`,
+    };
+  }
+  return resolved;
+}
+
+// Deduplicate resolved follow-up entries by `(targetIntentName,
+// targetParam)` so the codegen emits one factory per unique signature
+// even when multiple list tools point at the same target.
+export function deriveFollowUpFactorySpecs(resolvedMap) {
+  return Array.from(
+    new Map(
+      Object.values(resolvedMap).map((e) => [
+        e.factoryKey,
+        { targetIntentName: e.targetIntentName, targetParam: e.targetParam },
+      ]),
+    ).values(),
+  );
+}

@@ -35,7 +35,34 @@ import {
   MAX_TITLE_LEN,
   swiftParamDecl,
   buildArgsBlock,
+  resolveFollowUpMap,
+  deriveFollowUpFactorySpecs,
 } from "../scripts/lib/codegen-helpers.mjs";
+
+// Helper for resolveFollowUpMap tests: build a minimal manifest tool
+// with a list-object outputSchema carrying the named item fields.
+function makeListTool(name, itemFields) {
+  const itemProps = {};
+  for (const [field, type] of Object.entries(itemFields)) {
+    itemProps[field] = { type };
+  }
+  return {
+    name,
+    inputSchema: { properties: {} },
+    outputSchema: {
+      type: "object",
+      properties: {
+        items: { type: "array", items: { type: "object", properties: itemProps } },
+      },
+    },
+  };
+}
+
+function makeReadTool(name, paramNames) {
+  const props = {};
+  for (const p of paramNames) props[p] = { type: "string" };
+  return { name, inputSchema: { properties: props } };
+}
 
 describe("toPascalCase", () => {
   test("snake_case joins without underscore", () => {
@@ -808,5 +835,149 @@ describe("buildArgsBlock", () => {
     for (const line of out.prelude.split("\n")) {
       expect(line.startsWith("        ")).toBe(true);
     }
+  });
+});
+
+describe("resolveFollowUpMap", () => {
+  test("happy path — list + read match, id→id", () => {
+    const byName = new Map([
+      ["list_events", makeListTool("list_events", { id: "string", summary: "string" })],
+      ["read_event", makeReadTool("read_event", ["id"])],
+    ]);
+    const resolved = resolveFollowUpMap(
+      { list_events: { target: "read_event", itemField: "id", targetParam: "id" } },
+      byName,
+    );
+    expect(resolved.list_events).toEqual({
+      target: "read_event",
+      itemField: "id",
+      targetParam: "id",
+      targetIntentName: "ReadEventIntent",
+      factoryKey: "ReadEventIntent_id",
+    });
+  });
+
+  test("rename case — itemField id → targetParam chatId", () => {
+    const byName = new Map([
+      ["list_chats", makeListTool("list_chats", { id: "string", name: "string" })],
+      ["read_chat", makeReadTool("read_chat", ["chatId"])],
+    ]);
+    const resolved = resolveFollowUpMap(
+      { list_chats: { target: "read_chat", itemField: "id", targetParam: "chatId" } },
+      byName,
+    );
+    expect(resolved.list_chats.factoryKey).toBe("ReadChatIntent_chatId");
+  });
+
+  test("throws on missing list tool", () => {
+    expect(() =>
+      resolveFollowUpMap(
+        { missing: { target: "read_event", itemField: "id", targetParam: "id" } },
+        new Map(),
+      ),
+    ).toThrow(/list tool missing: missing/);
+  });
+
+  test("throws on missing target tool", () => {
+    const byName = new Map([
+      ["list_events", makeListTool("list_events", { id: "string" })],
+    ]);
+    expect(() =>
+      resolveFollowUpMap(
+        { list_events: { target: "read_missing", itemField: "id", targetParam: "id" } },
+        byName,
+      ),
+    ).toThrow(/target tool missing: read_missing/);
+  });
+
+  test("throws when list output is not list-object", () => {
+    const byName = new Map([
+      ["not_list", { name: "not_list", inputSchema: {}, outputSchema: { type: "object", properties: { scalar: { type: "string" } } } }],
+      ["read_event", makeReadTool("read_event", ["id"])],
+    ]);
+    expect(() =>
+      resolveFollowUpMap(
+        { not_list: { target: "read_event", itemField: "id", targetParam: "id" } },
+        byName,
+      ),
+    ).toThrow(/is not a list-object shape \(got scalar\)/);
+  });
+
+  test("throws when items missing the named itemField", () => {
+    const byName = new Map([
+      ["list_events", makeListTool("list_events", { summary: "string" })], // no id
+      ["read_event", makeReadTool("read_event", ["id"])],
+    ]);
+    expect(() =>
+      resolveFollowUpMap(
+        { list_events: { target: "read_event", itemField: "id", targetParam: "id" } },
+        byName,
+      ),
+    ).toThrow(/items have no string field "id" \(fields: summary\)/);
+  });
+
+  test("throws when target missing the named @Parameter", () => {
+    const byName = new Map([
+      ["list_events", makeListTool("list_events", { id: "string", summary: "string" })],
+      ["read_event", makeReadTool("read_event", ["eventId"])], // no `id`
+    ]);
+    expect(() =>
+      resolveFollowUpMap(
+        { list_events: { target: "read_event", itemField: "id", targetParam: "id" } },
+        byName,
+      ),
+    ).toThrow(/target read_event has no @Parameter named "id" \(params: eventId\)/);
+  });
+
+  test("empty config → empty resolved map", () => {
+    expect(resolveFollowUpMap({}, new Map())).toEqual({});
+  });
+});
+
+describe("deriveFollowUpFactorySpecs", () => {
+  test("two list tools → same (target, param) share one factory", () => {
+    const resolved = {
+      list_events: {
+        target: "read_event",
+        itemField: "id",
+        targetParam: "id",
+        targetIntentName: "ReadEventIntent",
+        factoryKey: "ReadEventIntent_id",
+      },
+      search_events: {
+        target: "read_event",
+        itemField: "id",
+        targetParam: "id",
+        targetIntentName: "ReadEventIntent",
+        factoryKey: "ReadEventIntent_id",
+      },
+    };
+    const specs = deriveFollowUpFactorySpecs(resolved);
+    expect(specs).toHaveLength(1);
+    expect(specs[0]).toEqual({ targetIntentName: "ReadEventIntent", targetParam: "id" });
+  });
+
+  test("same target + different param → two factories", () => {
+    const resolved = {
+      list_events: {
+        target: "read_event",
+        targetIntentName: "ReadEventIntent",
+        targetParam: "id",
+        factoryKey: "ReadEventIntent_id",
+      },
+      list_chats: {
+        target: "read_chat",
+        targetIntentName: "ReadChatIntent",
+        targetParam: "chatId",
+        factoryKey: "ReadChatIntent_chatId",
+      },
+    };
+    const specs = deriveFollowUpFactorySpecs(resolved);
+    expect(specs).toHaveLength(2);
+    expect(specs.map((s) => s.targetParam).sort()).toEqual(["chatId", "id"]);
+  });
+
+  test("empty resolved map → empty specs", () => {
+    expect(deriveFollowUpFactorySpecs({})).toEqual([]);
   });
 });

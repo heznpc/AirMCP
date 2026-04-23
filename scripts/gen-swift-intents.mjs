@@ -62,6 +62,8 @@ import {
   renderAppEnum as _renderAppEnum,
   swiftParamDecl,
   buildArgsBlock,
+  resolveFollowUpMap as _resolveFollowUpMap,
+  deriveFollowUpFactorySpecs,
 } from "./lib/codegen-helpers.mjs";
 
 // CLI wrappers: the lib throws on invalid enum value so tests can
@@ -628,63 +630,17 @@ function renderScalarRow(key, propSchema) {
 
 // detectSnippetShape imported from scripts/lib/codegen-helpers.mjs.
 
-// Validate FOLLOW_UP_MAP against the manifest so a typo or removed tool
-// surfaces at codegen time rather than as a SwiftUI compile error. Also
-// ensures the list's items carry the expected id field and the target's
-// @Parameter shape matches.
-function resolveFollowUpMap() {
-  const resolved = {};
-  for (const [listName, entry] of Object.entries(FOLLOW_UP_MAP)) {
-    const listTool = byName.get(listName);
-    const target = byName.get(entry.target);
-    if (!listTool) {
-      console.error(`[gen-intents] FOLLOW_UP_MAP: list tool missing: ${listName}`);
-      process.exit(2);
-    }
-    if (!target) {
-      console.error(`[gen-intents] FOLLOW_UP_MAP: target tool missing: ${entry.target}`);
-      process.exit(2);
-    }
-    const info = detectSnippetShape(listTool.outputSchema ?? {});
-    if (info.shape !== "list-object") {
-      console.error(
-        `[gen-intents] FOLLOW_UP_MAP: ${listName} is not a list-object shape (got ${info.shape})`,
-      );
-      process.exit(2);
-    }
-    const itemProps = listTool.outputSchema?.properties?.[info.arrayField]?.items?.properties ?? {};
-    if (itemProps[entry.itemField]?.type !== "string") {
-      console.error(
-        `[gen-intents] FOLLOW_UP_MAP: ${listName} items have no string field "${entry.itemField}" (fields: ${Object.keys(itemProps).join(", ")})`,
-      );
-      process.exit(2);
-    }
-    const targetParams = Object.keys(target.inputSchema?.properties ?? {});
-    if (!targetParams.includes(entry.targetParam)) {
-      console.error(
-        `[gen-intents] FOLLOW_UP_MAP: target ${entry.target} has no @Parameter named "${entry.targetParam}" (params: ${targetParams.join(", ")})`,
-      );
-      process.exit(2);
-    }
-    resolved[listName] = {
-      ...entry,
-      targetIntentName: intentStructName(entry.target),
-      // Factory key by (target, targetParam). Two list tools pointing at
-      // the same read target with the same param share one factory; two
-      // list tools pointing at the same target via different params
-      // (unlikely but possible) each get their own.
-      factoryKey: `${intentStructName(entry.target)}_${entry.targetParam}`,
-    };
-  }
-  return resolved;
+// CLI wrapper: lib's resolveFollowUpMap throws on any invariant
+// violation so tests can assert the specific error; the CLI needs
+// the historic process.exit(2) contract.
+let followUpMap;
+try {
+  followUpMap = _resolveFollowUpMap(FOLLOW_UP_MAP, byName);
+} catch (e) {
+  console.error(`[gen-intents] ${e.message}`);
+  process.exit(2);
 }
-const followUpMap = resolveFollowUpMap();
-// Deduplicate factories by (targetIntentName, targetParam).
-const followUpFactorySpecs = Array.from(
-  new Map(
-    Object.values(followUpMap).map((e) => [e.factoryKey, { targetIntentName: e.targetIntentName, targetParam: e.targetParam }]),
-  ).values(),
-);
+const followUpFactorySpecs = deriveFollowUpFactorySpecs(followUpMap);
 
 // snippetViewNameFor imported from scripts/lib/codegen-helpers.mjs.
 

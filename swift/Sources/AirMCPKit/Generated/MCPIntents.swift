@@ -776,7 +776,13 @@ public struct AiPlanMetricsIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "ai_plan_metrics", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPAiPlanMetricsOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPAiPlanMetricsOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPAiPlanMetricsSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -857,7 +863,13 @@ public struct AuditSummaryIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "audit_summary", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPAuditSummaryOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPAuditSummaryOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPAuditSummarySnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -969,7 +981,13 @@ public struct DiscoverToolsIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "discover_tools", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPDiscoverToolsOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPDiscoverToolsOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPDiscoverToolsSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -1185,7 +1203,13 @@ public struct GetClipboardIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "get_clipboard", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPGetClipboardOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPGetClipboardOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPGetClipboardSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -1223,7 +1247,13 @@ public struct GetCurrentTabIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "get_current_tab", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPGetCurrentTabOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPGetCurrentTabOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPGetCurrentTabSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -1250,7 +1280,13 @@ public struct GetCurrentWeatherIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "get_current_weather", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPGetCurrentWeatherOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPGetCurrentWeatherOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPGetCurrentWeatherSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -1300,7 +1336,13 @@ public struct GetFileInfoIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "get_file_info", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPGetFileInfoOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPGetFileInfoOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPGetFileInfoSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -1321,7 +1363,13 @@ public struct GetFrontmostAppIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "get_frontmost_app", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPGetFrontmostAppOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPGetFrontmostAppOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPGetFrontmostAppSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -1445,7 +1493,13 @@ public struct GetShortcutDetailIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "get_shortcut_detail", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPGetShortcutDetailOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPGetShortcutDetailOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPGetShortcutDetailSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -1486,7 +1540,13 @@ public struct GetUnreadCountIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "get_unread_count", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPGetUnreadCountOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPGetUnreadCountOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPGetUnreadCountSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -1510,7 +1570,13 @@ public struct GetUpcomingEventsIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "get_upcoming_events", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPGetUpcomingEventsOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPGetUpcomingEventsOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPGetUpcomingEventsSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -1531,7 +1597,13 @@ public struct GetVolumeIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "get_volume", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPGetVolumeOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPGetVolumeOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPGetVolumeSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -1911,7 +1983,13 @@ public struct ListAccountsIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "list_accounts", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPListAccountsOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPListAccountsOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPListAccountsSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -1983,7 +2061,13 @@ public struct ListBookmarksIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "list_bookmarks", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPListBookmarksOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPListBookmarksOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPListBookmarksSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -2004,7 +2088,13 @@ public struct ListCalendarsIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "list_calendars", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPListCalendarsOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPListCalendarsOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPListCalendarsSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -2028,7 +2118,13 @@ public struct ListChatsIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "list_chats", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPListChatsOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPListChatsOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPListChatsSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -2055,7 +2151,13 @@ public struct ListContactsIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "list_contacts", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPListContactsOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPListContactsOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPListContactsSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -2082,7 +2184,13 @@ public struct ListDirectoryIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "list_directory", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPListDirectoryOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPListDirectoryOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPListDirectorySnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -2124,7 +2232,13 @@ public struct ListEventsIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "list_events", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPListEventsOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPListEventsOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPListEventsSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -2165,7 +2279,13 @@ public struct ListFoldersIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "list_folders", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPListFoldersOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPListFoldersOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPListFoldersSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -2192,7 +2312,13 @@ public struct ListGroupMembersIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "list_group_members", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPListGroupMembersOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPListGroupMembersOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPListGroupMembersSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -2213,7 +2339,13 @@ public struct ListGroupsIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "list_groups", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPListGroupsOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPListGroupsOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPListGroupsSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -2234,7 +2366,13 @@ public struct ListMailboxesIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "list_mailboxes", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPListMailboxesOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPListMailboxesOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPListMailboxesSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -2272,7 +2410,13 @@ public struct ListMessagesIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "list_messages", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPListMessagesOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPListMessagesOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPListMessagesSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -2306,7 +2450,13 @@ public struct ListNotesIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "list_notes", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPListNotesOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPListNotesOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPListNotesSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -2330,7 +2480,13 @@ public struct ListParticipantsIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "list_participants", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPListParticipantsOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPListParticipantsOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPListParticipantsSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -2377,7 +2533,13 @@ public struct ListPlaylistsIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "list_playlists", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPListPlaylistsOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPListPlaylistsOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPListPlaylistsSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -2438,7 +2600,13 @@ public struct ListReadingListIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "list_reading_list", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPListReadingListOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPListReadingListOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPListReadingListSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -2459,7 +2627,13 @@ public struct ListReminderListsIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "list_reminder_lists", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPListReminderListsOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPListReminderListsOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPListReminderListsSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -2497,7 +2671,13 @@ public struct ListRemindersIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "list_reminders", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPListRemindersOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPListRemindersOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPListRemindersSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -2535,7 +2715,13 @@ public struct ListShortcutsIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "list_shortcuts", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPListShortcutsOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPListShortcutsOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPListShortcutsSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -2556,7 +2742,13 @@ public struct ListTabsIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "list_tabs", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPListTabsOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPListTabsOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPListTabsSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -2583,7 +2775,13 @@ public struct ListTracksIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "list_tracks", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPListTracksOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPListTracksOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPListTracksSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -2706,7 +2904,13 @@ public struct MemoryQueryIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "memory_query", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPMemoryQueryOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPMemoryQueryOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPMemoryQuerySnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -2727,7 +2931,13 @@ public struct MemoryStatsIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "memory_stats", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPMemoryStatsOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPMemoryStatsOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPMemoryStatsSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -2765,7 +2975,13 @@ public struct NowPlayingIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "now_playing", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPNowPlayingOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPNowPlayingOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPNowPlayingSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -2938,7 +3154,13 @@ public struct ProactiveContextIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "proactive_context", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPProactiveContextOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPProactiveContextOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPProactiveContextSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -3020,7 +3242,13 @@ public struct ReadChatIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "read_chat", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPReadChatOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPReadChatOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPReadChatSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -3044,7 +3272,13 @@ public struct ReadContactIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "read_contact", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPReadContactOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPReadContactOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPReadContactSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -3068,7 +3302,13 @@ public struct ReadEventIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "read_event", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPReadEventOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPReadEventOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPReadEventSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -3115,7 +3355,13 @@ public struct ReadNoteIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "read_note", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPReadNoteOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPReadNoteOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPReadNoteSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -3165,7 +3411,13 @@ public struct ReadReminderIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "read_reminder", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPReadReminderOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPReadReminderOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPReadReminderSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -3338,7 +3590,13 @@ public struct SearchChatsIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "search_chats", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPSearchChatsOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPSearchChatsOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPSearchChatsSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -3365,7 +3623,13 @@ public struct SearchContactsIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "search_contacts", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPSearchContactsOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPSearchContactsOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPSearchContactsSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -3398,7 +3662,13 @@ public struct SearchEventsIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "search_events", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPSearchEventsOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPSearchEventsOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPSearchEventsSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -3480,7 +3750,13 @@ public struct SearchNotesIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "search_notes", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPSearchNotesOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPSearchNotesOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPSearchNotesSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -3553,7 +3829,13 @@ public struct SearchRemindersIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "search_reminders", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPSearchRemindersOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPSearchRemindersOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPSearchRemindersSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -3577,7 +3859,13 @@ public struct SearchShortcutsIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "search_shortcuts", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPSearchShortcutsOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPSearchShortcutsOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPSearchShortcutsSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -3947,7 +4235,13 @@ public struct SuggestNextToolsIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "suggest_next_tools", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPSuggestNextToolsOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPSuggestNextToolsOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPSuggestNextToolsSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -4050,7 +4344,13 @@ public struct TodayEventsIntent: AppIntent {
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "today_events", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(MCPTodayEventsOutput.self, from: data)
+        let decoded = try JSONDecoder().decode(MCPTodayEventsOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPTodayEventsSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }

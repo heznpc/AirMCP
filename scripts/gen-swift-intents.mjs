@@ -486,28 +486,37 @@ function generateIntent(tool) {
             args: ${argsExpr}
         )`;
 
-  // A.2b.2 scope note:
+  // A.2b.2 + A.4.2 scope note:
   // AppIntent's `ReturnsValue<T>` only accepts Apple's `_IntentValue`-
   // conforming types (String/Int/Date/URL/AppEntity/AppEnum/etc.);
   // plain Codable structs are not acceptable return values without a
   // full AppEntity wrapper. That wrapper has query/display/id facets
   // too big for this phase.
   //
-  // Instead, when a tool has a codable-safe outputSchema we *decode*
-  // the router's String result through the generated struct as a
-  // runtime drift guard — mismatches throw before the user sees an
-  // out-of-contract response — but still hand the raw String to
-  // `.result(value:)`. The generated struct is also the input shape
-  // for axis 4's Interactive Snippets renderer, which will consume
-  // `_ = decoded` explicitly. Until then the decode is "validate and
-  // discard".
+  // When a tool has a codable-safe outputSchema we *decode* the router's
+  // String result through the generated struct. This serves two purposes:
+  //   1. Drift guard — JSONDecoder throws on schema mismatch before the
+  //      user sees an out-of-contract response.
+  //   2. A.4.2: the decoded payload feeds the matching Interactive
+  //      Snippet view via `.result(value:, view:)`. That path is gated
+  //      on `canImport(SwiftUI) && compiler(>=6.3)` + `#available(macOS
+  //      26, iOS 26, *)` — matching the view's own gate. On older OS /
+  //      compilers we fall through to plain `.result(value:)`, so the
+  //      decode still runs (drift guard stays) and `_ = decoded` swallows
+  //      the unused-variable warning.
   const typed = hasTypedOutput(tool);
   const returnClause = "some IntentResult & ReturnsValue<String>";
   const tailBlock = typed
     ? `        guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "${tool.name}", message: "empty result from router")
         }
-        _ = try JSONDecoder().decode(${outputTypeNameFor(tool)}.self, from: data)
+        let decoded = try JSONDecoder().decode(${outputTypeNameFor(tool)}.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: ${snippetViewNameFor(tool)}(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)`
     : `        return .result(value: result)`;
 

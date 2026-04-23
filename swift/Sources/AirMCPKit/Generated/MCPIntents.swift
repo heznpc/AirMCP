@@ -2,8 +2,8 @@
 //
 // Source: docs/tool-manifest.json
 // Generator: scripts/gen-swift-intents.mjs
-// RFC 0007 Phase A.2b.2 + A.4.1 — 154 auto-selected read-only
-// tools (50 with typed drift-guards + Interactive Snippet
+// RFC 0007 Phase A.2b.2 + A.4.1 — 277 auto-selected read-only
+// tools (55 with typed drift-guards + Interactive Snippet
 // SwiftUI views) + 9 AppShortcutsProvider entries.
 // Run `npm run gen:intents` to refresh after tool metadata changes.
 // CI guards against drift via `npm run gen:intents:check`.
@@ -450,6 +450,29 @@ public struct MCPListTracksOutput: Codable, Sendable {
     public let tracks: [TracksItem]
 }
 
+// Output type for: memory_forget
+public struct MCPMemoryForgetOutput: Codable, Sendable {
+    public let removed: [String]
+    public let count: Double
+}
+
+// Output type for: memory_put
+public struct MCPMemoryPutOutput: Codable, Sendable {
+    public struct Stored: Codable, Sendable {
+        public let id: String
+        public let kind: String
+        public let key: String
+        public let value: String
+        public let tags: [String]
+        public let source: String?
+        public let createdAt: String
+        public let updatedAt: String
+        public let expiresAt: String?
+    }
+
+    public let stored: Stored
+}
+
 // Output type for: memory_query
 public struct MCPMemoryQueryOutput: Codable, Sendable {
     public struct EntriesItem: Codable, Sendable {
@@ -690,6 +713,18 @@ public struct MCPSearchShortcutsOutput: Codable, Sendable {
     public let shortcuts: [String]
 }
 
+// Output type for: set_clipboard
+public struct MCPSetClipboardOutput: Codable, Sendable {
+    public let set: Bool
+    public let length: Double
+}
+
+// Output type for: set_volume
+public struct MCPSetVolumeOutput: Codable, Sendable {
+    public let outputVolume: Double
+    public let outputMuted: Bool
+}
+
 // Output type for: suggest_next_tools
 public struct MCPSuggestNextToolsOutput: Codable, Sendable {
     public struct SuggestionsItem: Codable, Sendable {
@@ -719,7 +754,185 @@ public struct MCPTodayEventsOutput: Codable, Sendable {
     public let events: [EventsItem]
 }
 
+// Output type for: toggle_dark_mode
+public struct MCPToggleDarkModeOutput: Codable, Sendable {
+    public let darkMode: Bool
+}
+
 // MARK: - AppIntents
+
+// Tool: activate_tab
+public struct ActivateTabIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Activate Tab"
+    nonisolated(unsafe) public static var description = IntentDescription("Switch to a specific Safari tab. Use list_tabs to find window/tab indices.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Window index (default: 0)", default: 0)
+    public var windowIndex: Int
+
+    @Parameter(title: "Tab index")
+    public var tabIndex: Int
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "activate_tab",
+            args: ["windowIndex": windowIndex, "tabIndex": tabIndex]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: add_contact_email
+public struct AddContactEmailIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Add Contact Email"
+    nonisolated(unsafe) public static var description = IntentDescription("Add an email address to an existing contact.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Contact ID")
+    public var id: String
+
+    @Parameter(title: "Email address to add")
+    public var email: String
+
+    @Parameter(title: "Email label (default: work)", default: "work")
+    public var label: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "add_contact_email",
+            args: ["id": id, "email": email, "label": label]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: add_contact_phone
+public struct AddContactPhoneIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Add Contact Phone"
+    nonisolated(unsafe) public static var description = IntentDescription("Add a phone number to an existing contact.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Contact ID")
+    public var id: String
+
+    @Parameter(title: "Phone number to add")
+    public var phone: String
+
+    @Parameter(title: "Phone label (default: mobile)", default: "mobile")
+    public var label: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "add_contact_phone",
+            args: ["id": id, "phone": phone, "label": label]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: add_to_album
+public struct AddToAlbumIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Add Photos to Album"
+    nonisolated(unsafe) public static var description = IntentDescription("Add photos to an existing album by photo IDs and album name.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Array of photo media item IDs (max 500)")
+    public var photoIds: [String]
+
+    @Parameter(title: "Target album name")
+    public var albumName: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "add_to_album",
+            args: ["photoIds": photoIds, "albumName": albumName]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: add_to_playlist
+public struct AddToPlaylistIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Add to Playlist"
+    nonisolated(unsafe) public static var description = IntentDescription("Add a track to an existing playlist.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Playlist name")
+    public var playlistName: String
+
+    @Parameter(title: "Track name to add")
+    public var trackName: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "add_to_playlist",
+            args: ["playlistName": playlistName, "trackName": trackName]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: add_to_reading_list
+public struct AddToReadingListIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Add to Reading List"
+    nonisolated(unsafe) public static var description = IntentDescription("Add a URL to Safari's Reading List with an optional title.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "URL to add to Reading List")
+    public var url: String
+
+    @Parameter(title: "Title for the Reading List item")
+    public var title: String?
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["url"] = url
+        if let v = title { args["title"] = v }
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "add_to_reading_list",
+            args: args
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: ai_agent
+public struct AiAgentIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "On-Device AI Agent"
+    nonisolated(unsafe) public static var description = IntentDescription("Run a prompt through Apple's on-device Foundation Models with access to AirMCP tools (Calendar, Reminders, Contacts). The on-device LLM autonomously decides which tools to call. Requires macOS 26+ with Apple Silicon.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "What you want the on-device AI to do with your Apple data")
+    public var prompt: String
+
+    @Parameter(title: "Optional system instruction for the AI agent")
+    public var systemInstruction: String?
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["prompt"] = prompt
+        if let v = systemInstruction { args["systemInstruction"] = v }
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "ai_agent",
+            args: args
+        )
+        return .result(value: result)
+    }
+}
 
 // Tool: ai_chat
 public struct AiChatIntent: AppIntent {
@@ -874,6 +1087,34 @@ public struct AuditSummaryIntent: AppIntent {
     }
 }
 
+// Tool: bulk_move_notes
+@available(iOS 18, macOS 15, *)
+public struct BulkMoveNotesIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Bulk Move Notes"
+    nonisolated(unsafe) public static var description = IntentDescription("Move multiple notes to a target folder at once. Same limitations as move_note apply to each note (new ID, date reset, attachments lost). Returns per-note success/failure results.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Array of note IDs to move (max 100)")
+    public var ids: [String]
+
+    @Parameter(title: "Target folder name")
+    public var folder: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Bulk Move Notes with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "bulk_move_notes",
+            args: ["ids": ids, "folder": folder]
+        )
+        return .result(value: result)
+    }
+}
+
 // Tool: calendar_week_view
 public struct CalendarWeekViewIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Calendar Week View"
@@ -890,6 +1131,107 @@ public struct CalendarWeekViewIntent: AppIntent {
         if let v = startDate { args["startDate"] = v }
         let result = try await MCPIntentRouter.shared.call(
             tool: "calendar_week_view",
+            args: args
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: capture_area
+public struct CaptureAreaIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Capture Screen Area"
+    nonisolated(unsafe) public static var description = IntentDescription("Capture a screenshot of a specific rectangular region of the screen. Coordinates are in screen pixels with origin at top-left. Requires Screen Recording permission.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "X coordinate of the top-left corner of the capture region")
+    public var x: Double
+
+    @Parameter(title: "Y coordinate of the top-left corner of the capture region")
+    public var y: Double
+
+    @Parameter(title: "Width of the capture region in pixels")
+    public var width: Double
+
+    @Parameter(title: "Height of the capture region in pixels")
+    public var height: Double
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "capture_area",
+            args: ["x": x, "y": y, "width": width, "height": height]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: capture_screen
+public struct CaptureScreenIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Capture Screen"
+    nonisolated(unsafe) public static var description = IntentDescription("Capture a full-screen screenshot as a PNG image. Optionally specify a display number for multi-monitor setups (1 = main display). Requires Screen Recording permission.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Display number for multi-monitor setups (1 = main display). Omit for default dis")
+    public var display: Int?
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        if let v = display { args["display"] = v }
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "capture_screen",
+            args: args
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: capture_screenshot
+@available(iOS 18, macOS 15, *)
+public struct CaptureScreenshotIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Capture Screenshot"
+    nonisolated(unsafe) public static var description = IntentDescription("Take a screenshot and save to the specified path. Supports full screen, window, or selection capture.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Absolute file path to save the screenshot (e.g. '/tmp/screenshot.png')")
+    public var path: String
+
+    @Parameter(title: "Capture region: fullscreen (default), window, or selection · Allowed: fullscreen", default: "fullscreen")
+    public var region: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Capture Screenshot with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "capture_screenshot",
+            args: ["path": path, "region": region]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: capture_window
+public struct CaptureWindowIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Capture Window"
+    nonisolated(unsafe) public static var description = IntentDescription("Capture a screenshot of the frontmost window. Optionally specify an app name to activate that app first and capture its window. Requires Screen Recording permission.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Application name to activate before capture (e.g. 'Safari', 'Xcode'). If omitted")
+    public var appName: String?
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        if let v = appName { args["appName"] = v }
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "capture_window",
             args: args
         )
         return .result(value: result)
@@ -914,6 +1256,34 @@ public struct ClassifyImageIntent: AppIntent {
         let result = try await MCPIntentRouter.shared.call(
             tool: "classify_image",
             args: ["imagePath": imagePath, "maxResults": maxResults]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: close_tab
+@available(iOS 18, macOS 15, *)
+public struct CloseTabIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Close Tab"
+    nonisolated(unsafe) public static var description = IntentDescription("Close a specific Safari tab. Use list_tabs to find window/tab indices.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Window index (default: 0)", default: 0)
+    public var windowIndex: Int
+
+    @Parameter(title: "Tab index")
+    public var tabIndex: Int
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Close Tab with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "close_tab",
+            args: ["windowIndex": windowIndex, "tabIndex": tabIndex]
         )
         return .result(value: result)
     }
@@ -956,6 +1326,551 @@ public struct CompareNotesIntent: AppIntent {
     }
 }
 
+// Tool: complete_reminder
+public struct CompleteReminderIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Complete Reminder"
+    nonisolated(unsafe) public static var description = IntentDescription("Mark a reminder as completed or un-complete it.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Reminder ID")
+    public var id: String
+
+    @Parameter(title: "Set to true to complete, false to un-complete (default: true)", default: true)
+    public var completed: Bool
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "complete_reminder",
+            args: ["id": id, "completed": completed]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: connect_bluetooth
+public struct ConnectBluetoothIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Connect Bluetooth"
+    nonisolated(unsafe) public static var description = IntentDescription("Connect to a BLE device by its UUID. The UUID can be obtained from scan_bluetooth results. Note: the connection persists only while the server process is running.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Peripheral UUID from scan results")
+    public var identifier: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "connect_bluetooth",
+            args: ["identifier": identifier]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: create_album
+public struct CreateAlbumIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Create Album"
+    nonisolated(unsafe) public static var description = IntentDescription("Create a new photo album.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Album name")
+    public var name: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "create_album",
+            args: ["name": name]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: create_contact
+public struct CreateContactIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Create Contact"
+    nonisolated(unsafe) public static var description = IntentDescription("Create a new contact with name and optional email, phone, organization.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "First name")
+    public var firstName: String
+
+    @Parameter(title: "Last name")
+    public var lastName: String
+
+    @Parameter(title: "Email address")
+    public var email: String?
+
+    @Parameter(title: "Phone number")
+    public var phone: String?
+
+    @Parameter(title: "Company/organization")
+    public var organization: String?
+
+    @Parameter(title: "Job title")
+    public var jobTitle: String?
+
+    @Parameter(title: "Notes")
+    public var note: String?
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["firstName"] = firstName
+        args["lastName"] = lastName
+        if let v = email { args["email"] = v }
+        if let v = phone { args["phone"] = v }
+        if let v = organization { args["organization"] = v }
+        if let v = jobTitle { args["jobTitle"] = v }
+        if let v = note { args["note"] = v }
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "create_contact",
+            args: args
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: create_directory
+public struct CreateDirectoryIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Create Directory"
+    nonisolated(unsafe) public static var description = IntentDescription("Create a new directory (and intermediate directories if needed).")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Absolute path of the folder to create")
+    public var path: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "create_directory",
+            args: ["path": path]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: create_event
+public struct CreateEventIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Create Event"
+    nonisolated(unsafe) public static var description = IntentDescription("Create a new calendar event. Recurring events cannot be created via automation. Attendees cannot be added programmatically.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Event title")
+    public var summary: String
+
+    @Parameter(title: "Start date/time (ISO 8601, e.g. '2026-03-15T09:00:00Z')")
+    public var startDate: String
+
+    @Parameter(title: "End date/time (ISO 8601, e.g. '2026-03-15T10:00:00Z')")
+    public var endDate: String
+
+    @Parameter(title: "Event location")
+    public var location: String?
+
+    @Parameter(title: "Event notes/description")
+    public var description: String?
+
+    @Parameter(title: "Target calendar name. Defaults to first writable calendar.")
+    public var calendar: String?
+
+    @Parameter(title: "Set as all-day event")
+    public var allDay: Bool?
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["summary"] = summary
+        args["startDate"] = startDate
+        args["endDate"] = endDate
+        if let v = location { args["location"] = v }
+        if let v = description { args["description"] = v }
+        if let v = calendar { args["calendar"] = v }
+        if let v = allDay { args["allDay"] = v }
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "create_event",
+            args: args
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: create_folder
+public struct CreateFolderIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Create Folder"
+    nonisolated(unsafe) public static var description = IntentDescription("Create a new folder. Optionally specify which account to create it in.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Folder name")
+    public var name: String
+
+    @Parameter(title: "Account name (e.g. 'iCloud'). Defaults to primary account.")
+    public var account: String?
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["name"] = name
+        if let v = account { args["account"] = v }
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "create_folder",
+            args: args
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: create_note
+public struct CreateNoteIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Create Note"
+    nonisolated(unsafe) public static var description = IntentDescription("Create a new note with HTML body. The first line of the body becomes the note title automatically. Optionally specify a target folder.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Note content in HTML (e.g. '<h1>Title</h1><p>Body text</p>')")
+    public var body: String
+
+    @Parameter(title: "Target folder name")
+    public var folder: String?
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["body"] = body
+        if let v = folder { args["folder"] = v }
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "create_note",
+            args: args
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: create_playlist
+public struct CreatePlaylistIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Create Playlist"
+    nonisolated(unsafe) public static var description = IntentDescription("Create a new playlist in Music.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Name for the new playlist")
+    public var name: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "create_playlist",
+            args: ["name": name]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: create_reminder
+public struct CreateReminderIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Create Reminder"
+    nonisolated(unsafe) public static var description = IntentDescription("Create a new reminder. Optionally set notes, due date, priority (0=none, 1-4=high, 5=medium, 6-9=low), and target list. Recurrence rules cannot be set via automation.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Reminder title")
+    public var title: String
+
+    @Parameter(title: "Notes/body text")
+    public var body: String?
+
+    @Parameter(title: "Due date in ISO 8601 format (e.g. '2026-03-15T10:00:00Z')")
+    public var dueDate: String?
+
+    @Parameter(title: "Priority: 0=none, 1-4=high, 5=medium, 6-9=low", inclusiveRange: (0, 9))
+    public var priority: Int?
+
+    @Parameter(title: "Target list name. Defaults to the default list.")
+    public var list: String?
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["title"] = title
+        if let v = body { args["body"] = v }
+        if let v = dueDate { args["dueDate"] = v }
+        if let v = priority { args["priority"] = v }
+        if let v = list { args["list"] = v }
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "create_reminder",
+            args: args
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: create_reminder_list
+public struct CreateReminderListIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Create Reminder List"
+    nonisolated(unsafe) public static var description = IntentDescription("Create a new reminder list.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Name for the new list")
+    public var name: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "create_reminder_list",
+            args: ["name": name]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: create_shortcut
+public struct CreateShortcutIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Create Shortcut"
+    nonisolated(unsafe) public static var description = IntentDescription("Create a new Siri Shortcut by name. Uses UI automation to open the Shortcuts app and create a new empty shortcut. The shortcut must be further configured in the Shortcuts app.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Name for the new shortcut")
+    public var name: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "create_shortcut",
+            args: ["name": name]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: delete_contact
+@available(iOS 18, macOS 15, *)
+public struct DeleteContactIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Delete Contact"
+    nonisolated(unsafe) public static var description = IntentDescription("Delete a contact by ID. This action is permanent.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Contact ID")
+    public var id: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Delete Contact with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "delete_contact",
+            args: ["id": id]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: delete_event
+@available(iOS 18, macOS 15, *)
+public struct DeleteEventIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Delete Event"
+    nonisolated(unsafe) public static var description = IntentDescription("Delete a calendar event by ID. This action is permanent.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Event UID")
+    public var id: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Delete Event with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "delete_event",
+            args: ["id": id]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: delete_note
+@available(iOS 18, macOS 15, *)
+public struct DeleteNoteIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Delete Note"
+    nonisolated(unsafe) public static var description = IntentDescription("Delete a note by ID. The note is moved to Recently Deleted and permanently removed after 30 days.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Note ID (x-coredata:// format)")
+    public var id: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Delete Note with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "delete_note",
+            args: ["id": id]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: delete_photos
+@available(iOS 18, macOS 15, *)
+public struct DeletePhotosIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Delete Photos"
+    nonisolated(unsafe) public static var description = IntentDescription("Delete photos by local identifier. Shows macOS confirmation dialog for user approval. Requires macOS 26+ Swift bridge.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Array of photo local identifiers to delete")
+    public var identifiers: [String]
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Delete Photos with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "delete_photos",
+            args: ["identifiers": identifiers]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: delete_playlist
+@available(iOS 18, macOS 15, *)
+public struct DeletePlaylistIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Delete Playlist"
+    nonisolated(unsafe) public static var description = IntentDescription("Delete an existing playlist from Music.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Playlist name to delete")
+    public var name: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Delete Playlist with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "delete_playlist",
+            args: ["name": name]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: delete_reminder
+@available(iOS 18, macOS 15, *)
+public struct DeleteReminderIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Delete Reminder"
+    nonisolated(unsafe) public static var description = IntentDescription("Delete a reminder by ID. This action is permanent.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Reminder ID")
+    public var id: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Delete Reminder with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "delete_reminder",
+            args: ["id": id]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: delete_reminder_list
+@available(iOS 18, macOS 15, *)
+public struct DeleteReminderListIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Delete Reminder List"
+    nonisolated(unsafe) public static var description = IntentDescription("Delete a reminder list by name. This action is permanent and removes all reminders in the list.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Name of the list to delete")
+    public var name: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Delete Reminder List with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "delete_reminder_list",
+            args: ["name": name]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: delete_shortcut
+@available(iOS 18, macOS 15, *)
+public struct DeleteShortcutIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Delete Shortcut"
+    nonisolated(unsafe) public static var description = IntentDescription("Delete a Siri Shortcut by name. Uses the macOS shortcuts CLI (macOS 13+). This action is permanent and cannot be undone.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Shortcut name to delete (exact match)")
+    public var name: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Delete Shortcut with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "delete_shortcut",
+            args: ["name": name]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: disconnect_bluetooth
+public struct DisconnectBluetoothIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Disconnect Bluetooth"
+    nonisolated(unsafe) public static var description = IntentDescription("Disconnect a BLE device by its UUID.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Peripheral UUID to disconnect")
+    public var identifier: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "disconnect_bluetooth",
+            args: ["identifier": identifier]
+        )
+        return .result(value: result)
+    }
+}
+
 // Tool: discover_tools
 public struct DiscoverToolsIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Discover Tools"
@@ -988,6 +1903,79 @@ public struct DiscoverToolsIntent: AppIntent {
         }
         #endif
         _ = decoded
+        return .result(value: result)
+    }
+}
+
+// Tool: drop_pin
+public struct DropPinIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Drop Pin"
+    nonisolated(unsafe) public static var description = IntentDescription("Drop a pin at specific coordinates in Apple Maps.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Latitude coordinate")
+    public var latitude: Double
+
+    @Parameter(title: "Longitude coordinate")
+    public var longitude: Double
+
+    @Parameter(title: "Optional label for the pin")
+    public var label: String?
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["latitude"] = latitude
+        args["longitude"] = longitude
+        if let v = label { args["label"] = v }
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "drop_pin",
+            args: args
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: duplicate_shortcut
+public struct DuplicateShortcutIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Duplicate Shortcut"
+    nonisolated(unsafe) public static var description = IntentDescription("Duplicate an existing Siri Shortcut. Exports the shortcut to a temporary file and re-imports it with a new name.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Name of the shortcut to duplicate (exact match)")
+    public var name: String
+
+    @Parameter(title: "Name for the duplicated shortcut")
+    public var newName: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "duplicate_shortcut",
+            args: ["name": name, "newName": newName]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: edit_shortcut
+public struct EditShortcutIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Edit Shortcut"
+    nonisolated(unsafe) public static var description = IntentDescription("Open a Siri Shortcut in the Shortcuts app for manual editing. Uses UI automation (System Events) to activate the app, search for the shortcut, and open it. The user can then edit the shortcut in the Shortcuts app UI.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Shortcut name to edit (exact match)")
+    public var name: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "edit_shortcut",
+            args: ["name": name]
+        )
         return .result(value: result)
     }
 }
@@ -1026,6 +2014,29 @@ public struct EventSubscribeIntent: AppIntent {
     }
 }
 
+// Tool: export_shortcut
+public struct ExportShortcutIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Export Shortcut"
+    nonisolated(unsafe) public static var description = IntentDescription("Export a Siri Shortcut to a .shortcut file. Uses the macOS shortcuts CLI to save the shortcut to the specified output path.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Shortcut name to export (exact match)")
+    public var name: String
+
+    @Parameter(title: "File path to export the .shortcut file to (e.g. ~/Desktop/MyShortcut.shortcut)")
+    public var outputPath: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "export_shortcut",
+            args: ["name": name, "outputPath": outputPath]
+        )
+        return .result(value: result)
+    }
+}
+
 // Tool: find_related
 public struct FindRelatedIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Find Related Items"
@@ -1050,6 +2061,60 @@ public struct FindRelatedIntent: AppIntent {
         if let v = threshold { args["threshold"] = v }
         let result = try await MCPIntentRouter.shared.call(
             tool: "find_related",
+            args: args
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: flag_message
+public struct FlagMessageIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Flag Message"
+    nonisolated(unsafe) public static var description = IntentDescription("Flag or unflag an email message.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Message ID")
+    public var id: String
+
+    @Parameter(title: "true=flag, false=unflag (default: true)", default: true)
+    public var flagged: Bool
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "flag_message",
+            args: ["id": id, "flagged": flagged]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: generate_image
+@available(iOS 18, macOS 15, *)
+public struct GenerateImageIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Generate Image"
+    nonisolated(unsafe) public static var description = IntentDescription("Generate an image from a text description using Apple Intelligence on-device image generation (Image Playground). Returns the file path to the generated PNG. Requires macOS 26+ with Apple Silicon.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Text description of the image to generate")
+    public var prompt: String
+
+    @Parameter(title: "Optional output path for the image (defaults to /tmp, must end in .png/.jpg)")
+    public var outputPath: String?
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["prompt"] = prompt
+        if let v = outputPath { args["outputPath"] = v }
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Generate Image with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "generate_image",
             args: args
         )
         return .result(value: result)
@@ -1312,6 +2377,32 @@ public struct GetDailyForecastIntent: AppIntent {
         let result = try await MCPIntentRouter.shared.call(
             tool: "get_daily_forecast",
             args: ["latitude": latitude, "longitude": longitude, "days": days]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: get_directions
+public struct GetDirectionsIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Get Directions"
+    nonisolated(unsafe) public static var description = IntentDescription("Get directions between two locations in Apple Maps.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Starting location or address")
+    public var from: String
+
+    @Parameter(title: "Destination location or address")
+    public var to: String
+
+    @Parameter(title: "Mode of transport (default: driving) · Allowed: driving, walking, transit", default: "driving")
+    public var transportType: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "get_directions",
+            args: ["from": from, "to": to, "transportType": transportType]
         )
         return .result(value: result)
     }
@@ -1625,6 +2716,44 @@ public struct GetWifiStatusIntent: AppIntent {
     }
 }
 
+// Tool: gws_calendar_create
+public struct GwsCalendarCreateIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Create Google Calendar Event"
+    nonisolated(unsafe) public static var description = IntentDescription("Create an event in Google Calendar.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Event title")
+    public var summary: String
+
+    @Parameter(title: "Start time (ISO 8601)")
+    public var start: String
+
+    @Parameter(title: "End time (ISO 8601)")
+    public var end: String
+
+    @Parameter(title: "Event description")
+    public var description: String?
+
+    @Parameter(title: "Event location")
+    public var location: String?
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["summary"] = summary
+        args["start"] = start
+        args["end"] = end
+        if let v = description { args["description"] = v }
+        if let v = location { args["location"] = v }
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "gws_calendar_create",
+            args: args
+        )
+        return .result(value: result)
+    }
+}
+
 // Tool: gws_calendar_list
 public struct GwsCalendarListIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "List Google Calendar Events"
@@ -1801,6 +2930,45 @@ public struct GwsGmailReadIntent: AppIntent {
     }
 }
 
+// Tool: gws_gmail_send
+@available(iOS 18, macOS 15, *)
+public struct GwsGmailSendIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Send Gmail"
+    nonisolated(unsafe) public static var description = IntentDescription("Send an email via Gmail. Encodes the message in RFC 2822 format.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Recipient email address")
+    public var to: String
+
+    @Parameter(title: "Email subject")
+    public var subject: String
+
+    @Parameter(title: "Email body (plain text)")
+    public var body: String
+
+    @Parameter(title: "CC recipients (comma-separated)")
+    public var cc: String?
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["to"] = to
+        args["subject"] = subject
+        args["body"] = body
+        if let v = cc { args["cc"] = v }
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Send Gmail with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "gws_gmail_send",
+            args: args
+        )
+        return .result(value: result)
+    }
+}
+
 // Tool: gws_people_search
 public struct GwsPeopleSearchIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Search Google Contacts"
@@ -1847,6 +3015,29 @@ public struct GwsSheetsReadIntent: AppIntent {
     }
 }
 
+// Tool: gws_sheets_write
+public struct GwsSheetsWriteIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Write to Google Sheet"
+    nonisolated(unsafe) public static var description = IntentDescription("Write values to a Google Sheets range.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Spreadsheet ID")
+    public var spreadsheetId: String
+
+    @Parameter(title: "A1 range (e.g. 'Sheet1!A1:B2')")
+    public var range: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "gws_sheets_write",
+            args: ["spreadsheetId": spreadsheetId, "range": range]
+        )
+        return .result(value: result)
+    }
+}
+
 // Tool: gws_status
 public struct GwsStatusIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Google Workspace Status"
@@ -1859,6 +3050,36 @@ public struct GwsStatusIntent: AppIntent {
         let result = try await MCPIntentRouter.shared.call(
             tool: "gws_status",
             args: [String: any Sendable]()
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: gws_tasks_create
+public struct GwsTasksCreateIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Create Google Task"
+    nonisolated(unsafe) public static var description = IntentDescription("Create a task in Google Tasks.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Task title")
+    public var title: String
+
+    @Parameter(title: "Task notes/description")
+    public var notes: String?
+
+    @Parameter(title: "Due date (ISO 8601 or YYYY-MM-DD)")
+    public var due: String?
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["title"] = title
+        if let v = notes { args["notes"] = v }
+        if let v = due { args["due"] = v }
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "gws_tasks_create",
+            args: args
         )
         return .result(value: result)
     }
@@ -1887,6 +3108,52 @@ public struct GwsTasksListIntent: AppIntent {
     }
 }
 
+// Tool: import_photo
+public struct ImportPhotoIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Import Photo"
+    nonisolated(unsafe) public static var description = IntentDescription("Import a photo from a file path into Photos library. Optionally add to an existing album. Requires macOS 26+ Swift bridge.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Absolute file path to the image file to import")
+    public var filePath: String
+
+    @Parameter(title: "Album to add the imported photo to (must already exist)")
+    public var albumName: String?
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["filePath"] = filePath
+        if let v = albumName { args["albumName"] = v }
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "import_photo",
+            args: args
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: import_shortcut
+public struct ImportShortcutIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Import Shortcut"
+    nonisolated(unsafe) public static var description = IntentDescription("Import a .shortcut file into Siri Shortcuts. Uses the macOS shortcuts CLI to import the shortcut from the specified file path.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Path to the .shortcut file to import")
+    public var filePath: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "import_shortcut",
+            args: ["filePath": filePath]
+        )
+        return .result(value: result)
+    }
+}
+
 // Tool: is_app_running
 public struct IsAppRunningIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Is App Running"
@@ -1902,6 +3169,99 @@ public struct IsAppRunningIntent: AppIntent {
         let result = try await MCPIntentRouter.shared.call(
             tool: "is_app_running",
             args: ["name": name]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: keynote_add_slide
+public struct KeynoteAddSlideIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Add Keynote Slide"
+    nonisolated(unsafe) public static var description = IntentDescription("Add a new slide to a Keynote presentation.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Document name")
+    public var document: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "keynote_add_slide",
+            args: ["document": document]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: keynote_close_document
+@available(iOS 18, macOS 15, *)
+public struct KeynoteCloseDocumentIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Close Keynote Document"
+    nonisolated(unsafe) public static var description = IntentDescription("Close an open Keynote presentation, optionally saving changes.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Document name")
+    public var document: String
+
+    @Parameter(title: "Save before closing (default: true)", default: true)
+    public var saving: Bool
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Close Keynote Document with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "keynote_close_document",
+            args: ["document": document, "saving": saving]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: keynote_create_document
+public struct KeynoteCreateDocumentIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Create Keynote Presentation"
+    nonisolated(unsafe) public static var description = IntentDescription("Create a new blank Keynote presentation.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "keynote_create_document",
+            args: [String: any Sendable]()
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: keynote_export_pdf
+@available(iOS 18, macOS 15, *)
+public struct KeynoteExportPdfIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Export Keynote to PDF"
+    nonisolated(unsafe) public static var description = IntentDescription("Export a Keynote presentation to PDF. Will overwrite an existing file at the same path.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Document name")
+    public var document: String
+
+    @Parameter(title: "Absolute output path for the PDF file")
+    public var outputPath: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Export Keynote to PDF with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "keynote_export_pdf",
+            args: ["document": document, "outputPath": outputPath]
         )
         return .result(value: result)
     }
@@ -1962,6 +3322,75 @@ public struct KeynoteListSlidesIntent: AppIntent {
         let result = try await MCPIntentRouter.shared.call(
             tool: "keynote_list_slides",
             args: ["document": document]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: keynote_set_presenter_notes
+public struct KeynoteSetPresenterNotesIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Set Keynote Presenter Notes"
+    nonisolated(unsafe) public static var description = IntentDescription("Set presenter notes on a specific slide.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Document name")
+    public var document: String
+
+    @Parameter(title: "Slide number (1-based)")
+    public var slideNumber: Int
+
+    @Parameter(title: "Presenter notes text")
+    public var notes: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "keynote_set_presenter_notes",
+            args: ["document": document, "slideNumber": slideNumber, "notes": notes]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: keynote_start_slideshow
+public struct KeynoteStartSlideshowIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Start Keynote Slideshow"
+    nonisolated(unsafe) public static var description = IntentDescription("Start playing a Keynote slideshow from a specific slide.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Document name")
+    public var document: String
+
+    @Parameter(title: "Start from slide number (default: 1)", default: 1)
+    public var fromSlide: Int
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "keynote_start_slideshow",
+            args: ["document": document, "fromSlide": fromSlide]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: launch_app
+public struct LaunchAppIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Launch App"
+    nonisolated(unsafe) public static var description = IntentDescription("Launch an application by name. Lightweight — just activates the app without reading its accessibility tree.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Application name (e.g. 'Safari', 'Xcode') or bundle ID")
+    public var name: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "launch_app",
+            args: ["name": name]
         )
         return .result(value: result)
     }
@@ -2867,6 +4296,134 @@ public struct LocalLlmStatusIntent: AppIntent {
     }
 }
 
+// Tool: mark_message_read
+public struct MarkMessageReadIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Mark Message Read/Unread"
+    nonisolated(unsafe) public static var description = IntentDescription("Mark an email message as read or unread.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Message ID")
+    public var id: String
+
+    @Parameter(title: "true=read, false=unread (default: true)", default: true)
+    public var read: Bool
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "mark_message_read",
+            args: ["id": id, "read": read]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: memory_forget
+@available(iOS 18, macOS 15, *)
+public struct MemoryForgetIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Forget Memory Entries"
+    nonisolated(unsafe) public static var description = IntentDescription("Delete context-memory entries. Provide exactly one selector: `id` (single entry), `key` (all entries with that key), or `tag` (all entries carrying that tag). Optional `kind` further restricts the delete within the chosen selector.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Exact entry id to remove")
+    public var id: String?
+
+    @Parameter(title: "Delete all entries with this key")
+    public var key: String?
+
+    @Parameter(title: "Delete all entries tagged with this label")
+    public var tag: String?
+
+    @Parameter(title: "Only delete entries of this kind · Allowed: fact, entity, episode")
+    public var kind: String?
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        if let v = id { args["id"] = v }
+        if let v = key { args["key"] = v }
+        if let v = tag { args["tag"] = v }
+        if let v = kind { args["kind"] = v }
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Forget Memory Entries with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "memory_forget",
+            args: args
+        )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "memory_forget", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPMemoryForgetOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPMemoryForgetSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
+        return .result(value: result)
+    }
+}
+
+// Tool: memory_put
+public struct MemoryPutIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Remember a Fact, Entity, or Episode"
+    nonisolated(unsafe) public static var description = IntentDescription("Insert or update a context-memory entry. Use `fact` for durable key→value notes, `entity` for named people/places/projects, and `episode` for time-anchored records. If you omit `id`, the key is used as the stable id (so a second call with the same key upserts). `ttl_ms` makes the entry self-expiring.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Entry category: fact | entity | episode · Allowed: fact, entity, episode")
+    public var kind: String
+
+    @Parameter(title: "Stable label (e.g. 'favorite_editor', 'person:Ada')")
+    public var key: String
+
+    @Parameter(title: "Payload. JSON-stringify structured data upstream.")
+    public var value: String
+
+    @Parameter(title: "Override the default `${kind}:${key}` id")
+    public var id: String?
+
+    @Parameter(title: "Optional tags for later filtering")
+    public var tags: [String]?
+
+    @Parameter(title: "Originator — tool name, skill id, 'user' …")
+    public var source: String?
+
+    @Parameter(title: "Self-expire after N milliseconds")
+    public var ttl_ms: Int?
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["kind"] = kind
+        args["key"] = key
+        args["value"] = value
+        if let v = id { args["id"] = v }
+        if let v = tags { args["tags"] = v }
+        if let v = source { args["source"] = v }
+        if let v = ttl_ms { args["ttl_ms"] = v }
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "memory_put",
+            args: args
+        )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "memory_put", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPMemoryPutOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPMemoryPutSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
+        return .result(value: result)
+    }
+}
+
 // Tool: memory_query
 public struct MemoryQueryIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Query Context Memory"
@@ -2942,6 +4499,158 @@ public struct MemoryStatsIntent: AppIntent {
     }
 }
 
+// Tool: minimize_window
+public struct MinimizeWindowIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Minimize Window"
+    nonisolated(unsafe) public static var description = IntentDescription("Minimize or restore a window.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Application name (e.g. 'Safari')")
+    public var appName: String
+
+    @Parameter(title: "Set true to restore (un-minimize) instead of minimizing", default: false)
+    public var restore: Bool
+
+    @Parameter(title: "Specific window title. If omitted, targets the first window.")
+    public var windowTitle: String?
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["appName"] = appName
+        args["restore"] = restore
+        if let v = windowTitle { args["windowTitle"] = v }
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "minimize_window",
+            args: args
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: move_file
+@available(iOS 18, macOS 15, *)
+public struct MoveFileIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Move File"
+    nonisolated(unsafe) public static var description = IntentDescription("Move or rename a file or folder to a new location.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Absolute path of the file or folder to move")
+    public var source: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Move File with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "move_file",
+            args: ["source": source]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: move_message
+@available(iOS 18, macOS 15, *)
+public struct MoveMessageIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Move Message"
+    nonisolated(unsafe) public static var description = IntentDescription("Move a message to another mailbox.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Message ID")
+    public var id: String
+
+    @Parameter(title: "Target mailbox name (e.g. 'Archive', 'Trash')")
+    public var targetMailbox: String
+
+    @Parameter(title: "Target account name. Searches all accounts if omitted.")
+    public var targetAccount: String?
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["id"] = id
+        args["targetMailbox"] = targetMailbox
+        if let v = targetAccount { args["targetAccount"] = v }
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Move Message with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "move_message",
+            args: args
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: move_note
+@available(iOS 18, macOS 15, *)
+public struct MoveNoteIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Move Note"
+    nonisolated(unsafe) public static var description = IntentDescription("Move a note to a different folder. NOTE: Apple Notes has no native move command, so this copies the note body to the target folder and deletes the original. The note will get a new ID and creation date. Attachments (images) will be lost.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Note ID to move")
+    public var id: String
+
+    @Parameter(title: "Target folder name")
+    public var folder: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Move Note with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "move_note",
+            args: ["id": id, "folder": folder]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: move_window
+public struct MoveWindowIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Move Window"
+    nonisolated(unsafe) public static var description = IntentDescription("Move a window to a specific position on screen.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Application name (e.g. 'Safari')")
+    public var appName: String
+
+    @Parameter(title: "X coordinate for top-left corner")
+    public var x: Int
+
+    @Parameter(title: "Y coordinate for top-left corner")
+    public var y: Int
+
+    @Parameter(title: "Specific window title. If omitted, targets the first window.")
+    public var windowTitle: String?
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["appName"] = appName
+        args["x"] = x
+        args["y"] = y
+        if let v = windowTitle { args["windowTitle"] = v }
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "move_window",
+            args: args
+        )
+        return .result(value: result)
+    }
+}
+
 // Tool: music_player
 public struct MusicPlayerIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Music Player"
@@ -2982,6 +4691,102 @@ public struct NowPlayingIntent: AppIntent {
         }
         #endif
         _ = decoded
+        return .result(value: result)
+    }
+}
+
+// Tool: numbers_add_sheet
+public struct NumbersAddSheetIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Add Numbers Sheet"
+    nonisolated(unsafe) public static var description = IntentDescription("Add a new sheet to a Numbers spreadsheet.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Document name")
+    public var document: String
+
+    @Parameter(title: "Name for the new sheet")
+    public var sheetName: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "numbers_add_sheet",
+            args: ["document": document, "sheetName": sheetName]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: numbers_close_document
+@available(iOS 18, macOS 15, *)
+public struct NumbersCloseDocumentIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Close Numbers Document"
+    nonisolated(unsafe) public static var description = IntentDescription("Close an open Numbers spreadsheet, optionally saving changes.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Document name")
+    public var document: String
+
+    @Parameter(title: "Save before closing (default: true)", default: true)
+    public var saving: Bool
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Close Numbers Document with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "numbers_close_document",
+            args: ["document": document, "saving": saving]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: numbers_create_document
+public struct NumbersCreateDocumentIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Create Numbers Document"
+    nonisolated(unsafe) public static var description = IntentDescription("Create a new blank Numbers spreadsheet.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "numbers_create_document",
+            args: [String: any Sendable]()
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: numbers_export_pdf
+@available(iOS 18, macOS 15, *)
+public struct NumbersExportPdfIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Export Numbers to PDF"
+    nonisolated(unsafe) public static var description = IntentDescription("Export a Numbers spreadsheet to PDF. Will overwrite an existing file at the same path.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Document name")
+    public var document: String
+
+    @Parameter(title: "Absolute output path for the PDF file")
+    public var outputPath: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Export Numbers to PDF with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "numbers_export_pdf",
+            args: ["document": document, "outputPath": outputPath]
+        )
         return .result(value: result)
     }
 }
@@ -3084,6 +4889,148 @@ public struct NumbersReadCellsIntent: AppIntent {
     }
 }
 
+// Tool: numbers_set_cell
+public struct NumbersSetCellIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Set Numbers Cell"
+    nonisolated(unsafe) public static var description = IntentDescription("Write a value to a single cell.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Document name")
+    public var document: String
+
+    @Parameter(title: "Sheet name")
+    public var sheet: String
+
+    @Parameter(title: "Cell address (e.g. 'A1')")
+    public var cell: String
+
+    @Parameter(title: "Value to write")
+    public var value: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "numbers_set_cell",
+            args: ["document": document, "sheet": sheet, "cell": cell, "value": value]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: open_address
+public struct OpenAddressIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Open Address"
+    nonisolated(unsafe) public static var description = IntentDescription("Open a specific address in Apple Maps.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Address to open in Maps")
+    public var address: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "open_address",
+            args: ["address": address]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: open_url
+public struct OpenUrlIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Open URL"
+    nonisolated(unsafe) public static var description = IntentDescription("Open a URL in Safari's frontmost window.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "URL to open")
+    public var url: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "open_url",
+            args: ["url": url]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: pages_close_document
+@available(iOS 18, macOS 15, *)
+public struct PagesCloseDocumentIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Close Pages Document"
+    nonisolated(unsafe) public static var description = IntentDescription("Close an open Pages document, optionally saving changes.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Document name")
+    public var document: String
+
+    @Parameter(title: "Save before closing (default: true)", default: true)
+    public var saving: Bool
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Close Pages Document with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "pages_close_document",
+            args: ["document": document, "saving": saving]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: pages_create_document
+public struct PagesCreateDocumentIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Create Pages Document"
+    nonisolated(unsafe) public static var description = IntentDescription("Create a new blank Pages document.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "pages_create_document",
+            args: [String: any Sendable]()
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: pages_export_pdf
+@available(iOS 18, macOS 15, *)
+public struct PagesExportPdfIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Export Pages to PDF"
+    nonisolated(unsafe) public static var description = IntentDescription("Export an open Pages document to PDF. Will overwrite an existing file at the same path.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Document name")
+    public var document: String
+
+    @Parameter(title: "Absolute output path for the PDF file")
+    public var outputPath: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Export Pages to PDF with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "pages_export_pdf",
+            args: ["document": document, "outputPath": outputPath]
+        )
+        return .result(value: result)
+    }
+}
+
 // Tool: pages_get_body_text
 public struct PagesGetBodyTextIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Get Pages Body Text"
@@ -3121,6 +5068,152 @@ public struct PagesListDocumentsIntent: AppIntent {
     }
 }
 
+// Tool: pages_open_document
+public struct PagesOpenDocumentIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Open Pages Document"
+    nonisolated(unsafe) public static var description = IntentDescription("Open a Pages document from a file path.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Absolute file path to the .pages document")
+    public var path: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "pages_open_document",
+            args: ["path": path]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: pages_set_body_text
+@available(iOS 18, macOS 15, *)
+public struct PagesSetBodyTextIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Set Pages Body Text"
+    nonisolated(unsafe) public static var description = IntentDescription("Replace the body text of an open Pages document.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Document name")
+    public var document: String
+
+    @Parameter(title: "New body text content")
+    public var text: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Set Pages Body Text with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "pages_set_body_text",
+            args: ["document": document, "text": text]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: play_playlist
+public struct PlayPlaylistIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Play Playlist"
+    nonisolated(unsafe) public static var description = IntentDescription("Start playing a playlist by name, with optional shuffle control.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Playlist name")
+    public var name: String
+
+    @Parameter(title: "Enable or disable shuffle")
+    public var shuffle: Bool?
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["name"] = name
+        if let v = shuffle { args["shuffle"] = v }
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "play_playlist",
+            args: args
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: play_podcast_episode
+public struct PlayPodcastEpisodeIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Play Podcast Episode"
+    nonisolated(unsafe) public static var description = IntentDescription("Play a specific podcast episode by name, optionally from a specific show.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Episode name to play")
+    public var episodeName: String
+
+    @Parameter(title: "Show to search in (searches all shows if omitted)")
+    public var showName: String?
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["episodeName"] = episodeName
+        if let v = showName { args["showName"] = v }
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "play_podcast_episode",
+            args: args
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: play_track
+public struct PlayTrackIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Play Track"
+    nonisolated(unsafe) public static var description = IntentDescription("Play a specific track by name, optionally from a specific playlist.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Track name to play")
+    public var trackName: String
+
+    @Parameter(title: "Playlist to search in (default: Library)")
+    public var playlist: String?
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["trackName"] = trackName
+        if let v = playlist { args["playlist"] = v }
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "play_track",
+            args: args
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: playback_control
+public struct PlaybackControlIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Playback Control"
+    nonisolated(unsafe) public static var description = IntentDescription("Control Music playback: play, pause, nextTrack, previousTrack.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Playback action · Allowed: play, pause, nextTrack, previousTrack")
+    public var action: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "playback_control",
+            args: ["action": action]
+        )
+        return .result(value: result)
+    }
+}
+
 // Tool: podcast_now_playing
 public struct PodcastNowPlayingIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Podcast Now Playing"
@@ -3133,6 +5226,46 @@ public struct PodcastNowPlayingIntent: AppIntent {
         let result = try await MCPIntentRouter.shared.call(
             tool: "podcast_now_playing",
             args: [String: any Sendable]()
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: podcast_playback_control
+public struct PodcastPlaybackControlIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Podcast Playback Control"
+    nonisolated(unsafe) public static var description = IntentDescription("Control Podcasts playback: play, pause, next, previous.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Playback action · Allowed: play, pause, nextTrack, previousTrack")
+    public var action: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "podcast_playback_control",
+            args: ["action": action]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: prevent_sleep
+public struct PreventSleepIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Prevent Sleep"
+    nonisolated(unsafe) public static var description = IntentDescription("Prevent the Mac from sleeping for a specified duration using caffeinate. Returns the process PID for cancellation.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Duration in seconds (default: 3600 = 1 hour, max: 86400 = 24 hours)", default: 3600, inclusiveRange: (1, 86400))
+    public var seconds: Int
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "prevent_sleep",
+            args: ["seconds": seconds]
         )
         return .result(value: result)
     }
@@ -3218,6 +5351,31 @@ public struct QueryPhotosIntent: AppIntent {
         let result = try await MCPIntentRouter.shared.call(
             tool: "query_photos",
             args: args
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: quit_app
+@available(iOS 18, macOS 15, *)
+public struct QuitAppIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Quit App"
+    nonisolated(unsafe) public static var description = IntentDescription("Quit a running application by name. May cause unsaved work to be lost.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Application name (e.g. 'Safari')")
+    public var name: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Quit App with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "quit_app",
+            args: ["name": name]
         )
         return .result(value: result)
     }
@@ -3448,6 +5606,130 @@ public struct RecentFilesIntent: AppIntent {
     }
 }
 
+// Tool: record_screen
+@available(iOS 18, macOS 15, *)
+public struct RecordScreenIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Record Screen"
+    nonisolated(unsafe) public static var description = IntentDescription("Record the screen for a specified duration (1-60 seconds). Returns the recording as a .mov file path. Requires Screen Recording permission.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Recording duration in seconds (1-60)", inclusiveRange: (1, 60))
+    public var duration: Int
+
+    @Parameter(title: "Display number for multi-monitor setups (1 = main display). Omit for default dis")
+    public var display: Int?
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["duration"] = duration
+        if let v = display { args["display"] = v }
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Record Screen with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "record_screen",
+            args: args
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: remove_from_playlist
+@available(iOS 18, macOS 15, *)
+public struct RemoveFromPlaylistIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Remove from Playlist"
+    nonisolated(unsafe) public static var description = IntentDescription("Remove a track from a playlist.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Playlist name")
+    public var playlistName: String
+
+    @Parameter(title: "Track name to remove")
+    public var trackName: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Remove from Playlist with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "remove_from_playlist",
+            args: ["playlistName": playlistName, "trackName": trackName]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: reply_mail
+@available(iOS 18, macOS 15, *)
+public struct ReplyMailIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Reply to Email"
+    nonisolated(unsafe) public static var description = IntentDescription("Reply to an email message. Requires allowSendMail config.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Original message ID to reply to")
+    public var id: String
+
+    @Parameter(title: "Reply body text")
+    public var body: String
+
+    @Parameter(title: "Reply to all recipients (default: false)", default: false)
+    public var replyAll: Bool
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .send,
+            dialog: IntentDialog("Run Reply to Email with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "reply_mail",
+            args: ["id": id, "body": body, "replyAll": replyAll]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: resize_window
+public struct ResizeWindowIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Resize Window"
+    nonisolated(unsafe) public static var description = IntentDescription("Resize a window to specific dimensions.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Application name (e.g. 'Safari')")
+    public var appName: String
+
+    @Parameter(title: "Window width in pixels")
+    public var width: Int
+
+    @Parameter(title: "Window height in pixels")
+    public var height: Int
+
+    @Parameter(title: "Specific window title. If omitted, targets the first window.")
+    public var windowTitle: String?
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["appName"] = appName
+        args["width"] = width
+        args["height"] = height
+        if let v = windowTitle { args["windowTitle"] = v }
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "resize_window",
+            args: args
+        )
+        return .result(value: result)
+    }
+}
+
 // Tool: reverse_geocode
 public struct ReverseGeocodeIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Reverse Geocode"
@@ -3489,6 +5771,68 @@ public struct RewriteTextIntent: AppIntent {
         let result = try await MCPIntentRouter.shared.call(
             tool: "rewrite_text",
             args: ["text": text, "tone": tone]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: run_javascript
+@available(iOS 18, macOS 15, *)
+public struct RunJavascriptIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Run JavaScript"
+    nonisolated(unsafe) public static var description = IntentDescription("Execute JavaScript in a Safari tab. Use list_tabs to find window/tab indices. Returns the result as a string.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "JavaScript to execute")
+    public var code: String
+
+    @Parameter(title: "Window index (default: 0)", default: 0)
+    public var windowIndex: Int
+
+    @Parameter(title: "Tab index (default: 0)", default: 0)
+    public var tabIndex: Int
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Run JavaScript with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "run_javascript",
+            args: ["code": code, "windowIndex": windowIndex, "tabIndex": tabIndex]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: run_shortcut
+@available(iOS 18, macOS 15, *)
+public struct RunShortcutIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Run Shortcut"
+    nonisolated(unsafe) public static var description = IntentDescription("Run a Siri Shortcut by name. Optionally provide text input. Returns the shortcut's output. Note: shortcuts may trigger UI prompts or perform system actions.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Shortcut name (exact match)")
+    public var name: String
+
+    @Parameter(title: "Optional text input for the shortcut")
+    public var input: String?
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["name"] = name
+        if let v = input { args["input"] = v }
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Run Shortcut with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "run_shortcut",
+            args: args
         )
         return .result(value: result)
     }
@@ -3699,6 +6043,26 @@ public struct SearchFilesIntent: AppIntent {
     }
 }
 
+// Tool: search_location
+public struct SearchLocationIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Search Location"
+    nonisolated(unsafe) public static var description = IntentDescription("Search for a place or location in Apple Maps.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Location or place to search for")
+    public var query: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "search_location",
+            args: ["query": query]
+        )
+        return .result(value: result)
+    }
+}
+
 // Tool: search_messages
 public struct SearchMessagesIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Search Messages"
@@ -3720,6 +6084,36 @@ public struct SearchMessagesIntent: AppIntent {
         let result = try await MCPIntentRouter.shared.call(
             tool: "search_messages",
             args: ["query": query, "mailbox": mailbox, "limit": limit]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: search_nearby
+public struct SearchNearbyIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Search Nearby"
+    nonisolated(unsafe) public static var description = IntentDescription("Search for places near a location in Apple Maps. If no coordinates are given, searches near the current location.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "What to search for (e.g. 'coffee shops', 'gas stations')")
+    public var query: String
+
+    @Parameter(title: "Latitude of the center point")
+    public var latitude: Double?
+
+    @Parameter(title: "Longitude of the center point")
+    public var longitude: Double?
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["query"] = query
+        if let v = latitude { args["latitude"] = v }
+        if let v = longitude { args["longitude"] = v }
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "search_nearby",
+            args: args
         )
         return .result(value: result)
     }
@@ -3913,6 +6307,55 @@ public struct SearchTracksIntent: AppIntent {
     }
 }
 
+// Tool: semantic_clear
+@available(iOS 18, macOS 15, *)
+public struct SemanticClearIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Clear Semantic Index"
+    nonisolated(unsafe) public static var description = IntentDescription("Delete all indexed data from the local vector store AND remove corresponding entries from macOS Spotlight. Use for privacy or to force a fresh re-index. Requires Swift bridge for Spotlight cleanup.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Clear Semantic Index with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "semantic_clear",
+            args: [String: any Sendable]()
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: semantic_index
+@available(iOS 18, macOS 15, *)
+public struct SemanticIndexIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Build Semantic Index"
+    nonisolated(unsafe) public static var description = IntentDescription("Index data from enabled Apple apps (Notes, Calendar, Reminders, Mail, Photos, Finder) into the local vector store for semantic search. Run this once, then use semantic_search. Replaces any existing index. Requires Swift bridge (npm run swift-build).")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Which sources to index. Defaults to all enabled modules.")
+    public var sources: [String]?
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        if let v = sources { args["sources"] = v }
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Build Semantic Index with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "semantic_index",
+            args: args
+        )
+        return .result(value: result)
+    }
+}
+
 // Tool: semantic_search
 public struct SemanticSearchIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Semantic Search"
@@ -3964,6 +6407,313 @@ public struct SemanticStatusIntent: AppIntent {
     }
 }
 
+// Tool: send_file
+@available(iOS 18, macOS 15, *)
+public struct SendFileIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Send File"
+    nonisolated(unsafe) public static var description = IntentDescription("Send a file attachment via iMessage/SMS. Requires absolute file path and recipient handle.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Recipient handle (phone number or email)")
+    public var target: String
+
+    @Parameter(title: "Absolute file path to send")
+    public var filePath: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .send,
+            dialog: IntentDialog("Run Send File with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "send_file",
+            args: ["target": target, "filePath": filePath]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: send_mail
+@available(iOS 18, macOS 15, *)
+public struct SendMailIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Send Email"
+    nonisolated(unsafe) public static var description = IntentDescription("Compose and send an email via Apple Mail. Requires allowSendMail config.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Recipient email addresses (max 20)")
+    public var to: [String]
+
+    @Parameter(title: "Email subject")
+    public var subject: String
+
+    @Parameter(title: "Email body text")
+    public var body: String
+
+    @Parameter(title: "CC recipients (max 20)")
+    public var cc: [String]?
+
+    @Parameter(title: "BCC recipients (max 20)")
+    public var bcc: [String]?
+
+    @Parameter(title: "Sender email address (uses default account if omitted)")
+    public var account: String?
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["to"] = to
+        args["subject"] = subject
+        args["body"] = body
+        if let v = cc { args["cc"] = v }
+        if let v = bcc { args["bcc"] = v }
+        if let v = account { args["account"] = v }
+        try await requestConfirmation(
+            actionName: .send,
+            dialog: IntentDialog("Run Send Email with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "send_mail",
+            args: args
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: send_message
+@available(iOS 18, macOS 15, *)
+public struct SendMessageIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Send Message"
+    nonisolated(unsafe) public static var description = IntentDescription("Send a text message via iMessage/SMS. Requires a phone number or email as the target handle.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Recipient handle (phone number or email, e.g. '+821012345678' or 'user@example.c")
+    public var target: String
+
+    @Parameter(title: "Message text to send")
+    public var text: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .send,
+            dialog: IntentDialog("Run Send Message with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "send_message",
+            args: ["target": target, "text": text]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: set_brightness
+public struct SetBrightnessIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Set Brightness"
+    nonisolated(unsafe) public static var description = IntentDescription("Set the display brightness level. Requires the 'brightness' CLI tool (brew install brightness).")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Brightness level from 0.0 (darkest) to 1.0 (brightest)", inclusiveRange: (0, 1))
+    public var level: Double
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "set_brightness",
+            args: ["level": level]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: set_clipboard
+public struct SetClipboardIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Set Clipboard"
+    nonisolated(unsafe) public static var description = IntentDescription("Write text to the system clipboard, replacing its current content.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Text to copy to the clipboard")
+    public var text: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "set_clipboard",
+            args: ["text": text]
+        )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "set_clipboard", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPSetClipboardOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPSetClipboardSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
+        return .result(value: result)
+    }
+}
+
+// Tool: set_disliked
+public struct SetDislikedIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Set Disliked"
+    nonisolated(unsafe) public static var description = IntentDescription("Mark or unmark a track as disliked.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Track name")
+    public var trackName: String
+
+    @Parameter(title: "Whether to mark as disliked")
+    public var disliked: Bool
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "set_disliked",
+            args: ["trackName": trackName, "disliked": disliked]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: set_favorited
+public struct SetFavoritedIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Set Favorited"
+    nonisolated(unsafe) public static var description = IntentDescription("Mark or unmark a track as favorited (loved).")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Track name")
+    public var trackName: String
+
+    @Parameter(title: "Whether to mark as favorited")
+    public var favorited: Bool
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "set_favorited",
+            args: ["trackName": trackName, "favorited": favorited]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: set_file_tags
+public struct SetFileTagsIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Set File Tags"
+    nonisolated(unsafe) public static var description = IntentDescription("Set Finder tags on a file. Replaces all existing tags.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Absolute file path")
+    public var path: String
+
+    @Parameter(title: "Array of tag names to set")
+    public var tags: [String]
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "set_file_tags",
+            args: ["path": path, "tags": tags]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: set_rating
+public struct SetRatingIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Set Rating"
+    nonisolated(unsafe) public static var description = IntentDescription("Set the star rating (0-100) for a track. Use multiples of 20 for full stars (0, 20, 40, 60, 80, 100).")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Track name")
+    public var trackName: String
+
+    @Parameter(title: "Rating value (0-100)", inclusiveRange: (0, 100))
+    public var rating: Int
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "set_rating",
+            args: ["trackName": trackName, "rating": rating]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: set_shuffle
+public struct SetShuffleIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Set Shuffle & Repeat"
+    nonisolated(unsafe) public static var description = IntentDescription("Enable/disable shuffle and set repeat mode (off, one, all).")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Enable or disable shuffle")
+    public var shuffle: Bool?
+
+    @Parameter(title: "Repeat mode · Allowed: off, one, all")
+    public var songRepeat: String?
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        if let v = shuffle { args["shuffle"] = v }
+        if let v = songRepeat { args["songRepeat"] = v }
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "set_shuffle",
+            args: args
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: set_volume
+public struct SetVolumeIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Set Volume"
+    nonisolated(unsafe) public static var description = IntentDescription("Set the system output volume (0-100) and/or mute state.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Output volume level (0-100)", inclusiveRange: (0, 100))
+    public var volume: Double?
+
+    @Parameter(title: "Whether to mute output audio")
+    public var muted: Bool?
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        if let v = volume { args["volume"] = v }
+        if let v = muted { args["muted"] = v }
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "set_volume",
+            args: args
+        )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "set_volume", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPSetVolumeOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPSetVolumeSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
+        return .result(value: result)
+    }
+}
+
 // Tool: setup_permissions
 public struct SetupPermissionsIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Setup Permissions"
@@ -4005,6 +6755,40 @@ public struct ShareLocationIntent: AppIntent {
         if let v = label { args["label"] = v }
         let result = try await MCPIntentRouter.shared.call(
             tool: "share_location",
+            args: args
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: show_notification
+public struct ShowNotificationIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Show Notification"
+    nonisolated(unsafe) public static var description = IntentDescription("Display a macOS system notification with optional title, subtitle, and sound.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Notification body text")
+    public var message: String
+
+    @Parameter(title: "Notification title")
+    public var title: String?
+
+    @Parameter(title: "Notification subtitle")
+    public var subtitle: String?
+
+    @Parameter(title: "Sound name to play (e.g. 'Frog', 'Glass', 'Hero')")
+    public var sound: String?
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["message"] = message
+        if let v = title { args["title"] = v }
+        if let v = subtitle { args["subtitle"] = v }
+        if let v = sound { args["sound"] = v }
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "show_notification",
             args: args
         )
         return .result(value: result)
@@ -4210,6 +6994,45 @@ public struct SpeechAvailabilityIntent: AppIntent {
     }
 }
 
+// Tool: spotlight_clear
+@available(iOS 18, macOS 15, *)
+public struct SpotlightClearIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Clear Spotlight Index"
+    nonisolated(unsafe) public static var description = IntentDescription("Remove all AirMCP entries from macOS Spotlight without clearing the local vector store. Requires Swift bridge.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Clear Spotlight Index with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "spotlight_clear",
+            args: [String: any Sendable]()
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: spotlight_sync
+public struct SpotlightSyncIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Sync to Spotlight"
+    nonisolated(unsafe) public static var description = IntentDescription("Push semantically indexed data to macOS Core Spotlight, making it discoverable via Spotlight search and Siri. Run after semantic_index to expose your notes, events, reminders, and emails to system-wide search. Requires Swift bridge (npm run swift-build).")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "spotlight_sync",
+            args: [String: any Sendable]()
+        )
+        return .result(value: result)
+    }
+}
+
 // Tool: suggest_next_tools
 public struct SuggestNextToolsIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Suggest Next Tools"
@@ -4288,6 +7111,53 @@ public struct SummarizeTextIntent: AppIntent {
     }
 }
 
+// Tool: system_power
+@available(iOS 18, macOS 15, *)
+public struct SystemPowerIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "System Power"
+    nonisolated(unsafe) public static var description = IntentDescription("Shutdown or restart the Mac. Use with caution.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Power action: shutdown or restart · Allowed: shutdown, restart")
+    public var action: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run System Power with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "system_power",
+            args: ["action": action]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: system_sleep
+@available(iOS 18, macOS 15, *)
+public struct SystemSleepIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "System Sleep"
+    nonisolated(unsafe) public static var description = IntentDescription("Put the Mac to sleep.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run System Sleep with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "system_sleep",
+            args: [String: any Sendable]()
+        )
+        return .result(value: result)
+    }
+}
+
 // Tool: tag_content
 public struct TagContentIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Tag Content"
@@ -4355,6 +7225,78 @@ public struct TodayEventsIntent: AppIntent {
     }
 }
 
+// Tool: toggle_dark_mode
+public struct ToggleDarkModeIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Toggle Dark Mode"
+    nonisolated(unsafe) public static var description = IntentDescription("Toggle macOS appearance between dark mode and light mode.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "toggle_dark_mode",
+            args: [String: any Sendable]()
+        )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "toggle_dark_mode", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPToggleDarkModeOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPToggleDarkModeSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
+        return .result(value: result)
+    }
+}
+
+// Tool: toggle_focus_mode
+public struct ToggleFocusModeIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Toggle Focus Mode"
+    nonisolated(unsafe) public static var description = IntentDescription("Toggle Do Not Disturb (Focus mode) on or off.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "True to enable Do Not Disturb, false to disable")
+    public var enable: Bool
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "toggle_focus_mode",
+            args: ["enable": enable]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: toggle_wifi
+@available(iOS 18, macOS 15, *)
+public struct ToggleWifiIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Toggle WiFi"
+    nonisolated(unsafe) public static var description = IntentDescription("Turn WiFi on or off.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "True to enable WiFi, false to disable")
+    public var enable: Bool
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Toggle WiFi with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "toggle_wifi",
+            args: ["enable": enable]
+        )
+        return .result(value: result)
+    }
+}
+
 // Tool: transcribe_audio
 public struct TranscribeAudioIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Transcribe Audio"
@@ -4376,6 +7318,31 @@ public struct TranscribeAudioIntent: AppIntent {
         let result = try await MCPIntentRouter.shared.call(
             tool: "transcribe_audio",
             args: args
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: trash_file
+@available(iOS 18, macOS 15, *)
+public struct TrashFileIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Trash File"
+    nonisolated(unsafe) public static var description = IntentDescription("Move a file or folder to the Trash using Finder.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Absolute path of the file or folder to trash")
+    public var path: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Trash File with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "trash_file",
+            args: ["path": path]
         )
         return .result(value: result)
     }
@@ -4433,6 +7400,46 @@ public struct TvNowPlayingIntent: AppIntent {
         let result = try await MCPIntentRouter.shared.call(
             tool: "tv_now_playing",
             args: [String: any Sendable]()
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: tv_play
+public struct TvPlayIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Play TV Content"
+    nonisolated(unsafe) public static var description = IntentDescription("Play a movie or episode by name.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Movie or episode name")
+    public var name: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "tv_play",
+            args: ["name": name]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: tv_playback_control
+public struct TvPlaybackControlIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "TV Playback Control"
+    nonisolated(unsafe) public static var description = IntentDescription("Control Apple TV playback: play, pause, next, previous.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Playback action · Allowed: play, pause, nextTrack, previousTrack")
+    public var action: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "tv_playback_control",
+            args: ["action": action]
         )
         return .result(value: result)
     }
@@ -4515,6 +7522,53 @@ public struct UiAccessibilityQueryIntent: AppIntent {
     }
 }
 
+// Tool: ui_click
+@available(iOS 18, macOS 15, *)
+public struct UiClickIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Click UI Element"
+    nonisolated(unsafe) public static var description = IntentDescription("Click a UI element either by exact screen coordinates (x, y) or by searching for an element containing the given text. Optionally filter by accessibility role (e.g. 'AXButton', 'AXMenuItem', 'AXTextField'). Requires Accessibility permissions.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "App name to activate before clicking. If omitted, uses the frontmost app.")
+    public var appName: String?
+
+    @Parameter(title: "X screen coordinate to click")
+    public var x: Double?
+
+    @Parameter(title: "Y screen coordinate to click")
+    public var y: Double?
+
+    @Parameter(title: "Text to search for in UI element names, descriptions, titles, and values")
+    public var text: String?
+
+    @Parameter(title: "Filter by accessibility role (e.g. 'AXButton', 'AXMenuItem', 'AXStaticText', 'AX")
+    public var role: String?
+
+    @Parameter(title: "If multiple elements match, click the one at this index (default: 0, first match", default: 0)
+    public var index: Int
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        if let v = appName { args["appName"] = v }
+        if let v = x { args["x"] = v }
+        if let v = y { args["y"] = v }
+        if let v = text { args["text"] = v }
+        if let v = role { args["role"] = v }
+        args["index"] = index
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Click UI Element with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "ui_click",
+            args: args
+        )
+        return .result(value: result)
+    }
+}
+
 // Tool: ui_diff
 public struct UiDiffIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Compare UI State"
@@ -4535,6 +7589,124 @@ public struct UiDiffIntent: AppIntent {
         if let v = app { args["app"] = v }
         let result = try await MCPIntentRouter.shared.call(
             tool: "ui_diff",
+            args: args
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: ui_open_app
+public struct UiOpenAppIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Open App (UI Automation)"
+    nonisolated(unsafe) public static var description = IntentDescription("Open an application by name or bundle ID and return an accessibility tree summary of its windows and top-level UI elements. Requires Accessibility permissions.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Application name (e.g. 'Safari', 'Xcode') or bundle ID (e.g. 'com.apple.Safari')")
+    public var appName: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "ui_open_app",
+            args: ["appName": appName]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: ui_perform_action
+@available(iOS 18, macOS 15, *)
+public struct UiPerformActionIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Perform Action on UI Element"
+    nonisolated(unsafe) public static var description = IntentDescription("Find a UI element by locator (role + title/value) and perform an accessibility action on it. Actions: press (click), pick (select), confirm, setValue, raise (focus), showMenu. Combines query + action in one step. Requires Accessibility permissions.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "App name")
+    public var app: String?
+
+    @Parameter(title: "AX role filter")
+    public var role: String?
+
+    @Parameter(title: "Title text to match")
+    public var title: String?
+
+    @Parameter(title: "Value text to match")
+    public var value: String?
+
+    @Parameter(title: "Description text to match")
+    public var description: String?
+
+    @Parameter(title: "AXIdentifier exact match")
+    public var identifier: String?
+
+    @Parameter(title: "General label search")
+    public var label: String?
+
+    @Parameter(title: "Action to perform · Allowed: press, click, pick, select, confirm, setValue, set,")
+    public var action: String
+
+    @Parameter(title: "Value to set (for setValue action)")
+    public var actionValue: String?
+
+    @Parameter(title: "If multiple matches, act on element at this index (default: 0)", default: 0)
+    public var index: Int
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        if let v = app { args["app"] = v }
+        if let v = role { args["role"] = v }
+        if let v = title { args["title"] = v }
+        if let v = value { args["value"] = v }
+        if let v = description { args["description"] = v }
+        if let v = identifier { args["identifier"] = v }
+        if let v = label { args["label"] = v }
+        args["action"] = action
+        if let v = actionValue { args["actionValue"] = v }
+        args["index"] = index
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Perform Action on UI Element with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "ui_perform_action",
+            args: args
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: ui_press_key
+@available(iOS 18, macOS 15, *)
+public struct UiPressKeyIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Press Key Combination"
+    nonisolated(unsafe) public static var description = IntentDescription("Send a key or key combination (e.g. Return, Cmd+S, Ctrl+C). Supports modifier keys: command/cmd, shift, option/alt, control/ctrl. Special keys: return, enter, tab, space, delete, escape, arrow keys (up/down/left/right), F1-F12, home, end, pageup, pagedown. Requires Accessibility permissions.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Key to press — a single character (e.g. 's', 'a') or special key name (e.g. 'ret")
+    public var key: String
+
+    @Parameter(title: "Modifier keys to hold: 'command'/'cmd', 'shift', 'option'/'alt', 'control'/'ctrl")
+    public var modifiers: [String]?
+
+    @Parameter(title: "App name to activate before pressing keys. If omitted, sends to the frontmost ap")
+    public var appName: String?
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["key"] = key
+        if let v = modifiers { args["modifiers"] = v }
+        if let v = appName { args["appName"] = v }
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Press Key Combination with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "ui_press_key",
             args: args
         )
         return .result(value: result)
@@ -4565,6 +7737,36 @@ public struct UiReadIntent: AppIntent {
         args["maxElements"] = maxElements
         let result = try await MCPIntentRouter.shared.call(
             tool: "ui_read",
+            args: args
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: ui_scroll
+public struct UiScrollIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Scroll"
+    nonisolated(unsafe) public static var description = IntentDescription("Scroll in the specified direction within the frontmost window. Uses arrow key simulation for cross-app compatibility. Requires Accessibility permissions.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Scroll direction · Allowed: up, down, left, right")
+    public var direction: String
+
+    @Parameter(title: "Number of scroll steps (default: 3)", default: 3, inclusiveRange: (1, 100))
+    public var amount: Int
+
+    @Parameter(title: "App name to activate before scrolling. If omitted, scrolls in the frontmost app.")
+    public var appName: String?
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["direction"] = direction
+        args["amount"] = amount
+        if let v = appName { args["appName"] = v }
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "ui_scroll",
             args: args
         )
         return .result(value: result)
@@ -4603,6 +7805,202 @@ public struct UiTraverseIntent: AppIntent {
         args["onlyVisible"] = onlyVisible
         let result = try await MCPIntentRouter.shared.call(
             tool: "ui_traverse",
+            args: args
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: ui_type
+@available(iOS 18, macOS 15, *)
+public struct UiTypeIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Type Text"
+    nonisolated(unsafe) public static var description = IntentDescription("Type text into the currently focused field using simulated keystrokes via System Events. Optionally activate a specific app first. Requires Accessibility permissions.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Text to type")
+    public var text: String
+
+    @Parameter(title: "App name to activate before typing. If omitted, types into the frontmost app.")
+    public var appName: String?
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["text"] = text
+        if let v = appName { args["appName"] = v }
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Type Text with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "ui_type",
+            args: args
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: update_contact
+@available(iOS 18, macOS 15, *)
+public struct UpdateContactIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Update Contact"
+    nonisolated(unsafe) public static var description = IntentDescription("Update contact properties. Only specified fields are changed.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Contact ID")
+    public var id: String
+
+    @Parameter(title: "New first name")
+    public var firstName: String?
+
+    @Parameter(title: "New last name")
+    public var lastName: String?
+
+    @Parameter(title: "New organization")
+    public var organization: String?
+
+    @Parameter(title: "New job title")
+    public var jobTitle: String?
+
+    @Parameter(title: "New notes")
+    public var note: String?
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["id"] = id
+        if let v = firstName { args["firstName"] = v }
+        if let v = lastName { args["lastName"] = v }
+        if let v = organization { args["organization"] = v }
+        if let v = jobTitle { args["jobTitle"] = v }
+        if let v = note { args["note"] = v }
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Update Contact with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "update_contact",
+            args: args
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: update_event
+@available(iOS 18, macOS 15, *)
+public struct UpdateEventIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Update Event"
+    nonisolated(unsafe) public static var description = IntentDescription("Update event properties. Only specified fields are changed. Attendees and recurrence rules cannot be modified via automation.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Event UID")
+    public var id: String
+
+    @Parameter(title: "New title")
+    public var summary: String?
+
+    @Parameter(title: "New start date/time (ISO 8601, e.g. '2026-03-15T09:00:00Z')")
+    public var startDate: String?
+
+    @Parameter(title: "New end date/time (ISO 8601, e.g. '2026-03-15T10:00:00Z')")
+    public var endDate: String?
+
+    @Parameter(title: "New location")
+    public var location: String?
+
+    @Parameter(title: "New notes/description")
+    public var description: String?
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["id"] = id
+        if let v = summary { args["summary"] = v }
+        if let v = startDate { args["startDate"] = v }
+        if let v = endDate { args["endDate"] = v }
+        if let v = location { args["location"] = v }
+        if let v = description { args["description"] = v }
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Update Event with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "update_event",
+            args: args
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: update_note
+@available(iOS 18, macOS 15, *)
+public struct UpdateNoteIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Update Note"
+    nonisolated(unsafe) public static var description = IntentDescription("Replace the entire body of an existing note. WARNING: This overwrites all content. Read the note first if you need to preserve parts of it. Attachments may be lost.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Note ID (x-coredata:// format)")
+    public var id: String
+
+    @Parameter(title: "New HTML body to replace existing content")
+    public var body: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Update Note with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "update_note",
+            args: ["id": id, "body": body]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: update_reminder
+@available(iOS 18, macOS 15, *)
+public struct UpdateReminderIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Update Reminder"
+    nonisolated(unsafe) public static var description = IntentDescription("Update reminder properties. Only specified fields are changed. Set dueDate to null to clear it. Recurrence rules cannot be modified via automation.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Reminder ID")
+    public var id: String
+
+    @Parameter(title: "New title")
+    public var title: String?
+
+    @Parameter(title: "New notes/body text")
+    public var body: String?
+
+    @Parameter(title: "New priority (0-9)", inclusiveRange: (0, 9))
+    public var priority: Int?
+
+    @Parameter(title: "Set flagged status")
+    public var flagged: Bool?
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["id"] = id
+        if let v = title { args["title"] = v }
+        if let v = body { args["body"] = v }
+        if let v = priority { args["priority"] = v }
+        if let v = flagged { args["flagged"] = v }
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Run Update Reminder with AirMCP? This action is destructive and cannot be undone.")
+        )
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "update_reminder",
             args: args
         )
         return .result(value: result)
@@ -5271,6 +8669,36 @@ public struct MCPListTracksSnippetView: View {
     }
 }
 
+// Snippet view for: memory_forget  (shape: list-string)
+@available(macOS 26, iOS 26, *)
+public struct MCPMemoryForgetSnippetView: View {
+    public let data: MCPMemoryForgetOutput
+    public init(data: MCPMemoryForgetOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.removed.enumerated()), id: \.offset) { _, row in
+                Text(row)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: memory_put  (shape: scalar)
+@available(macOS 26, iOS 26, *)
+public struct MCPMemoryPutSnippetView: View {
+    public let data: MCPMemoryPutOutput
+    public init(data: MCPMemoryPutOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack { Text("stored"); Spacer(); Text(String(describing: data.stored)) }
+        }
+        .padding()
+    }
+}
+
 // Snippet view for: memory_query  (shape: list-object)
 @available(macOS 26, iOS 26, *)
 public struct MCPMemoryQuerySnippetView: View {
@@ -5538,6 +8966,34 @@ public struct MCPSearchShortcutsSnippetView: View {
     }
 }
 
+// Snippet view for: set_clipboard  (shape: scalar)
+@available(macOS 26, iOS 26, *)
+public struct MCPSetClipboardSnippetView: View {
+    public let data: MCPSetClipboardOutput
+    public init(data: MCPSetClipboardOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack { Text("set"); Spacer(); Text(String(describing: data.set)) }
+            HStack { Text("length"); Spacer(); Text(String(describing: data.length)) }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: set_volume  (shape: scalar)
+@available(macOS 26, iOS 26, *)
+public struct MCPSetVolumeSnippetView: View {
+    public let data: MCPSetVolumeOutput
+    public init(data: MCPSetVolumeOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack { Text("outputVolume"); Spacer(); Text(String(describing: data.outputVolume)) }
+            HStack { Text("outputMuted"); Spacer(); Text(String(describing: data.outputMuted)) }
+        }
+        .padding()
+    }
+}
+
 // Snippet view for: suggest_next_tools  (shape: list-object)
 @available(macOS 26, iOS 26, *)
 public struct MCPSuggestNextToolsSnippetView: View {
@@ -5567,6 +9023,19 @@ public struct MCPTodayEventsSnippetView: View {
                     .font(.body)
                     .lineLimit(1)
             }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: toggle_dark_mode  (shape: scalar)
+@available(macOS 26, iOS 26, *)
+public struct MCPToggleDarkModeSnippetView: View {
+    public let data: MCPToggleDarkModeOutput
+    public init(data: MCPToggleDarkModeOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack { Text("darkMode"); Spacer(); Text(String(describing: data.darkMode)) }
         }
         .padding()
     }

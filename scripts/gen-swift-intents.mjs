@@ -45,11 +45,20 @@ const OUT_PATH =
   process.env.AIRMCP_INTENTS_OUT ?? join(ROOT, "swift", "Sources", "AirMCPKit", "Generated", "MCPIntents.swift");
 const CHECK_ONLY = process.argv.includes("--check");
 
-// ── A.2b.1 selection ─────────────────────────────────────────────────
-// Automatic filter: every tool that is eligible, read-only, and not
-// destructive. No more hand-picked list. Destructive tools land in A.3
-// behind requestConfirmation(actionName:snippetIntent:) (see RFC 0007 §R2
-// amendment 2026-04-23).
+// ── A.2b.1 + A.3 selection ───────────────────────────────────────────
+// Automatic filter: every AppIntent-eligible tool.
+//   • readOnly → direct call, no confirmation
+//   • write (non-destructive) → direct call, no confirmation
+//   • destructive (A.3) → `requestConfirmation(actionName:dialog:)` before
+//     the router call (iOS 16+ / macOS 13+ API, inside the AppIntents
+//     gate so older SDKs stay excluded). The confirmation dialog text is
+//     generic ("Run <title> with AirMCP? This action is destructive and
+//     cannot be undone."); Shortcuts surfaces the typed @Parameter values
+//     separately, so users still see exactly what they're about to run.
+//
+// A.4 (config-gated opt-out for destructive tools) is a follow-up — once
+// real-device verification of the confirmation UI is available we can add
+// an opt-in escape hatch without changing the per-tool code paths.
 //
 // An explicit SKIP list remains for specific tools that would otherwise
 // generate but have known runtime issues we haven't addressed yet. Empty
@@ -91,11 +100,11 @@ try {
 }
 
 const byName = new Map(manifest.tools.map((t) => [t.name, t]));
+// A.3: accept every eligible tool. Destructive ones get a confirmation
+// dialog injected by `generateIntent`; writes with `destructiveHint:
+// false` run without prompt, same as read-only tools.
 const picked = manifest.tools
-  .filter(
-    (t) =>
-      t.appIntentEligible && t.annotations.readOnlyHint && !t.annotations.destructiveHint && !SKIP_NAMES.has(t.name),
-  )
+  .filter((t) => t.appIntentEligible && !SKIP_NAMES.has(t.name))
   .sort((a, b) => a.name.localeCompare(b.name));
 const pickedSet = new Set(picked);
 
@@ -139,6 +148,24 @@ function intentStructName(toolName) {
   // audit_log → AuditLogIntent; avoids collision with hand-written
   // intents that live in app/Sources/AirMCPApp (different Swift module).
   return `${toPascalCase(toolName)}Intent`;
+}
+
+/**
+ * Pick a `ConfirmationActionName` literal for a destructive tool. Apple
+ * only exposes `.go` and `.send` on this type as of iOS 26 (checked with
+ * `swiftc -typecheck` — `.delete`/`.save` don't compile, and
+ * `ConfirmationActionName` has no public initializers), so we map:
+ *   send/reply/post → `.send` (renders as "Send")
+ *   everything else → `.go`  (generic verb)
+ *
+ * The destructive semantic is carried by the dialog text ("This action
+ * is destructive and cannot be undone"), not the button label. When
+ * Apple widens the ConfirmationActionName case list this mapping can be
+ * refined — nothing else in the codegen has to change.
+ */
+function intentActionNameFor(toolName) {
+  if (/^(send|reply|post)_/.test(toolName)) return ".send";
+  return ".go";
 }
 
 /**
@@ -475,13 +502,32 @@ function generateIntent(tool) {
     .join("\n\n");
   const { prelude, argsExpr } = buildArgsBlock(decls);
 
+  // A.3: destructive tools block on a `requestConfirmation` call before
+  // reaching the router. The `(actionName:dialog:)` overload we use is
+  // iOS 18+/macOS 15+, so the whole destructive intent struct carries
+  // `@available(iOS 18, macOS 15, *)` below — on iOS 17 / macOS 14 the
+  // destructive intent simply doesn't exist, which is the correct
+  // security posture (better than shipping an unconfirmed destructive
+  // path to paper over the availability gap).
+  //
+  // Parameter values — the interesting structured part (which event,
+  // which file) — are rendered by Shortcuts automatically next to the
+  // dialog, so we don't try to inject them into the prose.
+  const confirmBlock = tool.annotations.destructiveHint
+    ? `        try await requestConfirmation(
+            actionName: ${intentActionNameFor(tool.name)},
+            dialog: IntentDialog("Run ${title} with AirMCP? This action is destructive and cannot be undone.")
+        )
+`
+    : "";
+
   const callBlock = prelude
     ? `${prelude}
-        let result = try await MCPIntentRouter.shared.call(
+${confirmBlock}        let result = try await MCPIntentRouter.shared.call(
             tool: "${tool.name}",
             args: ${argsExpr}
         )`
-    : `        let result = try await MCPIntentRouter.shared.call(
+    : `${confirmBlock}        let result = try await MCPIntentRouter.shared.call(
             tool: "${tool.name}",
             args: ${argsExpr}
         )`;
@@ -520,8 +566,11 @@ function generateIntent(tool) {
         return .result(value: result)`
     : `        return .result(value: result)`;
 
+  // @available gate for destructive intents — see `confirmBlock` comment.
+  const availability = tool.annotations.destructiveHint ? "@available(iOS 18, macOS 15, *)\n" : "";
+
   return `// Tool: ${tool.name}
-public struct ${structName}: AppIntent {
+${availability}public struct ${structName}: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "${title}"
     nonisolated(unsafe) public static var description = IntentDescription("${description}")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false

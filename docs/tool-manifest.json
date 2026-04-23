@@ -7,7 +7,7 @@
     {
       "name": "activate_tab",
       "title": "Activate Tab",
-      "description": "Switch to a specific Safari tab.",
+      "description": "Switch to a specific Safari tab. Use list_tabs to find window/tab indices.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -228,7 +228,7 @@
     {
       "name": "ai_agent",
       "title": "On-Device AI Agent",
-      "description": "Run a prompt through Apple's on-device Foundation Models with access to AirMC...",
+      "description": "Run a prompt through Apple's on-device Foundation Models with access to AirMCP tools (Calendar, Reminders, Contacts). The on-device LLM autonomously decides which tools to call. Requires macOS 26+ with Apple Silicon.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -262,7 +262,7 @@
     {
       "name": "ai_chat",
       "title": "AI Chat",
-      "description": "Send a message to an on-device AI session using Apple Foundation Models.",
+      "description": "Send a message to an on-device AI session using Apple Foundation Models. Note: each call creates a fresh session — sessionName is for caller-side tracking only, not server-side persistence. Requires macOS 26+.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -301,7 +301,7 @@
     {
       "name": "ai_plan_metrics",
       "title": "AI Plan Metrics",
-      "description": "Run a sample of planner goals against the on-device Foundation Model and repo...",
+      "description": "Run a sample of planner goals against the on-device Foundation Model and report the aggregate score. Useful after macOS / Apple Intelligence updates to catch planner regressions. Requires macOS 26+ with Apple Silicon. Each case makes one model call, so keep `limit` small for interactive use.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -405,7 +405,7 @@
     {
       "name": "ai_status",
       "title": "AI Status",
-      "description": "Check availability and status of Apple's on-device Foundation Models.",
+      "description": "Check availability and status of Apple's on-device Foundation Models. Returns whether the model is available, macOS version, and Apple Silicon status.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -423,7 +423,7 @@
     {
       "name": "audit_log",
       "title": "Audit Log",
-      "description": "Query the on-device audit log of tool calls.",
+      "description": "Query the on-device audit log of tool calls. Reads JSONL rows from ~/.airmcp/audit.jsonl (+ rotated siblings) and returns recent entries newest-first with optional filters by tool / status / time window. Args are already PII-scrubbed at write-time; sensitive-tool entries have `_redacted` args.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -523,7 +523,7 @@
     {
       "name": "audit_summary",
       "title": "Audit Summary",
-      "description": "Aggregate the audit log over a time window — total call count, error rate, an...",
+      "description": "Aggregate the audit log over a time window — total call count, error rate, and the busiest tools. Useful for weekly reviews and for spotting runaway agents (a sudden top-of-leaderboard `create_*` tool is a red flag).",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -607,7 +607,7 @@
     {
       "name": "bulk_move_notes",
       "title": "Bulk Move Notes",
-      "description": "Move multiple notes to a target folder at once.",
+      "description": "Move multiple notes to a target folder at once. Same limitations as move_note apply to each note (new ID, date reset, attachments lost). Returns per-note success/failure results.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -671,7 +671,7 @@
     {
       "name": "capture_area",
       "title": "Capture Screen Area",
-      "description": "Capture a screenshot of a specific rectangular region of the screen.",
+      "description": "Capture a screenshot of a specific rectangular region of the screen. Coordinates are in screen pixels with origin at top-left. Requires Screen Recording permission.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -715,7 +715,7 @@
     {
       "name": "capture_screen",
       "title": "Capture Screen",
-      "description": "Capture a full-screen screenshot as a PNG image.",
+      "description": "Capture a full-screen screenshot as a PNG image. Optionally specify a display number for multi-monitor setups (1 = main display). Requires Screen Recording permission.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -740,7 +740,7 @@
     {
       "name": "capture_screenshot",
       "title": "Capture Screenshot",
-      "description": "Take a screenshot and save to the specified path.",
+      "description": "Take a screenshot and save to the specified path. Supports full screen, window, or selection capture.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -779,7 +779,7 @@
     {
       "name": "capture_window",
       "title": "Capture Window",
-      "description": "Capture a screenshot of the frontmost window.",
+      "description": "Capture a screenshot of the frontmost window. Optionally specify an app name to activate that app first and capture its window. Requires Screen Recording permission.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -804,7 +804,7 @@
     {
       "name": "classify_image",
       "title": "Classify Image",
-      "description": "Classify an image using Apple Vision framework.",
+      "description": "Classify an image using Apple Vision framework. Returns labels with confidence scores (e.g. 'dog', 'outdoor', 'food'). Works on any image file. Requires Swift bridge.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -840,7 +840,7 @@
     {
       "name": "close_tab",
       "title": "Close Tab",
-      "description": "Close a specific Safari tab.",
+      "description": "Close a specific Safari tab. Use list_tabs to find window/tab indices.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -874,7 +874,7 @@
     {
       "name": "cloud_sync_status",
       "title": "iCloud Sync Status",
-      "description": "Check iCloud sync status — see what usage data and config is synced across yo...",
+      "description": "Check iCloud sync status — see what usage data and config is synced across your Apple devices.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -892,7 +892,7 @@
     {
       "name": "compare_notes",
       "title": "Compare Notes",
-      "description": "Retrieve full plaintext content of 2-5 notes at once for comparison.",
+      "description": "Retrieve full plaintext content of 2-5 notes at once for comparison. Use this after scan_notes to safely compare potentially duplicate or similar notes before deciding what to keep, merge, or delete.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -957,7 +957,7 @@
     {
       "name": "connect_bluetooth",
       "title": "Connect Bluetooth",
-      "description": "Connect to a BLE device by its UUID.",
+      "description": "Connect to a BLE device by its UUID. The UUID can be obtained from scan_bluetooth results. Note: the connection persists only while the server process is running.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1101,7 +1101,7 @@
     {
       "name": "create_event",
       "title": "Create Event",
-      "description": "Create a new calendar event.",
+      "description": "Create a new calendar event. Recurring events cannot be created via automation. Attendees cannot be added programmatically.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1161,7 +1161,7 @@
     {
       "name": "create_folder",
       "title": "Create Folder",
-      "description": "Create a new folder.",
+      "description": "Create a new folder. Optionally specify which account to create it in.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1194,7 +1194,7 @@
     {
       "name": "create_note",
       "title": "Create Note",
-      "description": "Create a new note with HTML body.",
+      "description": "Create a new note with HTML body. The first line of the body becomes the note title automatically. Optionally specify a target folder.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1255,7 +1255,7 @@
     {
       "name": "create_recurring_event",
       "title": "Create Recurring Event",
-      "description": "Create a recurring calendar event via EventKit.",
+      "description": "Create a recurring calendar event via EventKit. Supports daily, weekly, monthly, and yearly recurrence with configurable intervals. Requires macOS 26+ Swift bridge.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1357,7 +1357,7 @@
     {
       "name": "create_recurring_reminder",
       "title": "Create Recurring Reminder",
-      "description": "Create a recurring reminder via EventKit.",
+      "description": "Create a recurring reminder via EventKit. Supports daily, weekly, monthly, and yearly recurrence with configurable intervals. Requires macOS 26+ Swift bridge.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1452,7 +1452,7 @@
     {
       "name": "create_reminder",
       "title": "Create Reminder",
-      "description": "Create a new reminder.",
+      "description": "Create a new reminder. Optionally set notes, due date, priority (0=none, 1-4=high, 5=medium, 6-9=low), and target list. Recurrence rules cannot be set via automation.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1529,7 +1529,7 @@
     {
       "name": "create_shortcut",
       "title": "Create Shortcut",
-      "description": "Create a new Siri Shortcut by name.",
+      "description": "Create a new Siri Shortcut by name. Uses UI automation to open the Shortcuts app and create a new empty shortcut. The shortcut must be further configured in the Shortcuts app.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1557,7 +1557,7 @@
     {
       "name": "delete_contact",
       "title": "Delete Contact",
-      "description": "Delete a contact by ID.",
+      "description": "Delete a contact by ID. This action is permanent.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1585,7 +1585,7 @@
     {
       "name": "delete_event",
       "title": "Delete Event",
-      "description": "Delete a calendar event by ID.",
+      "description": "Delete a calendar event by ID. This action is permanent.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1613,7 +1613,7 @@
     {
       "name": "delete_note",
       "title": "Delete Note",
-      "description": "Delete a note by ID.",
+      "description": "Delete a note by ID. The note is moved to Recently Deleted and permanently removed after 30 days.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1641,7 +1641,7 @@
     {
       "name": "delete_photos",
       "title": "Delete Photos",
-      "description": "Delete photos by local identifier.",
+      "description": "Delete photos by local identifier. Shows macOS confirmation dialog for user approval. Requires macOS 26+ Swift bridge.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1699,7 +1699,7 @@
     {
       "name": "delete_reminder",
       "title": "Delete Reminder",
-      "description": "Delete a reminder by ID.",
+      "description": "Delete a reminder by ID. This action is permanent.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1727,7 +1727,7 @@
     {
       "name": "delete_reminder_list",
       "title": "Delete Reminder List",
-      "description": "Delete a reminder list by name.",
+      "description": "Delete a reminder list by name. This action is permanent and removes all reminders in the list.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1755,7 +1755,7 @@
     {
       "name": "delete_shortcut",
       "title": "Delete Shortcut",
-      "description": "Delete a Siri Shortcut by name.",
+      "description": "Delete a Siri Shortcut by name. Uses the macOS shortcuts CLI (macOS 13+). This action is permanent and cannot be undone.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1811,7 +1811,7 @@
     {
       "name": "discover_tools",
       "title": "Discover Tools",
-      "description": "Search available tools by keyword.",
+      "description": "Search available tools by keyword. Returns matching tools with descriptions. Use this instead of scanning all 250+ tools — describe what you need and get relevant tools.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1926,7 +1926,7 @@
     {
       "name": "duplicate_shortcut",
       "title": "Duplicate Shortcut",
-      "description": "Duplicate an existing Siri Shortcut.",
+      "description": "Duplicate an existing Siri Shortcut. Exports the shortcut to a temporary file and re-imports it with a new name.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1960,7 +1960,7 @@
     {
       "name": "edit_shortcut",
       "title": "Edit Shortcut",
-      "description": "Open a Siri Shortcut in the Shortcuts app for manual editing.",
+      "description": "Open a Siri Shortcut in the Shortcuts app for manual editing. Uses UI automation (System Events) to activate the app, search for the shortcut, and open it. The user can then edit the shortcut in the Shortcuts app UI.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -2006,7 +2006,7 @@
     {
       "name": "event_subscribe",
       "title": "Subscribe to Events",
-      "description": "Start real-time monitoring of Apple data changes: calendar, reminders, clipbo...",
+      "description": "Start real-time monitoring of Apple data changes: calendar, reminders, clipboard, mail unread count, focus mode, now-playing track, and watched file paths. Native observers (calendar/reminders/clipboard/focus/files) are pushed from the Swift bridge; mail and now-playing are polled. Requires the Swift bridge in persistent mode for the native observers.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -2024,7 +2024,7 @@
     {
       "name": "export_shortcut",
       "title": "Export Shortcut",
-      "description": "Export a Siri Shortcut to a .shortcut file.",
+      "description": "Export a Siri Shortcut to a .shortcut file. Uses the macOS shortcuts CLI to save the shortcut to the specified output path.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -2059,7 +2059,7 @@
     {
       "name": "find_related",
       "title": "Find Related Items",
-      "description": "Given a note, event, reminder, or email ID, find semantically related items a...",
+      "description": "Given a note, event, reminder, or email ID, find semantically related items across all indexed Apple apps. Discovers cross-app connections (e.g., a calendar event related to notes and reminders about the same topic).",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -2133,7 +2133,7 @@
     {
       "name": "generate_image",
       "title": "Generate Image",
-      "description": "Generate an image from a text description using Apple Intelligence on-device ...",
+      "description": "Generate an image from a text description using Apple Intelligence on-device image generation (Image Playground). Returns the file path to the generated PNG. Requires macOS 26+ with Apple Silicon.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -2168,7 +2168,7 @@
     {
       "name": "generate_plan",
       "title": "Generate Plan",
-      "description": "Use Apple's on-device Foundation Model to analyze a goal and generate a sugge...",
+      "description": "Use Apple's on-device Foundation Model to analyze a goal and generate a suggested plan of AirMCP tool calls. Returns a JSON array of planned actions for the CALLER to review and execute — this tool does NOT execute anything itself. Requires macOS 26+. Works completely offline with no API keys.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -2208,7 +2208,7 @@
     {
       "name": "generate_structured",
       "title": "Generate Structured Output",
-      "description": "Generate structured JSON output from Apple's on-device Foundation Model with ...",
+      "description": "Generate structured JSON output from Apple's on-device Foundation Model with optional schema constraints. Useful for extracting structured data from natural language. Requires macOS 26+.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -2264,7 +2264,7 @@
     {
       "name": "generate_text",
       "title": "Generate Text",
-      "description": "Generate text using Apple's on-device Foundation Model with custom system ins...",
+      "description": "Generate text using Apple's on-device Foundation Model with custom system instructions. Runs entirely on-device via Apple Silicon. Requires macOS 26+.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -2303,7 +2303,7 @@
     {
       "name": "geocode",
       "title": "Geocode",
-      "description": "Convert a place name or address to geographic coordinates.",
+      "description": "Convert a place name or address to geographic coordinates. Returns up to 5 matching locations with latitude, longitude, country, and timezone.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -2332,7 +2332,7 @@
     {
       "name": "get_battery_status",
       "title": "Get Battery Status",
-      "description": "Get battery percentage, charging state, power source, and estimated time rema...",
+      "description": "Get battery percentage, charging state, power source, and estimated time remaining.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -2424,7 +2424,7 @@
     {
       "name": "get_current_location",
       "title": "Get Current Location",
-      "description": "Get the device's current geographic location (latitude, longitude, altitude).",
+      "description": "Get the device's current geographic location (latitude, longitude, altitude). Requires Location Services permission. First use triggers a macOS permission dialog.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -2743,7 +2743,7 @@
     {
       "name": "get_frontmost_app",
       "title": "Get Frontmost App",
-      "description": "Get the name, bundle identifier, and PID of the currently active (frontmost) ...",
+      "description": "Get the name, bundle identifier, and PID of the currently active (frontmost) application.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -2824,7 +2824,7 @@
     {
       "name": "get_location_permission",
       "title": "Get Location Permission",
-      "description": "Check the current Location Services authorization status.",
+      "description": "Check the current Location Services authorization status. Returns the permission state (not_determined, authorized_always, denied, restricted).",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -2898,7 +2898,7 @@
     {
       "name": "get_screen_info",
       "title": "Get Screen Info",
-      "description": "Get display information including resolution, pixel dimensions, and Retina st...",
+      "description": "Get display information including resolution, pixel dimensions, and Retina status.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -3042,7 +3042,7 @@
     {
       "name": "get_upcoming_events",
       "title": "Get Upcoming Events",
-      "description": "Get the next N upcoming events from now (searches up to 30 days ahead).",
+      "description": "Get the next N upcoming events from now (searches up to 30 days ahead). A convenience wrapper that doesn't require date range parameters.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -3163,7 +3163,7 @@
     {
       "name": "get_wifi_status",
       "title": "Get WiFi Status",
-      "description": "Get the current WiFi status including connected network name, signal strength...",
+      "description": "Get the current WiFi status including connected network name, signal strength, and channel.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -3181,7 +3181,7 @@
     {
       "name": "get_workflow",
       "title": "Get Workflow",
-      "description": "Retrieve a registered MCP prompt by name and return its workflow instructions...",
+      "description": "Retrieve a registered MCP prompt by name and return its workflow instructions as text. Useful in autonomous/Cowork environments where prompts cannot be invoked directly.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -3340,7 +3340,7 @@
     {
       "name": "gws_drive_list",
       "title": "List Drive Files",
-      "description": "List files in Google Drive.",
+      "description": "List files in Google Drive. Supports query filters.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -3440,7 +3440,7 @@
     {
       "name": "gws_gmail_list",
       "title": "List Gmail Messages",
-      "description": "List recent Gmail messages.",
+      "description": "List recent Gmail messages. Supports query filters (e.g. 'from:alice is:unread').",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -3472,7 +3472,7 @@
     {
       "name": "gws_gmail_read",
       "title": "Read Gmail Message",
-      "description": "Read a Gmail message by ID.",
+      "description": "Read a Gmail message by ID. Returns subject, from, to, date, and body.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -3511,7 +3511,7 @@
     {
       "name": "gws_gmail_send",
       "title": "Send Gmail",
-      "description": "Send an email via Gmail.",
+      "description": "Send an email via Gmail. Encodes the message in RFC 2822 format.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -3592,7 +3592,7 @@
     {
       "name": "gws_raw",
       "title": "Raw GWS Command",
-      "description": "Execute any Google Workspace CLI command.",
+      "description": "Execute any Google Workspace CLI command. For advanced use when specific tools don't cover your need.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -3816,7 +3816,7 @@
     {
       "name": "import_photo",
       "title": "Import Photo",
-      "description": "Import a photo from a file path into Photos library.",
+      "description": "Import a photo from a file path into Photos library. Optionally add to an existing album. Requires macOS 26+ Swift bridge.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -3850,7 +3850,7 @@
     {
       "name": "import_shortcut",
       "title": "Import Shortcut",
-      "description": "Import a .shortcut file into Siri Shortcuts.",
+      "description": "Import a .shortcut file into Siri Shortcuts. Uses the macOS shortcuts CLI to import the shortcut from the specified file path.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -3879,7 +3879,7 @@
     {
       "name": "is_app_running",
       "title": "Is App Running",
-      "description": "Check whether an application is currently running.",
+      "description": "Check whether an application is currently running. Returns process details if found.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -3987,7 +3987,7 @@
     {
       "name": "keynote_export_pdf",
       "title": "Export Keynote to PDF",
-      "description": "Export a Keynote presentation to PDF.",
+      "description": "Export a Keynote presentation to PDF. Will overwrite an existing file at the same path.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -4022,7 +4022,7 @@
     {
       "name": "keynote_get_slide",
       "title": "Get Keynote Slide",
-      "description": "Get detailed content of a specific slide including all text items and present...",
+      "description": "Get detailed content of a specific slide including all text items and presenter notes.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -4074,7 +4074,7 @@
     {
       "name": "keynote_list_slides",
       "title": "List Keynote Slides",
-      "description": "List all slides in a Keynote presentation with title, body preview, and prese...",
+      "description": "List all slides in a Keynote presentation with title, body preview, and presenter notes.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -4176,7 +4176,7 @@
     {
       "name": "launch_app",
       "title": "Launch App",
-      "description": "Launch an application by name.",
+      "description": "Launch an application by name. Lightweight — just activates the app without reading its accessibility tree.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -4279,7 +4279,7 @@
     {
       "name": "list_all_windows",
       "title": "List All Windows",
-      "description": "List windows across all running applications with title, size, position, app ...",
+      "description": "List windows across all running applications with title, size, position, app name, and PID.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -4525,7 +4525,7 @@
     {
       "name": "list_contacts",
       "title": "List Contacts",
-      "description": "List contacts with name, primary email, and phone.",
+      "description": "List contacts with name, primary email, and phone. Supports pagination.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -4612,7 +4612,7 @@
     {
       "name": "list_directory",
       "title": "List Directory",
-      "description": "List files and folders in a directory with metadata (kind, size, modification...",
+      "description": "List files and folders in a directory with metadata (kind, size, modification date).",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -4690,7 +4690,7 @@
     {
       "name": "list_events",
       "title": "List Events",
-      "description": "List events within a date range.",
+      "description": "List events within a date range. Requires startDate and endDate (ISO 8601). Optionally filter by calendar name. Supports limit/offset pagination.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -5068,7 +5068,7 @@
     {
       "name": "list_messages",
       "title": "List Messages",
-      "description": "List recent messages in a mailbox (e.g.",
+      "description": "List recent messages in a mailbox (e.g. 'INBOX'). Returns subject, sender, date, read status.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -5173,7 +5173,7 @@
     {
       "name": "list_notes",
       "title": "List Notes",
-      "description": "List all notes with title, folder, and dates.",
+      "description": "List all notes with title, folder, and dates. Optionally filter by folder name. Supports pagination via limit/offset.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -5340,7 +5340,7 @@
     {
       "name": "list_photos",
       "title": "List Photos",
-      "description": "List photos in an album with metadata.",
+      "description": "List photos in an album with metadata. Use list_albums to find album names first.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -5588,7 +5588,7 @@
     {
       "name": "list_reminders",
       "title": "List Reminders",
-      "description": "List reminders.",
+      "description": "List reminders. Optionally filter by list name and/or completion status. Supports pagination via limit/offset.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -5915,7 +5915,7 @@
     {
       "name": "list_triggers",
       "title": "List Event Triggers",
-      "description": "Show all skills with event triggers (calendar_changed, reminders_changed, pas...",
+      "description": "Show all skills with event triggers (calendar_changed, reminders_changed, pasteboard_changed, mail_unread_changed, focus_mode_changed, now_playing_changed, file_modified, screen_locked, screen_unlocked) and their debounce settings.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -5933,7 +5933,7 @@
     {
       "name": "list_windows",
       "title": "List Windows",
-      "description": "List all visible windows across all running applications.",
+      "description": "List all visible windows across all running applications. Returns JSON with each window's app name, bundle ID, title, position, and size. Requires Accessibility permissions.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -5951,7 +5951,7 @@
     {
       "name": "local_llm_generate",
       "title": "Local LLM Generate",
-      "description": "Generate text using a local Ollama model.",
+      "description": "Generate text using a local Ollama model. Runs entirely on your machine — no data sent to any cloud. Requires Ollama running at localhost:11434. Useful for summarization, extraction, and analysis.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -6042,7 +6042,7 @@
     {
       "name": "memory_forget",
       "title": "Forget Memory Entries",
-      "description": "Delete context-memory entries.",
+      "description": "Delete context-memory entries. Provide exactly one selector: `id` (single entry), `key` (all entries with that key), or `tag` (all entries carrying that tag). Optional `kind` further restricts the delete within the chosen selector.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -6102,7 +6102,7 @@
     {
       "name": "memory_put",
       "title": "Remember a Fact, Entity, or Episode",
-      "description": "Insert or update a context-memory entry.",
+      "description": "Insert or update a context-memory entry. Use `fact` for durable key→value notes, `entity` for named people/places/projects, and `episode` for time-anchored records. If you omit `id`, the key is used as the stable id (so a second call with the same key upserts). `ttl_ms` makes the entry self-expiring.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -6224,7 +6224,7 @@
     {
       "name": "memory_query",
       "title": "Query Context Memory",
-      "description": "List non-expired memory entries.",
+      "description": "List non-expired memory entries. All filters are AND-combined. Returns entries sorted by `updatedAt` descending by default. Safe read-only — use before composing LLM prompts so recent user-supplied context is recalled.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -6344,7 +6344,7 @@
     {
       "name": "memory_stats",
       "title": "Context Memory Stats",
-      "description": "Summarize the context-memory store: counts by kind, oldest/newest timestamps,...",
+      "description": "Summarize the context-memory store: counts by kind, oldest/newest timestamps, and on-disk path. Also sweeps any expired entries as a side-effect.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -6522,7 +6522,7 @@
     {
       "name": "move_note",
       "title": "Move Note",
-      "description": "Move a note to a different folder.",
+      "description": "Move a note to a different folder. NOTE: Apple Notes has no native move command, so this copies the note body to the target folder and deletes the original. The note will get a new ID and creation date. Attachments (images) will be lost.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -6769,7 +6769,7 @@
     {
       "name": "numbers_export_pdf",
       "title": "Export Numbers to PDF",
-      "description": "Export a Numbers spreadsheet to PDF.",
+      "description": "Export a Numbers spreadsheet to PDF. Will overwrite an existing file at the same path.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -6804,7 +6804,7 @@
     {
       "name": "numbers_get_cell",
       "title": "Get Numbers Cell",
-      "description": "Read a single cell value by address (e.g.",
+      "description": "Read a single cell value by address (e.g. 'A1').",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -6890,7 +6890,7 @@
     {
       "name": "numbers_read_cells",
       "title": "Read Numbers Cell Range",
-      "description": "Read a range of cells from a sheet.",
+      "description": "Read a range of cells from a sheet. Uses 0-based row/column indices.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -7101,7 +7101,7 @@
     {
       "name": "pages_export_pdf",
       "title": "Export Pages to PDF",
-      "description": "Export an open Pages document to PDF.",
+      "description": "Export an open Pages document to PDF. Will overwrite an existing file at the same path.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -7427,7 +7427,7 @@
     {
       "name": "prevent_sleep",
       "title": "Prevent Sleep",
-      "description": "Prevent the Mac from sleeping for a specified duration using caffeinate.",
+      "description": "Prevent the Mac from sleeping for a specified duration using caffeinate. Returns the process PID for cancellation.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -7454,7 +7454,7 @@
     {
       "name": "proactive_context",
       "title": "Proactive Context",
-      "description": "Get contextually relevant tool and workflow suggestions based on time of day,...",
+      "description": "Get contextually relevant tool and workflow suggestions based on time of day, day of week, and your usage patterns. Like Siri Suggestions but for MCP — tells you what you probably want to do right now.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -7534,7 +7534,7 @@
     {
       "name": "proofread_text",
       "title": "Proofread Text",
-      "description": "Proofread and correct grammar/spelling using Apple Intelligence (on-device Fo...",
+      "description": "Proofread and correct grammar/spelling using Apple Intelligence (on-device Foundation Models). Requires macOS 26+ with Apple Silicon.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -7562,7 +7562,7 @@
     {
       "name": "query_photos",
       "title": "Query Photos",
-      "description": "Query the Photos library with filters: media type, date range, favorites.",
+      "description": "Query the Photos library with filters: media type, date range, favorites. Returns photo metadata (identifier, filename, date, dimensions). Requires Swift bridge.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -7612,7 +7612,7 @@
     {
       "name": "quit_app",
       "title": "Quit App",
-      "description": "Quit a running application by name.",
+      "description": "Quit a running application by name. May cause unsaved work to be lost.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -7721,7 +7721,7 @@
     {
       "name": "read_contact",
       "title": "Read Contact",
-      "description": "Read full details of a contact by ID including all emails, phones, and addres...",
+      "description": "Read full details of a contact by ID including all emails, phones, and addresses.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -7877,7 +7877,7 @@
     {
       "name": "read_event",
       "title": "Read Event",
-      "description": "Read full details of a calendar event by ID.",
+      "description": "Read full details of a calendar event by ID. Includes attendees (read-only), location, description, and recurrence info.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -7998,7 +7998,7 @@
     {
       "name": "read_message",
       "title": "Read Message",
-      "description": "Read full content of an email message by ID.",
+      "description": "Read full content of an email message by ID. Content length is configurable (default: 5000 chars, max: 100000).",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -8034,7 +8034,7 @@
     {
       "name": "read_note",
       "title": "Read Note",
-      "description": "Read the full content of a specific note by its ID.",
+      "description": "Read the full content of a specific note by its ID. Returns HTML body and plaintext.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -8106,7 +8106,7 @@
     {
       "name": "read_page_content",
       "title": "Read Page Content",
-      "description": "Read the HTML source of a Safari tab.",
+      "description": "Read the HTML source of a Safari tab. Specify window and tab index from list_tabs.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -8272,7 +8272,7 @@
     {
       "name": "record_screen",
       "title": "Record Screen",
-      "description": "Record the screen for a specified duration (1-60 seconds).",
+      "description": "Record the screen for a specified duration (1-60 seconds). Returns the recording as a .mov file path. Requires Screen Recording permission.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -8340,7 +8340,7 @@
     {
       "name": "reply_mail",
       "title": "Reply to Email",
-      "description": "Reply to an email message.",
+      "description": "Reply to an email message. Requires allowSendMail config.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -8462,7 +8462,7 @@
     {
       "name": "rewrite_text",
       "title": "Rewrite Text",
-      "description": "Rewrite text in a specified tone using Apple Intelligence (on-device Foundati...",
+      "description": "Rewrite text in a specified tone using Apple Intelligence (on-device Foundation Models). Requires macOS 26+ with Apple Silicon.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -8500,7 +8500,7 @@
     {
       "name": "run_javascript",
       "title": "Run JavaScript",
-      "description": "Execute JavaScript in a Safari tab.",
+      "description": "Execute JavaScript in a Safari tab. Use list_tabs to find window/tab indices. Returns the result as a string.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -8540,7 +8540,7 @@
     {
       "name": "run_shortcut",
       "title": "Run Shortcut",
-      "description": "Run a Siri Shortcut by name.",
+      "description": "Run a Siri Shortcut by name. Optionally provide text input. Returns the shortcut's output. Note: shortcuts may trigger UI prompts or perform system actions.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -8573,7 +8573,7 @@
     {
       "name": "scan_bluetooth",
       "title": "Scan Bluetooth",
-      "description": "Scan for nearby BLE (Bluetooth Low Energy) devices.",
+      "description": "Scan for nearby BLE (Bluetooth Low Energy) devices. Returns device names, UUIDs, and signal strength (RSSI). Default scan duration is 5 seconds.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -8600,7 +8600,7 @@
     {
       "name": "scan_document",
       "title": "Scan Document",
-      "description": "Extract text and structure from an image file using Apple Vision framework OCR.",
+      "description": "Extract text and structure from an image file using Apple Vision framework OCR. Returns recognized text elements with confidence scores. Works with photos of documents, receipts, whiteboards, etc.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -8629,7 +8629,7 @@
     {
       "name": "scan_notes",
       "title": "Scan Notes",
-      "description": "Bulk scan notes returning metadata and a text preview for each.",
+      "description": "Bulk scan notes returning metadata and a text preview for each. Supports pagination via offset. Optionally filter by folder. Use this to get an overview before organizing.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -8972,7 +8972,7 @@
     {
       "name": "search_files",
       "title": "Search Files",
-      "description": "Search files using Spotlight (mdfind).",
+      "description": "Search files using Spotlight (mdfind). Searches file names and content.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -9083,7 +9083,7 @@
     {
       "name": "search_nearby",
       "title": "Search Nearby",
-      "description": "Search for places near a location in Apple Maps.",
+      "description": "Search for places near a location in Apple Maps. If no coordinates are given, searches near the current location.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -9119,7 +9119,7 @@
     {
       "name": "search_notes",
       "title": "Search Notes",
-      "description": "Search notes by keyword in title and body.",
+      "description": "Search notes by keyword in title and body. Returns matching notes with a 200-char preview.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -9487,7 +9487,7 @@
     {
       "name": "semantic_clear",
       "title": "Clear Semantic Index",
-      "description": "Delete all indexed data from the local vector store AND remove corresponding ...",
+      "description": "Delete all indexed data from the local vector store AND remove corresponding entries from macOS Spotlight. Use for privacy or to force a fresh re-index. Requires Swift bridge for Spotlight cleanup.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -9505,7 +9505,7 @@
     {
       "name": "semantic_index",
       "title": "Build Semantic Index",
-      "description": "Index data from enabled Apple apps (Notes, Calendar, Reminders, Mail, Photos,...",
+      "description": "Index data from enabled Apple apps (Notes, Calendar, Reminders, Mail, Photos, Finder) into the local vector store for semantic search. Run this once, then use semantic_search. Replaces any existing index. Requires Swift bridge (npm run swift-build).",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -9540,7 +9540,7 @@
     {
       "name": "semantic_search",
       "title": "Semantic Search",
-      "description": "Search across Apple app data by meaning, not just keywords.",
+      "description": "Search across Apple app data by meaning, not just keywords. Finds related notes, events, reminders, and emails even if they use different words. Auto-indexes on first use and refreshes every 30 minutes.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -9593,7 +9593,7 @@
     {
       "name": "semantic_status",
       "title": "Semantic Index Status",
-      "description": "Show the current state of the semantic vector index -- total entries, breakdo...",
+      "description": "Show the current state of the semantic vector index -- total entries, breakdown by source.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -9611,7 +9611,7 @@
     {
       "name": "send_file",
       "title": "Send File",
-      "description": "Send a file attachment via iMessage/SMS.",
+      "description": "Send a file attachment via iMessage/SMS. Requires absolute file path and recipient handle.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -9647,7 +9647,7 @@
     {
       "name": "send_mail",
       "title": "Send Email",
-      "description": "Compose and send an email via Apple Mail.",
+      "description": "Compose and send an email via Apple Mail. Requires allowSendMail config.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -9715,7 +9715,7 @@
     {
       "name": "send_message",
       "title": "Send Message",
-      "description": "Send a text message via iMessage/SMS.",
+      "description": "Send a text message via iMessage/SMS. Requires a phone number or email as the target handle.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -9750,7 +9750,7 @@
     {
       "name": "set_brightness",
       "title": "Set Brightness",
-      "description": "Set the display brightness level.",
+      "description": "Set the display brightness level. Requires the 'brightness' CLI tool (brew install brightness).",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -9889,7 +9889,7 @@
     {
       "name": "set_file_tags",
       "title": "Set File Tags",
-      "description": "Set Finder tags on a file.",
+      "description": "Set Finder tags on a file. Replaces all existing tags.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -9926,7 +9926,7 @@
     {
       "name": "set_rating",
       "title": "Set Rating",
-      "description": "Set the star rating (0-100) for a track.",
+      "description": "Set the star rating (0-100) for a track. Use multiples of 20 for full stars (0, 20, 40, 60, 80, 100).",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -10040,7 +10040,7 @@
     {
       "name": "setup_permissions",
       "title": "Setup Permissions",
-      "description": "Trigger macOS permission prompts for all Apple apps used by AirMCP.",
+      "description": "Trigger macOS permission prompts for all Apple apps used by AirMCP. Run this once after installation to grant all permissions at once. Each app will show a one-time macOS permission dialog.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -10156,7 +10156,7 @@
     {
       "name": "skill_clipboard-url-to-reading",
       "title": "Clipboard URL → Reading List",
-      "description": "[Skill] Listens for clipboard changes and, when a URL is on the pasteboard, p...",
+      "description": "[Skill] Listens for clipboard changes and, when a URL is on the pasteboard, pushes it into Safari's Reading List. Combines the `pasteboard_changed` event trigger with `on_error: continue` so non-URL clipboard content doesn't spam the user with errors — Safari's validator rejects the non-URL and the skill quietly moves on.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -10174,7 +10174,7 @@
     {
       "name": "skill_daily-journal",
       "title": "Daily Journal → Memory",
-      "description": "[Skill] Captures today's events + open reminders, summarises them on-device, ...",
+      "description": "[Skill] Captures today's events + open reminders, summarises them on-device, and persists the summary as a context-memory `episode` tagged `journal`. Demonstrates inputs + parallel + retry + the newly-exposed `memory_put` tool working together so ai_agent can later recall \"what did I do last Tuesday?\" via `memory_query`. DESTRUCTIVE: writes a memory entry (non-destructive to Apple apps).",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -10199,7 +10199,7 @@
     {
       "name": "skill_evening-winddown",
       "title": "Evening Wind-down",
-      "description": "[Skill] Fires when the screen is locked — drafts a short day-in-review note c...",
+      "description": "[Skill] Fires when the screen is locked — drafts a short day-in-review note covering today's events + open reminders so the next unlock (or tomorrow morning) has a fresh snapshot waiting. Showcases the `screen_locked` event trigger combined with `parallel` reads and `retry` on the on-device summariser.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -10217,7 +10217,7 @@
     {
       "name": "skill_focus-block-planner",
       "title": "Focus Block Planner",
-      "description": "[Skill] Walks today's open reminders and drops a calendar time-block for each...",
+      "description": "[Skill] Walks today's open reminders and drops a calendar time-block for each one. Uses `loop` with `on_error: continue` so a single failed event creation (e.g. conflicting calendar, missing permission) doesn't abort the rest of the plan — the skill result reports which reminders got blocked and which didn't. DESTRUCTIVE: creates calendar events; each insertion is gated by HITL approval.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -10235,7 +10235,7 @@
     {
       "name": "skill_focus-guardian",
       "title": "Focus Mode Guardian",
-      "description": "[Skill] Auto-snapshots today's events and open reminders whenever the system ...",
+      "description": "[Skill] Auto-snapshots today's events and open reminders whenever the system focus mode changes (entering/leaving Do Not Disturb, Work, Personal, etc.) so the AI has fresh context right after you change mode. Showcases the `focus_mode_changed` event trigger plus parallel data gathering.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -10271,7 +10271,7 @@
     {
       "name": "skill_project-digest",
       "title": "Project Digest",
-      "description": "[Skill] Semantic-search the user's indexed Apple data for a topic, then loop ...",
+      "description": "[Skill] Semantic-search the user's indexed Apple data for a topic, then loop over each match to pull semantically-related items — effectively a cross-app \"everything about this project\" view. Demonstrates the Skills DSL's loop construct and conditional execution.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -10289,7 +10289,7 @@
     {
       "name": "skill_sender-to-tasks",
       "title": "Sender → Tasks",
-      "description": "[Skill] Scans mail for a keyword and turns each hit into a reminder so nothin...",
+      "description": "[Skill] Scans mail for a keyword and turns each hit into a reminder so nothing in the inbox goes unresolved. Accepts runtime inputs so the same skill handles newsletter triage, a specific sender, or any ad-hoc query without editing YAML. Loop + `on_error: continue` means the rest of the batch still gets queued even if one reminder-create fails (HITL denial, Reminders permission, etc.). DESTRUCTIVE: creates reminders; each insertion is gated by HITL approval.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -10324,7 +10324,7 @@
     {
       "name": "smart_clipboard",
       "title": "Smart Clipboard",
-      "description": "Get clipboard content with automatic type detection (text, URL, email, phone,...",
+      "description": "Get clipboard content with automatic type detection (text, URL, email, phone, date, file path, image). More structured than raw clipboard access.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -10360,7 +10360,7 @@
     {
       "name": "spotlight_clear",
       "title": "Clear Spotlight Index",
-      "description": "Remove all AirMCP entries from macOS Spotlight without clearing the local vec...",
+      "description": "Remove all AirMCP entries from macOS Spotlight without clearing the local vector store. Requires Swift bridge.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -10378,7 +10378,7 @@
     {
       "name": "spotlight_sync",
       "title": "Sync to Spotlight",
-      "description": "Push semantically indexed data to macOS Core Spotlight, making it discoverabl...",
+      "description": "Push semantically indexed data to macOS Core Spotlight, making it discoverable via Spotlight search and Siri. Run after semantic_index to expose your notes, events, reminders, and emails to system-wide search. Requires Swift bridge (npm run swift-build).",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -10396,7 +10396,7 @@
     {
       "name": "suggest_next_tools",
       "title": "Suggest Next Tools",
-      "description": "Based on your usage patterns, suggest which tools typically follow a given tool.",
+      "description": "Based on your usage patterns, suggest which tools typically follow a given tool. Learns from how you use AirMCP over time. Returns frequently-used tool sequences.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -10470,7 +10470,7 @@
     {
       "name": "summarize_context",
       "title": "Summarize Context",
-      "description": "Collect context from all enabled Apple apps and ask the client's LLM to produ...",
+      "description": "Collect context from all enabled Apple apps and ask the client's LLM to produce a concise briefing. Uses MCP Sampling — works with any LLM the client is using. No API keys required.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -10495,7 +10495,7 @@
     {
       "name": "summarize_text",
       "title": "Summarize Text",
-      "description": "Summarize text using Apple Intelligence (on-device Foundation Models).",
+      "description": "Summarize text using Apple Intelligence (on-device Foundation Models). Requires macOS 26+ with Apple Silicon.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -10523,7 +10523,7 @@
     {
       "name": "system_power",
       "title": "System Power",
-      "description": "Shutdown or restart the Mac.",
+      "description": "Shutdown or restart the Mac. Use with caution.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -10572,7 +10572,7 @@
     {
       "name": "tag_content",
       "title": "Tag Content",
-      "description": "Classify and tag content using Apple's on-device Foundation Model.",
+      "description": "Classify and tag content using Apple's on-device Foundation Model. Returns confidence scores for each provided tag/category. Requires macOS 26+.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -10611,7 +10611,7 @@
     {
       "name": "timeline_today",
       "title": "Timeline (Today)",
-      "description": "Display today's events and due reminders on a single day-axis timeline.",
+      "description": "Display today's events and due reminders on a single day-axis timeline. Fuses Calendar + Reminders; items without a start/due time fall into an 'Unscheduled' rail.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -10783,7 +10783,7 @@
     {
       "name": "transcribe_audio",
       "title": "Transcribe Audio",
-      "description": "Transcribe an audio file to text using Apple's on-device speech recognition.",
+      "description": "Transcribe an audio file to text using Apple's on-device speech recognition. Supports most audio formats (m4a, mp3, wav, caf).",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -11011,7 +11011,7 @@
     {
       "name": "ui_accessibility_query",
       "title": "Query UI Elements",
-      "description": "Search for UI elements by accessibility attributes (role, title, value, descr...",
+      "description": "Search for UI elements by accessibility attributes (role, title, value, description, identifier). More precise than ui_read — returns only matching elements with full attribute data. Works on any app, including those without AppleScript support. Requires Accessibility permissions.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -11078,7 +11078,7 @@
     {
       "name": "ui_click",
       "title": "Click UI Element",
-      "description": "Click a UI element either by exact screen coordinates (x, y) or by searching ...",
+      "description": "Click a UI element either by exact screen coordinates (x, y) or by searching for an element containing the given text. Optionally filter by accessibility role (e.g. 'AXButton', 'AXMenuItem', 'AXTextField'). Requires Accessibility permissions.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -11124,7 +11124,7 @@
     {
       "name": "ui_diff",
       "title": "Compare UI State",
-      "description": "Compare the current UI state against a previous snapshot to detect changes.",
+      "description": "Compare the current UI state against a previous snapshot to detect changes. Pass the 'elements' array from a previous ui_traverse result as beforeSnapshot. Returns added, removed, and changed elements. Useful for verifying action results.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -11158,7 +11158,7 @@
     {
       "name": "ui_open_app",
       "title": "Open App (UI Automation)",
-      "description": "Open an application by name or bundle ID and return an accessibility tree sum...",
+      "description": "Open an application by name or bundle ID and return an accessibility tree summary of its windows and top-level UI elements. Requires Accessibility permissions.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -11186,7 +11186,7 @@
     {
       "name": "ui_perform_action",
       "title": "Perform Action on UI Element",
-      "description": "Find a UI element by locator (role + title/value) and perform an accessibilit...",
+      "description": "Find a UI element by locator (role + title/value) and perform an accessibility action on it. Actions: press (click), pick (select), confirm, setValue, raise (focus), showMenu. Combines query + action in one step. Requires Accessibility permissions.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -11277,7 +11277,7 @@
     {
       "name": "ui_press_key",
       "title": "Press Key Combination",
-      "description": "Send a key or key combination (e.g.",
+      "description": "Send a key or key combination (e.g. Return, Cmd+S, Ctrl+C). Supports modifier keys: command/cmd, shift, option/alt, control/ctrl. Special keys: return, enter, tab, space, delete, escape, arrow keys (up/down/left/right), F1-F12, home, end, pageup, pagedown. Requires Accessibility permissions.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -11316,7 +11316,7 @@
     {
       "name": "ui_read",
       "title": "Read Accessibility Tree",
-      "description": "Read the accessibility tree of the frontmost app (or specified app).",
+      "description": "Read the accessibility tree of the frontmost app (or specified app). Returns structured data about all visible UI elements including their roles, names, values, positions, and hierarchy. Use this to understand what UI elements are available before interacting with them. Requires Accessibility permissions.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -11355,7 +11355,7 @@
     {
       "name": "ui_scroll",
       "title": "Scroll",
-      "description": "Scroll in the specified direction within the frontmost window.",
+      "description": "Scroll in the specified direction within the frontmost window. Uses arrow key simulation for cross-app compatibility. Requires Accessibility permissions.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -11399,7 +11399,7 @@
     {
       "name": "ui_traverse",
       "title": "BFS Traverse UI Tree",
-      "description": "Breadth-first traversal of the accessibility tree.",
+      "description": "Breadth-first traversal of the accessibility tree. Returns a flat list of all UI elements with parent-child relationships, positions, sizes, and states. Supports PID targeting and visible-only filtering. More thorough than ui_read. Requires Accessibility permissions.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -11447,7 +11447,7 @@
     {
       "name": "ui_type",
       "title": "Type Text",
-      "description": "Type text into the currently focused field using simulated keystrokes via Sys...",
+      "description": "Type text into the currently focused field using simulated keystrokes via System Events. Optionally activate a specific app first. Requires Accessibility permissions.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -11480,7 +11480,7 @@
     {
       "name": "update_contact",
       "title": "Update Contact",
-      "description": "Update contact properties.",
+      "description": "Update contact properties. Only specified fields are changed.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -11533,7 +11533,7 @@
     {
       "name": "update_event",
       "title": "Update Event",
-      "description": "Update event properties.",
+      "description": "Update event properties. Only specified fields are changed. Attendees and recurrence rules cannot be modified via automation.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -11586,7 +11586,7 @@
     {
       "name": "update_note",
       "title": "Update Note",
-      "description": "Replace the entire body of an existing note.",
+      "description": "Replace the entire body of an existing note. WARNING: This overwrites all content. Read the note first if you need to preserve parts of it. Attachments may be lost.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -11620,7 +11620,7 @@
     {
       "name": "update_reminder",
       "title": "Update Reminder",
-      "description": "Update reminder properties.",
+      "description": "Update reminder properties. Only specified fields are changed. Set dueDate to null to clear it. Recurrence rules cannot be modified via automation.",
       "inputSchema": {
         "type": "object",
         "properties": {

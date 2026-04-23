@@ -52,6 +52,15 @@ if (!existsSync(entry)) {
 //                              developer laptop with a live config emits
 //                              ~120+. The bridge codegen needs the full
 //                              inventory regardless of user preference.
+//   AIRMCP_COMPACT_TOOLS=false  Keep full tool descriptions. Compact mode
+//                              (src/shared/tool-filter.ts) truncates to
+//                              ~80 chars with "…" to save tokens in
+//                              tools/list for LLM consumers, but Shortcuts
+//                              / Siri / Spotlight render the description
+//                              as user-facing UI, where truncation turns
+//                              into e.g. "… Foundation Model and repo…".
+//                              The manifest-driven Swift codegen wants
+//                              the authored text verbatim.
 //
 // Do not set AIRMCP_TEST_MODE — that flag disables a separate set of
 // paths (test helpers) unrelated to tool registration.
@@ -61,6 +70,7 @@ const server = spawn("node", [entry, "--full"], {
     ...process.env,
     AIRMCP_FAKE_OS_VERSION: "0",
     AIRMCP_FULL: "true",
+    AIRMCP_COMPACT_TOOLS: "false",
     // Clear any per-module AIRMCP_DISABLE_* set in the developer shell
     // (belt-and-suspenders with --full).
     ...Object.fromEntries(

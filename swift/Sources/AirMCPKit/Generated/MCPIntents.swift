@@ -724,7 +724,7 @@ public struct MCPTodayEventsOutput: Codable, Sendable {
 // Tool: ai_chat
 public struct AiChatIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "AI Chat"
-    nonisolated(unsafe) public static var description = IntentDescription("Send a message to an on-device AI session using Apple Foundation Models.")
+    nonisolated(unsafe) public static var description = IntentDescription("Send a message to an on-device AI session using Apple Foundation Models. Note: each call creates a fresh session — sessionName is for caller-side tracking only, not server-side persistence. Requires macOS 26+.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -754,7 +754,7 @@ public struct AiChatIntent: AppIntent {
 // Tool: ai_plan_metrics
 public struct AiPlanMetricsIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "AI Plan Metrics"
-    nonisolated(unsafe) public static var description = IntentDescription("Run a sample of planner goals against the on-device Foundation Model and repo...")
+    nonisolated(unsafe) public static var description = IntentDescription("Run a sample of planner goals against the on-device Foundation Model and report the aggregate score. Useful after macOS / Apple Intelligence updates to catch planner regressions. Requires macOS 26+ with Apple Silicon. Each case makes one model call, so keep `limit` small for interactive use.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -784,7 +784,7 @@ public struct AiPlanMetricsIntent: AppIntent {
 // Tool: ai_status
 public struct AiStatusIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "AI Status"
-    nonisolated(unsafe) public static var description = IntentDescription("Check availability and status of Apple's on-device Foundation Models.")
+    nonisolated(unsafe) public static var description = IntentDescription("Check availability and status of Apple's on-device Foundation Models. Returns whether the model is available, macOS version, and Apple Silicon status.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -801,7 +801,7 @@ public struct AiStatusIntent: AppIntent {
 // Tool: audit_log
 public struct AuditLogIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Audit Log"
-    nonisolated(unsafe) public static var description = IntentDescription("Query the on-device audit log of tool calls.")
+    nonisolated(unsafe) public static var description = IntentDescription("Query the on-device audit log of tool calls. Reads JSONL rows from ~/.airmcp/audit.jsonl (+ rotated siblings) and returns recent entries newest-first with optional filters by tool / status / time window. Args are already PII-scrubbed at write-time; sensitive-tool entries have `_redacted` args.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -835,7 +835,7 @@ public struct AuditLogIntent: AppIntent {
 // Tool: audit_summary
 public struct AuditSummaryIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Audit Summary"
-    nonisolated(unsafe) public static var description = IntentDescription("Aggregate the audit log over a time window — total call count, error rate, an...")
+    nonisolated(unsafe) public static var description = IntentDescription("Aggregate the audit log over a time window — total call count, error rate, and the busiest tools. Useful for weekly reviews and for spotting runaway agents (a sudden top-of-leaderboard `create_*` tool is a red flag).")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -887,7 +887,7 @@ public struct CalendarWeekViewIntent: AppIntent {
 // Tool: classify_image
 public struct ClassifyImageIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Classify Image"
-    nonisolated(unsafe) public static var description = IntentDescription("Classify an image using Apple Vision framework.")
+    nonisolated(unsafe) public static var description = IntentDescription("Classify an image using Apple Vision framework. Returns labels with confidence scores (e.g. 'dog', 'outdoor', 'food'). Works on any image file. Requires Swift bridge.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -910,7 +910,7 @@ public struct ClassifyImageIntent: AppIntent {
 // Tool: cloud_sync_status
 public struct CloudSyncStatusIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "iCloud Sync Status"
-    nonisolated(unsafe) public static var description = IntentDescription("Check iCloud sync status — see what usage data and config is synced across yo...")
+    nonisolated(unsafe) public static var description = IntentDescription("Check iCloud sync status — see what usage data and config is synced across your Apple devices.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -927,7 +927,7 @@ public struct CloudSyncStatusIntent: AppIntent {
 // Tool: compare_notes
 public struct CompareNotesIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Compare Notes"
-    nonisolated(unsafe) public static var description = IntentDescription("Retrieve full plaintext content of 2-5 notes at once for comparison.")
+    nonisolated(unsafe) public static var description = IntentDescription("Retrieve full plaintext content of 2-5 notes at once for comparison. Use this after scan_notes to safely compare potentially duplicate or similar notes before deciding what to keep, merge, or delete.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -947,7 +947,7 @@ public struct CompareNotesIntent: AppIntent {
 // Tool: discover_tools
 public struct DiscoverToolsIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Discover Tools"
-    nonisolated(unsafe) public static var description = IntentDescription("Search available tools by keyword.")
+    nonisolated(unsafe) public static var description = IntentDescription("Search available tools by keyword. Returns matching tools with descriptions. Use this instead of scanning all 250+ tools — describe what you need and get relevant tools.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -994,7 +994,7 @@ public struct EventStatusIntent: AppIntent {
 // Tool: event_subscribe
 public struct EventSubscribeIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Subscribe to Events"
-    nonisolated(unsafe) public static var description = IntentDescription("Start real-time monitoring of Apple data changes: calendar, reminders, clipbo...")
+    nonisolated(unsafe) public static var description = IntentDescription("Start real-time monitoring of Apple data changes: calendar, reminders, clipboard, mail unread count, focus mode, now-playing track, and watched file paths. Native observers (calendar/reminders/clipboard/focus/files) are pushed from the Swift bridge; mail and now-playing are polled. Requires the Swift bridge in persistent mode for the native observers.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -1011,7 +1011,7 @@ public struct EventSubscribeIntent: AppIntent {
 // Tool: find_related
 public struct FindRelatedIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Find Related Items"
-    nonisolated(unsafe) public static var description = IntentDescription("Given a note, event, reminder, or email ID, find semantically related items a...")
+    nonisolated(unsafe) public static var description = IntentDescription("Given a note, event, reminder, or email ID, find semantically related items across all indexed Apple apps. Discovers cross-app connections (e.g., a calendar event related to notes and reminders about the same topic).")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -1041,7 +1041,7 @@ public struct FindRelatedIntent: AppIntent {
 // Tool: generate_plan
 public struct GeneratePlanIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Generate Plan"
-    nonisolated(unsafe) public static var description = IntentDescription("Use Apple's on-device Foundation Model to analyze a goal and generate a sugge...")
+    nonisolated(unsafe) public static var description = IntentDescription("Use Apple's on-device Foundation Model to analyze a goal and generate a suggested plan of AirMCP tool calls. Returns a JSON array of planned actions for the CALLER to review and execute — this tool does NOT execute anything itself. Requires macOS 26+. Works completely offline with no API keys.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -1071,7 +1071,7 @@ public struct GeneratePlanIntent: AppIntent {
 // Tool: generate_text
 public struct GenerateTextIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Generate Text"
-    nonisolated(unsafe) public static var description = IntentDescription("Generate text using Apple's on-device Foundation Model with custom system ins...")
+    nonisolated(unsafe) public static var description = IntentDescription("Generate text using Apple's on-device Foundation Model with custom system instructions. Runs entirely on-device via Apple Silicon. Requires macOS 26+.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -1101,7 +1101,7 @@ public struct GenerateTextIntent: AppIntent {
 // Tool: geocode
 public struct GeocodeIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Geocode"
-    nonisolated(unsafe) public static var description = IntentDescription("Convert a place name or address to geographic coordinates.")
+    nonisolated(unsafe) public static var description = IntentDescription("Convert a place name or address to geographic coordinates. Returns up to 5 matching locations with latitude, longitude, country, and timezone.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -1121,7 +1121,7 @@ public struct GeocodeIntent: AppIntent {
 // Tool: get_battery_status
 public struct GetBatteryStatusIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Get Battery Status"
-    nonisolated(unsafe) public static var description = IntentDescription("Get battery percentage, charging state, power source, and estimated time rema...")
+    nonisolated(unsafe) public static var description = IntentDescription("Get battery percentage, charging state, power source, and estimated time remaining.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -1193,7 +1193,7 @@ public struct GetClipboardIntent: AppIntent {
 // Tool: get_current_location
 public struct GetCurrentLocationIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Get Current Location"
-    nonisolated(unsafe) public static var description = IntentDescription("Get the device's current geographic location (latitude, longitude, altitude).")
+    nonisolated(unsafe) public static var description = IntentDescription("Get the device's current geographic location (latitude, longitude, altitude). Requires Location Services permission. First use triggers a macOS permission dialog.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -1308,7 +1308,7 @@ public struct GetFileInfoIntent: AppIntent {
 // Tool: get_frontmost_app
 public struct GetFrontmostAppIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Get Frontmost App"
-    nonisolated(unsafe) public static var description = IntentDescription("Get the name, bundle identifier, and PID of the currently active (frontmost) ...")
+    nonisolated(unsafe) public static var description = IntentDescription("Get the name, bundle identifier, and PID of the currently active (frontmost) application.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -1355,7 +1355,7 @@ public struct GetHourlyForecastIntent: AppIntent {
 // Tool: get_location_permission
 public struct GetLocationPermissionIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Get Location Permission"
-    nonisolated(unsafe) public static var description = IntentDescription("Check the current Location Services authorization status.")
+    nonisolated(unsafe) public static var description = IntentDescription("Check the current Location Services authorization status. Returns the permission state (not_determined, authorized_always, denied, restricted).")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -1412,7 +1412,7 @@ public struct GetRatingIntent: AppIntent {
 // Tool: get_screen_info
 public struct GetScreenInfoIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Get Screen Info"
-    nonisolated(unsafe) public static var description = IntentDescription("Get display information including resolution, pixel dimensions, and Retina st...")
+    nonisolated(unsafe) public static var description = IntentDescription("Get display information including resolution, pixel dimensions, and Retina status.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -1494,7 +1494,7 @@ public struct GetUnreadCountIntent: AppIntent {
 // Tool: get_upcoming_events
 public struct GetUpcomingEventsIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Get Upcoming Events"
-    nonisolated(unsafe) public static var description = IntentDescription("Get the next N upcoming events from now (searches up to 30 days ahead).")
+    nonisolated(unsafe) public static var description = IntentDescription("Get the next N upcoming events from now (searches up to 30 days ahead). A convenience wrapper that doesn't require date range parameters.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -1539,7 +1539,7 @@ public struct GetVolumeIntent: AppIntent {
 // Tool: get_wifi_status
 public struct GetWifiStatusIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Get WiFi Status"
-    nonisolated(unsafe) public static var description = IntentDescription("Get the current WiFi status including connected network name, signal strength...")
+    nonisolated(unsafe) public static var description = IntentDescription("Get the current WiFi status including connected network name, signal strength, and channel.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -1610,7 +1610,7 @@ public struct GwsDocsReadIntent: AppIntent {
 // Tool: gws_drive_list
 public struct GwsDriveListIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "List Drive Files"
-    nonisolated(unsafe) public static var description = IntentDescription("List files in Google Drive.")
+    nonisolated(unsafe) public static var description = IntentDescription("List files in Google Drive. Supports query filters.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -1683,7 +1683,7 @@ public struct GwsDriveSearchIntent: AppIntent {
 // Tool: gws_gmail_list
 public struct GwsGmailListIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "List Gmail Messages"
-    nonisolated(unsafe) public static var description = IntentDescription("List recent Gmail messages.")
+    nonisolated(unsafe) public static var description = IntentDescription("List recent Gmail messages. Supports query filters (e.g. 'from:alice is:unread').")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -1709,7 +1709,7 @@ public struct GwsGmailListIntent: AppIntent {
 // Tool: gws_gmail_read
 public struct GwsGmailReadIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Read Gmail Message"
-    nonisolated(unsafe) public static var description = IntentDescription("Read a Gmail message by ID.")
+    nonisolated(unsafe) public static var description = IntentDescription("Read a Gmail message by ID. Returns subject, from, to, date, and body.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -1818,7 +1818,7 @@ public struct GwsTasksListIntent: AppIntent {
 // Tool: is_app_running
 public struct IsAppRunningIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Is App Running"
-    nonisolated(unsafe) public static var description = IntentDescription("Check whether an application is currently running.")
+    nonisolated(unsafe) public static var description = IntentDescription("Check whether an application is currently running. Returns process details if found.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -1838,7 +1838,7 @@ public struct IsAppRunningIntent: AppIntent {
 // Tool: keynote_get_slide
 public struct KeynoteGetSlideIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Get Keynote Slide"
-    nonisolated(unsafe) public static var description = IntentDescription("Get detailed content of a specific slide including all text items and present...")
+    nonisolated(unsafe) public static var description = IntentDescription("Get detailed content of a specific slide including all text items and presenter notes.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -1878,7 +1878,7 @@ public struct KeynoteListDocumentsIntent: AppIntent {
 // Tool: keynote_list_slides
 public struct KeynoteListSlidesIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "List Keynote Slides"
-    nonisolated(unsafe) public static var description = IntentDescription("List all slides in a Keynote presentation with title, body preview, and prese...")
+    nonisolated(unsafe) public static var description = IntentDescription("List all slides in a Keynote presentation with title, body preview, and presenter notes.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -1936,7 +1936,7 @@ public struct ListAlbumsIntent: AppIntent {
 // Tool: list_all_windows
 public struct ListAllWindowsIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "List All Windows"
-    nonisolated(unsafe) public static var description = IntentDescription("List windows across all running applications with title, size, position, app ...")
+    nonisolated(unsafe) public static var description = IntentDescription("List windows across all running applications with title, size, position, app name, and PID.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -2036,7 +2036,7 @@ public struct ListChatsIntent: AppIntent {
 // Tool: list_contacts
 public struct ListContactsIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "List Contacts"
-    nonisolated(unsafe) public static var description = IntentDescription("List contacts with name, primary email, and phone.")
+    nonisolated(unsafe) public static var description = IntentDescription("List contacts with name, primary email, and phone. Supports pagination.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -2063,7 +2063,7 @@ public struct ListContactsIntent: AppIntent {
 // Tool: list_directory
 public struct ListDirectoryIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "List Directory"
-    nonisolated(unsafe) public static var description = IntentDescription("List files and folders in a directory with metadata (kind, size, modification...")
+    nonisolated(unsafe) public static var description = IntentDescription("List files and folders in a directory with metadata (kind, size, modification date).")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -2090,7 +2090,7 @@ public struct ListDirectoryIntent: AppIntent {
 // Tool: list_events
 public struct ListEventsIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "List Events"
-    nonisolated(unsafe) public static var description = IntentDescription("List events within a date range.")
+    nonisolated(unsafe) public static var description = IntentDescription("List events within a date range. Requires startDate and endDate (ISO 8601). Optionally filter by calendar name. Supports limit/offset pagination.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -2242,7 +2242,7 @@ public struct ListMailboxesIntent: AppIntent {
 // Tool: list_messages
 public struct ListMessagesIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "List Messages"
-    nonisolated(unsafe) public static var description = IntentDescription("List recent messages in a mailbox (e.g.")
+    nonisolated(unsafe) public static var description = IntentDescription("List recent messages in a mailbox (e.g. 'INBOX'). Returns subject, sender, date, read status.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -2280,7 +2280,7 @@ public struct ListMessagesIntent: AppIntent {
 // Tool: list_notes
 public struct ListNotesIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "List Notes"
-    nonisolated(unsafe) public static var description = IntentDescription("List all notes with title, folder, and dates.")
+    nonisolated(unsafe) public static var description = IntentDescription("List all notes with title, folder, and dates. Optionally filter by folder name. Supports pagination via limit/offset.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -2338,7 +2338,7 @@ public struct ListParticipantsIntent: AppIntent {
 // Tool: list_photos
 public struct ListPhotosIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "List Photos"
-    nonisolated(unsafe) public static var description = IntentDescription("List photos in an album with metadata.")
+    nonisolated(unsafe) public static var description = IntentDescription("List photos in an album with metadata. Use list_albums to find album names first.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -2467,7 +2467,7 @@ public struct ListReminderListsIntent: AppIntent {
 // Tool: list_reminders
 public struct ListRemindersIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "List Reminders"
-    nonisolated(unsafe) public static var description = IntentDescription("List reminders.")
+    nonisolated(unsafe) public static var description = IntentDescription("List reminders. Optionally filter by list name and/or completion status. Supports pagination via limit/offset.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -2591,7 +2591,7 @@ public struct ListTracksIntent: AppIntent {
 // Tool: list_triggers
 public struct ListTriggersIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "List Event Triggers"
-    nonisolated(unsafe) public static var description = IntentDescription("Show all skills with event triggers (calendar_changed, reminders_changed, pas...")
+    nonisolated(unsafe) public static var description = IntentDescription("Show all skills with event triggers (calendar_changed, reminders_changed, pasteboard_changed, mail_unread_changed, focus_mode_changed, now_playing_changed, file_modified, screen_locked, screen_unlocked) and their debounce settings.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -2608,7 +2608,7 @@ public struct ListTriggersIntent: AppIntent {
 // Tool: list_windows
 public struct ListWindowsIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "List Windows"
-    nonisolated(unsafe) public static var description = IntentDescription("List all visible windows across all running applications.")
+    nonisolated(unsafe) public static var description = IntentDescription("List all visible windows across all running applications. Returns JSON with each window's app name, bundle ID, title, position, and size. Requires Accessibility permissions.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -2625,7 +2625,7 @@ public struct ListWindowsIntent: AppIntent {
 // Tool: local_llm_generate
 public struct LocalLlmGenerateIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Local LLM Generate"
-    nonisolated(unsafe) public static var description = IntentDescription("Generate text using a local Ollama model.")
+    nonisolated(unsafe) public static var description = IntentDescription("Generate text using a local Ollama model. Runs entirely on your machine — no data sent to any cloud. Requires Ollama running at localhost:11434. Useful for summarization, extraction, and analysis.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -2672,7 +2672,7 @@ public struct LocalLlmStatusIntent: AppIntent {
 // Tool: memory_query
 public struct MemoryQueryIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Query Context Memory"
-    nonisolated(unsafe) public static var description = IntentDescription("List non-expired memory entries.")
+    nonisolated(unsafe) public static var description = IntentDescription("List non-expired memory entries. All filters are AND-combined. Returns entries sorted by `updatedAt` descending by default. Safe read-only — use before composing LLM prompts so recent user-supplied context is recalled.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -2714,7 +2714,7 @@ public struct MemoryQueryIntent: AppIntent {
 // Tool: memory_stats
 public struct MemoryStatsIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Context Memory Stats"
-    nonisolated(unsafe) public static var description = IntentDescription("Summarize the context-memory store: counts by kind, oldest/newest timestamps,...")
+    nonisolated(unsafe) public static var description = IntentDescription("Summarize the context-memory store: counts by kind, oldest/newest timestamps, and on-disk path. Also sweeps any expired entries as a side-effect.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -2773,7 +2773,7 @@ public struct NowPlayingIntent: AppIntent {
 // Tool: numbers_get_cell
 public struct NumbersGetCellIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Get Numbers Cell"
-    nonisolated(unsafe) public static var description = IntentDescription("Read a single cell value by address (e.g.")
+    nonisolated(unsafe) public static var description = IntentDescription("Read a single cell value by address (e.g. 'A1').")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -2836,7 +2836,7 @@ public struct NumbersListSheetsIntent: AppIntent {
 // Tool: numbers_read_cells
 public struct NumbersReadCellsIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Read Numbers Cell Range"
-    nonisolated(unsafe) public static var description = IntentDescription("Read a range of cells from a sheet.")
+    nonisolated(unsafe) public static var description = IntentDescription("Read a range of cells from a sheet. Uses 0-based row/column indices.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -2925,7 +2925,7 @@ public struct PodcastNowPlayingIntent: AppIntent {
 // Tool: proactive_context
 public struct ProactiveContextIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Proactive Context"
-    nonisolated(unsafe) public static var description = IntentDescription("Get contextually relevant tool and workflow suggestions based on time of day,...")
+    nonisolated(unsafe) public static var description = IntentDescription("Get contextually relevant tool and workflow suggestions based on time of day, day of week, and your usage patterns. Like Siri Suggestions but for MCP — tells you what you probably want to do right now.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -2946,7 +2946,7 @@ public struct ProactiveContextIntent: AppIntent {
 // Tool: proofread_text
 public struct ProofreadTextIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Proofread Text"
-    nonisolated(unsafe) public static var description = IntentDescription("Proofread and correct grammar/spelling using Apple Intelligence (on-device Fo...")
+    nonisolated(unsafe) public static var description = IntentDescription("Proofread and correct grammar/spelling using Apple Intelligence (on-device Foundation Models). Requires macOS 26+ with Apple Silicon.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -2966,7 +2966,7 @@ public struct ProofreadTextIntent: AppIntent {
 // Tool: query_photos
 public struct QueryPhotosIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Query Photos"
-    nonisolated(unsafe) public static var description = IntentDescription("Query the Photos library with filters: media type, date range, favorites.")
+    nonisolated(unsafe) public static var description = IntentDescription("Query the Photos library with filters: media type, date range, favorites. Returns photo metadata (identifier, filename, date, dimensions). Requires Swift bridge.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -3028,7 +3028,7 @@ public struct ReadChatIntent: AppIntent {
 // Tool: read_contact
 public struct ReadContactIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Read Contact"
-    nonisolated(unsafe) public static var description = IntentDescription("Read full details of a contact by ID including all emails, phones, and addres...")
+    nonisolated(unsafe) public static var description = IntentDescription("Read full details of a contact by ID including all emails, phones, and addresses.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -3052,7 +3052,7 @@ public struct ReadContactIntent: AppIntent {
 // Tool: read_event
 public struct ReadEventIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Read Event"
-    nonisolated(unsafe) public static var description = IntentDescription("Read full details of a calendar event by ID.")
+    nonisolated(unsafe) public static var description = IntentDescription("Read full details of a calendar event by ID. Includes attendees (read-only), location, description, and recurrence info.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -3076,7 +3076,7 @@ public struct ReadEventIntent: AppIntent {
 // Tool: read_message
 public struct ReadMessageIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Read Message"
-    nonisolated(unsafe) public static var description = IntentDescription("Read full content of an email message by ID.")
+    nonisolated(unsafe) public static var description = IntentDescription("Read full content of an email message by ID. Content length is configurable (default: 5000 chars, max: 100000).")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -3099,7 +3099,7 @@ public struct ReadMessageIntent: AppIntent {
 // Tool: read_note
 public struct ReadNoteIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Read Note"
-    nonisolated(unsafe) public static var description = IntentDescription("Read the full content of a specific note by its ID.")
+    nonisolated(unsafe) public static var description = IntentDescription("Read the full content of a specific note by its ID. Returns HTML body and plaintext.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -3123,7 +3123,7 @@ public struct ReadNoteIntent: AppIntent {
 // Tool: read_page_content
 public struct ReadPageContentIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Read Page Content"
-    nonisolated(unsafe) public static var description = IntentDescription("Read the HTML source of a Safari tab.")
+    nonisolated(unsafe) public static var description = IntentDescription("Read the HTML source of a Safari tab. Specify window and tab index from list_tabs.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -3222,7 +3222,7 @@ public struct ReverseGeocodeIntent: AppIntent {
 // Tool: rewrite_text
 public struct RewriteTextIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Rewrite Text"
-    nonisolated(unsafe) public static var description = IntentDescription("Rewrite text in a specified tone using Apple Intelligence (on-device Foundati...")
+    nonisolated(unsafe) public static var description = IntentDescription("Rewrite text in a specified tone using Apple Intelligence (on-device Foundation Models). Requires macOS 26+ with Apple Silicon.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -3245,7 +3245,7 @@ public struct RewriteTextIntent: AppIntent {
 // Tool: scan_bluetooth
 public struct ScanBluetoothIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Scan Bluetooth"
-    nonisolated(unsafe) public static var description = IntentDescription("Scan for nearby BLE (Bluetooth Low Energy) devices.")
+    nonisolated(unsafe) public static var description = IntentDescription("Scan for nearby BLE (Bluetooth Low Energy) devices. Returns device names, UUIDs, and signal strength (RSSI). Default scan duration is 5 seconds.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -3265,7 +3265,7 @@ public struct ScanBluetoothIntent: AppIntent {
 // Tool: scan_document
 public struct ScanDocumentIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Scan Document"
-    nonisolated(unsafe) public static var description = IntentDescription("Extract text and structure from an image file using Apple Vision framework OCR.")
+    nonisolated(unsafe) public static var description = IntentDescription("Extract text and structure from an image file using Apple Vision framework OCR. Returns recognized text elements with confidence scores. Works with photos of documents, receipts, whiteboards, etc.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -3285,7 +3285,7 @@ public struct ScanDocumentIntent: AppIntent {
 // Tool: scan_notes
 public struct ScanNotesIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Scan Notes"
-    nonisolated(unsafe) public static var description = IntentDescription("Bulk scan notes returning metadata and a text preview for each.")
+    nonisolated(unsafe) public static var description = IntentDescription("Bulk scan notes returning metadata and a text preview for each. Supports pagination via offset. Optionally filter by folder. Use this to get an overview before organizing.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -3406,7 +3406,7 @@ public struct SearchEventsIntent: AppIntent {
 // Tool: search_files
 public struct SearchFilesIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Search Files"
-    nonisolated(unsafe) public static var description = IntentDescription("Search files using Spotlight (mdfind).")
+    nonisolated(unsafe) public static var description = IntentDescription("Search files using Spotlight (mdfind). Searches file names and content.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -3458,7 +3458,7 @@ public struct SearchMessagesIntent: AppIntent {
 // Tool: search_notes
 public struct SearchNotesIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Search Notes"
-    nonisolated(unsafe) public static var description = IntentDescription("Search notes by keyword in title and body.")
+    nonisolated(unsafe) public static var description = IntentDescription("Search notes by keyword in title and body. Returns matching notes with a 200-char preview.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -3628,7 +3628,7 @@ public struct SearchTracksIntent: AppIntent {
 // Tool: semantic_search
 public struct SemanticSearchIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Semantic Search"
-    nonisolated(unsafe) public static var description = IntentDescription("Search across Apple app data by meaning, not just keywords.")
+    nonisolated(unsafe) public static var description = IntentDescription("Search across Apple app data by meaning, not just keywords. Finds related notes, events, reminders, and emails even if they use different words. Auto-indexes on first use and refreshes every 30 minutes.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -3662,7 +3662,7 @@ public struct SemanticSearchIntent: AppIntent {
 // Tool: semantic_status
 public struct SemanticStatusIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Semantic Index Status"
-    nonisolated(unsafe) public static var description = IntentDescription("Show the current state of the semantic vector index -- total entries, breakdo...")
+    nonisolated(unsafe) public static var description = IntentDescription("Show the current state of the semantic vector index -- total entries, breakdown by source.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -3679,7 +3679,7 @@ public struct SemanticStatusIntent: AppIntent {
 // Tool: setup_permissions
 public struct SetupPermissionsIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Setup Permissions"
-    nonisolated(unsafe) public static var description = IntentDescription("Trigger macOS permission prompts for all Apple apps used by AirMCP.")
+    nonisolated(unsafe) public static var description = IntentDescription("Trigger macOS permission prompts for all Apple apps used by AirMCP. Run this once after installation to grant all permissions at once. Each app will show a one-time macOS permission dialog.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -3743,7 +3743,7 @@ public struct SkillCalendarAlertIntent: AppIntent {
 // Tool: skill_clipboard-url-to-reading
 public struct SkillClipboardUrlToReadingIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Clipboard URL → Reading List"
-    nonisolated(unsafe) public static var description = IntentDescription("[Skill] Listens for clipboard changes and, when a URL is on the pasteboard, p...")
+    nonisolated(unsafe) public static var description = IntentDescription("[Skill] Listens for clipboard changes and, when a URL is on the pasteboard, pushes it into Safari's Reading List. Combines the `pasteboard_changed` event trigger with `on_error: continue` so non-URL clipboard content doesn't spam the user with errors — Safari's validator rejects the non-URL and the skill quietly moves on.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -3760,7 +3760,7 @@ public struct SkillClipboardUrlToReadingIntent: AppIntent {
 // Tool: skill_daily-journal
 public struct SkillDailyJournalIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Daily Journal → Memory"
-    nonisolated(unsafe) public static var description = IntentDescription("[Skill] Captures today's events + open reminders, summarises them on-device, ...")
+    nonisolated(unsafe) public static var description = IntentDescription("[Skill] Captures today's events + open reminders, summarises them on-device, and persists the summary as a context-memory `episode` tagged `journal`. Demonstrates inputs + parallel + retry + the newly-exposed `memory_put` tool working together so ai_agent can later recall \"what did I do last Tuesday?\" via `memory_query`. DESTRUCTIVE: writes a memory entry (non-destructive to Apple apps).")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -3780,7 +3780,7 @@ public struct SkillDailyJournalIntent: AppIntent {
 // Tool: skill_evening-winddown
 public struct SkillEveningWinddownIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Evening Wind-down"
-    nonisolated(unsafe) public static var description = IntentDescription("[Skill] Fires when the screen is locked — drafts a short day-in-review note c...")
+    nonisolated(unsafe) public static var description = IntentDescription("[Skill] Fires when the screen is locked — drafts a short day-in-review note covering today's events + open reminders so the next unlock (or tomorrow morning) has a fresh snapshot waiting. Showcases the `screen_locked` event trigger combined with `parallel` reads and `retry` on the on-device summariser.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -3797,7 +3797,7 @@ public struct SkillEveningWinddownIntent: AppIntent {
 // Tool: skill_focus-block-planner
 public struct SkillFocusBlockPlannerIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Focus Block Planner"
-    nonisolated(unsafe) public static var description = IntentDescription("[Skill] Walks today's open reminders and drops a calendar time-block for each...")
+    nonisolated(unsafe) public static var description = IntentDescription("[Skill] Walks today's open reminders and drops a calendar time-block for each one. Uses `loop` with `on_error: continue` so a single failed event creation (e.g. conflicting calendar, missing permission) doesn't abort the rest of the plan — the skill result reports which reminders got blocked and which didn't. DESTRUCTIVE: creates calendar events; each insertion is gated by HITL approval.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -3814,7 +3814,7 @@ public struct SkillFocusBlockPlannerIntent: AppIntent {
 // Tool: skill_focus-guardian
 public struct SkillFocusGuardianIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Focus Mode Guardian"
-    nonisolated(unsafe) public static var description = IntentDescription("[Skill] Auto-snapshots today's events and open reminders whenever the system ...")
+    nonisolated(unsafe) public static var description = IntentDescription("[Skill] Auto-snapshots today's events and open reminders whenever the system focus mode changes (entering/leaving Do Not Disturb, Work, Personal, etc.) so the AI has fresh context right after you change mode. Showcases the `focus_mode_changed` event trigger plus parallel data gathering.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -3848,7 +3848,7 @@ public struct SkillInboxTriageIntent: AppIntent {
 // Tool: skill_project-digest
 public struct SkillProjectDigestIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Project Digest"
-    nonisolated(unsafe) public static var description = IntentDescription("[Skill] Semantic-search the user's indexed Apple data for a topic, then loop ...")
+    nonisolated(unsafe) public static var description = IntentDescription("[Skill] Semantic-search the user's indexed Apple data for a topic, then loop over each match to pull semantically-related items — effectively a cross-app \"everything about this project\" view. Demonstrates the Skills DSL's loop construct and conditional execution.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -3865,7 +3865,7 @@ public struct SkillProjectDigestIntent: AppIntent {
 // Tool: skill_sender-to-tasks
 public struct SkillSenderToTasksIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Sender → Tasks"
-    nonisolated(unsafe) public static var description = IntentDescription("[Skill] Scans mail for a keyword and turns each hit into a reminder so nothin...")
+    nonisolated(unsafe) public static var description = IntentDescription("[Skill] Scans mail for a keyword and turns each hit into a reminder so nothing in the inbox goes unresolved. Accepts runtime inputs so the same skill handles newsletter triage, a specific sender, or any ad-hoc query without editing YAML. Loop + `on_error: continue` means the rest of the batch still gets queued even if one reminder-create fails (HITL denial, Reminders permission, etc.). DESTRUCTIVE: creates reminders; each insertion is gated by HITL approval.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -3891,7 +3891,7 @@ public struct SkillSenderToTasksIntent: AppIntent {
 // Tool: smart_clipboard
 public struct SmartClipboardIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Smart Clipboard"
-    nonisolated(unsafe) public static var description = IntentDescription("Get clipboard content with automatic type detection (text, URL, email, phone,...")
+    nonisolated(unsafe) public static var description = IntentDescription("Get clipboard content with automatic type detection (text, URL, email, phone, date, file path, image). More structured than raw clipboard access.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -3925,7 +3925,7 @@ public struct SpeechAvailabilityIntent: AppIntent {
 // Tool: suggest_next_tools
 public struct SuggestNextToolsIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Suggest Next Tools"
-    nonisolated(unsafe) public static var description = IntentDescription("Based on your usage patterns, suggest which tools typically follow a given tool.")
+    nonisolated(unsafe) public static var description = IntentDescription("Based on your usage patterns, suggest which tools typically follow a given tool. Learns from how you use AirMCP over time. Returns frequently-used tool sequences.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -3955,7 +3955,7 @@ public struct SuggestNextToolsIntent: AppIntent {
 // Tool: summarize_context
 public struct SummarizeContextIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Summarize Context"
-    nonisolated(unsafe) public static var description = IntentDescription("Collect context from all enabled Apple apps and ask the client's LLM to produ...")
+    nonisolated(unsafe) public static var description = IntentDescription("Collect context from all enabled Apple apps and ask the client's LLM to produce a concise briefing. Uses MCP Sampling — works with any LLM the client is using. No API keys required.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -3977,7 +3977,7 @@ public struct SummarizeContextIntent: AppIntent {
 // Tool: summarize_text
 public struct SummarizeTextIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Summarize Text"
-    nonisolated(unsafe) public static var description = IntentDescription("Summarize text using Apple Intelligence (on-device Foundation Models).")
+    nonisolated(unsafe) public static var description = IntentDescription("Summarize text using Apple Intelligence (on-device Foundation Models). Requires macOS 26+ with Apple Silicon.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -3997,7 +3997,7 @@ public struct SummarizeTextIntent: AppIntent {
 // Tool: tag_content
 public struct TagContentIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Tag Content"
-    nonisolated(unsafe) public static var description = IntentDescription("Classify and tag content using Apple's on-device Foundation Model.")
+    nonisolated(unsafe) public static var description = IntentDescription("Classify and tag content using Apple's on-device Foundation Model. Returns confidence scores for each provided tag/category. Requires macOS 26+.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -4020,7 +4020,7 @@ public struct TagContentIntent: AppIntent {
 // Tool: timeline_today
 public struct TimelineTodayIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Timeline (Today)"
-    nonisolated(unsafe) public static var description = IntentDescription("Display today's events and due reminders on a single day-axis timeline.")
+    nonisolated(unsafe) public static var description = IntentDescription("Display today's events and due reminders on a single day-axis timeline. Fuses Calendar + Reminders; items without a start/due time fall into an 'Unscheduled' rail.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -4058,7 +4058,7 @@ public struct TodayEventsIntent: AppIntent {
 // Tool: transcribe_audio
 public struct TranscribeAudioIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Transcribe Audio"
-    nonisolated(unsafe) public static var description = IntentDescription("Transcribe an audio file to text using Apple's on-device speech recognition.")
+    nonisolated(unsafe) public static var description = IntentDescription("Transcribe an audio file to text using Apple's on-device speech recognition. Supports most audio formats (m4a, mp3, wav, caf).")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -4164,7 +4164,7 @@ public struct TvSearchIntent: AppIntent {
 // Tool: ui_accessibility_query
 public struct UiAccessibilityQueryIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Query UI Elements"
-    nonisolated(unsafe) public static var description = IntentDescription("Search for UI elements by accessibility attributes (role, title, value, descr...")
+    nonisolated(unsafe) public static var description = IntentDescription("Search for UI elements by accessibility attributes (role, title, value, description, identifier). More precise than ui_read — returns only matching elements with full attribute data. Works on any app, including those without AppleScript support. Requires Accessibility permissions.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -4218,7 +4218,7 @@ public struct UiAccessibilityQueryIntent: AppIntent {
 // Tool: ui_diff
 public struct UiDiffIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Compare UI State"
-    nonisolated(unsafe) public static var description = IntentDescription("Compare the current UI state against a previous snapshot to detect changes.")
+    nonisolated(unsafe) public static var description = IntentDescription("Compare the current UI state against a previous snapshot to detect changes. Pass the 'elements' array from a previous ui_traverse result as beforeSnapshot. Returns added, removed, and changed elements. Useful for verifying action results.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -4244,7 +4244,7 @@ public struct UiDiffIntent: AppIntent {
 // Tool: ui_read
 public struct UiReadIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Read Accessibility Tree"
-    nonisolated(unsafe) public static var description = IntentDescription("Read the accessibility tree of the frontmost app (or specified app).")
+    nonisolated(unsafe) public static var description = IntentDescription("Read the accessibility tree of the frontmost app (or specified app). Returns structured data about all visible UI elements including their roles, names, values, positions, and hierarchy. Use this to understand what UI elements are available before interacting with them. Requires Accessibility permissions.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -4274,7 +4274,7 @@ public struct UiReadIntent: AppIntent {
 // Tool: ui_traverse
 public struct UiTraverseIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "BFS Traverse UI Tree"
-    nonisolated(unsafe) public static var description = IntentDescription("Breadth-first traversal of the accessibility tree.")
+    nonisolated(unsafe) public static var description = IntentDescription("Breadth-first traversal of the accessibility tree. Returns a flat list of all UI elements with parent-child relationships, positions, sizes, and states. Supports PID targeting and visible-only filtering. More thorough than ui_read. Requires Accessibility permissions.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}

@@ -98,7 +98,23 @@ Breaking을 포함한 minor/patch는 **금지**. 직전 메이저에 묶어 둘 
 - [ ] `npm view airmcp@X.Y.Z` 로 반영 검증
 - [ ] `npx -y airmcp@X.Y.Z --version` 스모크
 
-### 3.4 GitHub Release
+### 3.4 Signed .app + .mcpb → GitHub Release
+- [ ] `release-app.yml` 워크플로가 태그 푸시로 자동 실행됐는지 확인 (Actions 탭)
+- [ ] 실패 시 **Missing required secrets** 에러면 아래 6개를 Settings → Secrets and variables → Actions에 등록:
+  - `APPLE_DEVELOPER_ID` — Developer ID Application certificate 공통명 (예: `Developer ID Application: Jane Doe (A1B2C3D4E5)`)
+  - `APPLE_ID` — notarytool용 Apple ID 이메일
+  - `APPLE_ID_PASSWORD` — [App-specific password](https://appleid.apple.com) (Sign-in and security → App-specific passwords)
+  - `APPLE_TEAM_ID` — 10자리 팀 ID
+  - `APPLE_CERT_P12_BASE64` — `.p12` 인증서 + 개인키를 base64 인코딩 (`base64 -i cert.p12 | pbcopy`)
+  - `APPLE_CERT_P12_PASSWORD` — `.p12` import 암호
+- [ ] 성공 시 Release에 두 산출물 첨부되어 있어야 함:
+  - `AirMCP-X.Y.Z.zip` (Developer ID 서명 + 공증 + staple 완료)
+  - `airmcp-X.Y.Z.mcpb` (Claude Desktop 원클릭 설치용)
+- [ ] 공증 실패 시 Actions 로그의 `notarytool log` 출력에서 거부 사유 확인 (hardened runtime / timestamp / 빠진 entitlement 등)
+- [ ] 신호용 검증: `codesign -dv --verbose=4 AirMCP.app` 에서 `Authority=Developer ID Application: …` 확인
+- [ ] Gatekeeper 검증: `spctl -a -vvv AirMCP.app` → `accepted, source=Notarized Developer ID`
+
+### 3.5 GitHub Release notes
 - [ ] Release notes는 CHANGELOG 섹션 복사 (요약 강조, 이미지/GIF는 README 링크)
 - [ ] Breaking이 있으면 Release 제목에 `[BREAKING]` 프리픽스
 - [ ] `latest` 태그 갱신 확인

@@ -188,6 +188,20 @@ AirMCP runs with access to 270+ tools on your machine. A few layers keep a buggy
 
 ---
 
+## Siri · Shortcuts · Spotlight (iOS 17+ / macOS 14+)
+
+AirMCP's 154 read-only tools auto-register as Apple App Intents. Anything that speaks the Intents system — Siri, Shortcuts, Spotlight, the Action Button, Widgets — calls them directly without opening the app.
+
+- **Top-10 Siri phrases** ship out of the box via `AppShortcutsProvider` (codegen'd from the MCP tool manifest).
+- **Shortcuts app**: every AirMCP tool appears as an action with typed parameters.
+- **iOS 26 "Use Model"**: autonomously picks AirMCP tools as tool-call targets.
+- **Interactive Snippets** (iOS 26+): 50 typed tools render SwiftUI result views inline in Shortcuts/Siri/Spotlight.
+- **"Ask AirMCP"** (iOS 26+/macOS 26+): natural-language agent routed to Apple's on-device Foundation Models with AirMCP tools registered. 100% on-device.
+
+See [docs/shortcuts.md](docs/shortcuts.md) for the full guide + [RFC 0007](docs/rfc/0007-app-intent-bridge.md) for the architecture.
+
+---
+
 ## Client Setup
 
 Works with any MCP-compatible client. Examples:

@@ -161,14 +161,28 @@ try {
       // Eligibility gate for Swift AppIntent codegen (RFC 0007 §3.3).
       // Composite inputs (arrays of objects, records) can't map to @Parameter
       // today; we flag them so gen-swift-intents skips without breaking.
-      appIntentEligible: isAppIntentEligible(t.inputSchema, t.annotations),
+      // When ineligible we also record the specific reason so a future
+      // WWDC update (e.g. AppIntent accepting struct params) or manifest
+      // refactor can surface "here's what's missing" without re-deriving
+      // from the schema. `null` when the tool is eligible.
+      ...appIntentEligibility(t.inputSchema),
     }));
+
+  const ineligibleCount = normalized.filter((t) => !t.appIntentEligible).length;
+  const ineligibleByReason = {};
+  for (const t of normalized) {
+    if (t.appIntentEligible) continue;
+    const reason = t.ineligibleReason ?? "unknown";
+    ineligibleByReason[reason] = (ineligibleByReason[reason] ?? 0) + 1;
+  }
 
   const manifest = {
     generatedAt: new Date().toISOString(),
     protocolVersion: "2025-06-18",
     toolCount: normalized.length,
     eligibleCount: normalized.filter((t) => t.appIntentEligible).length,
+    ineligibleCount,
+    ineligibleByReason,
     tools: normalized,
   };
 
@@ -187,13 +201,17 @@ try {
       exitCode = 1;
     } else if (existing) {
       console.error(
-        `[manifest --check] OK — ${manifest.toolCount} tools (${manifest.eligibleCount} AppIntent-eligible)`,
+        `[manifest --check] OK — ${manifest.toolCount} tools (${manifest.eligibleCount} AppIntent-eligible, ${manifest.ineligibleCount} ineligible${
+          manifest.ineligibleCount > 0 ? ": " + Object.entries(manifest.ineligibleByReason).map(([r, n]) => `${r}=${n}`).join(", ") : ""
+        })`,
       );
     }
   } else {
     writeFileSync(OUT_PATH, serialized);
     console.error(
-      `[manifest] wrote ${OUT_PATH} — ${manifest.toolCount} tools (${manifest.eligibleCount} AppIntent-eligible)`,
+      `[manifest] wrote ${OUT_PATH} — ${manifest.toolCount} tools (${manifest.eligibleCount} AppIntent-eligible, ${manifest.ineligibleCount} ineligible${
+        manifest.ineligibleCount > 0 ? ": " + Object.entries(manifest.ineligibleByReason).map(([r, n]) => `${r}=${n}`).join(", ") : ""
+      })`,
     );
   }
 } catch (e) {
@@ -220,27 +238,38 @@ function replacerStripGenerated(key, value) {
 }
 
 /**
- * Return true if the tool's inputSchema is expressible as a flat list of
- * AppIntent `@Parameter` properties. RFC 0007 §3.3 table.
+ * Decide whether the tool's inputSchema is expressible as a flat list of
+ * AppIntent `@Parameter` properties, and if not, record why. RFC 0007
+ * §3.3 table.
  *
- * Ineligible cases:
- *   - any property whose type is "array" AND whose items is "object"
- *     (AppIntent supports [String], [Int], [Double], [Bool] but not arrays
- *     of structs at the @Parameter layer as of iOS 17)
- *   - any property whose type is "object" (composite)
- *   - `additionalProperties: true` / record-like schemas
+ * Returns `{ appIntentEligible: true, ineligibleReason: null }` when
+ * eligible, or `{ appIntentEligible: false, ineligibleReason: "..." }`
+ * with a specific code:
+ *   - "record-input"       additionalProperties: true (keys unknown)
+ *   - "object-param:<key>" a property is `type: object` (composite)
+ *   - "array-of-object:<k>" a property is `array<object>` (composite items)
+ *
+ * The reason code lands in the manifest so diagnostic tools can group
+ * ineligibles by cause and so a future WWDC that lifts one constraint
+ * can target a specific code to rerun codegen against.
  */
-function isAppIntentEligible(inputSchema, _annotations) {
-  if (!inputSchema || typeof inputSchema !== "object") return true;
-  if (inputSchema.additionalProperties === true) return false;
+function appIntentEligibility(inputSchema) {
+  if (!inputSchema || typeof inputSchema !== "object") {
+    return { appIntentEligible: true, ineligibleReason: null };
+  }
+  if (inputSchema.additionalProperties === true) {
+    return { appIntentEligible: false, ineligibleReason: "record-input" };
+  }
   const props = inputSchema.properties ?? {};
   for (const key of Object.keys(props)) {
     const p = props[key];
     if (!p || typeof p !== "object") continue;
-    if (p.type === "object") return false;
+    if (p.type === "object") {
+      return { appIntentEligible: false, ineligibleReason: `object-param:${key}` };
+    }
     if (p.type === "array" && p.items && typeof p.items === "object" && p.items.type === "object") {
-      return false;
+      return { appIntentEligible: false, ineligibleReason: `array-of-object:${key}` };
     }
   }
-  return true;
+  return { appIntentEligible: true, ineligibleReason: null };
 }

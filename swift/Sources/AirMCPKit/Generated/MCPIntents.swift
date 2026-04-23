@@ -6781,30 +6781,44 @@ public struct AirMCPGeneratedShortcuts: AppShortcutsProvider {
 import SwiftUI
 
 @available(macOS 26, iOS 26, *)
-fileprivate func _mkReadEventIntent(id: String) -> ReadEventIntent {
+fileprivate func _mkReadEventIntent_id(id: String) -> ReadEventIntent {
     var intent = ReadEventIntent()
     intent.id = id
     return intent
 }
 
 @available(macOS 26, iOS 26, *)
-fileprivate func _mkReadNoteIntent(id: String) -> ReadNoteIntent {
+fileprivate func _mkReadNoteIntent_id(id: String) -> ReadNoteIntent {
     var intent = ReadNoteIntent()
     intent.id = id
     return intent
 }
 
 @available(macOS 26, iOS 26, *)
-fileprivate func _mkReadReminderIntent(id: String) -> ReadReminderIntent {
+fileprivate func _mkReadReminderIntent_id(id: String) -> ReadReminderIntent {
     var intent = ReadReminderIntent()
     intent.id = id
     return intent
 }
 
 @available(macOS 26, iOS 26, *)
-fileprivate func _mkReadContactIntent(id: String) -> ReadContactIntent {
+fileprivate func _mkReadContactIntent_id(id: String) -> ReadContactIntent {
     var intent = ReadContactIntent()
     intent.id = id
+    return intent
+}
+
+@available(macOS 26, iOS 26, *)
+fileprivate func _mkReadMessageIntent_id(id: String) -> ReadMessageIntent {
+    var intent = ReadMessageIntent()
+    intent.id = id
+    return intent
+}
+
+@available(macOS 26, iOS 26, *)
+fileprivate func _mkReadChatIntent_chatId(chatId: String) -> ReadChatIntent {
+    var intent = ReadChatIntent()
+    intent.chatId = chatId
     return intent
 }
 
@@ -7101,7 +7115,7 @@ public struct MCPGetUpcomingEventsSnippetView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(data.events, id: \.id) { row in
-                Button(intent: _mkReadEventIntent(id: row.id)) {
+                Button(intent: _mkReadEventIntent_id(id: row.id)) {
                     Text(row.summary)
                         .font(.body)
                         .lineLimit(1)
@@ -7204,10 +7218,13 @@ public struct MCPListChatsSnippetView: View {
     public init(data: MCPListChatsOutput) { self.data = data }
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            ForEach(Array(data.chats.enumerated()), id: \.offset) { _, row in
-                Text(row.id)
-                    .font(.body)
-                    .lineLimit(1)
+            ForEach(data.chats, id: \.id) { row in
+                Button(intent: _mkReadChatIntent_chatId(chatId: row.id)) {
+                    Text((row.name ?? ""))
+                        .font(.body)
+                        .lineLimit(1)
+                }
+                .buttonStyle(.plain)
             }
         }
         .padding()
@@ -7222,7 +7239,7 @@ public struct MCPListContactsSnippetView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(data.contacts, id: \.id) { row in
-                Button(intent: _mkReadContactIntent(id: row.id)) {
+                Button(intent: _mkReadContactIntent_id(id: row.id)) {
                     Text(row.name)
                         .font(.body)
                         .lineLimit(1)
@@ -7259,7 +7276,7 @@ public struct MCPListEventsSnippetView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(data.events, id: \.id) { row in
-                Button(intent: _mkReadEventIntent(id: row.id)) {
+                Button(intent: _mkReadEventIntent_id(id: row.id)) {
                     Text(row.summary)
                         .font(.body)
                         .lineLimit(1)
@@ -7346,10 +7363,13 @@ public struct MCPListMessagesSnippetView: View {
     public init(data: MCPListMessagesOutput) { self.data = data }
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            ForEach(Array(data.messages.enumerated()), id: \.offset) { _, row in
-                Text(row.subject)
-                    .font(.body)
-                    .lineLimit(1)
+            ForEach(data.messages, id: \.id) { row in
+                Button(intent: _mkReadMessageIntent_id(id: row.id)) {
+                    Text(row.subject)
+                        .font(.body)
+                        .lineLimit(1)
+                }
+                .buttonStyle(.plain)
             }
         }
         .padding()
@@ -7364,7 +7384,7 @@ public struct MCPListNotesSnippetView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(data.notes, id: \.id) { row in
-                Button(intent: _mkReadNoteIntent(id: row.id)) {
+                Button(intent: _mkReadNoteIntent_id(id: row.id)) {
                     Text(row.name)
                         .font(.body)
                         .lineLimit(1)
@@ -7384,7 +7404,7 @@ public struct MCPListParticipantsSnippetView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(Array(data.participants.enumerated()), id: \.offset) { _, row in
-                Text("(row)")
+                Text((row.name ?? ""))
                     .font(.body)
                     .lineLimit(1)
             }
@@ -7452,7 +7472,7 @@ public struct MCPListRemindersSnippetView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(data.reminders, id: \.id) { row in
-                Button(intent: _mkReadReminderIntent(id: row.id)) {
+                Button(intent: _mkReadReminderIntent_id(id: row.id)) {
                     Text(row.name)
                         .font(.body)
                         .lineLimit(1)
@@ -7672,7 +7692,7 @@ public struct MCPReadChatSnippetView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(Array(data.participants.enumerated()), id: \.offset) { _, row in
-                Text("(row)")
+                Text((row.name ?? ""))
                     .font(.body)
                     .lineLimit(1)
             }
@@ -7778,7 +7798,7 @@ public struct MCPReadEventSnippetView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(Array(data.attendees.enumerated()), id: \.offset) { _, row in
-                Text("(row)")
+                Text((row.name ?? ""))
                     .font(.body)
                     .lineLimit(1)
             }
@@ -7958,10 +7978,13 @@ public struct MCPSearchChatsSnippetView: View {
     public init(data: MCPSearchChatsOutput) { self.data = data }
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            ForEach(Array(data.chats.enumerated()), id: \.offset) { _, row in
-                Text(row.id)
-                    .font(.body)
-                    .lineLimit(1)
+            ForEach(data.chats, id: \.id) { row in
+                Button(intent: _mkReadChatIntent_chatId(chatId: row.id)) {
+                    Text((row.name ?? ""))
+                        .font(.body)
+                        .lineLimit(1)
+                }
+                .buttonStyle(.plain)
             }
         }
         .padding()
@@ -7976,7 +7999,7 @@ public struct MCPSearchContactsSnippetView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(data.contacts, id: \.id) { row in
-                Button(intent: _mkReadContactIntent(id: row.id)) {
+                Button(intent: _mkReadContactIntent_id(id: row.id)) {
                     Text(row.name)
                         .font(.body)
                         .lineLimit(1)
@@ -7996,7 +8019,7 @@ public struct MCPSearchEventsSnippetView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(data.events, id: \.id) { row in
-                Button(intent: _mkReadEventIntent(id: row.id)) {
+                Button(intent: _mkReadEventIntent_id(id: row.id)) {
                     Text(row.summary)
                         .font(.body)
                         .lineLimit(1)
@@ -8016,7 +8039,7 @@ public struct MCPSearchNotesSnippetView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(data.notes, id: \.id) { row in
-                Button(intent: _mkReadNoteIntent(id: row.id)) {
+                Button(intent: _mkReadNoteIntent_id(id: row.id)) {
                     Text(row.name)
                         .font(.body)
                         .lineLimit(1)
@@ -8036,7 +8059,7 @@ public struct MCPSearchRemindersSnippetView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(data.reminders, id: \.id) { row in
-                Button(intent: _mkReadReminderIntent(id: row.id)) {
+                Button(intent: _mkReadReminderIntent_id(id: row.id)) {
                     Text(row.name)
                         .font(.body)
                         .lineLimit(1)
@@ -8142,7 +8165,7 @@ public struct MCPTodayEventsSnippetView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(data.events, id: \.id) { row in
-                Button(intent: _mkReadEventIntent(id: row.id)) {
+                Button(intent: _mkReadEventIntent_id(id: row.id)) {
                     Text(row.summary)
                         .font(.body)
                         .lineLimit(1)

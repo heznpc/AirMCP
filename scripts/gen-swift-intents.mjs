@@ -786,22 +786,37 @@ ${toolEntries.join("\n")}
 // compiler(>=6.3)` + `@available(macOS 26, iOS 26, *)`.
 
 // A.4.3: list → read follow-up map. Tools in this map render each row
-// as `Button(intent: Read<Target>Intent(id: row.id))` so taps dispatch
-// the follow-up AppIntent in-place. Entries validated at load time
-// against the manifest (tool/target must exist; target's @Parameter
-// must be named exactly "id"; list items must carry a matching `id`
-// field). Extending the map is adding one line + re-running codegen.
+// as `Button(intent: _mkRead<Target>Intent(<targetParam>: row.<itemField>))`
+// so taps dispatch the follow-up AppIntent in-place. The
+// itemField/targetParam split handles the common case where the list
+// result's `id` needs to be plumbed into a target tool whose @Parameter
+// has a different name (e.g. list_chats.id → read_chat.chatId).
+//
+// Validation at load time:
+//   • list tool exists in manifest
+//   • target tool exists in manifest
+//   • list output items have a string field named `itemField`
+//   • target input has a @Parameter named `targetParam`
+//
+// Extending the map is adding one line + re-running codegen.
 const FOLLOW_UP_MAP = {
-  list_events: { target: "read_event", idField: "id" },
-  today_events: { target: "read_event", idField: "id" },
-  get_upcoming_events: { target: "read_event", idField: "id" },
-  search_events: { target: "read_event", idField: "id" },
-  list_notes: { target: "read_note", idField: "id" },
-  search_notes: { target: "read_note", idField: "id" },
-  list_reminders: { target: "read_reminder", idField: "id" },
-  search_reminders: { target: "read_reminder", idField: "id" },
-  list_contacts: { target: "read_contact", idField: "id" },
-  search_contacts: { target: "read_contact", idField: "id" },
+  list_events: { target: "read_event", itemField: "id", targetParam: "id" },
+  today_events: { target: "read_event", itemField: "id", targetParam: "id" },
+  get_upcoming_events: { target: "read_event", itemField: "id", targetParam: "id" },
+  search_events: { target: "read_event", itemField: "id", targetParam: "id" },
+  list_notes: { target: "read_note", itemField: "id", targetParam: "id" },
+  search_notes: { target: "read_note", itemField: "id", targetParam: "id" },
+  list_reminders: { target: "read_reminder", itemField: "id", targetParam: "id" },
+  search_reminders: { target: "read_reminder", itemField: "id", targetParam: "id" },
+  list_contacts: { target: "read_contact", itemField: "id", targetParam: "id" },
+  search_contacts: { target: "read_contact", itemField: "id", targetParam: "id" },
+  // Messages: list_messages.id → read_message.id (clean match).
+  list_messages: { target: "read_message", itemField: "id", targetParam: "id" },
+  // Chats: list output uses `id`, read expects `chatId`. The mapping
+  // here lets the codegen plumb row.id → chatId: without changing the
+  // wire contract.
+  list_chats: { target: "read_chat", itemField: "id", targetParam: "chatId" },
+  search_chats: { target: "read_chat", itemField: "id", targetParam: "chatId" },
 };
 
 /**
@@ -882,10 +897,19 @@ function detectSnippetShape(schema) {
       // human label (summary / name / title) rather than the raw UID.
       // Fall back to `id` if nothing else is stringly typed — the row
       // still renders, just less prettily.
-      const stringKeys = Object.keys(itemProps).filter((k) => itemProps[k].type === "string");
+      //
+      // Schemas may declare `type: ["string", "null"]` for optional
+      // fields; treat those the same as plain strings when picking a
+      // display field. The snippet view handles nil via the Codable
+      // struct's Optional<String> type, so rendering the Optional with
+      // `?? ""` is covered at the SwiftUI layer.
+      const isStringish = (p) =>
+        p != null && (p.type === "string" || (Array.isArray(p.type) && p.type.includes("string")));
+      const stringKeys = Object.keys(itemProps).filter((k) => isStringish(itemProps[k]));
       const primaryField = stringKeys.find((k) => k !== "id") ?? stringKeys[0] ?? null;
-      const hasId = itemProps.id?.type === "string";
-      return { shape: "list-object", arrayField: arrayKey, primaryField, hasId };
+      const primaryFieldOptional = primaryField ? Array.isArray(itemProps[primaryField].type) : false;
+      const hasId = isStringish(itemProps.id);
+      return { shape: "list-object", arrayField: arrayKey, primaryField, primaryFieldOptional, hasId };
     }
     if (items.type === "string") {
       return { shape: "list-string", arrayField: arrayKey };
@@ -912,25 +936,45 @@ function resolveFollowUpMap() {
       process.exit(2);
     }
     const info = detectSnippetShape(listTool.outputSchema ?? {});
-    if (info.shape !== "list-object" || !info.hasId) {
+    if (info.shape !== "list-object") {
       console.error(
-        `[gen-intents] FOLLOW_UP_MAP: ${listName} has no list-object items with \`id\` field (shape=${info.shape}, hasId=${info.hasId})`,
+        `[gen-intents] FOLLOW_UP_MAP: ${listName} is not a list-object shape (got ${info.shape})`,
+      );
+      process.exit(2);
+    }
+    const itemProps = listTool.outputSchema?.properties?.[info.arrayField]?.items?.properties ?? {};
+    if (itemProps[entry.itemField]?.type !== "string") {
+      console.error(
+        `[gen-intents] FOLLOW_UP_MAP: ${listName} items have no string field "${entry.itemField}" (fields: ${Object.keys(itemProps).join(", ")})`,
       );
       process.exit(2);
     }
     const targetParams = Object.keys(target.inputSchema?.properties ?? {});
-    if (!targetParams.includes(entry.idField)) {
+    if (!targetParams.includes(entry.targetParam)) {
       console.error(
-        `[gen-intents] FOLLOW_UP_MAP: target ${entry.target} has no @Parameter named "${entry.idField}" (params: ${targetParams.join(", ")})`,
+        `[gen-intents] FOLLOW_UP_MAP: target ${entry.target} has no @Parameter named "${entry.targetParam}" (params: ${targetParams.join(", ")})`,
       );
       process.exit(2);
     }
-    resolved[listName] = { ...entry, targetIntentName: intentStructName(entry.target) };
+    resolved[listName] = {
+      ...entry,
+      targetIntentName: intentStructName(entry.target),
+      // Factory key by (target, targetParam). Two list tools pointing at
+      // the same read target with the same param share one factory; two
+      // list tools pointing at the same target via different params
+      // (unlikely but possible) each get their own.
+      factoryKey: `${intentStructName(entry.target)}_${entry.targetParam}`,
+    };
   }
   return resolved;
 }
 const followUpMap = resolveFollowUpMap();
-const followUpTargets = Array.from(new Set(Object.values(followUpMap).map((e) => e.targetIntentName)));
+// Deduplicate factories by (targetIntentName, targetParam).
+const followUpFactorySpecs = Array.from(
+  new Map(
+    Object.values(followUpMap).map((e) => [e.factoryKey, { targetIntentName: e.targetIntentName, targetParam: e.targetParam }]),
+  ).values(),
+);
 
 function snippetViewNameFor(tool) {
   return `MCP${toPascalCase(tool.name)}SnippetView`;
@@ -943,16 +987,27 @@ function renderSnippetView(tool) {
 
   let body;
   if (info.shape === "list-object") {
-    const primaryAccess = info.primaryField ? `row.${swiftIdent(info.primaryField)}` : `"(row)"`;
+    // Optional string fields decode to `String?`; render with `?? ""`
+    // so SwiftUI sees a non-optional for Text().
+    const primaryAccess = info.primaryField
+      ? info.primaryFieldOptional
+        ? `(row.${swiftIdent(info.primaryField)} ?? "")`
+        : `row.${swiftIdent(info.primaryField)}`
+      : `"(row)"`;
     const followUp = followUpMap[tool.name];
     // A.4.3: wrap the row in Button(intent:) when the tool has a list→read
-    // pairing AND the list items have an `id` field. Uses `id: \.id` for
-    // the ForEach key so SwiftUI diffs correctly across follow-up taps
-    // (the old `id: \.offset` was safe only for static-display rows).
+    // pairing AND the list items carry the expected itemField. Uses
+    // `id: \.id` for the ForEach key (items with string `id` always exist
+    // when a follow-up is configured) so SwiftUI diffs correctly across
+    // follow-up taps — the old `id: \.offset` was safe only for
+    // static-display rows. The factory argument label is the follow-up
+    // target's @Parameter name (may differ from itemField, e.g.
+    // list_chats.id → read_chat.chatId).
     if (followUp && info.hasId) {
+      const factory = `_mk${followUp.factoryKey}`;
       body = `        VStack(alignment: .leading, spacing: 4) {
             ForEach(data.${swiftIdent(info.arrayField)}, id: \\.id) { row in
-                Button(intent: _mk${followUp.targetIntentName}(id: row.id)) {
+                Button(intent: ${factory}(${swiftIdent(followUp.targetParam)}: row.${swiftIdent(followUp.itemField)})) {
                     Text(${primaryAccess})
                         .font(.body)
                         .lineLimit(1)
@@ -1028,18 +1083,23 @@ const outputStructs = typedTools.map((tool) => {
 });
 const snippetViews = typedTools.map((tool) => renderSnippetView(tool));
 
-// A.4.3: one factory per unique follow-up target so the snippet view
-// can construct a parameterized intent instance (AppIntent requires a
-// no-arg init + property set — a plain `Read<Foo>Intent(id:)` call
-// site doesn't compile). File-private keeps the helpers out of the
-// public surface.
-const followUpFactories = followUpTargets.map(
-  (intentName) => `@available(macOS 26, iOS 26, *)
-fileprivate func _mk${intentName}(id: String) -> ${intentName} {
-    var intent = ${intentName}()
-    intent.id = id
+// A.4.3: one factory per (target intent, target param) pair so the
+// snippet view can construct a parameterized intent instance (AppIntent
+// requires a no-arg init + property set — a plain `Read<Foo>Intent(
+// id:)` call site doesn't compile). File-private keeps the helpers out
+// of the public surface. Factory name = `_mk<Intent>_<param>` so
+// list_chats (→ read_chat.chatId) and list_events (→ read_event.id)
+// each get their own helper even when they share a target intent.
+const followUpFactories = followUpFactorySpecs.map(
+  ({ targetIntentName, targetParam }) => {
+    const paramIdent = swiftIdent(targetParam);
+    return `@available(macOS 26, iOS 26, *)
+fileprivate func _mk${targetIntentName}_${targetParam}(${paramIdent}: String) -> ${targetIntentName} {
+    var intent = ${targetIntentName}()
+    intent.${paramIdent} = ${paramIdent}
     return intent
-}`,
+}`;
+  },
 );
 
 const header = `// GENERATED — do not edit.

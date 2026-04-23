@@ -828,6 +828,71 @@ const FOLLOW_UP_MAP = {
   search_contacts: { target: "read_contact", idField: "id" },
 };
 
+/**
+ * Humanize a camelCase / snake_case property name into a display label.
+ * "stepsToday" → "Steps Today", "sleep_hours" → "Sleep Hours".
+ */
+function humanizeKey(key) {
+  const spaced = key
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .trim();
+  return spaced
+    .split(/\s+/)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+/**
+ * Render one row of the scalar snippet view VStack. Value rendering is
+ * type-aware:
+ *   • Bool                      → "Yes" / "No"
+ *   • Int / Double              → `.formatted()` (locale separators)
+ *   • String w/ format=date-time → ISO parse, then `.formatted(date:time:)`
+ *   • String (default)          → raw, `.lineLimit(1)` tail-truncated
+ *   • everything else           → String(describing:)
+ *
+ * Optional fields get an `?? "—"` fallback so nil values render as an em
+ * dash rather than disappearing (keeps the row stable).
+ */
+function renderScalarRow(key, propSchema) {
+  const ident = swiftIdent(key);
+  const label = humanizeKey(key);
+  const schema = isNullableUnion(propSchema) ? { ...propSchema, type: nonNullType(propSchema) } : propSchema;
+  const isOptional = isNullableUnion(propSchema);
+  const accessor = `data.${ident}`;
+
+  let valueExpr;
+  if (schema.type === "boolean") {
+    valueExpr = isOptional
+      ? `(${accessor}.map { $0 ? "Yes" : "No" } ?? "—")`
+      : `(${accessor} ? "Yes" : "No")`;
+  } else if (schema.type === "integer" || schema.type === "number") {
+    valueExpr = isOptional
+      ? `(${accessor}?.formatted() ?? "—")`
+      : `${accessor}.formatted()`;
+  } else if (schema.type === "string" && schema.format === "date-time") {
+    // ISO8601DateFormatter is Sendable on modern SDKs and cheap to
+    // instantiate once per render. The `?? raw` fallback keeps the UI
+    // working when the wire value isn't parseable (should never happen
+    // but better than rendering "nil").
+    const raw = isOptional ? `(${accessor} ?? "")` : accessor;
+    valueExpr = `(ISO8601DateFormatter().date(from: ${raw}).map { $0.formatted(date: .abbreviated, time: .shortened) } ?? ${raw})`;
+  } else if (schema.type === "string") {
+    valueExpr = isOptional ? `(${accessor} ?? "—")` : accessor;
+  } else {
+    valueExpr = `String(describing: ${accessor})`;
+  }
+
+  return `            HStack {
+                Text("${swiftLit(label)}")
+                Spacer()
+                Text(${valueExpr})
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }`;
+}
+
 function detectSnippetShape(schema) {
   const props = schema.properties ?? {};
   const keys = Object.keys(props);
@@ -940,12 +1005,15 @@ function renderSnippetView(tool) {
         }
         .padding()`;
   } else {
-    // scalar: show every top-level string/number field as key-value rows.
+    // scalar: show every top-level field as a key-value row. Each row
+    // renders with a humanized key label ("stepsToday" → "Steps Today"),
+    // type-aware value formatting (booleans as Yes/No, numbers via
+    // `.formatted()` for locale-aware separators, ISO date strings
+    // parsed to `Date.formatted(.abbreviated time: .shortened)` when
+    // the schema declares `format: date-time`), and a `.lineLimit(1)`
+    // tail truncation so long strings don't blow out the snippet card.
     const props = tool.outputSchema.properties ?? {};
-    const rows = Object.keys(props).map((k) => {
-      const ident = swiftIdent(k);
-      return `            HStack { Text("${k}"); Spacer(); Text(String(describing: data.${ident})) }`;
-    });
+    const rows = Object.keys(props).map((k) => renderScalarRow(k, props[k]));
     body = `        VStack(alignment: .leading, spacing: 2) {
 ${rows.join("\n")}
         }

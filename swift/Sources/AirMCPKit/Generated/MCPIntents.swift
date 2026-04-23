@@ -6866,9 +6866,27 @@ public struct MCPGetClipboardSnippetView: View {
     public init(data: MCPGetClipboardOutput) { self.data = data }
     public var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            HStack { Text("content"); Spacer(); Text(String(describing: data.content)) }
-            HStack { Text("length"); Spacer(); Text(String(describing: data.length)) }
-            HStack { Text("truncated"); Spacer(); Text(String(describing: data.truncated)) }
+            HStack {
+                Text("Content")
+                Spacer()
+                Text(data.content)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Length")
+                Spacer()
+                Text(data.length.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Truncated")
+                Spacer()
+                Text((data.truncated ? "Yes" : "No"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
         }
         .padding()
     }
@@ -6881,8 +6899,20 @@ public struct MCPGetCurrentTabSnippetView: View {
     public init(data: MCPGetCurrentTabOutput) { self.data = data }
     public var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            HStack { Text("title"); Spacer(); Text(String(describing: data.title)) }
-            HStack { Text("url"); Spacer(); Text(String(describing: data.url)) }
+            HStack {
+                Text("Title")
+                Spacer()
+                Text(data.title)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Url")
+                Spacer()
+                Text(data.url)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
         }
         .padding()
     }
@@ -6895,16 +6925,76 @@ public struct MCPGetCurrentWeatherSnippetView: View {
     public init(data: MCPGetCurrentWeatherOutput) { self.data = data }
     public var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            HStack { Text("temperature"); Spacer(); Text(String(describing: data.temperature)) }
-            HStack { Text("feelsLike"); Spacer(); Text(String(describing: data.feelsLike)) }
-            HStack { Text("humidity"); Spacer(); Text(String(describing: data.humidity)) }
-            HStack { Text("weatherCode"); Spacer(); Text(String(describing: data.weatherCode)) }
-            HStack { Text("weatherDescription"); Spacer(); Text(String(describing: data.weatherDescription)) }
-            HStack { Text("windSpeed"); Spacer(); Text(String(describing: data.windSpeed)) }
-            HStack { Text("windDirection"); Spacer(); Text(String(describing: data.windDirection)) }
-            HStack { Text("precipitation"); Spacer(); Text(String(describing: data.precipitation)) }
-            HStack { Text("cloudCover"); Spacer(); Text(String(describing: data.cloudCover)) }
-            HStack { Text("units"); Spacer(); Text(String(describing: data.units)) }
+            HStack {
+                Text("Temperature")
+                Spacer()
+                Text(data.temperature.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Feels Like")
+                Spacer()
+                Text(data.feelsLike.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Humidity")
+                Spacer()
+                Text(data.humidity.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Weather Code")
+                Spacer()
+                Text(data.weatherCode.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Weather Description")
+                Spacer()
+                Text(data.weatherDescription)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Wind Speed")
+                Spacer()
+                Text(data.windSpeed.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Wind Direction")
+                Spacer()
+                Text(data.windDirection.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Precipitation")
+                Spacer()
+                Text(data.precipitation.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Cloud Cover")
+                Spacer()
+                Text(data.cloudCover.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Units")
+                Spacer()
+                Text(String(describing: data.units))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
         }
         .padding()
     }
@@ -6934,9 +7024,27 @@ public struct MCPGetFrontmostAppSnippetView: View {
     public init(data: MCPGetFrontmostAppOutput) { self.data = data }
     public var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            HStack { Text("name"); Spacer(); Text(String(describing: data.name)) }
-            HStack { Text("bundleIdentifier"); Spacer(); Text(String(describing: data.bundleIdentifier)) }
-            HStack { Text("pid"); Spacer(); Text(String(describing: data.pid)) }
+            HStack {
+                Text("Name")
+                Spacer()
+                Text(data.name)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Bundle Identifier")
+                Spacer()
+                Text(data.bundleIdentifier)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Pid")
+                Spacer()
+                Text(data.pid.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
         }
         .padding()
     }
@@ -6949,8 +7057,20 @@ public struct MCPGetShortcutDetailSnippetView: View {
     public init(data: MCPGetShortcutDetailOutput) { self.data = data }
     public var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            HStack { Text("shortcut"); Spacer(); Text(String(describing: data.shortcut)) }
-            HStack { Text("detail"); Spacer(); Text(String(describing: data.detail)) }
+            HStack {
+                Text("Shortcut")
+                Spacer()
+                Text(data.shortcut)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Detail")
+                Spacer()
+                Text(data.detail)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
         }
         .padding()
     }
@@ -7000,9 +7120,27 @@ public struct MCPGetVolumeSnippetView: View {
     public init(data: MCPGetVolumeOutput) { self.data = data }
     public var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            HStack { Text("outputVolume"); Spacer(); Text(String(describing: data.outputVolume)) }
-            HStack { Text("inputVolume"); Spacer(); Text(String(describing: data.inputVolume)) }
-            HStack { Text("outputMuted"); Spacer(); Text(String(describing: data.outputMuted)) }
+            HStack {
+                Text("Output Volume")
+                Spacer()
+                Text(data.outputVolume.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Input Volume")
+                Spacer()
+                Text(data.inputVolume.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Output Muted")
+                Spacer()
+                Text((data.outputMuted ? "Yes" : "No"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
         }
         .padding()
     }
@@ -7384,7 +7522,13 @@ public struct MCPMemoryPutSnippetView: View {
     public init(data: MCPMemoryPutOutput) { self.data = data }
     public var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            HStack { Text("stored"); Spacer(); Text(String(describing: data.stored)) }
+            HStack {
+                Text("Stored")
+                Spacer()
+                Text(String(describing: data.stored))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
         }
         .padding()
     }
@@ -7414,12 +7558,48 @@ public struct MCPMemoryStatsSnippetView: View {
     public init(data: MCPMemoryStatsOutput) { self.data = data }
     public var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            HStack { Text("total"); Spacer(); Text(String(describing: data.total)) }
-            HStack { Text("byKind"); Spacer(); Text(String(describing: data.byKind)) }
-            HStack { Text("oldest"); Spacer(); Text(String(describing: data.oldest)) }
-            HStack { Text("newest"); Spacer(); Text(String(describing: data.newest)) }
-            HStack { Text("expiredSwept"); Spacer(); Text(String(describing: data.expiredSwept)) }
-            HStack { Text("path"); Spacer(); Text(String(describing: data.path)) }
+            HStack {
+                Text("Total")
+                Spacer()
+                Text(data.total.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("By Kind")
+                Spacer()
+                Text(String(describing: data.byKind))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Oldest")
+                Spacer()
+                Text(data.oldest)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Newest")
+                Spacer()
+                Text(data.newest)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Expired Swept")
+                Spacer()
+                Text(data.expiredSwept.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Path")
+                Spacer()
+                Text(data.path)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
         }
         .padding()
     }
@@ -7432,8 +7612,20 @@ public struct MCPNowPlayingSnippetView: View {
     public init(data: MCPNowPlayingOutput) { self.data = data }
     public var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            HStack { Text("playerState"); Spacer(); Text(String(describing: data.playerState)) }
-            HStack { Text("track"); Spacer(); Text(String(describing: data.track)) }
+            HStack {
+                Text("Player State")
+                Spacer()
+                Text(data.playerState)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Track")
+                Spacer()
+                Text(String(describing: data.track))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
         }
         .padding()
     }
@@ -7446,9 +7638,27 @@ public struct MCPProactiveContextSnippetView: View {
     public init(data: MCPProactiveContextOutput) { self.data = data }
     public var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            HStack { Text("timeContext"); Spacer(); Text(String(describing: data.timeContext)) }
-            HStack { Text("suggestedTools"); Spacer(); Text(String(describing: data.suggestedTools)) }
-            HStack { Text("suggestedWorkflows"); Spacer(); Text(String(describing: data.suggestedWorkflows)) }
+            HStack {
+                Text("Time Context")
+                Spacer()
+                Text(String(describing: data.timeContext))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Suggested Tools")
+                Spacer()
+                Text(String(describing: data.suggestedTools))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Suggested Workflows")
+                Spacer()
+                Text(String(describing: data.suggestedWorkflows))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
         }
         .padding()
     }
@@ -7478,17 +7688,83 @@ public struct MCPReadContactSnippetView: View {
     public init(data: MCPReadContactOutput) { self.data = data }
     public var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            HStack { Text("id"); Spacer(); Text(String(describing: data.id)) }
-            HStack { Text("name"); Spacer(); Text(String(describing: data.name)) }
-            HStack { Text("firstName"); Spacer(); Text(String(describing: data.firstName)) }
-            HStack { Text("lastName"); Spacer(); Text(String(describing: data.lastName)) }
-            HStack { Text("organization"); Spacer(); Text(String(describing: data.organization)) }
-            HStack { Text("jobTitle"); Spacer(); Text(String(describing: data.jobTitle)) }
-            HStack { Text("department"); Spacer(); Text(String(describing: data.department)) }
-            HStack { Text("note"); Spacer(); Text(String(describing: data.note)) }
-            HStack { Text("emails"); Spacer(); Text(String(describing: data.emails)) }
-            HStack { Text("phones"); Spacer(); Text(String(describing: data.phones)) }
-            HStack { Text("addresses"); Spacer(); Text(String(describing: data.addresses)) }
+            HStack {
+                Text("Id")
+                Spacer()
+                Text(data.id)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Name")
+                Spacer()
+                Text(data.name)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("First Name")
+                Spacer()
+                Text(data.firstName)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Last Name")
+                Spacer()
+                Text(data.lastName)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Organization")
+                Spacer()
+                Text((data.organization ?? "—"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Job Title")
+                Spacer()
+                Text((data.jobTitle ?? "—"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Department")
+                Spacer()
+                Text((data.department ?? "—"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Note")
+                Spacer()
+                Text((data.note ?? "—"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Emails")
+                Spacer()
+                Text(String(describing: data.emails))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Phones")
+                Spacer()
+                Text(String(describing: data.phones))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Addresses")
+                Spacer()
+                Text(String(describing: data.addresses))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
         }
         .padding()
     }
@@ -7518,15 +7794,69 @@ public struct MCPReadNoteSnippetView: View {
     public init(data: MCPReadNoteOutput) { self.data = data }
     public var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            HStack { Text("id"); Spacer(); Text(String(describing: data.id)) }
-            HStack { Text("name"); Spacer(); Text(String(describing: data.name)) }
-            HStack { Text("body"); Spacer(); Text(String(describing: data.body)) }
-            HStack { Text("plaintext"); Spacer(); Text(String(describing: data.plaintext)) }
-            HStack { Text("creationDate"); Spacer(); Text(String(describing: data.creationDate)) }
-            HStack { Text("modificationDate"); Spacer(); Text(String(describing: data.modificationDate)) }
-            HStack { Text("folder"); Spacer(); Text(String(describing: data.folder)) }
-            HStack { Text("shared"); Spacer(); Text(String(describing: data.shared)) }
-            HStack { Text("passwordProtected"); Spacer(); Text(String(describing: data.passwordProtected)) }
+            HStack {
+                Text("Id")
+                Spacer()
+                Text(data.id)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Name")
+                Spacer()
+                Text(data.name)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Body")
+                Spacer()
+                Text(data.body)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Plaintext")
+                Spacer()
+                Text(data.plaintext)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Creation Date")
+                Spacer()
+                Text(data.creationDate)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Modification Date")
+                Spacer()
+                Text(data.modificationDate)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Folder")
+                Spacer()
+                Text(data.folder)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Shared")
+                Spacer()
+                Text((data.shared ? "Yes" : "No"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Password Protected")
+                Spacer()
+                Text((data.passwordProtected ? "Yes" : "No"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
         }
         .padding()
     }
@@ -7539,17 +7869,83 @@ public struct MCPReadReminderSnippetView: View {
     public init(data: MCPReadReminderOutput) { self.data = data }
     public var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            HStack { Text("id"); Spacer(); Text(String(describing: data.id)) }
-            HStack { Text("name"); Spacer(); Text(String(describing: data.name)) }
-            HStack { Text("body"); Spacer(); Text(String(describing: data.body)) }
-            HStack { Text("completed"); Spacer(); Text(String(describing: data.completed)) }
-            HStack { Text("completionDate"); Spacer(); Text(String(describing: data.completionDate)) }
-            HStack { Text("creationDate"); Spacer(); Text(String(describing: data.creationDate)) }
-            HStack { Text("modificationDate"); Spacer(); Text(String(describing: data.modificationDate)) }
-            HStack { Text("dueDate"); Spacer(); Text(String(describing: data.dueDate)) }
-            HStack { Text("priority"); Spacer(); Text(String(describing: data.priority)) }
-            HStack { Text("flagged"); Spacer(); Text(String(describing: data.flagged)) }
-            HStack { Text("list"); Spacer(); Text(String(describing: data.list)) }
+            HStack {
+                Text("Id")
+                Spacer()
+                Text(data.id)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Name")
+                Spacer()
+                Text(data.name)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Body")
+                Spacer()
+                Text(data.body)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Completed")
+                Spacer()
+                Text((data.completed ? "Yes" : "No"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Completion Date")
+                Spacer()
+                Text((data.completionDate ?? "—"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Creation Date")
+                Spacer()
+                Text(data.creationDate)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Modification Date")
+                Spacer()
+                Text(data.modificationDate)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Due Date")
+                Spacer()
+                Text((data.dueDate ?? "—"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Priority")
+                Spacer()
+                Text(data.priority.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Flagged")
+                Spacer()
+                Text((data.flagged ? "Yes" : "No"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("List")
+                Spacer()
+                Text(data.list)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
         }
         .padding()
     }
@@ -7676,8 +8072,20 @@ public struct MCPSetClipboardSnippetView: View {
     public init(data: MCPSetClipboardOutput) { self.data = data }
     public var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            HStack { Text("set"); Spacer(); Text(String(describing: data.set)) }
-            HStack { Text("length"); Spacer(); Text(String(describing: data.length)) }
+            HStack {
+                Text("Set")
+                Spacer()
+                Text((data.set ? "Yes" : "No"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Length")
+                Spacer()
+                Text(data.length.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
         }
         .padding()
     }
@@ -7690,8 +8098,20 @@ public struct MCPSetVolumeSnippetView: View {
     public init(data: MCPSetVolumeOutput) { self.data = data }
     public var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            HStack { Text("outputVolume"); Spacer(); Text(String(describing: data.outputVolume)) }
-            HStack { Text("outputMuted"); Spacer(); Text(String(describing: data.outputMuted)) }
+            HStack {
+                Text("Output Volume")
+                Spacer()
+                Text(data.outputVolume.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Output Muted")
+                Spacer()
+                Text((data.outputMuted ? "Yes" : "No"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
         }
         .padding()
     }
@@ -7741,7 +8161,13 @@ public struct MCPToggleDarkModeSnippetView: View {
     public init(data: MCPToggleDarkModeOutput) { self.data = data }
     public var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            HStack { Text("darkMode"); Spacer(); Text(String(describing: data.darkMode)) }
+            HStack {
+                Text("Dark Mode")
+                Spacer()
+                Text((data.darkMode ? "Yes" : "No"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
         }
         .padding()
     }

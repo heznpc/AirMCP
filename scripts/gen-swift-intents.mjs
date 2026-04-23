@@ -1,22 +1,27 @@
 #!/usr/bin/env node
-// RFC 0007 Phase A.2b.1 — Swift AppIntent code generator.
+// RFC 0007 Phase A.2b.2 — Swift AppIntent code generator.
 //
 // Reads docs/tool-manifest.json and writes
-// swift/Sources/AirMCPKit/Generated/MCPIntents.swift: one `AppIntent`
-// struct per selected tool + a single `AppShortcutsProvider` (Apple's
-// 10-entry cap).
+// swift/Sources/AirMCPKit/Generated/MCPIntents.swift: Codable output
+// structs for every codable-safe tool + one `AppIntent` struct per
+// selected tool + a single `AppShortcutsProvider` (Apple's 10-entry cap).
 //
-// Scope now (A.2b.1):
-//   • Selection is automatic — every tool that is eligible, read-only, and
+// Scope now (A.2b.2):
+//   • Selection: automatic. Every tool that is eligible, read-only, and
 //     not destructive. Destructive tools land in A.3 behind
-//     requestConfirmation(actionName:snippetIntent:) (RFC 0007 §R2 amended
-//     2026-04-23).
-//   • @Parameter types: String, Int, Double, Bool, Date, [String]. Optional
-//     params become `T?` unless they carry an explicit default.
+//     requestConfirmation(actionName:snippetIntent:) (RFC 0007 §R2
+//     amended 2026-04-23).
+//   • @Parameter types: String, Int, Double, Bool, Date, [String].
+//     Optional params become `T?` unless they carry an explicit default.
+//   • outputSchema → Codable struct (MCP<PascalName>Output) for every
+//     codable-safe tool. Used as a **drift guard** at perform() time —
+//     JSONDecoder throws on mismatch before the caller sees stale shape.
+//     Return type stays `ReturnsValue<String>` because AppIntent only
+//     accepts `_IntentValue`-conforming types (plain Codable needs an
+//     AppEntity wrapper, deferred). Axis 4 consumes these structs to
+//     render Interactive Snippets.
 //   • Top-N AppShortcutsProvider hand-picked (usage-tracker data isn't
 //     available at codegen time yet).
-//   • Return value stays `ReturnsValue<String>` — A.2b.2 will codegen
-//     typed Codable structs from outputSchema and switch to ReturnsValue<T>.
 //
 // Router is live as of PR #103 (A.2a). Generated perform() calls hit
 // MCPIntentRouter.shared which the host (app/AirMCPApp or
@@ -285,6 +290,155 @@ function swiftIdent(name) {
   return SWIFT_RESERVED.has(name) ? `${name}_` : name;
 }
 
+// ── outputSchema → Swift Codable (A.2b.2) ────────────────────────────
+//
+// A tool's outputSchema is JSON Schema that describes the shape of its
+// primary text payload (result.ts:ok() serializes the payload into
+// content[0].text with JSON.stringify). We codegen a matching Codable
+// struct so the generated AppIntent can decode the router's String
+// result into a typed value.
+//
+// Limits (A.2b.2 scope):
+//   • Supports type: string / number / integer / boolean
+//   • Nullable union {type: [X, "null"]} → Optional<SwiftX>
+//   • array → [Element] (with Element recursively mapped)
+//   • nested object → nested Swift struct (e.g. ListCalendarsOutput.CalendarsItem)
+//   • additionalProperties: true OR {} → the tool is flagged not-codable-safe
+//     and falls back to ReturnsValue<String>. Exactly one tool today
+//     (audit_log, because of the free-form 'args' field).
+//
+// Everything else (oneOf, allOf, recursive refs) would require AnyCodable
+// or more elaborate machinery — out of A.2b.2 scope.
+
+function isNullableUnion(schema) {
+  if (!Array.isArray(schema.type)) return false;
+  return schema.type.length === 2 && schema.type.includes("null");
+}
+
+function nonNullType(schema) {
+  return schema.type.find((t) => t !== "null");
+}
+
+function isCodableSafe(schema) {
+  if (!schema || typeof schema !== "object") return true;
+  if (schema.type === "object") {
+    if (schema.additionalProperties === true) return false;
+    if (
+      schema.additionalProperties &&
+      typeof schema.additionalProperties === "object" &&
+      Object.keys(schema.additionalProperties).length === 0
+    ) {
+      return false;
+    }
+    for (const p of Object.values(schema.properties ?? {})) {
+      if (!isCodableSafe(p)) return false;
+    }
+    return true;
+  }
+  if (schema.type === "array") return isCodableSafe(schema.items);
+  return true;
+}
+
+/**
+ * Map a JSON-Schema node to a Swift type expression, recording any
+ * inline-nested object as a sub-struct declaration on `nested`.
+ *
+ * `path` is the PascalCased path from the outer struct down to this
+ * node — used to name nested structs deterministically.
+ */
+function swiftOutputType(schema, path, nested) {
+  if (isNullableUnion(schema)) {
+    const inner = nonNullType(schema);
+    return swiftOutputType({ ...schema, type: inner }, path, nested) + "?";
+  }
+  if (schema.type === "string") return "String";
+  if (schema.type === "number") return "Double";
+  if (schema.type === "integer") return "Int";
+  if (schema.type === "boolean") return "Bool";
+  if (schema.type === "array") {
+    const itemSchema = schema.items ?? {};
+    const itemName = `${path}Item`;
+    const itemType = swiftOutputType(itemSchema, itemName, nested);
+    return `[${itemType}]`;
+  }
+  if (schema.type === "object") {
+    nested.push({ name: path, schema });
+    return path;
+  }
+  // Fallback — shouldn't occur for codable-safe schemas.
+  return "String";
+}
+
+/**
+ * Render an object-typed schema into a Swift struct declaration.
+ * Nested object fields are rendered as inner structs (Swift doesn't
+ * require forward declarations, so order within the file doesn't matter).
+ */
+function renderStruct(name, schema, indent = "    ") {
+  const props = schema.properties ?? {};
+  const required = new Set(schema.required ?? []);
+  const nested = [];
+  const fieldLines = [];
+
+  for (const wireName of Object.keys(props)) {
+    const fieldSchema = props[wireName];
+    const fieldName = swiftIdent(wireName);
+    const pascal = toPascalCase(wireName);
+    let fieldType = swiftOutputType(fieldSchema, pascal, nested);
+    if (!required.has(wireName) && !fieldType.endsWith("?")) {
+      fieldType += "?";
+    }
+    fieldLines.push(`${indent}public let ${fieldName}: ${fieldType}`);
+  }
+
+  const nestedLines = nested.map((n) => renderStruct(n.name, n.schema, indent + "    ")).join("\n");
+
+  // Swift synthesizes CodingKeys from property names unless we override.
+  // We override only when at least one wire key had to be escaped (e.g.
+  // `class` → `class_`); in that case *every* key must be listed or the
+  // compiler rejects the partial enum.
+  const anyKeyEscaped = Object.keys(props).some((k) => swiftIdent(k) !== k);
+  const codingKeysBlock = anyKeyEscaped
+    ? `\n${indent}enum CodingKeys: String, CodingKey {\n` +
+      Object.keys(props)
+        .map((k) => {
+          const ident = swiftIdent(k);
+          return `${indent}    case ${ident}${ident !== k ? ` = "${k}"` : ""}`;
+        })
+        .join("\n") +
+      `\n${indent}}`
+    : "";
+
+  const body = [nestedLines ? nestedLines + "\n" : "", fieldLines.join("\n"), codingKeysBlock]
+    .filter(Boolean)
+    .join("\n");
+
+  return `${indent.slice(4)}public struct ${name}: Codable, Sendable {
+${body}
+${indent.slice(4)}}`;
+}
+
+function outputTypeNameFor(tool) {
+  // Prefix avoids collisions with existing hand-written types in
+  // AirMCPKit (e.g. EventKitService.swift already declares
+  // TodayEventsOutput / SearchEventsOutput / SearchRemindersOutput
+  // as native EventKit-backed shapes). Generated types are a separate
+  // transport layer, not the EventKit-native one.
+  return `MCP${toPascalCase(tool.name)}Output`;
+}
+
+/**
+ * Does this tool ship A.2b.2-level typed output? Requires:
+ *   • outputSchema present
+ *   • top-level is `type: object` (everything else is too free-form)
+ *   • no record-like additionalProperties anywhere in the tree
+ */
+function hasTypedOutput(tool) {
+  const s = tool.outputSchema;
+  if (!s || s.type !== "object") return false;
+  return isCodableSafe(s);
+}
+
 function generateIntent(tool) {
   const structName = intentStructName(tool.name);
   const title = swiftLit(tool.title ?? tool.name);
@@ -315,7 +469,7 @@ function generateIntent(tool) {
     .join("\n\n");
   const { prelude, argsExpr } = buildArgsBlock(decls);
 
-  const body = prelude
+  const callBlock = prelude
     ? `${prelude}
         let result = try await MCPIntentRouter.shared.call(
             tool: "${tool.name}",
@@ -326,6 +480,31 @@ function generateIntent(tool) {
             args: ${argsExpr}
         )`;
 
+  // A.2b.2 scope note:
+  // AppIntent's `ReturnsValue<T>` only accepts Apple's `_IntentValue`-
+  // conforming types (String/Int/Date/URL/AppEntity/AppEnum/etc.);
+  // plain Codable structs are not acceptable return values without a
+  // full AppEntity wrapper. That wrapper has query/display/id facets
+  // too big for this phase.
+  //
+  // Instead, when a tool has a codable-safe outputSchema we *decode*
+  // the router's String result through the generated struct as a
+  // runtime drift guard — mismatches throw before the user sees an
+  // out-of-contract response — but still hand the raw String to
+  // `.result(value:)`. The generated struct is also the input shape
+  // for axis 4's Interactive Snippets renderer, which will consume
+  // `_ = decoded` explicitly. Until then the decode is "validate and
+  // discard".
+  const typed = hasTypedOutput(tool);
+  const returnClause = "some IntentResult & ReturnsValue<String>";
+  const tailBlock = typed
+    ? `        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "${tool.name}", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(${outputTypeNameFor(tool)}.self, from: data)
+        return .result(value: result)`
+    : `        return .result(value: result)`;
+
   return `// Tool: ${tool.name}
 public struct ${structName}: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "${title}"
@@ -334,9 +513,9 @@ public struct ${structName}: AppIntent {
 
     public init() {}
 
-${paramDecls ? paramDecls + "\n\n" : ""}    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
-${body}
-        return .result(value: result)
+${paramDecls ? paramDecls + "\n\n" : ""}    public func perform() async throws -> ${returnClause} {
+${callBlock}
+${tailBlock}
     }
 }`;
 }
@@ -396,24 +575,38 @@ ${entries.join("\n")}
 
 // ── Assemble output ──────────────────────────────────────────────────
 
+const typedTools = picked.filter(hasTypedOutput);
+const outputStructs = typedTools.map((tool) => {
+  const name = outputTypeNameFor(tool);
+  return `// Output type for: ${tool.name}\n${renderStruct(name, tool.outputSchema)}`;
+});
+
 const header = `// GENERATED — do not edit.
 //
 // Source: docs/tool-manifest.json
 // Generator: scripts/gen-swift-intents.mjs
-// RFC 0007 Phase A.2b.1 — ${picked.length} auto-selected read-only tools +
-// ${appShortcutsPicks.length} AppShortcutsProvider entries (Apple's 10-entry cap).
+// RFC 0007 Phase A.2b.2 — ${picked.length} auto-selected read-only tools
+// (${typedTools.length} with typed ReturnsValue<T> from outputSchema; the
+// rest stay on ReturnsValue<String>) + ${appShortcutsPicks.length}
+// AppShortcutsProvider entries (Apple's 10-entry cap).
 // Run \`npm run gen:intents\` to refresh after tool metadata changes.
 // CI guards against drift via \`npm run gen:intents:check\`.
 //
 // Router runtime is live as of PR #103 (A.2a): macOS execFile stdio and
 // iOS in-process MCPServer.callToolText. Every generated intent's
-// \`perform()\` hits that router.
+// \`perform()\` hits that router. Typed intents additionally decode the
+// router's String result through JSONDecoder.
 
 #if canImport(AppIntents)
 import AppIntents
 import Foundation
 
+// MARK: - Typed output structs
+
 `;
+
+const intentsHeader = "\n\n// MARK: - AppIntents\n\n";
+const shortcutsHeader = "\n\n// MARK: - AppShortcutsProvider\n\n";
 
 const intents = picked.map(generateIntent).join("\n\n");
 const appShortcuts = generateAppShortcuts();
@@ -423,7 +616,7 @@ const footer = `
 #endif
 `;
 
-const source = header + intents + "\n\n" + appShortcuts + footer;
+const source = header + outputStructs.join("\n\n") + intentsHeader + intents + shortcutsHeader + appShortcuts + footer;
 
 // ── Write / check ────────────────────────────────────────────────────
 

@@ -2,18 +2,720 @@
 //
 // Source: docs/tool-manifest.json
 // Generator: scripts/gen-swift-intents.mjs
-// RFC 0007 Phase A.2b.1 — 154 auto-selected read-only tools +
-// 10 AppShortcutsProvider entries (Apple's 10-entry cap).
+// RFC 0007 Phase A.2b.2 — 154 auto-selected read-only tools
+// (50 with typed ReturnsValue<T> from outputSchema; the
+// rest stay on ReturnsValue<String>) + 10
+// AppShortcutsProvider entries (Apple's 10-entry cap).
 // Run `npm run gen:intents` to refresh after tool metadata changes.
 // CI guards against drift via `npm run gen:intents:check`.
 //
 // Router runtime is live as of PR #103 (A.2a): macOS execFile stdio and
 // iOS in-process MCPServer.callToolText. Every generated intent's
-// `perform()` hits that router.
+// `perform()` hits that router. Typed intents additionally decode the
+// router's String result through JSONDecoder.
 
 #if canImport(AppIntents)
 import AppIntents
 import Foundation
+
+// MARK: - Typed output structs
+
+// Output type for: ai_plan_metrics
+public struct MCPAiPlanMetricsOutput: Codable, Sendable {
+    public struct PercaseItem: Codable, Sendable {
+        public let name: String
+        public let total: Double
+        public let matchedExpected: [String]
+        public let leakedForbidden: [String]
+        public let stepCount: Double
+        public let unknownTools: [String]
+    }
+
+    public let sampled: Double
+    public let averageScore: Double
+    public let parseRate: Double
+    public let expectedCoverageAvg: Double
+    public let leakedForbiddenTotal: Double
+    public let perCase: [PercaseItem]
+}
+
+// Output type for: audit_summary
+public struct MCPAuditSummaryOutput: Codable, Sendable {
+    public struct ToptoolsItem: Codable, Sendable {
+        public let tool: String
+        public let count: Double
+        public let errors: Double
+    }
+
+    public let since: String
+    public let total: Double
+    public let errors: Double
+    public let errorRate: Double
+    public let scannedFiles: Double
+    public let topTools: [ToptoolsItem]
+}
+
+// Output type for: discover_tools
+public struct MCPDiscoverToolsOutput: Codable, Sendable {
+    public struct MatchesItem: Codable, Sendable {
+        public let name: String
+        public let title: String?
+        public let description: String?
+    }
+
+    public let query: String
+    public let matches: [MatchesItem]
+    public let total: Double?
+    public let method: String?
+    public let hint: String?
+}
+
+// Output type for: get_clipboard
+public struct MCPGetClipboardOutput: Codable, Sendable {
+    public let content: String
+    public let length: Double
+    public let truncated: Bool
+}
+
+// Output type for: get_current_tab
+public struct MCPGetCurrentTabOutput: Codable, Sendable {
+    public let title: String
+    public let url: String
+}
+
+// Output type for: get_current_weather
+public struct MCPGetCurrentWeatherOutput: Codable, Sendable {
+    public struct Units: Codable, Sendable {
+        public let temperature: String
+        public let windSpeed: String
+        public let precipitation: String
+    }
+
+    public let temperature: Double
+    public let feelsLike: Double
+    public let humidity: Double
+    public let weatherCode: Double
+    public let weatherDescription: String
+    public let windSpeed: Double
+    public let windDirection: Double
+    public let precipitation: Double
+    public let cloudCover: Double
+    public let units: Units
+}
+
+// Output type for: get_file_info
+public struct MCPGetFileInfoOutput: Codable, Sendable {
+    public let path: String
+    public let name: String
+    public let kind: String
+    public let size: Double
+    public let creationDate: String
+    public let modificationDate: String
+    public let tags: [String]
+}
+
+// Output type for: get_frontmost_app
+public struct MCPGetFrontmostAppOutput: Codable, Sendable {
+    public let name: String
+    public let bundleIdentifier: String
+    public let pid: Double
+}
+
+// Output type for: get_shortcut_detail
+public struct MCPGetShortcutDetailOutput: Codable, Sendable {
+    public let shortcut: String
+    public let detail: String
+}
+
+// Output type for: get_unread_count
+public struct MCPGetUnreadCountOutput: Codable, Sendable {
+    public struct MailboxesItem: Codable, Sendable {
+        public let account: String
+        public let mailbox: String
+        public let unread: Double
+    }
+
+    public let totalUnread: Double
+    public let mailboxes: [MailboxesItem]
+}
+
+// Output type for: get_upcoming_events
+public struct MCPGetUpcomingEventsOutput: Codable, Sendable {
+    public struct EventsItem: Codable, Sendable {
+        public let id: String
+        public let summary: String
+        public let startDate: String
+        public let endDate: String
+        public let allDay: Bool
+        public let calendar: String
+        public let location: String
+    }
+
+    public let total: Double
+    public let returned: Double
+    public let events: [EventsItem]
+}
+
+// Output type for: get_volume
+public struct MCPGetVolumeOutput: Codable, Sendable {
+    public let outputVolume: Double
+    public let inputVolume: Double
+    public let outputMuted: Bool
+}
+
+// Output type for: list_accounts
+public struct MCPListAccountsOutput: Codable, Sendable {
+    public struct AccountsItem: Codable, Sendable {
+        public let name: String
+        public let fullName: String?
+        public let emailAddresses: [String]
+    }
+
+    public let accounts: [AccountsItem]
+}
+
+// Output type for: list_bookmarks
+public struct MCPListBookmarksOutput: Codable, Sendable {
+    public struct BookmarksItem: Codable, Sendable {
+        public let title: String
+        public let url: String
+        public let folder: String
+    }
+
+    public let count: Double
+    public let bookmarks: [BookmarksItem]
+}
+
+// Output type for: list_calendars
+public struct MCPListCalendarsOutput: Codable, Sendable {
+    public struct CalendarsItem: Codable, Sendable {
+        public let id: String
+        public let name: String
+        public let color: String?
+        public let writable: Bool
+    }
+
+    public let calendars: [CalendarsItem]
+}
+
+// Output type for: list_chats
+public struct MCPListChatsOutput: Codable, Sendable {
+    public struct ChatsItem: Codable, Sendable {
+        public struct ParticipantsItem: Codable, Sendable {
+            public let name: String?
+            public let handle: String?
+        }
+
+        public let id: String
+        public let name: String?
+        public let participants: [ParticipantsItem]
+        public let updated: String?
+    }
+
+    public let total: Double
+    public let returned: Double
+    public let chats: [ChatsItem]
+}
+
+// Output type for: list_contacts
+public struct MCPListContactsOutput: Codable, Sendable {
+    public struct ContactsItem: Codable, Sendable {
+        public let id: String
+        public let name: String
+        public let email: String?
+        public let phone: String?
+    }
+
+    public let total: Double
+    public let offset: Double
+    public let returned: Double
+    public let contacts: [ContactsItem]
+}
+
+// Output type for: list_directory
+public struct MCPListDirectoryOutput: Codable, Sendable {
+    public struct ItemsItem: Codable, Sendable {
+        public let name: String
+        public let kind: String
+        public let size: Double?
+        public let modificationDate: String?
+    }
+
+    public let total: Double
+    public let returned: Double
+    public let items: [ItemsItem]
+}
+
+// Output type for: list_events
+public struct MCPListEventsOutput: Codable, Sendable {
+    public struct EventsItem: Codable, Sendable {
+        public let id: String
+        public let summary: String
+        public let startDate: String
+        public let endDate: String
+        public let allDay: Bool
+        public let calendar: String
+    }
+
+    public let total: Double
+    public let offset: Double
+    public let returned: Double
+    public let events: [EventsItem]
+}
+
+// Output type for: list_folders
+public struct MCPListFoldersOutput: Codable, Sendable {
+    public struct FoldersItem: Codable, Sendable {
+        public let id: String
+        public let name: String
+        public let account: String
+        public let noteCount: Double
+        public let shared: Bool
+    }
+
+    public let folders: [FoldersItem]
+}
+
+// Output type for: list_group_members
+public struct MCPListGroupMembersOutput: Codable, Sendable {
+    public struct ContactsItem: Codable, Sendable {
+        public let id: String
+        public let name: String
+        public let email: String?
+        public let phone: String?
+    }
+
+    public let group: String
+    public let total: Double
+    public let returned: Double
+    public let contacts: [ContactsItem]
+}
+
+// Output type for: list_groups
+public struct MCPListGroupsOutput: Codable, Sendable {
+    public struct GroupsItem: Codable, Sendable {
+        public let id: String
+        public let name: String
+    }
+
+    public let groups: [GroupsItem]
+}
+
+// Output type for: list_mailboxes
+public struct MCPListMailboxesOutput: Codable, Sendable {
+    public struct MailboxesItem: Codable, Sendable {
+        public let name: String
+        public let account: String
+        public let unreadCount: Double
+    }
+
+    public let mailboxes: [MailboxesItem]
+}
+
+// Output type for: list_messages
+public struct MCPListMessagesOutput: Codable, Sendable {
+    public struct MessagesItem: Codable, Sendable {
+        public let id: String
+        public let subject: String
+        public let sender: String
+        public let dateReceived: String?
+        public let read: Bool
+        public let flagged: Bool
+    }
+
+    public let total: Double
+    public let offset: Double
+    public let returned: Double
+    public let messages: [MessagesItem]
+}
+
+// Output type for: list_notes
+public struct MCPListNotesOutput: Codable, Sendable {
+    public struct NotesItem: Codable, Sendable {
+        public let id: String
+        public let name: String
+        public let folder: String
+        public let shared: Bool
+        public let creationDate: String
+        public let modificationDate: String
+    }
+
+    public let total: Double
+    public let offset: Double
+    public let returned: Double
+    public let notes: [NotesItem]
+}
+
+// Output type for: list_participants
+public struct MCPListParticipantsOutput: Codable, Sendable {
+    public struct ParticipantsItem: Codable, Sendable {
+        public let name: String?
+        public let handle: String?
+    }
+
+    public let chatId: String
+    public let chatName: String?
+    public let participants: [ParticipantsItem]
+}
+
+// Output type for: list_playlists
+public struct MCPListPlaylistsOutput: Codable, Sendable {
+    public struct PlaylistsItem: Codable, Sendable {
+        public let id: String
+        public let name: String
+        public let duration: Double
+        public let trackCount: Double
+    }
+
+    public let playlists: [PlaylistsItem]
+}
+
+// Output type for: list_reading_list
+public struct MCPListReadingListOutput: Codable, Sendable {
+    public struct ItemsItem: Codable, Sendable {
+        public let title: String
+        public let url: String
+    }
+
+    public let count: Double
+    public let items: [ItemsItem]
+}
+
+// Output type for: list_reminder_lists
+public struct MCPListReminderListsOutput: Codable, Sendable {
+    public struct ListsItem: Codable, Sendable {
+        public let id: String
+        public let name: String
+        public let reminderCount: Double
+    }
+
+    public let lists: [ListsItem]
+}
+
+// Output type for: list_reminders
+public struct MCPListRemindersOutput: Codable, Sendable {
+    public struct RemindersItem: Codable, Sendable {
+        public let id: String
+        public let name: String
+        public let completed: Bool
+        public let dueDate: String?
+        public let priority: Double
+        public let flagged: Bool
+        public let list: String
+    }
+
+    public let total: Double
+    public let offset: Double
+    public let returned: Double
+    public let reminders: [RemindersItem]
+}
+
+// Output type for: list_shortcuts
+public struct MCPListShortcutsOutput: Codable, Sendable {
+    public let total: Double
+    public let shortcuts: [String]
+}
+
+// Output type for: list_tabs
+public struct MCPListTabsOutput: Codable, Sendable {
+    public struct TabsItem: Codable, Sendable {
+        public let windowIndex: Double
+        public let tabIndex: Double
+        public let title: String
+        public let url: String
+    }
+
+    public let tabs: [TabsItem]
+}
+
+// Output type for: list_tracks
+public struct MCPListTracksOutput: Codable, Sendable {
+    public struct TracksItem: Codable, Sendable {
+        public let id: String
+        public let name: String
+        public let artist: String?
+        public let album: String?
+        public let duration: Double?
+        public let trackNumber: Double?
+        public let genre: String?
+        public let year: Double?
+    }
+
+    public let total: Double
+    public let returned: Double
+    public let tracks: [TracksItem]
+}
+
+// Output type for: memory_query
+public struct MCPMemoryQueryOutput: Codable, Sendable {
+    public struct EntriesItem: Codable, Sendable {
+        public let id: String
+        public let kind: String
+        public let key: String
+        public let value: String
+        public let tags: [String]
+        public let source: String?
+        public let createdAt: String
+        public let updatedAt: String
+        public let expiresAt: String?
+    }
+
+    public let total: Double
+    public let entries: [EntriesItem]
+}
+
+// Output type for: memory_stats
+public struct MCPMemoryStatsOutput: Codable, Sendable {
+    public struct Bykind: Codable, Sendable {
+        public let fact: Double
+        public let entity: Double
+        public let episode: Double
+    }
+
+    public let total: Double
+    public let byKind: Bykind
+    public let oldest: String?
+    public let newest: String?
+    public let expiredSwept: Double
+    public let path: String
+}
+
+// Output type for: now_playing
+public struct MCPNowPlayingOutput: Codable, Sendable {
+    public let playerState: String
+    public let track: String
+}
+
+// Output type for: proactive_context
+public struct MCPProactiveContextOutput: Codable, Sendable {
+    public struct Timecontext: Codable, Sendable {
+        public let period: String
+        public let hour: Double
+        public let isWeekend: Bool
+    }
+    public struct SuggestedtoolsItem: Codable, Sendable {
+        public let tool: String
+        public let reason: String
+    }
+
+    public let timeContext: Timecontext
+    public let suggestedTools: [SuggestedtoolsItem]
+    public let suggestedWorkflows: [String]
+}
+
+// Output type for: read_chat
+public struct MCPReadChatOutput: Codable, Sendable {
+    public struct ParticipantsItem: Codable, Sendable {
+        public let name: String?
+        public let handle: String?
+    }
+
+    public let id: String
+    public let name: String?
+    public let participants: [ParticipantsItem]
+    public let updated: String?
+}
+
+// Output type for: read_contact
+public struct MCPReadContactOutput: Codable, Sendable {
+    public struct EmailsItem: Codable, Sendable {
+        public let value: String
+        public let label: String
+    }
+    public struct PhonesItem: Codable, Sendable {
+        public let value: String
+        public let label: String
+    }
+    public struct AddressesItem: Codable, Sendable {
+        public let street: String
+        public let city: String
+        public let state: String
+        public let zip: String
+        public let country: String
+        public let label: String
+    }
+
+    public let id: String
+    public let name: String
+    public let firstName: String
+    public let lastName: String
+    public let organization: String?
+    public let jobTitle: String?
+    public let department: String?
+    public let note: String?
+    public let emails: [EmailsItem]
+    public let phones: [PhonesItem]
+    public let addresses: [AddressesItem]
+}
+
+// Output type for: read_event
+public struct MCPReadEventOutput: Codable, Sendable {
+    public struct AttendeesItem: Codable, Sendable {
+        public let name: String?
+        public let email: String?
+        public let status: String?
+    }
+
+    public let id: String
+    public let summary: String
+    public let description: String?
+    public let location: String?
+    public let startDate: String
+    public let endDate: String
+    public let allDay: Bool
+    public let recurrence: String?
+    public let url: String?
+    public let calendar: String
+    public let attendees: [AttendeesItem]
+}
+
+// Output type for: read_note
+public struct MCPReadNoteOutput: Codable, Sendable {
+    public let id: String
+    public let name: String
+    public let body: String
+    public let plaintext: String
+    public let creationDate: String
+    public let modificationDate: String
+    public let folder: String
+    public let shared: Bool
+    public let passwordProtected: Bool
+}
+
+// Output type for: read_reminder
+public struct MCPReadReminderOutput: Codable, Sendable {
+    public let id: String
+    public let name: String
+    public let body: String
+    public let completed: Bool
+    public let completionDate: String?
+    public let creationDate: String
+    public let modificationDate: String
+    public let dueDate: String?
+    public let priority: Double
+    public let flagged: Bool
+    public let list: String
+}
+
+// Output type for: search_chats
+public struct MCPSearchChatsOutput: Codable, Sendable {
+    public struct ChatsItem: Codable, Sendable {
+        public struct ParticipantsItem: Codable, Sendable {
+            public let name: String?
+            public let handle: String?
+        }
+
+        public let id: String
+        public let name: String?
+        public let participants: [ParticipantsItem]
+        public let updated: String?
+    }
+
+    public let total: Double
+    public let returned: Double
+    public let chats: [ChatsItem]
+}
+
+// Output type for: search_contacts
+public struct MCPSearchContactsOutput: Codable, Sendable {
+    public struct ContactsItem: Codable, Sendable {
+        public let id: String
+        public let name: String
+        public let organization: String?
+        public let email: String?
+        public let phone: String?
+        public let matchedField: String
+    }
+
+    public let total: Double
+    public let returned: Double
+    public let contacts: [ContactsItem]
+}
+
+// Output type for: search_events
+public struct MCPSearchEventsOutput: Codable, Sendable {
+    public struct EventsItem: Codable, Sendable {
+        public let id: String
+        public let summary: String
+        public let startDate: String
+        public let endDate: String
+        public let allDay: Bool
+        public let calendar: String
+    }
+
+    public let total: Double
+    public let events: [EventsItem]
+}
+
+// Output type for: search_notes
+public struct MCPSearchNotesOutput: Codable, Sendable {
+    public struct NotesItem: Codable, Sendable {
+        public let id: String
+        public let name: String
+        public let folder: String
+        public let preview: String
+        public let creationDate: String
+        public let modificationDate: String
+    }
+
+    public let total: Double
+    public let returned: Double
+    public let offset: Double
+    public let notes: [NotesItem]
+}
+
+// Output type for: search_reminders
+public struct MCPSearchRemindersOutput: Codable, Sendable {
+    public struct RemindersItem: Codable, Sendable {
+        public let id: String
+        public let name: String
+        public let completed: Bool
+        public let dueDate: String?
+        public let priority: Double
+        public let flagged: Bool
+        public let list: String
+    }
+
+    public let returned: Double
+    public let reminders: [RemindersItem]
+}
+
+// Output type for: search_shortcuts
+public struct MCPSearchShortcutsOutput: Codable, Sendable {
+    public let total: Double
+    public let shortcuts: [String]
+}
+
+// Output type for: suggest_next_tools
+public struct MCPSuggestNextToolsOutput: Codable, Sendable {
+    public struct SuggestionsItem: Codable, Sendable {
+        public let tool: String
+        public let count: Double
+    }
+
+    public let after: String
+    public let suggestions: [SuggestionsItem]
+    public let totalCalls: Double
+    public let hint: String?
+}
+
+// Output type for: today_events
+public struct MCPTodayEventsOutput: Codable, Sendable {
+    public struct EventsItem: Codable, Sendable {
+        public let id: String
+        public let summary: String
+        public let startDate: String
+        public let endDate: String
+        public let allDay: Bool
+        public let calendar: String
+        public let location: String
+    }
+
+    public let total: Double
+    public let events: [EventsItem]
+}
+
+// MARK: - AppIntents
 
 // Tool: ai_chat
 public struct AiChatIntent: AppIntent {
@@ -67,6 +769,10 @@ public struct AiPlanMetricsIntent: AppIntent {
             tool: "ai_plan_metrics",
             args: args
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "ai_plan_metrics", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPAiPlanMetricsOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -144,6 +850,10 @@ public struct AuditSummaryIntent: AppIntent {
             tool: "audit_summary",
             args: args
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "audit_summary", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPAuditSummaryOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -252,6 +962,10 @@ public struct DiscoverToolsIntent: AppIntent {
             tool: "discover_tools",
             args: args
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "discover_tools", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPDiscoverToolsOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -464,6 +1178,10 @@ public struct GetClipboardIntent: AppIntent {
             tool: "get_clipboard",
             args: [String: any Sendable]()
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "get_clipboard", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPGetClipboardOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -498,6 +1216,10 @@ public struct GetCurrentTabIntent: AppIntent {
             tool: "get_current_tab",
             args: [String: any Sendable]()
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "get_current_tab", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPGetCurrentTabOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -521,6 +1243,10 @@ public struct GetCurrentWeatherIntent: AppIntent {
             tool: "get_current_weather",
             args: ["latitude": latitude, "longitude": longitude]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "get_current_weather", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPGetCurrentWeatherOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -567,6 +1293,10 @@ public struct GetFileInfoIntent: AppIntent {
             tool: "get_file_info",
             args: ["path": path]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "get_file_info", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPGetFileInfoOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -584,6 +1314,10 @@ public struct GetFrontmostAppIntent: AppIntent {
             tool: "get_frontmost_app",
             args: [String: any Sendable]()
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "get_frontmost_app", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPGetFrontmostAppOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -704,6 +1438,10 @@ public struct GetShortcutDetailIntent: AppIntent {
             tool: "get_shortcut_detail",
             args: ["name": name]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "get_shortcut_detail", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPGetShortcutDetailOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -741,6 +1479,10 @@ public struct GetUnreadCountIntent: AppIntent {
             tool: "get_unread_count",
             args: [String: any Sendable]()
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "get_unread_count", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPGetUnreadCountOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -761,6 +1503,10 @@ public struct GetUpcomingEventsIntent: AppIntent {
             tool: "get_upcoming_events",
             args: ["limit": limit]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "get_upcoming_events", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPGetUpcomingEventsOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -778,6 +1524,10 @@ public struct GetVolumeIntent: AppIntent {
             tool: "get_volume",
             args: [String: any Sendable]()
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "get_volume", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPGetVolumeOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -1154,6 +1904,10 @@ public struct ListAccountsIntent: AppIntent {
             tool: "list_accounts",
             args: [String: any Sendable]()
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "list_accounts", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPListAccountsOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -1222,6 +1976,10 @@ public struct ListBookmarksIntent: AppIntent {
             tool: "list_bookmarks",
             args: [String: any Sendable]()
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "list_bookmarks", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPListBookmarksOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -1239,6 +1997,10 @@ public struct ListCalendarsIntent: AppIntent {
             tool: "list_calendars",
             args: [String: any Sendable]()
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "list_calendars", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPListCalendarsOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -1259,6 +2021,10 @@ public struct ListChatsIntent: AppIntent {
             tool: "list_chats",
             args: ["limit": limit]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "list_chats", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPListChatsOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -1282,6 +2048,10 @@ public struct ListContactsIntent: AppIntent {
             tool: "list_contacts",
             args: ["limit": limit, "offset": offset]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "list_contacts", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPListContactsOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -1305,6 +2075,10 @@ public struct ListDirectoryIntent: AppIntent {
             tool: "list_directory",
             args: ["path": path, "limit": limit]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "list_directory", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPListDirectoryOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -1343,6 +2117,10 @@ public struct ListEventsIntent: AppIntent {
             tool: "list_events",
             args: args
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "list_events", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPListEventsOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -1380,6 +2158,10 @@ public struct ListFoldersIntent: AppIntent {
             tool: "list_folders",
             args: [String: any Sendable]()
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "list_folders", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPListFoldersOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -1403,6 +2185,10 @@ public struct ListGroupMembersIntent: AppIntent {
             tool: "list_group_members",
             args: ["groupName": groupName, "limit": limit]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "list_group_members", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPListGroupMembersOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -1420,6 +2206,10 @@ public struct ListGroupsIntent: AppIntent {
             tool: "list_groups",
             args: [String: any Sendable]()
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "list_groups", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPListGroupsOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -1437,6 +2227,10 @@ public struct ListMailboxesIntent: AppIntent {
             tool: "list_mailboxes",
             args: [String: any Sendable]()
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "list_mailboxes", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPListMailboxesOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -1471,6 +2265,10 @@ public struct ListMessagesIntent: AppIntent {
             tool: "list_messages",
             args: args
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "list_messages", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPListMessagesOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -1501,6 +2299,10 @@ public struct ListNotesIntent: AppIntent {
             tool: "list_notes",
             args: args
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "list_notes", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPListNotesOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -1521,6 +2323,10 @@ public struct ListParticipantsIntent: AppIntent {
             tool: "list_participants",
             args: ["chatId": chatId]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "list_participants", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPListParticipantsOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -1564,6 +2370,10 @@ public struct ListPlaylistsIntent: AppIntent {
             tool: "list_playlists",
             args: [String: any Sendable]()
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "list_playlists", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPListPlaylistsOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -1621,6 +2431,10 @@ public struct ListReadingListIntent: AppIntent {
             tool: "list_reading_list",
             args: [String: any Sendable]()
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "list_reading_list", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPListReadingListOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -1638,6 +2452,10 @@ public struct ListReminderListsIntent: AppIntent {
             tool: "list_reminder_lists",
             args: [String: any Sendable]()
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "list_reminder_lists", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPListReminderListsOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -1672,6 +2490,10 @@ public struct ListRemindersIntent: AppIntent {
             tool: "list_reminders",
             args: args
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "list_reminders", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPListRemindersOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -1706,6 +2528,10 @@ public struct ListShortcutsIntent: AppIntent {
             tool: "list_shortcuts",
             args: [String: any Sendable]()
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "list_shortcuts", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPListShortcutsOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -1723,6 +2549,10 @@ public struct ListTabsIntent: AppIntent {
             tool: "list_tabs",
             args: [String: any Sendable]()
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "list_tabs", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPListTabsOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -1746,6 +2576,10 @@ public struct ListTracksIntent: AppIntent {
             tool: "list_tracks",
             args: ["playlist": playlist, "limit": limit]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "list_tracks", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPListTracksOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -1865,6 +2699,10 @@ public struct MemoryQueryIntent: AppIntent {
             tool: "memory_query",
             args: args
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "memory_query", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPMemoryQueryOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -1882,6 +2720,10 @@ public struct MemoryStatsIntent: AppIntent {
             tool: "memory_stats",
             args: [String: any Sendable]()
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "memory_stats", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPMemoryStatsOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -1916,6 +2758,10 @@ public struct NowPlayingIntent: AppIntent {
             tool: "now_playing",
             args: [String: any Sendable]()
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "now_playing", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPNowPlayingOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -2085,6 +2931,10 @@ public struct ProactiveContextIntent: AppIntent {
             tool: "proactive_context",
             args: [String: any Sendable]()
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "proactive_context", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPProactiveContextOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -2163,6 +3013,10 @@ public struct ReadChatIntent: AppIntent {
             tool: "read_chat",
             args: ["chatId": chatId]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "read_chat", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPReadChatOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -2183,6 +3037,10 @@ public struct ReadContactIntent: AppIntent {
             tool: "read_contact",
             args: ["id": id]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "read_contact", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPReadContactOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -2203,6 +3061,10 @@ public struct ReadEventIntent: AppIntent {
             tool: "read_event",
             args: ["id": id]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "read_event", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPReadEventOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -2246,6 +3108,10 @@ public struct ReadNoteIntent: AppIntent {
             tool: "read_note",
             args: ["id": id]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "read_note", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPReadNoteOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -2292,6 +3158,10 @@ public struct ReadReminderIntent: AppIntent {
             tool: "read_reminder",
             args: ["id": id]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "read_reminder", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPReadReminderOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -2461,6 +3331,10 @@ public struct SearchChatsIntent: AppIntent {
             tool: "search_chats",
             args: ["query": query, "limit": limit]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "search_chats", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPSearchChatsOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -2484,6 +3358,10 @@ public struct SearchContactsIntent: AppIntent {
             tool: "search_contacts",
             args: ["query": query, "limit": limit]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "search_contacts", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPSearchContactsOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -2513,6 +3391,10 @@ public struct SearchEventsIntent: AppIntent {
             tool: "search_events",
             args: ["query": query, "startDate": startDate, "endDate": endDate, "limit": limit]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "search_events", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPSearchEventsOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -2591,6 +3473,10 @@ public struct SearchNotesIntent: AppIntent {
             tool: "search_notes",
             args: ["query": query, "limit": limit, "offset": offset]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "search_notes", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPSearchNotesOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -2660,6 +3546,10 @@ public struct SearchRemindersIntent: AppIntent {
             tool: "search_reminders",
             args: ["query": query, "limit": limit]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "search_reminders", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPSearchRemindersOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -2680,6 +3570,10 @@ public struct SearchShortcutsIntent: AppIntent {
             tool: "search_shortcuts",
             args: ["query": query]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "search_shortcuts", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPSearchShortcutsOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -3046,6 +3940,10 @@ public struct SuggestNextToolsIntent: AppIntent {
             tool: "suggest_next_tools",
             args: args
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "suggest_next_tools", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPSuggestNextToolsOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -3145,6 +4043,10 @@ public struct TodayEventsIntent: AppIntent {
             tool: "today_events",
             args: [String: any Sendable]()
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "today_events", message: "empty result from router")
+        }
+        _ = try JSONDecoder().decode(MCPTodayEventsOutput.self, from: data)
         return .result(value: result)
     }
 }
@@ -3402,6 +4304,8 @@ public struct UiTraverseIntent: AppIntent {
         return .result(value: result)
     }
 }
+
+// MARK: - AppShortcutsProvider
 
 public struct AirMCPGeneratedShortcuts: AppShortcutsProvider {
     public static var appShortcuts: [AppShortcut] {

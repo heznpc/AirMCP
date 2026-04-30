@@ -2,7 +2,7 @@ import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { runAutomation } from "../shared/automation.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okStructured, okUntrustedStructured, okUntrustedLinkedStructured, toolError } from "../shared/result.js";
+import { ok, okStructured, okUntrustedStructured, okUntrustedLinkedStructured, errJxa } from "../shared/result.js";
 import {
   listContactsScript,
   searchContactsScript,
@@ -126,7 +126,8 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
         });
         return okUntrustedLinkedStructured("list_contacts", result);
       } catch (e) {
-        return toolError("list contacts", e);
+        const msg = e instanceof Error ? e.message : String(e);
+        return errJxa(`Failed to list contacts: ${msg}`);
       }
     },
   );
@@ -164,7 +165,8 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
         });
         return okUntrustedStructured(result);
       } catch (e) {
-        return toolError("search contacts", e);
+        const msg = e instanceof Error ? e.message : String(e);
+        return errJxa(`Failed to search contacts: ${msg}`);
       }
     },
   );
@@ -209,7 +211,8 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
         });
         return okUntrustedStructured(result);
       } catch (e) {
-        return toolError("read contact", e);
+        const msg = e instanceof Error ? e.message : String(e);
+        return errJxa(`Failed to read contact: ${msg}`);
       }
     },
   );
@@ -241,7 +244,8 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
         });
         return ok(result);
       } catch (e) {
-        return toolError("create contact", e);
+        const msg = e instanceof Error ? e.message : String(e);
+        return errJxa(`Failed to create contact: ${msg}`);
       }
     },
   );
@@ -269,7 +273,8 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
         });
         return ok(result);
       } catch (e) {
-        return toolError("update contact", e);
+        const msg = e instanceof Error ? e.message : String(e);
+        return errJxa(`Failed to update contact: ${msg}`);
       }
     },
   );
@@ -292,7 +297,8 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
         });
         return ok(result);
       } catch (e) {
-        return toolError("delete contact", e);
+        const msg = e instanceof Error ? e.message : String(e);
+        return errJxa(`Failed to delete contact: ${msg}`);
       }
     },
   );
@@ -321,7 +327,8 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
         });
         return okStructured({ groups: result });
       } catch (e) {
-        return toolError("list groups", e);
+        const msg = e instanceof Error ? e.message : String(e);
+        return errJxa(`Failed to list groups: ${msg}`);
       }
     },
   );
@@ -346,7 +353,8 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
         });
         return ok(result);
       } catch (e) {
-        return toolError("add email to contact", e);
+        const msg = e instanceof Error ? e.message : String(e);
+        return errJxa(`Failed to add email to contact: ${msg}`);
       }
     },
   );
@@ -371,7 +379,8 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
         });
         return ok(result);
       } catch (e) {
-        return toolError("add phone to contact", e);
+        const msg = e instanceof Error ? e.message : String(e);
+        return errJxa(`Failed to add phone to contact: ${msg}`);
       }
     },
   );
@@ -401,7 +410,8 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
         });
         return okUntrustedStructured(result);
       } catch (e) {
-        return toolError("list group members", e);
+        const msg = e instanceof Error ? e.message : String(e);
+        return errJxa(`Failed to list group members: ${msg}`);
       }
     },
   );

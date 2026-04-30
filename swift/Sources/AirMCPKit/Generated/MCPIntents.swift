@@ -3,7 +3,7 @@
 // Source: docs/tool-manifest.json
 // Generator: scripts/gen-swift-intents.mjs
 // RFC 0007 Phase A.2b.2 + A.4.1 — 229 auto-selected read-only
-// tools (61 with typed drift-guards + Interactive Snippet
+// tools (65 with typed drift-guards + Interactive Snippet
 // SwiftUI views) + 9 AppShortcutsProvider entries.
 // Run `npm run gen:intents` to refresh after tool metadata changes.
 // CI guards against drift via `npm run gen:intents:check`.
@@ -123,6 +123,21 @@ public struct MCPGetFrontmostAppOutput: Codable, Sendable {
     public let name: String
     public let bundleIdentifier: String
     public let pid: Double
+}
+
+// Output type for: get_photo_info
+public struct MCPGetPhotoInfoOutput: Codable, Sendable {
+    public let id: String
+    public let filename: String?
+    public let name: String?
+    public let description: String?
+    public let date: String?
+    public let width: Double
+    public let height: Double
+    public let altitude: Double?
+    public let location: String
+    public let favorite: Bool
+    public let keywords: String
 }
 
 // Output type for: get_shortcut_detail
@@ -267,6 +282,23 @@ public struct MCPListEventsOutput: Codable, Sendable {
     public let events: [EventsItem]
 }
 
+// Output type for: list_favorites
+public struct MCPListFavoritesOutput: Codable, Sendable {
+    public struct PhotosItem: Codable, Sendable {
+        public let id: String
+        public let filename: String?
+        public let name: String?
+        public let date: String?
+        public let width: Double
+        public let height: Double
+        public let favorite: Bool
+    }
+
+    public let total: Double
+    public let returned: Double
+    public let photos: [PhotosItem]
+}
+
 // Output type for: list_folders
 public struct MCPListFoldersOutput: Codable, Sendable {
     public struct FoldersItem: Codable, Sendable {
@@ -360,6 +392,24 @@ public struct MCPListParticipantsOutput: Codable, Sendable {
     public let chatId: String
     public let chatName: String?
     public let participants: [ParticipantsItem]
+}
+
+// Output type for: list_photos
+public struct MCPListPhotosOutput: Codable, Sendable {
+    public struct PhotosItem: Codable, Sendable {
+        public let id: String
+        public let filename: String?
+        public let name: String?
+        public let date: String?
+        public let width: Double
+        public let height: Double
+        public let favorite: Bool
+    }
+
+    public let total: Double
+    public let offset: Double
+    public let returned: Double
+    public let photos: [PhotosItem]
 }
 
 // Output type for: list_playlists
@@ -773,6 +823,21 @@ public struct MCPSearchNotesOutput: Codable, Sendable {
     public let returned: Double
     public let offset: Double
     public let notes: [NotesItem]
+}
+
+// Output type for: search_photos
+public struct MCPSearchPhotosOutput: Codable, Sendable {
+    public struct PhotosItem: Codable, Sendable {
+        public let id: String
+        public let filename: String?
+        public let name: String?
+        public let date: String?
+        public let favorite: Bool
+        public let description: String?
+    }
+
+    public let total: Double
+    public let photos: [PhotosItem]
 }
 
 // Output type for: search_reminders
@@ -2453,6 +2518,16 @@ public struct GetPhotoInfoIntent: AppIntent {
             tool: "get_photo_info",
             args: ["id": id]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "get_photo_info", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPGetPhotoInfoOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPGetPhotoInfoSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -3522,6 +3597,16 @@ public struct ListFavoritesIntent: AppIntent {
             tool: "list_favorites",
             args: ["limit": limit]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "list_favorites", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPListFavoritesOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPListFavoritesSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -3776,6 +3861,16 @@ public struct ListPhotosIntent: AppIntent {
             tool: "list_photos",
             args: ["album": album, "limit": limit, "offset": offset]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "list_photos", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPListPhotosOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPListPhotosSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -5614,6 +5709,16 @@ public struct SearchPhotosIntent: AppIntent {
             tool: "search_photos",
             args: ["query": query, "limit": limit]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "search_photos", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPSearchPhotosOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPSearchPhotosSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -7237,6 +7342,95 @@ public struct MCPGetFrontmostAppSnippetView: View {
     }
 }
 
+// Snippet view for: get_photo_info  (shape: scalar)
+@available(macOS 26, iOS 26, *)
+public struct MCPGetPhotoInfoSnippetView: View {
+    public let data: MCPGetPhotoInfoOutput
+    public init(data: MCPGetPhotoInfoOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text("Id")
+                Spacer()
+                Text(data.id)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Filename")
+                Spacer()
+                Text((data.filename ?? "—"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Name")
+                Spacer()
+                Text((data.name ?? "—"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Description")
+                Spacer()
+                Text((data.description ?? "—"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Date")
+                Spacer()
+                Text((data.date ?? "—"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Width")
+                Spacer()
+                Text(data.width.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Height")
+                Spacer()
+                Text(data.height.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Altitude")
+                Spacer()
+                Text((data.altitude?.formatted() ?? "—"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Location")
+                Spacer()
+                Text(String(describing: data.location))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Favorite")
+                Spacer()
+                Text((data.favorite ? "Yes" : "No"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Keywords")
+                Spacer()
+                Text(String(describing: data.keywords))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+        }
+        .padding()
+    }
+}
+
 // Snippet view for: get_shortcut_detail  (shape: scalar)
 @available(macOS 26, iOS 26, *)
 public struct MCPGetShortcutDetailSnippetView: View {
@@ -7461,6 +7655,23 @@ public struct MCPListEventsSnippetView: View {
     }
 }
 
+// Snippet view for: list_favorites  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPListFavoritesSnippetView: View {
+    public let data: MCPListFavoritesOutput
+    public init(data: MCPListFavoritesOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.photos.enumerated()), id: \.offset) { _, row in
+                Text((row.filename ?? ""))
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
 // Snippet view for: list_folders  (shape: list-object)
 @available(macOS 26, iOS 26, *)
 public struct MCPListFoldersSnippetView: View {
@@ -7578,6 +7789,23 @@ public struct MCPListParticipantsSnippetView: View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(Array(data.participants.enumerated()), id: \.offset) { _, row in
                 Text((row.name ?? ""))
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: list_photos  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPListPhotosSnippetView: View {
+    public let data: MCPListPhotosOutput
+    public init(data: MCPListPhotosOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.photos.enumerated()), id: \.offset) { _, row in
+                Text((row.filename ?? ""))
                     .font(.body)
                     .lineLimit(1)
             }
@@ -8422,6 +8650,23 @@ public struct MCPSearchNotesSnippetView: View {
                         .lineLimit(1)
                 }
                 .buttonStyle(.plain)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: search_photos  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPSearchPhotosSnippetView: View {
+    public let data: MCPSearchPhotosOutput
+    public init(data: MCPSearchPhotosOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.photos.enumerated()), id: \.offset) { _, row in
+                Text((row.filename ?? ""))
+                    .font(.body)
+                    .lineLimit(1)
             }
         }
         .padding()

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **outputSchema Wave 5 — 4 photos read tools** (`list_photos`, `search_photos`, `get_photo_info`, `list_favorites`) — extends Wave 4's pattern to the photos module. `list_photos` / `search_photos` / `list_favorites` route through `okUntrustedLinkedStructured` (photo metadata is user content); `get_photo_info` uses `okUntrustedStructured`. `list_albums` deferred — bare `AlbumItem[]` return shape, same array-vs-object breaking-change risk as `compare_notes`. Weather forecast tools (`get_daily_forecast` / `get_hourly_forecast`) also deferred for the same reason. 7 new drift guards in `tests/output-schema-wave5.test.js` covering full / null-EXIF / empty-list shapes; `tests/output-schema-structured.test.js` exhaustive coverage check picks up 4 fixtures so any future tool that adds outputSchema without a fixture breaks the build.
+
 ### Fixed
 - **`AskAirMCPIntent` rejects empty / whitespace-only prompts** ([`swift/Sources/AirMCPKit/AskAirMCPIntent.swift`](swift/Sources/AirMCPKit/AskAirMCPIntent.swift)) — Siri "Ask AirMCP" with no follow-up text used to hit `LanguageModelSession.respond(to: "")` → opaque framework error → generic Shortcuts failure. Now trim and return a recoverable user-facing message ("Please ask a question — I need something to look up.").
 - **`gen-llms-txt.mjs` count drift fully closed** ([`scripts/gen-llms-txt.mjs`](scripts/gen-llms-txt.mjs)) — was reporting `265 tools / 32 modules` while `count-stats.mjs` (canonical) said `269 / 29`. Two roots: strict `extractTools` regex missed 4 tools whose registration spans the regex boundary; `walkDir` overcounted cross / semantic / skills / server / shared as separate modules. Fix: broad-regex pass for totals (matches `count-stats`), canonical module count parsed from `MODULE_NAMES`. Per-module list keeps strict regex for rich rendering. Headline now `269 / 29` everywhere.

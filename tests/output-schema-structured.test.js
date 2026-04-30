@@ -36,6 +36,7 @@ const { registerHealthTools } = await import('../dist/health/tools.js');
 const { registerMessagesTools } = await import('../dist/messages/tools.js');
 const { registerShortcutsTools } = await import('../dist/shortcuts/tools.js');
 const { registerWeatherTools } = await import('../dist/weather/tools.js');
+const { registerPhotosTools } = await import('../dist/photos/tools.js');
 const { fetchCurrentWeather } = await import('../dist/weather/api.js');
 
 // ── Per-tool args and mock responses ────────────────────────────────
@@ -339,6 +340,36 @@ const TOOL_FIXTURES = {
     args: { limit: 100, offset: 0, previewLength: 300 },
     mock: { total: 0, offset: 0, returned: 0, notes: [] },
   },
+  // ── Wave 5 additions ──
+  // photos
+  list_photos: {
+    args: { album: 'Recents', limit: 50, offset: 0 },
+    mock: { total: 0, offset: 0, returned: 0, photos: [] },
+  },
+  search_photos: {
+    args: { query: 'beach', limit: 30 },
+    mock: { total: 0, photos: [] },
+  },
+  get_photo_info: {
+    args: { id: 'abc-123' },
+    mock: {
+      id: 'abc-123',
+      filename: 'IMG.JPG',
+      name: null,
+      description: null,
+      date: '2026-04-30T10:00:00Z',
+      width: 4032,
+      height: 3024,
+      altitude: null,
+      location: null,
+      favorite: false,
+      keywords: null,
+    },
+  },
+  list_favorites: {
+    args: { limit: 50 },
+    mock: { total: 0, returned: 0, photos: [] },
+  },
 };
 
 // ── Test suite ──────────────────────────────────────────────────────
@@ -362,6 +393,7 @@ describe('outputSchema → structuredContent contract', () => {
     registerMessagesTools(server, config);
     registerShortcutsTools(server, config);
     registerWeatherTools(server, config);
+    registerPhotosTools(server, config);
   });
 
   beforeEach(() => {

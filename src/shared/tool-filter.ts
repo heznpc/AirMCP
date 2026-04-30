@@ -4,7 +4,10 @@
  * Compact mode is ON by default. Set AIRMCP_COMPACT_TOOLS=false to disable.
  * Tool descriptions are shortened to save tokens in the LLM context window.
  *
- * Full list at ~37K tokens -> compact at ~20K tokens (46% reduction).
+ * Run `npm run tokens` to measure the live reduction; the script applies
+ * this same transform to the manifest at docs/tool-manifest.json. As of
+ * this writing the reduction is ~50% on the description budget across
+ * 282 tools (heuristic 4 chars/token).
  *
  * This is the pragmatic implementation of SEP-1821 filtering:
  * rather than hacking SDK internals to intercept the tools/list handler,

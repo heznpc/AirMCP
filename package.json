@@ -110,6 +110,7 @@
     "i18n:check": "node scripts/check-i18n.mjs",
     "llms": "node scripts/gen-llms-txt.mjs",
     "llms:check": "node scripts/gen-llms-txt.mjs --check",
+    "tokens": "node scripts/measure-tool-tokens.mjs",
     "prepare": "husky"
   },
   "peerDependencies": {

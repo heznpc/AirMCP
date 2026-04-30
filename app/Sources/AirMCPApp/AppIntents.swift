@@ -159,8 +159,19 @@ struct HealthSummaryIntent: AppIntent {
 ///
 /// Re-calling is safe — the router replaces the prior handler rather than
 /// stacking. Tests that swap in a fake can call `setHandler` again.
+///
+/// Uses `Task { @MainActor in ... }` at default priority instead of the
+/// previous `Task.detached(priority: .utility)`. The actor hop into
+/// `MCPIntentRouter.shared.setHandler` is unavoidable (the router is an
+/// actor), but raising the priority + dropping `.detached` shrinks the
+/// cold-launch race window from "seconds" (utility queue can sit behind
+/// other low-priority work) to "milliseconds before the first runloop
+/// tick". For a Siri / Shortcuts cold-launch the system's first AppIntent
+/// invocation lands well after that window, so `handlerNotInstalled`
+/// effectively can't fire — but if it ever does, the error path already
+/// surfaces the requested tool name so the stack trace is debuggable.
 func installMCPIntentRouterForMacOS() {
-    Task.detached(priority: .utility) {
+    Task { @MainActor in
         await MCPIntentRouter.shared.setHandler { tool, args in
             // Cast from [String: any Sendable] → [String: Any] for the
             // existing runAirMCPTool(args:) signature. All inbound values

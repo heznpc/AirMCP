@@ -18,8 +18,9 @@
  * SQLite or layer semantic search on top without changing the tool surface.
  */
 
-import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { dirname } from "node:path";
+import { readFile, writeFile, mkdir, rename } from "node:fs/promises";
+import { dirname, basename } from "node:path";
+import { randomBytes } from "node:crypto";
 import { PATHS } from "../shared/constants.js";
 
 export type MemoryKind = "fact" | "entity" | "episode";
@@ -96,13 +97,43 @@ function isExpired(entry: MemoryEntry, now: number): boolean {
   return t <= now;
 }
 
+/**
+ * `JSON.parse` reviver that drops `__proto__` / `constructor` / `prototype`
+ * keys so a hand-edited or attacker-supplied store file can't pollute the
+ * Object prototype when the JSON is loaded back into memory. Returns
+ * `undefined` from the reviver to delete the key from the parse result.
+ */
+function safeJsonReviver(key: string, value: unknown): unknown {
+  if (key === "__proto__" || key === "constructor" || key === "prototype") {
+    return undefined;
+  }
+  return value;
+}
+
 export class MemoryStore {
   private cache: MemoryStoreData | null = null;
   private loadPromise: Promise<MemoryStoreData> | null = null;
   private readonly path: string;
 
+  /**
+   * Serializes load / put / forget / save / sweep so concurrent calls
+   * (e.g. an agent loop dispatching `memory_put` in parallel with a
+   * `memory_query` that triggers a sweep) can't trample the on-disk
+   * file. Each entry chains onto the previous tail of the queue.
+   */
+  private opQueue: Promise<unknown> = Promise.resolve();
+
   constructor(path: string = PATHS.MEMORY_STORE) {
     this.path = path;
+  }
+
+  /** Run `op` while the next op waits its turn. The chain swallows
+   *  errors at the queue level so one failing op doesn't poison the
+   *  next; the caller's promise rejects normally with the same error. */
+  private enqueue<T>(op: () => Promise<T>): Promise<T> {
+    const next = this.opQueue.then(op, op);
+    this.opQueue = next.catch(() => {});
+    return next;
   }
 
   private async load(): Promise<MemoryStoreData> {
@@ -111,7 +142,7 @@ export class MemoryStore {
       this.loadPromise = (async () => {
         try {
           const raw = await readFile(this.path, "utf-8");
-          const parsed = JSON.parse(raw) as MemoryStoreData;
+          const parsed = JSON.parse(raw, safeJsonReviver) as MemoryStoreData;
           if (parsed && typeof parsed === "object" && parsed.entries) {
             this.cache = parsed;
           } else {
@@ -126,9 +157,38 @@ export class MemoryStore {
     return this.loadPromise;
   }
 
+  /**
+   * Atomic write: stage the new content in a sibling tempfile, then
+   * `rename()` it over the canonical path. POSIX rename is atomic for
+   * same-directory same-filesystem moves, so a SIGKILL / power loss
+   * mid-write leaves either the old contents or the new contents — never
+   * a half-flushed JSON file (which `load()` would catch with the
+   * try/catch but only by silently restoring to an empty store, losing
+   * every fact / entity / episode the user accumulated).
+   */
   private async save(data: MemoryStoreData): Promise<void> {
     await mkdir(dirname(this.path), { recursive: true });
-    await writeFile(this.path, JSON.stringify(data, null, 2), "utf-8");
+    const tmpPath = `${this.path}.${randomBytes(6).toString("hex")}.tmp`;
+    try {
+      await writeFile(tmpPath, JSON.stringify(data, null, 2), "utf-8");
+      await rename(tmpPath, this.path);
+    } catch (err) {
+      // Best-effort cleanup of the staging file. We deliberately don't
+      // throw the cleanup error — the caller wants the original write
+      // failure surfaced, not a secondary unlink ENOENT. Use the
+      // dynamic import so this module stays usable in test environments
+      // that mock fs/promises with a partial surface.
+      try {
+        const fsp = await import("node:fs/promises");
+        await fsp.unlink(tmpPath);
+      } catch {
+        // ignore — temp may not have been created at all
+      }
+      // Anchor the failure to a recognizable basename so stack traces
+      // identify the partial-write site even after rename strips it.
+      void basename;
+      throw err;
+    }
     this.cache = data;
     this.loadPromise = null;
   }
@@ -146,7 +206,7 @@ export class MemoryStore {
   }
 
   /** Insert or update. Returns the final stored entry. */
-  async put(input: {
+  put(input: {
     kind: MemoryKind;
     key: string;
     value: string;
@@ -155,32 +215,34 @@ export class MemoryStore {
     source?: string;
     ttlMs?: number;
   }): Promise<MemoryEntry> {
-    const data = await this.load();
-    const now = Date.now();
-    const nowIso = new Date(now).toISOString();
+    return this.enqueue(async () => {
+      const data = await this.load();
+      const now = Date.now();
+      const nowIso = new Date(now).toISOString();
 
-    this.sweepExpired(data, now);
+      this.sweepExpired(data, now);
 
-    const id = input.id?.trim() || deriveId(input.kind, input.key);
-    const existing = data.entries[id];
+      const id = input.id?.trim() || deriveId(input.kind, input.key);
+      const existing = data.entries[id];
 
-    const expiresAt = input.ttlMs && input.ttlMs > 0 ? new Date(now + input.ttlMs).toISOString() : undefined;
+      const expiresAt = input.ttlMs && input.ttlMs > 0 ? new Date(now + input.ttlMs).toISOString() : undefined;
 
-    const entry: MemoryEntry = {
-      id,
-      kind: input.kind,
-      key: input.key,
-      value: input.value,
-      tags: normalizeTags(input.tags),
-      source: input.source?.trim() || existing?.source,
-      createdAt: existing?.createdAt ?? nowIso,
-      updatedAt: nowIso,
-      ...(expiresAt ? { expiresAt } : {}),
-    };
+      const entry: MemoryEntry = {
+        id,
+        kind: input.kind,
+        key: input.key,
+        value: input.value,
+        tags: normalizeTags(input.tags),
+        source: input.source?.trim() || existing?.source,
+        createdAt: existing?.createdAt ?? nowIso,
+        updatedAt: nowIso,
+        ...(expiresAt ? { expiresAt } : {}),
+      };
 
-    data.entries[id] = entry;
-    await this.save(data);
-    return entry;
+      data.entries[id] = entry;
+      await this.save(data);
+      return entry;
+    });
   }
 
   /** Query non-expired entries matching opts. */
@@ -216,67 +278,71 @@ export class MemoryStore {
    * Delete entries. Caller must supply exactly one of id / key / tag.
    * Returns the list of ids actually removed.
    */
-  async forget(opts: { id?: string; key?: string; tag?: string; kind?: MemoryKind }): Promise<string[]> {
+  forget(opts: { id?: string; key?: string; tag?: string; kind?: MemoryKind }): Promise<string[]> {
     const { id, key, tag, kind } = opts;
     const specifiers = [id, key, tag].filter(Boolean).length;
     if (specifiers !== 1) {
-      throw new Error("memory.forget requires exactly one of: id, key, tag.");
+      return Promise.reject(new Error("memory.forget requires exactly one of: id, key, tag."));
     }
 
-    const data = await this.load();
-    const removed: string[] = [];
+    return this.enqueue(async () => {
+      const data = await this.load();
+      const removed: string[] = [];
 
-    if (id) {
-      if (data.entries[id] && (!kind || data.entries[id]!.kind === kind)) {
-        delete data.entries[id];
-        removed.push(id);
-      }
-    } else if (key) {
-      for (const [eid, entry] of Object.entries(data.entries)) {
-        if (entry.key === key && (!kind || entry.kind === kind)) {
-          delete data.entries[eid];
-          removed.push(eid);
+      if (id) {
+        if (data.entries[id] && (!kind || data.entries[id]!.kind === kind)) {
+          delete data.entries[id];
+          removed.push(id);
+        }
+      } else if (key) {
+        for (const [eid, entry] of Object.entries(data.entries)) {
+          if (entry.key === key && (!kind || entry.kind === kind)) {
+            delete data.entries[eid];
+            removed.push(eid);
+          }
+        }
+      } else if (tag) {
+        const needle = tag.toLowerCase();
+        for (const [eid, entry] of Object.entries(data.entries)) {
+          if (entry.tags.includes(needle) && (!kind || entry.kind === kind)) {
+            delete data.entries[eid];
+            removed.push(eid);
+          }
         }
       }
-    } else if (tag) {
-      const needle = tag.toLowerCase();
-      for (const [eid, entry] of Object.entries(data.entries)) {
-        if (entry.tags.includes(needle) && (!kind || entry.kind === kind)) {
-          delete data.entries[eid];
-          removed.push(eid);
-        }
-      }
-    }
 
-    if (removed.length > 0) await this.save(data);
-    return removed;
+      if (removed.length > 0) await this.save(data);
+      return removed;
+    });
   }
 
   /** Aggregate stats (sweeps expired as a side-effect). */
-  async stats(): Promise<MemoryStats> {
-    const data = await this.load();
-    const now = Date.now();
-    const expiredSwept = this.sweepExpired(data, now);
-    if (expiredSwept > 0) await this.save(data);
+  stats(): Promise<MemoryStats> {
+    return this.enqueue(async () => {
+      const data = await this.load();
+      const now = Date.now();
+      const expiredSwept = this.sweepExpired(data, now);
+      if (expiredSwept > 0) await this.save(data);
 
-    const byKind: Record<MemoryKind, number> = { fact: 0, entity: 0, episode: 0 };
-    let oldest: string | undefined;
-    let newest: string | undefined;
+      const byKind: Record<MemoryKind, number> = { fact: 0, entity: 0, episode: 0 };
+      let oldest: string | undefined;
+      let newest: string | undefined;
 
-    for (const entry of Object.values(data.entries)) {
-      byKind[entry.kind]++;
-      if (!oldest || entry.createdAt < oldest) oldest = entry.createdAt;
-      if (!newest || entry.updatedAt > newest) newest = entry.updatedAt;
-    }
+      for (const entry of Object.values(data.entries)) {
+        byKind[entry.kind]++;
+        if (!oldest || entry.createdAt < oldest) oldest = entry.createdAt;
+        if (!newest || entry.updatedAt > newest) newest = entry.updatedAt;
+      }
 
-    return {
-      total: Object.keys(data.entries).length,
-      byKind,
-      oldest,
-      newest,
-      expiredSwept,
-      path: this.path,
-    };
+      return {
+        total: Object.keys(data.entries).length,
+        byKind,
+        oldest,
+        newest,
+        expiredSwept,
+        path: this.path,
+      };
+    });
   }
 
   /** Testing hook: wipe in-memory cache so the next read re-loads from disk. */

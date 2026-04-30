@@ -130,3 +130,59 @@ describe('rate limit atomicity', () => {
     expect(after).toBe(before);
   });
 });
+
+describe('per-tenant isolation', () => {
+  test('one tenant exhausting its budget does not affect another tenant', () => {
+    // Capacity = 3 (from env). Burn tenant A entirely.
+    expect(checkRateLimit(false, 'tenant-a').allowed).toBe(true);
+    expect(checkRateLimit(false, 'tenant-a').allowed).toBe(true);
+    expect(checkRateLimit(false, 'tenant-a').allowed).toBe(true);
+    expect(checkRateLimit(false, 'tenant-a').allowed).toBe(false);
+
+    // Tenant B starts with a fresh bucket — must still succeed.
+    expect(checkRateLimit(false, 'tenant-b').allowed).toBe(true);
+    expect(checkRateLimit(false, 'tenant-b').allowed).toBe(true);
+    expect(checkRateLimit(false, 'tenant-b').allowed).toBe(true);
+    expect(checkRateLimit(false, 'tenant-b').allowed).toBe(false);
+  });
+
+  test('omitting tenantKey shares a single default bucket', () => {
+    // Calls without a key all hit the same DEFAULT_TENANT_KEY bucket.
+    expect(checkRateLimit(false).allowed).toBe(true);
+    expect(checkRateLimit(false).allowed).toBe(true);
+    expect(checkRateLimit(false).allowed).toBe(true);
+    expect(checkRateLimit(false).allowed).toBe(false);
+  });
+
+  test('emergency stop applies across all tenants', () => {
+    writeFileSync(STOP_FILE, '');
+    _resetRateLimitForTests();
+    expect(checkRateLimit(true, 'tenant-a').allowed).toBe(false);
+    expect(checkRateLimit(true, 'tenant-b').allowed).toBe(false);
+  });
+
+  test('getRateLimitStatus reports per-tenant state and the trackedTenants count', () => {
+    checkRateLimit(false, 'tenant-a');
+    checkRateLimit(false, 'tenant-a');
+    checkRateLimit(false, 'tenant-b');
+
+    const a = getRateLimitStatus('tenant-a');
+    const b = getRateLimitStatus('tenant-b');
+    expect(a.tenantKey).toBe('tenant-a');
+    expect(b.tenantKey).toBe('tenant-b');
+    // Tenant A consumed 2 of 3, tenant B consumed 1 of 3.
+    expect(a.globalRemaining).toBe(1);
+    expect(b.globalRemaining).toBe(2);
+    expect(a.trackedTenants).toBeGreaterThanOrEqual(2);
+  });
+
+  test('status for an unknown tenant returns full capacity without creating one', () => {
+    const before = getRateLimitStatus().trackedTenants;
+    const status = getRateLimitStatus('never-seen');
+    // Unseen tenants report their would-be starting capacity.
+    expect(status.globalRemaining).toBe(3);
+    expect(status.destructiveRemaining).toBe(2);
+    // …and the inspection itself does not allocate a bucket.
+    expect(getRateLimitStatus().trackedTenants).toBe(before);
+  });
+});

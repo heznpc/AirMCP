@@ -267,7 +267,11 @@ class ToolRegistry {
         // never touch the filesystem/APIs on the denied call. Denials
         // throw so the error is captured by audit and surfaces to the
         // caller with the same shape as any other failure.
-        const gate = checkRateLimit(entry?.destructive === true);
+        // Tenant isolation: when OAuth claims are present (HTTP transport),
+        // the bucket is keyed on the JWT subject so one tenant's runaway
+        // agent can't exhaust budget for everyone else. Stdio / loopback
+        // share the default tenant.
+        const gate = checkRateLimit(entry?.destructive === true, claims?.subject);
         if (!gate.allowed) {
           const msg = `[rate_limited] ${gate.reason ?? "Rate limit exceeded"}${
             gate.retryAfterMs ? ` (retry in ~${Math.ceil(gate.retryAfterMs / 1000)}s)` : ""

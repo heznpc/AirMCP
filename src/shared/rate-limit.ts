@@ -23,15 +23,25 @@ import { join } from "node:path";
  * button (`touch ~/.config/airmcp/emergency-stop`) that doesn't need a
  * restart.
  *
+ * Per-tenant isolation (RFC 0005 OAuth context):
+ *   When a request carries OAuth claims (HTTP transport), the bucket is
+ *   keyed on the JWT `sub` claim so one tenant's runaway agent can't
+ *   exhaust budget for everyone else. Stdio / loopback paths share a
+ *   single default tenant — that path has no multi-tenant exposure.
+ *   Bucket count is capped (AIRMCP_RATE_LIMIT_TENANT_CAP, default 256)
+ *   with LRU eviction to bound memory under abuse (random sub strings).
+ *
  * Env overrides:
  *   AIRMCP_RATE_LIMIT=false                — disable entirely
  *   AIRMCP_MAX_TOOL_CALLS_PER_MINUTE=<n>   — global bucket (default 60)
  *   AIRMCP_MAX_DESTRUCTIVE_PER_HOUR=<n>    — destructive bucket (default 10)
+ *   AIRMCP_RATE_LIMIT_TENANT_CAP=<n>       — max tracked tenants (default 256)
  *   AIRMCP_EMERGENCY_STOP_PATH=<path>      — override kill switch file
  */
 
 const DEFAULT_GLOBAL_PER_MINUTE = 60;
 const DEFAULT_DESTRUCTIVE_PER_HOUR = 10;
+const DEFAULT_TENANT_CAP = 256;
 
 function parseIntEnv(name: string, fallback: number, min = 1): number {
   const raw = process.env[name];
@@ -44,9 +54,14 @@ function parseIntEnv(name: string, fallback: number, min = 1): number {
 export const RATE_LIMIT_ENABLED = process.env.AIRMCP_RATE_LIMIT !== "false";
 export const MAX_GLOBAL_PER_MINUTE = parseIntEnv("AIRMCP_MAX_TOOL_CALLS_PER_MINUTE", DEFAULT_GLOBAL_PER_MINUTE);
 export const MAX_DESTRUCTIVE_PER_HOUR = parseIntEnv("AIRMCP_MAX_DESTRUCTIVE_PER_HOUR", DEFAULT_DESTRUCTIVE_PER_HOUR);
+export const TENANT_CAP = parseIntEnv("AIRMCP_RATE_LIMIT_TENANT_CAP", DEFAULT_TENANT_CAP);
 
 const EMERGENCY_STOP_PATH =
   process.env.AIRMCP_EMERGENCY_STOP_PATH ?? join(homedir(), ".config", "airmcp", "emergency-stop");
+
+/** Stdio / loopback default tenant — single shared bucket for the
+ *  non-OAuth path so existing single-user deployments behave identically. */
+export const DEFAULT_TENANT_KEY = "_default_";
 
 /** Token-bucket state. `tokens` is the current bucket level (float),
  *  `lastRefill` is the wall-clock at which we last accrued tokens. */
@@ -55,6 +70,14 @@ interface Bucket {
   lastRefill: number;
   capacity: number;
   refillRatePerMs: number;
+}
+
+interface TenantBuckets {
+  global: Bucket;
+  destructive: Bucket;
+  /** Wall-clock of the last checkRateLimit hit. Powers LRU eviction
+   *  when the tracked-tenant count exceeds TENANT_CAP. */
+  lastSeen: number;
 }
 
 function makeBucket(capacity: number, windowMs: number): Bucket {
@@ -66,8 +89,42 @@ function makeBucket(capacity: number, windowMs: number): Bucket {
   };
 }
 
-const globalBucket = makeBucket(MAX_GLOBAL_PER_MINUTE, 60_000);
-const destructiveBucket = makeBucket(MAX_DESTRUCTIVE_PER_HOUR, 60 * 60_000);
+function makeTenantBuckets(): TenantBuckets {
+  return {
+    global: makeBucket(MAX_GLOBAL_PER_MINUTE, 60_000),
+    destructive: makeBucket(MAX_DESTRUCTIVE_PER_HOUR, 60 * 60_000),
+    lastSeen: Date.now(),
+  };
+}
+
+/** Per-tenant bucket map. Keyed on OAuth `sub` claim or DEFAULT_TENANT_KEY
+ *  for non-OAuth callers. Bounded by TENANT_CAP via LRU eviction. */
+const tenants = new Map<string, TenantBuckets>();
+
+function getOrCreateTenant(key: string): TenantBuckets {
+  const existing = tenants.get(key);
+  if (existing) {
+    existing.lastSeen = Date.now();
+    return existing;
+  }
+  // Cap eviction: evict oldest (lowest lastSeen) when at capacity.
+  // O(n) scan is fine — TENANT_CAP is bounded (default 256) and this
+  // only runs on first-touch for a new key, not the hot path.
+  if (tenants.size >= TENANT_CAP) {
+    let oldestKey: string | null = null;
+    let oldestSeen = Infinity;
+    for (const [k, v] of tenants) {
+      if (v.lastSeen < oldestSeen) {
+        oldestSeen = v.lastSeen;
+        oldestKey = k;
+      }
+    }
+    if (oldestKey !== null) tenants.delete(oldestKey);
+  }
+  const created = makeTenantBuckets();
+  tenants.set(key, created);
+  return created;
+}
 
 function refillAndTake(bucket: Bucket): boolean {
   const now = Date.now();
@@ -101,8 +158,12 @@ export interface RateLimitCheckResult {
  *  when allowed; on denial no state changes, so callers can safely retry
  *  after the suggested delay. `destructive` triggers both bucket checks
  *  AND the kill-switch probe; non-destructive calls only consume the
- *  global bucket. */
-export function checkRateLimit(destructive: boolean): RateLimitCheckResult {
+ *  global bucket.
+ *
+ *  `tenantKey` selects the per-tenant bucket pair. Pass the OAuth
+ *  `sub` claim for HTTP requests; omit (or pass undefined) for stdio /
+ *  loopback paths to share the default tenant. */
+export function checkRateLimit(destructive: boolean, tenantKey?: string): RateLimitCheckResult {
   if (!RATE_LIMIT_ENABLED) return { allowed: true };
 
   if (destructive && isEmergencyStopActive()) {
@@ -113,26 +174,28 @@ export function checkRateLimit(destructive: boolean): RateLimitCheckResult {
     };
   }
 
+  const buckets = getOrCreateTenant(tenantKey ?? DEFAULT_TENANT_KEY);
+
   // Pre-check both buckets so we don't take a token from one and then
   // reject at the other. Deny side-effects must be atomic.
-  if (!canTake(globalBucket)) {
+  if (!canTake(buckets.global)) {
     return {
       allowed: false,
       reason: `Global tool-call budget exhausted (max ${MAX_GLOBAL_PER_MINUTE} / minute).`,
-      retryAfterMs: msUntilNextToken(globalBucket),
+      retryAfterMs: msUntilNextToken(buckets.global),
     };
   }
-  if (destructive && !canTake(destructiveBucket)) {
+  if (destructive && !canTake(buckets.destructive)) {
     return {
       allowed: false,
       reason: `Destructive-call budget exhausted (max ${MAX_DESTRUCTIVE_PER_HOUR} / hour). Review AirMCP audit log to confirm no runaway agent.`,
-      retryAfterMs: msUntilNextToken(destructiveBucket),
+      retryAfterMs: msUntilNextToken(buckets.destructive),
     };
   }
 
   // Commit side-effects atomically after all pre-checks pass.
-  refillAndTake(globalBucket);
-  if (destructive) refillAndTake(destructiveBucket);
+  refillAndTake(buckets.global);
+  if (destructive) refillAndTake(buckets.destructive);
   return { allowed: true };
 }
 
@@ -166,25 +229,31 @@ export function _resetRateLimitForTests(): void {
   if (process.env.NODE_ENV !== "test" && process.env.AIRMCP_TEST_MODE !== "1") {
     throw new Error("_resetRateLimitForTests is only callable in test mode");
   }
-  globalBucket.tokens = globalBucket.capacity;
-  globalBucket.lastRefill = Date.now();
-  destructiveBucket.tokens = destructiveBucket.capacity;
-  destructiveBucket.lastRefill = Date.now();
+  tenants.clear();
   emergencyProbeCache = null;
 }
 
-/** Diagnostics for doctor / audit_summary. Read-only snapshot. */
-export function getRateLimitStatus(): {
+/** Diagnostics for doctor / audit_summary. Read-only snapshot.
+ *  Pass `tenantKey` to inspect a specific tenant; omit to inspect the
+ *  default (stdio / loopback) tenant. Returns zeroed buckets if the
+ *  tenant has never been seen — avoids creating one as a side-effect. */
+export function getRateLimitStatus(tenantKey?: string): {
   enabled: boolean;
+  tenantKey: string;
+  trackedTenants: number;
   globalRemaining: number;
   destructiveRemaining: number;
   emergencyStop: boolean;
   emergencyStopPath: string;
 } {
+  const key = tenantKey ?? DEFAULT_TENANT_KEY;
+  const buckets = tenants.get(key);
   return {
     enabled: RATE_LIMIT_ENABLED,
-    globalRemaining: Math.floor(globalBucket.tokens),
-    destructiveRemaining: Math.floor(destructiveBucket.tokens),
+    tenantKey: key,
+    trackedTenants: tenants.size,
+    globalRemaining: buckets ? Math.floor(buckets.global.tokens) : MAX_GLOBAL_PER_MINUTE,
+    destructiveRemaining: buckets ? Math.floor(buckets.destructive.tokens) : MAX_DESTRUCTIVE_PER_HOUR,
     emergencyStop: isEmergencyStopActive(),
     emergencyStopPath: EMERGENCY_STOP_PATH,
   };

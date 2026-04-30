@@ -116,23 +116,49 @@ describe('UsageTracker — sequences', () => {
     expect(usageTracker.getNextTools('never_called')).toEqual([]);
   });
 
-  test('sequence pruning kicks in once the table grows past 1.2x cap', () => {
-    // MAX_SEQUENCE_ENTRIES = 500. The prune branch only fires when
-    // Object.keys(sequences).length > 600 — so build 650 distinct
-    // sequences and expect the table to be trimmed back to <= 500.
-    // Strategy: record alternating "anchor_i" → "tail_i" pairs so each
-    // pair creates exactly one new sequence key.
+  test('sequence pruning kicks in once the table grows past 1.2× cap', async () => {
+    // MAX_SEQUENCE_ENTRIES = 500. The prune branch fires when
+    // Object.keys(sequences).length > 600. We record 650 distinct
+    // anchor_i → tail_i transitions so each pair adds exactly one new
+    // sequence key, then assert the table was trimmed back to the cap.
+    //
+    // The internal sequences map isn't exposed; flush to disk and read
+    // the JSON file (already pointed at a tmp path via env) to inspect
+    // it. getStats().topSequences won't do — it always slices to 10
+    // regardless of map size, so the assertion would pass even if no
+    // pruning happened. (That's how this test got missed in PR #160.)
     for (let i = 0; i < 650; i++) {
       usageTracker.record(`anchor_${i}`);
       usageTracker.record(`tail_${i}`);
     }
-    const stats = usageTracker.getStats();
-    // After pruning: count should be at most MAX_SEQUENCE_ENTRIES (500).
-    expect(stats.topSequences.length).toBeLessThanOrEqual(10); // topK = 10
-    // The full sequences table is internal; we infer pruning happened
-    // via the lack of unbounded growth. Verify by calling getNextTools
-    // for one of the earliest pairs — those should be the ones evicted
-    // (they had count 1 vs survivors that we'll bump now).
+    await usageTracker.flush();
+    const onDisk = JSON.parse(readFileSync(PROFILE, 'utf-8'));
+    const seqCount = Object.keys(onDisk.sequences).length;
+    // Invariant: size is bounded by the 1.2× high-water trigger (600).
+    // Prune fires the moment the table exceeds that threshold and trims
+    // the bottom (least-used) keys down toward MAX_SEQUENCE_ENTRIES.
+    // Across a 650-pair burst the size oscillates within [500, 600];
+    // we don't pin a precise post-trim count because record-by-record
+    // re-trigger ordering is sensitive to sort tie-breaks.
+    expect(seqCount).toBeLessThanOrEqual(600);
+    // …and well below the count we'd see with no pruning at all
+    // (650 anchor→tail + 649 tail→next-anchor ≈ 1299 sequences).
+    expect(seqCount).toBeLessThan(1000);
+
+    // Spot-check: a heavily-reinforced key after pruning must survive a
+    // subsequent prune cycle. Bump anchor_649 → tail_649 a few more
+    // times so its count dominates the table tail; the next prune
+    // pass keeps high-count keys.
+    usageTracker.record('anchor_649');
+    usageTracker.record('tail_649');
+    usageTracker.record('anchor_649');
+    usageTracker.record('tail_649');
+    await usageTracker.flush();
+    const afterBump = JSON.parse(readFileSync(PROFILE, 'utf-8'));
+    expect(afterBump.sequences['anchor_649 → tail_649']).toBeGreaterThanOrEqual(3);
+    // Sanity: the table is still bounded (no leak after additional
+    // records).
+    expect(Object.keys(afterBump.sequences).length).toBeLessThanOrEqual(600);
   });
 });
 

@@ -118,25 +118,28 @@ describe('request-context — isolation', () => {
     const inner = baseClaims({ subject: 'inner' });
 
     runWithRequestContext({ oauth: outer }, () => {
-      expect(getOAuthClaims()?.subject).toBe('outer');
+      expect(getOAuthClaims()).toBe(outer);
       runWithRequestContext({ oauth: inner }, () => {
-        expect(getOAuthClaims()?.subject).toBe('inner');
+        expect(getOAuthClaims()).toBe(inner);
       });
-      // After the nested run unwinds we see the outer store again.
-      expect(getOAuthClaims()?.subject).toBe('outer');
+      // After the nested run unwinds we see the outer store again,
+      // including object identity (not just the same subject string).
+      expect(getOAuthClaims()).toBe(outer);
     });
   });
 
   test('nested context with a different shape (no oauth) hides outer claims', () => {
-    runWithRequestContext({ oauth: baseClaims() }, () => {
-      expect(getOAuthClaims()).toBeDefined();
+    const outer = baseClaims({ subject: 'outer' });
+    runWithRequestContext({ oauth: outer }, () => {
+      expect(getOAuthClaims()).toBe(outer);
       runWithRequestContext({}, () => {
         // The nested store has no oauth field; helper must return
         // undefined so downstream gates short-circuit instead of
         // surfacing stale claims from the outer scope.
         expect(getOAuthClaims()).toBeUndefined();
       });
-      expect(getOAuthClaims()).toBeDefined();
+      // Outer store restored after the nested run unwinds.
+      expect(getOAuthClaims()).toBe(outer);
     });
   });
 });

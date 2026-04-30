@@ -6,6 +6,14 @@ import { runJxa } from "./jxa.js";
  * Falls back to JXA if the Swift bridge is not built, the command is
  * not implemented in Swift, or the Swift call fails.
  *
+ * Error origin invariant (callers can rely on this for RFC 0001
+ * categorization):
+ *   Every error thrown by this function comes from the JXA path.
+ *   The Swift branch always falls through to `runJxa()` on failure,
+ *   so the only error that can reach the caller is the JXA one. This
+ *   means tools wrapping `runAutomation` can use `errJxa()` for their
+ *   catch blocks without needing a separate "automation" origin.
+ *
  * @param options.swift.command  The Swift bridge command name (e.g. "get-clipboard")
  * @param options.swift.input    Optional input payload (will be JSON-serialized)
  * @param options.jxa            Lazy JXA script generator (only called if needed)

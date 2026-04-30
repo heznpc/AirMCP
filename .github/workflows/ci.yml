@@ -110,6 +110,9 @@ jobs:
       - name: Verify stats
         run: node scripts/count-stats.mjs --check
 
+      - name: Verify llms.txt + llms-full.txt drift
+        run: npm run llms:check
+
       - name: Verify version sync
         run: node scripts/sync-version.mjs --check
 

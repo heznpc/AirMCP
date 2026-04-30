@@ -110,9 +110,17 @@ describe('Intelligence tools registration', () => {
     expect(config.annotations.readOnlyHint).toBe(false);
   });
 
-  test('ai_agent is not read-only (can call tools)', () => {
+  test('ai_agent is read-only (write tools intentionally not exposed to FoundationModels session)', () => {
+    // Updated for the FoundationModelsBridge.allTools() restriction:
+    // CreateReminderTool / CreateNoteTool removed because the agentic
+    // tool-calling loop bypasses the Node toolRegistry pre-handler
+    // (no HITL / rate-limit / audit). Only read tools remain
+    // (TodayEvents / DueReminders / SearchContacts), so the surface
+    // is honestly read-only. See CHANGELOG security entry + ROADMAP
+    // P1 "Swift→Node loop-back transport" for the path back to
+    // exposing writes safely.
     const { config } = server.tools.get('ai_agent');
-    expect(config.annotations.readOnlyHint).toBe(false);
+    expect(config.annotations.readOnlyHint).toBe(true);
   });
 
   test('ai_status is idempotent', () => {

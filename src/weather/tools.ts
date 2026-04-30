@@ -1,7 +1,7 @@
 import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import type { AirMcpConfig } from "../shared/config.js";
-import { okUntrusted, okUntrustedLinkedStructured, toolError } from "../shared/result.js";
+import { okUntrusted, okUntrustedLinkedStructured, errUpstream } from "../shared/result.js";
 import { fetchCurrentWeather, fetchDailyForecast, fetchHourlyForecast } from "./api.js";
 
 export function registerWeatherTools(server: McpServer, _config: AirMcpConfig): void {
@@ -39,7 +39,8 @@ export function registerWeatherTools(server: McpServer, _config: AirMcpConfig): 
         const result = await fetchCurrentWeather(latitude, longitude);
         return okUntrustedLinkedStructured("get_current_weather", result);
       } catch (e) {
-        return toolError("get current weather", e);
+        const msg = e instanceof Error ? e.message : String(e);
+        return errUpstream(`Failed to get current weather: ${msg}`, { retryable: true });
       }
     },
   );
@@ -60,7 +61,8 @@ export function registerWeatherTools(server: McpServer, _config: AirMcpConfig): 
       try {
         return okUntrusted(await fetchDailyForecast(latitude, longitude, days));
       } catch (e) {
-        return toolError("get daily forecast", e);
+        const msg = e instanceof Error ? e.message : String(e);
+        return errUpstream(`Failed to get daily forecast: ${msg}`, { retryable: true });
       }
     },
   );
@@ -88,7 +90,8 @@ export function registerWeatherTools(server: McpServer, _config: AirMcpConfig): 
       try {
         return okUntrusted(await fetchHourlyForecast(latitude, longitude, hours));
       } catch (e) {
-        return toolError("get hourly forecast", e);
+        const msg = e instanceof Error ? e.message : String(e);
+        return errUpstream(`Failed to get hourly forecast: ${msg}`, { retryable: true });
       }
     },
   );

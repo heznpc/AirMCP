@@ -234,7 +234,7 @@ describe('UsageTracker — _resetForTests guard', () => {
     process.env.NODE_ENV = 'production';
     delete process.env.AIRMCP_TEST_MODE;
     try {
-      expect(() => usageTracker._resetForTests()).toThrow(/only callable in test mode/);
+      expect(() => usageTracker._resetForTests()).toThrow(/only callable when NODE_ENV=test/);
     } finally {
       process.env.NODE_ENV = origNodeEnv;
       if (origTestMode !== undefined) process.env.AIRMCP_TEST_MODE = origTestMode;

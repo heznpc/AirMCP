@@ -31,6 +31,7 @@ const {
   getRateLimitStatus,
   _resetRateLimitForTests,
   _resetIpRateLimitForTests,
+  _forceIpBucketStaleForTests,
 } = await import('../dist/shared/rate-limit.js');
 
 beforeEach(() => {
@@ -253,32 +254,49 @@ describe('checkIpRateLimit — HTTP per-IP bucket', () => {
   // env var is read at module load — toggling it inside a single jest
   // worker is not reliable across ESM caches.
 
-  test('pruneStaleIpBuckets evicts buckets older than 2× window', async () => {
-    // Capacity 4, window 60s, 2× = 120s. The simplest way to simulate
-    // staleness without faking time is to mutate lastRefill on a known
-    // bucket. After pruning, a subsequent checkIpRateLimit reissues a
-    // fresh bucket (full capacity), proving the old one was dropped.
-    checkIpRateLimit('stale-ip');
-    checkIpRateLimit('stale-ip');
-    // Expected remaining now: 2 (4 - 2 takes).
-    expect(checkIpRateLimit('stale-ip').remaining).toBe(1);
-
-    // Force the bucket's lastRefill far in the past.
-    const mod = await import('../dist/shared/rate-limit.js');
-    // No public hook — use _resetIpRateLimitForTests to wipe + re-create
-    // staleness scenario via two pollings 0ms apart (prune still works
-    // because we mark cutoff = now - 120s; immediate refill puts it
-    // safely after the cutoff so prune leaves it alone).
-    mod._resetIpRateLimitForTests();
-    // Empty map → prune is a no-op and returns 0.
+  test('pruneStaleIpBuckets is a no-op on an empty map and on fresh buckets', () => {
+    // Empty map → return 0 without iterating.
     expect(pruneStaleIpBuckets()).toBe(0);
 
-    // Build one fresh bucket; prune should not evict it (lastRefill = now).
+    // Fresh bucket (lastRefill = now) survives a prune call.
     checkIpRateLimit('fresh-ip');
     expect(pruneStaleIpBuckets()).toBe(0);
-    // …and the bucket survives, so the next call still sees a partially
-    // depleted bucket (remaining = 3 - 1 = 2).
+    // Bucket still tracked: next call shows partial depletion (3 - 1 = 2).
     expect(checkIpRateLimit('fresh-ip').remaining).toBe(2);
+  });
+
+  test('pruneStaleIpBuckets evicts buckets older than 2× window', () => {
+    // Window = 60s, cutoff = now - 120s. Anything with lastRefill
+    // before that boundary is stale.
+    const now = Date.now();
+
+    // Build three buckets, then mark two of them stale via the
+    // test-only refill rewinder. The third stays fresh.
+    checkIpRateLimit('stale-1');
+    checkIpRateLimit('stale-2');
+    checkIpRateLimit('fresh');
+    _forceIpBucketStaleForTests('stale-1', now - 5 * 60_000); // 5 min old
+    _forceIpBucketStaleForTests('stale-2', now - 3 * 60_000); // 3 min old
+
+    expect(pruneStaleIpBuckets()).toBe(2);
+
+    // 'fresh' bucket survived: remaining is still 3 (one prior take).
+    // 'stale-*' should have been dropped: a new call reissues a full bucket.
+    expect(checkIpRateLimit('fresh').remaining).toBe(2);
+    expect(checkIpRateLimit('stale-1').remaining).toBe(3);
+    expect(checkIpRateLimit('stale-2').remaining).toBe(3);
+  });
+
+  test('pruneStaleIpBuckets keeps buckets just inside the 2× boundary', () => {
+    // Boundary check: cutoff is `now - 2 * window` and the comparison
+    // is strict (`<`). A bucket 1s newer than the cutoff must survive.
+    const now = Date.now();
+    checkIpRateLimit('boundary');
+    _forceIpBucketStaleForTests('boundary', now - 2 * 60_000 + 1_000);
+
+    expect(pruneStaleIpBuckets()).toBe(0);
+    // The original bucket is still tracked; we don't assert remaining
+    // here because refill against the rewound lastRefill changes it.
   });
 
   test('_resetIpRateLimitForTests guard throws outside test mode', () => {
@@ -287,7 +305,7 @@ describe('checkIpRateLimit — HTTP per-IP bucket', () => {
     process.env.NODE_ENV = 'production';
     delete process.env.AIRMCP_TEST_MODE;
     try {
-      expect(() => _resetIpRateLimitForTests()).toThrow(/only callable in test mode/);
+      expect(() => _resetIpRateLimitForTests()).toThrow(/only callable when NODE_ENV=test/);
     } finally {
       process.env.NODE_ENV = origNodeEnv;
       if (origTestMode !== undefined) process.env.AIRMCP_TEST_MODE = origTestMode;

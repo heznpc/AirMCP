@@ -131,21 +131,32 @@ public actor FoundationModelsBridge {
     public init() {}
 
     /// Get all AirMCP tools for Foundation Models.
+    ///
+    /// Read-only tools only. The Foundation Models session calls each tool's
+    /// `call(arguments:)` directly — the call path bypasses the Node-side
+    /// `toolRegistry` pre-handler, so HITL approval, rate-limit, and audit
+    /// log do not see these calls. Surfacing a write tool here would let an
+    /// agentic prompt mutate state with no oversight (RFC 0001 §security and
+    /// RFC 0002 §rate-limit are not honoured on this path).
+    ///
+    /// Restoring write capability requires either:
+    ///   1. A loop-back transport that re-enters the toolRegistry (i.e. the
+    ///      Swift tool calls back into the running Node MCP server), or
+    ///   2. A Swift-side mirror of the rate-limit + HITL + audit policies.
+    /// Tracked in TODO as a v2.12+ design item.
     public func allTools() -> [any Tool] {
         [
             TodayEventsTool(),
             DueRemindersTool(),
             SearchContactsTool(),
-            CreateReminderTool(),
-            CreateNoteTool(),
         ]
     }
 
     /// Run a prompt with AirMCP tools available to the on-device LLM.
-    /// The model will autonomously decide which tools to call.
+    /// The model autonomously decides which read-only tool to call.
     public func run(prompt: String, systemInstruction: String? = nil) async throws -> String {
         let tools = allTools()
-        let instruction = systemInstruction ?? "You are a helpful assistant with access to the user's Apple apps (Calendar, Reminders, Contacts, Notes). Use the available tools to answer questions about the user's data."
+        let instruction = systemInstruction ?? "You are a read-only assistant with access to the user's Calendar, Reminders, and Contacts. Use the available tools to answer questions about the user's data. You cannot create, modify, or delete anything — direct the user to the AirMCP app for write actions."
         let session = LanguageModelSession(instructions: instruction, tools: tools)
         let response = try await session.respond(to: prompt)
         return response.content

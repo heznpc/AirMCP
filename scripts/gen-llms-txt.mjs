@@ -139,8 +139,35 @@ for (const [key, mod] of Object.entries(modules).sort(([a], [b]) => a.localeComp
   }
 }
 
-writeFileSync(join(ROOT, "llms.txt"), llmsTxt);
-writeFileSync(join(ROOT, "llms-full.txt"), fullTxt);
+const llmsPath = join(ROOT, "llms.txt");
+const llmsFullPath = join(ROOT, "llms-full.txt");
+const checkMode = process.argv.includes("--check");
 
-console.log(`Generated llms.txt (${llmsTxt.length} bytes) and llms-full.txt (${fullTxt.length} bytes)`);
-console.log(`${totalTools} tools, ${totalPrompts} prompts across ${Object.keys(modules).length} modules`);
+if (checkMode) {
+  // Drift guard: regenerate llms.txt in-memory and diff against checked-in
+  // file. CI runs this so any tool/prompt/module addition without
+  // `npm run llms` fails the build instead of silently shipping a stale
+  // catalog (the long-standing "258 tools / 30 modules" drift bug that
+  // survived multiple releases). llms-full.txt is `.gitignore`d
+  // (oversize for review diffs) so we skip it in check mode and only
+  // pin the public-facing llms.txt summary.
+  let existing = "";
+  try {
+    existing = readFileSync(llmsPath, "utf-8");
+  } catch {
+    console.error(`[gen-llms --check] ${llmsPath} missing — run \`npm run llms\``);
+    process.exit(1);
+  }
+  if (existing !== llmsTxt) {
+    console.error(`[gen-llms --check] STALE: ${llmsPath} — run \`npm run llms\``);
+    process.exit(1);
+  }
+  console.log(
+    `[gen-llms --check] OK — ${totalTools} tools / ${totalPrompts} prompts / ${Object.keys(modules).length} modules`,
+  );
+} else {
+  writeFileSync(llmsPath, llmsTxt);
+  writeFileSync(llmsFullPath, fullTxt);
+  console.log(`Generated llms.txt (${llmsTxt.length} bytes) and llms-full.txt (${fullTxt.length} bytes)`);
+  console.log(`${totalTools} tools, ${totalPrompts} prompts across ${Object.keys(modules).length} modules`);
+}

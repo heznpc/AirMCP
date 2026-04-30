@@ -1154,8 +1154,8 @@ public struct AddToReadingListIntent: AppIntent {
 
 // Tool: ai_agent
 public struct AiAgentIntent: AppIntent {
-    nonisolated(unsafe) public static var title: LocalizedStringResource = "On-Device AI Agent"
-    nonisolated(unsafe) public static var description = IntentDescription("Run a prompt through Apple's on-device Foundation Models with access to AirMCP tools (Calendar, Reminders, Contacts). The on-device LLM autonomously decides which tools to call. Requires macOS 26+ with Apple Silicon.")
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "On-Device AI Agent (read-only)"
+    nonisolated(unsafe) public static var description = IntentDescription("Run a prompt through Apple's on-device Foundation Models with read-only access to AirMCP data (today's events, due reminders, contacts search). The on-device LLM autonomously decides which read tool to call. Requires macOS 26+ with Apple Silicon. Write actions (create/update/delete) are intentionally NOT exposed — the agent's tool calls bypass the Node-side toolRegistry (no HITL, rate-limit, or audit), so writes belong to direct MCP tool calls instead.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}

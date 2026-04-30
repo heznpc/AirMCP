@@ -1,6 +1,6 @@
 # AirMCP
 
-> MCP server for the entire Apple ecosystem. 258 tools across 30 modules.
+> MCP server for the entire Apple ecosystem. 265 tools across 32 modules.
 
 ## Links
 
@@ -12,6 +12,7 @@
 
 ## Modules
 
+- **audit** (2 tools): audit_log, audit_summary
 - **Bluetooth** (4 tools): get_bluetooth_state, scan_bluetooth, connect_bluetooth, disconnect_bluetooth
 - **Calendar** (10 tools): list_calendars, list_events, read_event, create_event, update_event, delete_event, search_events, get_upcoming_events, today_events, create_recurring_event
 - **Contacts** (10 tools): list_contacts, search_contacts, read_contact, create_contact, update_contact, delete_contact, list_groups, add_contact_email, add_contact_phone, list_group_members
@@ -19,11 +20,12 @@
 - **Finder** (8 tools): search_files, get_file_info, set_file_tags, recent_files, list_directory, move_file, trash_file, create_directory
 - **Google Workspace** (16 tools): gws_status, gws_gmail_list, gws_gmail_read, gws_gmail_send, gws_drive_list, gws_drive_read, gws_drive_search, gws_sheets_read, gws_sheets_write, gws_calendar_list, gws_calendar_create, gws_docs_read, gws_tasks_list, gws_tasks_create, gws_people_search, gws_raw
 - **health** (5 tools): health_summary, health_today_steps, health_heart_rate, health_sleep, health_authorize
-- **Apple Intelligence** (12 tools): summarize_text, rewrite_text, proofread_text, generate_text, generate_structured, tag_content, ai_chat, generate_image, scan_document, generate_plan, ai_status, ai_agent
+- **Apple Intelligence** (13 tools): summarize_text, rewrite_text, proofread_text, generate_text, generate_structured, tag_content, ai_chat, generate_image, scan_document, generate_plan, ai_plan_metrics, ai_status, ai_agent
 - **Keynote** (9 tools): keynote_list_documents, keynote_create_document, keynote_list_slides, keynote_get_slide, keynote_add_slide, keynote_set_presenter_notes, keynote_export_pdf, keynote_start_slideshow, keynote_close_document
 - **Location** (2 tools): get_current_location, get_location_permission
 - **Mail** (11 tools): list_mailboxes, list_messages, read_message, search_messages, mark_message_read, flag_message, get_unread_count, move_message, list_accounts, send_mail, reply_mail
 - **Maps** (8 tools): search_location, get_directions, drop_pin, open_address, search_nearby, share_location, geocode, reverse_geocode
+- **memory** (4 tools): memory_put, memory_query, memory_forget, memory_stats
 - **Messages** (6 tools): list_chats, read_chat, search_chats, send_message, send_file, list_participants
 - **Music** (17 tools): list_playlists, list_tracks, now_playing, playback_control, search_tracks, play_track, play_playlist, get_track_info, set_shuffle, create_playlist, add_to_playlist, remove_from_playlist, delete_playlist, get_rating, set_rating, set_favorited, set_disliked
 - **Notes** (12 tools): list_notes, search_notes, read_note, create_note, update_note, delete_note, list_folders, create_folder, move_note, scan_notes, compare_notes, bulk_move_notes

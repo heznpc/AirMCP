@@ -13,13 +13,20 @@ const BUILTINS_DIR = join(__dirname, "builtins");
 
 let skillsWatcher: FSWatcher | null = null;
 
-export async function registerSkillEngine(server: McpServer): Promise<void> {
+export interface SkillEngineCounts {
+  /** Built-in skills loaded from `dist/skills/builtins/*.yaml`. */
+  builtinCount: number;
+  /** User skills loaded from `~/.airmcp/skills/*.yaml`. */
+  userCount: number;
+}
+
+export async function registerSkillEngine(server: McpServer): Promise<SkillEngineCounts> {
   const { builtins, user } = loadAllSkills(BUILTINS_DIR);
   const merged = mergeSkills(builtins, user);
 
   if (merged.length === 0) {
     console.error("[AirMCP] Skills engine: no skills found");
-    return;
+    return { builtinCount: 0, userCount: 0 };
   }
 
   registerSkills(server, merged);
@@ -39,6 +46,8 @@ export async function registerSkillEngine(server: McpServer): Promise<void> {
       console.error("[AirMCP] User skills changed. Restart server to apply changes.");
     });
   }
+
+  return { builtinCount: builtins.length, userCount: user.length };
 }
 
 /** Close the file watcher. Called on process exit. */

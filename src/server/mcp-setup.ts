@@ -139,8 +139,8 @@ export async function createServer(
   // Setup & diagnostics
   registerSetupTools(lServer, config);
 
-  // Personal Skills Engine (YAML-based workflows)
-  await registerSkillEngine(lServer);
+  // Personal Skills Engine (YAML-based workflows). Counts feed the banner.
+  const skillCounts = await registerSkillEngine(lServer);
 
   // MCP Apps — interactive UI views (Calendar week, Music player, Timeline)
   registerApps(lServer, {
@@ -491,8 +491,8 @@ export async function createServer(
     toolCount,
     promptCount,
     dynamicShortcuts: dynamicShortcutCount,
-    skillsBuiltin: 7,
-    skillsUser: 0,
+    skillsBuiltin: skillCounts.builtinCount,
+    skillsUser: skillCounts.userCount,
     hitlLevel: config.hitl.level,
     macosVersion: osVersion,
     nodeVersion: process.version.slice(1),
@@ -501,11 +501,23 @@ export async function createServer(
     compactTools: isCompactMode(),
   };
 
-  /** Remove this server's eventBus listeners. Call on session close to prevent listener accumulation. */
+  /** Remove this server's eventBus listeners. Call on session close to prevent listener accumulation.
+   *
+   *  Must mirror every `eventBus.on(...)` call inside the `event_subscribe` handler — when v2.10
+   *  added 6 new event types (mail_unread / focus_mode / now_playing / file_modified /
+   *  screen_locked / screen_unlocked) the cleanup wasn't extended in lockstep, so HTTP servers
+   *  that idle-timed-out sessions accumulated 6 listeners per session and eventually tripped
+   *  Node's `MaxListenersExceededWarning`. */
   const cleanupEventListeners = () => {
     eventBus.off("calendar_changed", onCalendarChanged);
     eventBus.off("reminders_changed", onRemindersChanged);
     eventBus.off("pasteboard_changed", onPasteboardChanged);
+    eventBus.off("mail_unread_changed", onMailUnreadChanged);
+    eventBus.off("focus_mode_changed", onFocusModeChanged);
+    eventBus.off("now_playing_changed", onNowPlayingChanged);
+    eventBus.off("file_modified", onFileModified);
+    eventBus.off("screen_locked", onScreenLocked);
+    eventBus.off("screen_unlocked", onScreenUnlocked);
   };
 
   return { server, bannerInfo, cleanupEventListeners };

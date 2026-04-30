@@ -1,12 +1,12 @@
 # Using AirMCP with Siri · Shortcuts · Spotlight (iOS 17+, macOS 14+)
 
-AirMCP's 154 read-only tools are auto-registered as Apple App Intents. Anything that speaks the Intents system — Siri, Shortcuts, Spotlight, the Action Button, Widgets — can call them directly, without opening the app.
+AirMCP's 229 tools are auto-registered as Apple App Intents (read-only + non-destructive writes; destructive ones gate behind `AIRMCP_APPINTENTS_DESTRUCTIVE=true` at codegen time per RFC 0007 §6). Anything that speaks the Intents system — Siri, Shortcuts, Spotlight, the Action Button, Widgets — can call them directly, without opening the app.
 
 This doc is for users wiring AirMCP into those flows. The codegen plumbing lives in [RFC 0007](rfc/0007-app-intent-bridge.md).
 
 ## What's registered
 
-At build time, `scripts/gen-swift-intents.mjs` reads `docs/tool-manifest.json` and emits one `AppIntent` struct per eligible read-only MCP tool (154 of the 282-tool manifest in v2.13). Each intent routes through [`MCPIntentRouter`](../swift/Sources/AirMCPKit/MCPIntentRouter.swift) to whichever host is installed — on macOS that's the `airmcp` npm binary via stdio, on iOS it's the in-process `AirMCPServer`.
+At build time, `scripts/gen-swift-intents.mjs` reads `docs/tool-manifest.json` and emits one `AppIntent` struct per AppIntent-eligible MCP tool (229 of 277 eligible in v2.11; the remaining 5 ineligible tools have composite-object inputs that don't map cleanly to `@Parameter` types). Each intent routes through [`MCPIntentRouter`](../swift/Sources/AirMCPKit/MCPIntentRouter.swift) to whichever host is installed — on macOS that's the `airmcp` npm binary via stdio, on iOS it's the in-process `AirMCPServer`.
 
 ### AppShortcutsProvider (top-10 slots)
 
@@ -23,7 +23,7 @@ Apple caps `AppShortcutsProvider` at 10 entries per app. The curated top-10 (see
 9. Get Current Weather
 10. Summarize Context
 
-The other 144 intents are still discoverable inside the Shortcuts app — just not pinned as Siri-first phrases.
+The other 219 intents are still discoverable inside the Shortcuts app — just not pinned as Siri-first phrases.
 
 ## Siri phrases (out of the box)
 

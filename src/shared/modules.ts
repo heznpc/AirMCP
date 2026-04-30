@@ -38,7 +38,25 @@ export const MODULE_MANIFEST: ReadonlyArray<ModuleManifestEntry> = [
   { name: "mail" },
   { name: "music" },
   { name: "finder" },
-  { name: "safari" },
+  {
+    name: "safari",
+    compatibility: {
+      // Safari module remains stable, but the `add_bookmark` tool
+      // is deprecated on macOS 26+: Apple removed the `make new
+      // bookmark` JXA scripting verb (still works on ≤25). The tool
+      // itself runtime-gates so a degraded surface only shows up on
+      // 26+; the manifest entry surfaces that to discover_tools and
+      // RFC 0004's compatibility report.
+      status: "stable",
+      brokenOn: [26],
+      deprecation: {
+        since: "2.10.0",
+        replacedBy: "add_to_reading_list",
+        reason:
+          "Safari removed bookmark scripting verbs in macOS 26 (rdar://undocumented). Reading List remains scriptable.",
+      },
+    },
+  },
   { name: "system" },
   { name: "photos" },
   { name: "shortcuts", hasPrompts: true },
@@ -56,7 +74,24 @@ export const MODULE_MANIFEST: ReadonlyArray<ModuleManifestEntry> = [
   { name: "ui" },
   { name: "screen" },
   { name: "maps" },
-  { name: "podcasts" },
+  {
+    name: "podcasts",
+    compatibility: {
+      // Apple removed the entire Podcasts JXA scripting dictionary in
+      // macOS 26. All 6 tools fail at runtime; the module is still
+      // registered for ≤25 hosts. RFC 0004 doctor surfaces this so a
+      // user on 26 isn't left guessing why podcasts_* always errors.
+      // Deprecated rather than fully broken because the module
+      // continues to function correctly on supported hosts.
+      status: "deprecated",
+      brokenOn: [26],
+      deprecation: {
+        since: "2.11.0",
+        reason:
+          "Apple removed the Podcasts JXA scripting dictionary entirely in macOS 26. Investigating Shortcuts bridge or Media framework alternatives.",
+      },
+    },
+  },
   { name: "weather" },
   { name: "pages" },
   { name: "numbers" },

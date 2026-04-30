@@ -31,17 +31,32 @@ import { join } from "node:path";
  *   Bucket count is capped (AIRMCP_RATE_LIMIT_TENANT_CAP, default 256)
  *   with LRU eviction to bound memory under abuse (random sub strings).
  *
+ * HTTP request rate limit (per-IP):
+ *   Separate token bucket keyed on remote IP — defends the HTTP
+ *   transport against abuse / IP-rotation flooding before any tool-
+ *   call gate runs. Independent of the per-tenant tool buckets above
+ *   because IP and OAuth subject are different abuse axes (one IP can
+ *   hold many tenants; one tenant can hit from many IPs). Map size is
+ *   capped at AIRMCP_HTTP_RATE_IP_CAP (default 10000) with FIFO
+ *   eviction; a separate prune helper can be called on a timer to
+ *   drop stale buckets.
+ *
  * Env overrides:
  *   AIRMCP_RATE_LIMIT=false                — disable entirely
  *   AIRMCP_MAX_TOOL_CALLS_PER_MINUTE=<n>   — global bucket (default 60)
  *   AIRMCP_MAX_DESTRUCTIVE_PER_HOUR=<n>    — destructive bucket (default 10)
  *   AIRMCP_RATE_LIMIT_TENANT_CAP=<n>       — max tracked tenants (default 256)
+ *   AIRMCP_HTTP_MAX_REQUESTS_PER_MINUTE=<n> — HTTP per-IP cap (default 120)
+ *   AIRMCP_HTTP_RATE_IP_CAP=<n>            — max tracked IPs (default 10000)
  *   AIRMCP_EMERGENCY_STOP_PATH=<path>      — override kill switch file
  */
 
 const DEFAULT_GLOBAL_PER_MINUTE = 60;
 const DEFAULT_DESTRUCTIVE_PER_HOUR = 10;
 const DEFAULT_TENANT_CAP = 256;
+const DEFAULT_HTTP_PER_MINUTE = 120;
+const DEFAULT_HTTP_IP_CAP = 10_000;
+const HTTP_RATE_WINDOW_MS = 60_000;
 
 function parseIntEnv(name: string, fallback: number, min = 1): number {
   const raw = process.env[name];
@@ -55,6 +70,8 @@ export const RATE_LIMIT_ENABLED = process.env.AIRMCP_RATE_LIMIT !== "false";
 export const MAX_GLOBAL_PER_MINUTE = parseIntEnv("AIRMCP_MAX_TOOL_CALLS_PER_MINUTE", DEFAULT_GLOBAL_PER_MINUTE);
 export const MAX_DESTRUCTIVE_PER_HOUR = parseIntEnv("AIRMCP_MAX_DESTRUCTIVE_PER_HOUR", DEFAULT_DESTRUCTIVE_PER_HOUR);
 export const TENANT_CAP = parseIntEnv("AIRMCP_RATE_LIMIT_TENANT_CAP", DEFAULT_TENANT_CAP);
+export const HTTP_MAX_REQUESTS_PER_MINUTE = parseIntEnv("AIRMCP_HTTP_MAX_REQUESTS_PER_MINUTE", DEFAULT_HTTP_PER_MINUTE);
+export const HTTP_IP_CAP = parseIntEnv("AIRMCP_HTTP_RATE_IP_CAP", DEFAULT_HTTP_IP_CAP);
 
 const EMERGENCY_STOP_PATH =
   process.env.AIRMCP_EMERGENCY_STOP_PATH ?? join(homedir(), ".config", "airmcp", "emergency-stop");
@@ -231,6 +248,85 @@ export function _resetRateLimitForTests(): void {
   }
   tenants.clear();
   emergencyProbeCache = null;
+}
+
+// ── HTTP per-IP rate-limit ─────────────────────────────────────────────
+//
+// Lives in this module (instead of next to the Express middleware) so
+// the bucket math + eviction policy stay in one place. The HTTP
+// transport keeps the response-header / 429 plumbing.
+
+/** Per-IP bucket map. FIFO-evicted at HTTP_IP_CAP. Same Bucket shape
+ *  as the per-tenant pair so refillAndTake / canTake apply unchanged. */
+const ipBuckets = new Map<string, Bucket>();
+
+export interface IpRateLimitResult {
+  allowed: boolean;
+  /** Floor of remaining tokens. Useful for `RateLimit-Remaining`. */
+  remaining: number;
+  /** Bucket capacity per minute. Useful for `RateLimit-Limit`. */
+  limit: number;
+  /** Suggested `Retry-After` (seconds) when allowed=false. */
+  retryAfterSeconds?: number;
+}
+
+/** Token-bucket consume for HTTP requests. Returns response-header-
+ *  friendly metadata (limit / remaining / retry-after) plus the
+ *  allow/deny verdict. Disabled by AIRMCP_RATE_LIMIT=false (matches
+ *  tool-call gate so a single switch turns everything off). */
+export function checkIpRateLimit(ip: string): IpRateLimitResult {
+  if (!RATE_LIMIT_ENABLED) {
+    return { allowed: true, remaining: HTTP_MAX_REQUESTS_PER_MINUTE, limit: HTTP_MAX_REQUESTS_PER_MINUTE };
+  }
+  let bucket = ipBuckets.get(ip);
+  if (!bucket) {
+    // Cap eviction: drop the oldest insertion when at capacity.
+    // Map iteration order is insertion-order in V8/JSC; the head
+    // is the oldest IP, which keeps the steady-state cost O(1).
+    if (ipBuckets.size >= HTTP_IP_CAP) {
+      const oldest = ipBuckets.keys().next().value;
+      if (oldest !== undefined) ipBuckets.delete(oldest);
+    }
+    bucket = makeBucket(HTTP_MAX_REQUESTS_PER_MINUTE, HTTP_RATE_WINDOW_MS);
+    ipBuckets.set(ip, bucket);
+  }
+  const allowed = refillAndTake(bucket);
+  if (!allowed) {
+    return {
+      allowed: false,
+      remaining: 0,
+      limit: HTTP_MAX_REQUESTS_PER_MINUTE,
+      retryAfterSeconds: Math.ceil(msUntilNextToken(bucket) / 1000),
+    };
+  }
+  return {
+    allowed: true,
+    remaining: Math.floor(bucket.tokens),
+    limit: HTTP_MAX_REQUESTS_PER_MINUTE,
+  };
+}
+
+/** Drop IP buckets that haven't refilled within 2× the window. The HTTP
+ *  transport calls this on a timer so a long-running server doesn't
+ *  accumulate state from rotating client IPs. Returns the evicted count. */
+export function pruneStaleIpBuckets(): number {
+  const cutoff = Date.now() - HTTP_RATE_WINDOW_MS * 2;
+  let removed = 0;
+  for (const [ip, bucket] of ipBuckets) {
+    if (bucket.lastRefill < cutoff) {
+      ipBuckets.delete(ip);
+      removed++;
+    }
+  }
+  return removed;
+}
+
+/** Test-only: reset IP buckets so each case starts fresh. */
+export function _resetIpRateLimitForTests(): void {
+  if (process.env.NODE_ENV !== "test" && process.env.AIRMCP_TEST_MODE !== "1") {
+    throw new Error("_resetIpRateLimitForTests is only callable in test mode");
+  }
+  ipBuckets.clear();
 }
 
 /** Diagnostics for doctor / audit_summary. Read-only snapshot.

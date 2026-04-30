@@ -12,6 +12,27 @@ import { fileURLToPath } from "node:url";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = join(ROOT, "src");
 
+/**
+ * Canonical module list parsed from `src/shared/config.ts`'s
+ * `MODULE_NAMES` const. Read at script start so the module count stays
+ * aligned with `count-stats.mjs` (which counts the same array). Without
+ * this we used to show "32 modules" — `walkDir` happily groups every
+ * dir under src/ that has a `registerTool` call, including
+ * cross/semantic/audit/server which aren't user-visible "modules" in
+ * the config sense. The strict module list is what registry submissions
+ * + README counts already use.
+ */
+const CANONICAL_MODULE_COUNT = (() => {
+  try {
+    const config = readFileSync(join(SRC, "shared", "config.ts"), "utf-8");
+    const m = config.match(/export const MODULE_NAMES = \[([\s\S]*?)\] as const;/);
+    if (!m) return null;
+    return (m[1].match(/"([^"]+)"/g) || []).length;
+  } catch {
+    return null;
+  }
+})();
+
 // Extract tool registrations from a file
 function extractTools(filePath) {
   const content = readFileSync(filePath, "utf-8");
@@ -58,14 +79,29 @@ const MODULE_NAMES = {
   cross: "Cross-Module", apps: "App Management", shared: "Setup",
 };
 
-// Collect all tools by module
+// Collect all tools by module.
+// Authoritative counts use the same regex `count-stats.mjs` does. The
+// per-module list (built by `extractTools`) uses a stricter regex that
+// requires title + description to be co-located so we can render the
+// detailed per-tool entries in `llms-full.txt`. Drift between the two
+// (a tool whose registration spans the strict regex boundary so only
+// the broad regex catches it) used to push the headline numbers below
+// the canonical count — fixed by deriving totals from the broad pass
+// and treating `extractTools`'s output as a presentation projection.
+const TOOL_REGEX = /server\.registerTool\(/g;
+const PROMPT_REGEX = /server\.prompt\(/g;
 const modules = {};
+let totalTools = 0;
+let totalPrompts = 0;
 function walkDir(dir) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = join(dir, entry.name);
     if (entry.isDirectory()) walkDir(full);
     else if (entry.name.endsWith(".ts")) {
       const modDir = basename(dirname(full));
+      const content = readFileSync(full, "utf-8");
+      totalTools += (content.match(TOOL_REGEX) || []).length;
+      totalPrompts += (content.match(PROMPT_REGEX) || []).length;
       const tools = extractTools(full);
       if (tools.length > 0) {
         const key = modDir === "src" ? "core" : modDir;
@@ -82,20 +118,13 @@ function walkDir(dir) {
   }
 }
 walkDir(SRC);
-
-// Count totals
-let totalTools = 0;
-let totalPrompts = 0;
-for (const mod of Object.values(modules)) {
-  totalTools += mod.tools.length;
-  totalPrompts += mod.prompts.length;
-}
+const moduleCount = CANONICAL_MODULE_COUNT ?? Object.keys(modules).length;
 
 // Generate llms.txt (summary)
 const REPO = "https://github.com/heznpc/AirMCP";
 let llmsTxt = `# AirMCP
 
-> MCP server for the entire Apple ecosystem. ${totalTools} tools across ${Object.keys(modules).length} modules.
+> MCP server for the entire Apple ecosystem. ${totalTools} tools across ${moduleCount} modules.
 
 ## Links
 
@@ -117,7 +146,7 @@ for (const [key, mod] of Object.entries(modules).sort(([a], [b]) => a.localeComp
 // Generate llms-full.txt (complete reference)
 let fullTxt = `# AirMCP — Full Tool Reference
 
-> ${totalTools} tools, ${totalPrompts} prompts across ${Object.keys(modules).length} modules.
+> ${totalTools} tools, ${totalPrompts} prompts across ${moduleCount} modules.
 > Auto-generated from source by scripts/gen-llms-txt.mjs
 
 `;
@@ -163,11 +192,11 @@ if (checkMode) {
     process.exit(1);
   }
   console.log(
-    `[gen-llms --check] OK — ${totalTools} tools / ${totalPrompts} prompts / ${Object.keys(modules).length} modules`,
+    `[gen-llms --check] OK — ${totalTools} tools / ${totalPrompts} prompts / ${moduleCount} modules`,
   );
 } else {
   writeFileSync(llmsPath, llmsTxt);
   writeFileSync(llmsFullPath, fullTxt);
   console.log(`Generated llms.txt (${llmsTxt.length} bytes) and llms-full.txt (${fullTxt.length} bytes)`);
-  console.log(`${totalTools} tools, ${totalPrompts} prompts across ${Object.keys(modules).length} modules`);
+  console.log(`${totalTools} tools, ${totalPrompts} prompts across ${moduleCount} modules`);
 }

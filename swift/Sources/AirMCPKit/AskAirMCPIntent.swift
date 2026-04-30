@@ -47,8 +47,16 @@ public struct AskAirMCPIntent: AppIntent {
     public var instruction: String?
 
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        // Empty / whitespace-only prompts hit `LanguageModelSession.respond(to: "")`
+        // which throws an opaque framework error in current Foundation Models.
+        // Fail fast with a recoverable message so Siri / Shortcuts surface
+        // something the user can act on instead of a generic "intent failed".
+        let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return .result(value: "Please ask a question — I need something to look up.")
+        }
         let bridge = FoundationModelsBridge()
-        let answer = try await bridge.run(prompt: prompt, systemInstruction: instruction)
+        let answer = try await bridge.run(prompt: trimmed, systemInstruction: instruction)
         return .result(value: answer)
     }
 }

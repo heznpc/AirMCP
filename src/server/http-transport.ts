@@ -13,53 +13,17 @@ import { auditLog } from "../shared/audit.js";
 import { SERVER_ICON, WEBSITE_URL } from "../shared/icons.js";
 import { toolRegistry } from "../shared/tool-registry.js";
 import { runWithRequestContext } from "../shared/request-context.js";
+import { checkIpRateLimit, pruneStaleIpBuckets } from "../shared/rate-limit.js";
 import { createServer, type CreateServerOptions } from "./mcp-setup.js";
 import { registerShutdownHook } from "./shutdown.js";
 import { buildServerCard, buildOAuthProtectedResourceCard } from "./well-known-card.js";
 import { verifyBearer, type VerifyResult } from "./oauth-verifier.js";
 
-// ── Per-IP rate limiter (token bucket, no external dependency) ────────
-const RATE_WINDOW_MS = 60_000;
-const RATE_MAX_REQUESTS = 120; // 120 requests/minute per IP
-
-interface RateBucket {
-  tokens: number;
-  lastRefill: number;
-}
-
-const MAX_RATE_BUCKETS = 10_000;
-const rateBuckets = new Map<string, RateBucket>();
-
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now();
-  let bucket = rateBuckets.get(ip);
-  if (!bucket) {
-    // Evict oldest bucket if map is at capacity (prevents unbounded growth from IP rotation)
-    if (rateBuckets.size >= MAX_RATE_BUCKETS) {
-      const oldest = rateBuckets.keys().next().value;
-      if (oldest !== undefined) rateBuckets.delete(oldest);
-    }
-    bucket = { tokens: RATE_MAX_REQUESTS, lastRefill: now };
-    rateBuckets.set(ip, bucket);
-  }
-  // Refill tokens based on elapsed time
-  const elapsed = now - bucket.lastRefill;
-  if (elapsed > 0) {
-    bucket.tokens = Math.min(RATE_MAX_REQUESTS, bucket.tokens + (elapsed / RATE_WINDOW_MS) * RATE_MAX_REQUESTS);
-    bucket.lastRefill = now;
-  }
-  if (bucket.tokens < 1) return false;
-  bucket.tokens--;
-  return true;
-}
-
-// Clean stale rate buckets every window cycle (prevents accumulation from rotating IPs)
-const ratePruneTimer = setInterval(() => {
-  const cutoff = Date.now() - RATE_WINDOW_MS * 2;
-  for (const [ip, bucket] of rateBuckets) {
-    if (bucket.lastRefill < cutoff) rateBuckets.delete(ip);
-  }
-}, RATE_WINDOW_MS);
+// Per-IP rate limiting now lives in src/shared/rate-limit.ts so the
+// bucket math is shared with the per-tenant tool-call gate. Prune
+// stale buckets once per window so a long-running server doesn't
+// accumulate state from rotating client IPs.
+const ratePruneTimer = setInterval(() => pruneStaleIpBuckets(), 60_000);
 if (ratePruneTimer.unref) ratePruneTimer.unref();
 
 // Compiled once — used in Origin validation middleware
@@ -292,21 +256,19 @@ export async function startHttpServer(options: HttpServerOptions): Promise<void>
     next();
   });
 
-  // Per-IP rate limiting — 120 requests/minute (with standard RateLimit headers)
+  // Per-IP rate limiting (default 120 req/min) with standard RateLimit headers.
+  // Both the bucket math and the IP eviction policy live in the shared
+  // rate-limit module — this middleware only owns the response shape.
   app.use((req, res, next) => {
     if (req.path === "/health") return next();
     const ip = req.ip ?? req.socket.remoteAddress ?? "unknown";
-    if (!checkRateLimit(ip)) {
-      res.set("RateLimit-Limit", String(RATE_MAX_REQUESTS));
-      res.set("RateLimit-Remaining", "0");
-      res.set("Retry-After", "60");
+    const verdict = checkIpRateLimit(ip);
+    res.set("RateLimit-Limit", String(verdict.limit));
+    res.set("RateLimit-Remaining", String(verdict.remaining));
+    if (!verdict.allowed) {
+      res.set("Retry-After", String(verdict.retryAfterSeconds ?? 60));
       res.status(429).json({ error: "Too many requests. Try again later." });
       return;
-    }
-    const bucket = rateBuckets.get(ip);
-    if (bucket) {
-      res.set("RateLimit-Limit", String(RATE_MAX_REQUESTS));
-      res.set("RateLimit-Remaining", String(Math.floor(bucket.tokens)));
     }
     next();
   });

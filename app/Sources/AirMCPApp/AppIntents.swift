@@ -129,76 +129,26 @@ struct HealthSummaryIntent: AppIntent {
 #endif
 
 // MARK: - App Shortcuts (Siri trigger phrases)
-
-struct AirMCPShortcuts: AppShortcutsProvider {
-    static var appShortcuts: [AppShortcut] {
-        AppShortcut(
-            intent: DailyBriefingIntent(),
-            phrases: [
-                "Daily briefing in \(.applicationName)",
-                "What's on my schedule in \(.applicationName)",
-            ],
-            shortTitle: "Daily Briefing",
-            systemImageName: "calendar.badge.clock"
-        )
-        AppShortcut(
-            intent: SearchNotesIntent(),
-            phrases: [
-                "Search notes in \(.applicationName)",
-                "Find in my notes with \(.applicationName)",
-            ],
-            shortTitle: "Search Notes",
-            systemImageName: "magnifyingglass"
-        )
-        AppShortcut(
-            intent: CheckCalendarIntent(),
-            phrases: [
-                "Check my calendar in \(.applicationName)",
-                "Today's events in \(.applicationName)",
-            ],
-            shortTitle: "Today's Events",
-            systemImageName: "calendar"
-        )
-        AppShortcut(
-            intent: SearchContactsIntent(),
-            phrases: [
-                "Search contacts in \(.applicationName)",
-                "Find a contact in \(.applicationName)",
-            ],
-            shortTitle: "Search Contacts",
-            systemImageName: "person.crop.circle"
-        )
-        AppShortcut(
-            intent: DueRemindersIntent(),
-            phrases: [
-                "Show overdue reminders in \(.applicationName)",
-                "What reminders are past due in \(.applicationName)",
-            ],
-            shortTitle: "Overdue Reminders",
-            systemImageName: "exclamationmark.circle"
-        )
-        AppShortcut(
-            intent: ListCalendarsIntent(),
-            phrases: [
-                "List my calendars in \(.applicationName)",
-                "Show all calendars in \(.applicationName)",
-            ],
-            shortTitle: "List Calendars",
-            systemImageName: "calendar.badge.plus"
-        )
-        #if canImport(HealthKit)
-        AppShortcut(
-            intent: HealthSummaryIntent(),
-            phrases: [
-                "Health summary in \(.applicationName)",
-                "How's my health today in \(.applicationName)",
-            ],
-            shortTitle: "Health Summary",
-            systemImageName: "heart.text.square"
-        )
-        #endif
-    }
-}
+//
+// AirMCP's `AppShortcutsProvider` is `AirMCPGeneratedShortcuts` in
+// `swift/Sources/AirMCPKit/Generated/MCPIntents.swift` — auto-generated
+// from the tool manifest with 1 + 9 entries (AskAirMCPIntent + 9 top tools)
+// pinned per Apple's 10-entry app cap.
+//
+// Apple constrains an app target to a single `AppShortcutsProvider`
+// conformance. The hand-written `AirMCPShortcuts` that previously lived
+// here pre-dated the codegen and conflicted with the generated one;
+// keeping both produced an ambiguity at build time and a runtime tie
+// that Apple resolves arbitrarily.
+//
+// The hand-written-only intents (`DailyBriefingIntent`,
+// `HealthSummaryIntent`) stay defined as standalone `AppIntent` types
+// above — they remain invocable from the Shortcuts app, Spotlight, and
+// Action Button. They just aren't pinned as Siri-first phrases. A future
+// codegen `APP_SHORTCUTS_TOP` entry can re-pin them by adding their tool
+// names to `scripts/gen-swift-intents.mjs` once the corresponding tools
+// (`daily_briefing`, `health_summary`) are first-party tool manifest
+// entries.
 
 // MARK: - MCPIntentRouter wiring (RFC 0007 Phase A.2a)
 

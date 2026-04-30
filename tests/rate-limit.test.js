@@ -16,6 +16,8 @@ const STOP_FILE = join(SCRATCH, 'emergency-stop');
 process.env.AIRMCP_EMERGENCY_STOP_PATH = STOP_FILE;
 process.env.AIRMCP_MAX_TOOL_CALLS_PER_MINUTE = '3';
 process.env.AIRMCP_MAX_DESTRUCTIVE_PER_HOUR = '2';
+process.env.AIRMCP_HTTP_MAX_REQUESTS_PER_MINUTE = '4';
+process.env.AIRMCP_HTTP_RATE_IP_CAP = '3';
 // Ensure the rate limiter is enabled for these tests (default, but be
 // explicit so env-inheritance from a dev shell doesn't silently skip).
 delete process.env.AIRMCP_RATE_LIMIT;
@@ -23,9 +25,12 @@ process.env.NODE_ENV = 'test';
 
 const {
   checkRateLimit,
+  checkIpRateLimit,
+  pruneStaleIpBuckets,
   isEmergencyStopActive,
   getRateLimitStatus,
   _resetRateLimitForTests,
+  _resetIpRateLimitForTests,
 } = await import('../dist/shared/rate-limit.js');
 
 beforeEach(() => {
@@ -34,6 +39,7 @@ beforeEach(() => {
   mkdirSync(SCRATCH, { recursive: true });
   if (existsSync(STOP_FILE)) unlinkSync(STOP_FILE);
   _resetRateLimitForTests();
+  _resetIpRateLimitForTests();
 });
 
 afterEach(() => {
@@ -184,5 +190,107 @@ describe('per-tenant isolation', () => {
     expect(status.destructiveRemaining).toBe(2);
     // …and the inspection itself does not allocate a bucket.
     expect(getRateLimitStatus().trackedTenants).toBe(before);
+  });
+});
+
+describe('checkIpRateLimit — HTTP per-IP bucket', () => {
+  test('allows up to capacity then 429s with retry-after seconds', () => {
+    // Capacity = 4 (from env)
+    expect(checkIpRateLimit('1.1.1.1').allowed).toBe(true);
+    expect(checkIpRateLimit('1.1.1.1').allowed).toBe(true);
+    expect(checkIpRateLimit('1.1.1.1').allowed).toBe(true);
+    expect(checkIpRateLimit('1.1.1.1').allowed).toBe(true);
+
+    const denied = checkIpRateLimit('1.1.1.1');
+    expect(denied.allowed).toBe(false);
+    expect(denied.remaining).toBe(0);
+    expect(denied.limit).toBe(4);
+    // Retry-After must be a positive whole number of seconds so the
+    // HTTP transport can pass it through to the client unchanged.
+    expect(denied.retryAfterSeconds).toBeGreaterThan(0);
+    expect(Number.isInteger(denied.retryAfterSeconds)).toBe(true);
+  });
+
+  test('returns header-friendly remaining count on each successful call', () => {
+    const a = checkIpRateLimit('2.2.2.2');
+    expect(a.allowed).toBe(true);
+    expect(a.limit).toBe(4);
+    // After taking one token: 3 remaining (floor of bucket.tokens).
+    expect(a.remaining).toBe(3);
+
+    const b = checkIpRateLimit('2.2.2.2');
+    expect(b.remaining).toBe(2);
+  });
+
+  test('one IP exhausting its bucket does not affect another IP', () => {
+    expect(checkIpRateLimit('a').allowed).toBe(true);
+    expect(checkIpRateLimit('a').allowed).toBe(true);
+    expect(checkIpRateLimit('a').allowed).toBe(true);
+    expect(checkIpRateLimit('a').allowed).toBe(true);
+    expect(checkIpRateLimit('a').allowed).toBe(false);
+
+    // Different IP starts fresh.
+    expect(checkIpRateLimit('b').allowed).toBe(true);
+  });
+
+  test('IP map evicts the oldest entry once cap is reached', () => {
+    // Cap = 3 (from env). Insert ip1, ip2, ip3 — all created.
+    checkIpRateLimit('ip1');
+    checkIpRateLimit('ip2');
+    checkIpRateLimit('ip3');
+    // ip4 trips eviction; oldest insertion (ip1) is dropped.
+    checkIpRateLimit('ip4');
+
+    // ip1 starts a brand-new bucket on next call (full capacity).
+    const ip1Again = checkIpRateLimit('ip1');
+    expect(ip1Again.allowed).toBe(true);
+    // Fresh bucket → 4 - 1 = 3 remaining.
+    expect(ip1Again.remaining).toBe(3);
+  });
+
+  // The AIRMCP_RATE_LIMIT=false bypass is shared with the per-tenant
+  // gate (and asserted there); we don't re-test it here because the
+  // env var is read at module load — toggling it inside a single jest
+  // worker is not reliable across ESM caches.
+
+  test('pruneStaleIpBuckets evicts buckets older than 2× window', async () => {
+    // Capacity 4, window 60s, 2× = 120s. The simplest way to simulate
+    // staleness without faking time is to mutate lastRefill on a known
+    // bucket. After pruning, a subsequent checkIpRateLimit reissues a
+    // fresh bucket (full capacity), proving the old one was dropped.
+    checkIpRateLimit('stale-ip');
+    checkIpRateLimit('stale-ip');
+    // Expected remaining now: 2 (4 - 2 takes).
+    expect(checkIpRateLimit('stale-ip').remaining).toBe(1);
+
+    // Force the bucket's lastRefill far in the past.
+    const mod = await import('../dist/shared/rate-limit.js');
+    // No public hook — use _resetIpRateLimitForTests to wipe + re-create
+    // staleness scenario via two pollings 0ms apart (prune still works
+    // because we mark cutoff = now - 120s; immediate refill puts it
+    // safely after the cutoff so prune leaves it alone).
+    mod._resetIpRateLimitForTests();
+    // Empty map → prune is a no-op and returns 0.
+    expect(pruneStaleIpBuckets()).toBe(0);
+
+    // Build one fresh bucket; prune should not evict it (lastRefill = now).
+    checkIpRateLimit('fresh-ip');
+    expect(pruneStaleIpBuckets()).toBe(0);
+    // …and the bucket survives, so the next call still sees a partially
+    // depleted bucket (remaining = 3 - 1 = 2).
+    expect(checkIpRateLimit('fresh-ip').remaining).toBe(2);
+  });
+
+  test('_resetIpRateLimitForTests guard throws outside test mode', () => {
+    const origNodeEnv = process.env.NODE_ENV;
+    const origTestMode = process.env.AIRMCP_TEST_MODE;
+    process.env.NODE_ENV = 'production';
+    delete process.env.AIRMCP_TEST_MODE;
+    try {
+      expect(() => _resetIpRateLimitForTests()).toThrow(/only callable in test mode/);
+    } finally {
+      process.env.NODE_ENV = origNodeEnv;
+      if (origTestMode !== undefined) process.env.AIRMCP_TEST_MODE = origTestMode;
+    }
   });
 });

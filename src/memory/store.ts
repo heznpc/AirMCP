@@ -19,7 +19,7 @@
  */
 
 import { readFile, writeFile, mkdir, rename } from "node:fs/promises";
-import { dirname, basename } from "node:path";
+import { dirname } from "node:path";
 import { randomBytes } from "node:crypto";
 import { PATHS } from "../shared/constants.js";
 
@@ -184,9 +184,6 @@ export class MemoryStore {
       } catch {
         // ignore — temp may not have been created at all
       }
-      // Anchor the failure to a recognizable basename so stack traces
-      // identify the partial-write site even after rename strips it.
-      void basename;
       throw err;
     }
     this.cache = data;

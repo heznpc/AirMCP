@@ -1,4 +1,5 @@
 import type { AirMCPEventType } from "./event-bus.js";
+import { assertTestMode } from "./errors.js";
 
 /**
  * Node-side poller registry. Feature modules (mail, music, …) import
@@ -123,12 +124,9 @@ export function createPollerLogger(name: string): (e: unknown) => void {
   };
 }
 
-/** Test-only: clear all registered pollers. Refuses to run outside test mode
- *  so production callers cannot wipe the registry. */
+/** Test-only: clear all registered pollers. */
 export function _resetPollerRegistryForTests(): void {
-  if (process.env.NODE_ENV !== "test" && process.env.AIRMCP_TEST_MODE !== "1") {
-    throw new Error("_resetPollerRegistryForTests is only callable in test mode");
-  }
+  assertTestMode("_resetPollerRegistryForTests");
   for (const p of pollers.values()) {
     if (p.timer) clearInterval(p.timer);
   }

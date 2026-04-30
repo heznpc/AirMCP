@@ -2,7 +2,7 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { PATHS } from "./constants.js";
-import { formatError } from "./errors.js";
+import { assertTestMode, formatError } from "./errors.js";
 
 interface UsageProfile {
   version: number;
@@ -141,14 +141,11 @@ class UsageTracker {
   }
 
   /** Test-only: wipe in-memory state so each case starts from a clean
-   *  singleton. Mirrors the rate-limit reset hook; guarded to prevent
-   *  production misuse. Disk file is not touched — point
+   *  singleton. Disk file is not touched — point
    *  AIRMCP_USAGE_PROFILE_PATH at a tmp file before importing this
    *  module to keep tests off the user's real profile. */
   _resetForTests(): void {
-    if (process.env.NODE_ENV !== "test" && process.env.AIRMCP_TEST_MODE !== "1") {
-      throw new Error("_resetForTests is only callable in test mode");
-    }
+    assertTestMode("UsageTracker._resetForTests");
     this.lastTool = null;
     this.profile = null;
     this.dirty = false;

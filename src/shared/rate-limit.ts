@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { assertTestMode } from "./errors.js";
 
 /**
  * Agent-safety rate limit + emergency kill switch.
@@ -241,11 +242,9 @@ export function isEmergencyStopActive(): boolean {
 }
 
 /** Test-only: wipe bucket state and the emergency probe cache so each
- *  case starts fresh. Guarded via NODE_ENV to prevent production misuse. */
+ *  case starts fresh. */
 export function _resetRateLimitForTests(): void {
-  if (process.env.NODE_ENV !== "test" && process.env.AIRMCP_TEST_MODE !== "1") {
-    throw new Error("_resetRateLimitForTests is only callable in test mode");
-  }
+  assertTestMode("_resetRateLimitForTests");
   tenants.clear();
   emergencyProbeCache = null;
 }
@@ -323,10 +322,19 @@ export function pruneStaleIpBuckets(): number {
 
 /** Test-only: reset IP buckets so each case starts fresh. */
 export function _resetIpRateLimitForTests(): void {
-  if (process.env.NODE_ENV !== "test" && process.env.AIRMCP_TEST_MODE !== "1") {
-    throw new Error("_resetIpRateLimitForTests is only callable in test mode");
-  }
+  assertTestMode("_resetIpRateLimitForTests");
   ipBuckets.clear();
+}
+
+/** Test-only: rewind an IP bucket's `lastRefill` so the next prune call
+ *  treats it as stale. Lets pruneStaleIpBuckets be exercised end-to-end
+ *  without faking the system clock. Throws if the IP isn't already
+ *  tracked — caller must check it via checkIpRateLimit first. */
+export function _forceIpBucketStaleForTests(ip: string, lastRefillMs: number): void {
+  assertTestMode("_forceIpBucketStaleForTests");
+  const bucket = ipBuckets.get(ip);
+  if (!bucket) throw new Error(`_forceIpBucketStaleForTests: no bucket for ${ip}`);
+  bucket.lastRefill = lastRefillMs;
 }
 
 /** Diagnostics for doctor / audit_summary. Read-only snapshot.

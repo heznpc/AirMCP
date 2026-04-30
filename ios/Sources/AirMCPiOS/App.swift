@@ -53,7 +53,12 @@ final class ServerManager {
             return try await mcp.callToolText(name: tool, args: args)
         }
 
-        let server = MCPHTTPServer(mcp: mcp, port: 3847)
+        // `MCPHTTPServer.make(...)` is the persistence-aware factory: it
+        // looks up the Bearer token in Keychain and only generates a new
+        // one on first launch. Synchronous `MCPHTTPServer.init(token:)`
+        // is reserved for tests / explicit-pairing flows where the
+        // caller already has a token in hand.
+        let server = await MCPHTTPServer.make(mcp: mcp, port: 3847)
         token = await server.authToken
 
         isRunning = true

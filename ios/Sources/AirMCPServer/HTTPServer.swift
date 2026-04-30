@@ -10,16 +10,35 @@ public actor MCPHTTPServer {
     private let port: Int
     private let token: String
 
+    /// Synchronous init — caller supplies the token explicitly. Use this
+    /// from tests or when an external pairing flow has already produced
+    /// a token. For default-app boot, prefer the async `make(...)`
+    /// factory which loads / generates the token from the Keychain.
     public init(
         mcp: MCPServer,
         host: String = "127.0.0.1",
         port: Int = 3847,
-        token: String? = nil
+        token: String
     ) {
         self.mcp = mcp
         self.host = host
         self.port = port
-        self.token = token ?? Self.generateToken()
+        self.token = token
+    }
+
+    /// Async factory — reads the persisted Bearer token from
+    /// `KeychainTokenStore` (or generates + persists a fresh one on
+    /// first boot). Survives reboots and app updates so a paired
+    /// Windows / macOS MCP client doesn't need to re-pair after every
+    /// process start. See `KeychainTokenStore` for the threat model.
+    public static func make(
+        mcp: MCPServer,
+        host: String = "127.0.0.1",
+        port: Int = 3847,
+        tokenStore: KeychainTokenStore = .shared
+    ) async -> MCPHTTPServer {
+        let token = await tokenStore.tokenOrGenerate()
+        return MCPHTTPServer(mcp: mcp, host: host, port: port, token: token)
     }
 
     public var authToken: String { token }
@@ -130,8 +149,6 @@ public actor MCPHTTPServer {
         )
     }
 
-    private static func generateToken() -> String {
-        let bytes = (0..<24).map { _ in UInt8.random(in: 0...255) }
-        return Data(bytes).base64EncodedString()
-    }
+    // Token generation lives in `KeychainTokenStore.generate()` now
+    // so the persistence layer owns the bytes that become persistent.
 }

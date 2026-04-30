@@ -113,10 +113,14 @@ describe('emergency stop file', () => {
 
 describe('getRateLimitStatus', () => {
   test('reports remaining tokens + emergency state', () => {
+    // Fresh default-tenant bucket has not been touched yet — both
+    // counters should report the configured capacity exactly. (The
+    // earlier `>= 0` assertion was tautologically true because both
+    // counters are non-negative integers.)
     const status = getRateLimitStatus();
     expect(status.enabled).toBe(true);
-    expect(status.globalRemaining).toBeGreaterThanOrEqual(0);
-    expect(status.destructiveRemaining).toBeGreaterThanOrEqual(0);
+    expect(status.globalRemaining).toBe(3); // AIRMCP_MAX_TOOL_CALLS_PER_MINUTE
+    expect(status.destructiveRemaining).toBe(2); // AIRMCP_MAX_DESTRUCTIVE_PER_HOUR
     expect(status.emergencyStop).toBe(false);
     expect(status.emergencyStopPath).toBe(STOP_FILE);
   });

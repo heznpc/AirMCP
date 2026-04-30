@@ -2,7 +2,7 @@ import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okLinkedStructured, okStructured, okUntrustedStructured, toolError } from "../shared/result.js";
+import { ok, okLinkedStructured, okStructured, okUntrustedStructured, errJxa } from "../shared/result.js";
 import { zFilePath, resolveAndGuard } from "../shared/validate.js";
 import {
   searchFilesScript,
@@ -47,7 +47,8 @@ export function registerFinderTools(server: McpServer, _config: AirMcpConfig): v
       try {
         return okLinkedStructured("search_files", await runJxa(searchFilesScript(folder, query, limit)));
       } catch (e) {
-        return toolError("search files", e);
+        const msg = e instanceof Error ? e.message : String(e);
+        return errJxa(`Failed to search files: ${msg}`);
       }
     },
   );
@@ -75,7 +76,8 @@ export function registerFinderTools(server: McpServer, _config: AirMcpConfig): v
       try {
         return okUntrustedStructured(await runJxa(getFileInfoScript(path)));
       } catch (e) {
-        return toolError("get file info", e);
+        const msg = e instanceof Error ? e.message : String(e);
+        return errJxa(`Failed to get file info: ${msg}`);
       }
     },
   );
@@ -95,7 +97,8 @@ export function registerFinderTools(server: McpServer, _config: AirMcpConfig): v
       try {
         return ok(await runJxa(setTagsScript(path, tags)));
       } catch (e) {
-        return toolError("set tags", e);
+        const msg = e instanceof Error ? e.message : String(e);
+        return errJxa(`Failed to set tags: ${msg}`);
       }
     },
   );
@@ -125,7 +128,8 @@ export function registerFinderTools(server: McpServer, _config: AirMcpConfig): v
       try {
         return okStructured(await runJxa(recentFilesScript(folder, days, limit)));
       } catch (e) {
-        return toolError("find recent files", e);
+        const msg = e instanceof Error ? e.message : String(e);
+        return errJxa(`Failed to find recent files: ${msg}`);
       }
     },
   );
@@ -157,7 +161,8 @@ export function registerFinderTools(server: McpServer, _config: AirMcpConfig): v
       try {
         return okUntrustedStructured(await runJxa(listDirectoryScript(path, limit)));
       } catch (e) {
-        return toolError("list directory", e);
+        const msg = e instanceof Error ? e.message : String(e);
+        return errJxa(`Failed to list directory: ${msg}`);
       }
     },
   );
@@ -179,7 +184,8 @@ export function registerFinderTools(server: McpServer, _config: AirMcpConfig): v
         resolveAndGuard(destination);
         return ok(await runJxa(moveFileScript(source, destination)));
       } catch (e) {
-        return toolError("move file", e);
+        const msg = e instanceof Error ? e.message : String(e);
+        return errJxa(`Failed to move file: ${msg}`);
       }
     },
   );
@@ -199,7 +205,8 @@ export function registerFinderTools(server: McpServer, _config: AirMcpConfig): v
         resolveAndGuard(path);
         return ok(await runJxa(trashFileScript(path)));
       } catch (e) {
-        return toolError("trash file", e);
+        const msg = e instanceof Error ? e.message : String(e);
+        return errJxa(`Failed to trash file: ${msg}`);
       }
     },
   );
@@ -219,7 +226,8 @@ export function registerFinderTools(server: McpServer, _config: AirMcpConfig): v
         resolveAndGuard(path);
         return ok(await runJxa(createFolderScript(path)));
       } catch (e) {
-        return toolError("create folder", e);
+        const msg = e instanceof Error ? e.message : String(e);
+        return errJxa(`Failed to create folder: ${msg}`);
       }
     },
   );

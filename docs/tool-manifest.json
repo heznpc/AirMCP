@@ -626,7 +626,7 @@
     {
       "name": "bulk_move_notes",
       "title": "Bulk Move Notes",
-      "description": "Move multiple notes to a target folder at once. Same limitations as move_note apply to each note (new ID, date reset, attachments lost). Returns per-note success/failure results.",
+      "description": "Move multiple notes to a target folder at once. Same limitations as move_note apply to each successful move (new ID, body-only copy — Notes JXA cannot preserve creationDate/modificationDate or attachments on the copy). Use `dryRun: true` to preview which notes would move + what meta would be lost without making any change. Default `stopOnError: true` halts on the first failure to keep the source/target in a recoverable mid-state — pass `false` for best-effort partial completion. Returns per-note results plus aggregate counts.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -644,6 +644,16 @@
             "type": "string",
             "maxLength": 500,
             "description": "Target folder name"
+          },
+          "dryRun": {
+            "type": "boolean",
+            "default": false,
+            "description": "Preview only — list what would move + meta that would be lost. No notes modified."
+          },
+          "stopOnError": {
+            "type": "boolean",
+            "default": true,
+            "description": "Halt on first failure (default true) so the move stays at a recoverable mid-state. Set false for best-effort partial completion."
           }
         },
         "required": [

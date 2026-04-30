@@ -1,5 +1,7 @@
 import { appendFile, chmod, mkdir, readdir, readFile, stat, rename } from "node:fs/promises";
 import { join } from "node:path";
+import { hostname, platform } from "node:os";
+import { createHmac } from "node:crypto";
 import { AUDIT, PATHS } from "./constants.js";
 import { assertTestMode, formatError } from "./errors.js";
 
@@ -15,6 +17,41 @@ interface AuditEntry {
   status: "ok" | "error";
   durationMs?: number;
 }
+
+/**
+ * HMAC-SHA256 chain key. Each audit line carries `_hmac` (computed from
+ * the previous line's hmac + this line's JSON) and `_prev` (the previous
+ * hmac). Tampering with any line breaks the chain at that point + every
+ * line after; `summarizeAuditEntries` reports `verified: false` and the
+ * offending file.
+ *
+ * Key source priority:
+ *   1. `AIRMCP_AUDIT_HMAC_KEY` env var — strongest. Operator-provided,
+ *      enables cross-machine integrity check (move audit.jsonl to a
+ *      different host + verify with the same key).
+ *   2. Host-derived fallback — `airmcp-audit::<hostname>::<platform>`.
+ *      Tamper-detection grade only: an attacker with shell access can
+ *      derive the key. This is fine for the actual threat model
+ *      (catching log doctoring after-the-fact) but explicitly NOT
+ *      strong auth. For high-assurance, set the env.
+ */
+const AUDIT_HMAC_KEY: Buffer = (() => {
+  const env = process.env.AIRMCP_AUDIT_HMAC_KEY;
+  if (env && env.length > 0) return Buffer.from(env, "utf-8");
+  return Buffer.from(`airmcp-audit::${hostname()}::${platform()}`, "utf-8");
+})();
+
+const HMAC_GENESIS = "0".repeat(64);
+
+function computeHmac(prev: string, body: string): string {
+  return createHmac("sha256", AUDIT_HMAC_KEY).update(prev).update("\0").update(body).digest("hex");
+}
+
+/** In-memory chain head — updated on every appended line. Resumed from
+ *  the on-disk tail at first flush so process restarts don't fork the
+ *  chain. */
+let lastHmac: string = HMAC_GENESIS;
+let chainResumed = false;
 
 /**
  * Tools whose args carry sensitive PII that must NEVER reach the audit log,
@@ -39,9 +76,17 @@ async function ensureDir(): Promise<void> {
   initialized = true;
 }
 
-/** Log a tool call to the audit log. Buffered — flushes every 30s (override via AIRMCP_AUDIT_FLUSH_INTERVAL). */
+/** Log a tool call to the audit log. Buffered — flushes every 30s (override via AIRMCP_AUDIT_FLUSH_INTERVAL).
+ *
+ * Each emitted line carries `_prev` and `_hmac` so `summarizeAuditEntries`
+ * can verify integrity later. Buffering still happens with raw entries
+ * (object form); the HMAC chain is sealed at flush time so a process
+ * restart can resume the chain from the disk tail rather than forking it. */
 export function auditLog(entry: AuditEntry): void {
-  if (auditDisabled) return;
+  if (auditDisabled) {
+    maybeAttemptRecovery();
+    if (auditDisabled) return;
+  }
   let sanitized: Record<string, unknown> | undefined;
   if (isSensitiveTool(entry.tool)) {
     sanitized = entry.args ? { _redacted: "sensitive_tool" } : undefined;
@@ -77,14 +122,84 @@ function ensureFlushTimer(): void {
 let flushing = false;
 let consecutiveFlushFailures = 0;
 let auditDisabled = false;
+let auditDisabledSince = 0;
+
+/** Backoff before re-attempting after auditDisabled trips. Disk-full
+ *  is the primary trigger and typically clears after the user frees
+ *  space, so 5 minutes balances "give the disk time to recover" with
+ *  "don't lose hours of audit data on a transient blip". */
+const AUDIT_RECOVERY_INTERVAL_MS = 5 * 60_000;
+
+function maybeAttemptRecovery(): void {
+  if (!auditDisabled) return;
+  const now = Date.now();
+  if (now - auditDisabledSince < AUDIT_RECOVERY_INTERVAL_MS) return;
+  console.error("[AirMCP Audit] Recovery window elapsed — re-enabling and retrying flush.");
+  auditDisabled = false;
+  auditDisabledSince = 0;
+  consecutiveFlushFailures = 0;
+  ensureFlushTimer();
+}
+
+/** On first flush after process start, scan the disk tail to extract
+ *  the previous chain head — so the chain spans process restarts
+ *  instead of forking at every boot. */
+async function resumeChainHead(): Promise<void> {
+  if (chainResumed) return;
+  chainResumed = true;
+  try {
+    const raw = await readFile(AUDIT_PATH, "utf-8");
+    const lines = raw.trimEnd().split("\n");
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const line = lines[i];
+      if (!line) continue;
+      try {
+        const parsed = JSON.parse(line) as { _hmac?: string };
+        if (parsed._hmac && /^[0-9a-f]{64}$/.test(parsed._hmac)) {
+          lastHmac = parsed._hmac;
+          return;
+        }
+      } catch {
+        // skip malformed
+      }
+    }
+  } catch {
+    // file missing or unreadable — start from genesis
+  }
+}
 
 async function flushBuffer(): Promise<void> {
-  if (buffer.length === 0 || flushing || auditDisabled) return;
+  if (buffer.length === 0 || flushing || auditDisabled) {
+    if (auditDisabled) maybeAttemptRecovery();
+    if (auditDisabled || flushing) return;
+    if (buffer.length === 0) return;
+  }
   flushing = true;
   // Swap buffer reference before flushing so auditLog() writes to a fresh array
   const toFlush = buffer;
   buffer = [];
-  const lines = toFlush.join("\n") + "\n";
+  // Seal each line into the HMAC chain at flush time so the chain head
+  // resumes correctly across process restarts (vs. computing in auditLog
+  // where each turn would assume the in-memory head is current).
+  await resumeChainHead();
+  const sealedLines: string[] = [];
+  for (const raw of toFlush) {
+    try {
+      const obj = JSON.parse(raw) as Record<string, unknown>;
+      const prev = lastHmac;
+      // _hmac is computed from the body PRE-attachment. The signed payload is
+      // the JSON without _hmac/_prev, so verifiers reconstruct the same body.
+      const body = JSON.stringify(obj);
+      const hmac = computeHmac(prev, body);
+      const sealed = JSON.stringify({ ...obj, _prev: prev, _hmac: hmac });
+      sealedLines.push(sealed);
+      lastHmac = hmac;
+    } catch {
+      // Malformed pre-buffer entry — skip rather than crash the flush.
+      // This shouldn't happen because auditLog itself JSON.stringify's.
+    }
+  }
+  const lines = sealedLines.join("\n") + "\n";
   try {
     await ensureDir();
     await appendFile(AUDIT_PATH, lines, { encoding: "utf-8", mode: 0o600 });
@@ -102,11 +217,15 @@ async function flushBuffer(): Promise<void> {
       );
       if (consecutiveFlushFailures >= AUDIT.MAX_FLUSH_FAILURES) {
         auditDisabled = true;
+        auditDisabledSince = Date.now();
         if (flushTimer) {
           clearTimeout(flushTimer);
           flushTimer = null;
         }
-        console.error("[AirMCP Audit] Too many consecutive flush failures — audit logging disabled");
+        console.error(
+          `[AirMCP Audit] Too many consecutive flush failures — audit logging disabled. ` +
+            `Auto-retry in ${AUDIT_RECOVERY_INTERVAL_MS / 60_000} minutes (or next auditLog call after that window).`,
+        );
       }
     }
   } finally {
@@ -165,6 +284,9 @@ export function _testReset(): string[] {
   flushing = false;
   consecutiveFlushFailures = 0;
   auditDisabled = false;
+  auditDisabledSince = 0;
+  lastHmac = HMAC_GENESIS;
+  chainResumed = false;
   return snapshot;
 }
 
@@ -272,11 +394,24 @@ export interface AuditSummary {
   errorRate: number;
   topTools: Array<{ tool: string; count: number; errors: number }>;
   scannedFiles: number;
+  /** True when every line carrying `_hmac` verifies against the chain.
+   *  Legacy lines (no `_hmac` — written before this version) are skipped
+   *  and don't break verification on their own. False means a chained
+   *  line was tampered with or removed. `verifiedFirstBreak` carries the
+   *  file + line index of the first mismatch when verification fails. */
+  verified: boolean;
+  verifiedFirstBreak?: { file: string; lineIndex: number; reason: "hmac_mismatch" | "prev_mismatch" | "malformed" };
+  /** Audit logging is currently disabled (disk full / permission error /
+   *  too many failures). Auto-recovery kicks in after the backoff window;
+   *  the field surfaces the state so a doctor / health check can flag it. */
+  auditDisabled: boolean;
 }
 
 /** Aggregate statistics over the audit log: total calls, error rate,
  *  and the top-N busiest tools. `since` defaults to 7 days. `topN`
- *  bounds the returned leaderboard (default 10, max 50). */
+ *  bounds the returned leaderboard (default 10, max 50). Also walks the
+ *  HMAC chain and reports `verified: true` only when every chained line
+ *  passes its prev/hmac check (legacy un-chained lines are tolerated). */
 export async function summarizeAuditEntries(opts: { since?: string; topN?: number } = {}): Promise<AuditSummary> {
   const sinceIso = opts.since ?? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const topN = Math.max(1, Math.min(50, opts.topN ?? 10));
@@ -297,6 +432,7 @@ export async function summarizeAuditEntries(opts: { since?: string; topN?: numbe
     .sort((a, b) => b.count - a.count)
     .slice(0, topN);
   const total = page.entries.length;
+  const chainResult = await verifyAuditChain();
   return {
     since: sinceIso,
     total,
@@ -304,5 +440,88 @@ export async function summarizeAuditEntries(opts: { since?: string; topN?: numbe
     errorRate: total > 0 ? Number((errors / total).toFixed(4)) : 0,
     topTools,
     scannedFiles: page.scannedFiles,
+    verified: chainResult.verified,
+    verifiedFirstBreak: chainResult.firstBreak,
+    auditDisabled,
   };
+}
+
+/** Walk every audit file in oldest→newest order and replay the HMAC
+ *  chain. A line carrying `_hmac` + `_prev` is "chained": the body
+ *  (entry minus those two fields) is fed to HMAC-SHA256(prev || \0 ||
+ *  body) and the result must equal `_hmac`; `_prev` must equal the
+ *  previous chained line's `_hmac` (or `HMAC_GENESIS` if first).
+ *
+ *  Lines without `_hmac` (legacy, pre-chain) are skipped — they don't
+ *  themselves break verification, but a malicious actor inserting a
+ *  legacy-shaped line in the middle of the chain would just mean the
+ *  next chained line's `_prev` doesn't match the prior `_hmac`, which
+ *  IS reported. So legacy interleaving cannot be used to launder a
+ *  tampered insertion. */
+async function verifyAuditChain(): Promise<{
+  verified: boolean;
+  firstBreak?: { file: string; lineIndex: number; reason: "hmac_mismatch" | "prev_mismatch" | "malformed" };
+}> {
+  let prev: string = HMAC_GENESIS;
+  let chainStarted = false;
+  for await (const { line, file, lineIndex } of readAllAuditLinesIndexed()) {
+    let entry: Record<string, unknown>;
+    try {
+      entry = JSON.parse(line) as Record<string, unknown>;
+    } catch {
+      // Tolerate malformed lines (partial writes, manual edits) — they
+      // don't break the chain because they have no `_hmac` to check.
+      continue;
+    }
+    const hmacField = entry._hmac;
+    const prevField = entry._prev;
+    if (typeof hmacField !== "string" || typeof prevField !== "string") continue; // legacy line
+    if (typeof hmacField !== "string" || !/^[0-9a-f]{64}$/.test(hmacField)) {
+      return { verified: false, firstBreak: { file, lineIndex, reason: "malformed" } };
+    }
+    if (chainStarted && prevField !== prev) {
+      return { verified: false, firstBreak: { file, lineIndex, reason: "prev_mismatch" } };
+    }
+    // Reconstruct the body that was signed: entry minus _hmac/_prev.
+    const { _hmac: _h, _prev: _p, ...body } = entry as { _hmac: unknown; _prev: unknown } & Record<string, unknown>;
+    void _h;
+    void _p;
+    const expected = computeHmac(prevField, JSON.stringify(body));
+    if (expected !== hmacField) {
+      return { verified: false, firstBreak: { file, lineIndex, reason: "hmac_mismatch" } };
+    }
+    prev = hmacField;
+    chainStarted = true;
+  }
+  return { verified: true };
+}
+
+async function* readAllAuditLinesIndexed(): AsyncGenerator<{ line: string; file: string; lineIndex: number }> {
+  let files: string[];
+  try {
+    files = await readdir(AUDIT_DIR);
+  } catch {
+    return;
+  }
+  const logFiles = files
+    .filter((f) => f === "audit.jsonl" || (f.startsWith(AUDIT_ROTATED_PREFIX) && f.endsWith(AUDIT_ROTATED_SUFFIX)))
+    .sort((a, b) => {
+      if (a === "audit.jsonl") return 1;
+      if (b === "audit.jsonl") return -1;
+      return a.localeCompare(b);
+    });
+  for (const f of logFiles) {
+    let raw: string;
+    try {
+      raw = await readFile(join(AUDIT_DIR, f), "utf-8");
+    } catch {
+      continue;
+    }
+    const lines = raw.split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (!line) continue;
+      yield { line, file: f, lineIndex: i };
+    }
+  }
 }

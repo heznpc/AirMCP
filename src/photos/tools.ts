@@ -3,7 +3,7 @@ import { z } from "zod";
 import { runSwift } from "../shared/swift.js";
 import { runAutomation } from "../shared/automation.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okUntrusted, toolError } from "../shared/result.js";
+import { ok, okUntrusted, okUntrustedLinkedStructured, okUntrustedStructured, toolError } from "../shared/result.js";
 import { zFilePath, resolveAndGuard } from "../shared/validate.js";
 import {
   listAlbumsScript,
@@ -124,6 +124,22 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
         limit: z.number().int().min(1).max(500).optional().default(50).describe("Max photos (default: 50)"),
         offset: z.number().int().min(0).optional().default(0).describe("Offset for pagination (default: 0)"),
       },
+      outputSchema: {
+        total: z.number(),
+        offset: z.number(),
+        returned: z.number(),
+        photos: z.array(
+          z.object({
+            id: z.string(),
+            filename: z.string().nullable(),
+            name: z.string().nullable(),
+            date: z.string().nullable(),
+            width: z.number(),
+            height: z.number(),
+            favorite: z.boolean(),
+          }),
+        ),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ album, limit, offset }) => {
@@ -135,7 +151,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
           },
           jxa: () => listPhotosScript(album, limit, offset),
         });
-        return okUntrusted(result);
+        return okUntrustedLinkedStructured("list_photos", result);
       } catch (e) {
         return toolError("list photos", e);
       }
@@ -151,6 +167,19 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
         query: z.string().max(500).describe("Search keyword"),
         limit: z.number().int().min(1).max(200).optional().default(30).describe("Max results (default: 30)"),
       },
+      outputSchema: {
+        total: z.number(),
+        photos: z.array(
+          z.object({
+            id: z.string(),
+            filename: z.string().nullable(),
+            name: z.string().nullable(),
+            date: z.string().nullable(),
+            favorite: z.boolean(),
+            description: z.string().nullable(),
+          }),
+        ),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ query, limit }) => {
@@ -162,7 +191,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
           },
           jxa: () => searchPhotosScript(query, limit),
         });
-        return okUntrusted(result);
+        return okUntrustedLinkedStructured("search_photos", result);
       } catch (e) {
         return toolError("search photos", e);
       }
@@ -177,6 +206,21 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
       inputSchema: {
         id: z.string().max(500).describe("Photo media item ID"),
       },
+      outputSchema: {
+        id: z.string(),
+        filename: z.string().nullable(),
+        name: z.string().nullable(),
+        description: z.string().nullable(),
+        date: z.string().nullable(),
+        width: z.number(),
+        height: z.number(),
+        altitude: z.number().nullable(),
+        // GPS coordinates as a [lat, lon] pair when EXIF carries them.
+        // Sensitive — clients should treat as PII.
+        location: z.array(z.number()).nullable(),
+        favorite: z.boolean(),
+        keywords: z.array(z.string()).nullable(),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ id }) => {
@@ -188,7 +232,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
           },
           jxa: () => getPhotoInfoScript(id),
         });
-        return okUntrusted(result);
+        return okUntrustedStructured(result);
       } catch (e) {
         return toolError("get photo info", e);
       }
@@ -203,6 +247,21 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
       inputSchema: {
         limit: z.number().int().min(1).max(500).optional().default(50).describe("Max photos (default: 50)"),
       },
+      outputSchema: {
+        total: z.number(),
+        returned: z.number(),
+        photos: z.array(
+          z.object({
+            id: z.string(),
+            filename: z.string().nullable(),
+            name: z.string().nullable(),
+            date: z.string().nullable(),
+            width: z.number(),
+            height: z.number(),
+            favorite: z.boolean(),
+          }),
+        ),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ limit }) => {
@@ -214,7 +273,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
           },
           jxa: () => listFavoritesScript(limit),
         });
-        return ok(result);
+        return okUntrustedLinkedStructured("list_favorites", result);
       } catch (e) {
         return toolError("list favorites", e);
       }

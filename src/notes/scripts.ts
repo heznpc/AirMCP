@@ -374,29 +374,88 @@ export function moveNoteScript(id: string, targetFolder: string): string {
   `;
 }
 
-export function bulkMoveNotesScript(ids: string[], targetFolder: string): string {
+export function bulkMoveNotesScript(
+  ids: string[],
+  targetFolder: string,
+  opts: { dryRun?: boolean; stopOnError?: boolean } = {},
+): string {
   const idsArray = ids.map((id) => `'${esc(id)}'`).join(",");
+  const dryRun = opts.dryRun === true;
+  const stopOnError = opts.stopOnError !== false; // default true
   return `
     const Notes = Application('Notes');
     const folders = Notes.folders.whose({name: '${esc(targetFolder)}'})();
     if (folders.length === 0) throw new Error('Folder not found: ${esc(targetFolder)}');
+    const targetFolderObj = folders[0];
     const targetIds = [${idsArray}];
     const results = [];
-    for (const id of targetIds) {
+    let stoppedAt = null;
+    for (let i = 0; i < targetIds.length; i++) {
+      const id = targetIds[i];
       try {
         const note = Notes.notes.byId(id);
-        const body = note.body();
         const originalName = note.name();
+        const originalFolder = note.container().name();
+        const creationDate = note.creationDate().toISOString();
+        const modificationDate = note.modificationDate().toISOString();
+        const body = note.body();
+        if (originalFolder === '${esc(targetFolder)}') {
+          // No-op for same-folder moves — avoids body-copy meta loss when
+          // target equals source. Reported as success with unchanged: true.
+          results.push({success: true, originalName, originalFolder, unchanged: true});
+          continue;
+        }
+        if (${dryRun}) {
+          results.push({
+            success: true,
+            dryRun: true,
+            id: id,
+            originalName: originalName,
+            originalFolder: originalFolder,
+            creationDate: creationDate,
+            modificationDate: modificationDate,
+            charCount: body.length,
+            metaPreservation: {
+              creationDateLost: true,
+              modificationDateLost: true,
+              attachmentsLost: true,
+              note: 'Notes JXA cannot set creationDate/modificationDate on new copies; the move re-creates the note with the body only.'
+            }
+          });
+          continue;
+        }
         const newNote = Notes.Note({body: body});
-        folders[0].notes.push(newNote);
+        targetFolderObj.notes.push(newNote);
         const newId = newNote.id();
         if (!newId) throw new Error('Failed to create note copy');
         Notes.delete(note);
-        results.push({success: true, originalName, newId: newId});
+        results.push({
+          success: true,
+          originalName: originalName,
+          originalFolder: originalFolder,
+          newId: newId,
+          metaLost: {creationDate: creationDate, modificationDate: modificationDate}
+        });
       } catch(e) {
         results.push({success: false, id: id, error: e.message});
+        if (${stopOnError}) {
+          stoppedAt = i;
+          break;
+        }
       }
     }
-    JSON.stringify({targetFolder: '${esc(targetFolder)}', moved: results.filter(r => r.success).length, failed: results.filter(r => !r.success).length, results: results});
+    JSON.stringify({
+      targetFolder: '${esc(targetFolder)}',
+      dryRun: ${dryRun},
+      stopOnError: ${stopOnError},
+      total: targetIds.length,
+      processed: results.length,
+      moved: results.filter(r => r.success && !r.unchanged && !r.dryRun).length,
+      unchanged: results.filter(r => r.unchanged).length,
+      previewed: results.filter(r => r.dryRun).length,
+      failed: results.filter(r => !r.success).length,
+      stoppedAt: stoppedAt,
+      results: results
+    });
   `;
 }

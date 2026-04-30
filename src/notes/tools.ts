@@ -523,10 +523,24 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
     {
       title: "Bulk Move Notes",
       description:
-        "Move multiple notes to a target folder at once. Same limitations as move_note apply to each note (new ID, date reset, attachments lost). Returns per-note success/failure results.",
+        "Move multiple notes to a target folder at once. Same limitations as move_note apply to each successful move (new ID, body-only copy — Notes JXA cannot preserve creationDate/modificationDate or attachments on the copy). " +
+        "Use `dryRun: true` to preview which notes would move + what meta would be lost without making any change. " +
+        "Default `stopOnError: true` halts on the first failure to keep the source/target in a recoverable mid-state — pass `false` for best-effort partial completion. Returns per-note results plus aggregate counts.",
       inputSchema: {
         ids: z.array(z.string().max(500)).min(1).max(100).describe("Array of note IDs to move (max 100)"),
         folder: z.string().max(500).describe("Target folder name"),
+        dryRun: z
+          .boolean()
+          .optional()
+          .default(false)
+          .describe("Preview only — list what would move + meta that would be lost. No notes modified."),
+        stopOnError: z
+          .boolean()
+          .optional()
+          .default(true)
+          .describe(
+            "Halt on first failure (default true) so the move stays at a recoverable mid-state. Set false for best-effort partial completion.",
+          ),
       },
       annotations: {
         readOnlyHint: false,
@@ -535,7 +549,7 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
         openWorldHint: false,
       },
     },
-    async ({ ids, folder }) => {
+    async ({ ids, folder, dryRun, stopOnError }) => {
       try {
         if (!config.includeShared) {
           const { sharedIds } = await runJxa<{ sharedIds: string[] }>(guardSharedBulkScript(ids));
@@ -544,7 +558,7 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
             if (blocked) return errPermission(blocked);
           }
         }
-        const result = await runJxa<unknown>(bulkMoveNotesScript(ids, folder));
+        const result = await runJxa<unknown>(bulkMoveNotesScript(ids, folder, { dryRun, stopOnError }));
         return ok(result);
       } catch (e) {
         return toolError("bulk move notes", e);

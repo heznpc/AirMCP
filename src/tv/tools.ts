@@ -2,7 +2,7 @@ import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okUntrusted, toolError } from "../shared/result.js";
+import { ok, okUntrusted, errJxa } from "../shared/result.js";
 import {
   listPlaylistsScript,
   listTracksScript,
@@ -25,7 +25,8 @@ export function registerTvTools(server: McpServer, _config: AirMcpConfig): void 
       try {
         return okUntrusted(await runJxa(listPlaylistsScript()));
       } catch (e) {
-        return toolError("list TV playlists", e);
+        const msg = e instanceof Error ? e.message : String(e);
+        return errJxa(`Failed to list TV playlists: ${msg}`);
       }
     },
   );
@@ -45,7 +46,8 @@ export function registerTvTools(server: McpServer, _config: AirMcpConfig): void 
       try {
         return okUntrusted(await runJxa(listTracksScript(playlist, limit)));
       } catch (e) {
-        return toolError("list TV tracks", e);
+        const msg = e instanceof Error ? e.message : String(e);
+        return errJxa(`Failed to list TV tracks: ${msg}`);
       }
     },
   );
@@ -62,7 +64,8 @@ export function registerTvTools(server: McpServer, _config: AirMcpConfig): void 
       try {
         return okUntrusted(await runJxa(nowPlayingScript()));
       } catch (e) {
-        return toolError("get TV now playing", e);
+        const msg = e instanceof Error ? e.message : String(e);
+        return errJxa(`Failed to get TV now playing: ${msg}`);
       }
     },
   );
@@ -81,7 +84,8 @@ export function registerTvTools(server: McpServer, _config: AirMcpConfig): void 
       try {
         return ok(await runJxa(playbackControlScript(action)));
       } catch (e) {
-        return toolError("control TV playback", e);
+        const msg = e instanceof Error ? e.message : String(e);
+        return errJxa(`Failed to control TV playback: ${msg}`);
       }
     },
   );
@@ -101,7 +105,8 @@ export function registerTvTools(server: McpServer, _config: AirMcpConfig): void 
       try {
         return okUntrusted(await runJxa(searchTracksScript(query, limit)));
       } catch (e) {
-        return toolError("search TV", e);
+        const msg = e instanceof Error ? e.message : String(e);
+        return errJxa(`Failed to search TV: ${msg}`);
       }
     },
   );
@@ -120,7 +125,8 @@ export function registerTvTools(server: McpServer, _config: AirMcpConfig): void 
       try {
         return ok(await runJxa(playTrackScript(name)));
       } catch (e) {
-        return toolError("play TV content", e);
+        const msg = e instanceof Error ? e.message : String(e);
+        return errJxa(`Failed to play TV content: ${msg}`);
       }
     },
   );

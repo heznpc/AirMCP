@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "../shared/mcp.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import { runSwift, checkSwiftBridge } from "../shared/swift.js";
-import { ok, okLinked, errSwift, toolError } from "../shared/result.js";
+import { ok, okLinked, errSwift } from "../shared/result.js";
 
 export function registerSpeechTools(server: McpServer, _config: AirMcpConfig): void {
   server.registerTool(
@@ -30,7 +30,8 @@ export function registerSpeechTools(server: McpServer, _config: AirMcpConfig): v
         );
         return okLinked("transcribe_audio", result);
       } catch (e) {
-        return toolError("transcribe audio", e);
+        const msg = e instanceof Error ? e.message : String(e);
+        return errSwift(`Failed to transcribe audio: ${msg}`);
       }
     },
   );
@@ -50,7 +51,8 @@ export function registerSpeechTools(server: McpServer, _config: AirMcpConfig): v
         const result = await runSwift<{ available: boolean; supportsOnDevice: boolean }>("speech-availability", "{}");
         return ok(result);
       } catch (e) {
-        return toolError("check speech availability", e);
+        const msg = e instanceof Error ? e.message : String(e);
+        return errSwift(`Failed to check speech availability: ${msg}`);
       }
     },
   );
@@ -79,7 +81,8 @@ export function registerSpeechTools(server: McpServer, _config: AirMcpConfig): v
         }>("pasteboard-smart", "{}");
         return ok(result);
       } catch (e) {
-        return toolError("read smart clipboard", e);
+        const msg = e instanceof Error ? e.message : String(e);
+        return errSwift(`Failed to read smart clipboard: ${msg}`);
       }
     },
   );

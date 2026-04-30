@@ -210,8 +210,8 @@ export const PATHS = {
   MEMORY_DIR: join(HOME, ".cache", "airmcp"),
   /** Context-memory JSON store. */
   MEMORY_STORE: join(HOME, ".cache", "airmcp", "memory.json"),
-  /** Usage profile */
-  USAGE_PROFILE: join(HOME, ".airmcp", "profile.json"),
+  /** Usage profile (env: AIRMCP_USAGE_PROFILE_PATH — primarily for tests) */
+  USAGE_PROFILE: resolveTilde(envStr("AIRMCP_USAGE_PROFILE_PATH", join(HOME, ".airmcp", "profile.json"))),
   /** Temp directory for screenshots, recordings, intermediate exports */
   TEMP_DIR: envStr("AIRMCP_TEMP_DIR", tmpdir()),
 } as const;

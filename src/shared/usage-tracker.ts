@@ -140,6 +140,25 @@ class UsageTracker {
     }
   }
 
+  /** Test-only: wipe in-memory state so each case starts from a clean
+   *  singleton. Mirrors the rate-limit reset hook; guarded to prevent
+   *  production misuse. Disk file is not touched — point
+   *  AIRMCP_USAGE_PROFILE_PATH at a tmp file before importing this
+   *  module to keep tests off the user's real profile. */
+  _resetForTests(): void {
+    if (process.env.NODE_ENV !== "test" && process.env.AIRMCP_TEST_MODE !== "1") {
+      throw new Error("_resetForTests is only callable in test mode");
+    }
+    this.lastTool = null;
+    this.profile = null;
+    this.dirty = false;
+    if (this.flushTimer) {
+      clearTimeout(this.flushTimer);
+      this.flushTimer = null;
+    }
+    this.loaded = null;
+  }
+
   private loadSync(): void {
     this.profile = { version: 1, frequency: {}, sequences: {}, hourly: {}, updatedAt: "" };
     this.loaded = this.loadFromDisk()

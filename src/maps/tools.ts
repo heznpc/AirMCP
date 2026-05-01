@@ -2,7 +2,7 @@ import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okLinked, okUntrusted, errJxa, errUpstream } from "../shared/result.js";
+import { ok, okLinked, okUntrusted, errJxaFor, errUpstreamFor } from "../shared/result.js";
 import {
   searchLocationScript,
   getDirectionsScript,
@@ -28,8 +28,7 @@ export function registerMapsTools(server: McpServer, _config: AirMcpConfig): voi
       try {
         return okLinked("search_maps", await runJxa(searchLocationScript(query)));
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to search location: ${msg}`);
+        return errJxaFor("search location", e);
       }
     },
   );
@@ -54,8 +53,7 @@ export function registerMapsTools(server: McpServer, _config: AirMcpConfig): voi
       try {
         return okUntrusted(await runJxa(getDirectionsScript(from, to, transportType)));
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to get directions: ${msg}`);
+        return errJxaFor("get directions", e);
       }
     },
   );
@@ -76,8 +74,7 @@ export function registerMapsTools(server: McpServer, _config: AirMcpConfig): voi
       try {
         return ok(await runJxa(dropPinScript(latitude, longitude, label)));
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to drop pin: ${msg}`);
+        return errJxaFor("drop pin", e);
       }
     },
   );
@@ -96,8 +93,7 @@ export function registerMapsTools(server: McpServer, _config: AirMcpConfig): voi
       try {
         return ok(await runJxa(openInMapsScript(address)));
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to open address: ${msg}`);
+        return errJxaFor("open address", e);
       }
     },
   );
@@ -119,8 +115,7 @@ export function registerMapsTools(server: McpServer, _config: AirMcpConfig): voi
       try {
         return okUntrusted(await runJxa(searchNearbyScript(query, latitude, longitude)));
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to search nearby: ${msg}`);
+        return errJxaFor("search nearby", e);
       }
     },
   );
@@ -141,8 +136,7 @@ export function registerMapsTools(server: McpServer, _config: AirMcpConfig): voi
       try {
         return ok(await runJxa(shareLocationScript(latitude, longitude, label)));
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to share location: ${msg}`);
+        return errJxaFor("share location", e);
       }
     },
   );
@@ -166,8 +160,7 @@ export function registerMapsTools(server: McpServer, _config: AirMcpConfig): voi
       try {
         return okUntrusted(await fetchGeocode(query));
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errUpstream(`Failed to geocode: ${msg}`, { retryable: true });
+        return errUpstreamFor("geocode", e, { retryable: true });
       }
     },
   );
@@ -187,8 +180,7 @@ export function registerMapsTools(server: McpServer, _config: AirMcpConfig): voi
       try {
         return okUntrusted(await fetchReverseGeocode(latitude, longitude));
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errUpstream(`Failed to reverse geocode: ${msg}`, { retryable: true });
+        return errUpstreamFor("reverse geocode", e, { retryable: true });
       }
     },
   );

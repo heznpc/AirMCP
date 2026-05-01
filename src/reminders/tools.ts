@@ -3,7 +3,7 @@ import { z } from "zod";
 import { runAutomation } from "../shared/automation.js";
 import { runSwift } from "../shared/swift.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okLinked, okLinkedStructured, okStructured, okUntrustedStructured, errJxa } from "../shared/result.js";
+import { ok, okLinked, okLinkedStructured, okStructured, okUntrustedStructured, errJxaFor } from "../shared/result.js";
 import type { MutationResult, DeleteResult } from "../shared/types.js";
 import {
   listReminderListsScript,
@@ -87,8 +87,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
         });
         return okStructured({ lists: result });
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to list reminder lists: ${msg}`);
+        return errJxaFor("list reminder lists", e);
       }
     },
   );
@@ -157,8 +156,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
         });
         return okLinkedStructured("list_reminders", result);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to list reminders: ${msg}`);
+        return errJxaFor("list reminders", e);
       }
     },
   );
@@ -199,8 +197,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
         });
         return okUntrustedStructured(result);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to read reminder: ${msg}`);
+        return errJxaFor("read reminder", e);
       }
     },
   );
@@ -236,8 +233,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
         });
         return okLinked("create_reminder", result);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to create reminder: ${msg}`);
+        return errJxaFor("create reminder", e);
       }
     },
   );
@@ -286,8 +282,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
         });
         return ok(result);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to update reminder: ${msg}`);
+        return errJxaFor("update reminder", e);
       }
     },
   );
@@ -323,8 +318,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
         });
         return ok(result);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to complete reminder: ${msg}`);
+        return errJxaFor("complete reminder", e);
       }
     },
   );
@@ -352,8 +346,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
         });
         return ok(result);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to delete reminder: ${msg}`);
+        return errJxaFor("delete reminder", e);
       }
     },
   );
@@ -399,8 +392,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
         });
         return okUntrustedStructured(result);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to search reminders: ${msg}`);
+        return errJxaFor("search reminders", e);
       }
     },
   );
@@ -431,8 +423,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
         });
         return ok(result);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to create reminder list: ${msg}`);
+        return errJxaFor("create reminder list", e);
       }
     },
   );
@@ -463,8 +454,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
         });
         return ok(result);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to delete reminder list: ${msg}`);
+        return errJxaFor("delete reminder list", e);
       }
     },
   );
@@ -520,8 +510,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
         );
         return ok(result);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to create recurring reminder: ${msg}`);
+        return errJxaFor("create recurring reminder", e);
       }
     },
   );

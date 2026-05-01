@@ -1,6 +1,6 @@
 import type { McpServer } from "../shared/mcp.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okUntrusted, errSwift } from "../shared/result.js";
+import { ok, okUntrusted, errSwiftFor } from "../shared/result.js";
 import { runSwift } from "../shared/swift.js";
 
 interface LocationResult {
@@ -37,8 +37,7 @@ export function registerLocationTools(server: McpServer, _config: AirMcpConfig):
       try {
         return okUntrusted(await runSwift<LocationResult>("get-location", "{}"));
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errSwift(`Failed to get current location: ${msg}`);
+        return errSwiftFor("get current location", e);
       }
     },
   );
@@ -62,8 +61,7 @@ export function registerLocationTools(server: McpServer, _config: AirMcpConfig):
       try {
         return ok(await runSwift<LocationPermissionResult>("location-permission", "{}"));
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errSwift(`Failed to get location permission: ${msg}`);
+        return errSwiftFor("get location permission", e);
       }
     },
   );

@@ -186,6 +186,37 @@ export function errUnsupportedOS(message: string, opts?: ToolErrorOptions) {
 }
 
 /**
+ * Catch-block one-liners that pair an `err*` category with the same
+ * "Failed to <action>: <message>" prefix the legacy `toolError` used,
+ * but with the right `cause.origin` baked in. Use these in tool
+ * handlers to keep catch blocks to a single line:
+ *
+ *   } catch (e) {
+ *     return errJxaFor("list reminders", e);
+ *   }
+ *
+ * Each helper is a thin wrapper around its `err*` counterpart — the
+ * full options object (`hint`, `retryable`, `retryAfterMs`) is still
+ * available via the third arg when the catch needs to pass extras.
+ */
+function formatCauseMessage(action: string, e: unknown): string {
+  const raw = e instanceof Error ? e.message : String(e);
+  return `Failed to ${action}: ${raw}`;
+}
+
+export function errJxaFor(action: string, e: unknown, opts?: ToolErrorOptions) {
+  return errJxa(formatCauseMessage(action, e), opts);
+}
+
+export function errSwiftFor(action: string, e: unknown, opts?: ToolErrorOptions) {
+  return errSwift(formatCauseMessage(action, e), opts);
+}
+
+export function errUpstreamFor(action: string, e: unknown, opts?: ToolErrorOptions) {
+  return errUpstream(formatCauseMessage(action, e), opts);
+}
+
+/**
  * Standardized catch-block helper for tool handlers. Classifies the error
  * automatically and delegates to {@link toolErr} so every legacy caller also
  * gets the RFC 0001 `structuredContent.error` payload for free.

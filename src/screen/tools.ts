@@ -3,7 +3,7 @@ import { z } from "zod";
 import { readFile, stat, unlink } from "node:fs/promises";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { okUntrusted, errJxa } from "../shared/result.js";
+import { okUntrusted, errJxaFor } from "../shared/result.js";
 import {
   captureScreenScript,
   captureWindowScript,
@@ -72,8 +72,7 @@ export function registerScreenTools(server: McpServer, _config: AirMcpConfig): v
       try {
         return await captureAndReturn(captureScreenScript(display));
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to capture screen: ${msg}`);
+        return errJxaFor("capture screen", e);
       }
     },
   );
@@ -104,8 +103,7 @@ export function registerScreenTools(server: McpServer, _config: AirMcpConfig): v
       try {
         return await captureAndReturn(captureWindowScript(appName));
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to capture window: ${msg}`);
+        return errJxaFor("capture window", e);
       }
     },
   );
@@ -133,8 +131,7 @@ export function registerScreenTools(server: McpServer, _config: AirMcpConfig): v
       try {
         return await captureAndReturn(captureAreaScript(x, y, width, height));
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to capture area: ${msg}`);
+        return errJxaFor("capture area", e);
       }
     },
   );
@@ -157,8 +154,7 @@ export function registerScreenTools(server: McpServer, _config: AirMcpConfig): v
       try {
         return okUntrusted(await runJxa(listWindowsScript()));
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to list windows: ${msg}`);
+        return errJxaFor("list windows", e);
       }
     },
   );
@@ -244,8 +240,7 @@ export function registerScreenTools(server: McpServer, _config: AirMcpConfig): v
           ],
         };
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to record screen: ${msg}`);
+        return errJxaFor("record screen", e);
       }
     },
   );

@@ -1,7 +1,7 @@
 import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okUntrusted, errSwift } from "../shared/result.js";
+import { ok, okUntrusted, errSwiftFor } from "../shared/result.js";
 import { runSwift } from "../shared/swift.js";
 
 interface BluetoothStateResult {
@@ -39,8 +39,7 @@ export function registerBluetoothTools(server: McpServer, _config: AirMcpConfig)
       try {
         return ok(await runSwift<BluetoothStateResult>("bluetooth-state", "{}"));
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errSwift(`Failed to get bluetooth state: ${msg}`);
+        return errSwiftFor("get bluetooth state", e);
       }
     },
   );
@@ -67,8 +66,7 @@ export function registerBluetoothTools(server: McpServer, _config: AirMcpConfig)
       try {
         return okUntrusted(await runSwift<BluetoothScanResult>("scan-bluetooth", JSON.stringify({ duration })));
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errSwift(`Failed to scan bluetooth: ${msg}`);
+        return errSwiftFor("scan bluetooth", e);
       }
     },
   );
@@ -89,8 +87,7 @@ export function registerBluetoothTools(server: McpServer, _config: AirMcpConfig)
       try {
         return ok(await runSwift<BluetoothConnectResult>("connect-bluetooth", JSON.stringify({ identifier })));
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errSwift(`Failed to connect bluetooth: ${msg}`);
+        return errSwiftFor("connect bluetooth", e);
       }
     },
   );
@@ -109,8 +106,7 @@ export function registerBluetoothTools(server: McpServer, _config: AirMcpConfig)
       try {
         return ok(await runSwift<BluetoothConnectResult>("disconnect-bluetooth", JSON.stringify({ identifier })));
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errSwift(`Failed to disconnect bluetooth: ${msg}`);
+        return errSwiftFor("disconnect bluetooth", e);
       }
     },
   );

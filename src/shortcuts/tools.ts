@@ -4,7 +4,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okLinked, okLinkedStructured, okStructured, errJxa } from "../shared/result.js";
+import { ok, okLinked, okLinkedStructured, okStructured, errJxaFor } from "../shared/result.js";
 import { TIMEOUT } from "../shared/constants.js";
 import { zFilePath } from "../shared/validate.js";
 import {
@@ -56,8 +56,7 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
       try {
         return okLinkedStructured("list_shortcuts", await runJxa<ShortcutsNameList>(listShortcutsScript()));
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to list shortcuts: ${msg}`);
+        return errJxaFor("list shortcuts", e);
       }
     },
   );
@@ -78,8 +77,7 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
       try {
         return okLinked("run_shortcut", await runJxa(runShortcutScript(name, input)));
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to run shortcut: ${msg}`);
+        return errJxaFor("run shortcut", e);
       }
     },
   );
@@ -102,8 +100,7 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
       try {
         return okStructured(await runJxa<ShortcutsNameList>(searchShortcutsScript(query)));
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to search shortcuts: ${msg}`);
+        return errJxaFor("search shortcuts", e);
       }
     },
   );
@@ -126,8 +123,7 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
       try {
         return okStructured(await runJxa<ShortcutsDetail>(getShortcutDetailScript(name)));
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to get shortcut detail: ${msg}`);
+        return errJxaFor("get shortcut detail", e);
       }
     },
   );
@@ -147,8 +143,7 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
       try {
         return ok(await runJxa(createShortcutScript(name)));
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to create shortcut: ${msg}`);
+        return errJxaFor("create shortcut", e);
       }
     },
   );
@@ -168,8 +163,7 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
       try {
         return ok(await runJxa(deleteShortcutScript(name)));
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to delete shortcut: ${msg}`);
+        return errJxaFor("delete shortcut", e);
       }
     },
   );
@@ -192,8 +186,7 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
       try {
         return ok(await runJxa(exportShortcutScript(name, outputPath)));
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to export shortcut: ${msg}`);
+        return errJxaFor("export shortcut", e);
       }
     },
   );
@@ -213,8 +206,7 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
       try {
         return ok(await runJxa(importShortcutScript(filePath)));
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to import shortcut: ${msg}`);
+        return errJxaFor("import shortcut", e);
       }
     },
   );
@@ -235,8 +227,7 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
       try {
         return ok(await runJxa(duplicateShortcutScript(name, newName)));
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to duplicate shortcut: ${msg}`);
+        return errJxaFor("duplicate shortcut", e);
       }
     },
   );
@@ -256,8 +247,7 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
       try {
         return ok(await runJxa(editShortcutScript(name)));
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to open shortcut for editing: ${msg}`);
+        return errJxaFor("open shortcut for editing", e);
       }
     },
   );
@@ -321,8 +311,7 @@ export async function registerDynamicShortcutTools(server: McpServer): Promise<n
         try {
           return ok(await runJxa(runShortcutScript(name, input)));
         } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          return errJxa(`Failed to run shortcut "${name}": ${msg}`);
+          return errJxaFor(`run shortcut "${name}"`, e);
         }
       },
     );

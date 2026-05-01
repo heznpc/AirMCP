@@ -3,7 +3,7 @@ import { z } from "zod";
 import { runAutomation } from "../shared/automation.js";
 import { runSwift } from "../shared/swift.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okStructured, okUntrustedStructured, okUntrustedLinkedStructured, errJxa } from "../shared/result.js";
+import { ok, okStructured, okUntrustedStructured, okUntrustedLinkedStructured, errJxaFor } from "../shared/result.js";
 import {
   listCalendarsScript,
   listEventsScript,
@@ -121,8 +121,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
         });
         return okStructured({ calendars: result });
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to list calendars: ${msg}`);
+        return errJxaFor("list calendars", e);
       }
     },
   );
@@ -180,8 +179,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
         });
         return okUntrustedStructured(result);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to list events: ${msg}`);
+        return errJxaFor("list events", e);
       }
     },
   );
@@ -229,8 +227,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
         });
         return okUntrustedStructured(result);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to read event: ${msg}`);
+        return errJxaFor("read event", e);
       }
     },
   );
@@ -268,8 +265,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
         });
         return ok(result);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to create event: ${msg}`);
+        return errJxaFor("create event", e);
       }
     },
   );
@@ -310,8 +306,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
         });
         return ok(result);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to update event: ${msg}`);
+        return errJxaFor("update event", e);
       }
     },
   );
@@ -339,8 +334,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
         });
         return ok(result);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to delete event: ${msg}`);
+        return errJxaFor("delete event", e);
       }
     },
   );
@@ -387,8 +381,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
         });
         return okUntrustedStructured(result);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to search events: ${msg}`);
+        return errJxaFor("search events", e);
       }
     },
   );
@@ -432,8 +425,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
         });
         return okUntrustedStructured(result);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to get upcoming events: ${msg}`);
+        return errJxaFor("get upcoming events", e);
       }
     },
   );
@@ -473,8 +465,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
         });
         return okUntrustedLinkedStructured("today_events", result);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to get today's events: ${msg}`);
+        return errJxaFor("get today's events", e);
       }
     },
   );
@@ -532,8 +523,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
         );
         return ok(result);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return errJxa(`Failed to create recurring event: ${msg}`);
+        return errJxaFor("create recurring event", e);
       }
     },
   );

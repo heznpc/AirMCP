@@ -127,7 +127,7 @@
     "express": "^5.2.1",
     "jose": "^6.2.2",
     "yaml": "^2.8.2",
-    "zod": "~3.25.76"
+    "zod": "~4.4.3"
   },
   "devDependencies": {
     "@commitlint/cli": "^20.4.4",

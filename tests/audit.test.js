@@ -64,6 +64,72 @@ describe('auditLog()', () => {
     expect(parsed.args).toBeUndefined();
   });
 
+  test('explicit correlationId is preserved verbatim', () => {
+    auditLog({
+      timestamp: 'T1',
+      tool: 'test_tool',
+      status: 'ok',
+      correlationId: 'corr-explicit-abc',
+    });
+    const buf = _testReset();
+    expect(JSON.parse(buf[0]).correlationId).toBe('corr-explicit-abc');
+  });
+
+  test('omitted correlationId stays undefined when no active context', () => {
+    // No runWithRequestContext → getCorrelationId() returns undefined.
+    auditLog({ timestamp: 'T1', tool: 'no_ctx_tool', status: 'ok' });
+    const buf = _testReset();
+    expect(JSON.parse(buf[0]).correlationId).toBeUndefined();
+  });
+
+  test('oauth_* tool name redacts args (RFC 0005 token guard)', () => {
+    auditLog({
+      timestamp: 'T1',
+      tool: 'oauth_authorize',
+      args: { code: 'tok_abc', state: 'xyz' },
+      status: 'ok',
+    });
+    const buf = _testReset();
+    const parsed = JSON.parse(buf[0]);
+    expect(parsed.args).toEqual({ _redacted: 'sensitive_tool' });
+  });
+
+  test('tool name containing "credential" is redacted', () => {
+    auditLog({
+      timestamp: 'T1',
+      tool: 'create_api_credential',
+      args: { secret: 'super-secret' },
+      status: 'ok',
+    });
+    const parsed = JSON.parse(_testReset()[0]);
+    expect(parsed.args).toEqual({ _redacted: 'sensitive_tool' });
+  });
+
+  test('tool name containing "token" is redacted', () => {
+    auditLog({
+      timestamp: 'T1',
+      tool: 'rotate_session_token',
+      args: { value: 'tok_xyz' },
+      status: 'ok',
+    });
+    const parsed = JSON.parse(_testReset()[0]);
+    expect(parsed.args).toEqual({ _redacted: 'sensitive_tool' });
+  });
+
+  test('non-sensitive tool names still flow through sanitizeArgs', () => {
+    // search_notes is not on the sensitive list, so its args go through
+    // sanitizeArgs (which redacts password / token / secret keys, not whole args).
+    auditLog({
+      timestamp: 'T1',
+      tool: 'search_notes',
+      args: { query: 'meeting', password: 'should-be-redacted' },
+      status: 'ok',
+    });
+    const parsed = JSON.parse(_testReset()[0]);
+    expect(parsed.args.query).toBe('meeting');
+    expect(parsed.args.password).toBe('[REDACTED]');
+  });
+
   test('entries exceeding 10KB are truncated', () => {
     // sanitizeArgs truncates individual strings at 500 chars, so we need
     // many fields to push the total JSON size over 10KB.

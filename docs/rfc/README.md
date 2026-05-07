@@ -92,7 +92,7 @@ Draft ──► Proposed ──► Accepted ──► Implemented
 | [0007](./0007-app-intent-bridge.md)         | MCP Tool ↔ App Intent Auto-Bridge (2-phase)                   | Draft  | v2.13.0+ (Phase A) · Apple-API-dependent (Phase B) |
 | [0010](./0010-progressive-disclosure.md)    | Progressive tool disclosure (SEP-1888 alignment)              | Stub   | v3.0.0 (after SEP-1888 ratifies)                    |
 | [0011](./0011-post-wwdc-2026.md)            | Post-WWDC 2026 positioning (placeholder)                      | Placeholder | TBD (post June 8-12 WWDC keynote)              |
-| [0008](./0008-elicitation.md)               | MCP Elicitation for destructive tools                         | Draft  | v2.13.0 (Phase 1) · v3.0.0 (Phase 2)               |
+| [0008](./0008-elicitation.md)               | MCP Elicitation for destructive tools                         | Phase 1 Implemented | v2.13.0 (Phase 1 ✅) · v3.0.0 (Phase 2) |
 | [0009](./0009-iwork-depth.md)               | iWork (Pages / Numbers / Keynote) coverage depth              | Draft  | v2.13.0 (Phase 1) · v3.0.0 (Phase 2)               |
 
 ## 관련 문서

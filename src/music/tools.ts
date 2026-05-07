@@ -2,7 +2,7 @@ import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okLinkedStructured, okStructured, toolError } from "../shared/result.js";
+import { ok, okLinkedStructured, okStructured, errJxaFor } from "../shared/result.js";
 // Side-effect import: register the now_playing poller with the shared registry
 // at module load time. The poller itself only starts when startPollers() is
 // invoked by the cross/event observer tool.
@@ -54,7 +54,7 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
           );
         return okStructured({ playlists });
       } catch (e) {
-        return toolError("list playlists", e);
+        return errJxaFor("list playlists", e);
       }
     },
   );
@@ -90,7 +90,7 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
       try {
         return okStructured(await runJxa(listTracksScript(playlist, limit)));
       } catch (e) {
-        return toolError("list tracks", e);
+        return errJxaFor("list tracks", e);
       }
     },
   );
@@ -119,7 +119,7 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
       try {
         return okLinkedStructured("now_playing", await runJxa(nowPlayingScript()));
       } catch (e) {
-        return toolError("get now playing", e);
+        return errJxaFor("get now playing", e);
       }
     },
   );
@@ -138,7 +138,7 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
       try {
         return ok(await runJxa(playbackControlScript(action)));
       } catch (e) {
-        return toolError("control playback", e);
+        return errJxaFor("control playback", e);
       }
     },
   );
@@ -158,7 +158,7 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
       try {
         return ok(await runJxa(searchTracksScript(query, limit)));
       } catch (e) {
-        return toolError("search tracks", e);
+        return errJxaFor("search tracks", e);
       }
     },
   );
@@ -178,7 +178,7 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
       try {
         return ok(await runJxa(playTrackScript(trackName, playlist)));
       } catch (e) {
-        return toolError("play track", e);
+        return errJxaFor("play track", e);
       }
     },
   );
@@ -198,7 +198,7 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
       try {
         return ok(await runJxa(playPlaylistScript(name, shuffle)));
       } catch (e) {
-        return toolError("play playlist", e);
+        return errJxaFor("play playlist", e);
       }
     },
   );
@@ -217,7 +217,7 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
       try {
         return ok(await runJxa(getTrackInfoScript(trackName)));
       } catch (e) {
-        return toolError("get track info", e);
+        return errJxaFor("get track info", e);
       }
     },
   );
@@ -237,7 +237,7 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
       try {
         return ok(await runJxa(setShuffleScript(shuffle, songRepeat)));
       } catch (e) {
-        return toolError("set shuffle/repeat", e);
+        return errJxaFor("set shuffle/repeat", e);
       }
     },
   );
@@ -256,7 +256,7 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
       try {
         return ok(await runJxa(createPlaylistScript(name)));
       } catch (e) {
-        return toolError("create playlist", e);
+        return errJxaFor("create playlist", e);
       }
     },
   );
@@ -276,7 +276,7 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
       try {
         return ok(await runJxa(addToPlaylistScript(playlistName, trackName)));
       } catch (e) {
-        return toolError("add to playlist", e);
+        return errJxaFor("add to playlist", e);
       }
     },
   );
@@ -296,7 +296,7 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
       try {
         return ok(await runJxa(removeFromPlaylistScript(playlistName, trackName)));
       } catch (e) {
-        return toolError("remove from playlist", e);
+        return errJxaFor("remove from playlist", e);
       }
     },
   );
@@ -315,7 +315,7 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
       try {
         return ok(await runJxa(deletePlaylistScript(name)));
       } catch (e) {
-        return toolError("delete playlist", e);
+        return errJxaFor("delete playlist", e);
       }
     },
   );
@@ -334,7 +334,7 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
       try {
         return ok(await runJxa(getRatingScript(trackName)));
       } catch (e) {
-        return toolError("get rating", e);
+        return errJxaFor("get rating", e);
       }
     },
   );
@@ -355,7 +355,7 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
       try {
         return ok(await runJxa(setRatingScript(trackName, rating)));
       } catch (e) {
-        return toolError("set rating", e);
+        return errJxaFor("set rating", e);
       }
     },
   );
@@ -375,7 +375,7 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
       try {
         return ok(await runJxa(setFavoritedScript(trackName, favorited)));
       } catch (e) {
-        return toolError("set favorited", e);
+        return errJxaFor("set favorited", e);
       }
     },
   );
@@ -395,7 +395,7 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
       try {
         return ok(await runJxa(setDislikedScript(trackName, disliked)));
       } catch (e) {
-        return toolError("set disliked", e);
+        return errJxaFor("set disliked", e);
       }
     },
   );

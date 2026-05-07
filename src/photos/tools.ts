@@ -3,7 +3,14 @@ import { z } from "zod";
 import { runSwift } from "../shared/swift.js";
 import { runAutomation } from "../shared/automation.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okUntrusted, okUntrustedLinkedStructured, okUntrustedStructured, toolError } from "../shared/result.js";
+import {
+  ok,
+  okUntrusted,
+  okUntrustedLinkedStructured,
+  okUntrustedStructured,
+  errJxaFor,
+  errSwiftFor,
+} from "../shared/result.js";
 import { zFilePath, resolveAndGuard } from "../shared/validate.js";
 import {
   listAlbumsScript,
@@ -109,7 +116,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
         });
         return okUntrusted(result);
       } catch (e) {
-        return toolError("list albums", e);
+        return errJxaFor("list albums", e);
       }
     },
   );
@@ -153,7 +160,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
         });
         return okUntrustedLinkedStructured("list_photos", result);
       } catch (e) {
-        return toolError("list photos", e);
+        return errJxaFor("list photos", e);
       }
     },
   );
@@ -193,7 +200,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
         });
         return okUntrustedLinkedStructured("search_photos", result);
       } catch (e) {
-        return toolError("search photos", e);
+        return errJxaFor("search photos", e);
       }
     },
   );
@@ -234,7 +241,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
         });
         return okUntrustedStructured(result);
       } catch (e) {
-        return toolError("get photo info", e);
+        return errJxaFor("get photo info", e);
       }
     },
   );
@@ -275,7 +282,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
         });
         return okUntrustedLinkedStructured("list_favorites", result);
       } catch (e) {
-        return toolError("list favorites", e);
+        return errJxaFor("list favorites", e);
       }
     },
   );
@@ -301,7 +308,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
         });
         return ok(result);
       } catch (e) {
-        return toolError("create album", e);
+        return errJxaFor("create album", e);
       }
     },
   );
@@ -328,7 +335,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
         });
         return ok(result);
       } catch (e) {
-        return toolError("add photos to album", e);
+        return errJxaFor("add photos to album", e);
       }
     },
   );
@@ -356,7 +363,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
         const result = await runSwift<PhotoImportResult>("import-photo", JSON.stringify({ filePath, albumName }));
         return ok(result);
       } catch (e) {
-        return toolError("import photo", e);
+        return errSwiftFor("import photo", e);
       }
     },
   );
@@ -382,7 +389,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
         const result = await runSwift<PhotoDeleteResult>("delete-photos", JSON.stringify({ identifiers }));
         return ok(result);
       } catch (e) {
-        return toolError("delete photos", e);
+        return errSwiftFor("delete photos", e);
       }
     },
   );
@@ -413,7 +420,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
         );
         return ok(result);
       } catch (e) {
-        return toolError("query photos", e);
+        return errSwiftFor("query photos", e);
       }
     },
   );
@@ -439,7 +446,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
         );
         return ok(result);
       } catch (e) {
-        return toolError("classify image", e);
+        return errSwiftFor("classify image", e);
       }
     },
   );

@@ -62,9 +62,21 @@ let chainResumed = false;
  * even truncated. Matching tool calls get their args replaced with a single
  * `_redacted` marker. The audit log already lives behind 0600 permissions,
  * but defense-in-depth: a single accidental share of audit.jsonl shouldn't
- * leak the user's location coordinates or health metrics.
+ * leak the user's location coordinates, health metrics, or OAuth tokens.
  */
-const SENSITIVE_TOOL_PATTERNS: RegExp[] = [/^get_current_location$/, /^get_location_permission$/, /^health_/];
+const SENSITIVE_TOOL_PATTERNS: RegExp[] = [
+  /^get_current_location$/,
+  /^get_location_permission$/,
+  /^health_/,
+  // OAuth / credential surface (RFC 0005). Tokens, refresh tokens, scope
+  // grants — anything an attacker could replay against an authorization
+  // server. Conservative pattern; tools that legitimately need to log
+  // their args can opt out by living outside this pattern.
+  /^oauth_/,
+  /password/i,
+  /credential/i,
+  /token/i,
+];
 
 function isSensitiveTool(name: string): boolean {
   return SENSITIVE_TOOL_PATTERNS.some((re) => re.test(name));
@@ -158,6 +170,7 @@ async function resumeChainHead(): Promise<void> {
   try {
     const raw = await readFile(AUDIT_PATH, "utf-8");
     const lines = raw.trimEnd().split("\n");
+    let malformedCount = 0;
     for (let i = lines.length - 1; i >= 0; i--) {
       const line = lines[i];
       if (!line) continue;
@@ -165,11 +178,23 @@ async function resumeChainHead(): Promise<void> {
         const parsed = JSON.parse(line) as { _hmac?: string };
         if (parsed._hmac && /^[0-9a-f]{64}$/.test(parsed._hmac)) {
           lastHmac = parsed._hmac;
+          if (malformedCount > 0) {
+            console.error(
+              `[AirMCP Audit] resumed chain at lastHmac=${parsed._hmac.slice(0, 8)}…; skipped ${malformedCount} malformed line(s) — possible tampering or corruption (run audit_summary to verify).`,
+            );
+          }
           return;
         }
       } catch {
-        // skip malformed
+        // Malformed line in the tail. Tracked so an operator notices a
+        // pattern of corruption before it gets buried under fresh entries.
+        malformedCount++;
       }
+    }
+    if (malformedCount > 0) {
+      console.error(
+        `[AirMCP Audit] no chain head found in ${lines.length} on-disk lines (${malformedCount} malformed) — restarting chain from genesis.`,
+      );
     }
   } catch {
     // file missing or unreadable — start from genesis

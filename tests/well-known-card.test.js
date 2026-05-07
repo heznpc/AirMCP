@@ -4,7 +4,7 @@
 // PulseMCP, Glama) build their catalog without connecting. A silent
 // shape regression breaks crawler parsing upstream — pin the contract.
 
-import { describe, test, expect } from "@jest/globals";
+import { describe, test, expect, beforeEach, afterEach } from "@jest/globals";
 import {
   buildServerCard,
   buildOAuthProtectedResourceCard,
@@ -220,8 +220,29 @@ describe("buildServerCard — OAuth authorization block (RFC 0005 Step 1)", () =
   });
 });
 
-describe("buildOAuthProtectedResourceCard (RFC 9728)", () => {
-  test("emits resource + authorization_servers + supported signing algs + scopes", () => {
+describe("buildOAuthProtectedResourceCard (RFC 9728 / SEP-985)", () => {
+  // Wipe optional env knobs so the default-shape assertions don't see
+  // accidental values from a dev shell.
+  const ENV_KEYS = [
+    "AIRMCP_OAUTH_RESOURCE_DOCS",
+    "AIRMCP_OAUTH_RESOURCE_POLICY",
+    "AIRMCP_OAUTH_RESOURCE_TOS",
+  ];
+  const originals = {};
+  beforeEach(() => {
+    for (const k of ENV_KEYS) {
+      originals[k] = process.env[k];
+      delete process.env[k];
+    }
+  });
+  afterEach(() => {
+    for (const k of ENV_KEYS) {
+      if (originals[k] === undefined) delete process.env[k];
+      else process.env[k] = originals[k];
+    }
+  });
+
+  test("emits the SEP-985 baseline shape", () => {
     const card = buildOAuthProtectedResourceCard(
       "https://airmcp.local/mcp",
       "https://auth.example.com/realms/airmcp",
@@ -232,6 +253,8 @@ describe("buildOAuthProtectedResourceCard (RFC 9728)", () => {
       bearer_methods_supported: ["header"],
       resource_signing_alg_values_supported: ["RS256", "ES256"],
       scopes_supported: [...SCOPES_SUPPORTED],
+      dpop_signing_alg_values_supported: ["ES256", "RS256"],
+      dpop_bound_access_tokens_required: false,
     });
   });
 
@@ -242,5 +265,28 @@ describe("buildOAuthProtectedResourceCard (RFC 9728)", () => {
     const card = buildOAuthProtectedResourceCard("https://a/mcp", "https://b");
     expect(card.resource_signing_alg_values_supported).not.toContain("HS256");
     expect(card.resource_signing_alg_values_supported).not.toContain("none");
+  });
+
+  test("DPoP advertised but not enforced (honest current state)", () => {
+    const card = buildOAuthProtectedResourceCard("https://a/mcp", "https://b");
+    expect(card.dpop_signing_alg_values_supported).toEqual(["ES256", "RS256"]);
+    expect(card.dpop_bound_access_tokens_required).toBe(false);
+  });
+
+  test("resource_documentation / policy / tos env knobs surface when set", () => {
+    process.env.AIRMCP_OAUTH_RESOURCE_DOCS = "https://airmcp.example/docs";
+    process.env.AIRMCP_OAUTH_RESOURCE_POLICY = "https://airmcp.example/privacy";
+    process.env.AIRMCP_OAUTH_RESOURCE_TOS = "https://airmcp.example/tos";
+    const card = buildOAuthProtectedResourceCard("https://a/mcp", "https://b");
+    expect(card.resource_documentation).toBe("https://airmcp.example/docs");
+    expect(card.resource_policy_uri).toBe("https://airmcp.example/privacy");
+    expect(card.resource_tos_uri).toBe("https://airmcp.example/tos");
+  });
+
+  test("optional fields are omitted when env knobs are unset", () => {
+    const card = buildOAuthProtectedResourceCard("https://a/mcp", "https://b");
+    expect(card.resource_documentation).toBeUndefined();
+    expect(card.resource_policy_uri).toBeUndefined();
+    expect(card.resource_tos_uri).toBeUndefined();
   });
 });

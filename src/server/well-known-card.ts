@@ -129,5 +129,23 @@ export function buildOAuthProtectedResourceCard(audience: string, issuer: string
     bearer_methods_supported: ["header"],
     resource_signing_alg_values_supported: ["RS256", "ES256"],
     scopes_supported: [...SCOPES_SUPPORTED],
+    // SEP-985 alignment with RFC 9728 §2: clients can negotiate DPoP
+    // sender-constrained tokens. AirMCP does not currently bind tokens
+    // to a DPoP proof — `dpop_bound_access_tokens_required: false`
+    // declares this honestly so a future SEP can flip the flag without
+    // renegotiating the discovery contract.
+    dpop_signing_alg_values_supported: ["ES256", "RS256"],
+    dpop_bound_access_tokens_required: false,
+    // RFC 9728 §2 standard fields. Operators with a privacy policy / docs
+    // can override via env (AIRMCP_OAUTH_RESOURCE_DOCS,
+    // AIRMCP_OAUTH_RESOURCE_POLICY); the discovery card omits the field
+    // when no URL is configured so crawlers don't render dead links.
+    ...(process.env.AIRMCP_OAUTH_RESOURCE_DOCS
+      ? { resource_documentation: process.env.AIRMCP_OAUTH_RESOURCE_DOCS }
+      : {}),
+    ...(process.env.AIRMCP_OAUTH_RESOURCE_POLICY
+      ? { resource_policy_uri: process.env.AIRMCP_OAUTH_RESOURCE_POLICY }
+      : {}),
+    ...(process.env.AIRMCP_OAUTH_RESOURCE_TOS ? { resource_tos_uri: process.env.AIRMCP_OAUTH_RESOURCE_TOS } : {}),
   };
 }

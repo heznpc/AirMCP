@@ -2,7 +2,7 @@ import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okUntrusted, errInvalidInput, toolError } from "../shared/result.js";
+import { ok, okUntrusted, errInvalidInput, errJxaFor } from "../shared/result.js";
 import {
   uiOpenAppScript,
   uiClickScript,
@@ -37,7 +37,7 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
       try {
         return okUntrusted(await runJxa(uiOpenAppScript(appName)));
       } catch (e) {
-        return toolError("open app", e);
+        return errJxaFor("open app", e);
       }
     },
   );
@@ -90,7 +90,7 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
         }
         return ok(await runJxa(uiClickScript(appName, x, y, text, role, index)));
       } catch (e) {
-        return toolError("click element", e);
+        return errJxaFor("click element", e);
       }
     },
   );
@@ -119,7 +119,7 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
       try {
         return ok(await runJxa(uiTypeScript(text, appName)));
       } catch (e) {
-        return toolError("type text", e);
+        return errJxaFor("type text", e);
       }
     },
   );
@@ -157,7 +157,7 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
       try {
         return ok(await runJxa(uiPressKeyScript(key, modifiers, appName)));
       } catch (e) {
-        return toolError("press key", e);
+        return errJxaFor("press key", e);
       }
     },
   );
@@ -187,7 +187,7 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
       try {
         return ok(await runJxa(uiScrollScript(direction, amount, appName)));
       } catch (e) {
-        return toolError("scroll", e);
+        return errJxaFor("scroll", e);
       }
     },
   );
@@ -228,7 +228,7 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
       try {
         return okUntrusted(await runJxa(uiReadScript(appName, maxDepth, maxElements)));
       } catch (e) {
-        return toolError("read UI", e);
+        return errJxaFor("read UI", e);
       }
     },
   );
@@ -290,7 +290,7 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
         const locator: AXLocator = { app, role, title, value, description, identifier, label };
         return okUntrusted(await runJxa(axQueryScript(locator, maxResults, maxDepth)));
       } catch (e) {
-        return toolError("accessibility query", e);
+        return errJxaFor("accessibility query", e);
       }
     },
   );
@@ -350,7 +350,7 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
         const locator: AXLocator = { app, role, title, value, description, identifier, label };
         return ok(await runJxa(axPerformScript(locator, action, actionValue, index)));
       } catch (e) {
-        return toolError("perform action", e);
+        return errJxaFor("perform action", e);
       }
     },
   );
@@ -387,7 +387,7 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
       try {
         return okUntrusted(await runJxa(axTraverseScript(app, pid, maxDepth, maxElements, onlyVisible)));
       } catch (e) {
-        return toolError("traverse UI", e);
+        return errJxaFor("traverse UI", e);
       }
     },
   );
@@ -414,7 +414,7 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
       try {
         return okUntrusted(await runJxa(axDiffScript(beforeSnapshot, app)));
       } catch (e) {
-        return toolError("UI diff", e);
+        return errJxaFor("UI diff", e);
       }
     },
   );

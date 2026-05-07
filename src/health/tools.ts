@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "../shared/mcp.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import { runSwift, checkSwiftBridge } from "../shared/swift.js";
-import { ok, okLinkedStructured, errSwift, toolError } from "../shared/result.js";
+import { ok, okLinkedStructured, errSwift, errSwiftFor } from "../shared/result.js";
 
 // Single source of truth for each Swift bridge payload. The zod shape drives
 // outputSchema validation; z.infer derives the TypeScript type that runSwift
@@ -89,7 +89,7 @@ export function registerHealthTools(server: McpServer, _config: AirMcpConfig): v
         const result = await runSwift<HealthSummary>("health-summary", "{}");
         return okLinkedStructured("health_summary", result);
       } catch (e) {
-        return toolError("get health summary", e);
+        return errSwiftFor("get health summary", e);
       }
     },
   );
@@ -110,7 +110,7 @@ export function registerHealthTools(server: McpServer, _config: AirMcpConfig): v
         const result = await runSwift<HealthSteps>("health-steps", "{}");
         return okLinkedStructured("health_today_steps", result);
       } catch (e) {
-        return toolError("get step count", e);
+        return errSwiftFor("get step count", e);
       }
     },
   );
@@ -131,7 +131,7 @@ export function registerHealthTools(server: McpServer, _config: AirMcpConfig): v
         const result = await runSwift<HealthHeartRate>("health-heart-rate", "{}");
         return okLinkedStructured("health_heart_rate", result);
       } catch (e) {
-        return toolError("get heart rate", e);
+        return errSwiftFor("get heart rate", e);
       }
     },
   );
@@ -159,7 +159,7 @@ export function registerHealthTools(server: McpServer, _config: AirMcpConfig): v
         const result = await runSwift<HealthSleep>("health-sleep", input);
         return okLinkedStructured("health_sleep", result);
       } catch (e) {
-        return toolError("get sleep data", e);
+        return errSwiftFor("get sleep data", e);
       }
     },
   );
@@ -180,7 +180,7 @@ export function registerHealthTools(server: McpServer, _config: AirMcpConfig): v
         const result = await runSwift<{ authorized: boolean }>("health-authorize", "{}");
         return ok(result);
       } catch (e) {
-        return toolError("authorize HealthKit", e);
+        return errSwiftFor("authorize HealthKit", e);
       }
     },
   );

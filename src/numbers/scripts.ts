@@ -101,3 +101,60 @@ export function exportPdfScript(documentName: string, outputPath: string): strin
 export function closeDocumentScript(documentName: string, saving: boolean): string {
   return iworkCloseDocumentScript("Numbers", documentName, saving);
 }
+
+/** RFC 0009 Phase 1 — list every table in a sheet with size + headers.
+ *  Numbers documents commonly hold multiple side-by-side tables per sheet
+ *  (totals + breakdown + chart-source). The existing tools assumed
+ *  `sheet.tables[0]` was canonical; this lets a tool consumer pick the
+ *  right one by name before reading. */
+export function listTablesScript(documentName: string, sheet: string): string {
+  return `
+    const Numbers = Application('com.apple.Numbers');
+    ${iworkDocLookup("Numbers", documentName)}
+    const sheets = docs[0].sheets.whose({name: '${esc(sheet)}'})();
+    if (sheets.length === 0) throw new Error('Sheet not found: ${esc(sheet)}');
+    const tables = sheets[0].tables();
+    const result = tables.map(t => ({
+      name: t.name(),
+      rowCount: t.rowCount(),
+      columnCount: t.columnCount(),
+    }));
+    JSON.stringify(result);
+  `;
+}
+
+/** RFC 0009 Phase 1 — read the formula behind a cell instead of its
+ *  evaluated value. \`numbers_get_cell\` returns the computed result;
+ *  \`numbers_get_formula\` returns the literal expression so a model
+ *  can audit / clone / template it. Returns null \`formula\` for cells
+ *  that hold a constant. */
+export function getFormulaScript(documentName: string, sheet: string, cell: string): string {
+  return `
+    const Numbers = Application('com.apple.Numbers');
+    ${iworkDocLookup("Numbers", documentName)}
+    ${sheetTableLookup(sheet)}
+    const c = table.cells['${esc(cell)}'];
+    let formula = null;
+    try { formula = c.formula(); } catch (e) { /* no formula on this cell */ }
+    JSON.stringify({
+      address: '${esc(cell)}',
+      formula: formula,
+      value: c.value(),
+      formattedValue: c.formattedValue(),
+    });
+  `;
+}
+
+/** RFC 0009 Phase 1 — rename a sheet in place. Numbers does NOT support
+ *  duplicate sheet names so the JXA call throws when the new name is
+ *  already taken; we surface that as a clean errJxa. */
+export function renameSheetScript(documentName: string, sheet: string, newName: string): string {
+  return `
+    const Numbers = Application('com.apple.Numbers');
+    ${iworkDocLookup("Numbers", documentName)}
+    const sheets = docs[0].sheets.whose({name: '${esc(sheet)}'})();
+    if (sheets.length === 0) throw new Error('Sheet not found: ${esc(sheet)}');
+    sheets[0].name = '${esc(newName)}';
+    JSON.stringify({renamed: true, from: '${esc(sheet)}', to: '${esc(newName)}'});
+  `;
+}

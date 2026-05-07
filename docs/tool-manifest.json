@@ -1,8 +1,8 @@
 {
   "generatedAt": "STABLE_PLACEHOLDER",
   "protocolVersion": "2025-06-18",
-  "toolCount": 282,
-  "eligibleCount": 277,
+  "toolCount": 285,
+  "eligibleCount": 280,
   "ineligibleCount": 5,
   "ineligibleByReason": {
     "object-param:recurrence": 2,
@@ -7241,6 +7241,47 @@
       "ineligibleReason": null
     },
     {
+      "name": "numbers_get_formula",
+      "title": "Get Numbers Cell Formula",
+      "description": "Read the literal formula behind a cell (e.g. '=SUM(A1:A10)') instead of its evaluated value. Returns null formula for cells that hold a constant.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "document": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Document name"
+          },
+          "sheet": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Sheet name"
+          },
+          "cell": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Cell address (e.g. 'A1')"
+          }
+        },
+        "required": [
+          "document",
+          "sheet",
+          "cell"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "outputSchema": null,
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "appIntentEligible": true,
+      "ineligibleReason": null
+    },
+    {
       "name": "numbers_list_documents",
       "title": "List Numbers Documents",
       "description": "List all open Numbers spreadsheets.",
@@ -7274,6 +7315,41 @@
         },
         "required": [
           "document"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "outputSchema": null,
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "appIntentEligible": true,
+      "ineligibleReason": null
+    },
+    {
+      "name": "numbers_list_tables",
+      "title": "List Numbers Tables",
+      "description": "List every table in a Numbers sheet with its name + dimensions. A sheet can hold multiple tables (totals + breakdown + chart-source); the older tools assume the first table is canonical, this lets a caller pick by name.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "document": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Document name"
+          },
+          "sheet": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Sheet name"
+          }
+        },
+        "required": [
+          "document",
+          "sheet"
         ],
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
@@ -7342,6 +7418,48 @@
         "readOnlyHint": true,
         "destructiveHint": false,
         "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "appIntentEligible": true,
+      "ineligibleReason": null
+    },
+    {
+      "name": "numbers_rename_sheet",
+      "title": "Rename Numbers Sheet",
+      "description": "Rename a sheet in place. Numbers does NOT allow duplicate sheet names; the call fails with errJxa when the new name is taken.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "document": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Document name"
+          },
+          "sheet": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Current sheet name"
+          },
+          "newName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "New sheet name"
+          }
+        },
+        "required": [
+          "document",
+          "sheet",
+          "newName"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "outputSchema": null,
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
         "openWorldHint": false
       },
       "appIntentEligible": true,

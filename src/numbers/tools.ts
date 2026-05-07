@@ -2,7 +2,7 @@ import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, toolError } from "../shared/result.js";
+import { ok, errJxaFor } from "../shared/result.js";
 import { zFilePath, resolveAndGuard } from "../shared/validate.js";
 import {
   listDocumentsScript,
@@ -14,6 +14,9 @@ import {
   addSheetScript,
   exportPdfScript,
   closeDocumentScript,
+  listTablesScript,
+  getFormulaScript,
+  renameSheetScript,
 } from "./scripts.js";
 
 export function registerNumbersTools(server: McpServer, _config: AirMcpConfig): void {
@@ -29,7 +32,7 @@ export function registerNumbersTools(server: McpServer, _config: AirMcpConfig): 
       try {
         return ok(await runJxa(listDocumentsScript()));
       } catch (e) {
-        return toolError("list Numbers documents", e);
+        return errJxaFor("list Numbers documents", e);
       }
     },
   );
@@ -46,7 +49,7 @@ export function registerNumbersTools(server: McpServer, _config: AirMcpConfig): 
       try {
         return ok(await runJxa(createDocumentScript()));
       } catch (e) {
-        return toolError("create Numbers document", e);
+        return errJxaFor("create Numbers document", e);
       }
     },
   );
@@ -65,7 +68,7 @@ export function registerNumbersTools(server: McpServer, _config: AirMcpConfig): 
       try {
         return ok(await runJxa(listSheetsScript(document)));
       } catch (e) {
-        return toolError("list Numbers sheets", e);
+        return errJxaFor("list Numbers sheets", e);
       }
     },
   );
@@ -86,7 +89,7 @@ export function registerNumbersTools(server: McpServer, _config: AirMcpConfig): 
       try {
         return ok(await runJxa(getCellScript(document, sheet, cell)));
       } catch (e) {
-        return toolError("get Numbers cell", e);
+        return errJxaFor("get Numbers cell", e);
       }
     },
   );
@@ -108,7 +111,7 @@ export function registerNumbersTools(server: McpServer, _config: AirMcpConfig): 
       try {
         return ok(await runJxa(setCellScript(document, sheet, cell, value)));
       } catch (e) {
-        return toolError("set Numbers cell", e);
+        return errJxaFor("set Numbers cell", e);
       }
     },
   );
@@ -132,7 +135,7 @@ export function registerNumbersTools(server: McpServer, _config: AirMcpConfig): 
       try {
         return ok(await runJxa(readCellsScript(document, sheet, startRow, startCol, endRow, endCol)));
       } catch (e) {
-        return toolError("read Numbers cells", e);
+        return errJxaFor("read Numbers cells", e);
       }
     },
   );
@@ -152,7 +155,7 @@ export function registerNumbersTools(server: McpServer, _config: AirMcpConfig): 
       try {
         return ok(await runJxa(addSheetScript(document, sheetName)));
       } catch (e) {
-        return toolError("add Numbers sheet", e);
+        return errJxaFor("add Numbers sheet", e);
       }
     },
   );
@@ -173,7 +176,7 @@ export function registerNumbersTools(server: McpServer, _config: AirMcpConfig): 
         resolveAndGuard(outputPath);
         return ok(await runJxa(exportPdfScript(document, outputPath)));
       } catch (e) {
-        return toolError("export Numbers to PDF", e);
+        return errJxaFor("export Numbers to PDF", e);
       }
     },
   );
@@ -193,7 +196,77 @@ export function registerNumbersTools(server: McpServer, _config: AirMcpConfig): 
       try {
         return ok(await runJxa(closeDocumentScript(document, saving)));
       } catch (e) {
-        return toolError("close Numbers document", e);
+        return errJxaFor("close Numbers document", e);
+      }
+    },
+  );
+
+  // RFC 0009 Phase 1 — first batch of structured-edit tools.
+
+  server.registerTool(
+    "numbers_list_tables",
+    {
+      title: "List Numbers Tables",
+      description:
+        "List every table in a Numbers sheet with its name + dimensions. " +
+        "A sheet can hold multiple tables (totals + breakdown + chart-source); " +
+        "the older tools assume the first table is canonical, this lets a caller pick by name.",
+      inputSchema: {
+        document: z.string().max(500).describe("Document name"),
+        sheet: z.string().max(500).describe("Sheet name"),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ document, sheet }) => {
+      try {
+        return ok(await runJxa(listTablesScript(document, sheet)));
+      } catch (e) {
+        return errJxaFor("list Numbers tables", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "numbers_get_formula",
+    {
+      title: "Get Numbers Cell Formula",
+      description:
+        "Read the literal formula behind a cell (e.g. '=SUM(A1:A10)') instead of its evaluated value. " +
+        "Returns null formula for cells that hold a constant.",
+      inputSchema: {
+        document: z.string().max(500).describe("Document name"),
+        sheet: z.string().max(500).describe("Sheet name"),
+        cell: z.string().max(500).describe("Cell address (e.g. 'A1')"),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ document, sheet, cell }) => {
+      try {
+        return ok(await runJxa(getFormulaScript(document, sheet, cell)));
+      } catch (e) {
+        return errJxaFor("get Numbers formula", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "numbers_rename_sheet",
+    {
+      title: "Rename Numbers Sheet",
+      description:
+        "Rename a sheet in place. Numbers does NOT allow duplicate sheet names; the call fails with errJxa when the new name is taken.",
+      inputSchema: {
+        document: z.string().max(500).describe("Document name"),
+        sheet: z.string().max(500).describe("Current sheet name"),
+        newName: z.string().min(1).max(500).describe("New sheet name"),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async ({ document, sheet, newName }) => {
+      try {
+        return ok(await runJxa(renameSheetScript(document, sheet, newName)));
+      } catch (e) {
+        return errJxaFor("rename Numbers sheet", e);
       }
     },
   );

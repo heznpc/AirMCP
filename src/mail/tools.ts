@@ -2,7 +2,7 @@ import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okStructured, okUntrustedLinkedStructured, errPermission, toolError } from "../shared/result.js";
+import { ok, okStructured, okUntrustedLinkedStructured, errPermission, errJxaFor } from "../shared/result.js";
 // Side-effect import: register the mail_unread poller with the shared registry
 // at module load time. The poller itself only starts when startPollers() is
 // invoked by the cross/event observer tool.
@@ -45,7 +45,7 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
       try {
         return okStructured(await runJxa(listMailboxesScript()));
       } catch (e) {
-        return toolError("list mailboxes", e);
+        return errJxaFor("list mailboxes", e);
       }
     },
   );
@@ -85,7 +85,7 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
           await runJxa(listMessagesScript(mailbox, limit, offset, account)),
         );
       } catch (e) {
-        return toolError("list messages", e);
+        return errJxaFor("list messages", e);
       }
     },
   );
@@ -127,7 +127,7 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
       try {
         return okUntrustedLinkedStructured("read_mail", await runJxa(readMessageScript(id, maxLength)));
       } catch (e) {
-        return toolError("read message", e);
+        return errJxaFor("read message", e);
       }
     },
   );
@@ -160,7 +160,7 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
       try {
         return okUntrustedLinkedStructured("search_mail", await runJxa(searchMessagesScript(query, mailbox, limit)));
       } catch (e) {
-        return toolError("search messages", e);
+        return errJxaFor("search messages", e);
       }
     },
   );
@@ -180,7 +180,7 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
       try {
         return ok(await runJxa(markReadScript(id, read)));
       } catch (e) {
-        return toolError("mark message", e);
+        return errJxaFor("mark message", e);
       }
     },
   );
@@ -200,7 +200,7 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
       try {
         return ok(await runJxa(flagMessageScript(id, flagged)));
       } catch (e) {
-        return toolError("flag message", e);
+        return errJxaFor("flag message", e);
       }
     },
   );
@@ -227,7 +227,7 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
       try {
         return okStructured(await runJxa(getUnreadCountScript()));
       } catch (e) {
-        return toolError("get unread count", e);
+        return errJxaFor("get unread count", e);
       }
     },
   );
@@ -252,7 +252,7 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
       try {
         return ok(await runJxa(moveMessageScript(id, targetMailbox, targetAccount)));
       } catch (e) {
-        return toolError("move message", e);
+        return errJxaFor("move message", e);
       }
     },
   );
@@ -282,7 +282,7 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
           );
         return okStructured({ accounts });
       } catch (e) {
-        return toolError("list accounts", e);
+        return errJxaFor("list accounts", e);
       }
     },
   );
@@ -324,7 +324,7 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
       try {
         return ok(await runJxa(sendMailScript(to, subject, body, cc, bcc, account)));
       } catch (e) {
-        return toolError("send mail", e);
+        return errJxaFor("send mail", e);
       }
     },
   );
@@ -353,7 +353,7 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
       try {
         return ok(await runJxa(replyMailScript(id, body, replyAll)));
       } catch (e) {
-        return toolError("reply", e);
+        return errJxaFor("reply", e);
       }
     },
   );

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import { runAutomation } from "../shared/automation.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okUntrustedStructured, okStructured, toolError } from "../shared/result.js";
+import { ok, okUntrustedStructured, okStructured, errJxaFor } from "../shared/result.js";
 import { zFilePath, resolveAndGuard } from "../shared/validate.js";
 import {
   getClipboardScript,
@@ -77,7 +77,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
           }),
         );
       } catch (e) {
-        return toolError("get clipboard", e);
+        return errJxaFor("get clipboard", e);
       }
     },
   );
@@ -105,7 +105,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       try {
         return okStructured(await runJxa<{ set: boolean; length: number }>(setClipboardScript(text)));
       } catch (e) {
-        return toolError("set clipboard", e);
+        return errJxaFor("set clipboard", e);
       }
     },
   );
@@ -134,7 +134,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
           await runJxa<{ outputVolume: number; inputVolume: number; outputMuted: boolean }>(getVolumeScript()),
         );
       } catch (e) {
-        return toolError("get volume", e);
+        return errJxaFor("get volume", e);
       }
     },
   );
@@ -165,7 +165,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
           await runJxa<{ outputVolume: number; outputMuted: boolean }>(setVolumeScript(volume, muted)),
         );
       } catch (e) {
-        return toolError("set volume", e);
+        return errJxaFor("set volume", e);
       }
     },
   );
@@ -190,7 +190,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       try {
         return okStructured(await runJxa<{ darkMode: boolean }>(toggleDarkModeScript()));
       } catch (e) {
-        return toolError("toggle dark mode", e);
+        return errJxaFor("toggle dark mode", e);
       }
     },
   );
@@ -219,7 +219,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
           await runJxa<{ name: string; bundleIdentifier: string; pid: number }>(getFrontmostAppScript()),
         );
       } catch (e) {
-        return toolError("get frontmost app", e);
+        return errJxaFor("get frontmost app", e);
       }
     },
   );
@@ -241,7 +241,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       try {
         return ok(await runJxa(listRunningAppsScript()));
       } catch (e) {
-        return toolError("list running apps", e);
+        return errJxaFor("list running apps", e);
       }
     },
   );
@@ -263,7 +263,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       try {
         return ok(await runJxa(getScreenInfoScript()));
       } catch (e) {
-        return toolError("get screen info", e);
+        return errJxaFor("get screen info", e);
       }
     },
   );
@@ -290,7 +290,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       try {
         return ok(await runJxa(showNotificationScript(message, title, subtitle, sound)));
       } catch (e) {
-        return toolError("show notification", e);
+        return errJxaFor("show notification", e);
       }
     },
   );
@@ -321,7 +321,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
         resolveAndGuard(path);
         return ok(await runJxa(captureScreenshotScript(path, region)));
       } catch (e) {
-        return toolError("capture screenshot", e);
+        return errJxaFor("capture screenshot", e);
       }
     },
   );
@@ -345,7 +345,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       try {
         return ok(await runJxa(getWifiStatusScript()));
       } catch (e) {
-        return toolError("get wifi status", e);
+        return errJxaFor("get wifi status", e);
       }
     },
   );
@@ -369,7 +369,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       try {
         return ok(await runJxa(toggleWifiScript(enable)));
       } catch (e) {
-        return toolError("toggle wifi", e);
+        return errJxaFor("toggle wifi", e);
       }
     },
   );
@@ -391,7 +391,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       try {
         return ok(await runJxa(listBluetoothDevicesScript()));
       } catch (e) {
-        return toolError("list bluetooth devices", e);
+        return errJxaFor("list bluetooth devices", e);
       }
     },
   );
@@ -413,7 +413,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       try {
         return ok(await runJxa(getBatteryStatusScript()));
       } catch (e) {
-        return toolError("get battery status", e);
+        return errJxaFor("get battery status", e);
       }
     },
   );
@@ -435,7 +435,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       try {
         return ok(await runJxa(getBrightnessScript()));
       } catch (e) {
-        return toolError("get brightness", e);
+        return errJxaFor("get brightness", e);
       }
     },
   );
@@ -459,7 +459,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       try {
         return ok(await runJxa(setBrightnessScript(level)));
       } catch (e) {
-        return toolError("set brightness", e);
+        return errJxaFor("set brightness", e);
       }
     },
   );
@@ -483,7 +483,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       try {
         return ok(await runJxa(toggleFocusModeScript(enable)));
       } catch (e) {
-        return toolError("toggle focus mode", e);
+        return errJxaFor("toggle focus mode", e);
       }
     },
   );
@@ -507,7 +507,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       try {
         return ok(await runJxa<{ action: string; success: boolean }>(systemSleepScript()));
       } catch (e) {
-        return toolError("system sleep", e);
+        return errJxaFor("system sleep", e);
       }
     },
   );
@@ -550,7 +550,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
         caffeinatePids.add(result.pid);
         return ok(result);
       } catch (e) {
-        return toolError("prevent sleep", e);
+        return errJxaFor("prevent sleep", e);
       }
     },
   );
@@ -574,7 +574,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       try {
         return ok(await runJxa<{ action: string; success: boolean }>(systemPowerScript(action)));
       } catch (e) {
-        return toolError("system power", e);
+        return errJxaFor("system power", e);
       }
     },
   );
@@ -596,7 +596,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       try {
         return ok(await runJxa(launchAppScript(name)));
       } catch (e) {
-        return toolError("launch app", e);
+        return errJxaFor("launch app", e);
       }
     },
   );
@@ -615,7 +615,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       try {
         return ok(await runJxa(quitAppScript(name)));
       } catch (e) {
-        return toolError("quit app", e);
+        return errJxaFor("quit app", e);
       }
     },
   );
@@ -634,7 +634,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       try {
         return ok(await runJxa(isAppRunningScript(name)));
       } catch (e) {
-        return toolError("check app running", e);
+        return errJxaFor("check app running", e);
       }
     },
   );
@@ -653,7 +653,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       try {
         return ok(await runJxa(listAllWindowsScript()));
       } catch (e) {
-        return toolError("list all windows", e);
+        return errJxaFor("list all windows", e);
       }
     },
   );
@@ -679,7 +679,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       try {
         return ok(await runJxa(moveWindowScript(appName, x, y, windowTitle)));
       } catch (e) {
-        return toolError("move window", e);
+        return errJxaFor("move window", e);
       }
     },
   );
@@ -705,7 +705,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       try {
         return ok(await runJxa(resizeWindowScript(appName, width, height, windowTitle)));
       } catch (e) {
-        return toolError("resize window", e);
+        return errJxaFor("resize window", e);
       }
     },
   );
@@ -734,7 +734,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       try {
         return ok(await runJxa(minimizeWindowScript(appName, restore, windowTitle)));
       } catch (e) {
-        return toolError("minimize window", e);
+        return errJxaFor("minimize window", e);
       }
     },
   );

@@ -2,7 +2,7 @@
 //
 // Source: docs/tool-manifest.json
 // Generator: scripts/gen-swift-intents.mjs
-// RFC 0007 Phase A.2b.2 + A.4.1 — 229 auto-selected read-only
+// RFC 0007 Phase A.2b.2 + A.4.1 — 232 auto-selected read-only
 // tools (65 with typed drift-guards + Interactive Snippet
 // SwiftUI views) + 9 AppShortcutsProvider entries.
 // Run `npm run gen:intents` to refresh after tool metadata changes.
@@ -4553,6 +4553,32 @@ public struct NumbersGetCellIntent: AppIntent {
     }
 }
 
+// Tool: numbers_get_formula
+public struct NumbersGetFormulaIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Get Numbers Cell Formula"
+    nonisolated(unsafe) public static var description = IntentDescription("Read the literal formula behind a cell (e.g. '=SUM(A1:A10)') instead of its evaluated value. Returns null formula for cells that hold a constant.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Document name")
+    public var document: String
+
+    @Parameter(title: "Sheet name")
+    public var sheet: String
+
+    @Parameter(title: "Cell address (e.g. 'A1')")
+    public var cell: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "numbers_get_formula",
+            args: ["document": document, "sheet": sheet, "cell": cell]
+        )
+        return .result(value: result)
+    }
+}
+
 // Tool: numbers_list_documents
 public struct NumbersListDocumentsIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "List Numbers Documents"
@@ -4590,6 +4616,29 @@ public struct NumbersListSheetsIntent: AppIntent {
     }
 }
 
+// Tool: numbers_list_tables
+public struct NumbersListTablesIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "List Numbers Tables"
+    nonisolated(unsafe) public static var description = IntentDescription("List every table in a Numbers sheet with its name + dimensions. A sheet can hold multiple tables (totals + breakdown + chart-source); the older tools assume the first table is canonical, this lets a caller pick by name.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Document name")
+    public var document: String
+
+    @Parameter(title: "Sheet name")
+    public var sheet: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "numbers_list_tables",
+            args: ["document": document, "sheet": sheet]
+        )
+        return .result(value: result)
+    }
+}
+
 // Tool: numbers_read_cells
 public struct NumbersReadCellsIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Read Numbers Cell Range"
@@ -4620,6 +4669,32 @@ public struct NumbersReadCellsIntent: AppIntent {
         let result = try await MCPIntentRouter.shared.call(
             tool: "numbers_read_cells",
             args: ["document": document, "sheet": sheet, "startRow": startRow, "startCol": startCol, "endRow": endRow, "endCol": endCol]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: numbers_rename_sheet
+public struct NumbersRenameSheetIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Rename Numbers Sheet"
+    nonisolated(unsafe) public static var description = IntentDescription("Rename a sheet in place. Numbers does NOT allow duplicate sheet names; the call fails with errJxa when the new name is taken.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Document name")
+    public var document: String
+
+    @Parameter(title: "Current sheet name")
+    public var sheet: String
+
+    @Parameter(title: "New sheet name")
+    public var newName: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "numbers_rename_sheet",
+            args: ["document": document, "sheet": sheet, "newName": newName]
         )
         return .result(value: result)
     }

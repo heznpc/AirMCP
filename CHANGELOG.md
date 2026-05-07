@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### RFC 0001 typed errors — adoption complete (29/32 modules)
+
+The `toolError(action, e)` fallback classifier in `result.ts` got companion `errJxaFor` / `errSwiftFor` / `errUpstreamFor` catch helpers (PR #173) that auto-attach `cause.origin` and the `"Failed to <action>: <message>"` prefix. Across PRs #166, #168, #169, #170, #171, #172, #173, #185, #186, #187, #188 every module that wraps `runJxa` / `runSwift` / `runAutomation` / HTTP fetches migrated their catch blocks from the fallback to the typed helpers. Adoption is now **29/32 `tools.ts` files**.
+
+The remaining three modules intentionally keep `toolError` because the fallback's `internal_error` classification is the right answer for them:
+
+- **`audit/tools.ts`** — fs reads of the on-disk JSONL audit log. ENOENT / EACCES are already handled inside the audit reader, and zod surfaces `invalid_input` automatically for the `since` ISO-8601 parameter. No category gain from migrating.
+- **`memory/tools.ts`** — fs + JSON parse of `~/.cache/airmcp/memory.json`. Same shape as `audit`: storage failures are `internal_error`, input validation already runs through zod + `errInvalidInput`. PR #154 already hardened the write path (atomic temp+rename + serialized op queue + JSON-reviver prototype-pollution guard); the catch-block category isn't where the action is.
+- **`podcasts/tools.ts`** — module is fully broken on macOS 26+ (Apple removed the Podcasts JXA scripting dictionary, see RFC 0004 / `compatibility.brokenOn: [26]` block). Migrating the dead-on-arrival catches isn't worth the noise; the deprecation is already advertised through `airmcp doctor` and `print-compat-report`.
+
+`toolError` itself stays exported for these three modules and as the safety net for any future tool that hasn't yet picked up a typed origin.
+
 ### Added
 - **outputSchema Wave 5 — 4 photos read tools** (`list_photos`, `search_photos`, `get_photo_info`, `list_favorites`) — extends Wave 4's pattern to the photos module. `list_photos` / `search_photos` / `list_favorites` route through `okUntrustedLinkedStructured` (photo metadata is user content); `get_photo_info` uses `okUntrustedStructured`. `list_albums` deferred — bare `AlbumItem[]` return shape, same array-vs-object breaking-change risk as `compare_notes`. Weather forecast tools (`get_daily_forecast` / `get_hourly_forecast`) also deferred for the same reason. 7 new drift guards in `tests/output-schema-wave5.test.js` covering full / null-EXIF / empty-list shapes; `tests/output-schema-structured.test.js` exhaustive coverage check picks up 4 fixtures so any future tool that adds outputSchema without a fixture breaks the build.
 

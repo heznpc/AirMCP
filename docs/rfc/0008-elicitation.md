@@ -1,9 +1,11 @@
 # RFC 0008 — MCP Elicitation for destructive tools
 
-- **Status**: Draft (May 2026)
+- **Status**: Phase 1 Implemented (May 2026 — `tryElicitApproval` in `src/shared/hitl-guard.ts`). Phase 2 Draft.
 - **Author**: heznpc + Claude
 - **Created**: 2026-05-07
-- **Target**: v2.13.0 (Phase 1 — confirmation prompts) · v3.0.0 (Phase 2 — form/URL elicit)
+- **Target**: v2.13.0 (Phase 1 — confirmation prompts ✅) · v3.0.0 (Phase 2 — form/URL elicit)
+- **Amendment**:
+  - 2026-05-07 — Phase 1 lands: capability gate + `AIRMCP_ELICITATION_DISABLE` env opt-out folded into the existing HITL guard's elicitation path. The previous draft assumed a fresh wrapper at the tool-registry layer; on review the `installHitlGuard` interceptor was already wiring `inner.elicitInput()` for destructive tools — the gap was just the negotiated-capability check + env switch. No new wrapper layer needed.
 - **Related**: [`@modelcontextprotocol/sdk` 1.29.0 elicitInput API](https://github.com/modelcontextprotocol/typescript-sdk),
   [MCP Elicitation spec (draft)](https://modelcontextprotocol.io/specification/draft/client/elicitation),
   [GitHub Copilot blog — MCP elicitation](https://github.blog/ai-and-ml/github-copilot/building-smarter-interactions-with-mcp-elicitation-from-clunky-tool-calls-to-seamless-user-experiences/),

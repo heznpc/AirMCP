@@ -22,7 +22,8 @@ import { withResultSizeHint } from "./result.js";
 import { traceToolCall } from "./telemetry.js";
 import { assertTestMode } from "./errors.js";
 import { checkRateLimit } from "./rate-limit.js";
-import { getOAuthClaims } from "./request-context.js";
+import { getOAuthClaims, getRequestContext, runWithRequestContext } from "./request-context.js";
+import { randomUUID } from "node:crypto";
 import { evaluateScopeGate } from "./oauth-scope.js";
 
 /** Threshold in characters above which we auto-attach a result size hint. */
@@ -235,21 +236,60 @@ class ToolRegistry {
 
         const entry = tools.get(name);
 
-        // OAuth scope gate (RFC 0005 §3.4 — Step 2). Runs BEFORE the
-        // rate-limit bucket so a token missing `mcp:destructive` can't
-        // burn the destructive bucket's budget just to hit a 403.
-        // Absence of claims means we're on a non-OAuth path (stdio,
-        // loopback, legacy Bearer) — skip the gate entirely.
-        const claims = getOAuthClaims();
-        if (claims) {
-          const decision = evaluateScopeGate({
-            toolName: name,
-            isReadOnly: entry?.readOnly === true,
-            isDestructive: entry?.destructive === true,
-            callerScopes: claims.scopes,
-          });
-          if (!decision.allowed) {
-            const msg = `[forbidden] scope ${decision.missing} required for tool "${name}"`;
+        // Stamp a correlation ID on the active context (or open one if
+        // the call came in over stdio with no upstream middleware) so
+        // every audit / telemetry / error line for this tool call shares
+        // an identifier. Honors any ID already set by a transport
+        // middleware so external tracing systems can drive it.
+        const existing = getRequestContext();
+        if (!existing?.correlationId) {
+          const ctx = { ...(existing ?? {}), correlationId: randomUUID() };
+          return runWithRequestContext(ctx, () => runWrapped());
+        }
+        return runWrapped();
+
+        async function runWrapped(): Promise<unknown> {
+          // OAuth scope gate (RFC 0005 §3.4 — Step 2). Runs BEFORE the
+          // rate-limit bucket so a token missing `mcp:destructive` can't
+          // burn the destructive bucket's budget just to hit a 403.
+          // Absence of claims means we're on a non-OAuth path (stdio,
+          // loopback, legacy Bearer) — skip the gate entirely.
+          const claims = getOAuthClaims();
+          if (claims) {
+            const decision = evaluateScopeGate({
+              toolName: name,
+              isReadOnly: entry?.readOnly === true,
+              isDestructive: entry?.destructive === true,
+              callerScopes: claims.scopes,
+            });
+            if (!decision.allowed) {
+              const msg = `[forbidden] scope ${decision.missing} required for tool "${name}"`;
+              if (process.env.AIRMCP_AUDIT_LOG !== "false") {
+                auditLog({
+                  timestamp: new Date().toISOString(),
+                  tool: name,
+                  args: args[0] as Record<string, unknown>,
+                  status: "error",
+                });
+              }
+              throw new Error(msg);
+            }
+          }
+
+          // Rate-limit + emergency-stop gate. Runs before the call reaches
+          // the handler so a runaway agent burning through the bucket can
+          // never touch the filesystem/APIs on the denied call. Denials
+          // throw so the error is captured by audit and surfaces to the
+          // caller with the same shape as any other failure.
+          // Tenant isolation: when OAuth claims are present (HTTP transport),
+          // the bucket is keyed on the JWT subject so one tenant's runaway
+          // agent can't exhaust budget for everyone else. Stdio / loopback
+          // share the default tenant.
+          const gate = checkRateLimit(entry?.destructive === true, claims?.subject);
+          if (!gate.allowed) {
+            const msg = `[rate_limited] ${gate.reason ?? "Rate limit exceeded"}${
+              gate.retryAfterMs ? ` (retry in ~${Math.ceil(gate.retryAfterMs / 1000)}s)` : ""
+            }`;
             if (process.env.AIRMCP_AUDIT_LOG !== "false") {
               auditLog({
                 timestamp: new Date().toISOString(),
@@ -260,67 +300,42 @@ class ToolRegistry {
             }
             throw new Error(msg);
           }
-        }
 
-        // Rate-limit + emergency-stop gate. Runs before the call reaches
-        // the handler so a runaway agent burning through the bucket can
-        // never touch the filesystem/APIs on the denied call. Denials
-        // throw so the error is captured by audit and surfaces to the
-        // caller with the same shape as any other failure.
-        // Tenant isolation: when OAuth claims are present (HTTP transport),
-        // the bucket is keyed on the JWT subject so one tenant's runaway
-        // agent can't exhaust budget for everyone else. Stdio / loopback
-        // share the default tenant.
-        const gate = checkRateLimit(entry?.destructive === true, claims?.subject);
-        if (!gate.allowed) {
-          const msg = `[rate_limited] ${gate.reason ?? "Rate limit exceeded"}${
-            gate.retryAfterMs ? ` (retry in ~${Math.ceil(gate.retryAfterMs / 1000)}s)` : ""
-          }`;
-          if (process.env.AIRMCP_AUDIT_LOG !== "false") {
-            auditLog({
-              timestamp: new Date().toISOString(),
-              tool: name,
-              args: args[0] as Record<string, unknown>,
-              status: "error",
-            });
-          }
-          throw new Error(msg);
-        }
-
-        const execute = async () => {
-          const start = Date.now();
-          try {
-            let result = await handler(...args);
-            if (process.env.AIRMCP_AUDIT_LOG !== "false") {
-              auditLog({
-                timestamp: new Date(start).toISOString(),
-                tool: name,
-                args: args[0] as Record<string, unknown>,
-                status: "ok",
-                durationMs: Date.now() - start,
-              });
+          const execute = async () => {
+            const start = Date.now();
+            try {
+              let result = await handler(...args);
+              if (process.env.AIRMCP_AUDIT_LOG !== "false") {
+                auditLog({
+                  timestamp: new Date(start).toISOString(),
+                  tool: name,
+                  args: args[0] as Record<string, unknown>,
+                  status: "ok",
+                  durationMs: Date.now() - start,
+                });
+              }
+              result = autoSizeHint(result);
+              return result;
+            } catch (e) {
+              if (process.env.AIRMCP_AUDIT_LOG !== "false") {
+                auditLog({
+                  timestamp: new Date(start).toISOString(),
+                  tool: name,
+                  args: args[0] as Record<string, unknown>,
+                  status: "error",
+                  durationMs: Date.now() - start,
+                });
+              }
+              throw e;
             }
-            result = autoSizeHint(result);
-            return result;
-          } catch (e) {
-            if (process.env.AIRMCP_AUDIT_LOG !== "false") {
-              auditLog({
-                timestamp: new Date(start).toISOString(),
-                tool: name,
-                args: args[0] as Record<string, unknown>,
-                status: "error",
-                durationMs: Date.now() - start,
-              });
-            }
-            throw e;
-          }
-        };
+          };
 
-        if (process.env.AIRMCP_TELEMETRY === "true") {
-          const toolArgs = args[0] as Record<string, unknown> | undefined;
-          return traceToolCall(name, toolArgs ? Object.keys(toolArgs).length : 0, execute);
+          if (process.env.AIRMCP_TELEMETRY === "true") {
+            const toolArgs = args[0] as Record<string, unknown> | undefined;
+            return traceToolCall(name, toolArgs ? Object.keys(toolArgs).length : 0, execute);
+          }
+          return execute();
         }
-        return execute();
       }) as AnyFn;
     };
 

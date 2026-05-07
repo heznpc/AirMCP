@@ -90,6 +90,8 @@ Draft ──► Proposed ──► Accepted ──► Implemented
 | [0005](./0005-oauth-resource-indicators.md) | OAuth 2.1 + Resource Indicators (MCP 2025-06-18 spec)         | Draft  | v2.11.0                                            |
 | [0006](./0006-swift-bridge-schema-dump.md)  | Swift Bridge `--dump-example-output` for True Schema Contract | Draft  | v2.12.0                                            |
 | [0007](./0007-app-intent-bridge.md)         | MCP Tool ↔ App Intent Auto-Bridge (2-phase)                   | Draft  | v2.13.0+ (Phase A) · Apple-API-dependent (Phase B) |
+| [0008](./0008-elicitation.md)               | MCP Elicitation for destructive tools                         | Draft  | v2.13.0 (Phase 1) · v3.0.0 (Phase 2)               |
+| [0009](./0009-iwork-depth.md)               | iWork (Pages / Numbers / Keynote) coverage depth              | Draft  | v2.13.0 (Phase 1) · v3.0.0 (Phase 2)               |
 
 ## 관련 문서
 

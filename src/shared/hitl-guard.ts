@@ -84,9 +84,22 @@ async function tryElicitApproval(
   toolArgs: Record<string, unknown>,
   destructive: boolean,
 ): Promise<boolean | undefined> {
+  // RFC 0008 §3.3 — operator opt-out for end-to-end scripted pipelines
+  // that don't want any user prompt. When set, every call falls through
+  // to the socket HITL channel (or the no-prompt path) just like a
+  // client that doesn't advertise elicitation.
+  if (process.env.AIRMCP_ELICITATION_DISABLE === "true") return undefined;
+
   try {
     const inner = server.server;
     if (!inner?.elicitInput) return undefined;
+
+    // RFC 0008 §3.2 — capability gate. Honoring the negotiated capability
+    // up-front avoids waiting on a doomed request when the client declared
+    // no elicitation support; the try/catch around the call below stays as
+    // a belt-and-suspenders fallback for clients that lie about it.
+    const caps = inner.getClientCapabilities?.();
+    if (caps && !caps.elicitation) return undefined;
 
     const label = destructive ? `⚠️ Destructive: ${toolName}` : `Approve: ${toolName}`;
     const argsSummary = JSON.stringify(toolArgs, null, 2).slice(0, 500);

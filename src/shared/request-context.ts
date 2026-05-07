@@ -26,6 +26,11 @@ export interface OAuthClaims {
 
 export interface RequestContext {
   oauth?: OAuthClaims;
+  /** Unique ID for the in-flight request / tool-call. Lets audit log
+   *  entries, telemetry traces, and error envelopes thread together
+   *  without manual plumbing through the SDK. Generated lazily by the
+   *  tool-registry wrapper if no upstream middleware set one. */
+  correlationId?: string;
 }
 
 const storage = new AsyncLocalStorage<RequestContext>();
@@ -42,4 +47,11 @@ export function getRequestContext(): RequestContext | undefined {
  *  call stack wasn't entered through an OAuth middleware. */
 export function getOAuthClaims(): OAuthClaims | undefined {
   return storage.getStore()?.oauth;
+}
+
+/** The correlation ID for the active request, or undefined if no
+ *  context has been entered. Audit / telemetry / error builders read
+ *  this so a single failing tool call can be traced across log lines. */
+export function getCorrelationId(): string | undefined {
+  return storage.getStore()?.correlationId;
 }

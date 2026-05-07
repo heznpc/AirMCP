@@ -14,7 +14,7 @@
  */
 import { describe, test, expect } from '@jest/globals';
 
-const { runWithRequestContext, getRequestContext, getOAuthClaims } = await import(
+const { runWithRequestContext, getRequestContext, getOAuthClaims, getCorrelationId } = await import(
   '../dist/shared/request-context.js'
 );
 
@@ -140,6 +140,45 @@ describe('request-context — isolation', () => {
       });
       // Outer store restored after the nested run unwinds.
       expect(getOAuthClaims()).toBe(outer);
+    });
+  });
+});
+
+describe('request-context — correlation ID', () => {
+  test('getCorrelationId is undefined outside a context', () => {
+    expect(getCorrelationId()).toBeUndefined();
+  });
+
+  test('correlationId returned verbatim when set', () => {
+    runWithRequestContext({ correlationId: 'corr-abc-123' }, () => {
+      expect(getCorrelationId()).toBe('corr-abc-123');
+    });
+  });
+
+  test('correlationId persists across an await boundary', async () => {
+    const got = await runWithRequestContext({ correlationId: 'corr-async' }, async () => {
+      await Promise.resolve();
+      return getCorrelationId();
+    });
+    expect(got).toBe('corr-async');
+  });
+
+  test('concurrent contexts do not see each other’s correlation IDs', async () => {
+    const branch = (id, holdMs) =>
+      runWithRequestContext({ correlationId: id }, async () => {
+        await new Promise((r) => setTimeout(r, holdMs));
+        return getCorrelationId();
+      });
+    const [a, b] = await Promise.all([branch('A', 10), branch('B', 1)]);
+    expect(a).toBe('A');
+    expect(b).toBe('B');
+  });
+
+  test('correlationId coexists with oauth claims', () => {
+    const oauth = baseClaims({ subject: 'alice' });
+    runWithRequestContext({ oauth, correlationId: 'corr-and-oauth' }, () => {
+      expect(getCorrelationId()).toBe('corr-and-oauth');
+      expect(getOAuthClaims()).toBe(oauth);
     });
   });
 });

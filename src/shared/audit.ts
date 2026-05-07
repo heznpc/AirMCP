@@ -4,6 +4,7 @@ import { hostname, platform } from "node:os";
 import { createHmac } from "node:crypto";
 import { AUDIT, PATHS } from "./constants.js";
 import { assertTestMode, formatError } from "./errors.js";
+import { getCorrelationId } from "./request-context.js";
 
 const AUDIT_PATH = join(PATHS.VECTOR_STORE, "audit.jsonl");
 const AUDIT_DIR = PATHS.VECTOR_STORE;
@@ -16,6 +17,9 @@ interface AuditEntry {
   args?: Record<string, unknown>;
   status: "ok" | "error";
   durationMs?: number;
+  /** Correlation ID for cross-line tracing. Auto-populated from
+   *  request-context if not set explicitly by the caller. */
+  correlationId?: string;
 }
 
 /**
@@ -93,7 +97,11 @@ export function auditLog(entry: AuditEntry): void {
   } else if (entry.args) {
     sanitized = sanitizeArgs(entry.args);
   }
-  let line = JSON.stringify({ ...entry, args: sanitized });
+  // Auto-attach the active correlation ID when the caller didn't pass
+  // one. Falls through to undefined for synthetic / pre-context callers
+  // (e.g. startup banner, direct test invocations).
+  const correlationId = entry.correlationId ?? getCorrelationId();
+  let line = JSON.stringify({ ...entry, args: sanitized, correlationId });
   if (line.length > AUDIT.MAX_ENTRY_SIZE) {
     line = JSON.stringify({
       ...entry,

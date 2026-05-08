@@ -328,6 +328,73 @@ export async function runDoctor(): Promise<void> {
     }
   }
 
+  // ── Deep checks (opt-in) ──────────────────────────────────────────
+  // `--deep` runs slower live probes that aren't safe in the default
+  // doctor run: audit-log HMAC chain integrity, Swift bridge round-trip,
+  // module registry boot. Used in user-reported troubleshooting.
+  if (process.argv.includes("--deep")) {
+    console.log(heading("Deep checks (--deep)"));
+
+    // 1. Audit log HMAC chain — single-line tampering probe.
+    const s4 = spinner("Verifying audit log HMAC chain...");
+    try {
+      const auditMod = await import("../shared/audit.js");
+      const summary = await auditMod.summarizeAuditEntries({});
+      s4.succeed("Audit verification complete");
+      if (summary.auditDisabled) {
+        meh("Audit log", "currently disabled (recovery window — re-enables on next call)");
+      } else if (summary.verified) {
+        ok("Audit HMAC chain", `verified across ${summary.scannedFiles} file(s), ${summary.total} entries`);
+      } else if (summary.verifiedFirstBreak) {
+        const b = summary.verifiedFirstBreak;
+        bad("Audit HMAC chain", `break at ${b.file}:${b.lineIndex} (${b.reason}) — possible tampering or corruption`);
+      } else {
+        meh("Audit HMAC chain", "no chained entries on disk yet");
+      }
+    } catch (e) {
+      s4.fail("Audit verification failed");
+      meh("Audit HMAC chain", `error: ${e instanceof Error ? e.message : String(e)}`);
+    }
+
+    // 2. Swift bridge live ping. checkSwiftBridge resolves to null when
+    //    everything is fine, or a string with the human-readable reason.
+    const s5 = spinner("Pinging Swift bridge...");
+    try {
+      const swiftMod = await import("../shared/swift.js");
+      const missing = await swiftMod.checkSwiftBridge();
+      s5.succeed("Swift bridge probe complete");
+      if (!missing) {
+        ok("Swift bridge", "responsive");
+      } else {
+        meh("Swift bridge", missing);
+      }
+    } catch (e) {
+      s5.fail("Swift bridge probe failed");
+      meh("Swift bridge", `error: ${e instanceof Error ? e.message : String(e)}`);
+    }
+
+    // 3. Module registry boot smoke. Loads every module's tools.ts +
+    //    optional prompts.ts the same way the runtime does and reports
+    //    any module that fails to import (typo in a script.ts, missing
+    //    transitive dep, etc.).
+    const s6 = spinner("Loading module registry (boot smoke)...");
+    try {
+      const modulesMod = await import("../shared/modules.js");
+      const registry = await modulesMod.loadModuleRegistry();
+      s6.succeed("Module registry loaded");
+      ok("Module registry", `${registry.length} of ${MODULE_NAMES.length} modules loaded successfully`);
+      if (registry.length < MODULE_NAMES.length) {
+        meh(
+          "Module registry",
+          `${MODULE_NAMES.length - registry.length} module(s) failed — see stderr for the failed names`,
+        );
+      }
+    } catch (e) {
+      s6.fail("Module registry boot failed");
+      bad("Module registry", `import error: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
   // ── Summary ────────────────────────────────────────────────────────
   console.log("");
   console.log(divider());
@@ -342,6 +409,11 @@ export async function runDoctor(): Promise<void> {
     console.log(`\n  ${DIM}Warnings are optional. AirMCP will work with current setup.${RESET}`);
   } else {
     console.log(`\n  ${GREEN}${BOLD}  All checks passed. AirMCP is ready.${RESET}`);
+  }
+  if (!process.argv.includes("--deep")) {
+    console.log(
+      `  ${DIM}Run \`npx airmcp doctor --deep\` for audit chain + Swift bridge + module registry probes.${RESET}`,
+    );
   }
   console.log("");
 }

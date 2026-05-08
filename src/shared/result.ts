@@ -1,6 +1,7 @@
 import { getToolLinks, withLinks } from "./tool-links.js";
 import { usageTracker } from "./usage-tracker.js";
 import { CATEGORY_RETRYABLE, type ErrorCategory, type ErrorOrigin, type ToolErrorPayload } from "./error-categories.js";
+import { getCorrelationId } from "./request-context.js";
 
 /** Return a successful MCP tool response with JSON-formatted data. */
 export function ok(data: unknown) {
@@ -121,10 +122,15 @@ export interface ToolErrorOptions {
   retryAfterMs?: number;
   hint?: string;
   cause?: { code?: string; origin?: ErrorOrigin };
+  /** Override the auto-attached correlation ID. Useful for tests; in
+   *  production the active request-context value is picked up
+   *  automatically. */
+  correlationId?: string;
 }
 
 export function toolErr(category: ErrorCategory, message: string, opts: ToolErrorOptions = {}) {
   const retryable = opts.retryable ?? (opts.retryAfterMs !== undefined ? true : CATEGORY_RETRYABLE[category]);
+  const correlationId = opts.correlationId ?? getCorrelationId();
 
   const payload: ToolErrorPayload = {
     category,
@@ -133,10 +139,16 @@ export function toolErr(category: ErrorCategory, message: string, opts: ToolErro
     ...(opts.retryAfterMs !== undefined ? { retryAfterMs: opts.retryAfterMs } : {}),
     ...(opts.hint ? { hint: opts.hint } : {}),
     ...(opts.cause ? { cause: opts.cause } : {}),
+    ...(correlationId ? { correlationId } : {}),
   };
 
   const lines = [`[${category}] ${message}`];
   if (opts.hint) lines.push(`Hint: ${opts.hint}`);
+  if (correlationId) {
+    // One-line trace breadcrumb so a user looking at a failed tool call
+    // can grep the audit log directly: `grep <id> ~/.airmcp/audit.jsonl`.
+    lines.push(`Trace: ${correlationId}`);
+  }
 
   return {
     content: [{ type: "text" as const, text: lines.join("\n") }],

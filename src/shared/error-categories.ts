@@ -59,6 +59,10 @@ export interface ToolErrorPayload {
     code?: string;
     origin?: ErrorOrigin;
   };
+  /** Auto-attached correlation ID for cross-log tracing. Pairs with
+   *  the same field on `audit.jsonl` entries — `grep <id>` joins
+   *  the failed tool result, the audit row, and any HITL prompt. */
+  correlationId?: string;
 }
 
 /**

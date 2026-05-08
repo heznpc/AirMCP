@@ -357,6 +357,14 @@ public struct EventKitService: Sendable {
     }
 
     /// Shared authorization logic for EventKit stores.
+    ///
+    /// Issue #145: a freshly-granted `EKEventStore` can return an empty
+    /// `calendars(for:)` array even though the user has calendars
+    /// available — the shared store keeps the pre-authorization snapshot
+    /// of sources and never picks up the now-readable data. `reset()`
+    /// after the grant clears that snapshot so the very next call sees
+    /// the real backing data. Idempotent across subsequent calls because
+    /// `flag` short-circuits.
     private func authorize(
         store: EKEventStore,
         flag: OSAllocatedUnfairLock<Bool>,
@@ -367,6 +375,7 @@ public struct EventKitService: Sendable {
         if !isAuthorized {
             let granted = try await request(store)
             guard granted else { throw AirMCPKitError.permissionDenied(errorMessage) }
+            store.reset()
             flag.withLock { $0 = true }
         }
         return store

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+> **Reading guide**: entries are grouped by RFC track and audience.
+> - **For users** — features visible in the AI's tool surface, error messages, or `npx airmcp doctor` output.
+> - **For developers** — internal helpers, test infra, RFC 0001 helpers, error envelope shape.
+> - **For operators** — env var changes, audit / OAuth / rate-limit / network policy adjustments. See [docs/environment.md](docs/environment.md) for the full env knob index.
+
 ### RFC 0001 typed errors — adoption complete (29/32 modules)
 
 The `toolError(action, e)` fallback classifier in `result.ts` got companion `errJxaFor` / `errSwiftFor` / `errUpstreamFor` catch helpers (PR #173) that auto-attach `cause.origin` and the `"Failed to <action>: <message>"` prefix. Across PRs #166, #168, #169, #170, #171, #172, #173, #185, #186, #187, #188 every module that wraps `runJxa` / `runSwift` / `runAutomation` / HTTP fetches migrated their catch blocks from the fallback to the typed helpers. Adoption is now **29/32 `tools.ts` files**.

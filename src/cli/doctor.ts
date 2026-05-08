@@ -329,10 +329,11 @@ export async function runDoctor(): Promise<void> {
   }
 
   // ── Deep checks (opt-in) ──────────────────────────────────────────
-  // `--deep` runs slower live probes that aren't safe in the default
-  // doctor run: audit-log HMAC chain integrity, Swift bridge round-trip,
-  // module registry boot. Used in user-reported troubleshooting.
-  if (process.argv.includes("--deep")) {
+  // `--deep` runs slower live probes useful for user-reported triage:
+  // audit-log HMAC chain integrity, Swift bridge round-trip, module
+  // registry boot.
+  const deepFlag = process.argv.includes("--deep");
+  if (deepFlag) {
     console.log(heading("Deep checks (--deep)"));
 
     // 1. Audit log HMAC chain — single-line tampering probe.
@@ -347,7 +348,11 @@ export async function runDoctor(): Promise<void> {
         ok("Audit HMAC chain", `verified across ${summary.scannedFiles} file(s), ${summary.total} entries`);
       } else if (summary.verifiedFirstBreak) {
         const b = summary.verifiedFirstBreak;
-        bad("Audit HMAC chain", `break at ${b.file}:${b.lineIndex} (${b.reason}) — possible tampering or corruption`);
+        bad(
+          "Audit HMAC chain",
+          `break at ${b.file}:${b.lineIndex} (${b.reason}) — possible tampering or corruption. ` +
+            `Inspect the surrounding lines, then call audit_summary to see the full break window.`,
+        );
       } else {
         meh("Audit HMAC chain", "no chained entries on disk yet");
       }
@@ -410,7 +415,7 @@ export async function runDoctor(): Promise<void> {
   } else {
     console.log(`\n  ${GREEN}${BOLD}  All checks passed. AirMCP is ready.${RESET}`);
   }
-  if (!process.argv.includes("--deep")) {
+  if (!deepFlag) {
     console.log(
       `  ${DIM}Run \`npx airmcp doctor --deep\` for audit chain + Swift bridge + module registry probes.${RESET}`,
     );

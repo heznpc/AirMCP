@@ -233,6 +233,50 @@ const I18N: Record<string, Record<LangCode, string>> = {
     de: "N\u00E4chste Schritte",
     pt: "Pr\u00F3ximos passos",
   },
+  try_asking: {
+    en: "Try asking your AI:",
+    ko: "AI\uC5D0\uAC8C \uBB3C\uC5B4\uBCF4\uC138\uC694:",
+    ja: "AI\u306B\u8A66\u3057\u306B\u805E\u3044\u3066\u307F\u3066:",
+    "zh-CN": "\u8BD5\u8BD5\u95EE\u4F60\u7684 AI:",
+    "zh-TW": "\u8A66\u8A66\u554F\u4F60\u7684 AI:",
+    es: "Prueba preguntando a tu IA:",
+    fr: "Essayez de demander \u00E0 votre IA :",
+    de: "Frage deine KI:",
+    pt: "Experimente perguntar \u00E0 sua IA:",
+  },
+  prompt_calendar_today: {
+    en: "What's on my calendar today?",
+    ko: "\uC624\uB298 \uC77C\uC815\uC774 \uBB34\uC5C7\uC778\uAC00\uC694?",
+    ja: "\u4ECA\u65E5\u306E\u30B9\u30B1\u30B8\u30E5\u30FC\u30EB\u306F\uFF1F",
+    "zh-CN": "\u6211\u4ECA\u5929\u7684\u65E5\u7A0B\u5B89\u6392\u5982\u4F55\uFF1F",
+    "zh-TW": "\u6211\u4ECA\u5929\u7684\u884C\u7A0B\u5B89\u6392\u5982\u4F55\uFF1F",
+    es: "\u00BFQu\u00E9 hay en mi calendario hoy?",
+    fr: "Qu\u2019y a-t-il \u00E0 mon agenda aujourd\u2019hui ?",
+    de: "Was steht heute in meinem Kalender?",
+    pt: "O que tenho na agenda hoje?",
+  },
+  prompt_summarize_notes: {
+    en: "Read my latest notes and summarize them",
+    ko: "\uCD5C\uADFC \uBA54\uBAA8\uB97C \uC77D\uACE0 \uC694\uC57D\uD574\uC8FC\uC138\uC694",
+    ja: "\u6700\u8FD1\u306E\u30E1\u30E2\u3092\u8AAD\u3093\u3067\u8981\u7D04\u3057\u3066\u304F\u3060\u3055\u3044",
+    "zh-CN": "\u9605\u8BFB\u6700\u8FD1\u7684\u7B14\u8BB0\u5E76\u603B\u7ED3",
+    "zh-TW": "\u95B1\u8B80\u6700\u8FD1\u7684\u7B46\u8A18\u4E26\u7E3D\u7D50",
+    es: "Lee mis \u00FAltimas notas y res\u00FAmelas",
+    fr: "Lis mes derni\u00E8res notes et r\u00E9sume-les",
+    de: "Lies meine letzten Notizen und fasse sie zusammen",
+    pt: "Leia minhas notas recentes e resuma-as",
+  },
+  prompt_overdue_reminders: {
+    en: "Show overdue reminders and reschedule them to tomorrow",
+    ko: "\uC9C0\uB09C \uB9AC\uB9C8\uC778\uB354\uB97C \uBCF4\uC5EC\uC8FC\uACE0 \uB0B4\uC77C\uB85C \uC62E\uACA8\uC8FC\uC138\uC694",
+    ja: "\u671F\u9650\u5207\u308C\u306E\u30EA\u30DE\u30A4\u30F3\u30C0\u30FC\u3092\u660E\u65E5\u306B\u518D\u30B9\u30B1\u30B8\u30E5\u30FC\u30EB",
+    "zh-CN": "\u663E\u793A\u8FC7\u671F\u63D0\u9192\u5E76\u91CD\u65B0\u5B89\u6392\u5230\u660E\u5929",
+    "zh-TW": "\u986F\u793A\u903E\u671F\u63D0\u9192\u4E26\u91CD\u65B0\u5B89\u6392\u5230\u660E\u5929",
+    es: "Muestra recordatorios atrasados y reprogr\u00E1malos para ma\u00F1ana",
+    fr: "Affiche les rappels en retard et reprogramme-les \u00E0 demain",
+    de: "Zeige \u00FCberf\u00E4llige Erinnerungen und verschiebe sie auf morgen",
+    pt: "Mostre lembretes atrasados e reagende-os para amanh\u00E3",
+  },
 };
 
 function t(key: string, lang: LangCode): string {
@@ -477,9 +521,9 @@ export async function runInit(): Promise<void> {
   console.log(`    ${DIM}\u2022${RESET} Re-run ${BOLD}npx airmcp init${RESET} anytime to change modules`);
   console.log(`    ${DIM}\u2022${RESET} Use ${BOLD}npx airmcp --full${RESET} to enable all modules temporarily`);
   console.log("");
-  console.log(`  ${DIM}Try asking your AI:${RESET}`);
-  console.log(`    ${DIM}\u201c${RESET}What's on my calendar today?${DIM}\u201d${RESET}`);
-  console.log(`    ${DIM}\u201c${RESET}Read my latest notes and summarize them${DIM}\u201d${RESET}`);
-  console.log(`    ${DIM}\u201c${RESET}Show overdue reminders and reschedule them to tomorrow${DIM}\u201d${RESET}`);
+  console.log(`  ${DIM}${t("try_asking", lang)}${RESET}`);
+  console.log(`    ${DIM}\u201c${RESET}${t("prompt_calendar_today", lang)}${DIM}\u201d${RESET}`);
+  console.log(`    ${DIM}\u201c${RESET}${t("prompt_summarize_notes", lang)}${DIM}\u201d${RESET}`);
+  console.log(`    ${DIM}\u201c${RESET}${t("prompt_overdue_reminders", lang)}${DIM}\u201d${RESET}`);
   console.log("");
 }

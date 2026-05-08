@@ -165,8 +165,22 @@ export function errNotFound(message: string, opts?: ToolErrorOptions) {
   return toolErr("not_found", message, opts);
 }
 
+/** Default hint added to permission_denied errors when the caller
+ *  didn't supply a more specific one. Points the user at the macOS
+ *  Privacy & Security pane, which is the canonical fix for the JXA /
+ *  Automation / Accessibility / Screen Recording denials AirMCP hits.
+ *  Operators on non-darwin (CI runners, Linux clones) get a generic
+ *  hint instead. */
+const PERMISSION_HINT_MACOS =
+  "Open System Settings → Privacy & Security and grant the requested permission, then re-run the tool.";
+
 export function errPermission(message: string, opts?: ToolErrorOptions) {
-  return toolErr("permission_denied", message, opts);
+  // Auto-attach the macOS Settings deep-link as a hint when the caller
+  // didn't supply one. Honors any caller-provided hint verbatim.
+  const withHint: ToolErrorOptions = opts?.hint
+    ? opts
+    : { ...opts, hint: process.platform === "darwin" ? PERMISSION_HINT_MACOS : (opts?.hint ?? "") };
+  return toolErr("permission_denied", message, withHint);
 }
 
 export function errUpstream(message: string, opts?: ToolErrorOptions) {

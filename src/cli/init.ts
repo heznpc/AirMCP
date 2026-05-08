@@ -471,7 +471,15 @@ export async function runInit(): Promise<void> {
   console.log("");
   console.log(`  ${DIM}${t("next_steps", lang)}:${RESET}`);
   console.log(`    ${DIM}\u2022${RESET} Run ${BOLD}npx airmcp doctor${RESET} to check everything is working`);
+  console.log(
+    `    ${DIM}\u2022${RESET} Run ${BOLD}npx airmcp doctor --deep${RESET} for audit + Swift bridge + module-load probes`,
+  );
   console.log(`    ${DIM}\u2022${RESET} Re-run ${BOLD}npx airmcp init${RESET} anytime to change modules`);
   console.log(`    ${DIM}\u2022${RESET} Use ${BOLD}npx airmcp --full${RESET} to enable all modules temporarily`);
+  console.log("");
+  console.log(`  ${DIM}Try asking your AI:${RESET}`);
+  console.log(`    ${DIM}\u201c${RESET}What's on my calendar today?${DIM}\u201d${RESET}`);
+  console.log(`    ${DIM}\u201c${RESET}Read my latest notes and summarize them${DIM}\u201d${RESET}`);
+  console.log(`    ${DIM}\u201c${RESET}Show overdue reminders and reschedule them to tomorrow${DIM}\u201d${RESET}`);
   console.log("");
 }

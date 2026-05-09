@@ -106,7 +106,7 @@ Once connected, just ask your AI in natural language. Here are some things you c
 - "Check today's meetings, find related notes, and create a prep checklist in Reminders"
 - "Search my files for the Q1 report, read it, and draft a summary email to the team"
 
-These are just starting points — with 269 tools across 29 Apple apps, the combinations are endless.
+These are just starting points — with 272 tools across 29 Apple apps, the combinations are endless.
 
 ---
 
@@ -116,7 +116,7 @@ After [`supermemoryai/apple-mcp` was archived 2026-01-01](https://github.com/sup
 
 |                                   | Direct AppleScript      | Siri Shortcuts    | apple-mcp (archived)       | **AirMCP**                                                                                        |
 | --------------------------------- | ----------------------- | ----------------- | -------------------------- | ------------------------------------------------------------------------------------------------- |
-| Tools                             | Manual scripts          | Limited actions   | 15                         | **269**                                                                                           |
+| Tools                             | Manual scripts          | Limited actions   | 15                         | **272**                                                                                           |
 | Modules                           | —                       | —                 | 5                          | **29**                                                                                            |
 | MCP protocol                      | ❌                      | ❌                | ✅                         | ✅ (2025-06-18 spec + OAuth 2.1 + Resource Indicators, RFC 0005)                                  |
 | Input validation                  | ❌                      | N/A               | ❌                         | **Zod + `outputSchema` on ~35% of read tools + script↔schema contract tests**                     |
@@ -177,7 +177,7 @@ User-authored skills land in `~/.config/airmcp/skills/*.yaml` and hot-reload.
 
 ## Safety & Operations
 
-AirMCP runs with access to 269 tools on your machine. A few layers keep a buggy agent plan from turning into an incident:
+AirMCP runs with access to 272 tools on your machine. A few layers keep a buggy agent plan from turning into an incident:
 
 - **HITL approval** — every destructive tool prompts before firing (via MCP Elicitation or a Unix socket fallback). Per-call, per-scope.
 - **Rate limit** — 60 tool calls/minute globally, 10 destructive/hour. Token-bucket so bursts are fine; sustained rate isn't.
@@ -343,7 +343,7 @@ npx airmcp --http --bind-all --port 3847
 curl http://127.0.0.1:3847/.well-known/mcp.json
 ```
 
-The response includes `"network_policy": "with-token+origin"` so the client can confirm what it's connecting to before a single tool call. Registry crawlers (Anthropic MCP Registry, Smithery, PulseMCP, Glama) use the same endpoint to build their catalog without connecting live — it carries the full tool inventory (`tools.count`, `tools.names`), enabled modules, license, and homepage, so a crawler can surface "AirMCP: 269 tools across calendar, notes, mail, …" without opening a session. MCP spec version pinned via `schema_version: "2025-11-25"`. When the policy is `with-oauth*`, a sibling `/.well-known/oauth-protected-resource` endpoint (RFC 9728) advertises the authorization server + audience + supported scopes so conforming clients can negotiate OAuth before the first MCP call.
+The response includes `"network_policy": "with-token+origin"` so the client can confirm what it's connecting to before a single tool call. Registry crawlers (Anthropic MCP Registry, Smithery, PulseMCP, Glama) use the same endpoint to build their catalog without connecting live — it carries the full tool inventory (`tools.count`, `tools.names`), enabled modules, license, and homepage, so a crawler can surface "AirMCP: 272 tools across calendar, notes, mail, …" without opening a session. MCP spec version pinned via `schema_version: "2025-11-25"`. When the policy is `with-oauth*`, a sibling `/.well-known/oauth-protected-resource` endpoint (RFC 9728) advertises the authorization server + audience + supported scopes so conforming clients can negotiate OAuth before the first MCP call.
 
 Running AirMCP on a laptop that suspends? Put the menubar app on your Mac Mini / always-on host, point the browser at that hostname, and leave the token in Chrome's secure storage. Revoke by rotating `AIRMCP_HTTP_TOKEN` and restarting the server.
 
@@ -914,7 +914,7 @@ Modules with OS requirements (e.g., Intelligence requires macOS 26+) are automat
 - **Input sanitization** — `run_javascript` blocks `javascript:` and `data:` URL schemes to prevent code injection. `escJxaShell` strips control characters from shell arguments.
 - **Read data exposure** — Destructive operations require HITL approval, but read operations (mail, messages, contacts) are not rate-limited. When connected to cloud LLMs, sensitive data passes through the LLM provider. Mitigations: PII scrubbing in logs, pagination limits, sensitive modules (mail, messages) require explicit opt-in.
 - **IPC overhead** — Multi-process path (Client → Node.js → osascript/Swift CLI → macOS app). Each JXA call adds ~50ms overhead. Pagination prevents bulk data transfers. Swift bridge path bypasses JXA for EventKit/PhotoKit operations.
-- **Scope** — 269 tools across 29 modules follow 5 repeating patterns (JXA CRUD, Swift bridge, HTTP API, System Events, CLI wrapper), keeping maintenance proportional to pattern count, not tool count.
+- **Scope** — 272 tools across 29 modules follow 5 repeating patterns (JXA CRUD, Swift bridge, HTTP API, System Events, CLI wrapper), keeping maintenance proportional to pattern count, not tool count.
 
 ### Location & Bluetooth
 

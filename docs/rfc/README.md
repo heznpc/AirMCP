@@ -94,6 +94,7 @@ Draft ──► Proposed ──► Accepted ──► Implemented
 | [0011](./0011-post-wwdc-2026.md)            | Post-WWDC 2026 positioning (placeholder)                      | Placeholder | TBD (post June 8-12 WWDC keynote)              |
 | [0008](./0008-elicitation.md)               | MCP Elicitation for destructive tools                         | Phase 1 Implemented | v2.13.0 (Phase 1 ✅) · v3.0.0 (Phase 2) |
 | [0009](./0009-iwork-depth.md)               | iWork (Pages / Numbers / Keynote) coverage depth              | Draft  | v2.13.0 (Phase 1) · v3.0.0 (Phase 2)               |
+| [0012](./0012-always-on-daemon.md)          | Always-on daemon mode (LaunchAgent + scheduled skills + queued HITL) | Draft  | v2.14.0 (Phase 1) · v2.15.0 (Phase 2)              |
 
 ## 관련 문서
 

@@ -2,7 +2,7 @@
 //
 // Source: docs/tool-manifest.json
 // Generator: scripts/gen-swift-intents.mjs
-// RFC 0007 Phase A.2b.2 + A.4.1 — 232 auto-selected read-only
+// RFC 0007 Phase A.2b.2 + A.4.1 — 235 auto-selected read-only
 // tools (65 with typed drift-guards + Interactive Snippet
 // SwiftUI views) + 9 AppShortcutsProvider entries.
 // Run `npm run gen:intents` to refresh after tool metadata changes.
@@ -4579,6 +4579,29 @@ public struct NumbersGetFormulaIntent: AppIntent {
     }
 }
 
+// Tool: numbers_list_charts
+public struct NumbersListChartsIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "List Numbers Charts"
+    nonisolated(unsafe) public static var description = IntentDescription("List every chart in a Numbers sheet with its name + chart type. A sheet can carry multiple charts (revenue trend + segment pie + region bar); a model picking which one to interrogate or update needs to enumerate them first. Symmetric to numbers_list_tables.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Document name")
+    public var document: String
+
+    @Parameter(title: "Sheet name")
+    public var sheet: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "numbers_list_charts",
+            args: ["document": document, "sheet": sheet]
+        )
+        return .result(value: result)
+    }
+}
+
 // Tool: numbers_list_documents
 public struct NumbersListDocumentsIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "List Numbers Documents"
@@ -4724,6 +4747,61 @@ public struct NumbersSetCellIntent: AppIntent {
         let result = try await MCPIntentRouter.shared.call(
             tool: "numbers_set_cell",
             args: ["document": document, "sheet": sheet, "cell": cell, "value": value]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: numbers_set_formula
+public struct NumbersSetFormulaIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Set Numbers Cell Formula"
+    nonisolated(unsafe) public static var description = IntentDescription("Write a formula expression to a cell (e.g. '=SUM(A1:A10)'). The leading '=' is optional — passing 'SUM(A1:A10)' or '=SUM(A1:A10)' both work. Errors in the formula (bad reference, unknown function) surface as errJxa with the Numbers parse message. Symmetric to numbers_get_formula.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Document name")
+    public var document: String
+
+    @Parameter(title: "Sheet name")
+    public var sheet: String
+
+    @Parameter(title: "Cell address (e.g. 'A1')")
+    public var cell: String
+
+    @Parameter(title: "Formula expression — '=' prefix optional")
+    public var formula: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "numbers_set_formula",
+            args: ["document": document, "sheet": sheet, "cell": cell, "formula": formula]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: numbers_set_range
+public struct NumbersSetRangeIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Set Numbers Cell Range"
+    nonisolated(unsafe) public static var description = IntentDescription("Bulk-write a 2D rectangular block of string values starting at a top-left cell address (e.g. 'B2'). Each value is written via the .value setter — values starting with '=' are parsed as formulas (same as numbers_set_cell). Cell addresses use A1 notation; the script auto-extends past Z (AA, AB, …). Returns the count of cells written. Capped at 1000 cells per call to stay within Phase 1's range-size budget (RFC 0009 §6.2).")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Document name")
+    public var document: String
+
+    @Parameter(title: "Sheet name")
+    public var sheet: String
+
+    @Parameter(title: "Top-left cell address in A1 notation (e.g. 'B2')")
+    public var startCell: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "numbers_set_range",
+            args: ["document": document, "sheet": sheet, "startCell": startCell]
         )
         return .result(value: result)
     }

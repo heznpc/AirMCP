@@ -16,7 +16,7 @@ MCP server for the entire Apple ecosystem — Notes, Reminders, Calendar, Contac
 
 ## Features
 
-- **272 tools** (29 modules) — Apple app CRUD + system control + Apple Intelligence + UI Automation + Screen Capture + Maps + Podcasts + Weather + iWork (Pages/Numbers/Keynote) + Google Workspace + dynamic shortcuts + context memory + audit introspection
+- **276 tools** (29 modules) — Apple app CRUD + system control + Apple Intelligence + UI Automation + Screen Capture + Maps + Podcasts + Weather + iWork (Pages/Numbers/Keynote) + Google Workspace + dynamic shortcuts + context memory + audit introspection
 - **229 Shortcuts / Siri AppIntents** — auto-generated from the tool manifest (50 Interactive Snippet views + 17 AppEnum pickers); `AskAirMCPIntent` natural-language agent on iOS 26+/macOS 26+ via FoundationModels
 - **34 prompts + 14 YAML skill built-ins** — per-app workflows + cross-module + developer workflows + Skills DSL (`inputs` / `parallel` / `loop` / `on_error` / `retry` / 9 event triggers)
 - **9 MCP resources** — Notes, Calendar, Reminders, Music, Mail, System, Context Memory + unified `context://snapshot/{depth}`

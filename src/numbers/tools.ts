@@ -17,6 +17,10 @@ import {
   listTablesScript,
   getFormulaScript,
   renameSheetScript,
+  listChartsScript,
+  setFormulaScript,
+  setRangeScript,
+  resizeTableScript,
 } from "./scripts.js";
 
 export function registerNumbersTools(server: McpServer, _config: AirMcpConfig): void {
@@ -267,6 +271,137 @@ export function registerNumbersTools(server: McpServer, _config: AirMcpConfig): 
         return ok(await runJxa(renameSheetScript(document, sheet, newName)));
       } catch (e) {
         return errJxaFor("rename Numbers sheet", e);
+      }
+    },
+  );
+
+  // RFC 0009 Phase 1 batch 2 — list_charts (read) + set_formula / set_range / resize_table (edit).
+
+  server.registerTool(
+    "numbers_list_charts",
+    {
+      title: "List Numbers Charts",
+      description:
+        "List every chart in a Numbers sheet with its name + chart type. " +
+        "A sheet can carry multiple charts (revenue trend + segment pie + region bar); " +
+        "a model picking which one to interrogate or update needs to enumerate them first. " +
+        "Symmetric to numbers_list_tables.",
+      inputSchema: {
+        document: z.string().max(500).describe("Document name"),
+        sheet: z.string().max(500).describe("Sheet name"),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ document, sheet }) => {
+      try {
+        return ok(await runJxa(listChartsScript(document, sheet)));
+      } catch (e) {
+        return errJxaFor("list Numbers charts", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "numbers_set_formula",
+    {
+      title: "Set Numbers Cell Formula",
+      description:
+        "Write a formula expression to a cell (e.g. '=SUM(A1:A10)'). " +
+        "The leading '=' is optional — passing 'SUM(A1:A10)' or '=SUM(A1:A10)' both work. " +
+        "Errors in the formula (bad reference, unknown function) surface as errJxa with the Numbers parse message. " +
+        "Symmetric to numbers_get_formula.",
+      inputSchema: {
+        document: z.string().max(500).describe("Document name"),
+        sheet: z.string().max(500).describe("Sheet name"),
+        cell: z.string().max(500).describe("Cell address (e.g. 'A1')"),
+        formula: z.string().min(1).max(10000).describe("Formula expression — '=' prefix optional"),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ document, sheet, cell, formula }) => {
+      try {
+        return ok(await runJxa(setFormulaScript(document, sheet, cell, formula)));
+      } catch (e) {
+        return errJxaFor("set Numbers formula", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "numbers_set_range",
+    {
+      title: "Set Numbers Cell Range",
+      description:
+        "Bulk-write a 2D rectangular block of string values starting at a top-left cell address (e.g. 'B2'). " +
+        "Each value is written via the .value setter — values starting with '=' are parsed as formulas (same as numbers_set_cell). " +
+        "Cell addresses use A1 notation; the script auto-extends past Z (AA, AB, …). " +
+        "Returns the count of cells written. Capped at 1000 cells per call to stay within Phase 1's range-size budget (RFC 0009 §6.2).",
+      inputSchema: {
+        document: z.string().max(500).describe("Document name"),
+        sheet: z.string().max(500).describe("Sheet name"),
+        startCell: z
+          .string()
+          .regex(/^[A-Z]+[0-9]+$/)
+          .max(20)
+          .describe("Top-left cell address in A1 notation (e.g. 'B2')"),
+        values: z
+          .array(z.array(z.string().max(10000)))
+          .min(1)
+          .max(1000)
+          .describe("2D array: outer = rows, inner = columns. Max 1000 cells total."),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ document, sheet, startCell, values }) => {
+      try {
+        const total = values.reduce((sum: number, row: string[]) => sum + row.length, 0);
+        if (total > 1000) {
+          throw new Error(`Range size ${total} exceeds Phase 1 cap of 1000 cells (RFC 0009 §6.2)`);
+        }
+        return ok(await runJxa(setRangeScript(document, sheet, startCell, values)));
+      } catch (e) {
+        return errJxaFor("set Numbers range", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "numbers_resize_table",
+    {
+      title: "Resize Numbers Table",
+      description:
+        "Resize a table by setting its rowCount and/or columnCount. " +
+        "Growing appends empty rows/columns on the bottom/right. " +
+        "Shrinking DISCARDS the trailing rows/columns AND THEIR CONTENT — destructive. " +
+        "Pass null for either dimension to leave it unchanged.",
+      inputSchema: {
+        document: z.string().max(500).describe("Document name"),
+        sheet: z.string().max(500).describe("Sheet name"),
+        rowCount: z
+          .number()
+          .int()
+          .min(1)
+          .max(100000)
+          .nullable()
+          .describe("New row count (null to leave unchanged). Shrinking truncates trailing rows."),
+        columnCount: z
+          .number()
+          .int()
+          .min(1)
+          .max(1000)
+          .nullable()
+          .describe("New column count (null to leave unchanged). Shrinking truncates trailing columns."),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ document, sheet, rowCount, columnCount }) => {
+      try {
+        if (rowCount === null && columnCount === null) {
+          throw new Error("At least one of rowCount or columnCount must be provided");
+        }
+        return ok(await runJxa(resizeTableScript(document, sheet, rowCount, columnCount)));
+      } catch (e) {
+        return errJxaFor("resize Numbers table", e);
       }
     },
   );

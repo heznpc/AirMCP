@@ -297,17 +297,24 @@ describe('list_all_windows', () => {
 
   test('returns window list', async () => {
     const { server } = setup();
-    mockRunJxa.mockResolvedValue([
-      { app: 'Safari', title: 'Google', x: 0, y: 0, width: 1200, height: 800 },
-      { app: 'Finder', title: 'Documents', x: 100, y: 100, width: 600, height: 400 },
-    ]);
+    // Wave 6: list_all_windows now declares outputSchema so structuredContent
+    // is the source of truth. Mock matches the actual script return shape
+    // (was previously a bare array; the script always returned {total, windows}).
+    mockRunJxa.mockResolvedValue({
+      total: 2,
+      windows: [
+        { app: 'Safari', pid: 100, title: 'Google', position: [0, 0], size: [1200, 800], minimized: false },
+        { app: 'Finder', pid: 200, title: 'Documents', position: [100, 100], size: [600, 400], minimized: false },
+      ],
+    });
 
     const result = await server.callTool('list_all_windows', {});
 
     expect(result.isError).toBeUndefined();
-    const parsed = JSON.parse(result.content[0].text);
-    expect(parsed).toHaveLength(2);
-    expect(parsed[0].app).toBe('Safari');
+    expect(result.structuredContent).toBeDefined();
+    expect(result.structuredContent.total).toBe(2);
+    expect(result.structuredContent.windows).toHaveLength(2);
+    expect(result.structuredContent.windows[0].app).toBe('Safari');
   });
 });
 

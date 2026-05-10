@@ -230,6 +230,17 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       title: "List Running Apps",
       description: "List all running applications with name, bundle identifier, PID, and visibility.",
       inputSchema: {},
+      outputSchema: {
+        total: z.number().int().min(0),
+        apps: z.array(
+          z.object({
+            name: z.string(),
+            bundleIdentifier: z.string(),
+            pid: z.number().int(),
+            visible: z.boolean(),
+          }),
+        ),
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -239,7 +250,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
     },
     async () => {
       try {
-        return ok(await runJxa(listRunningAppsScript()));
+        return okUntrustedStructured(await runJxa(listRunningAppsScript()));
       } catch (e) {
         return errJxaFor("list running apps", e);
       }
@@ -252,6 +263,17 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       title: "Get Screen Info",
       description: "Get display information including resolution, pixel dimensions, and Retina status.",
       inputSchema: {},
+      outputSchema: {
+        displays: z.array(
+          z.object({
+            name: z.string(),
+            resolution: z.string().nullable(),
+            pixelWidth: z.number().int().nullable(),
+            pixelHeight: z.number().int().nullable(),
+            retina: z.boolean(),
+          }),
+        ),
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -261,7 +283,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
     },
     async () => {
       try {
-        return ok(await runJxa(getScreenInfoScript()));
+        return okStructured(await runJxa(getScreenInfoScript()));
       } catch (e) {
         return errJxaFor("get screen info", e);
       }
@@ -334,6 +356,15 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       title: "Get WiFi Status",
       description: "Get the current WiFi status including connected network name, signal strength, and channel.",
       inputSchema: {},
+      outputSchema: {
+        ssid: z.string().nullable(),
+        bssid: z.string().nullable(),
+        signalStrength: z.number().int().nullable(),
+        noiseLevel: z.number().int().nullable(),
+        channel: z.string().nullable(),
+        connected: z.boolean(),
+        raw: z.string(),
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -343,7 +374,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
     },
     async () => {
       try {
-        return ok(await runJxa(getWifiStatusScript()));
+        return okUntrustedStructured(await runJxa(getWifiStatusScript()));
       } catch (e) {
         return errJxaFor("get wifi status", e);
       }
@@ -380,6 +411,17 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       title: "List Bluetooth Devices",
       description: "List paired Bluetooth devices with their connection status.",
       inputSchema: {},
+      outputSchema: {
+        total: z.number().int().min(0),
+        devices: z.array(
+          z.object({
+            name: z.string(),
+            connected: z.boolean(),
+            address: z.string().nullable(),
+            type: z.string().nullable(),
+          }),
+        ),
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -389,7 +431,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
     },
     async () => {
       try {
-        return ok(await runJxa(listBluetoothDevicesScript()));
+        return okUntrustedStructured(await runJxa(listBluetoothDevicesScript()));
       } catch (e) {
         return errJxaFor("list bluetooth devices", e);
       }
@@ -402,6 +444,13 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       title: "Get Battery Status",
       description: "Get battery percentage, charging state, power source, and estimated time remaining.",
       inputSchema: {},
+      outputSchema: {
+        percentage: z.number().int().min(0).max(100).nullable(),
+        charging: z.boolean(),
+        source: z.string().nullable(),
+        timeRemaining: z.string().nullable(),
+        raw: z.string(),
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -411,7 +460,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
     },
     async () => {
       try {
-        return ok(await runJxa(getBatteryStatusScript()));
+        return okStructured(await runJxa(getBatteryStatusScript()));
       } catch (e) {
         return errJxaFor("get battery status", e);
       }
@@ -424,6 +473,10 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       title: "Get Brightness",
       description: "Get the current display brightness level.",
       inputSchema: {},
+      outputSchema: {
+        brightness: z.number().min(0).max(1).nullable(),
+        raw: z.string(),
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -433,7 +486,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
     },
     async () => {
       try {
-        return ok(await runJxa(getBrightnessScript()));
+        return okStructured(await runJxa(getBrightnessScript()));
       } catch (e) {
         return errJxaFor("get brightness", e);
       }
@@ -647,11 +700,24 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       title: "List All Windows",
       description: "List windows across all running applications with title, size, position, app name, and PID.",
       inputSchema: {},
+      outputSchema: {
+        total: z.number().int().min(0),
+        windows: z.array(
+          z.object({
+            app: z.string(),
+            pid: z.number().int(),
+            title: z.string(),
+            position: z.tuple([z.number(), z.number()]).nullable(),
+            size: z.tuple([z.number(), z.number()]).nullable(),
+            minimized: z.boolean(),
+          }),
+        ),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async () => {
       try {
-        return ok(await runJxa(listAllWindowsScript()));
+        return okUntrustedStructured(await runJxa(listAllWindowsScript()));
       } catch (e) {
         return errJxaFor("list all windows", e);
       }

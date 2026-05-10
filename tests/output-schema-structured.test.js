@@ -370,6 +370,88 @@ const TOOL_FIXTURES = {
     args: { limit: 50 },
     mock: { total: 0, returned: 0, photos: [] },
   },
+  // ── Wave 6 additions ──
+  // system
+  list_running_apps: {
+    args: {},
+    mock: { total: 0, apps: [] },
+  },
+  get_screen_info: {
+    args: {},
+    mock: { displays: [] },
+  },
+  get_wifi_status: {
+    args: {},
+    mock: {
+      ssid: null,
+      bssid: null,
+      signalStrength: null,
+      noiseLevel: null,
+      channel: null,
+      connected: false,
+      raw: '',
+    },
+  },
+  list_bluetooth_devices: {
+    args: {},
+    mock: { total: 0, devices: [] },
+  },
+  get_battery_status: {
+    args: {},
+    mock: {
+      percentage: null,
+      charging: false,
+      source: null,
+      timeRemaining: null,
+      raw: '',
+    },
+  },
+  get_brightness: {
+    args: {},
+    mock: { brightness: null, raw: '' },
+  },
+  list_all_windows: {
+    args: {},
+    mock: { total: 0, windows: [] },
+  },
+  // music
+  search_tracks: {
+    args: { query: 'jazz', limit: 30 },
+    mock: { total: 0, returned: 0, tracks: [] },
+  },
+  get_track_info: {
+    args: { trackName: 'Take Five' },
+    mock: {
+      id: 1,
+      name: 'Take Five',
+      artist: 'Dave Brubeck',
+      album: 'Time Out',
+      albumArtist: 'Dave Brubeck',
+      genre: 'Jazz',
+      year: 1959,
+      trackNumber: 3,
+      discNumber: 1,
+      duration: 324,
+      playedCount: 0,
+      rating: 0,
+      favorited: false,
+      disliked: false,
+      dateAdded: null,
+      sampleRate: 44100,
+      bitRate: 256,
+      size: 12345678,
+    },
+  },
+  get_rating: {
+    args: { trackName: 'Take Five' },
+    mock: {
+      name: 'Take Five',
+      artist: 'Dave Brubeck',
+      rating: 0,
+      favorited: false,
+      disliked: false,
+    },
+  },
 };
 
 // ── Test suite ──────────────────────────────────────────────────────

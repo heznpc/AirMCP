@@ -92,6 +92,51 @@ export const SkillDefinitionSchema = z.object({
       debounce_ms: z.number().optional(),
     })
     .optional(),
+  /**
+   * RFC 0012 Phase 1 prep — POSIX 5-field cron expression for autonomous
+   * scheduled execution by the always-on daemon. Honored only when the
+   * daemon is running (env `AIRMCP_DAEMON_MODE=true`); ignored entirely
+   * in client-driven mode so existing skills behave unchanged.
+   *
+   * Format: `minute hour day-of-month month day-of-week`. See
+   * `src/skills/scheduler/cron.ts` for the full grammar.
+   *
+   * Examples:
+   *   "0 9 * * 1-5"   — weekdays 9:00 local time
+   *   "* /15 * * * *" — every 15 minutes (no leading space, single token)
+   *   "0 0 1 * *"     — first of every month at midnight
+   */
+  on_schedule: z
+    .string()
+    .regex(/^\S+(\s+\S+){4}$/, "Cron expression must have exactly 5 space-separated fields")
+    .optional(),
+  /**
+   * RFC 0012 Phase 1 prep — autonomous-call HITL policy. Only consulted
+   * when an autonomous skill (scheduled or event-driven) triggers a
+   * destructive tool call AND the user is detected as absent
+   * (`IOHIDIdleTime > AIRMCP_HITL_ABSENT_THRESHOLD_SEC`, default 60).
+   *
+   * Modes:
+   *   - "queue" (default)  — buffer in `hitl-queue.jsonl`; menu-bar
+   *                          surfaces; on user return notify and let
+   *                          the user approve/reject each entry.
+   *   - "proceed"          — fire immediately. `audit_log` records
+   *                          `hitl_bypass: true`. Requires
+   *                          `AIRMCP_AUTONOMOUS_DESTRUCTIVE=true`
+   *                          environment opt-in.
+   *   - "abort"            — skill fails on the destructive step with
+   *                          `permission_denied` if user is absent.
+   */
+  hitl_policy: z
+    .object({
+      destructive_on_absence: z.enum(["queue", "proceed", "abort"]).optional().default("queue"),
+      queue_ttl: z
+        .string()
+        .regex(/^\d+[mhd]$/, "Queue TTL must look like '4h', '30m', '2d'")
+        .optional(),
+      on_user_return: z.enum(["notify", "silent"]).optional().default("notify"),
+    })
+    .optional(),
   steps: z.array(SkillStepSchema).min(1, "At least one step required"),
 });
 

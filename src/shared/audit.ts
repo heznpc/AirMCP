@@ -20,6 +20,24 @@ interface AuditEntry {
   /** Correlation ID for cross-line tracing. Auto-populated from
    *  request-context if not set explicitly by the caller. */
   correlationId?: string;
+  /**
+   * RFC 0012 Phase 1 prep — call origin tag.
+   *
+   *   - "user"                — interactive user request via MCP client.
+   *                             This is the implicit default and remains
+   *                             omitted when not explicitly stamped, so
+   *                             pre-RFC-0012 audit entries are
+   *                             backward-compatible.
+   *   - "daemon-skill:<name>" — the always-on daemon's SkillScheduler
+   *                             or event loop fired this autonomously.
+   *                             Lets `audit_summary` separate human-driven
+   *                             from autonomous activity for review.
+   *   - "hitl-approved"       — a queued autonomous call the user later
+   *                             reviewed and approved via the menu-bar
+   *                             HITL queue UI; the corresponding
+   *                             pending entry is also archived.
+   */
+  actor?: string;
 }
 
 /**

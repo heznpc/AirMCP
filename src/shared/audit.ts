@@ -341,6 +341,48 @@ export function _testReset(): string[] {
   return snapshot;
 }
 
+/**
+ * Manually flush the buffer to disk. For testing only — production flushing
+ * happens automatically via the 30s timer (see `ensureFlushTimer`). Tests use
+ * this to exercise the flush + rotate + recovery code paths synchronously
+ * instead of waiting on real timers.
+ */
+export async function _testFlush(): Promise<void> {
+  assertTestMode("_testFlush()");
+  await flushBuffer();
+}
+
+/**
+ * Read internal state for test assertions. For testing only — exposes the
+ * audit-disabled / consecutive-failure counters that production code only
+ * surfaces through `summarizeAuditEntries`.
+ */
+export function _testGetState(): {
+  auditDisabled: boolean;
+  consecutiveFlushFailures: number;
+  bufferLength: number;
+  flushing: boolean;
+} {
+  assertTestMode("_testGetState()");
+  return {
+    auditDisabled,
+    consecutiveFlushFailures,
+    bufferLength: buffer.length,
+    flushing,
+  };
+}
+
+/**
+ * Override `auditDisabledSince` to a specific Unix-ms timestamp. For testing
+ * only — lets the recovery-window test exercise `maybeAttemptRecovery()`
+ * without waiting 5 real minutes between the auditDisabled trip and the
+ * retry probe.
+ */
+export function _testSetAuditDisabledSince(timestamp: number): void {
+  assertTestMode("_testSetAuditDisabledSince()");
+  auditDisabledSince = timestamp;
+}
+
 // ── Read API (audit_log / audit_summary tools) ───────────────────────
 
 export interface ReadAuditOptions {

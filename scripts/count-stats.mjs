@@ -44,6 +44,13 @@ function countInDir(dir, pattern) {
 const tools = countInDir(SRC, /server\.registerTool\(/g);
 const prompts = countInDir(SRC, /server\.prompt\(/g);
 
+// MCP Apps (interactive UI views via @modelcontextprotocol/ext-apps).
+// Registered separately from regular tools via `registerAppTool` rather than
+// `server.registerTool`, so the 272-tool count above legitimately excludes
+// them. Surfaced here so module-health audits don't mis-flag `src/apps/` as
+// a 0-tool ghost module.
+const mcpApps = countInDir(SRC, /registerAppTool\(/g);
+
 const resContent = readFileSync(join(SRC, "shared", "resources.ts"), "utf-8");
 const resLines = resContent.split("\n");
 let resources = 0;
@@ -64,7 +71,7 @@ const modules = moduleBlock
   ? (moduleBlock[1].match(/"/g) || []).length / 2
   : 0;
 
-const stats = { tools, prompts, resources, modules };
+const stats = { tools, prompts, resources, modules, mcpApps };
 
 // ── Print mode ─────────────────────────────────────────────────────
 
@@ -117,7 +124,7 @@ function syncFile(relPath, replacements) {
 // ── Run ────────────────────────────────────────────────────────────
 
 console.log(
-  `\nStats ${mode}: ${tools} tools, ${prompts} prompts, ${resources} resources, ${modules} modules\n`,
+  `\nStats ${mode}: ${tools} tools, ${prompts} prompts, ${resources} resources, ${modules} modules, ${mcpApps} MCP Apps\n`,
 );
 
 // README.md

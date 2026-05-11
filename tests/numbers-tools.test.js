@@ -31,8 +31,8 @@ describe('Numbers tools registration', () => {
     registerNumbersTools(server, {});
   });
 
-  test('registers all 12 numbers tools', () => {
-    expect(server.tools.size).toBe(12);
+  test('registers all 16 numbers tools', () => {
+    expect(server.tools.size).toBe(16);
     const expected = [
       'numbers_list_documents',
       'numbers_create_document',
@@ -43,10 +43,15 @@ describe('Numbers tools registration', () => {
       'numbers_add_sheet',
       'numbers_export_pdf',
       'numbers_close_document',
-      // RFC 0009 Phase 1 first batch
+      // RFC 0009 Phase 1 first batch (PR #197)
       'numbers_list_tables',
       'numbers_get_formula',
       'numbers_rename_sheet',
+      // RFC 0009 Phase 1 batch 2 (this PR)
+      'numbers_list_charts',
+      'numbers_set_formula',
+      'numbers_set_range',
+      'numbers_resize_table',
     ];
     for (const name of expected) {
       expect(server.tools.has(name)).toBe(true);

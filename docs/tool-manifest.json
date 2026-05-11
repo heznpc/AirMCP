@@ -1,8 +1,8 @@
 {
   "generatedAt": "STABLE_PLACEHOLDER",
   "protocolVersion": "2025-06-18",
-  "toolCount": 285,
-  "eligibleCount": 280,
+  "toolCount": 289,
+  "eligibleCount": 284,
   "ineligibleCount": 5,
   "ineligibleByReason": {
     "object-param:recurrence": 2,
@@ -7282,6 +7282,41 @@
       "ineligibleReason": null
     },
     {
+      "name": "numbers_list_charts",
+      "title": "List Numbers Charts",
+      "description": "List every chart in a Numbers sheet with its name + chart type. A sheet can carry multiple charts (revenue trend + segment pie + region bar); a model picking which one to interrogate or update needs to enumerate them first. Symmetric to numbers_list_tables.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "document": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Document name"
+          },
+          "sheet": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Sheet name"
+          }
+        },
+        "required": [
+          "document",
+          "sheet"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "outputSchema": null,
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "appIntentEligible": true,
+      "ineligibleReason": null
+    },
+    {
       "name": "numbers_list_documents",
       "title": "List Numbers Documents",
       "description": "List all open Numbers spreadsheets.",
@@ -7466,6 +7501,69 @@
       "ineligibleReason": null
     },
     {
+      "name": "numbers_resize_table",
+      "title": "Resize Numbers Table",
+      "description": "Resize a table by setting its rowCount and/or columnCount. Growing appends empty rows/columns on the bottom/right. Shrinking DISCARDS the trailing rows/columns AND THEIR CONTENT — destructive. Pass null for either dimension to leave it unchanged.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "document": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Document name"
+          },
+          "sheet": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Sheet name"
+          },
+          "rowCount": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "New row count (null to leave unchanged). Shrinking truncates trailing rows."
+          },
+          "columnCount": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "New column count (null to leave unchanged). Shrinking truncates trailing columns."
+          }
+        },
+        "required": [
+          "document",
+          "sheet",
+          "rowCount",
+          "columnCount"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "outputSchema": null,
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "appIntentEligible": true,
+      "ineligibleReason": null
+    },
+    {
       "name": "numbers_set_cell",
       "title": "Set Numbers Cell",
       "description": "Write a value to a single cell.",
@@ -7498,6 +7596,110 @@
           "sheet",
           "cell",
           "value"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "outputSchema": null,
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "appIntentEligible": true,
+      "ineligibleReason": null
+    },
+    {
+      "name": "numbers_set_formula",
+      "title": "Set Numbers Cell Formula",
+      "description": "Write a formula expression to a cell (e.g. '=SUM(A1:A10)'). The leading '=' is optional — passing 'SUM(A1:A10)' or '=SUM(A1:A10)' both work. Errors in the formula (bad reference, unknown function) surface as errJxa with the Numbers parse message. Symmetric to numbers_get_formula.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "document": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Document name"
+          },
+          "sheet": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Sheet name"
+          },
+          "cell": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Cell address (e.g. 'A1')"
+          },
+          "formula": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10000,
+            "description": "Formula expression — '=' prefix optional"
+          }
+        },
+        "required": [
+          "document",
+          "sheet",
+          "cell",
+          "formula"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "outputSchema": null,
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "appIntentEligible": true,
+      "ineligibleReason": null
+    },
+    {
+      "name": "numbers_set_range",
+      "title": "Set Numbers Cell Range",
+      "description": "Bulk-write a 2D rectangular block of string values starting at a top-left cell address (e.g. 'B2'). Each value is written via the .value setter — values starting with '=' are parsed as formulas (same as numbers_set_cell). Cell addresses use A1 notation; the script auto-extends past Z (AA, AB, …). Returns the count of cells written. Capped at 1000 cells per call to stay within Phase 1's range-size budget (RFC 0009 §6.2).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "document": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Document name"
+          },
+          "sheet": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Sheet name"
+          },
+          "startCell": {
+            "type": "string",
+            "pattern": "^[A-Z]+[0-9]+$",
+            "maxLength": 20,
+            "description": "Top-left cell address in A1 notation (e.g. 'B2')"
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 10000
+              }
+            },
+            "minItems": 1,
+            "maxItems": 1000,
+            "description": "2D array: outer = rows, inner = columns. Max 1000 cells total."
+          }
+        },
+        "required": [
+          "document",
+          "sheet",
+          "startCell",
+          "values"
         ],
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"

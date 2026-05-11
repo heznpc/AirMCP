@@ -2,7 +2,7 @@ import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okLinkedStructured, okStructured, errJxaFor } from "../shared/result.js";
+import { ok, okLinkedStructured, okStructured, okUntrustedStructured, errJxaFor } from "../shared/result.js";
 // Side-effect import: register the now_playing poller with the shared registry
 // at module load time. The poller itself only starts when startPollers() is
 // invoked by the cross/event observer tool.
@@ -152,11 +152,24 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
         query: z.string().max(500).describe("Search keyword"),
         limit: z.number().int().min(1).max(200).optional().default(30).describe("Max results (default: 30)"),
       },
+      outputSchema: {
+        total: z.number().int().min(0),
+        returned: z.number().int().min(0),
+        tracks: z.array(
+          z.object({
+            id: z.number().int(),
+            name: z.string(),
+            artist: z.string(),
+            album: z.string(),
+            duration: z.number(),
+          }),
+        ),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ query, limit }) => {
       try {
-        return ok(await runJxa(searchTracksScript(query, limit)));
+        return okUntrustedStructured(await runJxa(searchTracksScript(query, limit)));
       } catch (e) {
         return errJxaFor("search tracks", e);
       }
@@ -211,11 +224,31 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
       inputSchema: {
         trackName: z.string().max(500).describe("Track name to look up"),
       },
+      outputSchema: {
+        id: z.number().int(),
+        name: z.string(),
+        artist: z.string(),
+        album: z.string(),
+        albumArtist: z.string(),
+        genre: z.string(),
+        year: z.number().int(),
+        trackNumber: z.number().int(),
+        discNumber: z.number().int(),
+        duration: z.number(),
+        playedCount: z.number().int(),
+        rating: z.number().int(),
+        favorited: z.boolean(),
+        disliked: z.boolean(),
+        dateAdded: z.string().nullable(),
+        sampleRate: z.number().int(),
+        bitRate: z.number().int(),
+        size: z.number(),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ trackName }) => {
       try {
-        return ok(await runJxa(getTrackInfoScript(trackName)));
+        return okUntrustedStructured(await runJxa(getTrackInfoScript(trackName)));
       } catch (e) {
         return errJxaFor("get track info", e);
       }
@@ -328,11 +361,18 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
       inputSchema: {
         trackName: z.string().max(500).describe("Track name to look up"),
       },
+      outputSchema: {
+        name: z.string(),
+        artist: z.string(),
+        rating: z.number().int(),
+        favorited: z.boolean(),
+        disliked: z.boolean(),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ trackName }) => {
       try {
-        return ok(await runJxa(getRatingScript(trackName)));
+        return okUntrustedStructured(await runJxa(getRatingScript(trackName)));
       } catch (e) {
         return errJxaFor("get rating", e);
       }

@@ -2414,7 +2414,50 @@
         "type": "object",
         "properties": {}
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "percentage": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "charging": {
+            "type": "boolean"
+          },
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "timeRemaining": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "raw": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "percentage",
+          "charging",
+          "source",
+          "timeRemaining",
+          "raw"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
       "annotations": {
         "readOnlyHint": true,
         "destructiveHint": false,
@@ -2452,7 +2495,32 @@
         "type": "object",
         "properties": {}
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "brightness": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "raw": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "brightness",
+          "raw"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
       "annotations": {
         "readOnlyHint": true,
         "destructiveHint": false,
@@ -3063,7 +3131,35 @@
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "artist": {
+            "type": "string"
+          },
+          "rating": {
+            "type": "integer"
+          },
+          "favorited": {
+            "type": "boolean"
+          },
+          "disliked": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "artist",
+          "rating",
+          "favorited",
+          "disliked"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
       "annotations": {
         "readOnlyHint": true,
         "destructiveHint": false,
@@ -3082,7 +3178,64 @@
         "type": "object",
         "properties": {}
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "displays": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "resolution": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "pixelWidth": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "pixelHeight": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "retina": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "name",
+                "resolution",
+                "pixelWidth",
+                "pixelHeight",
+                "retina"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "displays"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
       "annotations": {
         "readOnlyHint": true,
         "destructiveHint": false,
@@ -3156,7 +3309,90 @@
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "artist": {
+            "type": "string"
+          },
+          "album": {
+            "type": "string"
+          },
+          "albumArtist": {
+            "type": "string"
+          },
+          "genre": {
+            "type": "string"
+          },
+          "year": {
+            "type": "integer"
+          },
+          "trackNumber": {
+            "type": "integer"
+          },
+          "discNumber": {
+            "type": "integer"
+          },
+          "duration": {
+            "type": "number"
+          },
+          "playedCount": {
+            "type": "integer"
+          },
+          "rating": {
+            "type": "integer"
+          },
+          "favorited": {
+            "type": "boolean"
+          },
+          "disliked": {
+            "type": "boolean"
+          },
+          "dateAdded": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sampleRate": {
+            "type": "integer"
+          },
+          "bitRate": {
+            "type": "integer"
+          },
+          "size": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "artist",
+          "album",
+          "albumArtist",
+          "genre",
+          "year",
+          "trackNumber",
+          "discNumber",
+          "duration",
+          "playedCount",
+          "rating",
+          "favorited",
+          "disliked",
+          "dateAdded",
+          "sampleRate",
+          "bitRate",
+          "size"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
       "annotations": {
         "readOnlyHint": true,
         "destructiveHint": false,
@@ -3353,7 +3589,66 @@
         "type": "object",
         "properties": {}
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ssid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bssid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "signalStrength": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "noiseLevel": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "channel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "connected": {
+            "type": "boolean"
+          },
+          "raw": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ssid",
+          "bssid",
+          "signalStrength",
+          "noiseLevel",
+          "channel",
+          "connected",
+          "raw"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
       "annotations": {
         "readOnlyHint": true,
         "destructiveHint": false,
@@ -4502,7 +4797,90 @@
         "type": "object",
         "properties": {}
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "windows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "app": {
+                  "type": "string"
+                },
+                "pid": {
+                  "type": "integer"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "position": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "items": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "number"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "size": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "items": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "number"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "minimized": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "app",
+                "pid",
+                "title",
+                "position",
+                "size",
+                "minimized"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "total",
+          "windows"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
       "annotations": {
         "readOnlyHint": true,
         "destructiveHint": false,
@@ -4521,7 +4899,54 @@
         "type": "object",
         "properties": {}
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "devices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "connected": {
+                  "type": "boolean"
+                },
+                "address": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "type": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "name",
+                "connected",
+                "address",
+                "type"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "total",
+          "devices"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
       "annotations": {
         "readOnlyHint": true,
         "destructiveHint": false,
@@ -6073,7 +6498,48 @@
         "type": "object",
         "properties": {}
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "apps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "bundleIdentifier": {
+                  "type": "string"
+                },
+                "pid": {
+                  "type": "integer"
+                },
+                "visible": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "name",
+                "bundleIdentifier",
+                "pid",
+                "visible"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "total",
+          "apps"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
       "annotations": {
         "readOnlyHint": true,
         "destructiveHint": false,
@@ -10459,7 +10925,57 @@
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "returned": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "tracks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "artist": {
+                  "type": "string"
+                },
+                "album": {
+                  "type": "string"
+                },
+                "duration": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "artist",
+                "album",
+                "duration"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "total",
+          "returned",
+          "tracks"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
       "annotations": {
         "readOnlyHint": true,
         "destructiveHint": false,

@@ -277,14 +277,23 @@ describe('is_app_running', () => {
 
   test('returns running status', async () => {
     const { server } = setup();
-    mockRunJxa.mockResolvedValue({ running: true, name: 'Safari', pid: 1234 });
+    // Wave 7: is_app_running now has outputSchema → structuredContent is the
+    // source of truth. Mock matches the actual script return shape including
+    // the running:true variant fields (bundleIdentifier, visible).
+    mockRunJxa.mockResolvedValue({
+      running: true,
+      name: 'Safari',
+      bundleIdentifier: 'com.apple.Safari',
+      pid: 1234,
+      visible: true,
+    });
 
     const result = await server.callTool('is_app_running', { name: 'Safari' });
 
     expect(result.isError).toBeUndefined();
-    const parsed = JSON.parse(result.content[0].text);
-    expect(parsed.running).toBe(true);
-    expect(parsed.pid).toBe(1234);
+    expect(result.structuredContent).toBeDefined();
+    expect(result.structuredContent.running).toBe(true);
+    expect(result.structuredContent.pid).toBe(1234);
   });
 });
 

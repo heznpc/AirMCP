@@ -2,7 +2,7 @@ import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, errJxaFor } from "../shared/result.js";
+import { ok, okUntrustedStructured, errJxaFor } from "../shared/result.js";
 import { zFilePath, resolveAndGuard } from "../shared/validate.js";
 import {
   listDocumentsScript,
@@ -26,11 +26,21 @@ export function registerNumbersTools(server: McpServer, _config: AirMcpConfig): 
       title: "List Numbers Documents",
       description: "List all open Numbers spreadsheets.",
       inputSchema: {},
+      outputSchema: {
+        documents: z.array(
+          z.object({
+            name: z.string(),
+            path: z.string().nullable(),
+            modified: z.boolean(),
+          }),
+        ),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async () => {
       try {
-        return ok(await runJxa(listDocumentsScript()));
+        const documents = (await runJxa(listDocumentsScript())) as Array<unknown>;
+        return okUntrustedStructured({ documents });
       } catch (e) {
         return errJxaFor("list Numbers documents", e);
       }
@@ -62,11 +72,20 @@ export function registerNumbersTools(server: McpServer, _config: AirMcpConfig): 
       inputSchema: {
         document: z.string().max(500).describe("Document name"),
       },
+      outputSchema: {
+        sheets: z.array(
+          z.object({
+            name: z.string(),
+            tableCount: z.number().int().min(0),
+          }),
+        ),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ document }) => {
       try {
-        return ok(await runJxa(listSheetsScript(document)));
+        const sheets = (await runJxa(listSheetsScript(document))) as Array<unknown>;
+        return okUntrustedStructured({ sheets });
       } catch (e) {
         return errJxaFor("list Numbers sheets", e);
       }
@@ -83,11 +102,18 @@ export function registerNumbersTools(server: McpServer, _config: AirMcpConfig): 
         sheet: z.string().max(500).describe("Sheet name"),
         cell: z.string().max(500).describe("Cell address (e.g. 'A1', 'B3')"),
       },
+      outputSchema: {
+        address: z.string(),
+        // Cell values are dynamically typed in Numbers (number, string, date, boolean, null).
+        // Zod's `unknown()` keeps the contract honest rather than forcing a coercion.
+        value: z.unknown(),
+        formattedValue: z.string().nullable(),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ document, sheet, cell }) => {
       try {
-        return ok(await runJxa(getCellScript(document, sheet, cell)));
+        return okUntrustedStructured(await runJxa(getCellScript(document, sheet, cell)));
       } catch (e) {
         return errJxaFor("get Numbers cell", e);
       }
@@ -129,11 +155,22 @@ export function registerNumbersTools(server: McpServer, _config: AirMcpConfig): 
         endRow: z.number().int().min(0).describe("End row index (inclusive)"),
         endCol: z.number().int().min(0).describe("End column index (inclusive)"),
       },
+      outputSchema: {
+        // Outer array = rows. Inner array = cell values per row.
+        // Cell values stay `unknown` for the same dynamic-typing reason as get_cell.
+        rows: z.array(z.array(z.unknown())),
+        startRow: z.number().int().min(0),
+        startCol: z.number().int().min(0),
+        endRow: z.number().int().min(0),
+        endCol: z.number().int().min(0),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ document, sheet, startRow, startCol, endRow, endCol }) => {
       try {
-        return ok(await runJxa(readCellsScript(document, sheet, startRow, startCol, endRow, endCol)));
+        return okUntrustedStructured(
+          await runJxa(readCellsScript(document, sheet, startRow, startCol, endRow, endCol)),
+        );
       } catch (e) {
         return errJxaFor("read Numbers cells", e);
       }
@@ -215,11 +252,21 @@ export function registerNumbersTools(server: McpServer, _config: AirMcpConfig): 
         document: z.string().max(500).describe("Document name"),
         sheet: z.string().max(500).describe("Sheet name"),
       },
+      outputSchema: {
+        tables: z.array(
+          z.object({
+            name: z.string(),
+            rowCount: z.number().int().min(0),
+            columnCount: z.number().int().min(0),
+          }),
+        ),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ document, sheet }) => {
       try {
-        return ok(await runJxa(listTablesScript(document, sheet)));
+        const tables = (await runJxa(listTablesScript(document, sheet))) as Array<unknown>;
+        return okUntrustedStructured({ tables });
       } catch (e) {
         return errJxaFor("list Numbers tables", e);
       }
@@ -238,11 +285,18 @@ export function registerNumbersTools(server: McpServer, _config: AirMcpConfig): 
         sheet: z.string().max(500).describe("Sheet name"),
         cell: z.string().max(500).describe("Cell address (e.g. 'A1')"),
       },
+      outputSchema: {
+        address: z.string(),
+        // `formula` is null when the cell holds a constant (no formula behind it).
+        formula: z.string().nullable(),
+        value: z.unknown(),
+        formattedValue: z.string().nullable(),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ document, sheet, cell }) => {
       try {
-        return ok(await runJxa(getFormulaScript(document, sheet, cell)));
+        return okUntrustedStructured(await runJxa(getFormulaScript(document, sheet, cell)));
       } catch (e) {
         return errJxaFor("get Numbers formula", e);
       }

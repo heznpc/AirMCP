@@ -37,6 +37,7 @@ const { registerMessagesTools } = await import('../dist/messages/tools.js');
 const { registerShortcutsTools } = await import('../dist/shortcuts/tools.js');
 const { registerWeatherTools } = await import('../dist/weather/tools.js');
 const { registerPhotosTools } = await import('../dist/photos/tools.js');
+const { registerNumbersTools } = await import('../dist/numbers/tools.js');
 const { fetchCurrentWeather } = await import('../dist/weather/api.js');
 
 // ── Per-tool args and mock responses ────────────────────────────────
@@ -370,6 +371,37 @@ const TOOL_FIXTURES = {
     args: { limit: 50 },
     mock: { total: 0, returned: 0, photos: [] },
   },
+  // ── Wave 7 additions ──
+  // numbers
+  numbers_list_documents: {
+    args: {},
+    mock: [],
+  },
+  numbers_list_sheets: {
+    args: { document: 'TestDoc' },
+    mock: [],
+  },
+  numbers_get_cell: {
+    args: { document: 'TestDoc', sheet: 'Sheet 1', cell: 'A1' },
+    mock: { address: 'A1', value: 42, formattedValue: '42' },
+  },
+  numbers_read_cells: {
+    args: { document: 'TestDoc', sheet: 'Sheet 1', startRow: 0, startCol: 0, endRow: 0, endCol: 1 },
+    mock: { rows: [[1, 2]], startRow: 0, startCol: 0, endRow: 0, endCol: 1 },
+  },
+  numbers_list_tables: {
+    args: { document: 'TestDoc', sheet: 'Sheet 1' },
+    mock: [],
+  },
+  numbers_get_formula: {
+    args: { document: 'TestDoc', sheet: 'Sheet 1', cell: 'B5' },
+    mock: { address: 'B5', formula: '=SUM(B1:B4)', value: 10, formattedValue: '10' },
+  },
+  // system
+  is_app_running: {
+    args: { name: 'Safari' },
+    mock: { running: true, name: 'Safari', bundleIdentifier: 'com.apple.Safari', pid: 1234, visible: true },
+  },
   // ── Wave 6 additions ──
   // system
   list_running_apps: {
@@ -476,6 +508,7 @@ describe('outputSchema → structuredContent contract', () => {
     registerShortcutsTools(server, config);
     registerWeatherTools(server, config);
     registerPhotosTools(server, config);
+    registerNumbersTools(server, config);
   });
 
   beforeEach(() => {

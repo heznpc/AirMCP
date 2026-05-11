@@ -681,11 +681,21 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       inputSchema: {
         name: z.string().min(1).max(500).describe("Application name to check (e.g. 'Safari')"),
       },
+      outputSchema: {
+        running: z.boolean(),
+        name: z.string(),
+        // null when running === false. MCP SDK doesn't serialize z.optional()
+        // at the root of outputSchema — z.nullable() is the supported form for
+        // "may not be present" semantics; the script emits explicit nulls.
+        bundleIdentifier: z.string().nullable(),
+        pid: z.number().int().nullable(),
+        visible: z.boolean().nullable(),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ name }) => {
       try {
-        return ok(await runJxa(isAppRunningScript(name)));
+        return okUntrustedStructured(await runJxa(isAppRunningScript(name)));
       } catch (e) {
         return errJxaFor("check app running", e);
       }

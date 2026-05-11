@@ -3,7 +3,7 @@
 // Source: docs/tool-manifest.json
 // Generator: scripts/gen-swift-intents.mjs
 // RFC 0007 Phase A.2b.2 + A.4.1 — 232 auto-selected read-only
-// tools (65 with typed drift-guards + Interactive Snippet
+// tools (82 with typed drift-guards + Interactive Snippet
 // SwiftUI views) + 9 AppShortcutsProvider entries.
 // Run `npm run gen:intents` to refresh after tool metadata changes.
 // CI guards against drift via `npm run gen:intents:check`.
@@ -74,6 +74,21 @@ public struct MCPDiscoverToolsOutput: Codable, Sendable {
     public let hint: String?
 }
 
+// Output type for: get_battery_status
+public struct MCPGetBatteryStatusOutput: Codable, Sendable {
+    public let percentage: String
+    public let charging: Bool
+    public let source: String?
+    public let timeRemaining: String?
+    public let raw: String
+}
+
+// Output type for: get_brightness
+public struct MCPGetBrightnessOutput: Codable, Sendable {
+    public let brightness: String
+    public let raw: String
+}
+
 // Output type for: get_clipboard
 public struct MCPGetClipboardOutput: Codable, Sendable {
     public let content: String
@@ -140,10 +155,54 @@ public struct MCPGetPhotoInfoOutput: Codable, Sendable {
     public let keywords: String
 }
 
+// Output type for: get_rating
+public struct MCPGetRatingOutput: Codable, Sendable {
+    public let name: String
+    public let artist: String
+    public let rating: Int
+    public let favorited: Bool
+    public let disliked: Bool
+}
+
+// Output type for: get_screen_info
+public struct MCPGetScreenInfoOutput: Codable, Sendable {
+    public struct DisplaysItem: Codable, Sendable {
+        public let name: String
+        public let resolution: String?
+        public let pixelWidth: String
+        public let pixelHeight: String
+        public let retina: Bool
+    }
+
+    public let displays: [DisplaysItem]
+}
+
 // Output type for: get_shortcut_detail
 public struct MCPGetShortcutDetailOutput: Codable, Sendable {
     public let shortcut: String
     public let detail: String
+}
+
+// Output type for: get_track_info
+public struct MCPGetTrackInfoOutput: Codable, Sendable {
+    public let id: Int
+    public let name: String
+    public let artist: String
+    public let album: String
+    public let albumArtist: String
+    public let genre: String
+    public let year: Int
+    public let trackNumber: Int
+    public let discNumber: Int
+    public let duration: Double
+    public let playedCount: Int
+    public let rating: Int
+    public let favorited: Bool
+    public let disliked: Bool
+    public let dateAdded: String?
+    public let sampleRate: Int
+    public let bitRate: Int
+    public let size: Double
 }
 
 // Output type for: get_unread_count
@@ -182,6 +241,26 @@ public struct MCPGetVolumeOutput: Codable, Sendable {
     public let outputMuted: Bool
 }
 
+// Output type for: get_wifi_status
+public struct MCPGetWifiStatusOutput: Codable, Sendable {
+    public let ssid: String?
+    public let bssid: String?
+    public let signalStrength: String
+    public let noiseLevel: String
+    public let channel: String?
+    public let connected: Bool
+    public let raw: String
+}
+
+// Output type for: is_app_running
+public struct MCPIsAppRunningOutput: Codable, Sendable {
+    public let running: Bool
+    public let name: String
+    public let bundleIdentifier: String?
+    public let pid: String
+    public let visible: Bool?
+}
+
 // Output type for: list_accounts
 public struct MCPListAccountsOutput: Codable, Sendable {
     public struct AccountsItem: Codable, Sendable {
@@ -191,6 +270,34 @@ public struct MCPListAccountsOutput: Codable, Sendable {
     }
 
     public let accounts: [AccountsItem]
+}
+
+// Output type for: list_all_windows
+public struct MCPListAllWindowsOutput: Codable, Sendable {
+    public struct WindowsItem: Codable, Sendable {
+        public let app: String
+        public let pid: Int
+        public let title: String
+        public let position: String
+        public let size: String
+        public let minimized: Bool
+    }
+
+    public let total: Int
+    public let windows: [WindowsItem]
+}
+
+// Output type for: list_bluetooth_devices
+public struct MCPListBluetoothDevicesOutput: Codable, Sendable {
+    public struct DevicesItem: Codable, Sendable {
+        public let name: String
+        public let connected: Bool
+        public let address: String?
+        public let type: String?
+    }
+
+    public let total: Int
+    public let devices: [DevicesItem]
 }
 
 // Output type for: list_bookmarks
@@ -464,6 +571,19 @@ public struct MCPListRemindersOutput: Codable, Sendable {
     public let reminders: [RemindersItem]
 }
 
+// Output type for: list_running_apps
+public struct MCPListRunningAppsOutput: Codable, Sendable {
+    public struct AppsItem: Codable, Sendable {
+        public let name: String
+        public let bundleIdentifier: String
+        public let pid: Int
+        public let visible: Bool
+    }
+
+    public let total: Int
+    public let apps: [AppsItem]
+}
+
 // Output type for: list_shortcuts
 public struct MCPListShortcutsOutput: Codable, Sendable {
     public let total: Double
@@ -555,6 +675,62 @@ public struct MCPMemoryStatsOutput: Codable, Sendable {
 public struct MCPNowPlayingOutput: Codable, Sendable {
     public let playerState: String
     public let track: String
+}
+
+// Output type for: numbers_get_cell
+public struct MCPNumbersGetCellOutput: Codable, Sendable {
+    public let address: String
+    public let value: String?
+    public let formattedValue: String?
+}
+
+// Output type for: numbers_get_formula
+public struct MCPNumbersGetFormulaOutput: Codable, Sendable {
+    public let address: String
+    public let formula: String?
+    public let value: String?
+    public let formattedValue: String?
+}
+
+// Output type for: numbers_list_documents
+public struct MCPNumbersListDocumentsOutput: Codable, Sendable {
+    public struct DocumentsItem: Codable, Sendable {
+        public let name: String
+        public let path: String?
+        public let modified: Bool
+    }
+
+    public let documents: [DocumentsItem]
+}
+
+// Output type for: numbers_list_sheets
+public struct MCPNumbersListSheetsOutput: Codable, Sendable {
+    public struct SheetsItem: Codable, Sendable {
+        public let name: String
+        public let tableCount: Int
+    }
+
+    public let sheets: [SheetsItem]
+}
+
+// Output type for: numbers_list_tables
+public struct MCPNumbersListTablesOutput: Codable, Sendable {
+    public struct TablesItem: Codable, Sendable {
+        public let name: String
+        public let rowCount: Int
+        public let columnCount: Int
+    }
+
+    public let tables: [TablesItem]
+}
+
+// Output type for: numbers_read_cells
+public struct MCPNumbersReadCellsOutput: Codable, Sendable {
+    public let rows: [[String]]
+    public let startRow: Int
+    public let startCol: Int
+    public let endRow: Int
+    public let endCol: Int
 }
 
 // Output type for: proactive_context
@@ -873,6 +1049,21 @@ public struct MCPSearchTabsOutput: Codable, Sendable {
 
     public let returned: Double
     public let tabs: [TabsItem]
+}
+
+// Output type for: search_tracks
+public struct MCPSearchTracksOutput: Codable, Sendable {
+    public struct TracksItem: Codable, Sendable {
+        public let id: Int
+        public let name: String
+        public let artist: String
+        public let album: String
+        public let duration: Double
+    }
+
+    public let total: Int
+    public let returned: Int
+    public let tracks: [TracksItem]
 }
 
 // Output type for: set_clipboard
@@ -2208,6 +2399,16 @@ public struct GetBatteryStatusIntent: AppIntent {
             tool: "get_battery_status",
             args: [String: any Sendable]()
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "get_battery_status", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPGetBatteryStatusOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPGetBatteryStatusSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -2242,6 +2443,16 @@ public struct GetBrightnessIntent: AppIntent {
             tool: "get_brightness",
             args: [String: any Sendable]()
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "get_brightness", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPGetBrightnessOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPGetBrightnessSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -2548,6 +2759,16 @@ public struct GetRatingIntent: AppIntent {
             tool: "get_rating",
             args: ["trackName": trackName]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "get_rating", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPGetRatingOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPGetRatingSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -2565,6 +2786,16 @@ public struct GetScreenInfoIntent: AppIntent {
             tool: "get_screen_info",
             args: [String: any Sendable]()
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "get_screen_info", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPGetScreenInfoOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPGetScreenInfoSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -2615,6 +2846,16 @@ public struct GetTrackInfoIntent: AppIntent {
             tool: "get_track_info",
             args: ["trackName": trackName]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "get_track_info", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPGetTrackInfoOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPGetTrackInfoSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -2716,6 +2957,16 @@ public struct GetWifiStatusIntent: AppIntent {
             tool: "get_wifi_status",
             args: [String: any Sendable]()
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "get_wifi_status", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPGetWifiStatusOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPGetWifiStatusSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -3135,6 +3386,16 @@ public struct IsAppRunningIntent: AppIntent {
             tool: "is_app_running",
             args: ["name": name]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "is_app_running", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPIsAppRunningOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPIsAppRunningSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -3362,6 +3623,16 @@ public struct ListAllWindowsIntent: AppIntent {
             tool: "list_all_windows",
             args: [String: any Sendable]()
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "list_all_windows", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPListAllWindowsOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPListAllWindowsSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -3379,6 +3650,16 @@ public struct ListBluetoothDevicesIntent: AppIntent {
             tool: "list_bluetooth_devices",
             args: [String: any Sendable]()
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "list_bluetooth_devices", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPListBluetoothDevicesOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPListBluetoothDevicesSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -4053,6 +4334,16 @@ public struct ListRunningAppsIntent: AppIntent {
             tool: "list_running_apps",
             args: [String: any Sendable]()
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "list_running_apps", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPListRunningAppsOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPListRunningAppsSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -4549,6 +4840,16 @@ public struct NumbersGetCellIntent: AppIntent {
             tool: "numbers_get_cell",
             args: ["document": document, "sheet": sheet, "cell": cell]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "numbers_get_cell", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPNumbersGetCellOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPNumbersGetCellSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -4575,6 +4876,16 @@ public struct NumbersGetFormulaIntent: AppIntent {
             tool: "numbers_get_formula",
             args: ["document": document, "sheet": sheet, "cell": cell]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "numbers_get_formula", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPNumbersGetFormulaOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPNumbersGetFormulaSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -4592,6 +4903,16 @@ public struct NumbersListDocumentsIntent: AppIntent {
             tool: "numbers_list_documents",
             args: [String: any Sendable]()
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "numbers_list_documents", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPNumbersListDocumentsOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPNumbersListDocumentsSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -4612,6 +4933,16 @@ public struct NumbersListSheetsIntent: AppIntent {
             tool: "numbers_list_sheets",
             args: ["document": document]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "numbers_list_sheets", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPNumbersListSheetsOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPNumbersListSheetsSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -4635,6 +4966,16 @@ public struct NumbersListTablesIntent: AppIntent {
             tool: "numbers_list_tables",
             args: ["document": document, "sheet": sheet]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "numbers_list_tables", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPNumbersListTablesOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPNumbersListTablesSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -4670,6 +5011,16 @@ public struct NumbersReadCellsIntent: AppIntent {
             tool: "numbers_read_cells",
             args: ["document": document, "sheet": sheet, "startRow": startRow, "startCol": startCol, "endRow": endRow, "endCol": endCol]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "numbers_read_cells", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPNumbersReadCellsOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPNumbersReadCellsSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -5933,6 +6284,16 @@ public struct SearchTracksIntent: AppIntent {
             tool: "search_tracks",
             args: ["query": query, "limit": limit]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "search_tracks", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPSearchTracksOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPSearchTracksSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -7226,6 +7587,79 @@ public struct MCPDiscoverToolsSnippetView: View {
     }
 }
 
+// Snippet view for: get_battery_status  (shape: scalar)
+@available(macOS 26, iOS 26, *)
+public struct MCPGetBatteryStatusSnippetView: View {
+    public let data: MCPGetBatteryStatusOutput
+    public init(data: MCPGetBatteryStatusOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text("Percentage")
+                Spacer()
+                Text(String(describing: data.percentage))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Charging")
+                Spacer()
+                Text((data.charging ? "Yes" : "No"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Source")
+                Spacer()
+                Text((data.source ?? "—"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Time Remaining")
+                Spacer()
+                Text((data.timeRemaining ?? "—"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Raw")
+                Spacer()
+                Text(data.raw)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: get_brightness  (shape: scalar)
+@available(macOS 26, iOS 26, *)
+public struct MCPGetBrightnessSnippetView: View {
+    public let data: MCPGetBrightnessOutput
+    public init(data: MCPGetBrightnessOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text("Brightness")
+                Spacer()
+                Text(String(describing: data.brightness))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Raw")
+                Spacer()
+                Text(data.raw)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+        }
+        .padding()
+    }
+}
+
 // Snippet view for: get_clipboard  (shape: scalar)
 @available(macOS 26, iOS 26, *)
 public struct MCPGetClipboardSnippetView: View {
@@ -7506,6 +7940,70 @@ public struct MCPGetPhotoInfoSnippetView: View {
     }
 }
 
+// Snippet view for: get_rating  (shape: scalar)
+@available(macOS 26, iOS 26, *)
+public struct MCPGetRatingSnippetView: View {
+    public let data: MCPGetRatingOutput
+    public init(data: MCPGetRatingOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text("Name")
+                Spacer()
+                Text(data.name)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Artist")
+                Spacer()
+                Text(data.artist)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Rating")
+                Spacer()
+                Text(data.rating.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Favorited")
+                Spacer()
+                Text((data.favorited ? "Yes" : "No"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Disliked")
+                Spacer()
+                Text((data.disliked ? "Yes" : "No"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: get_screen_info  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPGetScreenInfoSnippetView: View {
+    public let data: MCPGetScreenInfoOutput
+    public init(data: MCPGetScreenInfoOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.displays.enumerated()), id: \.offset) { _, row in
+                Text(row.name)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
 // Snippet view for: get_shortcut_detail  (shape: scalar)
 @available(macOS 26, iOS 26, *)
 public struct MCPGetShortcutDetailSnippetView: View {
@@ -7524,6 +8022,144 @@ public struct MCPGetShortcutDetailSnippetView: View {
                 Text("Detail")
                 Spacer()
                 Text(data.detail)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: get_track_info  (shape: scalar)
+@available(macOS 26, iOS 26, *)
+public struct MCPGetTrackInfoSnippetView: View {
+    public let data: MCPGetTrackInfoOutput
+    public init(data: MCPGetTrackInfoOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text("Id")
+                Spacer()
+                Text(data.id.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Name")
+                Spacer()
+                Text(data.name)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Artist")
+                Spacer()
+                Text(data.artist)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Album")
+                Spacer()
+                Text(data.album)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Album Artist")
+                Spacer()
+                Text(data.albumArtist)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Genre")
+                Spacer()
+                Text(data.genre)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Year")
+                Spacer()
+                Text(data.year.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Track Number")
+                Spacer()
+                Text(data.trackNumber.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Disc Number")
+                Spacer()
+                Text(data.discNumber.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Duration")
+                Spacer()
+                Text(data.duration.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Played Count")
+                Spacer()
+                Text(data.playedCount.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Rating")
+                Spacer()
+                Text(data.rating.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Favorited")
+                Spacer()
+                Text((data.favorited ? "Yes" : "No"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Disliked")
+                Spacer()
+                Text((data.disliked ? "Yes" : "No"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Date Added")
+                Spacer()
+                Text((data.dateAdded ?? "—"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Sample Rate")
+                Spacer()
+                Text(data.sampleRate.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Bit Rate")
+                Spacer()
+                Text(data.bitRate.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Size")
+                Spacer()
+                Text(data.size.formatted())
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -7602,6 +8238,114 @@ public struct MCPGetVolumeSnippetView: View {
     }
 }
 
+// Snippet view for: get_wifi_status  (shape: scalar)
+@available(macOS 26, iOS 26, *)
+public struct MCPGetWifiStatusSnippetView: View {
+    public let data: MCPGetWifiStatusOutput
+    public init(data: MCPGetWifiStatusOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text("Ssid")
+                Spacer()
+                Text((data.ssid ?? "—"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Bssid")
+                Spacer()
+                Text((data.bssid ?? "—"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Signal Strength")
+                Spacer()
+                Text(String(describing: data.signalStrength))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Noise Level")
+                Spacer()
+                Text(String(describing: data.noiseLevel))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Channel")
+                Spacer()
+                Text((data.channel ?? "—"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Connected")
+                Spacer()
+                Text((data.connected ? "Yes" : "No"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Raw")
+                Spacer()
+                Text(data.raw)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: is_app_running  (shape: scalar)
+@available(macOS 26, iOS 26, *)
+public struct MCPIsAppRunningSnippetView: View {
+    public let data: MCPIsAppRunningOutput
+    public init(data: MCPIsAppRunningOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text("Running")
+                Spacer()
+                Text((data.running ? "Yes" : "No"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Name")
+                Spacer()
+                Text(data.name)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Bundle Identifier")
+                Spacer()
+                Text((data.bundleIdentifier ?? "—"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Pid")
+                Spacer()
+                Text(String(describing: data.pid))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Visible")
+                Spacer()
+                Text((data.visible.map { $0 ? "Yes" : "No" } ?? "—"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+        }
+        .padding()
+    }
+}
+
 // Snippet view for: list_accounts  (shape: list-object)
 @available(macOS 26, iOS 26, *)
 public struct MCPListAccountsSnippetView: View {
@@ -7610,6 +8354,40 @@ public struct MCPListAccountsSnippetView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(Array(data.accounts.enumerated()), id: \.offset) { _, row in
+                Text(row.name)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: list_all_windows  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPListAllWindowsSnippetView: View {
+    public let data: MCPListAllWindowsOutput
+    public init(data: MCPListAllWindowsOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.windows.enumerated()), id: \.offset) { _, row in
+                Text(row.app)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: list_bluetooth_devices  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPListBluetoothDevicesSnippetView: View {
+    public let data: MCPListBluetoothDevicesOutput
+    public init(data: MCPListBluetoothDevicesOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.devices.enumerated()), id: \.offset) { _, row in
                 Text(row.name)
                     .font(.body)
                     .lineLimit(1)
@@ -7960,6 +8738,23 @@ public struct MCPListRemindersSnippetView: View {
     }
 }
 
+// Snippet view for: list_running_apps  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPListRunningAppsSnippetView: View {
+    public let data: MCPListRunningAppsOutput
+    public init(data: MCPListRunningAppsOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.apps.enumerated()), id: \.offset) { _, row in
+                Text(row.name)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
 // Snippet view for: list_shortcuts  (shape: list-string)
 @available(macOS 26, iOS 26, *)
 public struct MCPListShortcutsSnippetView: View {
@@ -8119,6 +8914,177 @@ public struct MCPNowPlayingSnippetView: View {
                 Text("Track")
                 Spacer()
                 Text(String(describing: data.track))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: numbers_get_cell  (shape: scalar)
+@available(macOS 26, iOS 26, *)
+public struct MCPNumbersGetCellSnippetView: View {
+    public let data: MCPNumbersGetCellOutput
+    public init(data: MCPNumbersGetCellOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text("Address")
+                Spacer()
+                Text(data.address)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Value")
+                Spacer()
+                Text(String(describing: data.value))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Formatted Value")
+                Spacer()
+                Text((data.formattedValue ?? "—"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: numbers_get_formula  (shape: scalar)
+@available(macOS 26, iOS 26, *)
+public struct MCPNumbersGetFormulaSnippetView: View {
+    public let data: MCPNumbersGetFormulaOutput
+    public init(data: MCPNumbersGetFormulaOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text("Address")
+                Spacer()
+                Text(data.address)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Formula")
+                Spacer()
+                Text((data.formula ?? "—"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Value")
+                Spacer()
+                Text(String(describing: data.value))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Formatted Value")
+                Spacer()
+                Text((data.formattedValue ?? "—"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: numbers_list_documents  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPNumbersListDocumentsSnippetView: View {
+    public let data: MCPNumbersListDocumentsOutput
+    public init(data: MCPNumbersListDocumentsOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.documents.enumerated()), id: \.offset) { _, row in
+                Text(row.name)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: numbers_list_sheets  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPNumbersListSheetsSnippetView: View {
+    public let data: MCPNumbersListSheetsOutput
+    public init(data: MCPNumbersListSheetsOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.sheets.enumerated()), id: \.offset) { _, row in
+                Text(row.name)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: numbers_list_tables  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPNumbersListTablesSnippetView: View {
+    public let data: MCPNumbersListTablesOutput
+    public init(data: MCPNumbersListTablesOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.tables.enumerated()), id: \.offset) { _, row in
+                Text(row.name)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: numbers_read_cells  (shape: scalar)
+@available(macOS 26, iOS 26, *)
+public struct MCPNumbersReadCellsSnippetView: View {
+    public let data: MCPNumbersReadCellsOutput
+    public init(data: MCPNumbersReadCellsOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text("Rows")
+                Spacer()
+                Text(String(describing: data.rows))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Start Row")
+                Spacer()
+                Text(data.startRow.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Start Col")
+                Spacer()
+                Text(data.startCol.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("End Row")
+                Spacer()
+                Text(data.endRow.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("End Col")
+                Spacer()
+                Text(data.endCol.formatted())
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -8794,6 +9760,23 @@ public struct MCPSearchTabsSnippetView: View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(Array(data.tabs.enumerated()), id: \.offset) { _, row in
                 Text(row.title)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: search_tracks  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPSearchTracksSnippetView: View {
+    public let data: MCPSearchTracksOutput
+    public init(data: MCPSearchTracksOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.tracks.enumerated()), id: \.offset) { _, row in
+                Text(row.name)
                     .font(.body)
                     .lineLimit(1)
             }

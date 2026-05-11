@@ -4395,7 +4395,48 @@
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "running": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "bundleIdentifier": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pid": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "visible": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "running",
+          "name",
+          "bundleIdentifier",
+          "pid",
+          "visible"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
       "annotations": {
         "readOnlyHint": true,
         "destructiveHint": false,
@@ -7696,7 +7737,27 @@
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "value": {},
+          "formattedValue": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "address",
+          "formattedValue"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
       "annotations": {
         "readOnlyHint": true,
         "destructiveHint": false,
@@ -7737,7 +7798,34 @@
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "formula": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "value": {},
+          "formattedValue": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "address",
+          "formula",
+          "formattedValue"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
       "annotations": {
         "readOnlyHint": true,
         "destructiveHint": false,
@@ -7756,7 +7844,42 @@
         "type": "object",
         "properties": {}
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "documents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "modified": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "name",
+                "path",
+                "modified"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "documents"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
       "annotations": {
         "readOnlyHint": true,
         "destructiveHint": false,
@@ -7785,7 +7908,36 @@
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sheets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "tableCount": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "name",
+                "tableCount"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "sheets"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
       "annotations": {
         "readOnlyHint": true,
         "destructiveHint": false,
@@ -7820,7 +7972,41 @@
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tables": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "rowCount": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "columnCount": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "name",
+                "rowCount",
+                "columnCount"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "tables"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
       "annotations": {
         "readOnlyHint": true,
         "destructiveHint": false,
@@ -7879,7 +8065,43 @@
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {}
+            }
+          },
+          "startRow": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "startCol": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "endRow": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "endCol": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "rows",
+          "startRow",
+          "startCol",
+          "endRow",
+          "endCol"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
       "annotations": {
         "readOnlyHint": true,
         "destructiveHint": false,

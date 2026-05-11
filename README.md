@@ -10,7 +10,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/heznpc/AirMCP)](https://github.com/heznpc/AirMCP/stargazers)
 
-MCP server for the entire Apple ecosystem — Notes, Reminders, Calendar, Contacts, Mail, Messages, Music, Finder, Safari, System, Photos, Shortcuts, Apple Intelligence, TV, Screen Capture, Maps, Podcasts, Weather, Pages, Numbers, Keynote, Location, and Bluetooth. Connect any AI to your Mac.
+**Apple-native agent runtime for any MCP client.** Skills DSL workflow engine, semantic memory, OAuth 2.1, HMAC-chained audit log — over native Swift bridges into EventKit, HealthKit, PhotoKit, Vision, and Foundation Models. 272 tools across 29 Apple + Google Workspace modules. Connect Claude, Codex, Gemini, Cursor, JetBrains Air, OpenClaw — any MCP-capable AI.
+
+**Requires**: macOS for the server. Apple Intelligence features (`ai_agent`, `summarize`, etc.) require macOS 26+ on Apple Silicon. Most tools work on macOS 14+.
 
 > Available in multiple languages at the [project landing page](https://heznpc.github.io/AirMCP/).
 
@@ -112,25 +114,44 @@ These are just starting points — with 272 tools across 29 Apple apps, the comb
 
 ## Why AirMCP?
 
-After [`supermemoryai/apple-mcp` was archived 2026-01-01](https://github.com/supermemoryai/apple-mcp) (3.1k stars, no more updates), AirMCP is the **only production-grade Apple-native MCP server** still shipping. Apple has not released an official iCloud MCP; Google, Dropbox, and Microsoft have. That gap is AirMCP's.
+**AirMCP is a runtime layer, not a tool collection.** The 272 tools operate on Apple data; the workflow engine + memory + safety operate on the tools. The value lives below the tool surface in infrastructure Apple won't ship in their own MCP API:
 
-|                                   | Direct AppleScript      | Siri Shortcuts    | apple-mcp (archived)       | **AirMCP**                                                                                        |
-| --------------------------------- | ----------------------- | ----------------- | -------------------------- | ------------------------------------------------------------------------------------------------- |
-| Tools                             | Manual scripts          | Limited actions   | 15                         | **272**                                                                                           |
-| Modules                           | —                       | —                 | 5                          | **29**                                                                                            |
-| MCP protocol                      | ❌                      | ❌                | ✅                         | ✅ (2025-06-18 spec + OAuth 2.1 + Resource Indicators, RFC 0005)                                  |
-| Input validation                  | ❌                      | N/A               | ❌                         | **Zod + `outputSchema` on ~35% of read tools + script↔schema contract tests**                     |
-| Security                          | None                    | Sandboxed         | Basic                      | **HITL + audit log (queryable) + rate limit + emergency stop + `allowNetwork` policy (RFC 0002)** |
-| Automations                       | Hand-wired AppleScripts | `.shortcut` files | ❌                         | **14 YAML skills with `parallel`/`loop`/`on_error`/`retry`/inputs + 9 event triggers**            |
-| Multi-client                      | ❌                      | ❌                | ✅                         | **Claude Desktop/Code/Cowork, Cursor, Windsurf, Copilot, VS Code, ChatGPT (MCP Apps)**            |
-| Swift bridge                      | ❌                      | ❌                | ❌                         | **EventKit, PhotoKit, HealthKit, Vision, Foundation Models**                                      |
-| **iOS: Siri/Shortcuts/Spotlight** | ❌                      | Native            | ❌                         | **154 auto-generated AppIntents + AppShortcutsProvider (RFC 0007)**                               |
-| **iOS: on-device agent**          | —                       | —                 | —                          | **`AskAirMCPIntent` → Foundation Models tool calling (iOS 26+)**                                  |
-| HTTP transport                    | —                       | —                 | ❌                         | **Streamable HTTP + declarative `allowNetwork` policy (RFC 0002)**                                |
-| i18n                              | ❌                      | ❌                | ❌                         | **9 languages**                                                                                   |
-| Maintained                        | —                       | Apple             | ❌ **Archived 2026-01-01** | **Active (v2.10+, daily commits)**                                                                |
+- **Skills DSL workflow engine** — declare multi-step automations in YAML with `parallel` / `loop` / `on_error` / `retry` / 9 event triggers. Not one-shot tool calls — a runtime that *orchestrates*.
+- **Semantic memory** — facts / entities / episodes with Gemini or on-device Swift embeddings. Persistent across restarts. This is agent context, not an OS feature.
+- **Safety primitives** — HITL approval, HMAC-chained audit log (88% coverage on safety-critical files), rate limiting, emergency stop, OAuth 2.1 + Resource Indicators (production-grade JWT verifier with RS256/ES256 + RFC 8707 audience + RFC 9728 protected-resource metadata + DPoP advertisement).
+- **Native Swift bridge** — direct access to EventKit / HealthKit / PhotoKit / Vision / Foundation Models. Not an `osascript` wrapper.
+- **Multi-client by design** — same server works for Claude, Codex, Gemini, Cursor, JetBrains Air, OpenClaw, ChatGPT (MCP Apps), and any future MCP-capable AI. No per-client porting.
 
-**The Apple-native MCP reference slot is open.** [Research from Apr 2026](https://www.local-mcp.com/guides/best-mcp-server-mac) notes: _"Outside the archived apple-mcp, no implementation exceeds 5 stars. Most have single-digit commits and single contributors."_
+### What AirMCP is — and isn't
+
+**Is**: the runtime layer for AI agents on Apple. When Apple ships their system MCP API (likely partial, focused on user-facing CRUD), AirMCP's tool surface gets *delegated* to the OS — and the runtime layer above stays. Apple Notes / Reminders / Calendar are the *bottom*; AirMCP's value is the *middle*.
+
+**Isn't**: "the only Apple MCP server." [LMCP](https://www.local-mcp.com/) (92 tools), [Apple-PIM-Agent-Plugin](https://github.com/omarshahine/Apple-PIM-Agent-Plugin), and ~100 narrower Apple MCPs exist. What's distinctive is *integrated depth*: 272 tools + Swift bridge + Skills DSL + production-grade safety primitives + Google Workspace + iOS AppIntents — all in one auditable open-source codebase.
+
+### Comparison vs other approaches
+
+|                                   | Direct AppleScript      | Siri Shortcuts    | LMCP                       | apple-mcp (archived)       | **AirMCP**                                                                                        |
+| --------------------------------- | ----------------------- | ----------------- | -------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------- |
+| Tools                             | Manual scripts          | Limited actions   | 92                         | 15                         | **272**                                                                                           |
+| Modules                           | —                       | —                 | (Mac productivity)         | 5                          | **29**                                                                                            |
+| Workflow engine                   | ❌                      | `.shortcut` files | ❌                         | ❌                         | **Skills DSL** (parallel / loop / on_error / retry / 9 event triggers)                            |
+| Semantic memory                   | ❌                      | ❌                | ❌                         | ❌                         | **Gemini + on-device Swift embeddings, persistent**                                                |
+| OAuth 2.1 + RFC 8707/9728         | —                       | —                 | ?                          | ❌                         | **Production JWT verifier (RS256/ES256) + RFC 8707 audience + RFC 9728 PRM + DPoP**               |
+| HMAC-chained audit log            | ❌                      | ❌                | ❌                         | ❌                         | **Tamper-detection via `summarizeAuditEntries`; 88% test coverage on safety-critical code**       |
+| Input validation                  | ❌                      | N/A               | ?                          | ❌                         | **Zod on every tool + outputSchema on ~75% of reads + script↔schema contract tests**              |
+| Multi-client                      | ❌                      | ❌                | ✅                         | ✅                         | **Claude / Codex / Gemini / Cursor / Air / OpenClaw / ChatGPT (MCP Apps) — any MCP-capable AI**   |
+| Native Swift API depth            | ❌                      | OS-blessed bridge | ?                          | AppleScript wrapper        | **Direct: EventKit, HealthKit, PhotoKit, Vision, Foundation Models**                              |
+| Google Workspace integration      | ❌                      | ❌                | ❌                         | ❌                         | **Gmail / Drive / Sheets / Calendar / Docs / Tasks / People — 14+ tools**                         |
+| **iOS: Siri / Shortcuts / Spotlight** | ❌                  | Native            | ❌                         | ❌                         | **232 auto-generated AppIntents + AppShortcutsProvider (RFC 0007)**                               |
+| **iOS: on-device agent**          | —                       | —                 | —                          | —                          | **`AskAirMCPIntent` → Foundation Models tool calling (iOS 26+)**                                  |
+| i18n                              | ❌                      | ❌                | ?                          | ❌                         | **9 languages**                                                                                   |
+| Maintenance                       | —                       | Apple             | Active                     | ❌ **Archived 2026-01-01** | **Active (v2.12+)**                                                                              |
+
+### Why this position holds
+
+- **Tool surface is leverage, not the moat.** Apple's eventual system MCP will replace many AppleScript wrappers; AirMCP's *workflow engine + safety + memory + multi-client + Google Workspace* layer survives as the integration above the OS.
+- **Open source**: every line auditable, modifiable, forkable. Apple's closed alternative won't have this.
+- **First-mover momentum on integrated depth**: [research from Apr 2026](https://www.local-mcp.com/guides/best-mcp-server-mac) notes — _"Outside the archived apple-mcp, no implementation exceeds 5 stars. Most have single-digit commits and single contributors."_ AirMCP holds the slot with active development at v2.12+.
 
 ---
 
@@ -190,7 +211,7 @@ AirMCP runs with access to 272 tools on your machine. A few layers keep a buggy 
 
 ## Siri · Shortcuts · Spotlight (iOS 17+ / macOS 14+)
 
-AirMCP's 154 read-only tools auto-register as Apple App Intents. Anything that speaks the Intents system — Siri, Shortcuts, Spotlight, the Action Button, Widgets — calls them directly without opening the app.
+AirMCP's tools auto-register as Apple App Intents — **232 generated intents** across read + non-destructive write surfaces (RFC 0007 Phase A). Destructive intents are env-gated (`AIRMCP_APPINTENTS_DESTRUCTIVE=true` opt-in). Anything that speaks the Intents system — Siri, Shortcuts, Spotlight, the Action Button, Widgets — calls them directly without opening the app.
 
 - **Top-10 Siri phrases** ship out of the box via `AppShortcutsProvider` (codegen'd from the MCP tool manifest).
 - **Shortcuts app**: every AirMCP tool appears as an action with typed parameters.

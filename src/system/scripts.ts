@@ -328,7 +328,8 @@ export function isAppRunningScript(name: string): string {
       const p = procs[0];
       JSON.stringify({running: true, name: p.name(), bundleIdentifier: p.bundleIdentifier(), pid: p.unixId(), visible: p.visible()});
     } else {
-      JSON.stringify({running: false, name: '${esc(name)}'});
+      // Emit explicit nulls so the outputSchema's nullable contract holds.
+      JSON.stringify({running: false, name: '${esc(name)}', bundleIdentifier: null, pid: null, visible: null});
     }
   `;
 }

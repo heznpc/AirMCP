@@ -2,8 +2,8 @@
 //
 // Source: docs/tool-manifest.json
 // Generator: scripts/gen-swift-intents.mjs
-// RFC 0007 Phase A.2b.2 + A.4.1 — 232 auto-selected read-only
-// tools (65 with typed drift-guards + Interactive Snippet
+// RFC 0007 Phase A.2b.2 + A.4.1 — 236 auto-selected read-only
+// tools (75 with typed drift-guards + Interactive Snippet
 // SwiftUI views) + 9 AppShortcutsProvider entries.
 // Run `npm run gen:intents` to refresh after tool metadata changes.
 // CI guards against drift via `npm run gen:intents:check`.
@@ -74,6 +74,21 @@ public struct MCPDiscoverToolsOutput: Codable, Sendable {
     public let hint: String?
 }
 
+// Output type for: get_battery_status
+public struct MCPGetBatteryStatusOutput: Codable, Sendable {
+    public let percentage: String
+    public let charging: Bool
+    public let source: String?
+    public let timeRemaining: String?
+    public let raw: String
+}
+
+// Output type for: get_brightness
+public struct MCPGetBrightnessOutput: Codable, Sendable {
+    public let brightness: String
+    public let raw: String
+}
+
 // Output type for: get_clipboard
 public struct MCPGetClipboardOutput: Codable, Sendable {
     public let content: String
@@ -140,10 +155,54 @@ public struct MCPGetPhotoInfoOutput: Codable, Sendable {
     public let keywords: String
 }
 
+// Output type for: get_rating
+public struct MCPGetRatingOutput: Codable, Sendable {
+    public let name: String
+    public let artist: String
+    public let rating: Int
+    public let favorited: Bool
+    public let disliked: Bool
+}
+
+// Output type for: get_screen_info
+public struct MCPGetScreenInfoOutput: Codable, Sendable {
+    public struct DisplaysItem: Codable, Sendable {
+        public let name: String
+        public let resolution: String?
+        public let pixelWidth: String
+        public let pixelHeight: String
+        public let retina: Bool
+    }
+
+    public let displays: [DisplaysItem]
+}
+
 // Output type for: get_shortcut_detail
 public struct MCPGetShortcutDetailOutput: Codable, Sendable {
     public let shortcut: String
     public let detail: String
+}
+
+// Output type for: get_track_info
+public struct MCPGetTrackInfoOutput: Codable, Sendable {
+    public let id: Int
+    public let name: String
+    public let artist: String
+    public let album: String
+    public let albumArtist: String
+    public let genre: String
+    public let year: Int
+    public let trackNumber: Int
+    public let discNumber: Int
+    public let duration: Double
+    public let playedCount: Int
+    public let rating: Int
+    public let favorited: Bool
+    public let disliked: Bool
+    public let dateAdded: String?
+    public let sampleRate: Int
+    public let bitRate: Int
+    public let size: Double
 }
 
 // Output type for: get_unread_count
@@ -182,6 +241,17 @@ public struct MCPGetVolumeOutput: Codable, Sendable {
     public let outputMuted: Bool
 }
 
+// Output type for: get_wifi_status
+public struct MCPGetWifiStatusOutput: Codable, Sendable {
+    public let ssid: String?
+    public let bssid: String?
+    public let signalStrength: String
+    public let noiseLevel: String
+    public let channel: String?
+    public let connected: Bool
+    public let raw: String
+}
+
 // Output type for: list_accounts
 public struct MCPListAccountsOutput: Codable, Sendable {
     public struct AccountsItem: Codable, Sendable {
@@ -191,6 +261,34 @@ public struct MCPListAccountsOutput: Codable, Sendable {
     }
 
     public let accounts: [AccountsItem]
+}
+
+// Output type for: list_all_windows
+public struct MCPListAllWindowsOutput: Codable, Sendable {
+    public struct WindowsItem: Codable, Sendable {
+        public let app: String
+        public let pid: Int
+        public let title: String
+        public let position: String
+        public let size: String
+        public let minimized: Bool
+    }
+
+    public let total: Int
+    public let windows: [WindowsItem]
+}
+
+// Output type for: list_bluetooth_devices
+public struct MCPListBluetoothDevicesOutput: Codable, Sendable {
+    public struct DevicesItem: Codable, Sendable {
+        public let name: String
+        public let connected: Bool
+        public let address: String?
+        public let type: String?
+    }
+
+    public let total: Int
+    public let devices: [DevicesItem]
 }
 
 // Output type for: list_bookmarks
@@ -462,6 +560,19 @@ public struct MCPListRemindersOutput: Codable, Sendable {
     public let offset: Double
     public let returned: Double
     public let reminders: [RemindersItem]
+}
+
+// Output type for: list_running_apps
+public struct MCPListRunningAppsOutput: Codable, Sendable {
+    public struct AppsItem: Codable, Sendable {
+        public let name: String
+        public let bundleIdentifier: String
+        public let pid: Int
+        public let visible: Bool
+    }
+
+    public let total: Int
+    public let apps: [AppsItem]
 }
 
 // Output type for: list_shortcuts
@@ -873,6 +984,21 @@ public struct MCPSearchTabsOutput: Codable, Sendable {
 
     public let returned: Double
     public let tabs: [TabsItem]
+}
+
+// Output type for: search_tracks
+public struct MCPSearchTracksOutput: Codable, Sendable {
+    public struct TracksItem: Codable, Sendable {
+        public let id: Int
+        public let name: String
+        public let artist: String
+        public let album: String
+        public let duration: Double
+    }
+
+    public let total: Int
+    public let returned: Int
+    public let tracks: [TracksItem]
 }
 
 // Output type for: set_clipboard
@@ -2208,6 +2334,16 @@ public struct GetBatteryStatusIntent: AppIntent {
             tool: "get_battery_status",
             args: [String: any Sendable]()
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "get_battery_status", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPGetBatteryStatusOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPGetBatteryStatusSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -2242,6 +2378,16 @@ public struct GetBrightnessIntent: AppIntent {
             tool: "get_brightness",
             args: [String: any Sendable]()
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "get_brightness", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPGetBrightnessOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPGetBrightnessSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -2548,6 +2694,16 @@ public struct GetRatingIntent: AppIntent {
             tool: "get_rating",
             args: ["trackName": trackName]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "get_rating", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPGetRatingOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPGetRatingSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -2565,6 +2721,16 @@ public struct GetScreenInfoIntent: AppIntent {
             tool: "get_screen_info",
             args: [String: any Sendable]()
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "get_screen_info", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPGetScreenInfoOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPGetScreenInfoSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -2615,6 +2781,16 @@ public struct GetTrackInfoIntent: AppIntent {
             tool: "get_track_info",
             args: ["trackName": trackName]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "get_track_info", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPGetTrackInfoOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPGetTrackInfoSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -2716,6 +2892,16 @@ public struct GetWifiStatusIntent: AppIntent {
             tool: "get_wifi_status",
             args: [String: any Sendable]()
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "get_wifi_status", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPGetWifiStatusOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPGetWifiStatusSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -3362,6 +3548,16 @@ public struct ListAllWindowsIntent: AppIntent {
             tool: "list_all_windows",
             args: [String: any Sendable]()
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "list_all_windows", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPListAllWindowsOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPListAllWindowsSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -3379,6 +3575,16 @@ public struct ListBluetoothDevicesIntent: AppIntent {
             tool: "list_bluetooth_devices",
             args: [String: any Sendable]()
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "list_bluetooth_devices", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPListBluetoothDevicesOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPListBluetoothDevicesSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -4053,6 +4259,16 @@ public struct ListRunningAppsIntent: AppIntent {
             tool: "list_running_apps",
             args: [String: any Sendable]()
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "list_running_apps", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPListRunningAppsOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPListRunningAppsSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -4527,6 +4743,58 @@ public struct NumbersCreateDocumentIntent: AppIntent {
     }
 }
 
+// Tool: numbers_create_table
+public struct NumbersCreateTableIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Create Numbers Table"
+    nonisolated(unsafe) public static var description = IntentDescription("Create a new table on a sheet with the given dimensions. If name is provided, the table is named accordingly; otherwise Numbers auto-names (e.g. 'Table 2'). Throws if name collides with an existing table on the same sheet.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Document name")
+    public var document: String
+
+    @Parameter(title: "Target sheet name")
+    public var sheet: String
+
+    @Parameter(title: "Number of rows in the new table", inclusiveRange: (1, 100000))
+    public var rowCount: Int
+
+    @Parameter(title: "Number of columns in the new table", inclusiveRange: (1, 1000))
+    public var columnCount: Int
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "numbers_create_table",
+            args: ["document": document, "sheet": sheet, "rowCount": rowCount, "columnCount": columnCount]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: numbers_duplicate_sheet
+public struct NumbersDuplicateSheetIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Duplicate Numbers Sheet"
+    nonisolated(unsafe) public static var description = IntentDescription("Duplicate a sheet with all its tables and content. If newName is provided, the copy is renamed; otherwise Numbers auto-suffixes (e.g. 'Sheet 1 - Copy'). Throws if newName already exists (Numbers does not allow duplicate sheet names).")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Document name")
+    public var document: String
+
+    @Parameter(title: "Source sheet name")
+    public var sheet: String
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "numbers_duplicate_sheet",
+            args: ["document": document, "sheet": sheet]
+        )
+        return .result(value: result)
+    }
+}
+
 // Tool: numbers_get_cell
 public struct NumbersGetCellIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Get Numbers Cell"
@@ -4574,6 +4842,58 @@ public struct NumbersGetFormulaIntent: AppIntent {
         let result = try await MCPIntentRouter.shared.call(
             tool: "numbers_get_formula",
             args: ["document": document, "sheet": sheet, "cell": cell]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: numbers_insert_column
+public struct NumbersInsertColumnIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Insert Numbers Column"
+    nonisolated(unsafe) public static var description = IntentDescription("Insert an empty column before the column at the given index (0-based). If atIndex >= columnCount, the column is appended at the right edge. Non-destructive — existing content shifts right.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Document name")
+    public var document: String
+
+    @Parameter(title: "Sheet name")
+    public var sheet: String
+
+    @Parameter(title: "0-based column index to insert before")
+    public var atIndex: Int
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "numbers_insert_column",
+            args: ["document": document, "sheet": sheet, "atIndex": atIndex]
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: numbers_insert_row
+public struct NumbersInsertRowIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Insert Numbers Row"
+    nonisolated(unsafe) public static var description = IntentDescription("Insert an empty row before the row at the given index (0-based). If atIndex >= rowCount, the row is appended at the end. Non-destructive — existing content shifts down.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Document name")
+    public var document: String
+
+    @Parameter(title: "Sheet name")
+    public var sheet: String
+
+    @Parameter(title: "0-based row index to insert before")
+    public var atIndex: Int
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "numbers_insert_row",
+            args: ["document": document, "sheet": sheet, "atIndex": atIndex]
         )
         return .result(value: result)
     }
@@ -5933,6 +6253,16 @@ public struct SearchTracksIntent: AppIntent {
             tool: "search_tracks",
             args: ["query": query, "limit": limit]
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "search_tracks", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPSearchTracksOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPSearchTracksSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -7226,6 +7556,79 @@ public struct MCPDiscoverToolsSnippetView: View {
     }
 }
 
+// Snippet view for: get_battery_status  (shape: scalar)
+@available(macOS 26, iOS 26, *)
+public struct MCPGetBatteryStatusSnippetView: View {
+    public let data: MCPGetBatteryStatusOutput
+    public init(data: MCPGetBatteryStatusOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text("Percentage")
+                Spacer()
+                Text(String(describing: data.percentage))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Charging")
+                Spacer()
+                Text((data.charging ? "Yes" : "No"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Source")
+                Spacer()
+                Text((data.source ?? "—"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Time Remaining")
+                Spacer()
+                Text((data.timeRemaining ?? "—"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Raw")
+                Spacer()
+                Text(data.raw)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: get_brightness  (shape: scalar)
+@available(macOS 26, iOS 26, *)
+public struct MCPGetBrightnessSnippetView: View {
+    public let data: MCPGetBrightnessOutput
+    public init(data: MCPGetBrightnessOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text("Brightness")
+                Spacer()
+                Text(String(describing: data.brightness))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Raw")
+                Spacer()
+                Text(data.raw)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+        }
+        .padding()
+    }
+}
+
 // Snippet view for: get_clipboard  (shape: scalar)
 @available(macOS 26, iOS 26, *)
 public struct MCPGetClipboardSnippetView: View {
@@ -7506,6 +7909,70 @@ public struct MCPGetPhotoInfoSnippetView: View {
     }
 }
 
+// Snippet view for: get_rating  (shape: scalar)
+@available(macOS 26, iOS 26, *)
+public struct MCPGetRatingSnippetView: View {
+    public let data: MCPGetRatingOutput
+    public init(data: MCPGetRatingOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text("Name")
+                Spacer()
+                Text(data.name)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Artist")
+                Spacer()
+                Text(data.artist)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Rating")
+                Spacer()
+                Text(data.rating.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Favorited")
+                Spacer()
+                Text((data.favorited ? "Yes" : "No"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Disliked")
+                Spacer()
+                Text((data.disliked ? "Yes" : "No"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: get_screen_info  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPGetScreenInfoSnippetView: View {
+    public let data: MCPGetScreenInfoOutput
+    public init(data: MCPGetScreenInfoOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.displays.enumerated()), id: \.offset) { _, row in
+                Text(row.name)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
 // Snippet view for: get_shortcut_detail  (shape: scalar)
 @available(macOS 26, iOS 26, *)
 public struct MCPGetShortcutDetailSnippetView: View {
@@ -7524,6 +7991,144 @@ public struct MCPGetShortcutDetailSnippetView: View {
                 Text("Detail")
                 Spacer()
                 Text(data.detail)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: get_track_info  (shape: scalar)
+@available(macOS 26, iOS 26, *)
+public struct MCPGetTrackInfoSnippetView: View {
+    public let data: MCPGetTrackInfoOutput
+    public init(data: MCPGetTrackInfoOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text("Id")
+                Spacer()
+                Text(data.id.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Name")
+                Spacer()
+                Text(data.name)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Artist")
+                Spacer()
+                Text(data.artist)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Album")
+                Spacer()
+                Text(data.album)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Album Artist")
+                Spacer()
+                Text(data.albumArtist)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Genre")
+                Spacer()
+                Text(data.genre)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Year")
+                Spacer()
+                Text(data.year.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Track Number")
+                Spacer()
+                Text(data.trackNumber.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Disc Number")
+                Spacer()
+                Text(data.discNumber.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Duration")
+                Spacer()
+                Text(data.duration.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Played Count")
+                Spacer()
+                Text(data.playedCount.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Rating")
+                Spacer()
+                Text(data.rating.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Favorited")
+                Spacer()
+                Text((data.favorited ? "Yes" : "No"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Disliked")
+                Spacer()
+                Text((data.disliked ? "Yes" : "No"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Date Added")
+                Spacer()
+                Text((data.dateAdded ?? "—"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Sample Rate")
+                Spacer()
+                Text(data.sampleRate.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Bit Rate")
+                Spacer()
+                Text(data.bitRate.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Size")
+                Spacer()
+                Text(data.size.formatted())
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -7602,6 +8207,67 @@ public struct MCPGetVolumeSnippetView: View {
     }
 }
 
+// Snippet view for: get_wifi_status  (shape: scalar)
+@available(macOS 26, iOS 26, *)
+public struct MCPGetWifiStatusSnippetView: View {
+    public let data: MCPGetWifiStatusOutput
+    public init(data: MCPGetWifiStatusOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text("Ssid")
+                Spacer()
+                Text((data.ssid ?? "—"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Bssid")
+                Spacer()
+                Text((data.bssid ?? "—"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Signal Strength")
+                Spacer()
+                Text(String(describing: data.signalStrength))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Noise Level")
+                Spacer()
+                Text(String(describing: data.noiseLevel))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Channel")
+                Spacer()
+                Text((data.channel ?? "—"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Connected")
+                Spacer()
+                Text((data.connected ? "Yes" : "No"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Raw")
+                Spacer()
+                Text(data.raw)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+        }
+        .padding()
+    }
+}
+
 // Snippet view for: list_accounts  (shape: list-object)
 @available(macOS 26, iOS 26, *)
 public struct MCPListAccountsSnippetView: View {
@@ -7610,6 +8276,40 @@ public struct MCPListAccountsSnippetView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(Array(data.accounts.enumerated()), id: \.offset) { _, row in
+                Text(row.name)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: list_all_windows  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPListAllWindowsSnippetView: View {
+    public let data: MCPListAllWindowsOutput
+    public init(data: MCPListAllWindowsOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.windows.enumerated()), id: \.offset) { _, row in
+                Text(row.app)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: list_bluetooth_devices  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPListBluetoothDevicesSnippetView: View {
+    public let data: MCPListBluetoothDevicesOutput
+    public init(data: MCPListBluetoothDevicesOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.devices.enumerated()), id: \.offset) { _, row in
                 Text(row.name)
                     .font(.body)
                     .lineLimit(1)
@@ -7954,6 +8654,23 @@ public struct MCPListRemindersSnippetView: View {
                         .lineLimit(1)
                 }
                 .buttonStyle(.plain)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: list_running_apps  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPListRunningAppsSnippetView: View {
+    public let data: MCPListRunningAppsOutput
+    public init(data: MCPListRunningAppsOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.apps.enumerated()), id: \.offset) { _, row in
+                Text(row.name)
+                    .font(.body)
+                    .lineLimit(1)
             }
         }
         .padding()
@@ -8794,6 +9511,23 @@ public struct MCPSearchTabsSnippetView: View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(Array(data.tabs.enumerated()), id: \.offset) { _, row in
                 Text(row.title)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: search_tracks  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPSearchTracksSnippetView: View {
+    public let data: MCPSearchTracksOutput
+    public init(data: MCPSearchTracksOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.tracks.enumerated()), id: \.offset) { _, row in
+                Text(row.name)
                     .font(.body)
                     .lineLimit(1)
             }

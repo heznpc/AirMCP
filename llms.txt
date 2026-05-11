@@ -1,6 +1,6 @@
 # AirMCP
 
-> MCP server for the entire Apple ecosystem. 272 tools across 29 modules.
+> MCP server for the entire Apple ecosystem. 278 tools across 29 modules.
 
 ## Links
 
@@ -29,7 +29,7 @@
 - **Messages** (6 tools): list_chats, read_chat, search_chats, send_message, send_file, list_participants
 - **Music** (17 tools): list_playlists, list_tracks, now_playing, playback_control, search_tracks, play_track, play_playlist, get_track_info, set_shuffle, create_playlist, add_to_playlist, remove_from_playlist, delete_playlist, get_rating, set_rating, set_favorited, set_disliked
 - **Notes** (12 tools): list_notes, search_notes, read_note, create_note, update_note, delete_note, list_folders, create_folder, move_note, scan_notes, compare_notes, bulk_move_notes
-- **Numbers** (12 tools): numbers_list_documents, numbers_create_document, numbers_list_sheets, numbers_get_cell, numbers_set_cell, numbers_read_cells, numbers_add_sheet, numbers_export_pdf, numbers_close_document, numbers_list_tables, numbers_get_formula, numbers_rename_sheet
+- **Numbers** (18 tools): numbers_list_documents, numbers_create_document, numbers_list_sheets, numbers_get_cell, numbers_set_cell, numbers_read_cells, numbers_add_sheet, numbers_export_pdf, numbers_close_document, numbers_list_tables, numbers_get_formula, numbers_rename_sheet, numbers_insert_row, numbers_insert_column, numbers_delete_row, numbers_delete_column, numbers_duplicate_sheet, numbers_create_table
 - **Pages** (7 tools): pages_list_documents, pages_open_document, pages_create_document, pages_get_body_text, pages_set_body_text, pages_export_pdf, pages_close_document
 - **Photos** (11 tools): list_albums, list_photos, search_photos, get_photo_info, list_favorites, create_album, add_to_album, import_photo, delete_photos, query_photos, classify_image
 - **Podcasts** (6 tools): list_podcast_shows, list_podcast_episodes, podcast_now_playing, podcast_playback_control, play_podcast_episode, search_podcast_episodes

@@ -1,8 +1,8 @@
 {
   "generatedAt": "STABLE_PLACEHOLDER",
   "protocolVersion": "2025-06-18",
-  "toolCount": 285,
-  "eligibleCount": 280,
+  "toolCount": 291,
+  "eligibleCount": 286,
   "ineligibleCount": 5,
   "ineligibleByReason": {
     "object-param:recurrence": 2,
@@ -7630,6 +7630,198 @@
       "ineligibleReason": null
     },
     {
+      "name": "numbers_create_table",
+      "title": "Create Numbers Table",
+      "description": "Create a new table on a sheet with the given dimensions. If name is provided, the table is named accordingly; otherwise Numbers auto-names (e.g. 'Table 2'). Throws if name collides with an existing table on the same sheet.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "document": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Document name"
+          },
+          "sheet": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Target sheet name"
+          },
+          "rowCount": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000,
+            "description": "Number of rows in the new table"
+          },
+          "columnCount": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "Number of columns in the new table"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional table name. Pass null for auto-naming."
+          }
+        },
+        "required": [
+          "document",
+          "sheet",
+          "rowCount",
+          "columnCount",
+          "name"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "outputSchema": null,
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "appIntentEligible": true,
+      "ineligibleReason": null
+    },
+    {
+      "name": "numbers_delete_column",
+      "title": "Delete Numbers Column",
+      "description": "Delete the column at the given index (0-based). DESTRUCTIVE — the column AND its cell content are removed; columns to the right shift left. Throws if atIndex is out of bounds.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "document": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Document name"
+          },
+          "sheet": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Sheet name"
+          },
+          "atIndex": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "0-based column index to delete"
+          }
+        },
+        "required": [
+          "document",
+          "sheet",
+          "atIndex"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "outputSchema": null,
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "appIntentEligible": true,
+      "ineligibleReason": null
+    },
+    {
+      "name": "numbers_delete_row",
+      "title": "Delete Numbers Row",
+      "description": "Delete the row at the given index (0-based). DESTRUCTIVE — the row AND its cell content are removed; rows below shift up. Throws if atIndex is out of bounds.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "document": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Document name"
+          },
+          "sheet": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Sheet name"
+          },
+          "atIndex": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "0-based row index to delete"
+          }
+        },
+        "required": [
+          "document",
+          "sheet",
+          "atIndex"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "outputSchema": null,
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "appIntentEligible": true,
+      "ineligibleReason": null
+    },
+    {
+      "name": "numbers_duplicate_sheet",
+      "title": "Duplicate Numbers Sheet",
+      "description": "Duplicate a sheet with all its tables and content. If newName is provided, the copy is renamed; otherwise Numbers auto-suffixes (e.g. 'Sheet 1 - Copy'). Throws if newName already exists (Numbers does not allow duplicate sheet names).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "document": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Document name"
+          },
+          "sheet": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Source sheet name"
+          },
+          "newName": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional new name. Pass null to let Numbers auto-suffix."
+          }
+        },
+        "required": [
+          "document",
+          "sheet",
+          "newName"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "outputSchema": null,
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "appIntentEligible": true,
+      "ineligibleReason": null
+    },
+    {
       "name": "numbers_export_pdf",
       "title": "Export Numbers to PDF",
       "description": "Export a Numbers spreadsheet to PDF. Will overwrite an existing file at the same path.",
@@ -7742,6 +7934,88 @@
         "readOnlyHint": true,
         "destructiveHint": false,
         "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "appIntentEligible": true,
+      "ineligibleReason": null
+    },
+    {
+      "name": "numbers_insert_column",
+      "title": "Insert Numbers Column",
+      "description": "Insert an empty column before the column at the given index (0-based). If atIndex >= columnCount, the column is appended at the right edge. Non-destructive — existing content shifts right.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "document": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Document name"
+          },
+          "sheet": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Sheet name"
+          },
+          "atIndex": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "0-based column index to insert before"
+          }
+        },
+        "required": [
+          "document",
+          "sheet",
+          "atIndex"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "outputSchema": null,
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "appIntentEligible": true,
+      "ineligibleReason": null
+    },
+    {
+      "name": "numbers_insert_row",
+      "title": "Insert Numbers Row",
+      "description": "Insert an empty row before the row at the given index (0-based). If atIndex >= rowCount, the row is appended at the end. Non-destructive — existing content shifts down.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "document": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Document name"
+          },
+          "sheet": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Sheet name"
+          },
+          "atIndex": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "0-based row index to insert before"
+          }
+        },
+        "required": [
+          "document",
+          "sheet",
+          "atIndex"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "outputSchema": null,
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
         "openWorldHint": false
       },
       "appIntentEligible": true,

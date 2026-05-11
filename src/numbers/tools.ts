@@ -17,6 +17,12 @@ import {
   listTablesScript,
   getFormulaScript,
   renameSheetScript,
+  insertRowScript,
+  insertColumnScript,
+  deleteRowScript,
+  deleteColumnScript,
+  duplicateSheetScript,
+  createTableScript,
 } from "./scripts.js";
 
 export function registerNumbersTools(server: McpServer, _config: AirMcpConfig): void {
@@ -267,6 +273,154 @@ export function registerNumbersTools(server: McpServer, _config: AirMcpConfig): 
         return ok(await runJxa(renameSheetScript(document, sheet, newName)));
       } catch (e) {
         return errJxaFor("rename Numbers sheet", e);
+      }
+    },
+  );
+
+  // RFC 0009 Phase 1 batch 3 — structural row/column edits + sheet/table creation.
+
+  server.registerTool(
+    "numbers_insert_row",
+    {
+      title: "Insert Numbers Row",
+      description:
+        "Insert an empty row before the row at the given index (0-based). " +
+        "If atIndex >= rowCount, the row is appended at the end. " +
+        "Non-destructive — existing content shifts down.",
+      inputSchema: {
+        document: z.string().max(500).describe("Document name"),
+        sheet: z.string().max(500).describe("Sheet name"),
+        atIndex: z.number().int().min(0).describe("0-based row index to insert before"),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async ({ document, sheet, atIndex }) => {
+      try {
+        return ok(await runJxa(insertRowScript(document, sheet, atIndex)));
+      } catch (e) {
+        return errJxaFor("insert Numbers row", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "numbers_insert_column",
+    {
+      title: "Insert Numbers Column",
+      description:
+        "Insert an empty column before the column at the given index (0-based). " +
+        "If atIndex >= columnCount, the column is appended at the right edge. " +
+        "Non-destructive — existing content shifts right.",
+      inputSchema: {
+        document: z.string().max(500).describe("Document name"),
+        sheet: z.string().max(500).describe("Sheet name"),
+        atIndex: z.number().int().min(0).describe("0-based column index to insert before"),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async ({ document, sheet, atIndex }) => {
+      try {
+        return ok(await runJxa(insertColumnScript(document, sheet, atIndex)));
+      } catch (e) {
+        return errJxaFor("insert Numbers column", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "numbers_delete_row",
+    {
+      title: "Delete Numbers Row",
+      description:
+        "Delete the row at the given index (0-based). " +
+        "DESTRUCTIVE — the row AND its cell content are removed; rows below shift up. " +
+        "Throws if atIndex is out of bounds.",
+      inputSchema: {
+        document: z.string().max(500).describe("Document name"),
+        sheet: z.string().max(500).describe("Sheet name"),
+        atIndex: z.number().int().min(0).describe("0-based row index to delete"),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+    },
+    async ({ document, sheet, atIndex }) => {
+      try {
+        return ok(await runJxa(deleteRowScript(document, sheet, atIndex)));
+      } catch (e) {
+        return errJxaFor("delete Numbers row", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "numbers_delete_column",
+    {
+      title: "Delete Numbers Column",
+      description:
+        "Delete the column at the given index (0-based). " +
+        "DESTRUCTIVE — the column AND its cell content are removed; columns to the right shift left. " +
+        "Throws if atIndex is out of bounds.",
+      inputSchema: {
+        document: z.string().max(500).describe("Document name"),
+        sheet: z.string().max(500).describe("Sheet name"),
+        atIndex: z.number().int().min(0).describe("0-based column index to delete"),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+    },
+    async ({ document, sheet, atIndex }) => {
+      try {
+        return ok(await runJxa(deleteColumnScript(document, sheet, atIndex)));
+      } catch (e) {
+        return errJxaFor("delete Numbers column", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "numbers_duplicate_sheet",
+    {
+      title: "Duplicate Numbers Sheet",
+      description:
+        "Duplicate a sheet with all its tables and content. " +
+        "If newName is provided, the copy is renamed; otherwise Numbers auto-suffixes (e.g. 'Sheet 1 - Copy'). " +
+        "Throws if newName already exists (Numbers does not allow duplicate sheet names).",
+      inputSchema: {
+        document: z.string().max(500).describe("Document name"),
+        sheet: z.string().max(500).describe("Source sheet name"),
+        newName: z.string().max(500).nullable().describe("Optional new name. Pass null to let Numbers auto-suffix."),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async ({ document, sheet, newName }) => {
+      try {
+        return ok(await runJxa(duplicateSheetScript(document, sheet, newName)));
+      } catch (e) {
+        return errJxaFor("duplicate Numbers sheet", e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "numbers_create_table",
+    {
+      title: "Create Numbers Table",
+      description:
+        "Create a new table on a sheet with the given dimensions. " +
+        "If name is provided, the table is named accordingly; otherwise Numbers auto-names (e.g. 'Table 2'). " +
+        "Throws if name collides with an existing table on the same sheet.",
+      inputSchema: {
+        document: z.string().max(500).describe("Document name"),
+        sheet: z.string().max(500).describe("Target sheet name"),
+        rowCount: z.number().int().min(1).max(100000).describe("Number of rows in the new table"),
+        columnCount: z.number().int().min(1).max(1000).describe("Number of columns in the new table"),
+        name: z.string().max(500).nullable().describe("Optional table name. Pass null for auto-naming."),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async ({ document, sheet, rowCount, columnCount, name }) => {
+      try {
+        return ok(await runJxa(createTableScript(document, sheet, rowCount, columnCount, name)));
+      } catch (e) {
+        return errJxaFor("create Numbers table", e);
       }
     },
   );

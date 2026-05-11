@@ -158,3 +158,125 @@ export function renameSheetScript(documentName: string, sheet: string, newName: 
     JSON.stringify({renamed: true, from: '${esc(sheet)}', to: '${esc(newName)}'});
   `;
 }
+
+/** RFC 0009 Phase 1 batch 3 — insert an empty row before the row at
+ *  \`atIndex\` (0-based). Uses JXA's standard \`make new\` with an \`at\`
+ *  reference. If \`atIndex >= rowCount\`, the row is appended at the end
+ *  (matches Numbers' "add new row" UI behavior at the bottom).
+ *
+ *  Returns the new rowCount after insertion. */
+export function insertRowScript(documentName: string, sheet: string, atIndex: number): string {
+  const safeIndex = Math.max(0, Math.floor(atIndex));
+  return `
+    const Numbers = Application('com.apple.Numbers');
+    ${iworkDocLookup("Numbers", documentName)}
+    ${sheetTableLookup(sheet)}
+    const before = table.rowCount();
+    if (${safeIndex} >= before) {
+      // Append at end: grow rowCount by 1 (fastest, no Numbers.make needed).
+      table.rowCount = before + 1;
+    } else {
+      // Insert before the target row using JXA's 'make new' + 'at' clause.
+      Numbers.make({new: 'row', at: table.rows[${safeIndex}]});
+    }
+    JSON.stringify({inserted: true, atIndex: ${safeIndex}, before: before, after: table.rowCount()});
+  `;
+}
+
+/** RFC 0009 Phase 1 batch 3 — insert an empty column before the column at
+ *  \`atIndex\` (0-based). Symmetric to insertRowScript. */
+export function insertColumnScript(documentName: string, sheet: string, atIndex: number): string {
+  const safeIndex = Math.max(0, Math.floor(atIndex));
+  return `
+    const Numbers = Application('com.apple.Numbers');
+    ${iworkDocLookup("Numbers", documentName)}
+    ${sheetTableLookup(sheet)}
+    const before = table.columnCount();
+    if (${safeIndex} >= before) {
+      table.columnCount = before + 1;
+    } else {
+      Numbers.make({new: 'column', at: table.columns[${safeIndex}]});
+    }
+    JSON.stringify({inserted: true, atIndex: ${safeIndex}, before: before, after: table.columnCount()});
+  `;
+}
+
+/** RFC 0009 Phase 1 batch 3 — delete the row at \`atIndex\` (0-based).
+ *  Destructive: the row AND ITS CONTENT are removed. JXA's standard
+ *  \`.delete()\` verb on the row reference handles the deletion. */
+export function deleteRowScript(documentName: string, sheet: string, atIndex: number): string {
+  const safeIndex = Math.max(0, Math.floor(atIndex));
+  return `
+    const Numbers = Application('com.apple.Numbers');
+    ${iworkDocLookup("Numbers", documentName)}
+    ${sheetTableLookup(sheet)}
+    const before = table.rowCount();
+    if (${safeIndex} >= before) {
+      throw new Error('Row index ${safeIndex} out of bounds (rowCount=' + before + ')');
+    }
+    table.rows[${safeIndex}].delete();
+    JSON.stringify({deleted: true, atIndex: ${safeIndex}, before: before, after: table.rowCount()});
+  `;
+}
+
+/** RFC 0009 Phase 1 batch 3 — delete the column at \`atIndex\` (0-based).
+ *  Destructive: column + content removed. Symmetric to deleteRowScript. */
+export function deleteColumnScript(documentName: string, sheet: string, atIndex: number): string {
+  const safeIndex = Math.max(0, Math.floor(atIndex));
+  return `
+    const Numbers = Application('com.apple.Numbers');
+    ${iworkDocLookup("Numbers", documentName)}
+    ${sheetTableLookup(sheet)}
+    const before = table.columnCount();
+    if (${safeIndex} >= before) {
+      throw new Error('Column index ${safeIndex} out of bounds (columnCount=' + before + ')');
+    }
+    table.columns[${safeIndex}].delete();
+    JSON.stringify({deleted: true, atIndex: ${safeIndex}, before: before, after: table.columnCount()});
+  `;
+}
+
+/** RFC 0009 Phase 1 batch 3 — duplicate a sheet, optionally giving it a
+ *  new name. Uses JXA's standard \`.duplicate()\` verb. If \`newName\` is
+ *  provided AND already exists, Numbers will refuse (no duplicate names)
+ *  and the call throws — surfaced as errJxa. */
+export function duplicateSheetScript(documentName: string, sheet: string, newName: string | null): string {
+  const renameStep = newName ? `dup.name = '${esc(newName)}';` : "/* no rename — Numbers auto-suffixes */";
+  return `
+    const Numbers = Application('com.apple.Numbers');
+    ${iworkDocLookup("Numbers", documentName)}
+    const sheets = docs[0].sheets.whose({name: '${esc(sheet)}'})();
+    if (sheets.length === 0) throw new Error('Sheet not found: ${esc(sheet)}');
+    const dup = sheets[0].duplicate();
+    ${renameStep}
+    JSON.stringify({duplicated: true, source: '${esc(sheet)}', newName: dup.name()});
+  `;
+}
+
+/** RFC 0009 Phase 1 batch 3 — create a new table on a sheet with given
+ *  dimensions. Uses JXA's \`make new table\` with optional \`withProperties\`.
+ *  Returns the new table's auto-assigned name (or supplied name). */
+export function createTableScript(
+  documentName: string,
+  sheet: string,
+  rowCount: number,
+  columnCount: number,
+  name: string | null,
+): string {
+  const safeRows = Math.max(1, Math.floor(rowCount));
+  const safeCols = Math.max(1, Math.floor(columnCount));
+  const propsParts: string[] = [`rowCount: ${safeRows}`, `columnCount: ${safeCols}`];
+  if (name) propsParts.push(`name: '${esc(name)}'`);
+  return `
+    const Numbers = Application('com.apple.Numbers');
+    ${iworkDocLookup("Numbers", documentName)}
+    const sheets = docs[0].sheets.whose({name: '${esc(sheet)}'})();
+    if (sheets.length === 0) throw new Error('Sheet not found: ${esc(sheet)}');
+    const newTable = Numbers.make({
+      new: 'table',
+      at: sheets[0],
+      withProperties: {${propsParts.join(", ")}}
+    });
+    JSON.stringify({created: true, name: newTable.name(), rowCount: newTable.rowCount(), columnCount: newTable.columnCount()});
+  `;
+}

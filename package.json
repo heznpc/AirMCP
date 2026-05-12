@@ -124,9 +124,9 @@
   "dependencies": {
     "@modelcontextprotocol/ext-apps": "1.7.1",
     "@modelcontextprotocol/sdk": "1.29.0",
-    "express": "^5.2.1",
-    "jose": "^6.2.2",
-    "yaml": "^2.8.2",
+    "express": "5.2.1",
+    "jose": "6.2.3",
+    "yaml": "2.8.4",
     "zod": "~3.25.76"
   },
   "devDependencies": {

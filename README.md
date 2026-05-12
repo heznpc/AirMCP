@@ -670,6 +670,8 @@ Consumable view of the on-device audit log (populated for every tool call).
 
 ### Podcasts (6 tools)
 
+> ⚠️ **Deprecated on macOS 26+** — Apple removed the entire Podcasts JXA scripting dictionary in Tahoe. The module is skipped at registration on macOS 26+ (manifest `brokenOn: [26]`); still available on macOS ≤ 25. Scheduled for removal at v3.0.0.
+
 | Tool                       | Description                       | Type  |
 | -------------------------- | --------------------------------- | ----- |
 | `list_podcast_shows`       | List subscribed podcast shows     | read  |
@@ -983,7 +985,7 @@ Modules with OS requirements (e.g., Intelligence requires macOS 26+) are automat
 
 ### Podcasts
 
-- **macOS 26+:** All Podcasts tools are non-functional. Apple removed the Podcasts scripting dictionary in macOS 26 (Tahoe). The circuit breaker will auto-disable the module after 3 failures.
+- **macOS 26+:** Apple removed the entire Podcasts JXA scripting dictionary in Tahoe. The module is skipped at registration time via `compatibility.brokenOn: [26]` in `src/shared/modules.ts` — `tools/list` won't surface any `*_podcast_*` tools on Tahoe hosts, so models can't pick a tool that can never succeed. Surfaced through `airmcp doctor` and `print-compat-report`. Scheduled for removal at v3.0.0; replacement under investigation (Shortcuts bridge / Media framework).
 
 ### Photos
 

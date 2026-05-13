@@ -2,6 +2,8 @@ import type { McpServer } from "../shared/mcp.js";
 import type { SkillDefinition } from "./types.js";
 import { executeSkill } from "./executor.js";
 import { eventBus, type AirMCPEvent } from "../shared/event-bus.js";
+import { runWithRequestContext, getRequestContext } from "../shared/request-context.js";
+import { randomUUID } from "node:crypto";
 
 interface TriggerBinding {
   skill: SkillDefinition;
@@ -30,13 +32,26 @@ function computeBackoff(attempt: number): number {
 }
 
 function runWithRetry(server: McpServer, skill: SkillDefinition, attempt: number): void {
-  executeSkill(server, skill).catch((e) => {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error(`[AirMCP] Trigger ${skill.name} failed (attempt ${attempt}): ${msg}`);
-    if (attempt >= 1 + TRIGGER_MAX_RETRIES) return;
-    const delay = computeBackoff(attempt);
-    const t = setTimeout(() => runWithRetry(server, skill, attempt + 1), delay);
-    t.unref?.();
+  // Stamp an autonomous-origin actor + fresh correlation ID on the
+  // AsyncLocalStorage context so every tool call inside this skill
+  // execution lands in the audit log as `actor: "daemon-skill:<name>"`.
+  // Without this stamp, autonomous tool calls were indistinguishable
+  // from user-initiated ones during audit review.
+  const existing = getRequestContext();
+  const ctx = {
+    ...(existing ?? {}),
+    actor: `daemon-skill:${skill.name}`,
+    correlationId: existing?.correlationId ?? randomUUID(),
+  };
+  runWithRequestContext(ctx, () => {
+    executeSkill(server, skill).catch((e) => {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[AirMCP] Trigger ${skill.name} failed (attempt ${attempt}): ${msg}`);
+      if (attempt >= 1 + TRIGGER_MAX_RETRIES) return;
+      const delay = computeBackoff(attempt);
+      const t = setTimeout(() => runWithRetry(server, skill, attempt + 1), delay);
+      t.unref?.();
+    });
   });
 }
 

@@ -204,8 +204,8 @@ export const PATHS = {
   CONFIG: resolveTilde(envStr("AIRMCP_CONFIG_PATH", "~/.config/airmcp/config.json")),
   /** HITL socket */
   HITL_SOCKET: join(HOME, ".config", "airmcp", "hitl.sock"),
-  /** Vector store directory */
-  VECTOR_STORE: join(HOME, ".airmcp"),
+  /** Vector store directory (env: AIRMCP_VECTOR_STORE_DIR — primarily for tests) */
+  VECTOR_STORE: resolveTilde(envStr("AIRMCP_VECTOR_STORE_DIR", join(HOME, ".airmcp"))),
   /** Context-memory index directory (facts / entities / episodes). */
   MEMORY_DIR: join(HOME, ".cache", "airmcp"),
   /** Context-memory JSON store. */

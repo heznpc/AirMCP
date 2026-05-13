@@ -4,6 +4,7 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { TIMEOUT, BUFFER } from "./constants.js";
+import { eventBus } from "./event-bus.js";
 
 // Package root — works in repo checkout, npm cache, and git worktrees.
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -191,6 +192,16 @@ function ensureProcess(): Promise<void> {
             child = proc;
             launching = null;
             resolve();
+            continue;
+          }
+
+          // Native events from the Swift observer share the same stdout
+          // stream as RPC responses, tagged with the reserved id
+          // "__event__". They carry no pending request — route the raw
+          // line (not the BridgeResponse projection, which strips
+          // event/data/timestamp) to the event bus so triggers fire.
+          if (msg.id === "__event__") {
+            eventBus.processLine(trimmed);
             continue;
           }
 

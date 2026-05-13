@@ -6,7 +6,7 @@ import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import { ok, okLinked, okLinkedStructured, okStructured, errJxaFor } from "../shared/result.js";
 import { TIMEOUT } from "../shared/constants.js";
-import { zFilePath } from "../shared/validate.js";
+import { zFilePath, resolveAndGuard } from "../shared/validate.js";
 import {
   listShortcutsScript,
   runShortcutScript,
@@ -184,6 +184,11 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
     },
     async ({ name, outputPath }) => {
       try {
+        // Symlink hardening: shortcuts CLI will follow a symlinked outputPath
+        // and clobber whatever it points to. Require resolution stays inside
+        // HOME so a malicious symlink can't redirect the export into
+        // /etc/launchd.plist.d/ or similar privileged locations.
+        resolveAndGuard(outputPath);
         return ok(await runJxa(exportShortcutScript(name, outputPath)));
       } catch (e) {
         return errJxaFor("export shortcut", e);
@@ -204,6 +209,11 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
     },
     async ({ filePath }) => {
       try {
+        // Symlink hardening: import reads the .shortcut bundle off disk,
+        // so a symlink pointing at a system file could be coerced into a
+        // shortcut by a malicious skill. Constrain to HOME like the other
+        // file-touching shortcut tools.
+        resolveAndGuard(filePath);
         return ok(await runJxa(importShortcutScript(filePath)));
       } catch (e) {
         return errJxaFor("import shortcut", e);

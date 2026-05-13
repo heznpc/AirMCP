@@ -22,7 +22,7 @@ import { withResultSizeHint } from "./result.js";
 import { traceToolCall } from "./telemetry.js";
 import { assertTestMode } from "./errors.js";
 import { checkRateLimit } from "./rate-limit.js";
-import { getOAuthClaims, getRequestContext, runWithRequestContext } from "./request-context.js";
+import { getOAuthClaims, getRequestContext, runWithRequestContext, getActor } from "./request-context.js";
 import { randomUUID } from "node:crypto";
 import { evaluateScopeGate } from "./oauth-scope.js";
 
@@ -270,6 +270,7 @@ class ToolRegistry {
                   tool: name,
                   args: args[0] as Record<string, unknown>,
                   status: "error",
+                  actor: getActor(),
                 });
               }
               throw new Error(msg);
@@ -296,6 +297,7 @@ class ToolRegistry {
                 tool: name,
                 args: args[0] as Record<string, unknown>,
                 status: "error",
+                actor: getActor(),
               });
             }
             throw new Error(msg);
@@ -312,6 +314,7 @@ class ToolRegistry {
                   args: args[0] as Record<string, unknown>,
                   status: "ok",
                   durationMs: Date.now() - start,
+                  actor: getActor(),
                 });
               }
               result = autoSizeHint(result);
@@ -324,6 +327,7 @@ class ToolRegistry {
                   args: args[0] as Record<string, unknown>,
                   status: "error",
                   durationMs: Date.now() - start,
+                  actor: getActor(),
                 });
               }
               throw e;

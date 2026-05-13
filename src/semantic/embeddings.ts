@@ -2,6 +2,26 @@ import { createHash } from "node:crypto";
 import { runSwift, checkSwiftBridge } from "../shared/swift.js";
 import { API, MODELS, TIMEOUT, LIMITS } from "../shared/constants.js";
 import { TtlCache } from "../shared/cache.js";
+import { auditLog } from "../shared/audit.js";
+
+/**
+ * Hard switch for local-only mode. When `AIRMCP_LOCAL_ONLY=true`:
+ *   - `detectProvider()` will never return "gemini" or "hybrid" — falls
+ *     back to "swift" if available, else "none".
+ *   - `hybridEmbed`/`hybridBatchEmbed` refuse the silent Gemini fallback
+ *     and surface the Swift error instead.
+ *   - An explicit `AIRMCP_EMBEDDING_PROVIDER=gemini` (or `hybrid`) is
+ *     overridden with a stderr warning so the privacy contract is
+ *     never silently violated.
+ *
+ * Without this opt-in, a user who set `GEMINI_API_KEY` once for testing
+ * could keep sending note titles to Google whenever the Swift bridge
+ * transiently failed — invisible in the audit log unless they read the
+ * provider-fallback notice (see `emitFallbackAudit`).
+ */
+function isLocalOnly(): boolean {
+  return process.env.AIRMCP_LOCAL_ONLY === "true" || process.env.AIRMCP_LOCAL_ONLY === "1";
+}
 
 interface EmbedTextResult {
   vector: number[];
@@ -60,19 +80,34 @@ const GEMINI_BATCH_URL = `${API.GEMINI_BASE}/${GEMINI_MODEL}:batchEmbedContents`
  * Detect which embedding provider is available.
  *
  * Priority:
- *   1. AIRMCP_EMBEDDING_PROVIDER env var (explicit override)
- *   2. "hybrid" if both GEMINI_API_KEY and Swift bridge are available
- *   3. "gemini" if GEMINI_API_KEY is set
- *   4. "swift" if Swift bridge is available
- *   5. "none"
+ *   1. `AIRMCP_LOCAL_ONLY=true` short-circuits to "swift" (or "none")
+ *      regardless of other settings — privacy contract overrides everything.
+ *   2. AIRMCP_EMBEDDING_PROVIDER env var (explicit override) — but cloud
+ *      providers are rejected with a warning when LOCAL_ONLY is set.
+ *   3. "hybrid" if both GEMINI_API_KEY and Swift bridge are available
+ *   4. "gemini" if GEMINI_API_KEY is set
+ *   5. "swift" if Swift bridge is available
+ *   6. "none"
  */
 export async function detectProvider(): Promise<EmbeddingProvider> {
+  const localOnly = isLocalOnly();
   const explicit = process.env.AIRMCP_EMBEDDING_PROVIDER as EmbeddingProvider | undefined;
+
   if (explicit && ["gemini", "swift", "hybrid", "none"].includes(explicit)) {
-    return explicit;
+    if (localOnly && (explicit === "gemini" || explicit === "hybrid")) {
+      // Don't silently downgrade — make the conflict loud so the operator
+      // notices the contradictory configuration. Fall through to the
+      // auto-detect block, which under LOCAL_ONLY can only return "swift"
+      // or "none".
+      console.error(
+        `[AirMCP] AIRMCP_LOCAL_ONLY=true overrides AIRMCP_EMBEDDING_PROVIDER=${explicit}; using on-device only.`,
+      );
+    } else {
+      return explicit;
+    }
   }
 
-  const hasGemini = !!process.env.GEMINI_API_KEY;
+  const hasGemini = !localOnly && !!process.env.GEMINI_API_KEY;
   const swiftErr = await checkSwiftBridge();
   const hasSwift = swiftErr === null;
 
@@ -173,12 +208,38 @@ async function swiftBatchEmbed(texts: string[], language?: string): Promise<numb
 }
 
 // -- Hybrid: on-device first, cloud fallback --
+//
+// Behaviour:
+//   - Normal: Swift bridge serves the request; on failure, silently
+//     re-tries via Gemini. Pre-fix this was invisible — a user who set
+//     GEMINI_API_KEY once for testing had no way to see when a transient
+//     Swift error sent their note titles to Google. The fallback now
+//     writes an `__embedding_fallback` audit line so `audit_summary`
+//     surfaces every cloud crossing.
+//   - LOCAL_ONLY: the fallback is refused outright. The Swift error
+//     surfaces to the caller so the privacy contract holds.
+
+function emitFallbackAudit(from: "swift", to: "gemini", err: unknown): void {
+  const reason = err instanceof Error ? err.message : String(err);
+  // The Swift error message is sourced from `runSwift` which already
+  // scrubs PII; we additionally cap length so an outlier payload can't
+  // bloat the audit line.
+  auditLog({
+    timestamp: new Date().toISOString(),
+    tool: "__embedding_fallback",
+    args: { from, to, reason: reason.slice(0, 200) },
+    status: "ok",
+  });
+}
 
 async function hybridEmbed(text: string, language?: string): Promise<number[]> {
   try {
     return await swiftEmbed(text, language);
-  } catch {
-    // Swift bridge failed — fallback to Gemini cloud
+  } catch (err) {
+    if (isLocalOnly()) {
+      throw err;
+    }
+    emitFallbackAudit("swift", "gemini", err);
     return geminiEmbed(text);
   }
 }
@@ -186,7 +247,11 @@ async function hybridEmbed(text: string, language?: string): Promise<number[]> {
 async function hybridBatchEmbed(texts: string[], language?: string): Promise<number[][]> {
   try {
     return await swiftBatchEmbed(texts, language);
-  } catch {
+  } catch (err) {
+    if (isLocalOnly()) {
+      throw err;
+    }
+    emitFallbackAudit("swift", "gemini", err);
     return geminiBatchEmbed(texts);
   }
 }
@@ -274,5 +339,9 @@ export function getEmbeddingConfig() {
     dimension: GEMINI_DIMENSION,
     hasApiKey: !!process.env.GEMINI_API_KEY,
     explicitProvider: process.env.AIRMCP_EMBEDDING_PROVIDER || null,
+    /** When true, hybrid fallback to Gemini is disabled and an explicit
+     *  cloud provider override is rejected. Reported here so `doctor`
+     *  and the diagnostics tool can show the effective privacy posture. */
+    localOnly: isLocalOnly(),
   };
 }

@@ -2131,10 +2131,10 @@ public struct DropPinIntent: AppIntent {
 
     public init() {}
 
-    @Parameter(title: "Latitude coordinate")
+    @Parameter(title: "Latitude coordinate (degrees, -90 to 90)", inclusiveRange: (-90, 90))
     public var latitude: Double
 
-    @Parameter(title: "Longitude coordinate")
+    @Parameter(title: "Longitude coordinate (degrees, -180 to 180)", inclusiveRange: (-180, 180))
     public var longitude: Double
 
     @Parameter(title: "Optional label for the pin")
@@ -6061,10 +6061,10 @@ public struct SearchNearbyIntent: AppIntent {
     @Parameter(title: "What to search for (e.g. 'coffee shops', 'gas stations')")
     public var query: String
 
-    @Parameter(title: "Latitude of the center point")
+    @Parameter(title: "Latitude of the center point (degrees, -90 to 90)", inclusiveRange: (-90, 90))
     public var latitude: Double?
 
-    @Parameter(title: "Longitude of the center point")
+    @Parameter(title: "Longitude of the center point (degrees, -180 to 180)", inclusiveRange: (-180, 180))
     public var longitude: Double?
 
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
@@ -6578,10 +6578,10 @@ public struct ShareLocationIntent: AppIntent {
 
     public init() {}
 
-    @Parameter(title: "Latitude coordinate")
+    @Parameter(title: "Latitude coordinate (degrees, -90 to 90)", inclusiveRange: (-90, 90))
     public var latitude: Double
 
-    @Parameter(title: "Longitude coordinate")
+    @Parameter(title: "Longitude coordinate (degrees, -180 to 180)", inclusiveRange: (-180, 180))
     public var longitude: Double
 
     @Parameter(title: "Optional label for the location")

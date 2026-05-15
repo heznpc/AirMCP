@@ -7,6 +7,31 @@
 
 ---
 
+## §0 갱신 (2026-05-12, v2.12.0 기준) — 권고 9개 중 7개 해결
+
+이 본문은 v2.7.3 스냅숏이며 역사 자료로 보존한다. 후속 8 minor 릴리스가 본문 권고를 어떻게 닫았는지의 *delta만* 아래 표에 기록한다.
+
+| 본문 권고 | 상태 (2026-05-12) | 근거 |
+|---|---|---|
+| **HIGH-1** outputSchema 10% (29/278) | 🟢 **부분 해결**, 24% (71/301) | Wave 1-7 출하. 다음 Wave 8 후보: system 19 + music 14 + shortcuts 8 = 41 untyped, 그 중 *읽기/idempotent만* 추려 ~15-20 |
+| **HIGH-2** TODO.md ↔ CHANGELOG 드리프트 | 🟢 **해결** | 본 갱신 PR로 TODO.md v2.7.3 → v2.12.0 동기화 + airmcp-direction.md 숫자 refresh |
+| **HIGH-3** 공개 HTTP 배포 실수 경로 | 🟢 **해결** | OAuth 2.1 + PKCE + Resource Indicators (RFC 0005 Step 1+2) 출하, `.well-known/oauth-protected-resource` SEP-985/RFC 9728 정합 |
+| **HIGH-4** macOS 26 블라스트 반경 감춰짐 | 🟢 **해결** | RFC 0004 `resolveModuleCompatibility` + `brokenOn`/`maxMacosVersion` 게이트 출하. Safari `add_bookmark`은 macOS 26+에서 등록 자체 스킵. Podcasts 모듈도 macOS 26에서 등록 스킵 |
+| **MEDIUM-1** mcp-setup.ts 통합 테스트 얇음 | 🔴 **여전히 열림** — 441 LOC unguarded. **WWDC 6/8 전 반드시 처리** (6/8 reposition 코드 진입점이므로) |
+| **MEDIUM-2** 직접 deps 버전 핀 느슨 | 🟡 **부분** | `zod ~` 적용. `express ^5.2.1`, `yaml ^2.8.4`, `jose ^6.2.3` 셋은 여전히 caret. 본 갱신 PR에 함께 처리 |
+| **MEDIUM-3** Hono 트랜시티브 취약점 | 🟢 **해결** | `package.json overrides`로 `hono@^4.12.13` + `@hono/node-server@^1.19.13` 강제. `npm audit --omit=dev` 0 findings |
+| **MEDIUM-4** 에러 shape 계약 부재 | 🟢 **해결** | RFC 0001 Wave 1-2 출하. 13 모듈 59 사이트가 `errPermission`/`errInvalidInput`/`errNotFound`/`errUpstream`/`errSwift`/`errDeprecated` 타입드 헬퍼 사용. `structuredContent.error.category` 컨트랙트 안정화 |
+| **MEDIUM-5** Swift 브리지 관측성 | 🟢 **부분 해결** | `doctor --deep` + correlation id가 error envelope에 노출. `--diagnostics` 서브커맨드는 아직 없음 |
+| **LOW-1** Zod outputSchema 필드 설명 | 🟡 **진행 중** | Wave별로 점진 |
+| **LOW-2** 중국어 로케일 byte | ❓ **재측정 필요** | i18n CI artifact는 아직 안 올림 |
+| **LOW-3** CI audit 등급 high-only | 🟢 **부분 해결** | overrides로 moderate 차단. 등급 단계적 상향은 미진행 |
+
+**요지**: HIGH 4개 중 4개 해결, MEDIUM 5개 중 4개 해결, 1개(mcp-setup 테스트) 시급. *이 한 가지가 6/8 WWDC reposition 코드 추가 시 가장 깨지기 쉬운 진입점.*
+
+신규 진단은 별도 파일 `QUALITY_DIAGNOSIS_2026-05.md`로 분리 권장 (작성 시점 미정).
+
+---
+
 ## TL;DR — 3줄 결론
 
 1. **v2.7.3는 이미 production-ready에 가깝다.** 262개 툴이 모듈 패턴으로 잘 나뉘어 있고, JXA escaping·circuit breaker·HITL·audit·PII 스크러빙 같은 “서비스 운영에서 실제로 아프게 만드는 것들”이 대부분 이미 중앙화되어 있다. v2.7.2에서 테스트 커버리지를 36.1% → 46.9%로 끌어올린 것은 품질 축의 변곡점이다.

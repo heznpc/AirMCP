@@ -238,7 +238,13 @@ export async function startHttpServer(options: HttpServerOptions): Promise<void>
       oauthAudience: oauth?.audience,
     });
   } catch (e) {
-    log.error("FATAL — startup invariant failed", { err: errToCtx(e) });
+    // Only the error MESSAGE is logged, never the stack. Stacks can capture
+    // interpolated env-derived strings (OAuth issuer URL, audience) which
+    // CodeQL's `js/clear-text-logging` treats as sensitive. The message
+    // alone tells the operator what invariant failed without re-emitting
+    // the config that derived from secret env vars.
+    const msg = e instanceof Error ? e.message : String(e);
+    log.error("FATAL — startup invariant failed", { reason: msg });
     process.exit(1);
   }
   app.use((req, res, next) => {

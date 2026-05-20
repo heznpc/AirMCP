@@ -6,15 +6,24 @@
 
 [![npm version](https://img.shields.io/npm/v/airmcp)](https://www.npmjs.com/package/airmcp)
 [![Tests](https://github.com/heznpc/AirMCP/actions/workflows/ci.yml/badge.svg)](https://github.com/heznpc/AirMCP/actions/workflows/ci.yml)
-[![Coverage](https://img.shields.io/badge/coverage-47%25-brightgreen)](#testing)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/heznpc/AirMCP)](https://github.com/heznpc/AirMCP/stargazers)
 
 **Apple-native agent runtime for any MCP client.** Skills DSL workflow engine, semantic memory, OAuth 2.1, HMAC-chained audit log — over native Swift bridges into EventKit, HealthKit, PhotoKit, Vision, and Foundation Models. 272 tools across 29 Apple + Google Workspace modules. Connect Claude, Codex, Gemini, Cursor, JetBrains Air, OpenClaw — any MCP-capable AI.
 
+**Part of:** Human-Controlled AI Systems · Research Program 1 (anchor — Apple-side agent governance).
+
 **Requires**: macOS for the server. Apple Intelligence features (`ai_agent`, `summarize`, etc.) require macOS 26+ on Apple Silicon. Most tools work on macOS 14+.
 
 > Available in multiple languages at the [project landing page](https://heznpc.github.io/AirMCP/).
+
+## What this is — at a glance
+
+- **Currently implemented** — 272 tools across 29 modules; HMAC-chained audit log with tamper-detection test suite; HITL approval per destructive call; rate limit (60/min + 10 destructive/hr); `allowNetwork` declarative HTTP policy (RFC 0002); OAuth 2.1 + Resource Indicators (RFC 0005 Steps 1+2 — RS256/ES256 JWT, scope gate, `.well-known/oauth-protected-resource` per RFC 9728); sessionless `.well-known/mcp.json` discovery; 232 Shortcuts/AppIntents auto-generated from the tool manifest; native SwiftUI menubar app (codesigned + notarized); 124 test suites / 2063 assertions.
+- **Planned** — RFC 0005 Step 3 browser PKCE guide; stateless streamable HTTP for horizontal scale per MCP 2026 roadmap; iOS/visionOS exploration (v3.0+); marketplace listings on MCP Market, Cline, LobeHub. iOS companion server (`ios/Sources/AirMCPServer`, ~1500 LOC) is **preview**, not GA — macOS is the shipping surface.
+- **Design intent** — Core infra (HITL · audit · rate-limit · HMAC chain · network policy · OAuth scope gate) is the differentiated layer; the tool surface is broad and JXA-thin **by design**. JXA is the bridge, not the product. The interesting code lives in `src/shared/` (audit, rate-limit, HITL, network policy, OAuth gate, structured-content validators) and the Swift bridges (`swift/Sources/AirMCPKit`) for EventKit / HealthKit / PhotoKit / Vision / FoundationModels. Blast-radius unit is one tool call.
+- **Non-goals** — Per-session batched approval that covers "the next N calls" (failure mode this project is built around). Editable or skippable audit entries (the chain is load-bearing). Promising iOS parity on the public surface (preview only). Replacing native Apple apps — AirMCP automates them, it does not reimplement them. Headless / non-Apple platforms beyond what Google Workspace already provides.
+- **Redacted** — External persons, accounts, and any internal-case identifiers are deliberately omitted. Self-critical metrics ("wrapper percentage", coverage-as-quality) are not surfaced as positioning.
 
 ## Features
 

@@ -42,3 +42,6 @@ llms-full.txt
 
 # Claude Code local worktrees + project state
 .claude/
+
+# Local design-rationale notes (not for publication)
+CLAUDE.md

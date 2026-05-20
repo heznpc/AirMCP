@@ -1,29 +1,19 @@
 /**
- * Per-host circuit breaker for outbound HTTP — closes/opens/half-opens based
- * on consecutive failures so a flaky upstream (Open-Meteo, Nominatim, etc.)
- * cannot make every subsequent tool call wait for the full request timeout.
+ * Per-host circuit breaker for outbound HTTP.
  *
  * Why this exists
  * ----------------
  * Outbound paths (`src/maps/api.ts`, future Google Workspace calls) wrap
  * `fetch()` with `AbortSignal.timeout(...)`. That bounds a single request,
- * but does not protect the *next* call from also hitting timeout. If the
- * upstream is down, ten consecutive tool calls each wait the full timeout
- * before failing — bad UX, wasted resource handles, and (for HTTP-mode
- * deployments) it amplifies the apparent latency seen by clients.
+ * but does not protect the *next* call from hitting the same timeout. If
+ * the upstream is down, ten consecutive tool calls each wait the full
+ * timeout before failing — bad UX, wasted resource handles, and (for HTTP
+ * mode) it amplifies the apparent latency seen by clients.
  *
  * A circuit breaker short-circuits in the OPEN state: requests are rejected
  * synchronously with `BreakerOpenError` while the upstream is presumed dead.
  * After `openMs` elapses the breaker transitions to HALF_OPEN — exactly one
- * probe request is allowed; success closes the breaker, failure re-opens it.
- *
- * Three-state machine
- * --------------------
- *   CLOSED      — pass-through. On failure, increment counter. On
- *                 `failureThreshold` consecutive failures, transition to OPEN.
- *   OPEN        — reject immediately. After `openMs` from the trip time,
- *                 transition to HALF_OPEN on next `execute()` call.
- *   HALF_OPEN   — allow one probe. Success → CLOSED. Failure → OPEN.
+ * probe is allowed; success closes the breaker, failure re-opens it.
  *
  * Tunable via `performance.circuitBreakerThreshold` /
  * `performance.circuitBreakerOpenMs` in `~/.config/airmcp/config.json`.
@@ -41,6 +31,7 @@
  *   the breaker is trying to suppress.
  */
 
+import { assertTestMode } from "./errors.js";
 import { log } from "./logger.js";
 
 export type BreakerState = "closed" | "open" | "half_open";
@@ -66,19 +57,25 @@ export class CircuitBreaker {
   private state: BreakerState = "closed";
   private consecutiveFailures = 0;
   private openedAt = 0;
+  private readonly name: string;
+  private readonly failureThreshold: number;
+  private readonly openMs: number;
 
-  constructor(private readonly opts: BreakerOptions) {}
+  constructor(opts: BreakerOptions) {
+    this.name = opts.name ?? "anonymous";
+    this.failureThreshold = opts.failureThreshold;
+    this.openMs = opts.openMs;
+  }
 
   /** Run `fn` through the breaker. Throws `BreakerOpenError` when OPEN. */
   async execute<T>(fn: () => Promise<T>): Promise<T> {
     if (this.state === "open") {
       const elapsed = Date.now() - this.openedAt;
-      if (elapsed < this.opts.openMs) {
-        throw new BreakerOpenError(this.opts.name ?? "anonymous", this.opts.openMs - elapsed);
+      if (elapsed < this.openMs) {
+        throw new BreakerOpenError(this.name, this.openMs - elapsed);
       }
-      // Probe.
       this.state = "half_open";
-      log.info("circuit breaker probing (half-open)", { name: this.opts.name ?? "anonymous" });
+      log.info("circuit breaker probing (half-open)", { name: this.name });
     }
 
     try {
@@ -110,7 +107,7 @@ export class CircuitBreaker {
 
   private recordSuccess(): void {
     if (this.state === "half_open") {
-      log.info("circuit breaker closed after successful probe", { name: this.opts.name ?? "anonymous" });
+      log.info("circuit breaker closed after successful probe", { name: this.name });
     }
     this.state = "closed";
     this.consecutiveFailures = 0;
@@ -119,32 +116,33 @@ export class CircuitBreaker {
   private recordFailure(): void {
     this.consecutiveFailures++;
     if (this.state === "half_open") {
-      // Probe failed — re-open immediately.
-      this.state = "open";
-      this.openedAt = Date.now();
-      log.warn("circuit breaker re-opened — probe failed", {
-        name: this.opts.name ?? "anonymous",
-        openMs: this.opts.openMs,
-      });
+      this.trip("probe-failed");
       return;
     }
-    if (this.state === "closed" && this.consecutiveFailures >= this.opts.failureThreshold) {
-      this.state = "open";
-      this.openedAt = Date.now();
-      log.warn("circuit breaker tripped — opening", {
-        name: this.opts.name ?? "anonymous",
-        consecutiveFailures: this.consecutiveFailures,
-        openMs: this.opts.openMs,
-      });
+    if (this.state === "closed" && this.consecutiveFailures >= this.failureThreshold) {
+      this.trip("threshold-reached");
     }
+  }
+
+  private trip(reason: "probe-failed" | "threshold-reached"): void {
+    this.state = "open";
+    this.openedAt = Date.now();
+    const event = reason === "probe-failed" ? "re-opened" : "tripped — opening";
+    log.warn(`circuit breaker ${event}`, {
+      name: this.name,
+      reason,
+      consecutiveFailures: this.consecutiveFailures,
+      openMs: this.openMs,
+    });
   }
 }
 
 // ── Per-host registry ─────────────────────────────────────────────────
 //
-// A single global Map keyed by host string. Defaults from constants;
-// override path via `config.performance.{circuitBreakerThreshold,
-// circuitBreakerOpenMs}` is honoured by callers that pass explicit opts.
+// A global Map keyed by host name. **Contract:** `name` must be a
+// compile-time constant (typically from `src/shared/constants.ts` →
+// `BREAKER.*`). Do NOT derive it from request data — the registry has no
+// eviction, so user-supplied names would grow memory monotonically.
 
 const breakers = new Map<string, CircuitBreaker>();
 
@@ -163,8 +161,6 @@ export function getBreaker(name: string, opts?: Partial<BreakerOptions>): Circui
 
 /** Test-only: reset every registered breaker to closed. */
 export function _resetAllBreakersForTests(): void {
-  if (process.env.NODE_ENV !== "test" && process.env.AIRMCP_TEST_MODE !== "1") {
-    throw new Error("_resetAllBreakersForTests is only callable in test mode");
-  }
+  assertTestMode("_resetAllBreakersForTests()");
   for (const b of breakers.values()) b.reset();
 }

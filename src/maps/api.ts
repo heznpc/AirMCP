@@ -7,7 +7,7 @@
 // GEOCODE timeout before failing. The breaker trips after 5 consecutive failures
 // per host and stays open for 30s before allowing one probe.
 
-import { API, TIMEOUT, IDENTITY } from "../shared/constants.js";
+import { API, BREAKER, TIMEOUT, IDENTITY } from "../shared/constants.js";
 import { getBreaker } from "../shared/circuit-breaker.js";
 
 const GEOCODE_URL = API.GEOCODING;
@@ -24,7 +24,7 @@ async function nominatimThrottle(): Promise<void> {
 }
 
 export async function fetchGeocode(query: string, count = 5) {
-  return getBreaker("open-meteo").execute(async () => {
+  return getBreaker(BREAKER.OPEN_METEO).execute(async () => {
     const params = new URLSearchParams({ name: query, count: String(count), language: "en", format: "json" });
     const res = await fetch(`${GEOCODE_URL}?${params}`, { signal: AbortSignal.timeout(TIMEOUT.GEOCODE) });
     if (!res.ok) throw new Error(`Geocoding API error: ${res.status} ${res.statusText}`);
@@ -45,7 +45,7 @@ export async function fetchGeocode(query: string, count = 5) {
 }
 
 export async function fetchReverseGeocode(latitude: number, longitude: number) {
-  return getBreaker("nominatim").execute(async () => {
+  return getBreaker(BREAKER.NOMINATIM).execute(async () => {
     await nominatimThrottle();
     const params = new URLSearchParams({ lat: String(latitude), lon: String(longitude), format: "json" });
     const res = await fetch(`${REVERSE_URL}?${params}`, {

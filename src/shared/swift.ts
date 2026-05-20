@@ -225,6 +225,10 @@ function ensureProcess(): Promise<void> {
     });
 
     proc.stderr!.on("data", (chunk: Buffer) => {
+      // Swift bridge writes stderr only for warnings/errors under normal
+      // operation, so we keep this at info — losing it would hide bridge
+      // failures from the menubar log viewer. Volume is not a concern in
+      // practice.
       log.info("swift bridge stderr", { line: chunk.toString().trim() });
     });
 

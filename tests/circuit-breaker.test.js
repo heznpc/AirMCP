@@ -163,7 +163,8 @@ describe("CircuitBreaker", () => {
     const origNode = process.env.NODE_ENV;
     delete process.env.NODE_ENV;
     try {
-      expect(() => _resetAllBreakersForTests()).toThrow(/test mode/);
+      // assertTestMode's canonical message; same gate used by audit / tool-registry.
+      expect(() => _resetAllBreakersForTests()).toThrow(/NODE_ENV=test or AIRMCP_TEST_MODE=1/);
     } finally {
       if (orig !== undefined) process.env.AIRMCP_TEST_MODE = orig;
       if (origNode !== undefined) process.env.NODE_ENV = origNode;

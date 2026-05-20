@@ -5,6 +5,7 @@ import { userPrompt } from "../shared/prompt.js";
 import { ok, errUpstream } from "../shared/result.js";
 import { toolRegistry } from "../shared/tool-registry.js";
 import { z } from "zod";
+import { log } from "../shared/logger.js";
 
 /**
  * Convert a skill's declared `inputs` into a Zod `inputSchema` record that
@@ -183,10 +184,10 @@ export function registerSkills(
     switch (skill.expose_as) {
       case "prompt": {
         if (isPromptNameTaken(skill.name)) {
-          console.error(
-            `[AirMCP] Skill "${skill.name}" collides with an already-registered prompt — skipping. ` +
-              `Rename the skill in its YAML to resolve.`,
-          );
+          log.warn("skill collides with an already-registered prompt — skipping", {
+            skill: skill.name,
+            remedy: "rename the skill in its YAML",
+          });
           skipped++;
           break;
         }
@@ -197,10 +198,11 @@ export function registerSkills(
       case "tool": {
         const toolName = `skill_${skill.name}`;
         if (isToolNameTaken(toolName)) {
-          console.error(
-            `[AirMCP] Skill "${skill.name}" collides with an already-registered tool "${toolName}" — skipping. ` +
-              `Rename the skill in its YAML to resolve.`,
-          );
+          log.warn("skill collides with an already-registered tool — skipping", {
+            skill: skill.name,
+            toolName,
+            remedy: "rename the skill in its YAML",
+          });
           skipped++;
           break;
         }

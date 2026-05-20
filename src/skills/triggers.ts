@@ -4,6 +4,7 @@ import { executeSkill } from "./executor.js";
 import { eventBus, type AirMCPEvent } from "../shared/event-bus.js";
 import { runWithRequestContext, getRequestContext } from "../shared/request-context.js";
 import { randomUUID } from "node:crypto";
+import { log, errToCtx } from "../shared/logger.js";
 
 interface TriggerBinding {
   skill: SkillDefinition;
@@ -45,8 +46,7 @@ function runWithRetry(server: McpServer, skill: SkillDefinition, attempt: number
   };
   runWithRequestContext(ctx, () => {
     executeSkill(server, skill).catch((e) => {
-      const msg = e instanceof Error ? e.message : String(e);
-      console.error(`[AirMCP] Trigger ${skill.name} failed (attempt ${attempt}): ${msg}`);
+      log.warn("trigger failed", { skill: skill.name, attempt, err: errToCtx(e) });
       if (attempt >= 1 + TRIGGER_MAX_RETRIES) return;
       const delay = computeBackoff(attempt);
       const t = setTimeout(() => runWithRetry(server, skill, attempt + 1), delay);

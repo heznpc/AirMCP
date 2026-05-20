@@ -3,6 +3,7 @@ import { runSwift, checkSwiftBridge } from "../shared/swift.js";
 import { API, MODELS, TIMEOUT, LIMITS } from "../shared/constants.js";
 import { TtlCache } from "../shared/cache.js";
 import { auditLog } from "../shared/audit.js";
+import { log } from "../shared/logger.js";
 
 /**
  * Hard switch for local-only mode. When `AIRMCP_LOCAL_ONLY=true`:
@@ -99,9 +100,9 @@ export async function detectProvider(): Promise<EmbeddingProvider> {
       // notices the contradictory configuration. Fall through to the
       // auto-detect block, which under LOCAL_ONLY can only return "swift"
       // or "none".
-      console.error(
-        `[AirMCP] AIRMCP_LOCAL_ONLY=true overrides AIRMCP_EMBEDDING_PROVIDER=${explicit}; using on-device only.`,
-      );
+      log.warn("AIRMCP_LOCAL_ONLY overrides AIRMCP_EMBEDDING_PROVIDER — using on-device only", {
+        explicit,
+      });
     } else {
       return explicit;
     }

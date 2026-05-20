@@ -18,6 +18,8 @@
  * targets. Shared between `getCompatibilityEnv()` (the heuristic gate) and
  * compatibility tests, so changing the threshold in one place updates both.
  */
+import { log } from "./logger.js";
+
 export const HEALTHKIT_MIN_MACOS = 15 as const;
 
 /** Lifecycle state of a module. */
@@ -181,10 +183,10 @@ function isHardwareAvailable(req: HardwareRequirement, env: CompatibilityEnv): b
       if (!env.cpu) {
         if (!warnedUnknownCpu.has(req)) {
           warnedUnknownCpu.add(req);
-          console.error(
-            `[AirMCP compatibility] cpu arch unknown (env.cpu is undefined); ` +
-              `treating "${req}" requirement as unavailable. Modules that require it will be skipped.`,
-          );
+          log.warn("compatibility: cpu arch unknown — treating requirement as unavailable", {
+            requirement: req,
+            note: "modules that require it will be skipped",
+          });
         }
         return false;
       }

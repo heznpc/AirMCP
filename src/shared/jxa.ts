@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { TIMEOUT, BUFFER, CONCURRENCY } from "./constants.js";
 import { Semaphore } from "./semaphore.js";
+import { log } from "./logger.js";
 
 const TRANSIENT_PATTERNS = ["Application isn't running", "Connection is invalid", "-1728"];
 
@@ -200,7 +201,7 @@ async function runJxaInner<T>(script: string, app: string | undefined): Promise<
       if (!isTransient(e) || attempt === CONCURRENCY.JXA_RETRIES) {
         handleOsascriptError(e, app, TIMEOUT.JXA);
       }
-      console.error(`[AirMCP] JXA retry attempt ${attempt + 2}/3`);
+      log.debug("jxa retry", { attempt: attempt + 2, max: 3, app });
       const jitter = Math.floor(Math.random() * 100);
       await new Promise((r) => setTimeout(r, CONCURRENCY.JXA_RETRY_DELAYS[attempt]! + jitter));
     }

@@ -3,8 +3,9 @@ import { join } from "node:path";
 import { hostname, platform } from "node:os";
 import { createHmac } from "node:crypto";
 import { AUDIT, PATHS } from "./constants.js";
-import { assertTestMode, formatError } from "./errors.js";
+import { assertTestMode } from "./errors.js";
 import { getCorrelationId } from "./request-context.js";
+import { log, errToCtx } from "./logger.js";
 
 const AUDIT_PATH = join(PATHS.VECTOR_STORE, "audit.jsonl");
 const AUDIT_DIR = PATHS.VECTOR_STORE;
@@ -150,7 +151,7 @@ function ensureFlushTimer(): void {
     // unexpected throws outside the inner try (e.g. ENOSPC during the buffer
     // swap, ESM/dynamic import failure) so the rejection never goes silent.
     flushBuffer().catch((err) => {
-      console.error(`[AirMCP Audit] flush timer error: ${formatError(err)}`);
+      log.error("audit: flush timer error", { err: errToCtx(err) });
     });
     flushTimer = null;
   }, AUDIT.FLUSH_INTERVAL);
@@ -172,7 +173,7 @@ function maybeAttemptRecovery(): void {
   if (!auditDisabled) return;
   const now = Date.now();
   if (now - auditDisabledSince < AUDIT_RECOVERY_INTERVAL_MS) return;
-  console.error("[AirMCP Audit] Recovery window elapsed — re-enabling and retrying flush.");
+  log.info("audit: recovery window elapsed — re-enabling and retrying flush");
   auditDisabled = false;
   auditDisabledSince = 0;
   consecutiveFlushFailures = 0;
@@ -232,9 +233,11 @@ async function scanFileForChainHead(path: string, isPrimary: boolean): Promise<b
       if (parsed._hmac && /^[0-9a-f]{64}$/.test(parsed._hmac)) {
         lastHmac = parsed._hmac;
         if (malformedCount > 0) {
-          console.error(
-            `[AirMCP Audit] resumed chain at lastHmac=${parsed._hmac.slice(0, 8)}…; skipped ${malformedCount} malformed line(s) — possible tampering or corruption (run audit_summary to verify).`,
-          );
+          log.warn("audit: resumed chain past malformed lines — possible tampering or corruption", {
+            lastHmacPrefix: parsed._hmac.slice(0, 8),
+            skippedMalformed: malformedCount,
+            note: "run audit_summary to verify",
+          });
         }
         return true;
       }
@@ -243,9 +246,10 @@ async function scanFileForChainHead(path: string, isPrimary: boolean): Promise<b
     }
   }
   if (malformedCount > 0 && isPrimary) {
-    console.error(
-      `[AirMCP Audit] no chain head found in ${lines.length} on-disk lines of audit.jsonl (${malformedCount} malformed) — falling back to rotated files.`,
-    );
+    log.warn("audit: no chain head found — falling back to rotated files", {
+      lines: lines.length,
+      malformed: malformedCount,
+    });
   }
   return false;
 }
@@ -294,9 +298,11 @@ async function flushBuffer(): Promise<void> {
       consecutiveFlushFailures = 0;
     } catch (retryErr) {
       consecutiveFlushFailures++;
-      console.error(
-        `[AirMCP Audit] flush failed (${consecutiveFlushFailures}/${AUDIT.MAX_FLUSH_FAILURES}): ${retryErr}`,
-      );
+      log.error("audit: flush failed", {
+        attempts: consecutiveFlushFailures,
+        max: AUDIT.MAX_FLUSH_FAILURES,
+        err: errToCtx(retryErr),
+      });
       if (consecutiveFlushFailures >= AUDIT.MAX_FLUSH_FAILURES) {
         auditDisabled = true;
         auditDisabledSince = Date.now();
@@ -304,10 +310,10 @@ async function flushBuffer(): Promise<void> {
           clearTimeout(flushTimer);
           flushTimer = null;
         }
-        console.error(
-          `[AirMCP Audit] Too many consecutive flush failures — audit logging disabled. ` +
-            `Auto-retry in ${AUDIT_RECOVERY_INTERVAL_MS / 60_000} minutes (or next auditLog call after that window).`,
-        );
+        log.error("audit: too many consecutive flush failures — audit logging disabled", {
+          retryAfterMinutes: AUDIT_RECOVERY_INTERVAL_MS / 60_000,
+          note: "auto-retry after that window or on next auditLog call",
+        });
       }
     }
   } finally {

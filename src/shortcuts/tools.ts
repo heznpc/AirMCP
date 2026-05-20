@@ -6,6 +6,7 @@ import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import { ok, okLinked, okLinkedStructured, okStructured, errJxaFor } from "../shared/result.js";
 import { TIMEOUT } from "../shared/constants.js";
+import { log, errToCtx } from "../shared/logger.js";
 import { zFilePath, resolveAndGuard } from "../shared/validate.js";
 import {
   listShortcutsScript,
@@ -275,15 +276,14 @@ async function discoverShortcuts(): Promise<string[]> {
     const result = await execFileAsync("shortcuts", ["list"], { timeout: TIMEOUT.SHORTCUTS_LIST });
     const names = result.stdout.split("\n").filter((n) => n.trim().length > 0);
     if (names.length > LIMITS.DYNAMIC_SHORTCUTS) {
-      console.error(
-        `[AirMCP] Found ${names.length} shortcuts, registering first ${LIMITS.DYNAMIC_SHORTCUTS} (limit reached)`,
-      );
+      log.info("dynamic shortcuts: limit reached", {
+        found: names.length,
+        registering: LIMITS.DYNAMIC_SHORTCUTS,
+      });
     }
     cachedShortcutNames = names.slice(0, LIMITS.DYNAMIC_SHORTCUTS);
   } catch (e) {
-    console.error(
-      `[AirMCP] Failed to list shortcuts for dynamic registration: ${e instanceof Error ? e.message : String(e)}`,
-    );
+    log.warn("dynamic shortcuts: failed to list", { err: errToCtx(e) });
     cachedShortcutNames = [];
   }
   return cachedShortcutNames;
@@ -298,11 +298,11 @@ export async function registerDynamicShortcutTools(server: McpServer): Promise<n
   for (const name of toRegister) {
     const toolName = sanitizeToolName(name);
     if (!toolName) {
-      console.error(`[AirMCP] Skipping shortcut with unsanitizable name: "${name}"`);
+      log.warn("skipping shortcut with unsanitizable name", { name });
       continue;
     }
     if (seen.has(toolName)) {
-      console.error(`[AirMCP] Skipping duplicate tool name: ${toolName} (from "${name}")`);
+      log.warn("skipping duplicate shortcut tool name", { toolName, source: name });
       continue;
     }
     seen.add(toolName);
@@ -326,10 +326,9 @@ export async function registerDynamicShortcutTools(server: McpServer): Promise<n
       },
     );
 
-    // NOTE: console.error (stderr), not console.log — MCP stdio transport reserves
-    // stdout for protocol traffic. This is an informational message, not an error;
-    // all server-side logging must go to stderr to avoid corrupting the channel.
-    console.error(`[AirMCP] Registered dynamic shortcut: ${name}`);
+    // The logger writes to stderr; MCP stdio transport reserves stdout for
+    // protocol traffic. Informational signal, not an error.
+    log.info("dynamic shortcut registered", { name });
     count++;
   }
 

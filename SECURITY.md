@@ -37,7 +37,7 @@ The moderate+ advisory is emitted by `scripts/summarize-audit.mjs`, which runs a
 - **JXA injection prevention** — `esc()`, `escAS()`, `escShell()`, `escJxaShell()` sanitize all user input before script interpolation
 - **Swift bridge prototype pollution guard** — JSON responses from the Swift helper are parsed with a reviver that rejects `__proto__` / `constructor` / `prototype` keys at any depth (see `src/shared/swift.ts`)
 - **PII scrubbing** — Email addresses and file paths redacted from error messages
-- **Audit logging** — Sensitive keys auto-redacted, log files restricted to owner-read-write (0o600)
+- **Audit logging** — Sensitive keys auto-redacted, log files restricted to owner-read-write (0o600). The active file rotates to `audit.<timestamp>.jsonl` when it exceeds 10 MiB (`AUDIT.MAX_FILE_SIZE` in `src/shared/constants.ts`); rotated files are kept indefinitely so the genesis-anchored HMAC chain can be verified end-to-end across history (covered by `tests/audit-tamper-detection.test.js`). All files stay on the user's machine — no off-machine retention; deletion is a user-initiated `rm` of `~/.airmcp/audit*.jsonl`.
 - **stdio transport** — No network exposure, local-only communication
 - **HTTP security** — Bearer token auth (timing-safe, SHA-256 hashed), rate limiting (120 req/min), origin validation, session timeout
 - **Shared note guard** — Destructive operations blocked on shared notes by default

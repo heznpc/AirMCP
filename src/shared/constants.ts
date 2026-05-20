@@ -46,6 +46,13 @@ export const API = {
   OLLAMA: envStr("AIRMCP_OLLAMA_URL", "http://localhost:11434"),
 } as const;
 
+/** Per-host circuit breaker identifiers. Must be compile-time constants —
+ *  the breaker registry has no eviction. Add new outbound hosts here. */
+export const BREAKER = {
+  OPEN_METEO: "open-meteo",
+  NOMINATIM: "nominatim",
+} as const;
+
 // ══════════════════════════════════════════════════════════════════════
 // EXTERNAL CDN DEPENDENCIES — pin versions here, change in one place
 // ══════════════════════════════════════════════════════════════════════

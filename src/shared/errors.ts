@@ -17,6 +17,25 @@ export function formatError(e: unknown): string {
 }
 
 /**
+ * Serialise an unknown throwable for inclusion in a structured log `ctx`.
+ *
+ * `formatError` returns a single string (good for interpolated messages);
+ * `errToCtx` returns `{name, message, stack}` so JSON consumers (menubar
+ * viewer, log shipping) can filter on each field. Use the latter exclusively
+ * with the structured logger (`src/shared/logger.ts`).
+ *
+ * `Error` instances don't round-trip through `JSON.stringify` because
+ * `name`/`message`/`stack` are non-enumerable — `JSON.stringify(new Error("x"))`
+ * is `"{}"`. This helper makes the fields explicit.
+ */
+export function errToCtx(e: unknown): Record<string, unknown> {
+  if (e instanceof Error) {
+    return { name: e.name, message: e.message, stack: e.stack };
+  }
+  return { value: String(e) };
+}
+
+/**
  * Throws unless we're in a test environment.
  *
  * Test environment is signaled by `NODE_ENV=test` (set automatically by Jest)

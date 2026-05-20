@@ -172,16 +172,15 @@ export function validateNetworkPolicy(ctx: {
         );
       }
       if (!/^https:\/\//.test(ctx.oauthIssuer)) {
-        // Report only the offending scheme — not the full URL value. The
-        // URL could carry an internal hostname an operator considers
-        // sensitive (private OIDC endpoint, customer-specific subdomain),
-        // and the FATAL log path emits this message to stderr where the
-        // menubar viewer / CI logs / log shipping pipelines can persist it.
-        // The operator can read their own env var to debug; we don't need
-        // to interpolate the value.
-        const scheme = ctx.oauthIssuer.split(":", 1)[0] || "<empty>";
+        // No part of the issuer value flows into the error message — not
+        // even the scheme. The URL can carry an internal hostname an
+        // operator treats as sensitive, and this error reaches stderr via
+        // the FATAL log path. The operator can read their own env var to
+        // debug; the message just names the contract that was violated.
+        // (Avoids CodeQL js/clear-text-logging on the taint flow into the
+        // logger sink.)
         throw new Error(
-          `AIRMCP_OAUTH_ISSUER must be an https:// URL (got scheme "${scheme}"). ` +
+          "AIRMCP_OAUTH_ISSUER must be an https:// URL. " +
             "Plain http issuers are a security hole — reject at startup.",
         );
       }

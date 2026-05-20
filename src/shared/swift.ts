@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { TIMEOUT, BUFFER } from "./constants.js";
 import { eventBus } from "./event-bus.js";
+import { log } from "./logger.js";
 
 // Package root — works in repo checkout, npm cache, and git worktrees.
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -175,13 +176,16 @@ function ensureProcess(): Promise<void> {
         if (!trimmed) continue;
         // Per-line size guard — reject abnormally large single responses
         if (trimmed.length > BUFFER.SWIFT_LINE_MAX) {
-          console.error(`[AirMCP Swift] Dropping oversized response line (>${BUFFER.SWIFT_LINE_MAX} bytes)`);
+          log.warn("swift bridge: dropping oversized response line", {
+            limitBytes: BUFFER.SWIFT_LINE_MAX,
+            lineBytes: trimmed.length,
+          });
           continue;
         }
         try {
           const msg = safeParseBridgeResponse(trimmed);
           if (!msg) {
-            console.error("[AirMCP Swift] Invalid response:", trimmed.slice(0, 200));
+            log.warn("swift bridge: invalid response", { preview: trimmed.slice(0, 200) });
             continue;
           }
 
@@ -215,13 +219,13 @@ function ensureProcess(): Promise<void> {
             entry.resolve(msg.result);
           }
         } catch {
-          console.error("[AirMCP Swift] Invalid response:", trimmed.slice(0, 200));
+          log.warn("swift bridge: invalid response (parse threw)", { preview: trimmed.slice(0, 200) });
         }
       }
     });
 
     proc.stderr!.on("data", (chunk: Buffer) => {
-      console.error(`[AirMCP Swift] ${chunk.toString().trim()}`);
+      log.info("swift bridge stderr", { line: chunk.toString().trim() });
     });
 
     proc.on("error", (err) => {

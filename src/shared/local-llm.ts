@@ -1,16 +1,17 @@
 import { API } from "./constants.js";
+import { log } from "./logger.js";
 
 const OLLAMA_BASE = API.OLLAMA;
 try {
   const parsedUrl = new URL(OLLAMA_BASE);
   const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
   if (!LOCAL_HOSTS.has(parsedUrl.hostname)) {
-    console.error(
-      `[AirMCP] Warning: AIRMCP_OLLAMA_URL points to non-local address: ${OLLAMA_BASE}. Prompts may contain sensitive Apple data.`,
-    );
+    log.warn("AIRMCP_OLLAMA_URL points to non-local address — prompts may contain sensitive Apple data", {
+      url: OLLAMA_BASE,
+    });
   }
 } catch {
-  console.error(`[AirMCP] Warning: AIRMCP_OLLAMA_URL is not a valid URL: ${OLLAMA_BASE}`);
+  log.warn("AIRMCP_OLLAMA_URL is not a valid URL", { url: OLLAMA_BASE });
 }
 export const DEFAULT_MODEL = process.env.AIRMCP_OLLAMA_MODEL || "llama3.2";
 

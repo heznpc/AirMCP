@@ -8,6 +8,38 @@ updates:
     open-pull-requests-limit: 10
     labels:
       - dependencies
+    # Group minor + patch into one PR per ecosystem-slice; keep majors
+    # separate so reviewers see breaking-change PRs in isolation. This
+    # matches RFC 0003's "minor/patch advisory, major scrutinised" stance.
+    groups:
+      production-minor-patch:
+        dependency-type: production
+        update-types:
+          - minor
+          - patch
+      development-minor-patch:
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+      types-definitions:
+        patterns:
+          - "@types/*"
+      eslint-stack:
+        patterns:
+          - "eslint"
+          - "@eslint/*"
+          - "typescript-eslint"
+          - "eslint-config-*"
+          - "eslint-plugin-*"
+      jest-stack:
+        patterns:
+          - "jest"
+          - "@jest/*"
+          - "ts-jest"
+      commitlint-stack:
+        patterns:
+          - "@commitlint/*"
 
   - package-ecosystem: github-actions
     directory: "/"
@@ -18,3 +50,8 @@ updates:
     labels:
       - dependencies
       - ci
+    groups:
+      actions-minor-patch:
+        update-types:
+          - minor
+          - patch

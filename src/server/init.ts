@@ -13,6 +13,7 @@ import { closeSkillsWatcher } from "../skills/index.js";
 import { closeSwiftBridge } from "../shared/swift.js";
 import { usageTracker } from "../shared/usage-tracker.js";
 import { runShutdownHooks } from "./shutdown.js";
+import { log, errToCtx } from "../shared/logger.js";
 
 // Re-export so callers that depend on `init.js` do not need to know about
 // the shutdown module layout. New transport code should prefer importing
@@ -81,10 +82,10 @@ export function initializeServer(): ServerContext {
 
   // Catch unhandled errors to prevent silent crashes
   process.on("unhandledRejection", (reason) => {
-    console.error("[AirMCP] Unhandled promise rejection:", reason);
+    log.error("unhandled promise rejection", { err: errToCtx(reason) });
   });
   process.on("uncaughtException", (error) => {
-    console.error("[AirMCP] Uncaught exception:", error);
+    log.error("uncaught exception", { err: errToCtx(error) });
     void gracefulShutdown(1);
   });
 

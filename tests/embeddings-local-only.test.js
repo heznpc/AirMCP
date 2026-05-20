@@ -86,7 +86,7 @@ describe('detectProvider — LOCAL_ONLY semantics', () => {
       const provider = await embeddings.detectProvider();
       expect(provider).toBe('swift'); // downgraded
       expect(errSpy).toHaveBeenCalledWith(
-        expect.stringContaining('AIRMCP_LOCAL_ONLY=true overrides AIRMCP_EMBEDDING_PROVIDER=gemini'),
+        expect.stringContaining('AIRMCP_LOCAL_ONLY overrides AIRMCP_EMBEDDING_PROVIDER'),
       );
     } finally {
       errSpy.mockRestore();

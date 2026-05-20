@@ -245,7 +245,7 @@ describe('startTriggerListener and event dispatch', () => {
     await jest.advanceTimersByTimeAsync(10);
 
     expect(console.error).toHaveBeenCalledWith(
-      expect.stringContaining('failed (attempt 1)'),
+      expect.stringContaining('"attempt":1'),
     );
 
     // Exponential backoff: base 2000ms + up to 25% jitter → bounded by 2500ms.
@@ -280,13 +280,13 @@ describe('startTriggerListener and event dispatch', () => {
 
     await jest.advanceTimersByTimeAsync(10);
     expect(console.error).toHaveBeenCalledWith(
-      expect.stringContaining('failed (attempt 1)'),
+      expect.stringContaining('"attempt":1'),
     );
 
     // See note on exponential-backoff bounds in the prior test.
     await jest.advanceTimersByTimeAsync(2600);
     expect(console.error).toHaveBeenCalledWith(
-      expect.stringContaining('failed (attempt 2)'),
+      expect.stringContaining('"attempt":2'),
     );
 
     jest.useRealTimers();

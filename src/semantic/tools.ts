@@ -1,6 +1,13 @@
 import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
-import { ok, okUntrusted, errNotFound, errUpstream, errSwift, toolError } from "../shared/result.js";
+import {
+  okStructured,
+  okUntrustedStructured,
+  errNotFound,
+  errUpstream,
+  errSwift,
+  toolError,
+} from "../shared/result.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import { SemanticSearchService } from "./service.js";
 import { runSwift, checkSwiftBridge } from "../shared/swift.js";
@@ -12,6 +19,26 @@ import { runSwift, checkSwiftBridge } from "../shared/swift.js";
  * All mutable state (provider cache, indexing lock, vector store) lives in
  * SemanticSearchService; this module is a thin MCP registration layer.
  */
+
+// Per-entry stats shape returned by VectorStore.getStats(). Used inside
+// semantic_index (under `store`) and semantic_status (flattened in).
+const indexStatsShape = {
+  total: z.number().int(),
+  bySource: z.record(z.string(), z.number().int()),
+  indexedAt: z.string().nullable(),
+  stale: z.boolean(),
+};
+
+// One search hit returned by VectorStore.search(). Title is derived from
+// user-controlled note/event/reminder/email metadata, so any structured
+// payload containing this shape is marked untrusted via the helper.
+const searchResultSchema = z.object({
+  id: z.string(),
+  source: z.string(),
+  title: z.string(),
+  similarity: z.number(),
+});
+
 export function registerSemanticTools(server: McpServer, config: AirMcpConfig): void {
   const service = new SemanticSearchService(config);
 
@@ -29,6 +56,14 @@ export function registerSemanticTools(server: McpServer, config: AirMcpConfig): 
           .array(z.enum(["notes", "calendar", "reminders", "mail", "photos", "finder"]))
           .optional()
           .describe("Which sources to index. Defaults to all enabled modules."),
+      },
+      // System-generated counters; `warnings` is only present when one or
+      // more sources hit a partial-failure path (e.g. Mail permission
+      // denied while Notes succeeds).
+      outputSchema: {
+        indexed: z.number().int(),
+        store: z.object(indexStatsShape),
+        warnings: z.array(z.string()).optional(),
       },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
@@ -49,7 +84,7 @@ export function registerSemanticTools(server: McpServer, config: AirMcpConfig): 
         if (indexed === 0) {
           return errUpstream(`No items to index.${errors.length > 0 ? " Errors: " + errors.join("; ") : ""}`);
         }
-        return ok({
+        return okStructured({
           indexed,
           store,
           ...(errors.length > 0 ? { warnings: errors } : {}),
@@ -78,12 +113,26 @@ export function registerSemanticTools(server: McpServer, config: AirMcpConfig): 
         limit: z.number().int().min(1).max(50).optional().describe("Max results (default 10)"),
         threshold: z.number().min(0).max(1).optional().describe("Minimum similarity (default 0.5)"),
       },
+      // Results derive titles from user-controlled note/event/reminder/
+      // email content, and we echo the caller's query verbatim — both
+      // make this untrusted from the LLM's perspective.
+      outputSchema: {
+        query: z.string(),
+        results: z.array(searchResultSchema),
+        total: z.number().int(),
+        autoIndexed: z.boolean(),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ query, sources, limit, threshold }) => {
       try {
-        const result = await service.search(query, { sources, limit, threshold });
-        return okUntrusted(result);
+        const result = (await service.search(query, { sources, limit, threshold })) as {
+          query: string;
+          results: Array<{ id: string; source: string; title: string; similarity: number }>;
+          total: number;
+          autoIndexed: boolean;
+        };
+        return okUntrustedStructured(result);
       } catch (e) {
         return toolError("semantic search", e);
       }
@@ -103,12 +152,27 @@ export function registerSemanticTools(server: McpServer, config: AirMcpConfig): 
         limit: z.number().int().min(1).max(50).optional().describe("Max results (default 10)"),
         threshold: z.number().min(0).max(1).optional().describe("Minimum similarity (default 0.6)"),
       },
+      // Seed item title and every related hit's title come from indexed
+      // user content, so the structured payload is untrusted.
+      outputSchema: {
+        item: z.object({
+          id: z.string(),
+          source: z.string(),
+          title: z.string(),
+        }),
+        related: z.array(searchResultSchema),
+        total: z.number().int(),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ id, limit, threshold }) => {
       try {
-        const result = await service.findRelated(id, { limit, threshold });
-        return ok(result);
+        const result = (await service.findRelated(id, { limit, threshold })) as {
+          item: { id: string; source: string; title: string };
+          related: Array<{ id: string; source: string; title: string; similarity: number }>;
+          total: number;
+        };
+        return okUntrustedStructured(result);
       } catch (e) {
         return toolError("semantic search", e);
       }
@@ -125,6 +189,11 @@ export function registerSemanticTools(server: McpServer, config: AirMcpConfig): 
         "Run after semantic_index to expose your notes, events, reminders, and emails to system-wide search. " +
         "Requires Swift bridge (npm run swift-build).",
       inputSchema: {},
+      // System ack from the Swift bridge — fixed shape, no user content.
+      outputSchema: {
+        indexed: z.number().int(),
+        success: z.boolean(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async () => {
@@ -146,11 +215,11 @@ export function registerSemanticTools(server: McpServer, config: AirMcpConfig): 
           source: entry.source,
         }));
 
-        const result = await runSwift<{ indexed: number; success: boolean }>(
+        const result = (await runSwift<{ indexed: number; success: boolean }>(
           "spotlight-index",
           JSON.stringify({ items }),
-        );
-        return ok(result);
+        )) as { indexed: number; success: boolean };
+        return okStructured(result);
       } catch (e) {
         return toolError("spotlight sync", e);
       }
@@ -166,6 +235,14 @@ export function registerSemanticTools(server: McpServer, config: AirMcpConfig): 
         "Delete all indexed data from the local vector store AND remove corresponding entries from macOS Spotlight. " +
         "Use for privacy or to force a fresh re-index. Requires Swift bridge for Spotlight cleanup.",
       inputSchema: {},
+      // System ack — entry count cleared plus whether the optional
+      // Spotlight purge ran (it's best-effort if the Swift bridge is
+      // unavailable).
+      outputSchema: {
+        cleared: z.number().int(),
+        spotlightCleared: z.boolean(),
+        message: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
     async () => {
@@ -181,7 +258,7 @@ export function registerSemanticTools(server: McpServer, config: AirMcpConfig): 
             // Spotlight clear is best-effort
           }
         }
-        return ok({
+        return okStructured({
           cleared: before.total,
           spotlightCleared: !swiftErr,
           message: "Vector store and Spotlight index cleared.",
@@ -200,14 +277,18 @@ export function registerSemanticTools(server: McpServer, config: AirMcpConfig): 
       description:
         "Remove all AirMCP entries from macOS Spotlight without clearing the local vector store. Requires Swift bridge.",
       inputSchema: {},
+      // System ack from the Swift bridge.
+      outputSchema: {
+        cleared: z.boolean(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
     async () => {
       try {
         const swiftErr = await checkSwiftBridge();
         if (swiftErr) return errSwift(swiftErr);
-        const result = await runSwift<{ cleared: boolean }>("spotlight-clear", "{}");
-        return ok(result);
+        const result = (await runSwift<{ cleared: boolean }>("spotlight-clear", "{}")) as { cleared: boolean };
+        return okStructured(result);
       } catch (e) {
         return toolError("spotlight clear", e);
       }
@@ -221,12 +302,27 @@ export function registerSemanticTools(server: McpServer, config: AirMcpConfig): 
       title: "Semantic Index Status",
       description: "Show the current state of the semantic vector index -- total entries, breakdown by source.",
       inputSchema: {},
+      // Index health snapshot — system-derived counters and capability
+      // flags. Shares `indexStatsShape` with semantic_index's `store`
+      // sub-object plus two backend-availability fields.
+      outputSchema: {
+        embeddingAvailable: z.boolean(),
+        provider: z.string(),
+        ...indexStatsShape,
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async () => {
       try {
-        const status = await service.status();
-        return ok(status);
+        const status = (await service.status()) as {
+          embeddingAvailable: boolean;
+          provider: string;
+          total: number;
+          bySource: Record<string, number>;
+          indexedAt: string | null;
+          stale: boolean;
+        };
+        return okStructured(status);
       } catch (e) {
         return toolError("check semantic status", e);
       }

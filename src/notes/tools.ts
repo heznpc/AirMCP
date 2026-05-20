@@ -4,11 +4,8 @@ import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import { LIMITS } from "../shared/constants.js";
 import {
-  ok,
-  okLinked,
   okLinkedStructured,
   okStructured,
-  okUntrusted,
   okUntrustedStructured,
   okUntrustedLinkedStructured,
   errPermission,
@@ -253,6 +250,10 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
         body: z.string().max(50000).describe("Note content in HTML (e.g. '<h1>Title</h1><p>Body text</p>')"),
         folder: z.string().max(500).optional().describe("Target folder name"),
       },
+      outputSchema: {
+        id: z.string(),
+        name: z.string(),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -264,7 +265,7 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
       try {
         const script = config.includeShared ? createNoteSharedScript(body, folder) : createNoteScript(body, folder);
         const result = await runJxa<MutationResult>(script);
-        return okLinked("create_note", result);
+        return okUntrustedLinkedStructured("create_note", result);
       } catch (e) {
         return errJxaFor("create note", e);
       }
@@ -281,6 +282,10 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
         id: z.string().max(500).describe("Note ID (x-coredata:// format)"),
         body: z.string().max(50000).describe("New HTML body to replace existing content"),
       },
+      outputSchema: {
+        id: z.string(),
+        name: z.string(),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: true,
@@ -293,7 +298,7 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
         const blocked = await guardShared(id, config, "update_note");
         if (blocked) return errPermission(blocked);
         const result = await runJxa<MutationResult>(updateNoteScript(id, body));
-        return ok(result);
+        return okUntrustedStructured(result);
       } catch (e) {
         return errJxaFor("update note", e);
       }
@@ -308,6 +313,10 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
       inputSchema: {
         id: z.string().max(500).describe("Note ID (x-coredata:// format)"),
       },
+      outputSchema: {
+        deleted: z.boolean(),
+        name: z.string(),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: true,
@@ -320,7 +329,7 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
         const blocked = await guardShared(id, config, "delete_note");
         if (blocked) return errPermission(blocked);
         const result = await runJxa<DeleteResult>(deleteNoteScript(id));
-        return ok(result);
+        return okUntrustedStructured(result);
       } catch (e) {
         return errJxaFor("delete note", e);
       }
@@ -370,6 +379,11 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
         name: z.string().max(500).describe("Folder name"),
         account: z.string().max(500).optional().describe("Account name (e.g. 'iCloud'). Defaults to primary account."),
       },
+      outputSchema: {
+        id: z.string(),
+        name: z.string(),
+        existing: z.boolean(),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -379,8 +393,8 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
     },
     async ({ name, account }) => {
       try {
-        const result = await runJxa<MutationResult>(createFolderScript(name, account));
-        return ok(result);
+        const result = await runJxa<MutationResult & { existing: boolean }>(createFolderScript(name, account));
+        return okUntrustedStructured(result);
       } catch (e) {
         return errJxaFor("create folder", e);
       }
@@ -397,6 +411,12 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
         id: z.string().max(500).describe("Note ID to move"),
         folder: z.string().max(500).describe("Target folder name"),
       },
+      outputSchema: {
+        originalName: z.string(),
+        newId: z.string(),
+        newName: z.string(),
+        targetFolder: z.string(),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: true,
@@ -408,8 +428,13 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
       try {
         const blocked = await guardShared(id, config, "move_note");
         if (blocked) return errPermission(blocked);
-        const result = await runJxa<MutationResult>(moveNoteScript(id, folder));
-        return ok(result);
+        const result = (await runJxa(moveNoteScript(id, folder))) as {
+          originalName: string;
+          newId: string;
+          newName: string;
+          targetFolder: string;
+        };
+        return okUntrustedStructured(result);
       } catch (e) {
         return errJxaFor("move note", e);
       }
@@ -495,6 +520,20 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
       inputSchema: {
         ids: z.array(z.string()).min(2).max(5).describe("Array of 2-5 note IDs to compare"),
       },
+      outputSchema: {
+        notes: z.array(
+          z.object({
+            id: z.string(),
+            name: z.string(),
+            plaintext: z.string(),
+            folder: z.string(),
+            creationDate: z.string(),
+            modificationDate: z.string(),
+            charCount: z.number(),
+            shared: z.boolean(),
+          }),
+        ),
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -511,7 +550,7 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
           const blocked = await guardSharedAccess(true, config, "notes", "compare_notes", { ids });
           if (blocked) return errPermission(blocked);
         }
-        return okUntrusted(result);
+        return okUntrustedStructured({ notes: result });
       } catch (e) {
         return errJxaFor("compare notes", e);
       }
@@ -542,6 +581,54 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
             "Halt on first failure (default true) so the move stays at a recoverable mid-state. Set false for best-effort partial completion.",
           ),
       },
+      // Per-note result entries are a discriminated union of three shapes:
+      //   - success+unchanged (same-folder no-op)
+      //   - success+dryRun (preview with meta-loss notice)
+      //   - success (actual move with meta loss)
+      //   - failure (error per note)
+      // We declare a permissive shape covering all variants rather than a
+      // strict union — clients can switch on `success`/`dryRun`/`unchanged`.
+      outputSchema: {
+        targetFolder: z.string(),
+        dryRun: z.boolean(),
+        stopOnError: z.boolean(),
+        total: z.number(),
+        processed: z.number(),
+        moved: z.number(),
+        unchanged: z.number(),
+        previewed: z.number(),
+        failed: z.number(),
+        stoppedAt: z.number().nullable(),
+        results: z.array(
+          z.object({
+            success: z.boolean(),
+            id: z.string().optional(),
+            originalName: z.string().optional(),
+            originalFolder: z.string().optional(),
+            newId: z.string().optional(),
+            unchanged: z.boolean().optional(),
+            dryRun: z.boolean().optional(),
+            creationDate: z.string().optional(),
+            modificationDate: z.string().optional(),
+            charCount: z.number().optional(),
+            metaPreservation: z
+              .object({
+                creationDateLost: z.boolean(),
+                modificationDateLost: z.boolean(),
+                attachmentsLost: z.boolean(),
+                note: z.string(),
+              })
+              .optional(),
+            metaLost: z
+              .object({
+                creationDate: z.string(),
+                modificationDate: z.string(),
+              })
+              .optional(),
+            error: z.string().optional(),
+          }),
+        ),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: true,
@@ -558,8 +645,20 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
             if (blocked) return errPermission(blocked);
           }
         }
-        const result = await runJxa<unknown>(bulkMoveNotesScript(ids, folder, { dryRun, stopOnError }));
-        return ok(result);
+        const result = (await runJxa(bulkMoveNotesScript(ids, folder, { dryRun, stopOnError }))) as {
+          targetFolder: string;
+          dryRun: boolean;
+          stopOnError: boolean;
+          total: number;
+          processed: number;
+          moved: number;
+          unchanged: number;
+          previewed: number;
+          failed: number;
+          stoppedAt: number | null;
+          results: Array<Record<string, unknown>>;
+        };
+        return okUntrustedStructured(result);
       } catch (e) {
         return errJxaFor("bulk move notes", e);
       }

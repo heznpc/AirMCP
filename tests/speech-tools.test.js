@@ -81,9 +81,14 @@ describe('transcribe_audio', () => {
 
     const result = await server.callTool('transcribe_audio', { path: '/tmp/test.m4a' });
     expect(result.isError).toBeUndefined();
-    const parsed = JSON.parse(result.content[0].text);
-    expect(parsed.text).toBe('Hello world');
-    expect(parsed.onDevice).toBe(true);
+    // Wave 8 added outputSchema → success payload now lives in
+    // structuredContent (validated against the schema). The text
+    // envelope carries an `[UNTRUSTED …]` security wrapper because
+    // transcribed audio is user-controlled content; parsing the text
+    // as raw JSON no longer works (and shouldn't — that was a leak
+    // of the implementation detail).
+    expect(result.structuredContent.text).toBe('Hello world');
+    expect(result.structuredContent.onDevice).toBe(true);
   });
 
   test('returns error when swift bridge unavailable', async () => {
@@ -161,10 +166,12 @@ describe('smart_clipboard', () => {
 
     const result = await server.callTool('smart_clipboard');
     expect(result.isError).toBeUndefined();
-    const parsed = JSON.parse(result.content[0].text);
-    expect(parsed.text).toBe('https://example.com');
-    expect(parsed.detectedType).toBe('url');
-    expect(parsed.hasURL).toBe(true);
+    // Wave 8: clipboard content is user-controlled, so success payload
+    // is validated via outputSchema → structuredContent. The text
+    // envelope wraps it in an `[UNTRUSTED …]` notice for the agent.
+    expect(result.structuredContent.text).toBe('https://example.com');
+    expect(result.structuredContent.detectedType).toBe('url');
+    expect(result.structuredContent.hasURL).toBe(true);
   });
 
   test('returns error when swift bridge unavailable', async () => {

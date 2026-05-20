@@ -3,7 +3,7 @@ import { z } from "zod";
 import { runAutomation } from "../shared/automation.js";
 import { runSwift } from "../shared/swift.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okStructured, okUntrustedStructured, okUntrustedLinkedStructured, errJxaFor } from "../shared/result.js";
+import { okStructured, okUntrustedStructured, okUntrustedLinkedStructured, errJxaFor } from "../shared/result.js";
 import {
   listCalendarsScript,
   listEventsScript,
@@ -247,6 +247,10 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
         calendar: z.string().max(500).optional().describe("Target calendar name. Defaults to first writable calendar."),
         allDay: z.boolean().optional().describe("Set as all-day event"),
       },
+      outputSchema: {
+        id: z.string(),
+        summary: z.string(),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -263,7 +267,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
           },
           jxa: () => createEventScript(summary, startDate, endDate, { location, description, calendar, allDay }),
         });
-        return ok(result);
+        return okUntrustedStructured(result);
       } catch (e) {
         return errJxaFor("create event", e);
       }
@@ -288,6 +292,10 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
         location: z.string().max(5000).optional().describe("New location"),
         description: z.string().max(5000).optional().describe("New notes/description"),
       },
+      outputSchema: {
+        id: z.string(),
+        summary: z.string(),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: true,
@@ -304,7 +312,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
           },
           jxa: () => updateEventScript(id, { summary, startDate, endDate, location, description }),
         });
-        return ok(result);
+        return okUntrustedStructured(result);
       } catch (e) {
         return errJxaFor("update event", e);
       }
@@ -319,6 +327,10 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
       inputSchema: {
         id: z.string().max(500).describe("Event UID"),
       },
+      outputSchema: {
+        deleted: z.boolean(),
+        summary: z.string(),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: true,
@@ -332,7 +344,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
           swift: { command: "delete-event", input: { id } },
           jxa: () => deleteEventScript(id),
         });
-        return ok(result);
+        return okUntrustedStructured(result);
       } catch (e) {
         return errJxaFor("delete event", e);
       }
@@ -500,6 +512,11 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
           })
           .describe("Recurrence rule"),
       },
+      outputSchema: {
+        id: z.string(),
+        title: z.string(),
+        recurring: z.boolean(),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -521,7 +538,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
             recurrence,
           }),
         );
-        return ok(result);
+        return okUntrustedStructured(result);
       } catch (e) {
         return errJxaFor("create recurring event", e);
       }

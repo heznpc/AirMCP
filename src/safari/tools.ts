@@ -3,14 +3,13 @@ import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import { getOsVersion, type AirMcpConfig } from "../shared/config.js";
 import {
-  ok,
-  okUntrusted,
+  okStructured,
   okUntrustedStructured,
   okUntrustedLinkedStructured,
   errInvalidInput,
   errPermission,
   errDeprecated,
-  toolError,
+  errJxaFor,
 } from "../shared/result.js";
 import {
   listTabsScript,
@@ -50,7 +49,7 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
       try {
         return okUntrustedLinkedStructured("list_tabs", await runJxa(listTabsScript()));
       } catch (e) {
-        return toolError("list tabs", e);
+        return errJxaFor("list tabs", e);
       }
     },
   );
@@ -87,7 +86,7 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
           await runJxa(readPageContentScript(windowIndex, tabIndex, maxLength)),
         );
       } catch (e) {
-        return toolError("read page", e);
+        return errJxaFor("read page", e);
       }
     },
   );
@@ -108,7 +107,7 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
       try {
         return okUntrustedStructured(await runJxa(getCurrentTabScript()));
       } catch (e) {
-        return toolError("get current tab", e);
+        return errJxaFor("get current tab", e);
       }
     },
   );
@@ -120,6 +119,10 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
       description: "Open a URL in Safari's frontmost window.",
       inputSchema: {
         url: z.string().url().describe("URL to open"),
+      },
+      outputSchema: {
+        opened: z.literal(true),
+        url: z.string(),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
@@ -158,9 +161,10 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
         return errInvalidInput("Invalid URL format.");
       }
       try {
-        return ok(await runJxa(openUrlScript(url)));
+        const result = (await runJxa(openUrlScript(url))) as { opened: true; url: string };
+        return okStructured(result);
       } catch (e) {
-        return toolError("open URL", e);
+        return errJxaFor("open URL", e);
       }
     },
   );
@@ -174,13 +178,19 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
         windowIndex: z.number().int().min(0).optional().default(0).describe("Window index (default: 0)"),
         tabIndex: z.number().int().min(0).describe("Tab index"),
       },
+      // `title` is the user-controlled page title of the closed tab.
+      outputSchema: {
+        closed: z.literal(true),
+        title: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
     async ({ windowIndex, tabIndex }) => {
       try {
-        return ok(await runJxa(closeTabScript(windowIndex, tabIndex)));
+        const result = (await runJxa(closeTabScript(windowIndex, tabIndex))) as { closed: true; title: string };
+        return okUntrustedStructured(result);
       } catch (e) {
-        return toolError("close tab", e);
+        return errJxaFor("close tab", e);
       }
     },
   );
@@ -194,13 +204,24 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
         windowIndex: z.number().int().min(0).optional().default(0).describe("Window index (default: 0)"),
         tabIndex: z.number().int().min(0).describe("Tab index"),
       },
+      // `title` / `url` come from the page itself and may be attacker-controlled.
+      outputSchema: {
+        activated: z.literal(true),
+        title: z.string(),
+        url: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ windowIndex, tabIndex }) => {
       try {
-        return ok(await runJxa(activateTabScript(windowIndex, tabIndex)));
+        const result = (await runJxa(activateTabScript(windowIndex, tabIndex))) as {
+          activated: true;
+          title: string;
+          url: string;
+        };
+        return okUntrustedStructured(result);
       } catch (e) {
-        return toolError("activate tab", e);
+        return errJxaFor("activate tab", e);
       }
     },
   );
@@ -216,6 +237,13 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
         windowIndex: z.number().int().min(0).optional().default(0).describe("Window index (default: 0)"),
         tabIndex: z.number().int().min(0).optional().default(0).describe("Tab index (default: 0)"),
       },
+      // The script coerces the JS return value to String() — the structured
+      // shape is just a `{result: string}` envelope. The string itself is
+      // attacker-controlled (the JS executed in a web page), so we use the
+      // untrusted helper.
+      outputSchema: {
+        result: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
     async ({ code, windowIndex, tabIndex }) => {
@@ -224,9 +252,10 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
           "Running JavaScript in Safari is disabled. Set AIRMCP_ALLOW_RUN_JAVASCRIPT=true or allowRunJavascript in config.json.",
         );
       try {
-        return okUntrusted(await runJxa(runJavascriptScript(code, windowIndex, tabIndex)));
+        const result = (await runJxa(runJavascriptScript(code, windowIndex, tabIndex))) as { result: string };
+        return okUntrustedStructured(result);
       } catch (e) {
-        return toolError("run JavaScript", e);
+        return errJxaFor("run JavaScript", e);
       }
     },
   );
@@ -256,7 +285,7 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
       try {
         return okUntrustedLinkedStructured("search_tabs", await runJxa(searchTabsScript(query)));
       } catch (e) {
-        return toolError("search tabs", e);
+        return errJxaFor("search tabs", e);
       }
     },
   );
@@ -283,7 +312,7 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
       try {
         return okUntrustedStructured(await runJxa(listBookmarksScript()));
       } catch (e) {
-        return toolError("list bookmarks", e);
+        return errJxaFor("list bookmarks", e);
       }
     },
   );
@@ -305,6 +334,16 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
         inputSchema: {
           url: z.string().url().describe("URL to bookmark"),
           title: z.string().max(500).describe("Bookmark title"),
+        },
+        // Declared for parity with the rest of the Safari surface even
+        // though the handler unconditionally returns errDeprecated on
+        // hosts where the tool is registered. Matches the legacy JXA
+        // success shape on macOS ≤ 25.
+        outputSchema: {
+          added: z.literal(true),
+          title: z.string(),
+          url: z.string(),
+          folder: z.string(),
         },
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
       },
@@ -338,7 +377,7 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
       try {
         return okUntrustedStructured(await runJxa(listReadingListScript()));
       } catch (e) {
-        return toolError("list reading list", e);
+        return errJxaFor("list reading list", e);
       }
     },
   );
@@ -352,13 +391,25 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
         url: z.string().url().describe("URL to add to Reading List"),
         title: z.string().max(500).optional().describe("Title for the Reading List item"),
       },
+      // `title` falls back to the URL in the script when not provided, so
+      // the field is always a string.
+      outputSchema: {
+        added: z.literal(true),
+        url: z.string(),
+        title: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
     async ({ url, title }) => {
       try {
-        return ok(await runJxa(addToReadingListScript(url, title)));
+        const result = (await runJxa(addToReadingListScript(url, title))) as {
+          added: true;
+          url: string;
+          title: string;
+        };
+        return okStructured(result);
       } catch (e) {
-        return toolError("add to reading list", e);
+        return errJxaFor("add to reading list", e);
       }
     },
   );

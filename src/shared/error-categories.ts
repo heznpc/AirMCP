@@ -36,7 +36,15 @@ export type ErrorCategory = (typeof ERROR_CATEGORIES)[number];
  * Origin hints — where a failure physically came from. Useful for triage,
  * not part of the client contract.
  */
-export type ErrorOrigin = "jxa" | "swift" | "http" | "hitl" | "filesystem" | "network" | "unknown";
+export type ErrorOrigin =
+  | "jxa"
+  | "applescript" // osascript without `-l JavaScript` — raw AppleScript path
+  | "swift"
+  | "http"
+  | "hitl"
+  | "filesystem"
+  | "network"
+  | "unknown";
 
 /**
  * Machine-readable error payload returned alongside the human-readable message.

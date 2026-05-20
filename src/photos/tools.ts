@@ -4,8 +4,7 @@ import { runSwift } from "../shared/swift.js";
 import { runAutomation } from "../shared/automation.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import {
-  ok,
-  okUntrusted,
+  okStructured,
   okUntrustedLinkedStructured,
   okUntrustedStructured,
   errJxaFor,
@@ -106,6 +105,18 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
       title: "List Photo Albums",
       description: "List all photo albums with name and item count.",
       inputSchema: {},
+      // Album names are user-controlled — helper marks payload untrusted.
+      // Wrap the raw array in `{ albums }` so the response matches an
+      // object outputSchema (MCP outputSchema must be an object).
+      outputSchema: {
+        albums: z.array(
+          z.object({
+            id: z.string(),
+            name: z.string(),
+            count: z.number().int().min(0),
+          }),
+        ),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async () => {
@@ -114,7 +125,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
           swift: { command: "list-albums" },
           jxa: () => listAlbumsScript(),
         });
-        return okUntrusted(result);
+        return okUntrustedStructured({ albums: result });
       } catch (e) {
         return errJxaFor("list albums", e);
       }
@@ -295,6 +306,12 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
       inputSchema: {
         name: z.string().max(500).describe("Album name"),
       },
+      // `id` is the PHCollection localIdentifier (Swift) or albums.id()
+      // (JXA fallback) — stable handle for follow-up add_to_album calls.
+      outputSchema: {
+        id: z.string(),
+        name: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
     async ({ name }) => {
@@ -306,7 +323,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
           },
           jxa: () => createAlbumScript(name),
         });
-        return ok(result);
+        return okUntrustedStructured(result);
       } catch (e) {
         return errJxaFor("create album", e);
       }
@@ -322,6 +339,12 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
         photoIds: z.array(z.string().max(500)).min(1).max(500).describe("Array of photo media item IDs (max 500)"),
         albumName: z.string().max(500).describe("Target album name"),
       },
+      // `added` may be less than the input length when some photo IDs
+      // don't resolve — the script silently skips misses.
+      outputSchema: {
+        added: z.number().int().min(0),
+        album: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
     async ({ photoIds, albumName }) => {
@@ -333,7 +356,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
           },
           jxa: () => addToAlbumScript(photoIds, albumName),
         });
-        return ok(result);
+        return okUntrustedStructured(result);
       } catch (e) {
         return errJxaFor("add photos to album", e);
       }
@@ -350,6 +373,12 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
         filePath: zFilePath.describe("Absolute file path to the image file to import"),
         albumName: z.string().max(500).optional().describe("Album to add the imported photo to (must already exist)"),
       },
+      // `identifier` is the PHAsset localIdentifier of the imported
+      // photo; null when the Swift bridge can't read it back (rare).
+      outputSchema: {
+        imported: z.boolean(),
+        identifier: z.string().nullable(),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -361,7 +390,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
       try {
         resolveAndGuard(filePath);
         const result = await runSwift<PhotoImportResult>("import-photo", JSON.stringify({ filePath, albumName }));
-        return ok(result);
+        return okStructured(result);
       } catch (e) {
         return errSwiftFor("import photo", e);
       }
@@ -377,6 +406,13 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
       inputSchema: {
         identifiers: z.array(z.string()).describe("Array of photo local identifiers to delete"),
       },
+      // `deleted` is the actual count Photos confirmed (after the user
+      // approves the confirmation dialog); `identifiers` echoes back
+      // the IDs the user approved deleting.
+      outputSchema: {
+        deleted: z.number().int().min(0),
+        identifiers: z.array(z.string()),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: true,
@@ -387,7 +423,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
     async ({ identifiers }) => {
       try {
         const result = await runSwift<PhotoDeleteResult>("delete-photos", JSON.stringify({ identifiers }));
-        return ok(result);
+        return okStructured(result);
       } catch (e) {
         return errSwiftFor("delete photos", e);
       }
@@ -410,15 +446,40 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
         favorites: z.boolean().optional().describe("Only favorites"),
         limit: z.number().int().min(1).max(200).optional().default(50).describe("Max results (default: 50)"),
       },
+      // Mirrors the Swift `PhotoQueryOutput` / `PhotoInfo` types in
+      // AirMCPKit/Types.swift. Filenames and creationDate are nullable
+      // because PHAsset can have either missing.
+      outputSchema: {
+        total: z.number().int().min(0),
+        photos: z.array(
+          z.object({
+            identifier: z.string(),
+            filename: z.string().nullable(),
+            creationDate: z.string().nullable(),
+            mediaType: z.string(),
+            isFavorite: z.boolean(),
+            width: z.number().int().min(0),
+            height: z.number().int().min(0),
+          }),
+        ),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ mediaType, startDate, endDate, favorites, limit }) => {
       try {
-        const result = await runSwift<{ photos: unknown[]; total: number }>(
-          "query-photos",
-          JSON.stringify({ mediaType, startDate, endDate, favorites, limit }),
-        );
-        return ok(result);
+        const result = await runSwift<{
+          photos: Array<{
+            identifier: string;
+            filename: string | null;
+            creationDate: string | null;
+            mediaType: string;
+            isFavorite: boolean;
+            width: number;
+            height: number;
+          }>;
+          total: number;
+        }>("query-photos", JSON.stringify({ mediaType, startDate, endDate, favorites, limit }));
+        return okUntrustedStructured(result);
       } catch (e) {
         return errSwiftFor("query photos", e);
       }
@@ -436,15 +497,27 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
         imagePath: zFilePath.describe("Absolute path to the image file"),
         maxResults: z.number().int().min(1).max(50).optional().default(10).describe("Max labels (default: 10)"),
       },
+      // Mirrors Swift `ClassifyImageOutput` (labels: [ImageLabel]).
+      // `identifier` is the Vision class name (e.g. "dog", "outdoor"),
+      // `confidence` is 0.0–1.0.
+      outputSchema: {
+        total: z.number().int().min(0),
+        labels: z.array(
+          z.object({
+            identifier: z.string(),
+            confidence: z.number(),
+          }),
+        ),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ imagePath, maxResults }) => {
       try {
-        const result = await runSwift<{ labels: unknown[]; total: number }>(
-          "classify-image",
-          JSON.stringify({ imagePath, maxResults }),
-        );
-        return ok(result);
+        const result = await runSwift<{
+          labels: Array<{ identifier: string; confidence: number }>;
+          total: number;
+        }>("classify-image", JSON.stringify({ imagePath, maxResults }));
+        return okStructured(result);
       } catch (e) {
         return errSwiftFor("classify image", e);
       }

@@ -2,7 +2,7 @@ import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okUntrusted, toolError } from "../shared/result.js";
+import { okStructured, okUntrustedStructured, errJxaFor } from "../shared/result.js";
 import { zFilePath, resolveAndGuard } from "../shared/validate.js";
 import {
   listDocumentsScript,
@@ -14,6 +14,15 @@ import {
   closeDocumentScript,
 } from "./scripts.js";
 
+// Shared shape for the open-document descriptor returned by JXA. Pages
+// reports `path` as null when the document hasn't been saved to disk yet
+// (untitled new documents), so the schema is explicit about nullability.
+const pagesDocSchema = z.object({
+  name: z.string(),
+  path: z.string().nullable(),
+  modified: z.boolean(),
+});
+
 export function registerPagesTools(server: McpServer, _config: AirMcpConfig): void {
   server.registerTool(
     "pages_list_documents",
@@ -21,13 +30,20 @@ export function registerPagesTools(server: McpServer, _config: AirMcpConfig): vo
       title: "List Pages Documents",
       description: "List all open Pages documents with name, path, and modified status.",
       inputSchema: {},
+      // Wave 8 outputSchema: documents come from open Pages files whose
+      // titles are user-controlled, so we mark the field as untrusted in
+      // the helper. The shape itself is fixed by the JXA script.
+      outputSchema: {
+        documents: z.array(pagesDocSchema),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async () => {
       try {
-        return ok(await runJxa(listDocumentsScript()));
+        const documents = (await runJxa(listDocumentsScript())) as Array<unknown>;
+        return okUntrustedStructured({ documents });
       } catch (e) {
-        return toolError("list Pages documents", e);
+        return errJxaFor("list Pages documents", e);
       }
     },
   );
@@ -40,13 +56,21 @@ export function registerPagesTools(server: McpServer, _config: AirMcpConfig): vo
       inputSchema: {
         path: zFilePath.describe("Absolute file path to the .pages document"),
       },
+      // `modified` is omitted from the script output here (open just
+      // reports name + path) — schema follows the actual shape rather
+      // than padding with synthetic fields.
+      outputSchema: {
+        name: z.string(),
+        path: z.string().nullable(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
     async ({ path }) => {
       try {
-        return ok(await runJxa(openDocumentScript(path)));
+        const result = (await runJxa(openDocumentScript(path))) as { name: string; path: string | null };
+        return okUntrustedStructured(result);
       } catch (e) {
-        return toolError("open Pages document", e);
+        return errJxaFor("open Pages document", e);
       }
     },
   );
@@ -57,13 +81,17 @@ export function registerPagesTools(server: McpServer, _config: AirMcpConfig): vo
       title: "Create Pages Document",
       description: "Create a new blank Pages document.",
       inputSchema: {},
+      outputSchema: {
+        name: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
     async () => {
       try {
-        return ok(await runJxa(createDocumentScript()));
+        const result = (await runJxa(createDocumentScript())) as { name: string };
+        return okStructured(result);
       } catch (e) {
-        return toolError("create Pages document", e);
+        return errJxaFor("create Pages document", e);
       }
     },
   );
@@ -76,13 +104,20 @@ export function registerPagesTools(server: McpServer, _config: AirMcpConfig): vo
       inputSchema: {
         document: z.string().max(500).describe("Document name (as shown in title bar)"),
       },
+      // bodyText is truncated to 10,000 chars by the script — schema
+      // documents the bound so callers don't expect the full document.
+      outputSchema: {
+        name: z.string(),
+        bodyText: z.string().max(10000),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ document }) => {
       try {
-        return okUntrusted(await runJxa(getBodyTextScript(document)));
+        const result = (await runJxa(getBodyTextScript(document))) as { name: string; bodyText: string };
+        return okUntrustedStructured(result);
       } catch (e) {
-        return toolError("get Pages body text", e);
+        return errJxaFor("get Pages body text", e);
       }
     },
   );
@@ -96,13 +131,18 @@ export function registerPagesTools(server: McpServer, _config: AirMcpConfig): vo
         document: z.string().max(500).describe("Document name"),
         text: z.string().max(50000).describe("New body text content"),
       },
+      outputSchema: {
+        updated: z.literal(true),
+        name: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
     async ({ document, text }) => {
       try {
-        return ok(await runJxa(setBodyTextScript(document, text)));
+        const result = (await runJxa(setBodyTextScript(document, text))) as { updated: true; name: string };
+        return okStructured(result);
       } catch (e) {
-        return toolError("set Pages body text", e);
+        return errJxaFor("set Pages body text", e);
       }
     },
   );
@@ -116,14 +156,19 @@ export function registerPagesTools(server: McpServer, _config: AirMcpConfig): vo
         document: z.string().max(500).describe("Document name"),
         outputPath: zFilePath.describe("Absolute output path for the PDF file"),
       },
+      outputSchema: {
+        exported: z.literal(true),
+        path: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
     async ({ document, outputPath }) => {
       try {
         resolveAndGuard(outputPath);
-        return ok(await runJxa(exportPdfScript(document, outputPath)));
+        const result = (await runJxa(exportPdfScript(document, outputPath))) as { exported: true; path: string };
+        return okStructured(result);
       } catch (e) {
-        return toolError("export Pages to PDF", e);
+        return errJxaFor("export Pages to PDF", e);
       }
     },
   );
@@ -137,13 +182,18 @@ export function registerPagesTools(server: McpServer, _config: AirMcpConfig): vo
         document: z.string().max(500).describe("Document name"),
         saving: z.boolean().optional().default(true).describe("Save before closing (default: true)"),
       },
+      outputSchema: {
+        closed: z.literal(true),
+        name: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     },
     async ({ document, saving }) => {
       try {
-        return ok(await runJxa(closeDocumentScript(document, saving)));
+        const result = (await runJxa(closeDocumentScript(document, saving))) as { closed: true; name: string };
+        return okStructured(result);
       } catch (e) {
-        return toolError("close Pages document", e);
+        return errJxaFor("close Pages document", e);
       }
     },
   );

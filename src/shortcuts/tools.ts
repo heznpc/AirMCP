@@ -4,7 +4,13 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okLinked, okLinkedStructured, okStructured, errJxaFor } from "../shared/result.js";
+import {
+  okLinkedStructured,
+  okStructured,
+  okUntrustedStructured,
+  okUntrustedLinkedStructured,
+  errJxaFor,
+} from "../shared/result.js";
 import { TIMEOUT } from "../shared/constants.js";
 import { zFilePath, resolveAndGuard } from "../shared/validate.js";
 import {
@@ -71,11 +77,18 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
         name: z.string().max(500).describe("Shortcut name (exact match)"),
         input: z.string().max(10000).optional().describe("Optional text input for the shortcut"),
       },
+      // `output` is whatever the shortcut returned over stdout — fully
+      // user/automation-controlled, so the helper marks it untrusted.
+      outputSchema: {
+        shortcut: z.string(),
+        output: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
     async ({ name, input }) => {
       try {
-        return okLinked("run_shortcut", await runJxa(runShortcutScript(name, input)));
+        const result = (await runJxa(runShortcutScript(name, input))) as { shortcut: string; output: string };
+        return okUntrustedLinkedStructured("run_shortcut", result);
       } catch (e) {
         return errJxaFor("run shortcut", e);
       }
@@ -137,11 +150,21 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
       inputSchema: {
         name: z.string().max(500).describe("Name for the new shortcut"),
       },
+      outputSchema: {
+        created: z.string(),
+        success: z.literal(true),
+        note: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },
     async ({ name }) => {
       try {
-        return ok(await runJxa(createShortcutScript(name)));
+        const result = (await runJxa(createShortcutScript(name))) as {
+          created: string;
+          success: true;
+          note: string;
+        };
+        return okStructured(result);
       } catch (e) {
         return errJxaFor("create shortcut", e);
       }
@@ -157,11 +180,16 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
       inputSchema: {
         name: z.string().max(500).describe("Shortcut name to delete (exact match)"),
       },
+      outputSchema: {
+        deleted: z.string(),
+        success: z.literal(true),
+      },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     },
     async ({ name }) => {
       try {
-        return ok(await runJxa(deleteShortcutScript(name)));
+        const result = (await runJxa(deleteShortcutScript(name))) as { deleted: string; success: true };
+        return okStructured(result);
       } catch (e) {
         return errJxaFor("delete shortcut", e);
       }
@@ -180,6 +208,11 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
           "File path to export the .shortcut file to (e.g. ~/Desktop/MyShortcut.shortcut)",
         ),
       },
+      outputSchema: {
+        shortcut: z.string(),
+        exportedTo: z.string(),
+        success: z.literal(true),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ name, outputPath }) => {
@@ -189,7 +222,12 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
         // HOME so a malicious symlink can't redirect the export into
         // /etc/launchd.plist.d/ or similar privileged locations.
         resolveAndGuard(outputPath);
-        return ok(await runJxa(exportShortcutScript(name, outputPath)));
+        const result = (await runJxa(exportShortcutScript(name, outputPath))) as {
+          shortcut: string;
+          exportedTo: string;
+          success: true;
+        };
+        return okStructured(result);
       } catch (e) {
         return errJxaFor("export shortcut", e);
       }
@@ -205,6 +243,10 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
       inputSchema: {
         filePath: zFilePath.describe("Path to the .shortcut file to import"),
       },
+      outputSchema: {
+        imported: z.string(),
+        success: z.literal(true),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
     async ({ filePath }) => {
@@ -214,7 +256,8 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
         // shortcut by a malicious skill. Constrain to HOME like the other
         // file-touching shortcut tools.
         resolveAndGuard(filePath);
-        return ok(await runJxa(importShortcutScript(filePath)));
+        const result = (await runJxa(importShortcutScript(filePath))) as { imported: string; success: true };
+        return okStructured(result);
       } catch (e) {
         return errJxaFor("import shortcut", e);
       }
@@ -231,11 +274,21 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
         name: z.string().max(500).describe("Name of the shortcut to duplicate (exact match)"),
         newName: z.string().max(500).describe("Name for the duplicated shortcut"),
       },
+      outputSchema: {
+        original: z.string(),
+        duplicate: z.string(),
+        success: z.literal(true),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
     async ({ name, newName }) => {
       try {
-        return ok(await runJxa(duplicateShortcutScript(name, newName)));
+        const result = (await runJxa(duplicateShortcutScript(name, newName))) as {
+          original: string;
+          duplicate: string;
+          success: true;
+        };
+        return okStructured(result);
       } catch (e) {
         return errJxaFor("duplicate shortcut", e);
       }
@@ -251,11 +304,21 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
       inputSchema: {
         name: z.string().max(500).describe("Shortcut name to edit (exact match)"),
       },
+      outputSchema: {
+        shortcut: z.string(),
+        success: z.literal(true),
+        note: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },
     async ({ name }) => {
       try {
-        return ok(await runJxa(editShortcutScript(name)));
+        const result = (await runJxa(editShortcutScript(name))) as {
+          shortcut: string;
+          success: true;
+          note: string;
+        };
+        return okStructured(result);
       } catch (e) {
         return errJxaFor("open shortcut for editing", e);
       }
@@ -315,11 +378,19 @@ export async function registerDynamicShortcutTools(server: McpServer): Promise<n
         inputSchema: {
           input: z.string().max(10000).optional().describe("Optional text input for the shortcut"),
         },
+        // Same shape as the static run_shortcut handler — `output` is the
+        // shortcut's stdout, which is fully attacker-controlled, so use
+        // the untrusted helper at the call site.
+        outputSchema: {
+          shortcut: z.string(),
+          output: z.string(),
+        },
         annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
       },
       async ({ input }) => {
         try {
-          return ok(await runJxa(runShortcutScript(name, input)));
+          const result = (await runJxa(runShortcutScript(name, input))) as { shortcut: string; output: string };
+          return okUntrustedStructured(result);
         } catch (e) {
           return errJxaFor(`run shortcut "${name}"`, e);
         }

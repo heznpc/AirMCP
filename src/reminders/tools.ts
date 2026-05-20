@@ -3,7 +3,7 @@ import { z } from "zod";
 import { runAutomation } from "../shared/automation.js";
 import { runSwift } from "../shared/swift.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okLinked, okLinkedStructured, okStructured, okUntrustedStructured, errJxaFor } from "../shared/result.js";
+import { okLinkedStructured, okStructured, okUntrustedStructured, errJxaFor } from "../shared/result.js";
 import type { MutationResult, DeleteResult } from "../shared/types.js";
 import {
   listReminderListsScript,
@@ -215,6 +215,10 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
         priority: z.number().int().min(0).max(9).optional().describe("Priority: 0=none, 1-4=high, 5=medium, 6-9=low"),
         list: z.string().max(500).optional().describe("Target list name. Defaults to the default list."),
       },
+      outputSchema: {
+        id: z.string(),
+        name: z.string(),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -224,14 +228,14 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
     },
     async ({ title, body, dueDate, priority, list }) => {
       try {
-        const result = await runAutomation<MutationResult>({
+        const result = (await runAutomation<MutationResult>({
           swift: {
             command: "create-reminder",
             input: { title, body, dueDate, priority, list },
           },
           jxa: () => createReminderScript(title, { body, dueDate, priority, list }),
-        });
-        return okLinked("create_reminder", result);
+        })) as MutationResult;
+        return okLinkedStructured("create_reminder", result);
       } catch (e) {
         return errJxaFor("create reminder", e);
       }
@@ -256,6 +260,10 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
         priority: z.number().int().min(0).max(9).optional().describe("New priority (0-9)"),
         flagged: z.boolean().optional().describe("Set flagged status"),
       },
+      outputSchema: {
+        id: z.string(),
+        name: z.string(),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: true,
@@ -265,7 +273,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
     },
     async ({ id, title, body, dueDate, priority, flagged }) => {
       try {
-        const result = await runAutomation<MutationResult>({
+        const result = (await runAutomation<MutationResult>({
           swift: {
             command: "update-reminder",
             input: {
@@ -279,8 +287,8 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
             },
           },
           jxa: () => updateReminderScript(id, { name: title, body, dueDate, priority, flagged }),
-        });
-        return ok(result);
+        })) as MutationResult;
+        return okStructured(result);
       } catch (e) {
         return errJxaFor("update reminder", e);
       }
@@ -300,6 +308,11 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
           .default(true)
           .describe("Set to true to complete, false to un-complete (default: true)"),
       },
+      outputSchema: {
+        id: z.string(),
+        name: z.string(),
+        completed: z.boolean(),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -309,14 +322,14 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
     },
     async ({ id, completed }) => {
       try {
-        const result = await runAutomation<CompleteResult>({
+        const result = (await runAutomation<CompleteResult>({
           swift: {
             command: "complete-reminder",
             input: { id, completed },
           },
           jxa: () => completeReminderScript(id, completed),
-        });
-        return ok(result);
+        })) as CompleteResult;
+        return okStructured(result);
       } catch (e) {
         return errJxaFor("complete reminder", e);
       }
@@ -331,6 +344,10 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
       inputSchema: {
         id: z.string().max(500).describe("Reminder ID"),
       },
+      outputSchema: {
+        deleted: z.boolean(),
+        name: z.string(),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: true,
@@ -340,11 +357,11 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
     },
     async ({ id }) => {
       try {
-        const result = await runAutomation<DeleteResult>({
+        const result = (await runAutomation<DeleteResult>({
           swift: { command: "delete-reminder", input: { id } },
           jxa: () => deleteReminderScript(id),
-        });
-        return ok(result);
+        })) as DeleteResult;
+        return okStructured(result);
       } catch (e) {
         return errJxaFor("delete reminder", e);
       }
@@ -405,6 +422,10 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
       inputSchema: {
         name: z.string().max(500).describe("Name for the new list"),
       },
+      outputSchema: {
+        id: z.string(),
+        name: z.string(),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -414,14 +435,14 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
     },
     async ({ name }) => {
       try {
-        const result = await runAutomation<MutationResult>({
+        const result = (await runAutomation<MutationResult>({
           swift: {
             command: "create-reminder-list",
             input: { name },
           },
           jxa: () => createReminderListScript(name),
-        });
-        return ok(result);
+        })) as MutationResult;
+        return okStructured(result);
       } catch (e) {
         return errJxaFor("create reminder list", e);
       }
@@ -436,6 +457,10 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
       inputSchema: {
         name: z.string().max(500).describe("Name of the list to delete"),
       },
+      outputSchema: {
+        deleted: z.boolean(),
+        name: z.string(),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: true,
@@ -445,14 +470,14 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
     },
     async ({ name }) => {
       try {
-        const result = await runAutomation<DeleteResult>({
+        const result = (await runAutomation<DeleteResult>({
           swift: {
             command: "delete-reminder-list",
             input: { name },
           },
           jxa: () => deleteReminderListScript(name),
-        });
-        return ok(result);
+        })) as DeleteResult;
+        return okStructured(result);
       } catch (e) {
         return errJxaFor("delete reminder list", e);
       }
@@ -488,6 +513,11 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
           })
           .describe("Recurrence rule"),
       },
+      outputSchema: {
+        id: z.string(),
+        title: z.string(),
+        recurring: z.boolean(),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -497,7 +527,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
     },
     async ({ title, list, notes, dueDate, priority, recurrence }) => {
       try {
-        const result = await runSwift<RecurringReminderResult>(
+        const result = (await runSwift<RecurringReminderResult>(
           "create-recurring-reminder",
           JSON.stringify({
             title,
@@ -507,8 +537,8 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
             priority,
             recurrence,
           }),
-        );
-        return ok(result);
+        )) as RecurringReminderResult;
+        return okStructured(result);
       } catch (e) {
         return errJxaFor("create recurring reminder", e);
       }

@@ -3,12 +3,13 @@ import { z } from "zod";
 import { runJxa, runAppleScript } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import {
-  ok,
+  okStructured,
   okLinkedStructured,
   okUntrustedLinkedStructured,
   okUntrustedStructured,
   errPermission,
-  toolError,
+  errJxaFor,
+  errAppleScriptFor,
 } from "../shared/result.js";
 import { TIMEOUT } from "../shared/constants.js";
 import { zFilePath, resolveAndGuard } from "../shared/validate.js";
@@ -97,7 +98,7 @@ export function registerMessagesTools(server: McpServer, config: AirMcpConfig): 
       try {
         return okLinkedStructured("list_chats", await runJxa<MessagesListChatsOutput>(listChatsScript(limit)));
       } catch (e) {
-        return toolError("list chats", e);
+        return errJxaFor("list chats", e);
       }
     },
   );
@@ -117,7 +118,7 @@ export function registerMessagesTools(server: McpServer, config: AirMcpConfig): 
       try {
         return okUntrustedLinkedStructured("read_chat", await runJxa<MessagesReadChatOutput>(readChatScript(chatId)));
       } catch (e) {
-        return toolError("read chat", e);
+        return errJxaFor("read chat", e);
       }
     },
   );
@@ -141,7 +142,7 @@ export function registerMessagesTools(server: McpServer, config: AirMcpConfig): 
           await runJxa<MessagesSearchChatsOutput>(searchMessagesScript(query, limit)),
         );
       } catch (e) {
-        return toolError("search chats", e);
+        return errJxaFor("search chats", e);
       }
     },
   );
@@ -158,6 +159,11 @@ export function registerMessagesTools(server: McpServer, config: AirMcpConfig): 
           .describe("Recipient handle (phone number or email, e.g. '+821012345678' or 'user@example.com')"),
         text: z.string().min(1).max(10000).describe("Message text to send"),
       },
+      outputSchema: {
+        sent: z.literal(true),
+        to: z.string(),
+        text: z.string().max(80),
+      },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
     async ({ target, text }) => {
@@ -165,9 +171,9 @@ export function registerMessagesTools(server: McpServer, config: AirMcpConfig): 
         return errPermission("Sending messages is disabled. Set AIRMCP_ALLOW_SEND_MESSAGES=true to enable.");
       try {
         await runAppleScript(sendMessageScript(target, text), { app: "Messages", timeout: TIMEOUT.MESSAGE_SEND });
-        return ok({ sent: true, to: target, text: text.substring(0, 80) });
+        return okStructured({ sent: true as const, to: target, text: text.substring(0, 80) });
       } catch (e) {
-        return toolError("send message", e);
+        return errAppleScriptFor("send message", e);
       }
     },
   );
@@ -180,6 +186,11 @@ export function registerMessagesTools(server: McpServer, config: AirMcpConfig): 
       inputSchema: {
         target: z.string().min(1).max(1000).describe("Recipient handle (phone number or email)"),
         filePath: zFilePath.describe("Absolute file path to send"),
+      },
+      outputSchema: {
+        sent: z.literal(true),
+        to: z.string(),
+        file: z.string(),
       },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
@@ -194,9 +205,9 @@ export function registerMessagesTools(server: McpServer, config: AirMcpConfig): 
         // as iMessage attachments to themselves.
         resolveAndGuard(filePath);
         await runAppleScript(sendFileScript(target, filePath), { app: "Messages", timeout: TIMEOUT.MESSAGE_SEND });
-        return ok({ sent: true, to: target, file: filePath });
+        return okStructured({ sent: true as const, to: target, file: filePath });
       } catch (e) {
-        return toolError("send file", e);
+        return errAppleScriptFor("send file", e);
       }
     },
   );
@@ -216,7 +227,7 @@ export function registerMessagesTools(server: McpServer, config: AirMcpConfig): 
       try {
         return okUntrustedStructured(await runJxa<MessagesListParticipantsOutput>(listParticipantsScript(chatId)));
       } catch (e) {
-        return toolError("list participants", e);
+        return errJxaFor("list participants", e);
       }
     },
   );

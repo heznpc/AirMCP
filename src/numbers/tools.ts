@@ -2,7 +2,7 @@ import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okUntrustedStructured, errJxaFor } from "../shared/result.js";
+import { okStructured, okUntrustedStructured, errJxaFor } from "../shared/result.js";
 import { zFilePath, resolveAndGuard } from "../shared/validate.js";
 import {
   listDocumentsScript,
@@ -53,11 +53,17 @@ export function registerNumbersTools(server: McpServer, _config: AirMcpConfig): 
       title: "Create Numbers Document",
       description: "Create a new blank Numbers spreadsheet.",
       inputSchema: {},
+      // Mirrors `iworkCreateDocumentScript` — returns just the auto-
+      // assigned document name (e.g. "Untitled").
+      outputSchema: {
+        name: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
     async () => {
       try {
-        return ok(await runJxa(createDocumentScript()));
+        const result = (await runJxa(createDocumentScript())) as { name: string };
+        return okStructured(result);
       } catch (e) {
         return errJxaFor("create Numbers document", e);
       }
@@ -131,11 +137,19 @@ export function registerNumbersTools(server: McpServer, _config: AirMcpConfig): 
         cell: z.string().max(500).describe("Cell address (e.g. 'A1')"),
         value: z.string().max(10000).describe("Value to write"),
       },
+      outputSchema: {
+        written: z.literal(true),
+        address: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ document, sheet, cell, value }) => {
       try {
-        return ok(await runJxa(setCellScript(document, sheet, cell, value)));
+        const result = (await runJxa(setCellScript(document, sheet, cell, value))) as {
+          written: true;
+          address: string;
+        };
+        return okStructured(result);
       } catch (e) {
         return errJxaFor("set Numbers cell", e);
       }
@@ -186,11 +200,16 @@ export function registerNumbersTools(server: McpServer, _config: AirMcpConfig): 
         document: z.string().max(500).describe("Document name"),
         sheetName: z.string().max(500).describe("Name for the new sheet"),
       },
+      outputSchema: {
+        created: z.literal(true),
+        name: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
     async ({ document, sheetName }) => {
       try {
-        return ok(await runJxa(addSheetScript(document, sheetName)));
+        const result = (await runJxa(addSheetScript(document, sheetName))) as { created: true; name: string };
+        return okStructured(result);
       } catch (e) {
         return errJxaFor("add Numbers sheet", e);
       }
@@ -206,12 +225,17 @@ export function registerNumbersTools(server: McpServer, _config: AirMcpConfig): 
         document: z.string().max(500).describe("Document name"),
         outputPath: zFilePath.describe("Absolute output path for the PDF file"),
       },
+      outputSchema: {
+        exported: z.literal(true),
+        path: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
     async ({ document, outputPath }) => {
       try {
         resolveAndGuard(outputPath);
-        return ok(await runJxa(exportPdfScript(document, outputPath)));
+        const result = (await runJxa(exportPdfScript(document, outputPath))) as { exported: true; path: string };
+        return okStructured(result);
       } catch (e) {
         return errJxaFor("export Numbers to PDF", e);
       }
@@ -227,11 +251,16 @@ export function registerNumbersTools(server: McpServer, _config: AirMcpConfig): 
         document: z.string().max(500).describe("Document name"),
         saving: z.boolean().optional().default(true).describe("Save before closing (default: true)"),
       },
+      outputSchema: {
+        closed: z.literal(true),
+        name: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     },
     async ({ document, saving }) => {
       try {
-        return ok(await runJxa(closeDocumentScript(document, saving)));
+        const result = (await runJxa(closeDocumentScript(document, saving))) as { closed: true; name: string };
+        return okStructured(result);
       } catch (e) {
         return errJxaFor("close Numbers document", e);
       }
@@ -314,11 +343,23 @@ export function registerNumbersTools(server: McpServer, _config: AirMcpConfig): 
         sheet: z.string().max(500).describe("Current sheet name"),
         newName: z.string().min(1).max(500).describe("New sheet name"),
       },
+      // `from` / `to` echo the rename pair so callers can confirm the
+      // exact names that hit Numbers (post-`esc`).
+      outputSchema: {
+        renamed: z.literal(true),
+        from: z.string(),
+        to: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
     async ({ document, sheet, newName }) => {
       try {
-        return ok(await runJxa(renameSheetScript(document, sheet, newName)));
+        const result = (await runJxa(renameSheetScript(document, sheet, newName))) as {
+          renamed: true;
+          from: string;
+          to: string;
+        };
+        return okStructured(result);
       } catch (e) {
         return errJxaFor("rename Numbers sheet", e);
       }

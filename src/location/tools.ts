@@ -1,6 +1,7 @@
 import type { McpServer } from "../shared/mcp.js";
+import { z } from "zod";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okUntrusted, errSwiftFor } from "../shared/result.js";
+import { okStructured, okUntrustedStructured, errSwiftFor } from "../shared/result.js";
 import { runSwift } from "../shared/swift.js";
 
 interface LocationResult {
@@ -26,6 +27,17 @@ export function registerLocationTools(server: McpServer, _config: AirMcpConfig):
         "Get the device's current geographic location (latitude, longitude, altitude). " +
         "Requires Location Services permission. First use triggers a macOS permission dialog.",
       inputSchema: {},
+      // Wave 8 outputSchema: matches Swift LocationOutput (Types.swift). The
+      // payload describes the user's physical location, so it's emitted via
+      // okUntrustedStructured to flag it as user-context data.
+      outputSchema: {
+        latitude: z.number(),
+        longitude: z.number(),
+        altitude: z.number(),
+        horizontalAccuracy: z.number(),
+        verticalAccuracy: z.number(),
+        timestamp: z.string(),
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -35,7 +47,7 @@ export function registerLocationTools(server: McpServer, _config: AirMcpConfig):
     },
     async () => {
       try {
-        return okUntrusted(await runSwift<LocationResult>("get-location", "{}"));
+        return okUntrustedStructured(await runSwift<LocationResult>("get-location", "{}"));
       } catch (e) {
         return errSwiftFor("get current location", e);
       }
@@ -50,6 +62,12 @@ export function registerLocationTools(server: McpServer, _config: AirMcpConfig):
         "Check the current Location Services authorization status. " +
         "Returns the permission state (not_determined, authorized_always, denied, restricted).",
       inputSchema: {},
+      // Matches Swift LocationPermissionOutput — a fixed status string from
+      // CoreLocation and a derived boolean. Not user content; emit plain.
+      outputSchema: {
+        status: z.string(),
+        authorized: z.boolean(),
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -59,7 +77,7 @@ export function registerLocationTools(server: McpServer, _config: AirMcpConfig):
     },
     async () => {
       try {
-        return ok(await runSwift<LocationPermissionResult>("location-permission", "{}"));
+        return okStructured(await runSwift<LocationPermissionResult>("location-permission", "{}"));
       } catch (e) {
         return errSwiftFor("get location permission", e);
       }

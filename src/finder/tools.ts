@@ -2,7 +2,7 @@ import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okLinkedStructured, okStructured, okUntrustedStructured, errJxaFor } from "../shared/result.js";
+import { okLinkedStructured, okStructured, okUntrustedStructured, errJxaFor } from "../shared/result.js";
 import { zFilePath, resolveAndGuard } from "../shared/validate.js";
 import {
   searchFilesScript,
@@ -89,11 +89,18 @@ export function registerFinderTools(server: McpServer, _config: AirMcpConfig): v
         path: zFilePath.describe("Absolute file path"),
         tags: z.array(z.string()).describe("Array of tag names to set"),
       },
+      // The script echoes back the path and the tag list it applied; this is
+      // a deterministic ack rather than untrusted Finder content.
+      outputSchema: {
+        path: z.string(),
+        tags: z.array(z.string()),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ path, tags }) => {
       try {
-        return ok(await runJxa(setTagsScript(path, tags)));
+        const result = (await runJxa(setTagsScript(path, tags))) as { path: string; tags: string[] };
+        return okStructured(result);
       } catch (e) {
         return errJxaFor("set tags", e);
       }
@@ -171,13 +178,23 @@ export function registerFinderTools(server: McpServer, _config: AirMcpConfig): v
         source: zFilePath.describe("Absolute path of the file or folder to move"),
         destination: zFilePath.describe("Absolute destination path"),
       },
+      outputSchema: {
+        moved: z.literal(true),
+        source: z.string(),
+        destination: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     },
     async ({ source, destination }) => {
       try {
         resolveAndGuard(source);
         resolveAndGuard(destination);
-        return ok(await runJxa(moveFileScript(source, destination)));
+        const result = (await runJxa(moveFileScript(source, destination))) as {
+          moved: true;
+          source: string;
+          destination: string;
+        };
+        return okStructured(result);
       } catch (e) {
         return errJxaFor("move file", e);
       }
@@ -192,12 +209,20 @@ export function registerFinderTools(server: McpServer, _config: AirMcpConfig): v
       inputSchema: {
         path: zFilePath.describe("Absolute path of the file or folder to trash"),
       },
+      // `name` reflects the on-disk Finder item name, so treat it as
+      // untrusted (filenames can be controlled by other apps).
+      outputSchema: {
+        trashed: z.literal(true),
+        name: z.string(),
+        path: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
     async ({ path }) => {
       try {
         resolveAndGuard(path);
-        return ok(await runJxa(trashFileScript(path)));
+        const result = (await runJxa(trashFileScript(path))) as { trashed: true; name: string; path: string };
+        return okUntrustedStructured(result);
       } catch (e) {
         return errJxaFor("trash file", e);
       }
@@ -212,12 +237,17 @@ export function registerFinderTools(server: McpServer, _config: AirMcpConfig): v
       inputSchema: {
         path: zFilePath.describe("Absolute path of the folder to create"),
       },
+      outputSchema: {
+        created: z.literal(true),
+        path: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ path }) => {
       try {
         resolveAndGuard(path);
-        return ok(await runJxa(createFolderScript(path)));
+        const result = (await runJxa(createFolderScript(path))) as { created: true; path: string };
+        return okStructured(result);
       } catch (e) {
         return errJxaFor("create folder", e);
       }

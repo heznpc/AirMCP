@@ -7,7 +7,7 @@
 import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okUntrusted, errInvalidInput, errPermission, errUpstream } from "../shared/result.js";
+import { okStructured, okUntrustedStructured, errInvalidInput, errPermission, errUpstream } from "../shared/result.js";
 import { runGws, checkGws } from "./gws.js";
 
 // ── Allowed services & methods for gws_raw ──────────────────────────
@@ -28,6 +28,105 @@ const GWS_ALLOWED_SERVICES = new Set([
 const GWS_DESTRUCTIVE_METHODS = new Set(["delete", "trash", "remove", "purge"]);
 const GWS_ALLOWED_LIST = [...GWS_ALLOWED_SERVICES].join(", ");
 
+// ── Shared output shapes ────────────────────────────────────────────
+// Google APIs return rich, deeply nested resources. We model the
+// commonly-referenced top-level fields explicitly and leave deeper
+// API-specific blobs as passthrough records — matching the actual
+// response shape without over-constraining or padding with synthetic
+// fields.
+
+/** Gmail Users.messages list entry — {id, threadId}. */
+const gmailMessageRefSchema = z.object({
+  id: z.string(),
+  threadId: z.string().optional(),
+});
+
+/** Gmail message header sub-resource. */
+const gmailHeaderSchema = z.object({
+  name: z.string(),
+  value: z.string(),
+});
+
+/** Gmail Users.messages.get / send response. payload is recursive and
+ *  service-specific, so deeper nesting is passthrough. */
+const gmailMessageSchema = z.object({
+  id: z.string().optional(),
+  threadId: z.string().optional(),
+  labelIds: z.array(z.string()).optional(),
+  snippet: z.string().optional(),
+  historyId: z.string().optional(),
+  internalDate: z.string().optional(),
+  sizeEstimate: z.number().optional(),
+  payload: z
+    .object({
+      partId: z.string().optional(),
+      mimeType: z.string().optional(),
+      filename: z.string().optional(),
+      headers: z.array(gmailHeaderSchema).optional(),
+      body: z.record(z.unknown()).optional(),
+      parts: z.array(z.record(z.unknown())).optional(),
+    })
+    .optional(),
+  raw: z.string().optional(),
+});
+
+/** Drive file metadata returned by files.list and files.get. We only
+ *  request a known field projection (see `fields` params below), but
+ *  callers may swap projections, so non-requested entries are also
+ *  modelled as optional. */
+const googleDriveFileSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().optional(),
+  mimeType: z.string().optional(),
+  modifiedTime: z.string().optional(),
+  size: z.string().optional(),
+  webViewLink: z.string().optional(),
+  description: z.string().optional(),
+  shared: z.boolean().optional(),
+  owners: z.array(z.record(z.unknown())).optional(),
+});
+
+/** Calendar Event resource — events.list / events.insert. */
+const calendarEventSchema = z.object({
+  id: z.string().optional(),
+  status: z.string().optional(),
+  htmlLink: z.string().optional(),
+  created: z.string().optional(),
+  updated: z.string().optional(),
+  summary: z.string().optional(),
+  description: z.string().optional(),
+  location: z.string().optional(),
+  creator: z.record(z.unknown()).optional(),
+  organizer: z.record(z.unknown()).optional(),
+  start: z.record(z.unknown()).optional(),
+  end: z.record(z.unknown()).optional(),
+  attendees: z.array(z.record(z.unknown())).optional(),
+  recurrence: z.array(z.string()).optional(),
+  iCalUID: z.string().optional(),
+  sequence: z.number().optional(),
+  eventType: z.string().optional(),
+});
+
+/** Google Tasks Task resource. */
+const googleTaskSchema = z.object({
+  kind: z.string().optional(),
+  id: z.string().optional(),
+  etag: z.string().optional(),
+  title: z.string().optional(),
+  updated: z.string().optional(),
+  selfLink: z.string().optional(),
+  parent: z.string().optional(),
+  position: z.string().optional(),
+  notes: z.string().optional(),
+  status: z.string().optional(),
+  due: z.string().optional(),
+  completed: z.string().optional(),
+  deleted: z.boolean().optional(),
+  hidden: z.boolean().optional(),
+  links: z.array(z.record(z.unknown())).optional(),
+  webViewLink: z.string().optional(),
+});
+
 export function registerGoogleTools(server: McpServer, config: AirMcpConfig): void {
   const { allowSendMail } = config;
   // ── Status ─────────────────────────────────────────────────────────
@@ -38,12 +137,18 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
       title: "Google Workspace Status",
       description: "Check if Google Workspace CLI (gws) is installed and authenticated.",
       inputSchema: {},
+      // Fixed-shape ack assembled locally — `available` is a literal flag,
+      // `message` is a server-controlled status string.
+      outputSchema: {
+        available: z.literal(true),
+        message: z.string(),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async () => {
       const error = await checkGws();
       if (error) return errUpstream(error + "\nInstall: npm install -g @googleworkspace/cli && gws auth setup");
-      return ok({ available: true, message: "Google Workspace CLI is ready." });
+      return okStructured({ available: true as const, message: "Google Workspace CLI is ready." });
     },
   );
 
@@ -64,13 +169,25 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
           .describe("Gmail search query (e.g. 'is:unread', 'from:bob subject:report')"),
         maxResults: z.number().int().min(1).max(100).optional().default(20).describe("Max messages to return"),
       },
+      // Gmail users.messages.list returns {messages, nextPageToken, resultSizeEstimate}.
+      // `messages` is omitted entirely on empty mailboxes — model as optional.
+      outputSchema: {
+        messages: z.array(gmailMessageRefSchema).optional(),
+        nextPageToken: z.string().optional(),
+        resultSizeEstimate: z.number().optional(),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
     async ({ query, maxResults }) => {
       try {
         const params: Record<string, unknown> = { userId: "me", maxResults };
         if (query) params.q = query;
-        return okUntrusted(await runGws("gmail", "users.messages", "list", params));
+        const raw = (await runGws("gmail", "users.messages", "list", params)) as {
+          messages?: Array<{ id: string; threadId?: string }>;
+          nextPageToken?: string;
+          resultSizeEstimate?: number;
+        };
+        return okUntrustedStructured(raw);
       } catch (e) {
         return errUpstream(`Gmail list failed: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -86,11 +203,19 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
         messageId: z.string().min(1).max(500).describe("Gmail message ID"),
         format: z.enum(["full", "metadata", "minimal"]).optional().default("full").describe("Response format"),
       },
+      // Gmail users.messages.get returns a Message resource. Every visible
+      // field — subject, body parts, snippet — is third-party content.
+      outputSchema: gmailMessageSchema.shape,
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
     async ({ messageId, format }) => {
       try {
-        return okUntrusted(await runGws("gmail", "users.messages", "get", { userId: "me", id: messageId, format }));
+        const raw = (await runGws("gmail", "users.messages", "get", {
+          userId: "me",
+          id: messageId,
+          format,
+        })) as z.infer<typeof gmailMessageSchema>;
+        return okUntrustedStructured(raw);
       } catch (e) {
         return errUpstream(`Gmail read failed: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -107,6 +232,13 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
         subject: z.string().max(1000).describe("Email subject"),
         body: z.string().max(50000).describe("Email body (plain text)"),
         cc: z.string().max(1000).optional().describe("CC recipients (comma-separated)"),
+      },
+      // Gmail users.messages.send returns a sparse Message resource —
+      // typically just id/threadId/labelIds for the inserted draft.
+      outputSchema: {
+        id: z.string().optional(),
+        threadId: z.string().optional(),
+        labelIds: z.array(z.string()).optional(),
       },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
@@ -126,7 +258,12 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
         if (safeCc) raw += `Cc: ${safeCc}\n`;
         raw += `\n${body}`;
         const encoded = Buffer.from(raw).toString("base64url");
-        return ok(await runGws("gmail", "users.messages", "send", { userId: "me" }, { raw: encoded }));
+        const result = (await runGws("gmail", "users.messages", "send", { userId: "me" }, { raw: encoded })) as {
+          id?: string;
+          threadId?: string;
+          labelIds?: string[];
+        };
+        return okUntrustedStructured(result);
       } catch (e) {
         return errUpstream(`Gmail send failed: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -150,6 +287,15 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
         pageSize: z.number().int().min(1).max(100).optional().default(20).describe("Max files to return"),
         orderBy: z.string().max(500).optional().describe("Sort order (e.g. 'modifiedTime desc', 'name')"),
       },
+      // Drive files.list returns {files, nextPageToken, incompleteSearch?, kind?}.
+      // We request a fixed projection; downstream files inherit the shared
+      // googleDriveFileSchema.
+      outputSchema: {
+        files: z.array(googleDriveFileSchema).optional(),
+        nextPageToken: z.string().optional(),
+        incompleteSearch: z.boolean().optional(),
+        kind: z.string().optional(),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
     async ({ query, pageSize, orderBy }) => {
@@ -160,7 +306,13 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
         };
         if (query) params.q = query;
         if (orderBy) params.orderBy = orderBy;
-        return okUntrusted(await runGws("drive", "files", "list", params));
+        const raw = (await runGws("drive", "files", "list", params)) as {
+          files?: Array<z.infer<typeof googleDriveFileSchema>>;
+          nextPageToken?: string;
+          incompleteSearch?: boolean;
+          kind?: string;
+        };
+        return okUntrustedStructured(raw);
       } catch (e) {
         return errUpstream(`Drive list failed: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -175,16 +327,19 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
       inputSchema: {
         fileId: z.string().min(1).max(500).describe("Drive file ID"),
       },
+      // Drive files.get returns a single file resource — same shape as
+      // entries in files.list, but with `owners`, `shared`, `description`
+      // also requested explicitly here.
+      outputSchema: googleDriveFileSchema.shape,
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
     async ({ fileId }) => {
       try {
-        return okUntrusted(
-          await runGws("drive", "files", "get", {
-            fileId,
-            fields: "id,name,mimeType,modifiedTime,size,webViewLink,owners,shared,description",
-          }),
-        );
+        const raw = (await runGws("drive", "files", "get", {
+          fileId,
+          fields: "id,name,mimeType,modifiedTime,size,webViewLink,owners,shared,description",
+        })) as z.infer<typeof googleDriveFileSchema>;
+        return okUntrustedStructured(raw);
       } catch (e) {
         return errUpstream(`Drive read failed: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -200,6 +355,13 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
         query: z.string().min(1).max(500).describe("Search text (searches file names and content)"),
         maxResults: z.number().int().min(1).max(50).optional().default(10),
       },
+      // Same drive files.list response shape as gws_drive_list.
+      outputSchema: {
+        files: z.array(googleDriveFileSchema).optional(),
+        nextPageToken: z.string().optional(),
+        incompleteSearch: z.boolean().optional(),
+        kind: z.string().optional(),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
     async ({ query, maxResults }) => {
@@ -209,13 +371,17 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
         // Single quotes are critical to remove as they delimit API query string literals.
         const safeQuery = query.replace(/[^a-zA-Z0-9\u3131-\uD79D\u4E00-\u9FFF\s]/g, "").trim();
         if (!safeQuery) return errInvalidInput("Search query contains no valid characters after sanitization.");
-        return okUntrusted(
-          await runGws("drive", "files", "list", {
-            q: `fullText contains '${safeQuery}'`,
-            pageSize: maxResults,
-            fields: "files(id,name,mimeType,modifiedTime,webViewLink),nextPageToken",
-          }),
-        );
+        const raw = (await runGws("drive", "files", "list", {
+          q: `fullText contains '${safeQuery}'`,
+          pageSize: maxResults,
+          fields: "files(id,name,mimeType,modifiedTime,webViewLink),nextPageToken",
+        })) as {
+          files?: Array<z.infer<typeof googleDriveFileSchema>>;
+          nextPageToken?: string;
+          incompleteSearch?: boolean;
+          kind?: string;
+        };
+        return okUntrustedStructured(raw);
       } catch (e) {
         return errUpstream(`Drive search failed: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -235,11 +401,24 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
         spreadsheetId: z.string().min(1).max(500).describe("Spreadsheet ID (from URL)"),
         range: z.string().max(1000).optional().default("Sheet1").describe("A1 range notation (e.g. 'Sheet1!A1:D10')"),
       },
+      // Sheets values.get returns a ValueRange:
+      //   {range, majorDimension, values: string[][]}.
+      // `values` is omitted when the range is empty.
+      outputSchema: {
+        range: z.string().optional(),
+        majorDimension: z.string().optional(),
+        values: z.array(z.array(z.string())).optional(),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
     async ({ spreadsheetId, range }) => {
       try {
-        return okUntrusted(await runGws("sheets", "spreadsheets.values", "get", { spreadsheetId, range }));
+        const raw = (await runGws("sheets", "spreadsheets.values", "get", { spreadsheetId, range })) as {
+          range?: string;
+          majorDimension?: string;
+          values?: string[][];
+        };
+        return okUntrustedStructured(raw);
       } catch (e) {
         return errUpstream(`Sheets read failed: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -256,23 +435,39 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
         range: z.string().min(1).max(1000).describe("A1 range (e.g. 'Sheet1!A1:B2')"),
         values: z.array(z.array(z.string())).min(1).describe("2D array of cell values [[row1col1, row1col2], ...]"),
       },
+      // Sheets values.update returns UpdateValuesResponse:
+      //   {spreadsheetId, updatedRange, updatedRows, updatedColumns, updatedCells}.
+      // Counts are returned as numbers; updatedData is omitted unless
+      // includeValuesInResponse=true (we never request it).
+      outputSchema: {
+        spreadsheetId: z.string().optional(),
+        updatedRange: z.string().optional(),
+        updatedRows: z.number().optional(),
+        updatedColumns: z.number().optional(),
+        updatedCells: z.number().optional(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },
     async ({ spreadsheetId, range, values }) => {
       try {
-        return ok(
-          await runGws(
-            "sheets",
-            "spreadsheets.values",
-            "update",
-            {
-              spreadsheetId,
-              range,
-              valueInputOption: "USER_ENTERED",
-            },
-            { values },
-          ),
-        );
+        const result = (await runGws(
+          "sheets",
+          "spreadsheets.values",
+          "update",
+          {
+            spreadsheetId,
+            range,
+            valueInputOption: "USER_ENTERED",
+          },
+          { values },
+        )) as {
+          spreadsheetId?: string;
+          updatedRange?: string;
+          updatedRows?: number;
+          updatedColumns?: number;
+          updatedCells?: number;
+        };
+        return okStructured(result);
       } catch (e) {
         return errUpstream(`Sheets write failed: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -294,6 +489,23 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
         timeMin: z.string().max(64).optional().describe("Start time (ISO 8601). Defaults to now."),
         timeMax: z.string().max(64).optional().describe("End time (ISO 8601)"),
       },
+      // Calendar events.list returns an Events resource:
+      //   {kind, etag, summary, updated, timeZone, accessRole,
+      //    defaultReminders, nextPageToken?, nextSyncToken?, items}
+      // Items are Event resources — third-party titles/descriptions/etc.
+      outputSchema: {
+        kind: z.string().optional(),
+        etag: z.string().optional(),
+        summary: z.string().optional(),
+        description: z.string().optional(),
+        updated: z.string().optional(),
+        timeZone: z.string().optional(),
+        accessRole: z.string().optional(),
+        defaultReminders: z.array(z.record(z.unknown())).optional(),
+        nextPageToken: z.string().optional(),
+        nextSyncToken: z.string().optional(),
+        items: z.array(calendarEventSchema).optional(),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
     async ({ maxResults, query, timeMin, timeMax }) => {
@@ -307,7 +519,20 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
         };
         if (query) params.q = query;
         if (timeMax) params.timeMax = timeMax;
-        return okUntrusted(await runGws("calendar", "events", "list", params));
+        const raw = (await runGws("calendar", "events", "list", params)) as {
+          kind?: string;
+          etag?: string;
+          summary?: string;
+          description?: string;
+          updated?: string;
+          timeZone?: string;
+          accessRole?: string;
+          defaultReminders?: Array<Record<string, unknown>>;
+          nextPageToken?: string;
+          nextSyncToken?: string;
+          items?: Array<z.infer<typeof calendarEventSchema>>;
+        };
+        return okUntrustedStructured(raw);
       } catch (e) {
         return errUpstream(`Calendar list failed: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -326,6 +551,11 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
         description: z.string().max(5000).optional().describe("Event description"),
         location: z.string().max(5000).optional().describe("Event location"),
       },
+      // Calendar events.insert returns the newly-created Event resource.
+      // Even though we just submitted the data, the API echoes it back
+      // with creator/organizer/htmlLink filled in — those are user-facing
+      // strings, so the structured payload is flagged untrusted.
+      outputSchema: calendarEventSchema.shape,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },
     async ({ summary, start, end, description, location }) => {
@@ -337,7 +567,10 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
         };
         if (description) body.description = description;
         if (location) body.location = location;
-        return ok(await runGws("calendar", "events", "insert", { calendarId: "primary" }, body));
+        const result = (await runGws("calendar", "events", "insert", { calendarId: "primary" }, body)) as z.infer<
+          typeof calendarEventSchema
+        >;
+        return okUntrustedStructured(result);
       } catch (e) {
         return errUpstream(`Calendar create failed: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -356,11 +589,47 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
       inputSchema: {
         documentId: z.string().min(1).max(500).describe("Google Docs document ID"),
       },
+      // Docs documents.get returns a Document resource — title, body
+      // content, named ranges, etc. `body` is a deeply nested StructuralElement
+      // tree (paragraphs/tables/lists) that we leave as passthrough; the
+      // top-level identifying fields are modelled explicitly.
+      outputSchema: {
+        documentId: z.string().optional(),
+        title: z.string().optional(),
+        revisionId: z.string().optional(),
+        suggestionsViewMode: z.string().optional(),
+        body: z.record(z.unknown()).optional(),
+        documentStyle: z.record(z.unknown()).optional(),
+        namedStyles: z.record(z.unknown()).optional(),
+        lists: z.record(z.unknown()).optional(),
+        namedRanges: z.record(z.unknown()).optional(),
+        inlineObjects: z.record(z.unknown()).optional(),
+        positionedObjects: z.record(z.unknown()).optional(),
+        headers: z.record(z.unknown()).optional(),
+        footers: z.record(z.unknown()).optional(),
+        footnotes: z.record(z.unknown()).optional(),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
     async ({ documentId }) => {
       try {
-        return okUntrusted(await runGws("docs", "documents", "get", { documentId }));
+        const raw = (await runGws("docs", "documents", "get", { documentId })) as {
+          documentId?: string;
+          title?: string;
+          revisionId?: string;
+          suggestionsViewMode?: string;
+          body?: Record<string, unknown>;
+          documentStyle?: Record<string, unknown>;
+          namedStyles?: Record<string, unknown>;
+          lists?: Record<string, unknown>;
+          namedRanges?: Record<string, unknown>;
+          inlineObjects?: Record<string, unknown>;
+          positionedObjects?: Record<string, unknown>;
+          headers?: Record<string, unknown>;
+          footers?: Record<string, unknown>;
+          footnotes?: Record<string, unknown>;
+        };
+        return okUntrustedStructured(raw);
       } catch (e) {
         return errUpstream(`Docs read failed: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -380,6 +649,14 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
         maxResults: z.number().int().min(1).max(100).optional().default(20),
         showCompleted: z.boolean().optional().default(false).describe("Include completed tasks"),
       },
+      // Tasks.list returns {kind, etag, nextPageToken?, items?}. Items are
+      // Task resources with user-authored titles and notes.
+      outputSchema: {
+        kind: z.string().optional(),
+        etag: z.string().optional(),
+        nextPageToken: z.string().optional(),
+        items: z.array(googleTaskSchema).optional(),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
     async ({ maxResults, showCompleted }) => {
@@ -387,7 +664,13 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
         // Get default task list first
         const lists = await runGws<{ items?: Array<{ id: string }> }>("tasks", "tasklists", "list", { maxResults: 1 });
         const listId = lists.items?.[0]?.id || "@default";
-        return okUntrusted(await runGws("tasks", "tasks", "list", { tasklist: listId, maxResults, showCompleted }));
+        const raw = (await runGws("tasks", "tasks", "list", { tasklist: listId, maxResults, showCompleted })) as {
+          kind?: string;
+          etag?: string;
+          nextPageToken?: string;
+          items?: Array<z.infer<typeof googleTaskSchema>>;
+        };
+        return okUntrustedStructured(raw);
       } catch (e) {
         return errUpstream(`Tasks list failed: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -404,6 +687,11 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
         notes: z.string().max(5000).optional().describe("Task notes/description"),
         due: z.string().max(64).optional().describe("Due date (ISO 8601 or YYYY-MM-DD)"),
       },
+      // Tasks.insert echoes the created Task resource. Title/notes are
+      // the values we just submitted, but selfLink/etag/updated are
+      // server-issued — still safer to mark untrusted since title/notes
+      // appear in the response verbatim.
+      outputSchema: googleTaskSchema.shape,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },
     async ({ title, notes, due }) => {
@@ -413,7 +701,10 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
         const body: Record<string, unknown> = { title };
         if (notes) body.notes = notes;
         if (due) body.due = due.includes("T") ? due : `${due}T00:00:00.000Z`;
-        return ok(await runGws("tasks", "tasks", "insert", { tasklist: listId }, body));
+        const result = (await runGws("tasks", "tasks", "insert", { tasklist: listId }, body)) as z.infer<
+          typeof googleTaskSchema
+        >;
+        return okUntrustedStructured(result);
       } catch (e) {
         return errUpstream(`Tasks create failed: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -433,17 +724,38 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
         query: z.string().min(1).max(500).describe("Search query (name, email, phone)"),
         pageSize: z.number().int().min(1).max(30).optional().default(10),
       },
+      // People.searchContacts returns {results: [{person: Person}]}.
+      // Each Person resource carries arrays of names/emails/phones/orgs;
+      // every nested field is contact data, so the entire payload is
+      // user-controlled and flagged untrusted. The Person sub-shape is
+      // schema-heavy — passthrough record under the `person` key keeps
+      // the structured contract honest without enumerating Google's
+      // FieldMask surface.
+      outputSchema: {
+        results: z
+          .array(
+            z.object({
+              person: z.record(z.unknown()).optional(),
+            }),
+          )
+          .optional(),
+        nextPageToken: z.string().optional(),
+        totalSize: z.number().optional(),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
     async ({ query, pageSize }) => {
       try {
-        return okUntrusted(
-          await runGws("people", "people", "searchContacts", {
-            query,
-            pageSize,
-            readMask: "names,emailAddresses,phoneNumbers,organizations",
-          }),
-        );
+        const raw = (await runGws("people", "people", "searchContacts", {
+          query,
+          pageSize,
+          readMask: "names,emailAddresses,phoneNumbers,organizations",
+        })) as {
+          results?: Array<{ person?: Record<string, unknown> }>;
+          nextPageToken?: string;
+          totalSize?: number;
+        };
+        return okUntrustedStructured(raw);
       } catch (e) {
         return errUpstream(`People search failed: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -479,6 +791,14 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
           .refine((v) => !v || JSON.stringify(v).length <= 100_000, "body must be under 100KB")
           .describe("Request body as JSON"),
       },
+      // gws_raw is a generic passthrough — the response shape varies by
+      // service/resource/method and may even be an NDJSON array merged by
+      // the gws wrapper. We wrap the raw response under a single `result`
+      // key so the structured payload still has the required object root,
+      // and treat the contents as untrusted (third-party API output).
+      outputSchema: {
+        result: z.union([z.record(z.unknown()), z.array(z.unknown())]).optional(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
     async ({ service, resource, method, params, body }) => {
@@ -504,7 +824,8 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
       }
 
       try {
-        return ok(await runGws(service, resource, method, params, body));
+        const raw = (await runGws(service, resource, method, params, body)) as Record<string, unknown> | unknown[];
+        return okUntrustedStructured({ result: raw });
       } catch (e) {
         return errUpstream(`GWS command failed: ${e instanceof Error ? e.message : String(e)}`);
       }

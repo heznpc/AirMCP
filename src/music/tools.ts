@@ -2,7 +2,7 @@ import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okLinkedStructured, okStructured, okUntrustedStructured, errJxaFor } from "../shared/result.js";
+import { okLinkedStructured, okStructured, okUntrustedStructured, errJxaFor } from "../shared/result.js";
 // Side-effect import: register the now_playing poller with the shared registry
 // at module load time. The poller itself only starts when startPollers() is
 // invoked by the cross/event observer tool.
@@ -132,11 +132,18 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
       inputSchema: {
         action: z.enum(["play", "pause", "nextTrack", "previousTrack"]).describe("Playback action"),
       },
+      // Echoes the action plus the resulting player state. `playerState`
+      // is the JXA enum string ("playing", "paused", "stopped", etc.).
+      outputSchema: {
+        action: z.string(),
+        playerState: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
     async ({ action }) => {
       try {
-        return ok(await runJxa(playbackControlScript(action)));
+        const result = (await runJxa(playbackControlScript(action))) as { action: string; playerState: string };
+        return okStructured(result);
       } catch (e) {
         return errJxaFor("control playback", e);
       }
@@ -185,11 +192,23 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
         trackName: z.string().max(500).describe("Track name to play"),
         playlist: z.string().max(500).optional().describe("Playlist to search in (default: Library)"),
       },
+      // `track` and `artist` are user-controlled library metadata; the
+      // helper marks the response untrusted.
+      outputSchema: {
+        playing: z.literal(true),
+        track: z.string(),
+        artist: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
     async ({ trackName, playlist }) => {
       try {
-        return ok(await runJxa(playTrackScript(trackName, playlist)));
+        const result = (await runJxa(playTrackScript(trackName, playlist))) as {
+          playing: true;
+          track: string;
+          artist: string;
+        };
+        return okUntrustedStructured(result);
       } catch (e) {
         return errJxaFor("play track", e);
       }
@@ -205,11 +224,24 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
         name: z.string().max(500).describe("Playlist name"),
         shuffle: z.boolean().optional().describe("Enable or disable shuffle"),
       },
+      // `shuffle` reflects the actual Music.shuffleEnabled value after
+      // the action — the script always reads it back rather than
+      // echoing the input flag.
+      outputSchema: {
+        playing: z.literal(true),
+        playlist: z.string(),
+        shuffle: z.boolean(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
     async ({ name, shuffle }) => {
       try {
-        return ok(await runJxa(playPlaylistScript(name, shuffle)));
+        const result = (await runJxa(playPlaylistScript(name, shuffle))) as {
+          playing: true;
+          playlist: string;
+          shuffle: boolean;
+        };
+        return okUntrustedStructured(result);
       } catch (e) {
         return errJxaFor("play playlist", e);
       }
@@ -264,11 +296,22 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
         shuffle: z.boolean().optional().describe("Enable or disable shuffle"),
         songRepeat: z.enum(["off", "one", "all"]).optional().describe("Repeat mode"),
       },
+      // Returns the post-write Music.shuffleEnabled / Music.songRepeat
+      // values, not the input — gives callers ground truth even when
+      // only one of the two args was supplied.
+      outputSchema: {
+        shuffleEnabled: z.boolean(),
+        songRepeat: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ shuffle, songRepeat }) => {
       try {
-        return ok(await runJxa(setShuffleScript(shuffle, songRepeat)));
+        const result = (await runJxa(setShuffleScript(shuffle, songRepeat))) as {
+          shuffleEnabled: boolean;
+          songRepeat: string;
+        };
+        return okStructured(result);
       } catch (e) {
         return errJxaFor("set shuffle/repeat", e);
       }
@@ -283,11 +326,19 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
       inputSchema: {
         name: z.string().max(500).describe("Name for the new playlist"),
       },
+      // `id` is the persistent Music database ID — useful for tools that
+      // need to reference the playlist without relying on the
+      // user-supplied name.
+      outputSchema: {
+        name: z.string(),
+        id: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
     async ({ name }) => {
       try {
-        return ok(await runJxa(createPlaylistScript(name)));
+        const result = (await runJxa(createPlaylistScript(name))) as { name: string; id: string };
+        return okStructured(result);
       } catch (e) {
         return errJxaFor("create playlist", e);
       }
@@ -303,11 +354,21 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
         playlistName: z.string().max(500).describe("Playlist name"),
         trackName: z.string().max(500).describe("Track name to add"),
       },
+      outputSchema: {
+        added: z.literal(true),
+        track: z.string(),
+        playlist: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
     async ({ playlistName, trackName }) => {
       try {
-        return ok(await runJxa(addToPlaylistScript(playlistName, trackName)));
+        const result = (await runJxa(addToPlaylistScript(playlistName, trackName))) as {
+          added: true;
+          track: string;
+          playlist: string;
+        };
+        return okStructured(result);
       } catch (e) {
         return errJxaFor("add to playlist", e);
       }
@@ -323,11 +384,21 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
         playlistName: z.string().max(500).describe("Playlist name"),
         trackName: z.string().max(500).describe("Track name to remove"),
       },
+      outputSchema: {
+        removed: z.literal(true),
+        track: z.string(),
+        playlist: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     },
     async ({ playlistName, trackName }) => {
       try {
-        return ok(await runJxa(removeFromPlaylistScript(playlistName, trackName)));
+        const result = (await runJxa(removeFromPlaylistScript(playlistName, trackName))) as {
+          removed: true;
+          track: string;
+          playlist: string;
+        };
+        return okStructured(result);
       } catch (e) {
         return errJxaFor("remove from playlist", e);
       }
@@ -342,11 +413,16 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
       inputSchema: {
         name: z.string().max(500).describe("Playlist name to delete"),
       },
+      outputSchema: {
+        deleted: z.literal(true),
+        playlist: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     },
     async ({ name }) => {
       try {
-        return ok(await runJxa(deletePlaylistScript(name)));
+        const result = (await runJxa(deletePlaylistScript(name))) as { deleted: true; playlist: string };
+        return okStructured(result);
       } catch (e) {
         return errJxaFor("delete playlist", e);
       }
@@ -389,11 +465,19 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
         trackName: z.string().max(500).describe("Track name"),
         rating: z.number().int().min(0).max(100).describe("Rating value (0-100)"),
       },
+      // `rating` is read back from the track post-write — Music can
+      // round/clamp the requested value, so we surface what actually
+      // landed rather than echoing the input.
+      outputSchema: {
+        name: z.string(),
+        rating: z.number().int(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ trackName, rating }) => {
       try {
-        return ok(await runJxa(setRatingScript(trackName, rating)));
+        const result = (await runJxa(setRatingScript(trackName, rating))) as { name: string; rating: number };
+        return okUntrustedStructured(result);
       } catch (e) {
         return errJxaFor("set rating", e);
       }
@@ -409,11 +493,19 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
         trackName: z.string().max(500).describe("Track name"),
         favorited: z.boolean().describe("Whether to mark as favorited"),
       },
+      outputSchema: {
+        name: z.string(),
+        favorited: z.boolean(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ trackName, favorited }) => {
       try {
-        return ok(await runJxa(setFavoritedScript(trackName, favorited)));
+        const result = (await runJxa(setFavoritedScript(trackName, favorited))) as {
+          name: string;
+          favorited: boolean;
+        };
+        return okUntrustedStructured(result);
       } catch (e) {
         return errJxaFor("set favorited", e);
       }
@@ -429,11 +521,19 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
         trackName: z.string().max(500).describe("Track name"),
         disliked: z.boolean().describe("Whether to mark as disliked"),
       },
+      outputSchema: {
+        name: z.string(),
+        disliked: z.boolean(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ trackName, disliked }) => {
       try {
-        return ok(await runJxa(setDislikedScript(trackName, disliked)));
+        const result = (await runJxa(setDislikedScript(trackName, disliked))) as {
+          name: string;
+          disliked: boolean;
+        };
+        return okUntrustedStructured(result);
       } catch (e) {
         return errJxaFor("set disliked", e);
       }

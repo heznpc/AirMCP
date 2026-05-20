@@ -2,7 +2,7 @@ import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { runAutomation } from "../shared/automation.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okStructured, okUntrustedStructured, okUntrustedLinkedStructured, errJxaFor } from "../shared/result.js";
+import { okStructured, okUntrustedStructured, okUntrustedLinkedStructured, errJxaFor } from "../shared/result.js";
 import {
   listContactsScript,
   searchContactsScript,
@@ -228,6 +228,10 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
         jobTitle: z.string().max(500).optional().describe("Job title"),
         note: z.string().max(5000).optional().describe("Notes"),
       },
+      outputSchema: {
+        id: z.string(),
+        name: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
     async ({ firstName, lastName, email, phone, organization, jobTitle, note }) => {
@@ -239,7 +243,7 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
           },
           jxa: () => createContactScript(firstName, lastName, { email, phone, organization, jobTitle, note }),
         });
-        return ok(result);
+        return okUntrustedStructured(result);
       } catch (e) {
         return errJxaFor("create contact", e);
       }
@@ -259,6 +263,10 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
         jobTitle: z.string().max(500).optional().describe("New job title"),
         note: z.string().max(5000).optional().describe("New notes"),
       },
+      outputSchema: {
+        id: z.string(),
+        name: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
     async ({ id, firstName, lastName, organization, jobTitle, note }) => {
@@ -267,7 +275,7 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
           swift: { command: "update-contact", input: { id, firstName, lastName, organization, jobTitle, note } },
           jxa: () => updateContactScript(id, { firstName, lastName, organization, jobTitle, note }),
         });
-        return ok(result);
+        return okUntrustedStructured(result);
       } catch (e) {
         return errJxaFor("update contact", e);
       }
@@ -282,6 +290,10 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
       inputSchema: {
         id: z.string().max(500).describe("Contact ID"),
       },
+      outputSchema: {
+        deleted: z.boolean(),
+        name: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
     async ({ id }) => {
@@ -290,7 +302,7 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
           swift: { command: "delete-contact", input: { id } },
           jxa: () => deleteContactScript(id),
         });
-        return ok(result);
+        return okUntrustedStructured(result);
       } catch (e) {
         return errJxaFor("delete contact", e);
       }
@@ -336,6 +348,11 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
         email: z.string().email().describe("Email address to add"),
         label: z.string().max(500).optional().default("work").describe("Email label (default: work)"),
       },
+      outputSchema: {
+        id: z.string(),
+        name: z.string(),
+        addedEmail: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
     async ({ id, email, label }) => {
@@ -344,7 +361,7 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
           swift: { command: "add-contact-email", input: { id, email, label } },
           jxa: () => addContactEmailScript(id, email, label),
         });
-        return ok(result);
+        return okUntrustedStructured(result);
       } catch (e) {
         return errJxaFor("add email to contact", e);
       }
@@ -361,6 +378,11 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
         phone: z.string().min(1).max(1000).describe("Phone number to add"),
         label: z.string().max(500).optional().default("mobile").describe("Phone label (default: mobile)"),
       },
+      outputSchema: {
+        id: z.string(),
+        name: z.string(),
+        addedPhone: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
     async ({ id, phone, label }) => {
@@ -369,7 +391,7 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
           swift: { command: "add-contact-phone", input: { id, phone, label } },
           jxa: () => addContactPhoneScript(id, phone, label),
         });
-        return ok(result);
+        return okUntrustedStructured(result);
       } catch (e) {
         return errJxaFor("add phone to contact", e);
       }

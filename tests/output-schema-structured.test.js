@@ -12,7 +12,7 @@ import { createMockConfig } from './helpers/mock-config.js';
 
 // ── Platform mocks (must precede all dynamic imports) ────────────────
 
-const { mockRunJxa, mockRunAutomation, mockRunSwift, mockCheckSwiftBridge } =
+const { mockRunJxa, mockRunAppleScript, mockRunAutomation, mockRunSwift, mockCheckSwiftBridge } =
   setupPlatformMocks();
 
 jest.unstable_mockModule('../dist/weather/api.js', () => ({
@@ -38,7 +38,7 @@ const { registerShortcutsTools } = await import('../dist/shortcuts/tools.js');
 const { registerWeatherTools } = await import('../dist/weather/tools.js');
 const { registerPhotosTools } = await import('../dist/photos/tools.js');
 const { registerNumbersTools } = await import('../dist/numbers/tools.js');
-const { fetchCurrentWeather } = await import('../dist/weather/api.js');
+const { fetchCurrentWeather, fetchDailyForecast, fetchHourlyForecast } = await import('../dist/weather/api.js');
 
 // ── Per-tool args and mock responses ────────────────────────────────
 
@@ -484,6 +484,390 @@ const TOOL_FIXTURES = {
       disliked: false,
     },
   },
+  // ── Wave 8 additions ──
+  // notes
+  create_note: {
+    args: { body: '<p>hello</p>' },
+    mock: { id: 'n1', name: 'Note' },
+  },
+  update_note: {
+    args: { id: 'x-coredata://NOTE/1', body: '<p>updated</p>' },
+    mock: { id: 'x-coredata://NOTE/1', name: 'Note' },
+  },
+  delete_note: {
+    args: { id: 'x-coredata://NOTE/1' },
+    mock: { deleted: true, name: 'Note' },
+  },
+  create_folder: {
+    args: { name: 'New Folder' },
+    mock: { id: 'f1', name: 'New Folder', existing: false },
+  },
+  move_note: {
+    args: { id: 'x-coredata://NOTE/1', folder: 'Archive' },
+    mock: { originalName: 'Note', newId: 'x-coredata://NOTE/2', newName: 'Note', targetFolder: 'Archive' },
+  },
+  compare_notes: {
+    args: { ids: ['x-coredata://NOTE/1', 'x-coredata://NOTE/2'] },
+    mock: [],
+  },
+  bulk_move_notes: {
+    args: { ids: ['x-coredata://NOTE/1'], folder: 'Archive', dryRun: true, stopOnError: true },
+    mock: {
+      targetFolder: 'Archive',
+      dryRun: true,
+      stopOnError: true,
+      total: 0,
+      processed: 0,
+      moved: 0,
+      unchanged: 0,
+      previewed: 0,
+      failed: 0,
+      stoppedAt: null,
+      results: [],
+    },
+  },
+  // reminders
+  create_reminder: {
+    args: { title: 'Task' },
+    mock: { id: 'r1', name: 'Task' },
+  },
+  update_reminder: {
+    args: { id: 'r1', title: 'Updated' },
+    mock: { id: 'r1', name: 'Updated' },
+  },
+  complete_reminder: {
+    args: { id: 'r1', completed: true },
+    mock: { id: 'r1', name: 'Task', completed: true },
+  },
+  delete_reminder: {
+    args: { id: 'r1' },
+    mock: { deleted: true, name: 'Task' },
+  },
+  create_reminder_list: {
+    args: { name: 'My List' },
+    mock: { id: 'l1', name: 'My List' },
+  },
+  delete_reminder_list: {
+    args: { name: 'My List' },
+    mock: { deleted: true, name: 'My List' },
+  },
+  create_recurring_reminder: {
+    args: {
+      title: 'Daily Standup',
+      recurrence: { frequency: 'daily', interval: 1 },
+    },
+    mock: { id: 'r1', title: 'Daily Standup', recurring: true },
+  },
+  // calendar
+  create_event: {
+    args: {
+      summary: 'Meeting',
+      startDate: '2026-05-20T09:00:00Z',
+      endDate: '2026-05-20T10:00:00Z',
+    },
+    mock: { id: 'e1', summary: 'Meeting' },
+  },
+  update_event: {
+    args: { id: 'e1', summary: 'Updated Meeting' },
+    mock: { id: 'e1', summary: 'Updated Meeting' },
+  },
+  delete_event: {
+    args: { id: 'e1' },
+    mock: { deleted: true, summary: 'Meeting' },
+  },
+  create_recurring_event: {
+    args: {
+      summary: 'Weekly Sync',
+      startDate: '2026-05-20T09:00:00Z',
+      endDate: '2026-05-20T10:00:00Z',
+      recurrence: { frequency: 'weekly', interval: 1 },
+    },
+    mock: { id: 'e1', title: 'Weekly Sync', recurring: true },
+  },
+  // contacts
+  create_contact: {
+    args: { firstName: 'John', lastName: 'Doe' },
+    mock: { id: 'c1', name: 'John Doe' },
+  },
+  update_contact: {
+    args: { id: 'c1', firstName: 'Jane' },
+    mock: { id: 'c1', name: 'Jane Doe' },
+  },
+  delete_contact: {
+    args: { id: 'c1' },
+    mock: { deleted: true, name: 'John Doe' },
+  },
+  add_contact_email: {
+    args: { id: 'c1', email: 'john@example.com', label: 'work' },
+    mock: { id: 'c1', name: 'John Doe', addedEmail: 'john@example.com' },
+  },
+  add_contact_phone: {
+    args: { id: 'c1', phone: '+15551234567', label: 'mobile' },
+    mock: { id: 'c1', name: 'John Doe', addedPhone: '+15551234567' },
+  },
+  // system
+  show_notification: {
+    args: { message: 'hello' },
+    mock: { sent: true, message: 'hello' },
+  },
+  capture_screenshot: {
+    args: { path: '~/screenshot.png' },
+    mock: { captured: true, path: '/Users/test/screenshot.png', sizeBytes: 1024 },
+  },
+  toggle_wifi: {
+    args: { enable: true },
+    mock: { wifi: 'on', success: true },
+  },
+  set_brightness: {
+    args: { level: 0.5 },
+    mock: { brightness: 0.5, success: true },
+  },
+  toggle_focus_mode: {
+    args: { enable: true },
+    mock: { doNotDisturb: true, success: true },
+  },
+  system_sleep: {
+    args: {},
+    mock: { action: 'sleep', success: true },
+  },
+  prevent_sleep: {
+    args: { seconds: 60 },
+    mock: { action: 'caffeinate', pid: 12345, seconds: 60 },
+  },
+  system_power: {
+    args: { action: 'shutdown' },
+    mock: { action: 'shutdown', success: true },
+  },
+  launch_app: {
+    args: { name: 'Safari' },
+    mock: { launched: true, name: 'Safari' },
+  },
+  quit_app: {
+    args: { name: 'Safari' },
+    mock: { quit: true, name: 'Safari' },
+  },
+  move_window: {
+    args: { appName: 'Safari', x: 100, y: 200 },
+    mock: { moved: true, app: 'Safari', position: [100, 200] },
+  },
+  resize_window: {
+    args: { appName: 'Safari', width: 800, height: 600 },
+    mock: { resized: true, app: 'Safari', size: [800, 600] },
+  },
+  minimize_window: {
+    args: { appName: 'Safari', restore: false },
+    mock: { app: 'Safari', minimized: true },
+  },
+  // mail
+  mark_message_read: {
+    args: { id: '123', read: true },
+    mock: { id: 123, read: true },
+  },
+  flag_message: {
+    args: { id: '123', flagged: true },
+    mock: { id: 123, flagged: true },
+  },
+  move_message: {
+    args: { id: '123', targetMailbox: 'Archive' },
+    mock: { moved: true, id: 123, targetMailbox: 'Archive' },
+  },
+  send_mail: {
+    args: { to: ['user@example.com'], subject: 'Hi', body: 'Hello' },
+    mock: { sent: true, to: ['user@example.com'], subject: 'Hi' },
+  },
+  reply_mail: {
+    args: { id: '123', body: 'Reply text' },
+    mock: { replied: true, id: 123, replyAll: false },
+  },
+  // safari
+  open_url: {
+    args: { url: 'https://example.com' },
+    mock: { opened: true, url: 'https://example.com' },
+  },
+  close_tab: {
+    args: { windowIndex: 0, tabIndex: 1 },
+    mock: { closed: true, title: 'Example' },
+  },
+  activate_tab: {
+    args: { windowIndex: 0, tabIndex: 1 },
+    mock: { activated: true, title: 'Example', url: 'https://example.com' },
+  },
+  run_javascript: {
+    args: { code: '1+1', windowIndex: 0, tabIndex: 0 },
+    mock: { result: '2' },
+  },
+  add_to_reading_list: {
+    args: { url: 'https://example.com' },
+    mock: { added: true, url: 'https://example.com', title: 'Example' },
+  },
+  // finder
+  set_file_tags: {
+    args: { path: '~/test.txt', tags: ['work'] },
+    mock: { path: '/Users/test/test.txt', tags: ['work'] },
+  },
+  move_file: {
+    args: { source: '~/a.txt', destination: '~/b.txt' },
+    mock: { moved: true, source: '/Users/test/a.txt', destination: '/Users/test/b.txt' },
+  },
+  trash_file: {
+    args: { path: '~/test.txt' },
+    mock: { trashed: true, name: 'test.txt', path: '/Users/test/test.txt' },
+  },
+  create_directory: {
+    args: { path: '~/new-folder' },
+    mock: { created: true, path: '/Users/test/new-folder' },
+  },
+  // music
+  playback_control: {
+    args: { action: 'play' },
+    mock: { action: 'play', playerState: 'playing' },
+  },
+  play_track: {
+    args: { trackName: 'Take Five' },
+    mock: { playing: true, track: 'Take Five', artist: 'Dave Brubeck' },
+  },
+  play_playlist: {
+    args: { name: 'Liked' },
+    mock: { playing: true, playlist: 'Liked', shuffle: false },
+  },
+  set_shuffle: {
+    args: { shuffle: true },
+    mock: { shuffleEnabled: true, songRepeat: 'off' },
+  },
+  create_playlist: {
+    args: { name: 'New Playlist' },
+    mock: { name: 'New Playlist', id: 'p1' },
+  },
+  add_to_playlist: {
+    args: { playlistName: 'Liked', trackName: 'Take Five' },
+    mock: { added: true, track: 'Take Five', playlist: 'Liked' },
+  },
+  remove_from_playlist: {
+    args: { playlistName: 'Liked', trackName: 'Take Five' },
+    mock: { removed: true, track: 'Take Five', playlist: 'Liked' },
+  },
+  delete_playlist: {
+    args: { name: 'Old' },
+    mock: { deleted: true, playlist: 'Old' },
+  },
+  set_rating: {
+    args: { trackName: 'Take Five', rating: 80 },
+    mock: { name: 'Take Five', rating: 80 },
+  },
+  set_favorited: {
+    args: { trackName: 'Take Five', favorited: true },
+    mock: { name: 'Take Five', favorited: true },
+  },
+  set_disliked: {
+    args: { trackName: 'Take Five', disliked: false },
+    mock: { name: 'Take Five', disliked: false },
+  },
+  // health
+  health_authorize: {
+    args: {},
+    mock: { authorized: true },
+  },
+  // messages
+  send_message: {
+    args: { target: '+15551234567', text: 'hi' },
+    mock: { sent: true, to: '+15551234567', text: 'hi' },
+  },
+  send_file: {
+    args: { target: '+15551234567', filePath: '~/file.txt' },
+    mock: { sent: true, to: '+15551234567', file: '/Users/test/file.txt' },
+  },
+  // shortcuts
+  run_shortcut: {
+    args: { name: 'Daily' },
+    mock: { shortcut: 'Daily', output: '' },
+  },
+  create_shortcut: {
+    args: { name: 'NewShortcut' },
+    mock: { created: 'NewShortcut', success: true, note: 'opened in Shortcuts app' },
+  },
+  delete_shortcut: {
+    args: { name: 'OldShortcut' },
+    mock: { deleted: 'OldShortcut', success: true },
+  },
+  export_shortcut: {
+    args: { name: 'MyShortcut', outputPath: '~/MyShortcut.shortcut' },
+    mock: { shortcut: 'MyShortcut', exportedTo: '/Users/test/MyShortcut.shortcut', success: true },
+  },
+  import_shortcut: {
+    args: { filePath: '~/MyShortcut.shortcut' },
+    mock: { imported: 'MyShortcut', success: true },
+  },
+  duplicate_shortcut: {
+    args: { name: 'MyShortcut', newName: 'MyShortcutCopy' },
+    mock: { original: 'MyShortcut', duplicate: 'MyShortcutCopy', success: true },
+  },
+  edit_shortcut: {
+    args: { name: 'MyShortcut' },
+    mock: { shortcut: 'MyShortcut', success: true, note: 'opened in Shortcuts app' },
+  },
+  // weather
+  get_daily_forecast: {
+    args: { latitude: 37.5, longitude: 127.0, days: 3 },
+    mock: [],
+  },
+  get_hourly_forecast: {
+    args: { latitude: 37.5, longitude: 127.0, hours: 6 },
+    mock: [],
+  },
+  // photos
+  list_albums: {
+    args: {},
+    mock: [],
+  },
+  create_album: {
+    args: { name: 'Vacation' },
+    mock: { id: 'a1', name: 'Vacation' },
+  },
+  add_to_album: {
+    args: { photoIds: ['p1'], albumName: 'Vacation' },
+    mock: { added: 1, album: 'Vacation' },
+  },
+  import_photo: {
+    args: { filePath: '~/photo.jpg' },
+    mock: { imported: true, identifier: 'abc-123' },
+  },
+  delete_photos: {
+    args: { identifiers: ['p1'] },
+    mock: { deleted: 1, identifiers: ['p1'] },
+  },
+  query_photos: {
+    args: { limit: 10 },
+    mock: { total: 0, photos: [] },
+  },
+  classify_image: {
+    args: { imagePath: '~/photo.jpg', maxResults: 5 },
+    mock: { total: 0, labels: [] },
+  },
+  // numbers
+  numbers_create_document: {
+    args: {},
+    mock: { name: 'Untitled' },
+  },
+  numbers_set_cell: {
+    args: { document: 'TestDoc', sheet: 'Sheet 1', cell: 'A1', value: '42' },
+    mock: { written: true, address: 'A1' },
+  },
+  numbers_add_sheet: {
+    args: { document: 'TestDoc', sheetName: 'Sheet 2' },
+    mock: { created: true, name: 'Sheet 2' },
+  },
+  numbers_export_pdf: {
+    args: { document: 'TestDoc', outputPath: '~/out.pdf' },
+    mock: { exported: true, path: '/Users/test/out.pdf' },
+  },
+  numbers_close_document: {
+    args: { document: 'TestDoc', saving: true },
+    mock: { closed: true, name: 'TestDoc' },
+  },
+  numbers_rename_sheet: {
+    args: { document: 'TestDoc', sheet: 'Sheet 1', newName: 'Renamed' },
+    mock: { renamed: true, from: 'Sheet 1', to: 'Renamed' },
+  },
 };
 
 // ── Test suite ──────────────────────────────────────────────────────
@@ -493,7 +877,14 @@ describe('outputSchema → structuredContent contract', () => {
 
   beforeAll(() => {
     server = createMockServer();
-    const config = createMockConfig();
+    const config = createMockConfig({
+      // Bypass shared-item guards so single-mock fixtures don't have to also
+      // satisfy the secondary `guardSharedScript` JXA call.
+      includeShared: true,
+      allowSendMail: true,
+      allowSendMessages: true,
+      allowRunJavascript: true,
+    });
     registerNoteTools(server, config);
     registerReminderTools(server, config);
     registerCalendarTools(server, config);
@@ -513,6 +904,7 @@ describe('outputSchema → structuredContent contract', () => {
 
   beforeEach(() => {
     mockRunJxa.mockReset();
+    mockRunAppleScript.mockReset();
     mockRunAutomation.mockReset();
     mockRunSwift.mockReset();
     mockCheckSwiftBridge.mockReset();
@@ -535,10 +927,17 @@ describe('outputSchema → structuredContent contract', () => {
   for (const [toolName, fixture] of Object.entries(TOOL_FIXTURES)) {
     test(`${toolName} → structuredContent + text JSON conform to outputSchema`, async () => {
       mockRunJxa.mockResolvedValue(fixture.mock);
+      mockRunAppleScript.mockResolvedValue(fixture.mock);
       mockRunAutomation.mockResolvedValue(fixture.mock);
       mockRunSwift.mockResolvedValue(fixture.mock);
       mockCheckSwiftBridge.mockResolvedValue(null);
       fetchCurrentWeather.mockResolvedValue(fixture.mock);
+      // Daily/hourly forecast handlers wrap an array result. When the
+      // fixture's mock is an array, fetchDailyForecast/fetchHourlyForecast
+      // are seeded with it directly; other fixtures pass a benign empty
+      // array so the schemas for {forecast: []} still parse.
+      fetchDailyForecast.mockResolvedValue(Array.isArray(fixture.mock) ? fixture.mock : []);
+      fetchHourlyForecast.mockResolvedValue(Array.isArray(fixture.mock) ? fixture.mock : []);
 
       const result = await server.callTool(toolName, fixture.args);
       const { opts } = server._tools.get(toolName);

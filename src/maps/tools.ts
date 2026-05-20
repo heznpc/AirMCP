@@ -2,7 +2,13 @@ import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okLinked, okUntrusted, errJxaFor, errUpstreamFor } from "../shared/result.js";
+import {
+  okStructured,
+  okUntrustedStructured,
+  okLinkedStructured,
+  errJxaFor,
+  errUpstreamFor,
+} from "../shared/result.js";
 import {
   searchLocationScript,
   getDirectionsScript,
@@ -22,11 +28,19 @@ export function registerMapsTools(server: McpServer, _config: AirMcpConfig): voi
       inputSchema: {
         query: z.string().max(500).describe("Location or place to search for"),
       },
+      // Wave 8 outputSchema: the JXA script echoes the user-supplied
+      // `query` string back to the caller, so the structured payload is
+      // emitted via the untrusted-aware linked helper.
+      outputSchema: {
+        searched: z.literal(true),
+        query: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
     async ({ query }) => {
       try {
-        return okLinked("search_maps", await runJxa(searchLocationScript(query)));
+        const result = (await runJxa(searchLocationScript(query))) as { searched: true; query: string };
+        return okLinkedStructured("search_maps", result);
       } catch (e) {
         return errJxaFor("search location", e);
       }
@@ -47,11 +61,24 @@ export function registerMapsTools(server: McpServer, _config: AirMcpConfig): voi
           .default("driving")
           .describe("Mode of transport (default: driving)"),
       },
+      // Echoes user-supplied from/to strings — emit as untrusted.
+      outputSchema: {
+        directions: z.literal(true),
+        from: z.string(),
+        to: z.string(),
+        transportType: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
     async ({ from, to, transportType }) => {
       try {
-        return okUntrusted(await runJxa(getDirectionsScript(from, to, transportType)));
+        const result = (await runJxa(getDirectionsScript(from, to, transportType))) as {
+          directions: true;
+          from: string;
+          to: string;
+          transportType: string;
+        };
+        return okUntrustedStructured(result);
       } catch (e) {
         return errJxaFor("get directions", e);
       }
@@ -74,11 +101,26 @@ export function registerMapsTools(server: McpServer, _config: AirMcpConfig): voi
         longitude: z.number().min(-180).max(180).describe("Longitude coordinate (degrees, -180 to 180)"),
         label: z.string().max(500).optional().describe("Optional label for the pin"),
       },
+      // The script may include `label` only when the caller supplied one,
+      // so the field is optional in the structured shape. lat/lng are
+      // server-controlled numbers echoed back from the validated input.
+      outputSchema: {
+        pinned: z.literal(true),
+        latitude: z.number(),
+        longitude: z.number(),
+        label: z.string().optional(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ latitude, longitude, label }) => {
       try {
-        return ok(await runJxa(dropPinScript(latitude, longitude, label)));
+        const result = (await runJxa(dropPinScript(latitude, longitude, label))) as {
+          pinned: true;
+          latitude: number;
+          longitude: number;
+          label?: string;
+        };
+        return okStructured(result);
       } catch (e) {
         return errJxaFor("drop pin", e);
       }
@@ -93,11 +135,16 @@ export function registerMapsTools(server: McpServer, _config: AirMcpConfig): voi
       inputSchema: {
         address: z.string().max(500).describe("Address to open in Maps"),
       },
+      outputSchema: {
+        opened: z.literal(true),
+        address: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
     async ({ address }) => {
       try {
-        return ok(await runJxa(openInMapsScript(address)));
+        const result = (await runJxa(openInMapsScript(address))) as { opened: true; address: string };
+        return okStructured(result);
       } catch (e) {
         return errJxaFor("open address", e);
       }
@@ -123,11 +170,29 @@ export function registerMapsTools(server: McpServer, _config: AirMcpConfig): voi
           .optional()
           .describe("Longitude of the center point (degrees, -180 to 180)"),
       },
+      // `near` is emitted only when both coordinates are supplied, so the
+      // structured shape marks it optional. `query` is user-supplied and
+      // echoed back — flagged via okUntrustedStructured.
+      outputSchema: {
+        searched: z.literal(true),
+        query: z.string(),
+        near: z
+          .object({
+            latitude: z.number(),
+            longitude: z.number(),
+          })
+          .optional(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
     async ({ query, latitude, longitude }) => {
       try {
-        return okUntrusted(await runJxa(searchNearbyScript(query, latitude, longitude)));
+        const result = (await runJxa(searchNearbyScript(query, latitude, longitude))) as {
+          searched: true;
+          query: string;
+          near?: { latitude: number; longitude: number };
+        };
+        return okUntrustedStructured(result);
       } catch (e) {
         return errJxaFor("search nearby", e);
       }
@@ -144,11 +209,16 @@ export function registerMapsTools(server: McpServer, _config: AirMcpConfig): voi
         longitude: z.number().min(-180).max(180).describe("Longitude coordinate (degrees, -180 to 180)"),
         label: z.string().max(500).optional().describe("Optional label for the location"),
       },
+      // The script only returns a URL string assembled from validated inputs.
+      outputSchema: {
+        url: z.string(),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ latitude, longitude, label }) => {
       try {
-        return ok(await runJxa(shareLocationScript(latitude, longitude, label)));
+        const result = (await runJxa(shareLocationScript(latitude, longitude, label))) as { url: string };
+        return okStructured(result);
       } catch (e) {
         return errJxaFor("share location", e);
       }
@@ -168,11 +238,30 @@ export function registerMapsTools(server: McpServer, _config: AirMcpConfig): voi
           .max(500)
           .describe("Place name or address (e.g. 'Seoul', 'Tokyo Tower', '1600 Pennsylvania Ave')"),
       },
+      // Results come from the Open-Meteo geocoding service — third-party
+      // user-facing strings (names, country names, timezone IDs) are flagged
+      // untrusted. Optional fields mirror the API's nullable shape.
+      outputSchema: {
+        total: z.number().int(),
+        results: z.array(
+          z.object({
+            name: z.string(),
+            latitude: z.number(),
+            longitude: z.number(),
+            country: z.string().optional(),
+            countryCode: z.string().optional(),
+            admin1: z.string().nullable(),
+            elevation: z.number().nullable(),
+            timezone: z.string().nullable(),
+            population: z.number().nullable(),
+          }),
+        ),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
     async ({ query }) => {
       try {
-        return okUntrusted(await fetchGeocode(query));
+        return okUntrustedStructured(await fetchGeocode(query));
       } catch (e) {
         return errUpstreamFor("geocode", e, { retryable: true });
       }
@@ -188,11 +277,27 @@ export function registerMapsTools(server: McpServer, _config: AirMcpConfig): voi
         latitude: z.number().min(-90).max(90).describe("Latitude coordinate"),
         longitude: z.number().min(-180).max(180).describe("Longitude coordinate"),
       },
+      // Response comes from Nominatim — third-party address text is
+      // flagged untrusted. All nested address fields are nullable per
+      // fetchReverseGeocode normalisation.
+      outputSchema: {
+        name: z.string().nullable(),
+        displayName: z.string().nullable(),
+        latitude: z.number(),
+        longitude: z.number(),
+        address: z.object({
+          road: z.string().nullable(),
+          city: z.string().nullable(),
+          state: z.string().nullable(),
+          country: z.string().nullable(),
+          postcode: z.string().nullable(),
+        }),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
     async ({ latitude, longitude }) => {
       try {
-        return okUntrusted(await fetchReverseGeocode(latitude, longitude));
+        return okUntrustedStructured(await fetchReverseGeocode(latitude, longitude));
       } catch (e) {
         return errUpstreamFor("reverse geocode", e, { retryable: true });
       }

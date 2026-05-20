@@ -2,7 +2,13 @@ import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okStructured, okUntrustedLinkedStructured, errPermission, errJxaFor } from "../shared/result.js";
+import {
+  okStructured,
+  okUntrustedStructured,
+  okUntrustedLinkedStructured,
+  errPermission,
+  errJxaFor,
+} from "../shared/result.js";
 // Side-effect import: register the mail_unread poller with the shared registry
 // at module load time. The poller itself only starts when startPollers() is
 // invoked by the cross/event observer tool.
@@ -174,11 +180,16 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
         id: z.string().max(500).regex(/^\d+$/, "Message ID must be numeric").describe("Message ID"),
         read: z.boolean().optional().default(true).describe("true=read, false=unread (default: true)"),
       },
+      outputSchema: {
+        id: z.number(),
+        read: z.boolean(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ id, read }) => {
       try {
-        return ok(await runJxa(markReadScript(id, read)));
+        const result = (await runJxa(markReadScript(id, read))) as { id: number; read: boolean };
+        return okStructured(result);
       } catch (e) {
         return errJxaFor("mark message", e);
       }
@@ -194,11 +205,16 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
         id: z.string().max(500).regex(/^\d+$/, "Message ID must be numeric").describe("Message ID"),
         flagged: z.boolean().optional().default(true).describe("true=flag, false=unflag (default: true)"),
       },
+      outputSchema: {
+        id: z.number(),
+        flagged: z.boolean(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ id, flagged }) => {
       try {
-        return ok(await runJxa(flagMessageScript(id, flagged)));
+        const result = (await runJxa(flagMessageScript(id, flagged))) as { id: number; flagged: boolean };
+        return okStructured(result);
       } catch (e) {
         return errJxaFor("flag message", e);
       }
@@ -246,11 +262,21 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
           .optional()
           .describe("Target account name. Searches all accounts if omitted."),
       },
+      outputSchema: {
+        moved: z.boolean(),
+        id: z.number(),
+        targetMailbox: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     },
     async ({ id, targetMailbox, targetAccount }) => {
       try {
-        return ok(await runJxa(moveMessageScript(id, targetMailbox, targetAccount)));
+        const result = (await runJxa(moveMessageScript(id, targetMailbox, targetAccount))) as {
+          moved: boolean;
+          id: number;
+          targetMailbox: string;
+        };
+        return okStructured(result);
       } catch (e) {
         return errJxaFor("move message", e);
       }
@@ -314,6 +340,11 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
           .describe(`BCC recipients (max ${LIMITS.MAIL_RECIPIENTS})`),
         account: z.string().max(500).optional().describe("Sender email address (uses default account if omitted)"),
       },
+      outputSchema: {
+        sent: z.boolean(),
+        to: z.array(z.string()),
+        subject: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
     async ({ to, subject, body, cc, bcc, account }) => {
@@ -322,7 +353,12 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
           "Sending mail is disabled. Set allowSendMail: true in config or AIRMCP_ALLOW_SEND_MAIL=true.",
         );
       try {
-        return ok(await runJxa(sendMailScript(to, subject, body, cc, bcc, account)));
+        const result = (await runJxa(sendMailScript(to, subject, body, cc, bcc, account))) as {
+          sent: boolean;
+          to: string[];
+          subject: string;
+        };
+        return okUntrustedStructured(result);
       } catch (e) {
         return errJxaFor("send mail", e);
       }
@@ -343,6 +379,11 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
         body: z.string().max(50000).describe("Reply body text"),
         replyAll: z.boolean().optional().default(false).describe("Reply to all recipients (default: false)"),
       },
+      outputSchema: {
+        replied: z.boolean(),
+        id: z.number(),
+        replyAll: z.boolean(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
     async ({ id, body, replyAll }) => {
@@ -351,7 +392,12 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
           "Sending mail is disabled. Set allowSendMail: true in config or AIRMCP_ALLOW_SEND_MAIL=true.",
         );
       try {
-        return ok(await runJxa(replyMailScript(id, body, replyAll)));
+        const result = (await runJxa(replyMailScript(id, body, replyAll))) as {
+          replied: boolean;
+          id: number;
+          replyAll: boolean;
+        };
+        return okUntrustedStructured(result);
       } catch (e) {
         return errJxaFor("reply", e);
       }

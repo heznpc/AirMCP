@@ -203,6 +203,21 @@ export function errSwift(message: string, opts?: ToolErrorOptions) {
   });
 }
 
+/** AppleScript origin — runs via the same osascript host as JXA, but
+ *  tagged separately so audit/telemetry/log analysers can distinguish
+ *  the two dialects. `cause.origin = "applescript"` flows through to
+ *  `structuredContent.error.cause.origin`. Use for Messages send_*,
+ *  Calendar/Reminders write paths that compose AppleScript strings,
+ *  and any other tool whose script body opens with `tell application
+ *  "X"` rather than `Application('X')`. */
+export function errAppleScript(message: string, opts?: ToolErrorOptions) {
+  const cause = opts?.cause ?? {};
+  return toolErr("jxa_error", message, {
+    ...opts,
+    cause: { origin: "applescript", ...cause },
+  });
+}
+
 export function errDeprecated(message: string, opts?: ToolErrorOptions) {
   return toolErr("deprecated", message, opts);
 }
@@ -236,6 +251,13 @@ export function errJxaFor(action: string, e: unknown, opts?: ToolErrorOptions) {
 
 export function errSwiftFor(action: string, e: unknown, opts?: ToolErrorOptions) {
   return errSwift(formatCauseMessage(action, e), opts);
+}
+
+/** Catch-block helper that pairs with `runAppleScript` calls — keeps
+ *  the JXA vs AppleScript origin distinction visible all the way
+ *  through to the structured error envelope. */
+export function errAppleScriptFor(action: string, e: unknown, opts?: ToolErrorOptions) {
+  return errAppleScript(formatCauseMessage(action, e), opts);
 }
 
 export function errUpstreamFor(action: string, e: unknown, opts?: ToolErrorOptions) {

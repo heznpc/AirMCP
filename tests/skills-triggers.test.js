@@ -1,4 +1,18 @@
 import { describe, test, expect, jest, beforeEach } from '@jest/globals';
+import { mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+// Persistent debounce state (MEDIUM-12 fix) lives at
+// `${PATHS.VECTOR_STORE}/trigger-debounce.json`. Override the dir BEFORE
+// importing triggers.ts so the test doesn't read whatever
+// `~/.airmcp/trigger-debounce.json` happens to contain on the dev machine
+// or whatever prior tests in the same Jest worker left there. Without this
+// override, `dispatch()`'s `Math.max(binding.lastFired, getLastFired(...))`
+// can be poisoned by stale persisted timestamps, suppressing the first
+// fire and making the debounce tests fail intermittently.
+const debounceDir = await mkdtemp(join(tmpdir(), 'airmcp-triggers-'));
+process.env.AIRMCP_VECTOR_STORE_DIR = debounceDir;
 
 // ─── Mock executor before importing triggers ────────────────────────────
 const mockExecuteSkill = jest.fn();
@@ -15,6 +29,7 @@ jest.unstable_mockModule('../dist/shared/event-bus.js', () => ({
 
 const { resetTriggers, registerTrigger, startTriggerListener, getRegisteredTriggers } =
   await import('../dist/skills/triggers.js');
+const { _resetDebounceState } = await import('../dist/skills/debounce-state.js');
 
 // ─── Helpers ────────────────────────────────────────────────────────────
 function makeSkill(overrides = {}) {
@@ -130,9 +145,13 @@ describe('trigger registration', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('startTriggerListener and event dispatch', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     mockEventBus.removeAllListeners();
     resetTriggers();
+    // Clear the persistent debounce singleton so every test starts with
+    // cold (epoch 0) timestamps. The temp-dir override above prevents
+    // cross-test pollution via the disk file itself.
+    _resetDebounceState();
     mockExecuteSkill.mockReset();
     mockExecuteSkill.mockResolvedValue({ success: true, steps: [] });
     jest.spyOn(console, 'error').mockImplementation(() => {});

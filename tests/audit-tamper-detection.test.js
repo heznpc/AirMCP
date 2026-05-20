@@ -158,4 +158,47 @@ describe('audit chain tamper detection', () => {
     });
     expect(summary.verified).toBe(false);
   });
+
+  test('6. first-line genesis bypass — attacker re-roots chain at arbitrary _prev', async () => {
+    // The most dangerous attack on the chain: an attacker with the HMAC
+    // key (host-derived in the default install) re-seals the ENTIRE file
+    // starting from an arbitrary `_prev` instead of HMAC_GENESIS. Each
+    // line's body+hmac is internally consistent — what breaks is only the
+    // chain root. The pre-2026-05-13 verifier skipped the first chained
+    // line's _prev check (`chainStarted=false`) and reported verified:true
+    // for this exact attack. The fix asserts the first chained line MUST
+    // have `_prev === HMAC_GENESIS`.
+    //
+    // We build a fully-self-consistent chain rooted at `_prev = 'a'*64`,
+    // write it as the only audit content, and assert the verifier rejects
+    // it at lineIndex 0 with prev_mismatch.
+    const { createHmac } = await import('node:crypto');
+    const sealFrom = (prev, body) => {
+      const hmac = createHmac('sha256', 'tamper-test-fixture-key')
+        .update(prev).update('\0').update(JSON.stringify(body)).digest('hex');
+      return { sealed: JSON.stringify({ ...body, _prev: prev, _hmac: hmac }), hmac };
+    };
+
+    // Wipe whatever seedFiveEntries built; start from a clean slate so
+    // the attacker's lines are the FIRST chained content the verifier sees.
+    await wipeDir();
+    _testReset();
+
+    const fakeRoot = 'a'.repeat(64); // NOT HMAC_GENESIS
+    const { sealed: l1, hmac: h1 } = sealFrom(fakeRoot, {
+      timestamp: 'F1', tool: 'fabricated_history', status: 'ok',
+    });
+    const { sealed: l2 } = sealFrom(h1, {
+      timestamp: 'F2', tool: 'fabricated_history_2', status: 'ok',
+    });
+    await writeFile(AUDIT_PATH, `${l1}\n${l2}\n`, 'utf-8');
+
+    const summary = await summarizeAuditEntries({
+      since: '2020-01-01T00:00:00Z',
+    });
+    expect(summary.verified).toBe(false);
+    expect(summary.verifiedFirstBreak).toBeDefined();
+    expect(summary.verifiedFirstBreak.reason).toBe('prev_mismatch');
+    expect(summary.verifiedFirstBreak.lineIndex).toBe(0); // first line itself
+  });
 });

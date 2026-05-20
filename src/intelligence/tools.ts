@@ -1,7 +1,8 @@
 import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okUntrusted, errSwift, errSwiftFor } from "../shared/result.js";
+import { ok, okStructured, okUntrustedStructured, errSwift, errSwiftFor } from "../shared/result.js";
+// `ok` is still used by ai_plan_metrics (already-covered tool — not touched per rules).
 import { runSwift, checkSwiftBridge } from "../shared/swift.js";
 import { zFilePath, resolveAndGuard } from "../shared/validate.js";
 import {
@@ -61,6 +62,9 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
       inputSchema: {
         text: z.string().max(10000).describe("Text to summarize"),
       },
+      outputSchema: {
+        output: z.string(),
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -71,7 +75,7 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
     async ({ text }) => {
       try {
         const result = await runSwift<TextResult>("summarize", JSON.stringify({ text }));
-        return ok(result);
+        return okUntrustedStructured(result);
       } catch (e) {
         return errSwiftFor("summarize", e);
       }
@@ -92,6 +96,9 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
           .default("professional")
           .describe("Target tone (default: professional)"),
       },
+      outputSchema: {
+        output: z.string(),
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -102,7 +109,7 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
     async ({ text, tone }) => {
       try {
         const result = await runSwift<TextResult>("rewrite", JSON.stringify({ text, tone }));
-        return ok(result);
+        return okUntrustedStructured(result);
       } catch (e) {
         return errSwiftFor("rewrite", e);
       }
@@ -118,6 +125,9 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
       inputSchema: {
         text: z.string().max(10000).describe("Text to proofread"),
       },
+      outputSchema: {
+        output: z.string(),
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -128,7 +138,7 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
     async ({ text }) => {
       try {
         const result = await runSwift<TextResult>("proofread", JSON.stringify({ text }));
-        return ok(result);
+        return okUntrustedStructured(result);
       } catch (e) {
         return errSwiftFor("proofread", e);
       }
@@ -157,6 +167,9 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
           .optional()
           .describe("Sampling temperature (0-2). Lower = more deterministic"),
       },
+      outputSchema: {
+        output: z.string(),
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -170,7 +183,7 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
           "generate-text",
           JSON.stringify({ prompt, systemInstruction, temperature }),
         );
-        return ok(result);
+        return okUntrustedStructured(result);
       } catch (e) {
         return errSwiftFor("generate text", e);
       }
@@ -200,6 +213,10 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
           .optional()
           .describe("Optional JSON schema describing expected output fields"),
       },
+      outputSchema: {
+        output: z.string(),
+        valid_json: z.boolean(),
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -213,7 +230,7 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
           "generate-structured",
           JSON.stringify({ prompt, systemInstruction, schema }),
         );
-        return ok(result);
+        return okUntrustedStructured(result);
       } catch (e) {
         return errSwiftFor("generate structured output", e);
       }
@@ -234,6 +251,10 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
           .max(100)
           .describe("List of tag/category names to classify the content against"),
       },
+      outputSchema: {
+        tags: z.record(z.number()),
+        text_preview: z.string(),
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -244,7 +265,7 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
     async ({ text, tags }) => {
       try {
         const result = await runSwift<TagResult>("tag-content", JSON.stringify({ text, tags }));
-        return ok(result);
+        return okUntrustedStructured(result);
       } catch (e) {
         return errSwiftFor("tag content", e);
       }
@@ -265,6 +286,10 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
         message: z.string().max(10000).describe("The message to send to the AI"),
         systemInstruction: z.string().max(10000).optional().describe("Optional system instruction for this session"),
       },
+      outputSchema: {
+        sessionName: z.string(),
+        response: z.string(),
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -278,7 +303,7 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
           "ai-chat",
           JSON.stringify({ sessionName, message, systemInstruction }),
         );
-        return ok(result);
+        return okUntrustedStructured(result);
       } catch (e) {
         return errSwiftFor("chat", e);
       }
@@ -301,6 +326,10 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
           .refine((p) => !p || /\.(png|jpg|jpeg)$/i.test(p), "Output path must end with .png, .jpg, or .jpeg")
           .describe("Optional output path for the image (defaults to /tmp, must end in .png/.jpg)"),
       },
+      outputSchema: {
+        generated: z.boolean(),
+        path: z.string(),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: true,
@@ -317,7 +346,7 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
         // etc.). Skip when outputPath is undefined — Swift defaults to /tmp.
         if (outputPath) resolveAndGuard(outputPath);
         const result = await runSwift<GenerateImageResult>("generate-image", JSON.stringify({ prompt, outputPath }));
-        return ok(result);
+        return okStructured(result);
       } catch (e) {
         return errSwiftFor("generate image", e);
       }
@@ -336,6 +365,16 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
       inputSchema: {
         imagePath: zFilePath.describe("Absolute path to the image file to scan"),
       },
+      outputSchema: {
+        elements: z.array(
+          z.object({
+            type: z.string(),
+            text: z.string(),
+            confidence: z.number(),
+          }),
+        ),
+        total: z.number().int().min(0),
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -346,7 +385,7 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
     async ({ imagePath }) => {
       try {
         const result = await runSwift<ScanDocumentResult>("scan-document", JSON.stringify({ imagePath }));
-        return okUntrusted(result);
+        return okUntrustedStructured(result);
       } catch (e) {
         return errSwiftFor("scan document", e);
       }
@@ -378,6 +417,12 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
           .optional()
           .describe("List of available tool names to plan with. Defaults to common tools."),
       },
+      outputSchema: {
+        plan: z.string(),
+        valid_json: z.boolean(),
+        model: z.string(),
+        warning: z.string(),
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -398,7 +443,7 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
               "You are an action planner. Analyze the goal and available tools, then output a JSON array of steps to achieve the goal. Be practical and concise.",
           }),
         );
-        return ok({
+        return okUntrustedStructured({
           plan: result.output,
           valid_json: result.valid_json,
           model: "apple-foundation-models",
@@ -537,6 +582,13 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
       description:
         "Check availability and status of Apple's on-device Foundation Models. Returns whether the model is available, macOS version, and Apple Silicon status.",
       inputSchema: {},
+      outputSchema: {
+        available: z.boolean(),
+        message: z.string(),
+        macOSVersion: z.string(),
+        hasAppleSilicon: z.boolean(),
+        foundationModelsSupported: z.boolean(),
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -547,7 +599,7 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
     async () => {
       try {
         const result = await runSwift<AiStatusResult>("ai-status", "{}");
-        return ok(result);
+        return okStructured(result);
       } catch (e) {
         return errSwiftFor("check AI status", e);
       }
@@ -570,6 +622,11 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
         prompt: z.string().min(1).max(10000).describe("What you want the on-device AI to do with your Apple data"),
         systemInstruction: z.string().max(10000).optional().describe("Optional system instruction for the AI agent"),
       },
+      outputSchema: {
+        response: z.string(),
+        model: z.string(),
+        onDevice: z.boolean(),
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -585,7 +642,7 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
           "ai-agent",
           JSON.stringify({ text: prompt, tone: systemInstruction }),
         );
-        return ok({ response: result.output, model: "apple-foundation-models", onDevice: true });
+        return okUntrustedStructured({ response: result.output, model: "apple-foundation-models", onDevice: true });
       } catch (e) {
         return errSwiftFor("run on-device AI agent", e);
       }

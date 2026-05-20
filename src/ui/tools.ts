@@ -2,7 +2,7 @@ import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okUntrusted, errInvalidInput, errJxaFor } from "../shared/result.js";
+import { okStructured, okUntrustedStructured, errInvalidInput, errJxaFor } from "../shared/result.js";
 import {
   uiOpenAppScript,
   uiClickScript,
@@ -12,6 +12,115 @@ import {
   uiReadScript,
 } from "./scripts.js";
 import { axQueryScript, axPerformScript, axTraverseScript, axDiffScript, type AXLocator } from "./ax-query.js";
+
+// ── Shared schemas ───────────────────────────────────────────────────
+//
+// The accessibility tree returned by System Events is rich and the
+// JXA scripts emit fixed JSON shapes. Where the tree is recursive
+// (ui_read), we use z.lazy + z.unknown() child arrays to avoid
+// over-specifying — System Events can return arbitrary AX roles and
+// attributes, and AXAttribute names are open-ended (each macOS app /
+// SwiftUI version can introduce new ones), so we don't enumerate them.
+
+// 2D point/size as returned by AX (always a tuple of two numbers, or
+// null when the element doesn't expose position/size).
+const axPointSchema = z.array(z.number()).length(2).nullable();
+const axSizeSchema = z.array(z.number()).length(2).nullable();
+
+// Element summary (role + title + description) emitted by uiOpenAppScript
+// for top-level window elements.
+const uiElementSummarySchema = z.object({
+  role: z.string(),
+  title: z.string(),
+  description: z.string(),
+});
+
+// Window info emitted by uiOpenAppScript.
+const uiWindowInfoSchema = z.object({
+  title: z.string(),
+  role: z.string(),
+  size: axSizeSchema,
+  position: axPointSchema,
+  elementSummary: z.array(uiElementSummarySchema),
+});
+
+// Recursive AX tree node emitted by uiReadScript. `children` is typed
+// as z.unknown() because the tree depth is bounded only by maxDepth
+// (1..10) and z.lazy() recursion blows up type inference at the schema
+// level — keeping children as unknown lets the schema document the
+// shape without pinning a TS-recursive type. Callers should treat
+// children as the same node shape at runtime.
+const uiTreeNodeSchema = z.object({
+  role: z.string(),
+  name: z.string(),
+  title: z.string(),
+  value: z.string(),
+  description: z.string(),
+  enabled: z.boolean().nullable(),
+  focused: z.boolean().nullable(),
+  position: axPointSchema,
+  size: axSizeSchema,
+  // Recursive structure: same shape as uiTreeNodeSchema. Modelled as
+  // z.unknown() so the schema stays acyclic at the type level; the
+  // runtime payload is well-formed because the JXA script enforces
+  // it via maxDepth/maxElements.
+  children: z.array(z.unknown()),
+});
+
+// Menu-bar item emitted by uiReadScript.
+const uiMenuItemSchema = z.object({
+  title: z.string(),
+  name: z.string(),
+});
+
+// Element shape returned by axQueryScript (rich, flat, no children).
+const axQueryElementSchema = z.object({
+  index: z.number().int(),
+  path: z.string(),
+  role: z.string(),
+  name: z.string(),
+  title: z.string(),
+  value: z.string(),
+  description: z.string(),
+  identifier: z.string(),
+  position: axPointSchema,
+  size: axSizeSchema,
+  enabled: z.boolean().nullable(),
+  focused: z.boolean().nullable(),
+});
+
+// Node shape returned by axTraverseScript (BFS flat list with parentId
+// links). selected may be true/false/null depending on whether the AX
+// element supports the selected attribute.
+const axTraverseNodeSchema = z.object({
+  id: z.number().int(),
+  parentId: z.number().int().nullable(),
+  depth: z.number().int(),
+  role: z.string(),
+  name: z.string(),
+  title: z.string(),
+  value: z.string(),
+  description: z.string(),
+  identifier: z.string(),
+  position: axPointSchema,
+  size: axSizeSchema,
+  enabled: z.boolean().nullable(),
+  focused: z.boolean().nullable(),
+  selected: z.boolean().nullable(),
+  childCount: z.number().int(),
+});
+
+// Diff change entry emitted by axDiffScript. `type` is one of
+// added/removed/changed; before/after only present on "changed",
+// value only present on "added". Modelled as a discriminated-ish
+// permissive shape because the script emits a mixed payload.
+const axDiffChangeSchema = z.object({
+  type: z.enum(["added", "removed", "changed"]),
+  path: z.string(),
+  value: z.string().optional(),
+  before: z.string().optional(),
+  after: z.string().optional(),
+});
 
 export function registerUiTools(server: McpServer, _config: AirMcpConfig): void {
   server.registerTool(
@@ -26,6 +135,16 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
           .min(1)
           .describe("Application name (e.g. 'Safari', 'Xcode') or bundle ID (e.g. 'com.apple.Safari')"),
       },
+      // Window titles and element labels come from user-controlled apps
+      // — untrusted markers applied via okUntrustedStructured.
+      outputSchema: {
+        activated: z.literal(true),
+        name: z.string(),
+        bundleIdentifier: z.string().nullable(),
+        pid: z.number().int(),
+        windowCount: z.number().int(),
+        windows: z.array(uiWindowInfoSchema),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -35,7 +154,15 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
     },
     async ({ appName }) => {
       try {
-        return okUntrusted(await runJxa(uiOpenAppScript(appName)));
+        const result = (await runJxa(uiOpenAppScript(appName))) as {
+          activated: true;
+          name: string;
+          bundleIdentifier: string | null;
+          pid: number;
+          windowCount: number;
+          windows: Array<unknown>;
+        };
+        return okUntrustedStructured(result);
       } catch (e) {
         return errJxaFor("open app", e);
       }
@@ -73,6 +200,26 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
           .default(0)
           .describe("If multiple elements match, click the one at this index (default: 0, first match)"),
       },
+      // Two distinct shapes: coordinate-click vs text-search click. We
+      // model both fields as optional so the schema covers both branches
+      // without needing a discriminated union (the JXA script picks one).
+      // method is "coordinate" or "text_search". `element.name/role`
+      // come from the AX tree (user-controlled), so the response is
+      // wrapped with untrusted markers.
+      outputSchema: {
+        clicked: z.literal(true),
+        method: z.enum(["coordinate", "text_search"]),
+        x: z.number().optional(),
+        y: z.number().optional(),
+        matchCount: z.number().int().optional(),
+        selectedIndex: z.number().int().optional(),
+        element: z
+          .object({
+            name: z.string(),
+            role: z.string(),
+          })
+          .optional(),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: true,
@@ -88,7 +235,16 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
         if ((x !== undefined) !== (y !== undefined)) {
           return errInvalidInput("Both x and y coordinates must be provided together");
         }
-        return ok(await runJxa(uiClickScript(appName, x, y, text, role, index)));
+        const result = (await runJxa(uiClickScript(appName, x, y, text, role, index))) as {
+          clicked: true;
+          method: "coordinate" | "text_search";
+          x?: number;
+          y?: number;
+          matchCount?: number;
+          selectedIndex?: number;
+          element?: { name: string; role: string };
+        };
+        return okUntrustedStructured(result);
       } catch (e) {
         return errJxaFor("click element", e);
       }
@@ -108,6 +264,11 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
           .optional()
           .describe("App name to activate before typing. If omitted, types into the frontmost app."),
       },
+      // length echoes input.text.length — no untrusted content.
+      outputSchema: {
+        typed: z.literal(true),
+        length: z.number().int(),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: true,
@@ -117,7 +278,8 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
     },
     async ({ text, appName }) => {
       try {
-        return ok(await runJxa(uiTypeScript(text, appName)));
+        const result = (await runJxa(uiTypeScript(text, appName))) as { typed: true; length: number };
+        return okStructured(result);
       } catch (e) {
         return errJxaFor("type text", e);
       }
@@ -146,6 +308,13 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
           .optional()
           .describe("App name to activate before pressing keys. If omitted, sends to the frontmost app."),
       },
+      // keyCode is only emitted when the key is a special-name mapping;
+      // for raw characters the script omits it. key echoes the input.
+      outputSchema: {
+        pressed: z.literal(true),
+        key: z.string(),
+        keyCode: z.number().int().optional(),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: true,
@@ -155,7 +324,12 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
     },
     async ({ key, modifiers, appName }) => {
       try {
-        return ok(await runJxa(uiPressKeyScript(key, modifiers, appName)));
+        const result = (await runJxa(uiPressKeyScript(key, modifiers, appName))) as {
+          pressed: true;
+          key: string;
+          keyCode?: number;
+        };
+        return okStructured(result);
       } catch (e) {
         return errJxaFor("press key", e);
       }
@@ -176,6 +350,12 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
           .optional()
           .describe("App name to activate before scrolling. If omitted, scrolls in the frontmost app."),
       },
+      // direction/amount echo the input — no untrusted content.
+      outputSchema: {
+        scrolled: z.literal(true),
+        direction: z.string(),
+        amount: z.number().int(),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -185,7 +365,12 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
     },
     async ({ direction, amount, appName }) => {
       try {
-        return ok(await runJxa(uiScrollScript(direction, amount, appName)));
+        const result = (await runJxa(uiScrollScript(direction, amount, appName))) as {
+          scrolled: true;
+          direction: string;
+          amount: number;
+        };
+        return okStructured(result);
       } catch (e) {
         return errJxaFor("scroll", e);
       }
@@ -217,6 +402,19 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
           .default(200)
           .describe("Maximum number of UI elements to return (default: 200)"),
       },
+      // windows contains recursive AX tree nodes (see uiTreeNodeSchema
+      // comment). Tree depth bounded by maxDepth; element strings are
+      // user-controlled — wrapped untrusted.
+      outputSchema: {
+        app: z.string(),
+        bundleIdentifier: z.string().nullable(),
+        windowCount: z.number().int(),
+        elementCount: z.number().int(),
+        truncated: z.boolean(),
+        maxDepth: z.number().int(),
+        windows: z.array(uiTreeNodeSchema),
+        menuBar: z.array(uiMenuItemSchema),
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -226,7 +424,17 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
     },
     async ({ appName, maxDepth, maxElements }) => {
       try {
-        return okUntrusted(await runJxa(uiReadScript(appName, maxDepth, maxElements)));
+        const result = (await runJxa(uiReadScript(appName, maxDepth, maxElements))) as {
+          app: string;
+          bundleIdentifier: string | null;
+          windowCount: number;
+          elementCount: number;
+          truncated: boolean;
+          maxDepth: number;
+          windows: Array<unknown>;
+          menuBar: Array<unknown>;
+        };
+        return okUntrustedStructured(result);
       } catch (e) {
         return errJxaFor("read UI", e);
       }
@@ -278,6 +486,19 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
           .default(8)
           .describe("Max tree depth to search (default: 8)"),
       },
+      // query echoes the input locator (free-form attribute map — we
+      // use z.record because identifiers and labels are caller-supplied
+      // strings and the locator shape may evolve). elements is a flat
+      // list of matched AX elements; their text fields are
+      // user-controlled, so the payload is wrapped untrusted.
+      outputSchema: {
+        app: z.string(),
+        pid: z.number().int(),
+        query: z.record(z.string(), z.unknown()),
+        matchCount: z.number().int(),
+        visited: z.number().int(),
+        elements: z.array(axQueryElementSchema),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
     async ({ app, role, title, value, description, identifier, label, maxResults, maxDepth }) => {
@@ -288,7 +509,15 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
           );
         }
         const locator: AXLocator = { app, role, title, value, description, identifier, label };
-        return okUntrusted(await runJxa(axQueryScript(locator, maxResults, maxDepth)));
+        const result = (await runJxa(axQueryScript(locator, maxResults, maxDepth))) as {
+          app: string;
+          pid: number;
+          query: Record<string, unknown>;
+          matchCount: number;
+          visited: number;
+          elements: Array<unknown>;
+        };
+        return okUntrustedStructured(result);
       } catch (e) {
         return errJxaFor("accessibility query", e);
       }
@@ -340,6 +569,14 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
           .default(0)
           .describe("If multiple matches, act on element at this index (default: 0)"),
       },
+      // result is a free-form action-result string ("clicked", "value
+      // set", "menu shown", or "<actionName> performed"). element is
+      // the AX element the action was applied to — user-controlled.
+      outputSchema: {
+        action: z.string(),
+        result: z.string(),
+        element: axQueryElementSchema,
+      },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
     async ({ app, role, title, value, description, identifier, label, action, actionValue, index }) => {
@@ -348,7 +585,12 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
           return errInvalidInput("At least one search criterion is required to locate the element.");
         }
         const locator: AXLocator = { app, role, title, value, description, identifier, label };
-        return ok(await runJxa(axPerformScript(locator, action, actionValue, index)));
+        const result = (await runJxa(axPerformScript(locator, action, actionValue, index))) as {
+          action: string;
+          result: string;
+          element: unknown;
+        };
+        return okUntrustedStructured(result);
       } catch (e) {
         return errJxaFor("perform action", e);
       }
@@ -381,11 +623,32 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
           .describe("Max elements to collect (default: 500)"),
         onlyVisible: z.boolean().optional().default(false).describe("Only include elements with visible position/size"),
       },
+      // Flat node list — parentId links nodes by id rather than nesting,
+      // so the schema is non-recursive. AX element text is
+      // user-controlled — payload wrapped untrusted.
+      outputSchema: {
+        app: z.string(),
+        pid: z.number().int(),
+        bundleId: z.string().nullable(),
+        totalElements: z.number().int(),
+        maxDepth: z.number().int(),
+        truncated: z.boolean(),
+        elements: z.array(axTraverseNodeSchema),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
     async ({ app, pid, maxDepth, maxElements, onlyVisible }) => {
       try {
-        return okUntrusted(await runJxa(axTraverseScript(app, pid, maxDepth, maxElements, onlyVisible)));
+        const result = (await runJxa(axTraverseScript(app, pid, maxDepth, maxElements, onlyVisible))) as {
+          app: string;
+          pid: number;
+          bundleId: string | null;
+          totalElements: number;
+          maxDepth: number;
+          truncated: boolean;
+          elements: Array<unknown>;
+        };
+        return okUntrustedStructured(result);
       } catch (e) {
         return errJxaFor("traverse UI", e);
       }
@@ -408,11 +671,23 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
           .describe("JSON string of previous UI tree snapshot (elements array from ui_traverse)"),
         app: z.string().max(500).optional().describe("App name to compare against"),
       },
+      // changes carries before/after AX values (user-controlled text)
+      // for each diff entry — payload wrapped untrusted.
+      outputSchema: {
+        app: z.string(),
+        changeCount: z.number().int(),
+        changes: z.array(axDiffChangeSchema),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
     async ({ beforeSnapshot, app }) => {
       try {
-        return okUntrusted(await runJxa(axDiffScript(beforeSnapshot, app)));
+        const result = (await runJxa(axDiffScript(beforeSnapshot, app))) as {
+          app: string;
+          changeCount: number;
+          changes: Array<unknown>;
+        };
+        return okUntrustedStructured(result);
       } catch (e) {
         return errJxaFor("UI diff", e);
       }

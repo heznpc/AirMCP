@@ -3,7 +3,7 @@ import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import { runAutomation } from "../shared/automation.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okUntrustedStructured, okStructured, errJxaFor } from "../shared/result.js";
+import { okUntrustedStructured, okStructured, errJxaFor } from "../shared/result.js";
 import { zFilePath, resolveAndGuard } from "../shared/validate.js";
 import {
   getClipboardScript,
@@ -301,6 +301,10 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
         subtitle: z.string().max(5000).optional().describe("Notification subtitle"),
         sound: z.string().max(500).optional().describe("Sound name to play (e.g. 'Frog', 'Glass', 'Hero')"),
       },
+      outputSchema: {
+        sent: z.literal(true),
+        message: z.string(),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -310,7 +314,9 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
     },
     async ({ message, title, subtitle, sound }) => {
       try {
-        return ok(await runJxa(showNotificationScript(message, title, subtitle, sound)));
+        return okStructured(
+          await runJxa<{ sent: true; message: string }>(showNotificationScript(message, title, subtitle, sound)),
+        );
       } catch (e) {
         return errJxaFor("show notification", e);
       }
@@ -331,6 +337,11 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
           .default("fullscreen")
           .describe("Capture region: fullscreen (default), window, or selection"),
       },
+      outputSchema: {
+        captured: z.literal(true),
+        path: z.string(),
+        sizeBytes: z.number().int(),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: true,
@@ -341,7 +352,9 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
     async ({ path, region }) => {
       try {
         resolveAndGuard(path);
-        return ok(await runJxa(captureScreenshotScript(path, region)));
+        return okStructured(
+          await runJxa<{ captured: true; path: string; sizeBytes: number }>(captureScreenshotScript(path, region)),
+        );
       } catch (e) {
         return errJxaFor("capture screenshot", e);
       }
@@ -389,6 +402,10 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       inputSchema: {
         enable: z.boolean().describe("True to enable WiFi, false to disable"),
       },
+      outputSchema: {
+        wifi: z.enum(["on", "off"]),
+        success: z.boolean(),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: true,
@@ -398,7 +415,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
     },
     async ({ enable }) => {
       try {
-        return ok(await runJxa(toggleWifiScript(enable)));
+        return okStructured(await runJxa<{ wifi: "on" | "off"; success: boolean }>(toggleWifiScript(enable)));
       } catch (e) {
         return errJxaFor("toggle wifi", e);
       }
@@ -501,6 +518,11 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       inputSchema: {
         level: z.number().min(0).max(1).describe("Brightness level from 0.0 (darkest) to 1.0 (brightest)"),
       },
+      outputSchema: {
+        brightness: z.number().min(0).max(1).nullable(),
+        success: z.boolean(),
+        error: z.string().optional(),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -510,7 +532,9 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
     },
     async ({ level }) => {
       try {
-        return ok(await runJxa(setBrightnessScript(level)));
+        return okStructured(
+          await runJxa<{ brightness: number | null; success: boolean; error?: string }>(setBrightnessScript(level)),
+        );
       } catch (e) {
         return errJxaFor("set brightness", e);
       }
@@ -525,6 +549,10 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       inputSchema: {
         enable: z.boolean().describe("True to enable Do Not Disturb, false to disable"),
       },
+      outputSchema: {
+        doNotDisturb: z.boolean(),
+        success: z.boolean(),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -534,7 +562,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
     },
     async ({ enable }) => {
       try {
-        return ok(await runJxa(toggleFocusModeScript(enable)));
+        return okStructured(await runJxa<{ doNotDisturb: boolean; success: boolean }>(toggleFocusModeScript(enable)));
       } catch (e) {
         return errJxaFor("toggle focus mode", e);
       }
@@ -549,6 +577,10 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       title: "System Sleep",
       description: "Put the Mac to sleep.",
       inputSchema: {},
+      outputSchema: {
+        action: z.string(),
+        success: z.boolean(),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: true,
@@ -558,7 +590,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
     },
     async () => {
       try {
-        return ok(await runJxa<{ action: string; success: boolean }>(systemSleepScript()));
+        return okStructured(await runJxa<{ action: string; success: boolean }>(systemSleepScript()));
       } catch (e) {
         return errJxaFor("system sleep", e);
       }
@@ -581,6 +613,11 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
           .default(3600)
           .describe("Duration in seconds (default: 3600 = 1 hour, max: 86400 = 24 hours)"),
       },
+      outputSchema: {
+        action: z.string(),
+        pid: z.number().int(),
+        seconds: z.number().int(),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -601,7 +638,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
         caffeinatePids.clear();
         const result = await runJxa<{ action: string; pid: number; seconds: number }>(preventSleepScript(seconds));
         caffeinatePids.add(result.pid);
-        return ok(result);
+        return okStructured(result);
       } catch (e) {
         return errJxaFor("prevent sleep", e);
       }
@@ -616,6 +653,10 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       inputSchema: {
         action: z.enum(["shutdown", "restart"]).describe("Power action: shutdown or restart"),
       },
+      outputSchema: {
+        action: z.string(),
+        success: z.boolean(),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: true,
@@ -625,7 +666,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
     },
     async ({ action }) => {
       try {
-        return ok(await runJxa<{ action: string; success: boolean }>(systemPowerScript(action)));
+        return okStructured(await runJxa<{ action: string; success: boolean }>(systemPowerScript(action)));
       } catch (e) {
         return errJxaFor("system power", e);
       }
@@ -643,11 +684,15 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       inputSchema: {
         name: z.string().min(1).max(500).describe("Application name (e.g. 'Safari', 'Xcode') or bundle ID"),
       },
+      outputSchema: {
+        launched: z.literal(true),
+        name: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
     async ({ name }) => {
       try {
-        return ok(await runJxa(launchAppScript(name)));
+        return okUntrustedStructured(await runJxa<{ launched: true; name: string }>(launchAppScript(name)));
       } catch (e) {
         return errJxaFor("launch app", e);
       }
@@ -662,11 +707,15 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       inputSchema: {
         name: z.string().min(1).max(500).describe("Application name (e.g. 'Safari')"),
       },
+      outputSchema: {
+        quit: z.literal(true),
+        name: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
     async ({ name }) => {
       try {
-        return ok(await runJxa(quitAppScript(name)));
+        return okUntrustedStructured(await runJxa<{ quit: true; name: string }>(quitAppScript(name)));
       } catch (e) {
         return errJxaFor("quit app", e);
       }
@@ -749,11 +798,20 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
           .optional()
           .describe("Specific window title. If omitted, targets the first window."),
       },
+      outputSchema: {
+        moved: z.literal(true),
+        app: z.string(),
+        position: z.tuple([z.number(), z.number()]),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ appName, x, y, windowTitle }) => {
       try {
-        return ok(await runJxa(moveWindowScript(appName, x, y, windowTitle)));
+        return okUntrustedStructured(
+          await runJxa<{ moved: true; app: string; position: [number, number] }>(
+            moveWindowScript(appName, x, y, windowTitle),
+          ),
+        );
       } catch (e) {
         return errJxaFor("move window", e);
       }
@@ -775,11 +833,20 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
           .optional()
           .describe("Specific window title. If omitted, targets the first window."),
       },
+      outputSchema: {
+        resized: z.literal(true),
+        app: z.string(),
+        size: z.tuple([z.number(), z.number()]),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ appName, width, height, windowTitle }) => {
       try {
-        return ok(await runJxa(resizeWindowScript(appName, width, height, windowTitle)));
+        return okUntrustedStructured(
+          await runJxa<{ resized: true; app: string; size: [number, number] }>(
+            resizeWindowScript(appName, width, height, windowTitle),
+          ),
+        );
       } catch (e) {
         return errJxaFor("resize window", e);
       }
@@ -804,11 +871,17 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
           .optional()
           .describe("Specific window title. If omitted, targets the first window."),
       },
+      outputSchema: {
+        app: z.string(),
+        minimized: z.boolean(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ appName, restore, windowTitle }) => {
       try {
-        return ok(await runJxa(minimizeWindowScript(appName, restore, windowTitle)));
+        return okUntrustedStructured(
+          await runJxa<{ app: string; minimized: boolean }>(minimizeWindowScript(appName, restore, windowTitle)),
+        );
       } catch (e) {
         return errJxaFor("minimize window", e);
       }

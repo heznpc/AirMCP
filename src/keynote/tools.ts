@@ -2,7 +2,7 @@ import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okUntrusted, toolError } from "../shared/result.js";
+import { okStructured, okUntrustedStructured, errJxaFor } from "../shared/result.js";
 import { zFilePath, resolveAndGuard } from "../shared/validate.js";
 import {
   listDocumentsScript,
@@ -16,6 +16,25 @@ import {
   closeDocumentScript,
 } from "./scripts.js";
 
+// Shared shape for the open-document descriptor returned by JXA. Keynote
+// reports `path` as null when the document hasn't been saved to disk yet
+// (untitled new documents), so the schema is explicit about nullability.
+const keynoteDocSchema = z.object({
+  name: z.string(),
+  path: z.string().nullable(),
+  modified: z.boolean(),
+});
+
+// Per-slide summary returned by listSlidesScript. Title and body fall back
+// to null when the slide layout has no default title/body item.
+const keynoteSlideSummarySchema = z.object({
+  number: z.number().int(),
+  skipped: z.boolean(),
+  title: z.string().nullable(),
+  body: z.string().nullable(),
+  presenterNotes: z.string(),
+});
+
 export function registerKeynoteTools(server: McpServer, _config: AirMcpConfig): void {
   server.registerTool(
     "keynote_list_documents",
@@ -23,13 +42,20 @@ export function registerKeynoteTools(server: McpServer, _config: AirMcpConfig): 
       title: "List Keynote Documents",
       description: "List all open Keynote presentations.",
       inputSchema: {},
+      // Wave 8 outputSchema: documents come from open Keynote files whose
+      // titles are user-controlled, so we mark the field as untrusted in
+      // the helper. The shape itself is fixed by the JXA script.
+      outputSchema: {
+        documents: z.array(keynoteDocSchema),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async () => {
       try {
-        return ok(await runJxa(listDocumentsScript()));
+        const documents = (await runJxa(listDocumentsScript())) as Array<unknown>;
+        return okUntrustedStructured({ documents });
       } catch (e) {
-        return toolError("list Keynote documents", e);
+        return errJxaFor("list Keynote documents", e);
       }
     },
   );
@@ -40,13 +66,17 @@ export function registerKeynoteTools(server: McpServer, _config: AirMcpConfig): 
       title: "Create Keynote Presentation",
       description: "Create a new blank Keynote presentation.",
       inputSchema: {},
+      outputSchema: {
+        name: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
     async () => {
       try {
-        return ok(await runJxa(createDocumentScript()));
+        const result = (await runJxa(createDocumentScript())) as { name: string };
+        return okStructured(result);
       } catch (e) {
-        return toolError("create Keynote presentation", e);
+        return errJxaFor("create Keynote presentation", e);
       }
     },
   );
@@ -59,13 +89,23 @@ export function registerKeynoteTools(server: McpServer, _config: AirMcpConfig): 
       inputSchema: {
         document: z.string().max(500).describe("Document name"),
       },
+      // Slide content (title/body/notes) is user-controlled text from the
+      // presentation, so we mark the structured payload as untrusted.
+      outputSchema: {
+        total: z.number().int(),
+        slides: z.array(keynoteSlideSummarySchema),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ document }) => {
       try {
-        return okUntrusted(await runJxa(listSlidesScript(document)));
+        const result = (await runJxa(listSlidesScript(document))) as {
+          total: number;
+          slides: Array<unknown>;
+        };
+        return okUntrustedStructured(result);
       } catch (e) {
-        return toolError("list Keynote slides", e);
+        return errJxaFor("list Keynote slides", e);
       }
     },
   );
@@ -79,13 +119,26 @@ export function registerKeynoteTools(server: McpServer, _config: AirMcpConfig): 
         document: z.string().max(500).describe("Document name"),
         slideNumber: z.number().int().min(1).describe("Slide number (1-based)"),
       },
+      // textItems and presenterNotes are user-authored content.
+      outputSchema: {
+        number: z.number().int(),
+        skipped: z.boolean(),
+        presenterNotes: z.string(),
+        textItems: z.array(z.object({ objectText: z.string() })),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ document, slideNumber }) => {
       try {
-        return okUntrusted(await runJxa(getSlideScript(document, slideNumber)));
+        const result = (await runJxa(getSlideScript(document, slideNumber))) as {
+          number: number;
+          skipped: boolean;
+          presenterNotes: string;
+          textItems: Array<{ objectText: string }>;
+        };
+        return okUntrustedStructured(result);
       } catch (e) {
-        return toolError("get Keynote slide", e);
+        return errJxaFor("get Keynote slide", e);
       }
     },
   );
@@ -98,13 +151,18 @@ export function registerKeynoteTools(server: McpServer, _config: AirMcpConfig): 
       inputSchema: {
         document: z.string().max(500).describe("Document name"),
       },
+      outputSchema: {
+        added: z.literal(true),
+        slideNumber: z.number().int(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
     async ({ document }) => {
       try {
-        return ok(await runJxa(addSlideScript(document)));
+        const result = (await runJxa(addSlideScript(document))) as { added: true; slideNumber: number };
+        return okStructured(result);
       } catch (e) {
-        return toolError("add Keynote slide", e);
+        return errJxaFor("add Keynote slide", e);
       }
     },
   );
@@ -119,13 +177,21 @@ export function registerKeynoteTools(server: McpServer, _config: AirMcpConfig): 
         slideNumber: z.number().int().min(1).describe("Slide number (1-based)"),
         notes: z.string().max(5000).describe("Presenter notes text"),
       },
+      outputSchema: {
+        updated: z.literal(true),
+        slideNumber: z.number().int(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ document, slideNumber, notes }) => {
       try {
-        return ok(await runJxa(setPresenterNotesScript(document, slideNumber, notes)));
+        const result = (await runJxa(setPresenterNotesScript(document, slideNumber, notes))) as {
+          updated: true;
+          slideNumber: number;
+        };
+        return okStructured(result);
       } catch (e) {
-        return toolError("set Keynote presenter notes", e);
+        return errJxaFor("set Keynote presenter notes", e);
       }
     },
   );
@@ -139,14 +205,19 @@ export function registerKeynoteTools(server: McpServer, _config: AirMcpConfig): 
         document: z.string().max(500).describe("Document name"),
         outputPath: zFilePath.describe("Absolute output path for the PDF file"),
       },
+      outputSchema: {
+        exported: z.literal(true),
+        path: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
     async ({ document, outputPath }) => {
       try {
         resolveAndGuard(outputPath);
-        return ok(await runJxa(exportPdfScript(document, outputPath)));
+        const result = (await runJxa(exportPdfScript(document, outputPath))) as { exported: true; path: string };
+        return okStructured(result);
       } catch (e) {
-        return toolError("export Keynote to PDF", e);
+        return errJxaFor("export Keynote to PDF", e);
       }
     },
   );
@@ -160,13 +231,21 @@ export function registerKeynoteTools(server: McpServer, _config: AirMcpConfig): 
         document: z.string().max(500).describe("Document name"),
         fromSlide: z.number().int().min(1).optional().default(1).describe("Start from slide number (default: 1)"),
       },
+      outputSchema: {
+        started: z.literal(true),
+        fromSlide: z.number().int(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
     async ({ document, fromSlide }) => {
       try {
-        return ok(await runJxa(startSlideshowScript(document, fromSlide)));
+        const result = (await runJxa(startSlideshowScript(document, fromSlide))) as {
+          started: true;
+          fromSlide: number;
+        };
+        return okStructured(result);
       } catch (e) {
-        return toolError("start Keynote slideshow", e);
+        return errJxaFor("start Keynote slideshow", e);
       }
     },
   );
@@ -180,13 +259,18 @@ export function registerKeynoteTools(server: McpServer, _config: AirMcpConfig): 
         document: z.string().max(500).describe("Document name"),
         saving: z.boolean().optional().default(true).describe("Save before closing (default: true)"),
       },
+      outputSchema: {
+        closed: z.literal(true),
+        name: z.string(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     },
     async ({ document, saving }) => {
       try {
-        return ok(await runJxa(closeDocumentScript(document, saving)));
+        const result = (await runJxa(closeDocumentScript(document, saving))) as { closed: true; name: string };
+        return okStructured(result);
       } catch (e) {
-        return toolError("close Keynote document", e);
+        return errJxaFor("close Keynote document", e);
       }
     },
   );

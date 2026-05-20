@@ -3,7 +3,7 @@ import { z } from "zod";
 import { readFile, stat, unlink } from "node:fs/promises";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { okUntrusted, errJxaFor } from "../shared/result.js";
+import { okStructured, okUntrustedStructured, errJxaFor } from "../shared/result.js";
 import {
   captureScreenScript,
   captureWindowScript,
@@ -19,7 +19,7 @@ import { BUFFER } from "../shared/constants.js";
  * and return MCP image content.
  */
 async function captureAndReturn(script: string) {
-  const result = await runJxa<{ path: string }>(script);
+  const result = (await runJxa<{ path: string }>(script)) as { path: string };
   const filePath = result.path;
   try {
     // Check file size BEFORE reading into memory to avoid OOM on huge screenshots
@@ -36,6 +36,7 @@ async function captureAndReturn(script: string) {
     const base64 = buffer.toString("base64");
     return {
       content: [{ type: "image" as const, data: base64, mimeType: "image/png" }],
+      structuredContent: { path: filePath },
     };
   } finally {
     try {
@@ -60,6 +61,13 @@ export function registerScreenTools(server: McpServer, _config: AirMcpConfig): v
           .min(1)
           .optional()
           .describe("Display number for multi-monitor setups (1 = main display). Omit for default display."),
+      },
+      // Wave 8 outputSchema: the JXA bridge returns the temp path of the
+      // PNG before TS reads and deletes it. The image bytes ship in
+      // `content`; structuredContent carries just the path for callers
+      // that want to log or correlate the capture.
+      outputSchema: {
+        path: z.string(),
       },
       annotations: {
         readOnlyHint: false,
@@ -92,6 +100,11 @@ export function registerScreenTools(server: McpServer, _config: AirMcpConfig): v
             "Application name to activate before capture (e.g. 'Safari', 'Xcode'). If omitted, captures the frontmost window.",
           ),
       },
+      // PNG bytes flow through `content`; structuredContent surfaces the
+      // temp path the JXA bridge produced before TS reads it.
+      outputSchema: {
+        path: z.string(),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -120,6 +133,11 @@ export function registerScreenTools(server: McpServer, _config: AirMcpConfig): v
         width: z.number().min(1).describe("Width of the capture region in pixels"),
         height: z.number().min(1).describe("Height of the capture region in pixels"),
       },
+      // PNG bytes flow through `content`; structuredContent surfaces the
+      // temp path the JXA bridge produced before TS reads it.
+      outputSchema: {
+        path: z.string(),
+      },
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -143,6 +161,21 @@ export function registerScreenTools(server: McpServer, _config: AirMcpConfig): v
       description:
         "List all visible windows across all running applications. Returns JSON with each window's app name, bundle ID, title, position, and size. Requires Accessibility permissions.",
       inputSchema: {},
+      // Window titles are user-controlled (browser tab names, document
+      // names, chat threads), so we mark the structured payload as
+      // untrusted. position/size come back as JXA tuples or null when
+      // Accessibility blocks the property read.
+      outputSchema: {
+        windows: z.array(
+          z.object({
+            app: z.string(),
+            bundleId: z.string(),
+            title: z.string(),
+            position: z.array(z.number()).nullable(),
+            size: z.array(z.number()).nullable(),
+          }),
+        ),
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -152,7 +185,8 @@ export function registerScreenTools(server: McpServer, _config: AirMcpConfig): v
     },
     async () => {
       try {
-        return okUntrusted(await runJxa(listWindowsScript()));
+        const windows = (await runJxa(listWindowsScript())) as Array<unknown>;
+        return okUntrustedStructured({ windows });
       } catch (e) {
         return errJxaFor("list windows", e);
       }
@@ -173,6 +207,13 @@ export function registerScreenTools(server: McpServer, _config: AirMcpConfig): v
           .min(1)
           .optional()
           .describe("Display number for multi-monitor setups (1 = main display). Omit for default display."),
+      },
+      // Recording metadata is system-generated (temp path + actual
+      // duration) — fixed shape, no user-controlled content.
+      outputSchema: {
+        path: z.string(),
+        duration: z.number().int(),
+        message: z.string(),
       },
       annotations: {
         readOnlyHint: false,
@@ -217,7 +258,7 @@ export function registerScreenTools(server: McpServer, _config: AirMcpConfig): v
           });
         }
 
-        const result = await recordPromise;
+        const result = (await recordPromise) as { path: string; duration: number };
         const { size } = await stat(result.path);
         if (size > BUFFER.CAPTURE) {
           try {
@@ -227,18 +268,11 @@ export function registerScreenTools(server: McpServer, _config: AirMcpConfig): v
           }
           throw new Error("Recording too large (>5MB). Use a shorter duration or smaller region.");
         }
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: JSON.stringify({
-                path: result.path,
-                duration: result.duration,
-                message: `Screen recorded for ${result.duration}s. File saved to ${result.path}`,
-              }),
-            },
-          ],
-        };
+        return okStructured({
+          path: result.path,
+          duration: result.duration,
+          message: `Screen recorded for ${result.duration}s. File saved to ${result.path}`,
+        });
       } catch (e) {
         return errJxaFor("record screen", e);
       }

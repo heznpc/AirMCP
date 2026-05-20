@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "../shared/mcp.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import { runSwift, checkSwiftBridge } from "../shared/swift.js";
-import { ok, okLinkedStructured, errSwift, errSwiftFor } from "../shared/result.js";
+import { okStructured, okLinkedStructured, errSwift, errSwiftFor } from "../shared/result.js";
 
 // Single source of truth for each Swift bridge payload. The zod shape drives
 // outputSchema validation; z.infer derives the TypeScript type that runSwift
@@ -171,14 +171,17 @@ export function registerHealthTools(server: McpServer, _config: AirMcpConfig): v
       description:
         "Request read-only HealthKit authorization. Call this first if other health tools return permission errors.",
       inputSchema: {},
+      outputSchema: {
+        authorized: z.boolean().describe("Whether HealthKit authorization was granted"),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async () => {
       const bridgeErr = await checkSwiftBridge();
       if (bridgeErr) return errSwift(`Swift bridge required: ${bridgeErr}`);
       try {
-        const result = await runSwift<{ authorized: boolean }>("health-authorize", "{}");
-        return ok(result);
+        const result = (await runSwift<{ authorized: boolean }>("health-authorize", "{}")) as { authorized: boolean };
+        return okStructured(result);
       } catch (e) {
         return errSwiftFor("authorize HealthKit", e);
       }

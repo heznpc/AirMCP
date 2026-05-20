@@ -39,3 +39,6 @@ llms-full.txt
 # Local env
 .env.local
 .vscode/
+
+# Claude Code local worktrees + project state
+.claude/

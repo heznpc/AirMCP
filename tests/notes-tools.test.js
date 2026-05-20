@@ -303,9 +303,12 @@ describe('create_note', () => {
     });
 
     expect(result.isError).toBeUndefined();
-    const parsed = JSON.parse(result.content[0].text);
-    expect(parsed.id).toBe('new-id');
-    expect(parsed.name).toBe('New Note');
+    // Wave 8: create_note now uses okUntrustedStructured — note titles
+    // are user-controlled, so the text envelope wraps the JSON in
+    // `[UNTRUSTED EXTERNAL CONTENT …]` markers. Read the validated
+    // structuredContent instead.
+    expect(result.structuredContent.id).toBe('new-id');
+    expect(result.structuredContent.name).toBe('New Note');
   });
 
   test('creates note in specified folder', async () => {
@@ -352,8 +355,8 @@ describe('update_note', () => {
     });
 
     expect(result.isError).toBeUndefined();
-    const parsed = JSON.parse(result.content[0].text);
-    expect(parsed.name).toBe('Updated Note');
+    // Wave 8: structuredContent carries the validated payload.
+    expect(result.structuredContent.name).toBe('Updated Note');
   });
 
   test('blocks update on shared note when includeShared=false', async () => {
@@ -385,8 +388,8 @@ describe('delete_note', () => {
     const result = await server.callTool('delete_note', { id: FAKE_NOTE_ID });
 
     expect(result.isError).toBeUndefined();
-    const parsed = JSON.parse(result.content[0].text);
-    expect(parsed.deleted).toBe(true);
+    // Wave 8: structuredContent carries the validated payload.
+    expect(result.structuredContent.deleted).toBe(true);
   });
 
   test('blocks deletion of shared note', async () => {

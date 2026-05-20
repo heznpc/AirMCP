@@ -4,10 +4,15 @@ import { executeSkill } from "./executor.js";
 import { eventBus, type AirMCPEvent } from "../shared/event-bus.js";
 import { runWithRequestContext, getRequestContext } from "../shared/request-context.js";
 import { randomUUID } from "node:crypto";
+import { loadDebounceState, getLastFired, recordFired } from "./debounce-state.js";
 
 interface TriggerBinding {
   skill: SkillDefinition;
   debounceMs: number;
+  /** Mirrors `debounce-state` for the hot dispatch path. Kept in sync
+   *  with the persisted store on every fire — losing this number is
+   *  fine across restarts because the persisted source of truth is
+   *  reloaded at startTriggerListener-time. */
   lastFired: number;
 }
 
@@ -89,8 +94,20 @@ function dispatch(evt: AirMCPEvent): void {
 
   const now = Date.now();
   for (const binding of list) {
-    if (now - binding.lastFired < binding.debounceMs) continue;
+    // Consult the persisted source of truth too — handles the window
+    // between `startTriggerListener` and `loadDebounceState` settling
+    // where `binding.lastFired` may still hold the registration-time
+    // zero. After settle this is the same value; correctness
+    // unaffected. Without the max() a daemon restarted seconds after
+    // a fire would re-fire immediately, the exact behaviour MEDIUM-12
+    // flagged.
+    const effectiveLastFired = Math.max(binding.lastFired, getLastFired(binding.skill.name, evt.type));
+    if (now - effectiveLastFired < binding.debounceMs) continue;
     binding.lastFired = now;
+    // Persist asynchronously. Failures already log inside recordFired;
+    // we don't await because the dispatch hot path must stay non-blocking
+    // — losing one persistence at most replays one event across a crash.
+    void recordFired(binding.skill.name, evt.type, now);
 
     // Fire and forget — don't block the event loop. `runWithRetry` handles
     // exponential backoff with jitter so bursty events (e.g. many calendar
@@ -99,12 +116,37 @@ function dispatch(evt: AirMCPEvent): void {
   }
 }
 
-/** Start listening for events and dispatching skills. Idempotent. */
+/** Start listening for events and dispatching skills. Idempotent.
+ *
+ *  Side effect: kicks off `loadDebounceState()` so the persisted
+ *  per-(skill, event) lastFired timestamps replace the cold zeros
+ *  initialised in `registerTrigger`. The load is async but the
+ *  hot-path `dispatch` reads via `getLastFired()` which returns 0
+ *  if the cache hasn't resolved yet — a worst-case "fire one extra
+ *  event per binding immediately after restart" rather than a hang.
+ *  Concrete: each `binding.lastFired` is patched in-place from the
+ *  persisted state as soon as the load settles. */
 export function startTriggerListener(server: McpServer): void {
   activeServer = server;
   if (listenerInstalled) return;
   eventBus.on("event", dispatch);
   listenerInstalled = true;
+  // Rehydrate every binding's lastFired from disk. If a binding is
+  // registered AFTER startTriggerListener (rare but legal), its
+  // registerTrigger call will also consult the freshly-loaded state.
+  loadDebounceState()
+    .then(() => {
+      for (const [eventType, list] of bindings) {
+        for (const b of list) {
+          const persisted = getLastFired(b.skill.name, eventType);
+          if (persisted > b.lastFired) b.lastFired = persisted;
+        }
+      }
+    })
+    .catch((err) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[AirMCP] Trigger debounce state load failed: ${msg}`);
+    });
 }
 
 /** Get all registered triggers for diagnostics. */

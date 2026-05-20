@@ -238,8 +238,11 @@ describe('launch_app', () => {
     const result = await server.callTool('launch_app', { name: 'Safari' });
 
     expect(result.isError).toBeUndefined();
-    const parsed = JSON.parse(result.content[0].text);
-    expect(parsed.launched).toBe(true);
+    // Wave 8: launch_app emits structuredContent validated against
+    // outputSchema. App names echo user input → wrapped as untrusted in
+    // the text envelope, so JSON.parse on content[0].text no longer
+    // works (the wrapper isn't valid JSON).
+    expect(result.structuredContent.launched).toBe(true);
   });
 
   test('returns error when app not found', async () => {
@@ -265,8 +268,8 @@ describe('quit_app', () => {
     const result = await server.callTool('quit_app', { name: 'TextEdit' });
 
     expect(result.isError).toBeUndefined();
-    const parsed = JSON.parse(result.content[0].text);
-    expect(parsed.quit).toBe(true);
+    // Wave 8: structuredContent over text JSON parse.
+    expect(result.structuredContent.quit).toBe(true);
   });
 });
 
@@ -334,14 +337,19 @@ describe('move_window', () => {
 
   test('moves a window to specified coordinates', async () => {
     const { server } = setup();
-    mockRunJxa.mockResolvedValue({ moved: true, app: 'Safari', x: 200, y: 100 });
+    // The real JXA script returns `position: [x, y]` (from
+    // `win.position()` — System Events emits a tuple). The pre-Wave-8
+    // mock returned `{x, y}` separately, which the old text-only
+    // assertion happily echoed; that was the mock-round-trip tautology
+    // the audit flagged. Aligned with the actual script shape now.
+    mockRunJxa.mockResolvedValue({ moved: true, app: 'Safari', position: [200, 100] });
 
     const result = await server.callTool('move_window', { appName: 'Safari', x: 200, y: 100 });
 
     expect(result.isError).toBeUndefined();
-    const parsed = JSON.parse(result.content[0].text);
-    expect(parsed.moved).toBe(true);
-    expect(parsed.x).toBe(200);
+    expect(result.structuredContent.moved).toBe(true);
+    expect(result.structuredContent.position[0]).toBe(200);
+    expect(result.structuredContent.position[1]).toBe(100);
   });
 });
 
@@ -352,13 +360,16 @@ describe('resize_window', () => {
 
   test('resizes a window', async () => {
     const { server } = setup();
-    mockRunJxa.mockResolvedValue({ resized: true, width: 800, height: 600 });
+    // Same correction as move_window: the script returns `size: [w, h]`,
+    // not flat `{width, height}`. Mock + assertion realigned.
+    mockRunJxa.mockResolvedValue({ resized: true, app: 'Safari', size: [800, 600] });
 
     const result = await server.callTool('resize_window', { appName: 'Safari', width: 800, height: 600 });
 
     expect(result.isError).toBeUndefined();
-    const parsed = JSON.parse(result.content[0].text);
-    expect(parsed.resized).toBe(true);
+    expect(result.structuredContent.resized).toBe(true);
+    expect(result.structuredContent.size[0]).toBe(800);
+    expect(result.structuredContent.size[1]).toBe(600);
   });
 });
 

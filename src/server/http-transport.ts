@@ -172,8 +172,16 @@ export function validateNetworkPolicy(ctx: {
         );
       }
       if (!/^https:\/\//.test(ctx.oauthIssuer)) {
+        // Report only the offending scheme — not the full URL value. The
+        // URL could carry an internal hostname an operator considers
+        // sensitive (private OIDC endpoint, customer-specific subdomain),
+        // and the FATAL log path emits this message to stderr where the
+        // menubar viewer / CI logs / log shipping pipelines can persist it.
+        // The operator can read their own env var to debug; we don't need
+        // to interpolate the value.
+        const scheme = ctx.oauthIssuer.split(":", 1)[0] || "<empty>";
         throw new Error(
-          `AIRMCP_OAUTH_ISSUER must be an https:// URL (got "${ctx.oauthIssuer}"). ` +
+          `AIRMCP_OAUTH_ISSUER must be an https:// URL (got scheme "${scheme}"). ` +
             "Plain http issuers are a security hole — reject at startup.",
         );
       }

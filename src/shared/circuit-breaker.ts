@@ -57,6 +57,15 @@ export class CircuitBreaker {
   private state: BreakerState = "closed";
   private consecutiveFailures = 0;
   private openedAt = 0;
+  /**
+   * True while a HALF_OPEN probe is currently `await`ing its `fn()`. Required
+   * to preserve the single-probe contract under concurrent callers: without
+   * this flag, two `execute()` calls landing after `openMs` would both see
+   * `state==="open"`, both transition to HALF_OPEN, and both run their `fn()`
+   * in parallel — exactly what the breaker is meant to prevent on a
+   * recovering upstream. (Caught by the audit at tests/circuit-breaker-race.test.js.)
+   */
+  private probeInFlight = false;
   private readonly name: string;
   private readonly failureThreshold: number;
   private readonly openMs: number;
@@ -74,8 +83,19 @@ export class CircuitBreaker {
       if (elapsed < this.openMs) {
         throw new BreakerOpenError(this.name, this.openMs - elapsed);
       }
+      // Transition to HALF_OPEN and claim the probe slot. Both writes are
+      // synchronous and run before the `await fn()` below, so they're
+      // atomic with respect to any other call to `execute()`.
       this.state = "half_open";
+      this.probeInFlight = true;
       log.info("circuit breaker probing (half-open)", { name: this.name });
+    } else if (this.state === "half_open" && this.probeInFlight) {
+      // Another call already claimed the probe slot and is awaiting fn().
+      // Reject this caller with retryInMs=0 so callers can retry the next
+      // tick — by then the in-flight probe has resolved and either closed
+      // the breaker (subsequent calls go through) or re-opened it
+      // (subsequent calls get a normal BreakerOpenError with retryInMs).
+      throw new BreakerOpenError(this.name, 0);
     }
 
     try {
@@ -103,6 +123,7 @@ export class CircuitBreaker {
     this.state = "closed";
     this.consecutiveFailures = 0;
     this.openedAt = 0;
+    this.probeInFlight = false;
   }
 
   private recordSuccess(): void {
@@ -111,6 +132,7 @@ export class CircuitBreaker {
     }
     this.state = "closed";
     this.consecutiveFailures = 0;
+    this.probeInFlight = false;
   }
 
   private recordFailure(): void {
@@ -127,6 +149,7 @@ export class CircuitBreaker {
   private trip(reason: "probe-failed" | "threshold-reached"): void {
     this.state = "open";
     this.openedAt = Date.now();
+    this.probeInFlight = false;
     const event = reason === "probe-failed" ? "re-opened" : "tripped — opening";
     log.warn(`circuit breaker ${event}`, {
       name: this.name,

@@ -126,6 +126,62 @@ describe("CircuitBreaker", () => {
     expect(b.getState()).toBe("closed");
   });
 
+  test("HALF_OPEN admits exactly one in-flight probe (concurrent callers)", async () => {
+    // Regression for the 2nd-pass audit (2026-05-21) — prior implementation
+    // let two concurrent callers both transition to HALF_OPEN and both run
+    // their fn() in parallel, violating the single-probe contract.
+    const b = new CircuitBreaker({ failureThreshold: 1, openMs: 10, name: "race" });
+    await expect(b.execute(async () => { throw new Error("trip"); })).rejects.toThrow("trip");
+    expect(b.getState()).toBe("open");
+    await new Promise((r) => setTimeout(r, 20));
+
+    let probeCalls = 0;
+    const slowProbe = async () => {
+      probeCalls++;
+      await new Promise((r) => setTimeout(r, 50));
+      return "probe-ok";
+    };
+    // Both calls land while the breaker is OPEN-past-deadline. Exactly one
+    // should claim the probe slot; the other must reject immediately with
+    // BreakerOpenError(retryInMs=0).
+    const [r1, r2] = await Promise.all([
+      b.execute(slowProbe).catch((e) => e),
+      b.execute(slowProbe).catch((e) => e),
+    ]);
+    expect(probeCalls).toBe(1);
+    const successes = [r1, r2].filter((r) => r === "probe-ok").length;
+    const rejections = [r1, r2].filter((r) => r instanceof BreakerOpenError).length;
+    expect(successes).toBe(1);
+    expect(rejections).toBe(1);
+    // After a successful probe the breaker should be closed and the probe
+    // slot released — a fresh call must go through.
+    expect(b.getState()).toBe("closed");
+    await b.execute(async () => "follow-up");
+  });
+
+  test("HALF_OPEN releases the probe slot after a failed probe", async () => {
+    // Companion to the race-probe test: a *failed* probe must also release
+    // the in-flight flag (it transitions back to OPEN, so subsequent
+    // callers get a normal BreakerOpenError with retryInMs > 0, not an
+    // immediate-retry response based on a stuck flag).
+    const b = new CircuitBreaker({ failureThreshold: 1, openMs: 10, name: "race-fail" });
+    await expect(b.execute(async () => { throw new Error("trip"); })).rejects.toThrow("trip");
+    await new Promise((r) => setTimeout(r, 20));
+
+    await expect(b.execute(async () => { throw new Error("probe-fail"); })).rejects.toThrow("probe-fail");
+    expect(b.getState()).toBe("open");
+    // Subsequent caller during the new OPEN window must see a retryInMs > 0,
+    // proving the probe slot did not leak the half_open lock.
+    try {
+      await b.execute(async () => "x");
+      throw new Error("expected BreakerOpenError");
+    } catch (e) {
+      expect(e).toBeInstanceOf(BreakerOpenError);
+      expect(e.message).toMatch(/retry in ~\d+ms/);
+      expect(e.message).not.toMatch(/retry in ~0ms/);
+    }
+  });
+
   test("BreakerOpenError carries the retry-in-ms message", async () => {
     const b = new CircuitBreaker({ failureThreshold: 1, openMs: 5_000, name: "open-meteo" });
     await expect(b.execute(async () => { throw new Error("trip"); })).rejects.toThrow("trip");

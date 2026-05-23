@@ -277,7 +277,16 @@ async function flushBuffer(): Promise<void> {
       // the JSON without _hmac/_prev, so verifiers reconstruct the same body.
       const body = JSON.stringify(obj);
       const hmac = computeHmac(prev, body);
-      const sealed = JSON.stringify({ ...obj, _prev: prev, _hmac: hmac });
+      // Build the sealed line by string surgery instead of `JSON.stringify({
+      // ...obj, _prev, _hmac })` to skip the second serialise of `obj`. Safe
+      // because: (1) `body` starts with "{" and ends with "}" — JSON.stringify
+      // of a non-null object is guaranteed to; (2) audit entries always carry
+      // at least timestamp/tool/args/status, so body is never the empty "{}"
+      // edge case where we'd need a leading comma guard; (3) `prev` and `hmac`
+      // are hex strings (`[0-9a-f]{64}`) and need no JSON escaping. Verifier
+      // round-trip (parse → delete _prev/_hmac → re-stringify) reconstructs
+      // exactly `body` because V8 preserves parsed-object insertion order.
+      const sealed = body.slice(0, -1) + `,"_prev":"${prev}","_hmac":"${hmac}"}`;
       sealedLines.push(sealed);
       lastHmac = hmac;
     } catch {

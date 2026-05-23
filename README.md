@@ -9,7 +9,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/heznpc/AirMCP)](https://github.com/heznpc/AirMCP/stargazers)
 
-**Apple-native agent runtime for any MCP client.** Skills DSL workflow engine, semantic memory, OAuth 2.1, HMAC-chained audit log — over native Swift bridges into EventKit, HealthKit, PhotoKit, Vision, and Foundation Models. 272 tools across 29 Apple + Google Workspace modules. Connect Claude, Codex, Gemini, Cursor, JetBrains Air, OpenClaw — any MCP-capable AI.
+**Apple-native agent runtime for any MCP client.** Skills DSL workflow engine, semantic memory, OAuth 2.1, HMAC-chained audit log — over native Swift bridges into EventKit, HealthKit, PhotoKit, Vision, and Foundation Models. 272 tools across 29 Apple + Google Workspace modules. Connect Claude, Codex, opencode, Gemini CLI, Cursor, Zed, Cline, JetBrains Air, OpenClaw — any MCP-capable AI.
 
 **Part of:** Human-Controlled AI Systems · Research Program 1 (anchor — Apple-side agent governance).
 
@@ -20,8 +20,8 @@
 ## What this is — at a glance
 
 - **Currently implemented** — 272 tools across 29 modules; HMAC-chained audit log with tamper-detection test suite; HITL approval per destructive call; rate limit (60/min + 10 destructive/hr); `allowNetwork` declarative HTTP policy (RFC 0002); OAuth 2.1 + Resource Indicators (RFC 0005 Steps 1+2 — RS256/ES256 JWT, scope gate, `.well-known/oauth-protected-resource` per RFC 9728); sessionless `.well-known/mcp.json` discovery; 232 Shortcuts/AppIntents auto-generated from the tool manifest; native SwiftUI menubar app (codesigned + notarized).
-- **Planned** — RFC 0005 Step 3 browser PKCE guide; stateless streamable HTTP for horizontal scale per MCP 2026 roadmap; iOS/visionOS exploration (v3.0+); marketplace listings on MCP Market, Cline, LobeHub. iOS companion server (`ios/Sources/AirMCPServer`, ~1500 LOC) is **preview**, not GA — macOS is the shipping surface.
-- **Design intent** — Core infra (HITL · audit · rate-limit · HMAC chain · network policy · OAuth scope gate) is the differentiated layer; the tool surface is broad and JXA-thin **by design**. JXA is the bridge, not the product. The interesting code lives in `src/shared/` (audit, rate-limit, HITL, network policy, OAuth gate, structured-content validators) and the Swift bridges (`swift/Sources/AirMCPKit`) for EventKit / HealthKit / PhotoKit / Vision / FoundationModels. Blast-radius unit is one tool call.
+- **Planned** — RFC 0005 Step 3 browser PKCE guide; stateless streamable HTTP for horizontal scale per MCP 2026 roadmap; iOS/visionOS exploration (v3.0+); consolidated registry re-publishing across Anthropic MCP Registry, Smithery, PulseMCP, Glama, MCP Market, Cline Marketplace, LobeHub (the `.well-known/mcp.json` endpoint is published, `mcpName` is set, and past ad-hoc registrations exist on some registries but their versions/metadata have drifted out of date — a single self-publishing PR will re-push the current manifest to each). iOS companion server (`ios/Sources/AirMCPServer`, ~1500 LOC) is **preview**, not GA — macOS is the shipping surface.
+- **Design intent** — Core infra (HITL · audit · rate-limit · HMAC chain · network policy · OAuth scope gate) is the differentiated layer; the tool surface is broad and JXA-thin **by design**. JXA is the bridge, not the product. The interesting code lives in `src/shared/` (audit, rate-limit, HITL, network policy, OAuth gate, structured-content validators) and the Swift bridges (`swift/Sources/AirMCPKit`) for EventKit / HealthKit / PhotoKit / Vision / FoundationModels. Blast-radius unit is one tool call. Adjacent to — not a replacement for — the canonical [Model Context Protocol reference servers](https://github.com/modelcontextprotocol/servers) (Everything, Filesystem, Fetch, Git, Memory, Sequential Thinking, Time); AirMCP fills the Apple-native domain those references leave open.
 - **Non-goals** — Per-session batched approval that covers "the next N calls" (failure mode this project is built around). Editable or skippable audit entries (the chain is load-bearing). Promising iOS parity on the public surface (preview only). Replacing native Apple apps — AirMCP automates them, it does not reimplement them. Headless / non-Apple platforms beyond what Google Workspace already provides.
 - **Redacted** — External persons, accounts, and any internal-case identifiers are deliberately omitted. Self-critical metrics ("wrapper percentage", coverage-as-quality) are not surfaced as positioning.
 
@@ -129,7 +129,7 @@ These are just starting points — with 272 tools across 29 Apple apps, the comb
 - **Semantic memory** — facts / entities / episodes with Gemini or on-device Swift embeddings. Persistent across restarts. This is agent context, not an OS feature.
 - **Safety primitives** — HITL approval, HMAC-chained audit log (88% coverage on safety-critical files), rate limiting, emergency stop, OAuth 2.1 + Resource Indicators (production-grade JWT verifier with RS256/ES256 + RFC 8707 audience + RFC 9728 protected-resource metadata + DPoP advertisement).
 - **Native Swift bridge** — direct access to EventKit / HealthKit / PhotoKit / Vision / Foundation Models. Not an `osascript` wrapper.
-- **Multi-client by design** — same server works for Claude, Codex, Gemini, Cursor, JetBrains Air, OpenClaw, ChatGPT (MCP Apps), and any future MCP-capable AI. No per-client porting.
+- **Multi-client by design** — same server works for Claude, Codex, opencode, Gemini CLI, Cursor, Zed, Cline, JetBrains Air, OpenClaw, ChatGPT (MCP Apps), and any future MCP-capable AI. No per-client porting.
 
 ### What AirMCP is — and isn't
 
@@ -148,7 +148,7 @@ These are just starting points — with 272 tools across 29 Apple apps, the comb
 | OAuth 2.1 + RFC 8707/9728         | —                       | —                 | ?                          | ❌                         | **Production JWT verifier (RS256/ES256) + RFC 8707 audience + RFC 9728 PRM + DPoP**               |
 | HMAC-chained audit log            | ❌                      | ❌                | ❌                         | ❌                         | **Tamper-detection via `summarizeAuditEntries`; 88% test coverage on safety-critical code**       |
 | Input validation                  | ❌                      | N/A               | ?                          | ❌                         | **Zod on every tool + outputSchema on ~75% of reads + script↔schema contract tests**              |
-| Multi-client                      | ❌                      | ❌                | ✅                         | ✅                         | **Claude / Codex / Gemini / Cursor / Air / OpenClaw / ChatGPT (MCP Apps) — any MCP-capable AI**   |
+| Multi-client                      | ❌                      | ❌                | ✅                         | ✅                         | **Claude / Codex / opencode / Gemini CLI / Cursor / Zed / Cline / Air / OpenClaw / ChatGPT (MCP Apps) — any MCP-capable AI** |
 | Native Swift API depth            | ❌                      | OS-blessed bridge | ?                          | AppleScript wrapper        | **Direct: EventKit, HealthKit, PhotoKit, Vision, Foundation Models**                              |
 | Google Workspace integration      | ❌                      | ❌                | ❌                         | ❌                         | **Gmail / Drive / Sheets / Calendar / Docs / Tasks / People — 14+ tools**                         |
 | **iOS: Siri / Shortcuts / Spotlight** | ❌                  | Native            | ❌                         | ❌                         | **232 auto-generated AppIntents + AppShortcutsProvider (RFC 0007)**                               |
@@ -1038,7 +1038,7 @@ Modules with OS requirements (e.g., Intelligence requires macOS 26+) are automat
 - **OAuth 2.1 browser PKCE flow guide** — RFC 0005 Step 3: docs for Managed Agents / Claude in Chrome clients (Steps 1+2 shipped in v2.11.0)
 - **Stateless streamable HTTP** — horizontal scale per MCP 2026 roadmap (session state externalized)
 - **iOS / visionOS exploration** (v3.0+)
-- **Marketplace listings** — MCP Market, Cline Marketplace, LobeHub (Anthropic MCP Registry + Smithery + PulseMCP + Glama already live)
+- **Consolidated registry re-publishing** — single self-publishing PR that re-pushes the current `.well-known/mcp.json` manifest + `mcpName` to Anthropic MCP Registry, Smithery, PulseMCP, Glama, MCP Market, Cline Marketplace, LobeHub. Past ad-hoc registrations exist on some of these but versions and metadata have drifted out of date; until the re-push lands, only the discovery endpoint itself (published on this server) reflects current state.
 
 ## Contributing
 

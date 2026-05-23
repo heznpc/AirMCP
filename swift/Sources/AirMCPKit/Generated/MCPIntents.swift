@@ -5332,7 +5332,7 @@ public struct PodcastPlaybackControlIntent: AppIntent {
 // Tool: prevent_sleep
 public struct PreventSleepIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Prevent Sleep"
-    nonisolated(unsafe) public static var description = IntentDescription("Prevent the Mac from sleeping for a specified duration using caffeinate. Returns the process PID for cancellation.")
+    nonisolated(unsafe) public static var description = IntentDescription("Prevent the Mac from sleeping for a specified duration using caffeinate. The assertion is transient — it auto-releases when the timer elapses; no manual stop is required.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}

@@ -13,6 +13,8 @@
  * complicate test mocking.
  */
 
+import { log } from "../shared/logger.js";
+
 export type ShutdownHook = () => Promise<void> | void;
 
 export const GRACEFUL_SHUTDOWN_TIMEOUT = 5000;
@@ -34,7 +36,9 @@ export async function runShutdownHooks(): Promise<void> {
     new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), GRACEFUL_SHUTDOWN_TIMEOUT)),
   ]);
   if (winner === "timeout") {
-    console.error(`[AirMCP] Shutdown hooks exceeded ${GRACEFUL_SHUTDOWN_TIMEOUT}ms budget; proceeding with exit.`);
+    log.warn("shutdown hooks exceeded budget — proceeding with exit", {
+      budgetMs: GRACEFUL_SHUTDOWN_TIMEOUT,
+    });
   }
 }
 

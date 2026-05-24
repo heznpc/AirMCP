@@ -9,10 +9,10 @@ import { getUnreadCountScript } from "../mail/scripts.js";
 import { AirMcpConfig, isModuleEnabled } from "./config.js";
 import { LIMITS } from "./constants.js";
 import { resourceCache } from "./cache.js";
-import { MemoryStore } from "../memory/store.js";
-// Memory reads are cheap (JSON file + in-memory cache) — a single lazy
-// instance shared across all `memory://…` resource requests.
-const memoryStore = new MemoryStore();
+import { getMemoryStore } from "../memory/instance.js";
+// Memory reads are cheap (JSON file + in-memory cache) — resolved at
+// call site (not at module load) so the singleton is shared with the
+// memory_* tools and remains substitutable in tests via _resetMemoryStore.
 
 const CACHE_TTL = {
   NOTES: 120_000, // 2min — notes change infrequently; event_subscribe invalidates on change
@@ -236,8 +236,9 @@ export function registerResources(server: McpServer, config?: AirMcpConfig): voi
   if (enabled("memory")) {
     jsonResource(server, "recent-memory", "memory://recent", "20 most recently updated context-memory entries", () =>
       resourceCache.getOrSet("memory:recent", CACHE_TTL.MAIL, async () => {
-        // memoryStore is lazy — no disk read until first call.
-        const entries = await memoryStore.query({ limit: 20, order: "desc" });
+        // Resolve at call site so put-then-read in the same process always
+        // sees the singleton's freshest cache.
+        const entries = await getMemoryStore().query({ limit: 20, order: "desc" });
         return { total: entries.length, entries };
       }),
     );

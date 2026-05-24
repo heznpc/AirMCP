@@ -19,10 +19,11 @@ import { usageTracker } from "./usage-tracker.js";
 import { auditLog } from "./audit.js";
 import { compactDescription } from "./tool-filter.js";
 import { withResultSizeHint } from "./result.js";
+import { log } from "./logger.js";
 import { traceToolCall } from "./telemetry.js";
 import { assertTestMode } from "./errors.js";
 import { checkRateLimit } from "./rate-limit.js";
-import { getOAuthClaims, getRequestContext, runWithRequestContext } from "./request-context.js";
+import { getOAuthClaims, getRequestContext, runWithRequestContext, getActor } from "./request-context.js";
 import { randomUUID } from "node:crypto";
 import { evaluateScopeGate } from "./oauth-scope.js";
 
@@ -216,10 +217,12 @@ class ToolRegistry {
   ): AnyFn | null {
     const lastArg = rest[rest.length - 1];
     if (typeof lastArg !== "function") {
-      console.error(
-        `[AirMCP] WARNING: ${method}() signature mismatch — callback not found at expected position. ` +
-          `SDK may have changed. ${entityType} "${name}" registered without interception.`,
-      );
+      log.warn("SDK signature mismatch — registered without interception", {
+        method,
+        entityType,
+        name,
+        note: "callback not found at expected position; SDK may have changed",
+      });
       origFn(name, ...rest);
       return null;
     }
@@ -270,6 +273,7 @@ class ToolRegistry {
                   tool: name,
                   args: args[0] as Record<string, unknown>,
                   status: "error",
+                  actor: getActor(),
                 });
               }
               throw new Error(msg);
@@ -296,6 +300,7 @@ class ToolRegistry {
                 tool: name,
                 args: args[0] as Record<string, unknown>,
                 status: "error",
+                actor: getActor(),
               });
             }
             throw new Error(msg);
@@ -312,6 +317,7 @@ class ToolRegistry {
                   args: args[0] as Record<string, unknown>,
                   status: "ok",
                   durationMs: Date.now() - start,
+                  actor: getActor(),
                 });
               }
               result = autoSizeHint(result);
@@ -324,6 +330,7 @@ class ToolRegistry {
                   args: args[0] as Record<string, unknown>,
                   status: "error",
                   durationMs: Date.now() - start,
+                  actor: getActor(),
                 });
               }
               throw e;
@@ -346,10 +353,10 @@ class ToolRegistry {
       // Validate config is an object (expected at rest[0])
       const hasConfig = rest.length >= 2;
       if (hasConfig && (typeof rest[0] !== "object" || rest[0] === null)) {
-        console.error(
-          `[AirMCP] WARNING: registerTool() config is not an object (got ${typeof rest[0]}). ` +
-            `Tool "${name}" registered without interception.`,
-        );
+        log.warn("registerTool() config is not an object — registered without interception", {
+          name,
+          configType: typeof rest[0],
+        });
         return (origRegisterTool as AnyFn)(name, ...rest);
       }
       const wrapped = wrapHandler(name, callback);

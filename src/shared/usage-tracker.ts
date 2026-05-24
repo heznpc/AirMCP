@@ -3,6 +3,7 @@ import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { PATHS } from "./constants.js";
 import { assertTestMode, formatError } from "./errors.js";
+import { log, errToCtx } from "./logger.js";
 
 interface UsageProfile {
   version: number;
@@ -221,7 +222,7 @@ class UsageTracker {
 }
 
 function logErr(context: string, e: unknown): void {
-  console.error(`[AirMCP UsageTracker] ${context} failed: ${formatError(e)}`);
+  log.warn("usage tracker step failed", { context, err: errToCtx(e) });
 }
 
 export const usageTracker = new UsageTracker();

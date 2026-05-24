@@ -1,0 +1,161 @@
+/**
+ * Tamper-detection test — verifies the HMAC chain ACTUALLY catches
+ * audit log mutation. The audit team's 2026-05-13 review noted:
+ *
+ *   "HMAC chain tamper detection 테스트 0건. Audit chain이 그렇게
+ *    자랑스러우면 '5 entries → flush → 가운데 line mutate →
+ *    audit_summary 호출 → verified:false 단정' 테스트가 있어야 함.
+ *    없음."
+ *
+ * The codebase ships `summarizeAuditEntries()` whose `verified` field
+ * is one of the strongest trust signals — but nothing was asserting it
+ * fires under real tampering. This test plugs that hole with four
+ * mutation shapes:
+ *   1. happy path — clean chain reports verified:true
+ *   2. body mutation — change one entry's args, _hmac no longer matches
+ *      → verified:false, reason:"hmac_mismatch"
+ *   3. prev-link mutation — change _prev on the middle line, chain
+ *      breaks at the seam → verified:false, reason:"prev_mismatch"
+ *   4. _hmac field shape corruption — non-hex value → verified:false,
+ *      reason:"malformed"
+ *
+ * If a future refactor weakens verifyAuditChain (e.g. silently tolerates
+ * mismatches, or only checks the last line), this test fires.
+ */
+import { describe, test, expect, beforeAll, beforeEach, afterAll } from '@jest/globals';
+import { mkdtemp, rm, readFile, writeFile, readdir } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+const workDir = await mkdtemp(join(tmpdir(), 'airmcp-tamper-'));
+process.env.AIRMCP_VECTOR_STORE_DIR = workDir;
+process.env.AIRMCP_AUDIT_HMAC_KEY = 'tamper-test-fixture-key';
+process.env.AIRMCP_AUDIT_LOG = 'true';
+
+afterAll(async () => {
+  if (workDir) await rm(workDir, { recursive: true, force: true }).catch(() => {});
+});
+
+const { auditLog, _testReset, _testFlush, summarizeAuditEntries } = await import(
+  '../dist/shared/audit.js'
+);
+
+async function wipeDir() {
+  const files = await readdir(workDir).catch(() => []);
+  for (const f of files) await rm(join(workDir, f), { force: true }).catch(() => {});
+}
+
+async function seedFiveEntries() {
+  _testReset();
+  await wipeDir();
+  for (let i = 0; i < 5; i++) {
+    auditLog({
+      timestamp: `2026-05-13T00:00:0${i}Z`,
+      tool: `tool_${i}`,
+      args: { i },
+      status: 'ok',
+    });
+  }
+  await _testFlush();
+}
+
+const AUDIT_PATH = join(workDir, 'audit.jsonl');
+
+describe('audit chain tamper detection', () => {
+  beforeEach(async () => {
+    await seedFiveEntries();
+  });
+
+  test('1. clean chain — summary reports verified:true', async () => {
+    const summary = await summarizeAuditEntries({
+      since: '2020-01-01T00:00:00Z',
+    });
+    expect(summary.verified).toBe(true);
+    expect(summary.verifiedFirstBreak).toBeUndefined();
+  });
+
+  test('2. body mutation — tool name changed mid-chain → verified:false, hmac_mismatch', async () => {
+    // Read all 5 sealed lines, mutate the middle one's `tool` field, write
+    // back. The _hmac is signed over the body — any body byte change
+    // invalidates the signature.
+    const raw = await readFile(AUDIT_PATH, 'utf-8');
+    const lines = raw.trimEnd().split('\n');
+    expect(lines).toHaveLength(5);
+
+    const middle = JSON.parse(lines[2]);
+    middle.tool = 'tampered_tool'; // mutation under signed envelope
+    lines[2] = JSON.stringify(middle);
+    await writeFile(AUDIT_PATH, lines.join('\n') + '\n', 'utf-8');
+
+    const summary = await summarizeAuditEntries({
+      since: '2020-01-01T00:00:00Z',
+    });
+    expect(summary.verified).toBe(false);
+    expect(summary.verifiedFirstBreak).toBeDefined();
+    expect(summary.verifiedFirstBreak.reason).toBe('hmac_mismatch');
+    // Index 2 is the third entry (0-indexed) — the one we mutated.
+    expect(summary.verifiedFirstBreak.lineIndex).toBe(2);
+  });
+
+  test('3. prev-link mutation — _prev flipped → verified:false, prev_mismatch', async () => {
+    const raw = await readFile(AUDIT_PATH, 'utf-8');
+    const lines = raw.trimEnd().split('\n');
+    const middle = JSON.parse(lines[2]);
+    // Recompute the _hmac for the mutated _prev so the body itself
+    // verifies — this isolates the prev_mismatch detection path from
+    // the body-mismatch path tested above.
+    const { createHmac } = await import('node:crypto');
+    middle._prev = 'f'.repeat(64);
+    const { _hmac: _h, _prev: _p, ...body } = middle;
+    middle._hmac = createHmac('sha256', 'tamper-test-fixture-key')
+      .update(middle._prev)
+      .update('\0')
+      .update(JSON.stringify(body))
+      .digest('hex');
+    lines[2] = JSON.stringify(middle);
+    await writeFile(AUDIT_PATH, lines.join('\n') + '\n', 'utf-8');
+
+    const summary = await summarizeAuditEntries({
+      since: '2020-01-01T00:00:00Z',
+    });
+    expect(summary.verified).toBe(false);
+    expect(summary.verifiedFirstBreak).toBeDefined();
+    expect(summary.verifiedFirstBreak.reason).toBe('prev_mismatch');
+  });
+
+  test('4. malformed _hmac — non-hex value → verified:false, malformed', async () => {
+    const raw = await readFile(AUDIT_PATH, 'utf-8');
+    const lines = raw.trimEnd().split('\n');
+    const middle = JSON.parse(lines[2]);
+    middle._hmac = 'not-a-valid-hex-hmac'; // wrong length AND wrong charset
+    lines[2] = JSON.stringify(middle);
+    await writeFile(AUDIT_PATH, lines.join('\n') + '\n', 'utf-8');
+
+    const summary = await summarizeAuditEntries({
+      since: '2020-01-01T00:00:00Z',
+    });
+    expect(summary.verified).toBe(false);
+    expect(summary.verifiedFirstBreak).toBeDefined();
+    expect(summary.verifiedFirstBreak.reason).toBe('malformed');
+  });
+
+  test('5. appended unauthorized entry — verified:false', async () => {
+    // Attacker who knows about the file but NOT the HMAC key tries to
+    // smuggle in a fake "ok" entry. They can craft any JSON, but they
+    // can't compute the right _hmac → verifier catches them.
+    const raw = await readFile(AUDIT_PATH, 'utf-8');
+    const fake = JSON.stringify({
+      timestamp: '2026-05-13T00:00:99Z',
+      tool: 'attacker_injected',
+      status: 'ok',
+      _prev: 'f'.repeat(64),
+      _hmac: '0'.repeat(64), // bogus signature
+    });
+    await writeFile(AUDIT_PATH, raw + fake + '\n', 'utf-8');
+
+    const summary = await summarizeAuditEntries({
+      since: '2020-01-01T00:00:00Z',
+    });
+    expect(summary.verified).toBe(false);
+  });
+});

@@ -6,7 +6,7 @@ Internal tracking doc for AirMCP's public-registry presence. Update the status c
 
 | Registry                       | Status                                           | Last action                               | Next step                                                                                                                                                                   |
 | ------------------------------ | ------------------------------------------------ | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Anthropic MCP Registry**     | Pending (submitted via Google Form, no response) | 2026-03-28                                | **Resubmit now** with the v2.11 description below — new differentiators: `.mcpb` one-click install, OAuth 2.1 + Resource Indicators, notarized macOS app, 229 AppIntents    |
+| **Anthropic MCP Registry**     | Pending (submitted via Google Form, no response) | 2026-03-28                                | **Resubmit now** with the v2.11 description below — new differentiators: `.mcpb` one-click install, OAuth 2.1 + Resource Indicators, notarized macOS app, 232 AppIntents    |
 | **Smithery.ai**                | Listed (`airmcp`)                                | Manifest auto-tracked via `smithery.yaml` | Request featured placement — v2.11 adds `.mcpb` + OAuth so the "only Apple-native production-grade MCP" angle is stronger than at v2.10                                     |
 | **Glama**                      | Listed (`AirMCP`)                                | `glama.json` present                      | Verify icon + category render on the live detail page; ask for category "Apple / macOS" pin                                                                                 |
 | **MCP Market (mcpmarket.com)** | Not submitted                                    | —                                         | **Submit this week** — see section below for the pitch (v2.11 headline)                                                                                                     |
@@ -54,7 +54,7 @@ When the counts or headline features change, walk this list before you touch any
 
 - [ ] `npm run stats:sync` shows **no** remaining diffs (zero "sync:" lines)
 - [ ] `server.json` `version` matches `package.json` version
-- [ ] `server.json` `description` reflects current headline features (v2.11: `.mcpb` one-click, OAuth 2.1, notarized app, 229 AppIntents, skills, memory, audit, allowNetwork)
+- [ ] `server.json` `description` reflects current headline features (v2.11: `.mcpb` one-click, OAuth 2.1, notarized app, 232 AppIntents, skills, memory, audit, allowNetwork)
 - [ ] `README.md` Features block mirrors the description — catches the case where one was updated without the other
 - [ ] `docs/index.html` hero + `tryit_footer` counts match the registry description
 - [ ] `CHANGELOG.md` `[Unreleased]` block names every user-visible change since the last registry ping

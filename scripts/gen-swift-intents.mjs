@@ -68,6 +68,7 @@ import {
   swiftOutputType,
   renderStruct,
   hasTypedOutput,
+  buildConfirmDialogBody,
 } from "./lib/codegen-helpers.mjs";
 
 // CLI wrappers: the lib throws on invalid enum value so tests can
@@ -241,8 +242,10 @@ for (const name of APP_SHORTCUTS_TOP) {
 // or more elaborate machinery — out of A.2b.2 scope.
 
 // isNullableUnion, nonNullType, isCodableSafe, swiftOutputType,
-// renderStruct, hasTypedOutput, outputTypeNameFor all imported from
-// scripts/lib/codegen-helpers.mjs.
+// renderStruct, hasTypedOutput, outputTypeNameFor, buildConfirmDialogBody
+// all imported from scripts/lib/codegen-helpers.mjs. The dialog-body
+// helper lives in lib so the test suite can import it without
+// triggering this script's top-level codegen run.
 
 function generateIntent(tool) {
   const structName = intentStructName(tool.name);
@@ -285,13 +288,22 @@ function generateIntent(tool) {
   // security posture (better than shipping an unconfirmed destructive
   // path to paper over the availability gap).
   //
+  // Dialog body is built from the tool's `description` so the user sees
+  // the actual consequence ("…moved to Recently Deleted, removed after
+  // 30 days") instead of a generic "cannot be undone" line — pre-fix the
+  // dialog was misleading for soft-delete tools like `delete_note` whose
+  // description explicitly documents the recovery window. We sanitize
+  // for the Swift string literal (no quotes / newlines / backslashes),
+  // cap at IntentDialog's practical readable length (240 chars), and
+  // fall through to the generic line when no description exists.
+  //
   // Parameter values — the interesting structured part (which event,
   // which file) — are rendered by Shortcuts automatically next to the
   // dialog, so we don't try to inject them into the prose.
   const confirmBlock = tool.annotations.destructiveHint
     ? `        try await requestConfirmation(
             actionName: ${intentActionNameFor(tool.name)},
-            dialog: IntentDialog("Run ${title} with AirMCP? This action is destructive and cannot be undone.")
+            dialog: IntentDialog("${buildConfirmDialogBody(tool)}")
         )
 `
     : "";

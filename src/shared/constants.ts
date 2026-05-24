@@ -46,6 +46,13 @@ export const API = {
   OLLAMA: envStr("AIRMCP_OLLAMA_URL", "http://localhost:11434"),
 } as const;
 
+/** Per-host circuit breaker identifiers. Must be compile-time constants —
+ *  the breaker registry has no eviction. Add new outbound hosts here. */
+export const BREAKER = {
+  OPEN_METEO: "open-meteo",
+  NOMINATIM: "nominatim",
+} as const;
+
 // ══════════════════════════════════════════════════════════════════════
 // EXTERNAL CDN DEPENDENCIES — pin versions here, change in one place
 // ══════════════════════════════════════════════════════════════════════
@@ -204,8 +211,8 @@ export const PATHS = {
   CONFIG: resolveTilde(envStr("AIRMCP_CONFIG_PATH", "~/.config/airmcp/config.json")),
   /** HITL socket */
   HITL_SOCKET: join(HOME, ".config", "airmcp", "hitl.sock"),
-  /** Vector store directory */
-  VECTOR_STORE: join(HOME, ".airmcp"),
+  /** Vector store directory (env: AIRMCP_VECTOR_STORE_DIR — primarily for tests) */
+  VECTOR_STORE: resolveTilde(envStr("AIRMCP_VECTOR_STORE_DIR", join(HOME, ".airmcp"))),
   /** Context-memory index directory (facts / entities / episodes). */
   MEMORY_DIR: join(HOME, ".cache", "airmcp"),
   /** Context-memory JSON store. */

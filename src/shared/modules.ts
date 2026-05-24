@@ -1,5 +1,6 @@
 import type { ModuleRegistration } from "./registry.js";
 import type { ModuleCompatibility } from "./compatibility.js";
+import { log, errToCtx } from "./logger.js";
 
 /**
  * Module manifest — the single source of truth for all AirMCP modules.
@@ -141,7 +142,7 @@ function getDebugWhitelist(): Set<string> | null {
     if (valid.has(n)) {
       whitelist.add(n);
     } else {
-      console.error(`[AirMCP] Debug: unknown module "${n}" — skipping (available: ${[...valid].join(", ")})`);
+      log.warn("Debug: unknown module — skipping", { module: n, available: [...valid] });
     }
   }
   return whitelist.size > 0 ? whitelist : null;
@@ -154,7 +155,7 @@ async function importModule(def: ModuleManifestEntry): Promise<ModuleRegistratio
     const toolsMod: Record<string, any> = await import(`../${def.name}/tools.js`);
     const toolsFn = findRegisterFn(toolsMod);
     if (!toolsFn) {
-      console.error(`[AirMCP] Warning: no register function found in ${def.name}/tools.ts`);
+      log.warn("no register function found in tools.ts", { module: def.name });
       return null;
     }
 
@@ -173,7 +174,7 @@ async function importModule(def: ModuleManifestEntry): Promise<ModuleRegistratio
       compatibility: def.compatibility,
     } as ModuleRegistration;
   } catch (e) {
-    console.error(`[AirMCP] Failed to load module ${def.name}: ${e instanceof Error ? e.message : String(e)}`);
+    log.error("failed to load module", { module: def.name, err: errToCtx(e) });
     return null;
   }
 }
@@ -188,12 +189,13 @@ export async function loadModuleRegistry(): Promise<ModuleRegistration[]> {
     : MODULE_MANIFEST;
 
   if (whitelist) {
-    console.error(
-      `[AirMCP] Debug mode: loading ${targets.length} module(s) — ${targets.map((m) => m.name).join(", ")}`,
-    );
+    log.info("Debug mode: loading whitelist subset (sequential loading optional)", {
+      count: targets.length,
+      modules: targets.map((m) => m.name),
+    });
   }
   if (sequential) {
-    console.error(`[AirMCP] Debug mode: sequential loading enabled`);
+    log.info("Debug mode: sequential loading enabled");
   }
 
   const registry: ModuleRegistration[] = [];
@@ -222,7 +224,7 @@ export async function loadModuleRegistry(): Promise<ModuleRegistration[]> {
   }
 
   if (failed.length > 0) {
-    console.error(`[AirMCP] Failed to load ${failed.length} module(s): ${failed.join(", ")}`);
+    log.error("failed to load modules", { count: failed.length, modules: failed });
   }
 
   cache = registry;

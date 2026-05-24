@@ -1,6 +1,7 @@
 import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { ok, errInvalidInput, errUpstream, toolError, toolErr } from "../shared/result.js";
+import { log, errToCtx } from "../shared/logger.js";
 import { buildSnapshot } from "../shared/resources.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import { isModuleEnabled } from "../shared/config.js";
@@ -96,7 +97,7 @@ export function registerCrossTools(mcpServer: McpServer, config: AirMcpConfig): 
               );
               return ok({ briefing: fmResult.output, model: "apple-foundation-models", fallback: true });
             } catch (fmErr) {
-              console.error(`[AirMCP] FM fallback failed: ${fmErr instanceof Error ? fmErr.message : String(fmErr)}`);
+              log.warn("foundation-models fallback failed", { err: errToCtx(fmErr) });
             }
           }
           let snapshot: unknown;

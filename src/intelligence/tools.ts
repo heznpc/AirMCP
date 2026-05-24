@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { AirMcpConfig } from "../shared/config.js";
 import { ok, okUntrusted, errSwift, errSwiftFor } from "../shared/result.js";
 import { runSwift, checkSwiftBridge } from "../shared/swift.js";
-import { zFilePath } from "../shared/validate.js";
+import { zFilePath, resolveAndGuard } from "../shared/validate.js";
 import {
   buildPlanPrompt,
   DEFAULT_PLAN_TOOLS,
@@ -310,6 +310,12 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
     },
     async ({ prompt, outputPath }) => {
       try {
+        // Symlink hardening: if outputPath is provided, force the realpath
+        // to live inside HOME so a tilde-rooted path with a symlinked
+        // parent can't trick ImageCreator into overwriting files outside
+        // the user's home (system caches, ~/.ssh/ symlinked into Desktop,
+        // etc.). Skip when outputPath is undefined — Swift defaults to /tmp.
+        if (outputPath) resolveAndGuard(outputPath);
         const result = await runSwift<GenerateImageResult>("generate-image", JSON.stringify({ prompt, outputPath }));
         return ok(result);
       } catch (e) {

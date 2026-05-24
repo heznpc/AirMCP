@@ -13,6 +13,7 @@ import { registerSemanticTools } from "../semantic/tools.js";
 import { registerResources } from "../shared/resources.js";
 import { registerSetupTools } from "../shared/setup.js";
 import { registerSkillEngine } from "../skills/index.js";
+import { log, errToCtx } from "../shared/logger.js";
 import { getRegisteredTriggers } from "../skills/triggers.js";
 import { registerApps } from "../apps/tools.js";
 import { getCompatibilityEnv, isModuleEnabled, NPM_PACKAGE_NAME, type AirMcpConfig } from "../shared/config.js";
@@ -108,7 +109,7 @@ export async function createServer(
       mod.tools(lServer, config);
       mod.prompts?.(lServer);
     } catch (e) {
-      console.error(`[AirMCP] Failed to register module ${mod.name}: ${e instanceof Error ? e.message : String(e)}`);
+      log.error("failed to register module", { module: mod.name, err: errToCtx(e) });
       disabled.push(mod.name);
       continue;
     }
@@ -117,7 +118,7 @@ export async function createServer(
 
     if (decision.decision === "register-with-deprecation") {
       deprecated.push(mod.name);
-      console.error(`[AirMCP] ${decision.reason}`);
+      log.warn("module registered with deprecation notice", { module: mod.name, reason: decision.reason });
     }
   }
   // Dynamic shortcut tools: auto-discover and register individual shortcuts
@@ -472,7 +473,7 @@ export async function createServer(
   // Index tool descriptions for semantic search (non-blocking, if enabled)
   if (config.features.semanticToolSearch) {
     indexToolDescriptions().catch((e) => {
-      console.error(`[AirMCP] Semantic tool index failed: ${e instanceof Error ? e.message : String(e)}`);
+      log.error("semantic tool index failed", { err: errToCtx(e) });
     });
   }
 

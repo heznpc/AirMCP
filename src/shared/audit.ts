@@ -3,8 +3,9 @@ import { join } from "node:path";
 import { hostname, platform } from "node:os";
 import { createHmac } from "node:crypto";
 import { AUDIT, PATHS } from "./constants.js";
-import { assertTestMode, formatError } from "./errors.js";
+import { assertTestMode } from "./errors.js";
 import { getCorrelationId } from "./request-context.js";
+import { log, errToCtx } from "./logger.js";
 
 const AUDIT_PATH = join(PATHS.VECTOR_STORE, "audit.jsonl");
 const AUDIT_DIR = PATHS.VECTOR_STORE;
@@ -150,7 +151,7 @@ function ensureFlushTimer(): void {
     // unexpected throws outside the inner try (e.g. ENOSPC during the buffer
     // swap, ESM/dynamic import failure) so the rejection never goes silent.
     flushBuffer().catch((err) => {
-      console.error(`[AirMCP Audit] flush timer error: ${formatError(err)}`);
+      log.error("audit: flush timer error", { err: errToCtx(err) });
     });
     flushTimer = null;
   }, AUDIT.FLUSH_INTERVAL);
@@ -172,7 +173,7 @@ function maybeAttemptRecovery(): void {
   if (!auditDisabled) return;
   const now = Date.now();
   if (now - auditDisabledSince < AUDIT_RECOVERY_INTERVAL_MS) return;
-  console.error("[AirMCP Audit] Recovery window elapsed — re-enabling and retrying flush.");
+  log.info("audit: recovery window elapsed — re-enabling and retrying flush");
   auditDisabled = false;
   auditDisabledSince = 0;
   consecutiveFlushFailures = 0;
@@ -181,42 +182,76 @@ function maybeAttemptRecovery(): void {
 
 /** On first flush after process start, scan the disk tail to extract
  *  the previous chain head — so the chain spans process restarts
- *  instead of forking at every boot. */
+ *  instead of forking at every boot.
+ *
+ *  Walks back through audit.jsonl first; if that file doesn't exist
+ *  (rotated-and-not-yet-rewritten race window) or contains no chained
+ *  entries, falls back to the most recent rotated file. Without this
+ *  fallback, a process restart that lands inside the "rotation just
+ *  happened, no new flush yet" window would silently reset the chain
+ *  to genesis and `verifyAuditChain` would report `verified: false` at
+ *  the seam — a false-positive that erodes the strongest trust signal
+ *  in the codebase.
+ */
 async function resumeChainHead(): Promise<void> {
   if (chainResumed) return;
   chainResumed = true;
+  if (await scanFileForChainHead(AUDIT_PATH, /* isPrimary */ true)) return;
+  // Primary file missing/empty/no-chain — walk rotated files newest-first.
+  let rotatedFiles: string[];
   try {
-    const raw = await readFile(AUDIT_PATH, "utf-8");
-    const lines = raw.trimEnd().split("\n");
-    let malformedCount = 0;
-    for (let i = lines.length - 1; i >= 0; i--) {
-      const line = lines[i];
-      if (!line) continue;
-      try {
-        const parsed = JSON.parse(line) as { _hmac?: string };
-        if (parsed._hmac && /^[0-9a-f]{64}$/.test(parsed._hmac)) {
-          lastHmac = parsed._hmac;
-          if (malformedCount > 0) {
-            console.error(
-              `[AirMCP Audit] resumed chain at lastHmac=${parsed._hmac.slice(0, 8)}…; skipped ${malformedCount} malformed line(s) — possible tampering or corruption (run audit_summary to verify).`,
-            );
-          }
-          return;
-        }
-      } catch {
-        // Malformed line in the tail. Tracked so an operator notices a
-        // pattern of corruption before it gets buried under fresh entries.
-        malformedCount++;
-      }
-    }
-    if (malformedCount > 0) {
-      console.error(
-        `[AirMCP Audit] no chain head found in ${lines.length} on-disk lines (${malformedCount} malformed) — restarting chain from genesis.`,
-      );
-    }
+    const all = await readdir(AUDIT_DIR);
+    rotatedFiles = all
+      .filter((f) => f !== "audit.jsonl" && f.startsWith(AUDIT_ROTATED_PREFIX) && f.endsWith(AUDIT_ROTATED_SUFFIX))
+      // Filenames are `audit.<Date.now()>.jsonl`; lex-sorting descending is
+      // chronological-descending for the next 200+ years (constant 13-digit
+      // millisecond timestamps). Sort reverse so we visit newest first.
+      .sort((a, b) => b.localeCompare(a));
   } catch {
-    // file missing or unreadable — start from genesis
+    return;
   }
+  for (const f of rotatedFiles) {
+    if (await scanFileForChainHead(join(AUDIT_DIR, f), /* isPrimary */ false)) return;
+  }
+}
+
+/** Returns true if a chain head was recovered from the given file. */
+async function scanFileForChainHead(path: string, isPrimary: boolean): Promise<boolean> {
+  let raw: string;
+  try {
+    raw = await readFile(path, "utf-8");
+  } catch {
+    return false;
+  }
+  const lines = raw.trimEnd().split("\n");
+  let malformedCount = 0;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i];
+    if (!line) continue;
+    try {
+      const parsed = JSON.parse(line) as { _hmac?: string };
+      if (parsed._hmac && /^[0-9a-f]{64}$/.test(parsed._hmac)) {
+        lastHmac = parsed._hmac;
+        if (malformedCount > 0) {
+          log.warn("audit: resumed chain past malformed lines — possible tampering or corruption", {
+            lastHmacPrefix: parsed._hmac.slice(0, 8),
+            skippedMalformed: malformedCount,
+            note: "run audit_summary to verify",
+          });
+        }
+        return true;
+      }
+    } catch {
+      malformedCount++;
+    }
+  }
+  if (malformedCount > 0 && isPrimary) {
+    log.warn("audit: no chain head found — falling back to rotated files", {
+      lines: lines.length,
+      malformed: malformedCount,
+    });
+  }
+  return false;
 }
 
 async function flushBuffer(): Promise<void> {
@@ -242,7 +277,16 @@ async function flushBuffer(): Promise<void> {
       // the JSON without _hmac/_prev, so verifiers reconstruct the same body.
       const body = JSON.stringify(obj);
       const hmac = computeHmac(prev, body);
-      const sealed = JSON.stringify({ ...obj, _prev: prev, _hmac: hmac });
+      // Build the sealed line by string surgery instead of `JSON.stringify({
+      // ...obj, _prev, _hmac })` to skip the second serialise of `obj`. Safe
+      // because: (1) `body` starts with "{" and ends with "}" — JSON.stringify
+      // of a non-null object is guaranteed to; (2) audit entries always carry
+      // at least timestamp/tool/args/status, so body is never the empty "{}"
+      // edge case where we'd need a leading comma guard; (3) `prev` and `hmac`
+      // are hex strings (`[0-9a-f]{64}`) and need no JSON escaping. Verifier
+      // round-trip (parse → delete _prev/_hmac → re-stringify) reconstructs
+      // exactly `body` because V8 preserves parsed-object insertion order.
+      const sealed = body.slice(0, -1) + `,"_prev":"${prev}","_hmac":"${hmac}"}`;
       sealedLines.push(sealed);
       lastHmac = hmac;
     } catch {
@@ -263,9 +307,11 @@ async function flushBuffer(): Promise<void> {
       consecutiveFlushFailures = 0;
     } catch (retryErr) {
       consecutiveFlushFailures++;
-      console.error(
-        `[AirMCP Audit] flush failed (${consecutiveFlushFailures}/${AUDIT.MAX_FLUSH_FAILURES}): ${retryErr}`,
-      );
+      log.error("audit: flush failed", {
+        attempts: consecutiveFlushFailures,
+        max: AUDIT.MAX_FLUSH_FAILURES,
+        err: errToCtx(retryErr),
+      });
       if (consecutiveFlushFailures >= AUDIT.MAX_FLUSH_FAILURES) {
         auditDisabled = true;
         auditDisabledSince = Date.now();
@@ -273,10 +319,10 @@ async function flushBuffer(): Promise<void> {
           clearTimeout(flushTimer);
           flushTimer = null;
         }
-        console.error(
-          `[AirMCP Audit] Too many consecutive flush failures — audit logging disabled. ` +
-            `Auto-retry in ${AUDIT_RECOVERY_INTERVAL_MS / 60_000} minutes (or next auditLog call after that window).`,
-        );
+        log.error("audit: too many consecutive flush failures — audit logging disabled", {
+          retryAfterMinutes: AUDIT_RECOVERY_INTERVAL_MS / 60_000,
+          note: "auto-retry after that window or on next auditLog call",
+        });
       }
     }
   } finally {
@@ -569,10 +615,18 @@ async function verifyAuditChain(): Promise<{
     const hmacField = entry._hmac;
     const prevField = entry._prev;
     if (typeof hmacField !== "string" || typeof prevField !== "string") continue; // legacy line
-    if (typeof hmacField !== "string" || !/^[0-9a-f]{64}$/.test(hmacField)) {
+    if (!/^[0-9a-f]{64}$/.test(hmacField)) {
       return { verified: false, firstBreak: { file, lineIndex, reason: "malformed" } };
     }
-    if (chainStarted && prevField !== prev) {
+    // The first chained line we encounter must trace back to genesis;
+    // every subsequent line must trace to the prior line's hmac.
+    // Folding both checks into one expression closes the audit gap from
+    // 2026-05-13: pre-fix, an attacker with the HMAC key could swap the
+    // entire on-disk file for a freshly-signed chain rooted at any
+    // arbitrary `_prev` value and still report `verified: true`, because
+    // the first-line `_prev` check was skipped (`chainStarted=false`).
+    const expectedPrev = chainStarted ? prev : HMAC_GENESIS;
+    if (prevField !== expectedPrev) {
       return { verified: false, firstBreak: { file, lineIndex, reason: "prev_mismatch" } };
     }
     // Reconstruct the body that was signed: entry minus _hmac/_prev.

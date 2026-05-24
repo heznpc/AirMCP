@@ -2,6 +2,8 @@
  * Simple counting semaphore for limiting concurrent subprocess calls.
  * Used by JXA, Swift bridge, and GWS CLI runners.
  */
+import { log } from "./logger.js";
+
 export class Semaphore {
   private running = 0;
   private readonly queue: Array<() => void> = [];
@@ -23,7 +25,7 @@ export class Semaphore {
 
   release(): void {
     if (this.running <= 0) {
-      console.error("[AirMCP] Semaphore double-release detected");
+      log.warn("semaphore double-release detected");
       this.running = 0;
       return;
     }

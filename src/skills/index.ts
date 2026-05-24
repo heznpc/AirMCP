@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { loadAllSkills, mergeSkills, watchUserSkills } from "./loader.js";
 import { registerSkills } from "./register.js";
 import { registerTrigger, resetTriggers, startTriggerListener } from "./triggers.js";
+import { log } from "../shared/logger.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // Resolves to dist/skills/builtins/ — works in repo checkout, npm cache, and git worktrees
@@ -25,7 +26,7 @@ export async function registerSkillEngine(server: McpServer): Promise<SkillEngin
   const merged = mergeSkills(builtins, user);
 
   if (merged.length === 0) {
-    console.error("[AirMCP] Skills engine: no skills found");
+    log.info("skills engine: no skills found");
     return { builtinCount: 0, userCount: 0 };
   }
 
@@ -43,7 +44,7 @@ export async function registerSkillEngine(server: McpServer): Promise<SkillEngin
   // Watch user skills directory for changes — only once per process
   if (!skillsWatcher) {
     skillsWatcher = watchUserSkills(() => {
-      console.error("[AirMCP] User skills changed. Restart server to apply changes.");
+      log.info("user skills changed — restart server to apply changes");
     });
   }
 

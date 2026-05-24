@@ -1,5 +1,6 @@
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, mkdir, rename, unlink } from "node:fs/promises";
 import { join } from "node:path";
+import { randomBytes } from "node:crypto";
 import { cosineSimilarity } from "./embeddings.js";
 import { PATHS, TIMEOUT } from "../shared/constants.js";
 
@@ -82,8 +83,32 @@ export class VectorStore {
   }
 
   private async save(store: VectorStoreData): Promise<void> {
+    // Atomic write: writing the embedding index in place is fatal if the
+    // process dies (SIGKILL, power loss, OOM-kill) midway — the half-written
+    // JSON fails to parse on next load(), which silently catches and resets
+    // to an empty index. That's hours of indexing time gone with no warning.
+    //
+    // Write to a sibling temp file in the same directory (so rename is a
+    // single inode swap on APFS / ext4 — atomic by POSIX guarantee), then
+    // rename onto STORE_PATH. If anything fails before rename, the old file
+    // is intact; if rename succeeds, the new file is intact. There is no
+    // observable mid-state.
     await mkdir(STORE_DIR, { recursive: true });
-    await writeFile(STORE_PATH, JSON.stringify(store), "utf-8");
+    const tmp = `${STORE_PATH}.${process.pid}.${randomBytes(4).toString("hex")}.tmp`;
+    try {
+      await writeFile(tmp, JSON.stringify(store), { encoding: "utf-8", mode: 0o600 });
+      await rename(tmp, STORE_PATH);
+    } catch (err) {
+      // Best-effort cleanup of the dangling temp file. Swallow ENOENT (the
+      // write may have failed before the file appeared) but rethrow the
+      // original error so the caller surfaces the real failure.
+      try {
+        await unlink(tmp);
+      } catch {
+        /* temp file never made it to disk */
+      }
+      throw err;
+    }
     this.cache = store;
     this.loadPromise = null; // Reset so next load reads fresh data if cache is cleared
   }

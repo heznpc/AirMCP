@@ -44,6 +44,26 @@ function countInDir(dir, pattern) {
 const tools = countInDir(SRC, /server\.registerTool\(/g);
 const prompts = countInDir(SRC, /server\.prompt\(/g);
 
+// AppIntent count — auto-generated from docs/tool-manifest.json by
+// scripts/gen-swift-intents.mjs. The generated file is the source of
+// truth; README/RFC/docs strings drift behind it and that drift has
+// repeatedly been the leading example of "docs lie" in audits. Count
+// every `: AppIntent {` conformance in the generated Swift file. If
+// the file is missing (fresh checkout pre-codegen) we report 0 rather
+// than crashing — the --check mode will then flag every doc as stale,
+// which is the correct loud signal.
+const INTENTS_PATH = join(ROOT, "swift", "Sources", "AirMCPKit", "Generated", "MCPIntents.swift");
+let appIntents = 0;
+if (existsSync(INTENTS_PATH)) {
+  const intentsContent = readFileSync(INTENTS_PATH, "utf-8");
+  // `: AppIntent {` matches the protocol conformance opening. `: AppIntent,`
+  // is unused in the generator output today but kept in the alternation
+  // so a future "conforms to AppIntent + Sendable" pattern doesn't silently
+  // start under-counting.
+  const matches = intentsContent.match(/:\s*AppIntent\s*[\{,]/g);
+  appIntents = matches ? matches.length : 0;
+}
+
 // MCP Apps (interactive UI views via @modelcontextprotocol/ext-apps).
 // Registered separately from regular tools via `registerAppTool` rather than
 // `server.registerTool`, so the 272-tool count above legitimately excludes
@@ -71,7 +91,7 @@ const modules = moduleBlock
   ? (moduleBlock[1].match(/"/g) || []).length / 2
   : 0;
 
-const stats = { tools, prompts, resources, modules, mcpApps };
+const stats = { tools, prompts, resources, modules, mcpApps, appIntents };
 
 // ── Print mode ─────────────────────────────────────────────────────
 
@@ -124,14 +144,18 @@ function syncFile(relPath, replacements) {
 // ── Run ────────────────────────────────────────────────────────────
 
 console.log(
-  `\nStats ${mode}: ${tools} tools, ${prompts} prompts, ${resources} resources, ${modules} modules, ${mcpApps} MCP Apps\n`,
+  `\nStats ${mode}: ${tools} tools, ${prompts} prompts, ${resources} resources, ${modules} modules, ${mcpApps} MCP Apps, ${appIntents} AppIntents\n`,
 );
 
-// README.md
+// README.md — also picks up the two lines audits keep flagging:
+//   "**229 Shortcuts / Siri AppIntents**" → reconciled with generated file
+//   "**34 prompts + 14 YAML skill built-ins**" → reconciled with src count
 syncFile("README.md", [
   { pattern: /\*\*(\d+) tools\*\*/, value: tools },
   { pattern: /(\d+) modules\)/g, value: modules },
   { pattern: /(\d+) Apple apps/g, value: modules },
+  { pattern: /\*\*(\d+) Shortcuts \/ Siri AppIntents\*\*/, value: appIntents },
+  { pattern: /\*\*(\d+) prompts \+ /, value: prompts },
 ]);
 
 // AGENTS.md
@@ -154,10 +178,22 @@ for (const page of docsPages) {
   syncFile(page, [{ pattern: /(\d+) modules/g, value: modules }]);
 }
 
+// MCPB manifest template — the long_description string lives in the user
+// install dialog, so a stale count is highly visible.
+syncFile("mcpb/manifest.template.json", [
+  { pattern: /(\d+) auto-generated Apple App Intents/g, value: appIntents },
+]);
+
 // Other docs
 syncFile("docs/skills.md", [
   { pattern: /(\d+) tools/g, value: tools },
   { pattern: /(\d+) modules/g, value: modules },
+]);
+syncFile("docs/shortcuts.md", [
+  { pattern: /(\d+) tools are auto-registered/g, value: tools },
+]);
+syncFile("docs/REGISTRY_SUBMISSIONS.md", [
+  { pattern: /(\d+) AppIntents/g, value: appIntents },
 ]);
 syncFile("docs/TERMS_OF_SERVICE.md", [
   { pattern: /(\d+) tools/g, value: tools },

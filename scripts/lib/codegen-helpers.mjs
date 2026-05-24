@@ -596,3 +596,37 @@ export function deriveFollowUpFactorySpecs(resolvedMap) {
     ).values(),
   );
 }
+
+// ── Destructive confirmation dialog body (RFC 0007 A.3) ──────────────
+//
+// The IntentDialog string Shortcuts / Siri shows BEFORE a destructive
+// AppIntent runs. Pre-fix every destructive tool got the same generic
+// "cannot be undone" line, which was wrong for soft deletes
+// (`delete_note` → 30-day Recently Deleted) and over-dramatic for
+// non-deletion destructives like `bulk_move_notes` (rearranges, doesn't
+// destroy data). The fix leads with the tool's title and follows with
+// a per-tool consequence drawn from `tool.description`.
+//
+// The host string IS double-quoted on the Swift side, so we sanitize
+// the four characters that would break the literal (CR, LF, backslash,
+// double-quote). Internal whitespace runs collapse so the rendered
+// dialog doesn't show double spaces. Output is capped at 220 chars
+// (empirical safe length on iOS 26 Shortcuts before mid-clause
+// truncation) with a trailing ellipsis when truncation fires.
+//
+// Lives in `scripts/lib/codegen-helpers.mjs` (not in
+// `gen-swift-intents.mjs`) so the test suite can import it without
+// also triggering the top-level codegen run inside that script.
+export function buildConfirmDialogBody(tool) {
+  const titleSrc = (tool.title ?? tool.name ?? "").trim();
+  const descSrc = (tool.description ?? "").trim();
+  const sanitize = (s) => s.replace(/[\r\n\\"]/g, " ").replace(/\s+/g, " ").trim();
+  const safeTitle = sanitize(titleSrc);
+  const safeDesc = sanitize(descSrc);
+  const head = safeTitle ? `${safeTitle} with AirMCP?` : "Run this AirMCP action?";
+  // No description → fall back to the historical generic body. Keeps
+  // future description-less tools from rendering a stub dialog.
+  if (!safeDesc) return `${head} This action is destructive and cannot be undone.`;
+  const body = `${head} ${safeDesc}`;
+  return body.length > 220 ? body.slice(0, 217).trimEnd() + "…" : body;
+}

@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import { log, errToCtx } from "./logger.js";
 
 export type AirMCPEventType =
   | "calendar_changed"
@@ -67,10 +68,10 @@ class EventBus extends EventEmitter {
       // failure so protocol drift between the Swift side and Node side
       // does not go undetected.
       if (line.includes('"event"') || line.includes('"type"')) {
-        const msg = e instanceof Error ? e.message : String(e);
-        console.error(
-          `[AirMCP event-bus] Malformed event line dropped: ${msg} — ${line.slice(0, 120)}${line.length > 120 ? "…" : ""}`,
-        );
+        log.warn("event-bus: malformed event line dropped", {
+          err: errToCtx(e),
+          preview: line.slice(0, 120) + (line.length > 120 ? "…" : ""),
+        });
       }
     }
   }

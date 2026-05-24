@@ -13,7 +13,8 @@ import type { McpServer } from "../shared/mcp.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import { z } from "zod";
 import { okStructured, errInvalidInput, toolError } from "../shared/result.js";
-import { MemoryStore, type MemoryKind } from "./store.js";
+import { type MemoryKind } from "./store.js";
+import { getMemoryStore } from "./instance.js";
 
 const kindSchema = z.enum(["fact", "entity", "episode"]);
 
@@ -33,7 +34,7 @@ const memoryEntrySchema = z.object({
 });
 
 export function registerMemoryTools(server: McpServer, _config: AirMcpConfig): void {
-  const store = new MemoryStore();
+  const store = getMemoryStore();
 
   server.registerTool(
     "memory_put",

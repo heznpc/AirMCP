@@ -1,5 +1,6 @@
 import { runSwift, hasSwiftCommand } from "./swift.js";
 import { runJxa } from "./jxa.js";
+import { log, errToCtx } from "./logger.js";
 
 /**
  * Run an automation command, preferring Swift bridge when available.
@@ -30,9 +31,10 @@ export async function runAutomation<T>(options: {
       return await runSwift<T>(options.swift.command, JSON.stringify(options.swift.input ?? {}));
     } catch (swiftErr) {
       // Swift bridge failed — fall through to JXA fallback
-      console.error(
-        `[AirMCP] Swift bridge failed for "${options.swift.command}", falling back to JXA: ${swiftErr instanceof Error ? swiftErr.message : String(swiftErr)}`,
-      );
+      log.warn("swift bridge failed — falling back to JXA", {
+        command: options.swift.command,
+        err: errToCtx(swiftErr),
+      });
     }
   }
 

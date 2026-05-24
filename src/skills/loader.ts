@@ -2,6 +2,7 @@ import { readFileSync, readdirSync, mkdirSync, watch, type FSWatcher } from "nod
 import { join } from "node:path";
 import { parse } from "yaml";
 import { SkillDefinitionSchema, type SkillDefinition } from "./types.js";
+import { log, errToCtx } from "../shared/logger.js";
 
 const USER_SKILLS_DIR = join(process.env.HOME ?? process.env.USERPROFILE ?? "", ".config", "airmcp", "skills");
 
@@ -11,13 +12,16 @@ export function loadSkillFile(path: string): SkillDefinition | null {
   try {
     const raw = readFileSync(path, "utf-8");
     if (raw.length > MAX_SKILL_FILE_SIZE) {
-      console.error(`[AirMCP] Skill file too large (${raw.length} bytes, max ${MAX_SKILL_FILE_SIZE}): ${path}`);
+      log.warn("skill file too large", { path, bytes: raw.length, maxBytes: MAX_SKILL_FILE_SIZE });
       return null;
     }
     const parsed = parse(raw);
     const result = SkillDefinitionSchema.safeParse(parsed);
     if (!result.success) {
-      console.error(`[AirMCP] Invalid skill ${path}: ${result.error.issues.map((i) => i.message).join(", ")}`);
+      log.warn("invalid skill — schema validation failed", {
+        path,
+        issues: result.error.issues.map((i) => i.message),
+      });
       return null;
     }
     // Inputs share the template namespace with step ids — catching the
@@ -28,15 +32,13 @@ export function loadSkillFile(path: string): SkillDefinition | null {
       const stepIds = new Set(result.data.steps.map((s) => s.id));
       const collisions = Object.keys(result.data.inputs).filter((name) => stepIds.has(name));
       if (collisions.length > 0) {
-        console.error(
-          `[AirMCP] Invalid skill ${path}: input name(s) collide with step id(s): ${collisions.join(", ")}`,
-        );
+        log.warn("invalid skill — input name(s) collide with step id(s)", { path, collisions });
         return null;
       }
     }
     return result.data;
   } catch (e) {
-    console.error(`[AirMCP] Failed to load skill ${path}: ${e instanceof Error ? e.message : String(e)}`);
+    log.warn("failed to load skill", { path, err: errToCtx(e) });
     return null;
   }
 }
@@ -78,7 +80,7 @@ export function mergeSkills(builtins: SkillDefinition[], user: SkillDefinition[]
   }
   for (const s of user) {
     if (protectedNames.has(s.name)) {
-      console.error(`[AirMCP] User skill "${s.name}" conflicts with built-in skill — skipping`);
+      log.warn("user skill conflicts with built-in — skipping", { name: s.name });
       continue;
     }
     map.set(s.name, s); // user adds new skills only

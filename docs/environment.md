@@ -95,14 +95,15 @@ If a variable accepts a path, `~` expands to `$HOME`. Booleans are `"true"` / `"
 
 | Variable | Default | Notes |
 |---|---|---|
-| `AIRMCP_EMBEDDING_PROVIDER` | `gemini` | One of `gemini` / `ollama`. |
+| `AIRMCP_LOCAL_ONLY` | (off) | `true` / `1` disables every cloud embedding path. `detectProvider` returns `swift` or `none` only, the hybrid Swift→Gemini fallback is refused (Swift error surfaces to the caller instead of silent re-try), and `AIRMCP_EMBEDDING_PROVIDER=gemini`/`hybrid` is overridden with a stderr warning. Set this when you want a hard privacy contract — note titles + previews stay on-device. |
+| `AIRMCP_EMBEDDING_PROVIDER` | (auto-detect) | Explicit override. One of `gemini` / `swift` / `hybrid` / `none`. Auto-detect picks `hybrid` if both `GEMINI_API_KEY` and the Swift bridge are available, else the highest-priority single backend. Rejected with warning under `AIRMCP_LOCAL_ONLY=true`. |
 | `AIRMCP_EMBEDDING_MODEL` | `gemini-embedding-2` | Override for the Gemini provider. |
 | `AIRMCP_EMBEDDING_DIM` | `256` | Output dim (256/512/1024/2048/3072). 256 is optimal for tool/note search. |
 | `AIRMCP_EMBED_CACHE_MAX_MB` | `256` | LRU embedding cache cap in megabytes. |
-| `AIRMCP_OLLAMA_URL` | `http://localhost:11434` | Local Ollama HTTP API. |
-| `AIRMCP_OLLAMA_MODEL` | (provider default) | Override the Ollama model name. |
 | `AIRMCP_GEMINI_API_URL` | (default endpoint) | Override the Gemini base URL. |
 | `AIRMCP_INDEX_COOLDOWN` | `300000` (5 min) | Backoff after an indexing failure before retry. |
+
+> When `hybrid` mode falls back from Swift to Gemini, AirMCP writes an `__embedding_fallback` line to the audit log with the original Swift error reason. `audit_summary` surfaces every cloud crossing so the trail is visible even when `AIRMCP_LOCAL_ONLY` is off.
 
 ---
 

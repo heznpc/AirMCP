@@ -8,6 +8,7 @@ import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { randomUUID, timingSafeEqual, randomBytes, createHash } from "node:crypto";
 import { NPM_PACKAGE_NAME } from "../shared/config.js";
 import { LIMITS, TIMEOUT } from "../shared/constants.js";
+import { log, errToCtx } from "./../shared/logger.js";
 import { printBanner } from "../shared/banner.js";
 import { auditLog } from "../shared/audit.js";
 import { SERVER_ICON, WEBSITE_URL } from "../shared/icons.js";
@@ -171,8 +172,15 @@ export function validateNetworkPolicy(ctx: {
         );
       }
       if (!/^https:\/\//.test(ctx.oauthIssuer)) {
+        // No part of the issuer value flows into the error message — not
+        // even the scheme. The URL can carry an internal hostname an
+        // operator treats as sensitive, and this error reaches stderr via
+        // the FATAL log path. The operator can read their own env var to
+        // debug; the message just names the contract that was violated.
+        // (Avoids CodeQL js/clear-text-logging on the taint flow into the
+        // logger sink.)
         throw new Error(
-          `AIRMCP_OAUTH_ISSUER must be an https:// URL (got "${ctx.oauthIssuer}"). ` +
+          "AIRMCP_OAUTH_ISSUER must be an https:// URL. " +
             "Plain http issuers are a security hole — reject at startup.",
         );
       }
@@ -189,18 +197,16 @@ export function validateNetworkPolicy(ctx: {
       // The server will refuse tool calls until Step 2 lands; for now, the
       // .well-known card advertises OAuth support so Managed Agents /
       // discovery clients can see the auth model before they try.
-      console.error(
-        `[AirMCP] allowNetwork=${ctx.policy} — Step 1 (discovery-only). ` +
-          "Token validation middleware arrives in a follow-up; " +
-          "do NOT bind this to a public interface until the middleware lands.",
-      );
+      log.warn("oauth in discovery-only mode (step 1)", {
+        policy: ctx.policy,
+        note: "Token validation middleware arrives in a follow-up; do NOT bind this to a public interface until the middleware lands.",
+      });
       return;
     case "unauthenticated":
       // No invariant — but loudly warn so the choice is visible.
-      console.error(
-        "[AirMCP] ⚠️  allowNetwork=unauthenticated — tool surface is exposed without auth. " +
-          "This mode is intended for CI/debug only. Public deployments in this mode are a security incident.",
-      );
+      log.warn("allowNetwork=unauthenticated — tool surface exposed without auth", {
+        note: "This mode is intended for CI/debug only. Public deployments in this mode are a security incident.",
+      });
       return;
   }
 }
@@ -239,7 +245,13 @@ export async function startHttpServer(options: HttpServerOptions): Promise<void>
       oauthAudience: oauth?.audience,
     });
   } catch (e) {
-    console.error(`[AirMCP] FATAL: ${e instanceof Error ? e.message : String(e)}`);
+    // Only the error MESSAGE is logged, never the stack. Stacks can capture
+    // interpolated env-derived strings (OAuth issuer URL, audience) which
+    // CodeQL's `js/clear-text-logging` treats as sensitive. The message
+    // alone tells the operator what invariant failed without re-emitting
+    // the config that derived from secret env vars.
+    const msg = e instanceof Error ? e.message : String(e);
+    log.error("FATAL — startup invariant failed", { reason: msg });
     process.exit(1);
   }
   app.use((req, res, next) => {
@@ -331,7 +343,7 @@ export async function startHttpServer(options: HttpServerOptions): Promise<void>
           // Defensive — verifyBearer's contract says it doesn't throw,
           // but a malformed jose dependency update shouldn't take down
           // the server silently.
-          console.error("[AirMCP] OAuth verify internal error:", e);
+          log.error("oauth verify internal error", { err: errToCtx(e) });
           res.status(500).json({ error: "Authorization internal error" });
         });
     });
@@ -378,17 +390,17 @@ export async function startHttpServer(options: HttpServerOptions): Promise<void>
     try {
       s.cleanupEventListeners?.();
     } catch (e) {
-      console.error(`[AirMCP] Session ${id} listener cleanup error:`, e);
+      log.error("session listener cleanup failed", { session: id, err: errToCtx(e) });
     }
     try {
       s.transport.close?.();
     } catch (e) {
-      console.error(`[AirMCP] Session ${id} transport close error:`, e);
+      log.error("session transport close failed", { session: id, err: errToCtx(e) });
     }
     try {
       s.server.close?.();
     } catch (e) {
-      console.error(`[AirMCP] Session ${id} server close error:`, e);
+      log.error("session server close failed", { session: id, err: errToCtx(e) });
     }
   }
 
@@ -494,12 +506,11 @@ export async function startHttpServer(options: HttpServerOptions): Promise<void>
       ]
         .filter(Boolean)
         .join(", ");
-      console.error(
-        `[AirMCP] ⚠️  Proxy signal detected on a loopback-only server (${signals}). ` +
-          "If AirMCP is reachable from outside this machine, move to " +
-          'AIRMCP_ALLOW_NETWORK="with-token" (or "with-token+origin") + AIRMCP_HTTP_TOKEN. ' +
-          "This warning fires once per process.",
-      );
+      log.warn("proxy signal detected on a loopback-only server", {
+        signals,
+        remediation:
+          'If AirMCP is reachable from outside this machine, set AIRMCP_ALLOW_NETWORK="with-token" (or "with-token+origin") + AIRMCP_HTTP_TOKEN. This warning fires once per process.',
+      });
       auditLog({
         timestamp: new Date().toISOString(),
         tool: "__proxy_signal_detected",
@@ -571,7 +582,7 @@ export async function startHttpServer(options: HttpServerOptions): Promise<void>
         server.close?.();
       }
     } catch (err) {
-      console.error("POST /mcp error:", err);
+      log.error("POST /mcp request failed", { err: errToCtx(err) });
       if (!res.headersSent) {
         res.status(500).json({
           jsonrpc: "2.0",
@@ -610,7 +621,7 @@ export async function startHttpServer(options: HttpServerOptions): Promise<void>
 
       await s.transport.handleRequest(req, res);
     } catch (err) {
-      console.error(`${method} /mcp error:`, err);
+      log.error("session request failed", { method, err: errToCtx(err) });
     }
   };
 
@@ -635,9 +646,11 @@ export async function startHttpServer(options: HttpServerOptions): Promise<void>
     bi.port = port;
     await printBanner(bi);
     if (bindAll)
-      console.error(
-        `[AirMCP] Bound to all interfaces (0.0.0.0:${port})${httpToken ? " with token auth" : " — NO AUTH"}`,
-      );
+      log.warn("bound to all interfaces", {
+        host: "0.0.0.0",
+        port,
+        auth: httpToken ? "token" : "NONE",
+      });
   });
 
   // Release the listening socket and per-process timers on shutdown so

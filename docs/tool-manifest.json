@@ -1958,11 +1958,15 @@
         "properties": {
           "latitude": {
             "type": "number",
-            "description": "Latitude coordinate"
+            "minimum": -90,
+            "maximum": 90,
+            "description": "Latitude coordinate (degrees, -90 to 90)"
           },
           "longitude": {
             "type": "number",
-            "description": "Longitude coordinate"
+            "minimum": -180,
+            "maximum": 180,
+            "description": "Longitude coordinate (degrees, -180 to 180)"
           },
           "label": {
             "type": "string",
@@ -8651,7 +8655,7 @@
     {
       "name": "prevent_sleep",
       "title": "Prevent Sleep",
-      "description": "Prevent the Mac from sleeping for a specified duration using caffeinate. Returns the process PID for cancellation.",
+      "description": "Prevent the Mac from sleeping for a specified duration using caffeinate. The assertion is transient — it auto-releases when the timer elapses; no manual stop is required.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -10659,11 +10663,15 @@
           },
           "latitude": {
             "type": "number",
-            "description": "Latitude of the center point"
+            "minimum": -90,
+            "maximum": 90,
+            "description": "Latitude of the center point (degrees, -90 to 90)"
           },
           "longitude": {
             "type": "number",
-            "description": "Longitude of the center point"
+            "minimum": -180,
+            "maximum": 180,
+            "description": "Longitude of the center point (degrees, -180 to 180)"
           }
         },
         "required": [
@@ -11803,11 +11811,15 @@
         "properties": {
           "latitude": {
             "type": "number",
-            "description": "Latitude coordinate"
+            "minimum": -90,
+            "maximum": 90,
+            "description": "Latitude coordinate (degrees, -90 to 90)"
           },
           "longitude": {
             "type": "number",
-            "description": "Longitude coordinate"
+            "minimum": -180,
+            "maximum": 180,
+            "description": "Longitude coordinate (degrees, -180 to 180)"
           },
           "label": {
             "type": "string",

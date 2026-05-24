@@ -31,6 +31,13 @@ export interface RequestContext {
    *  without manual plumbing through the SDK. Generated lazily by the
    *  tool-registry wrapper if no upstream middleware set one. */
   correlationId?: string;
+  /** Origin of the call — stamped onto every audit line emitted inside
+   *  this context. Values follow AuditEntry.actor's vocabulary:
+   *  "user" (omitted is treated as user), "daemon-skill:<name>",
+   *  "hitl-approved". Set by the autonomous trigger path so an
+   *  always-on daemon's tool calls are distinguishable from human ones
+   *  during audit review. */
+  actor?: string;
 }
 
 const storage = new AsyncLocalStorage<RequestContext>();
@@ -54,4 +61,12 @@ export function getOAuthClaims(): OAuthClaims | undefined {
  *  this so a single failing tool call can be traced across log lines. */
 export function getCorrelationId(): string | undefined {
   return storage.getStore()?.correlationId;
+}
+
+/** The actor tag for the active request — see RequestContext.actor.
+ *  Undefined for stdio / HTTP human-driven calls; the autonomous
+ *  daemon path stamps a "daemon-skill:<name>" value so audit summaries
+ *  can split human from autonomous activity. */
+export function getActor(): string | undefined {
+  return storage.getStore()?.actor;
 }

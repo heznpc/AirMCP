@@ -570,7 +570,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
     {
       title: "Prevent Sleep",
       description:
-        "Prevent the Mac from sleeping for a specified duration using caffeinate. Returns the process PID for cancellation.",
+        "Prevent the Mac from sleeping for a specified duration using caffeinate. The assertion is transient — it auto-releases when the timer elapses; no manual stop is required.",
       inputSchema: {
         seconds: z
           .number()

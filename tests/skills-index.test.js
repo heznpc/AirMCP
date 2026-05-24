@@ -128,7 +128,7 @@ describe('registerSkillEngine', () => {
     const watchCallback = mockWatchUserSkills.mock.calls[0][0];
     watchCallback();
     expect(console.error).toHaveBeenCalledWith(
-      expect.stringContaining('User skills changed'),
+      expect.stringContaining('user skills changed'),
     );
   });
 

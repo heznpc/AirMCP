@@ -1,6 +1,7 @@
 import { createConnection, Socket } from "node:net";
 import { randomUUID } from "node:crypto";
 import type { HitlConfig } from "./config.js";
+import { log } from "./logger.js";
 
 interface HitlRequest {
   id: string;
@@ -36,7 +37,7 @@ export class HitlClient {
     try {
       await this.ensureConnected();
     } catch {
-      console.error(`[hitl] socket unreachable at ${this.config.socketPath} — denying "${tool}"`);
+      log.warn("hitl: socket unreachable — denying", { socket: this.config.socketPath, tool });
       return false;
     }
 
@@ -53,7 +54,7 @@ export class HitlClient {
     return new Promise<boolean>((resolve) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);
-        console.error(`[hitl] timeout waiting for approval of "${tool}" — denying`);
+        log.warn("hitl: timeout waiting for approval — denying", { tool });
         resolve(false);
       }, this.config.timeout * 1000);
 
@@ -69,7 +70,7 @@ export class HitlClient {
       } catch {
         clearTimeout(timer);
         this.pending.delete(id);
-        console.error(`[hitl] failed to send request for "${tool}" — denying`);
+        log.warn("hitl: failed to send request — denying", { tool });
         resolve(false);
       }
     });
@@ -127,7 +128,7 @@ export class HitlClient {
     this.buffer += chunk;
     // Prevent unbounded buffer growth (DoS protection)
     if (this.buffer.length > HitlClient.MAX_BUFFER_SIZE) {
-      console.error("[hitl] buffer exceeded 1MB — resetting and denying all pending");
+      log.warn("hitl: buffer exceeded 1MB — resetting and denying all pending");
       this.buffer = "";
       this.denyAllPending("buffer overflow");
       return;
@@ -149,14 +150,14 @@ export class HitlClient {
           }
         }
       } catch {
-        console.error("[hitl] failed to parse response:", trimmed);
+        log.warn("hitl: failed to parse response", { preview: trimmed.slice(0, 200) });
       }
     }
   }
 
   private denyAllPending(reason: string): void {
     for (const [id, entry] of this.pending) {
-      console.error(`[hitl] ${reason} — denying pending request ${id}`);
+      log.warn("hitl: denying pending request", { reason, id });
       entry.resolve(false);
     }
     this.pending.clear();

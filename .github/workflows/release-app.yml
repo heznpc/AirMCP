@@ -41,6 +41,8 @@ jobs:
     environment: release
     permissions:
       contents: write
+      id-token: write       # Sigstore signing for attest-build-provenance
+      attestations: write   # Upload attestation to the repo's attestation store
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
@@ -146,6 +148,19 @@ jobs:
       # lockstep with the signed .app.
       - name: Build .mcpb bundle
         run: npm run build:mcpb
+
+      # SLSA build provenance for the notarized .app archive + the .mcpb
+      # bundle. Lets downstream consumers verify the artifacts came from
+      # this repo + this workflow run (cosign / `gh attestation verify`).
+      # The cd.yml pipeline already gets provenance for free via npm's
+      # trusted publishing; this closes the same gap for the distributable
+      # binaries that ship outside npm.
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
+        with:
+          subject-path: |
+            AirMCP-${{ steps.version.outputs.version }}.zip
+            build/mcpb/airmcp-${{ steps.version.outputs.version }}.mcpb
 
       - name: Attach artifacts to Release
         uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v2

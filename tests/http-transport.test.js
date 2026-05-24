@@ -278,7 +278,7 @@ describe('validateNetworkPolicy — OAuth branches (RFC 0005 Step 1)', () => {
       oauthIssuer: 'https://auth.example.com',
       oauthAudience: 'https://a/mcp',
     });
-    expect(err).toHaveBeenCalledWith(expect.stringContaining('Step 1'));
+    expect(err).toHaveBeenCalledWith(expect.stringContaining('discovery-only mode (step 1)'));
     err.mockRestore();
   });
 });

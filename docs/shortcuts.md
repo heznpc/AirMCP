@@ -1,6 +1,6 @@
 # Using AirMCP with Siri · Shortcuts · Spotlight (iOS 17+, macOS 14+)
 
-AirMCP's 229 tools are auto-registered as Apple App Intents (read-only + non-destructive writes; destructive ones gate behind `AIRMCP_APPINTENTS_DESTRUCTIVE=true` at codegen time per RFC 0007 §6). Anything that speaks the Intents system — Siri, Shortcuts, Spotlight, the Action Button, Widgets — can call them directly, without opening the app.
+AirMCP's 272 tools are auto-registered as Apple App Intents (read-only + non-destructive writes; destructive ones gate behind `AIRMCP_APPINTENTS_DESTRUCTIVE=true` at codegen time per RFC 0007 §6). Anything that speaks the Intents system — Siri, Shortcuts, Spotlight, the Action Button, Widgets — can call them directly, without opening the app.
 
 This doc is for users wiring AirMCP into those flows. The codegen plumbing lives in [RFC 0007](rfc/0007-app-intent-bridge.md).
 

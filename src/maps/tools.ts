@@ -64,8 +64,14 @@ export function registerMapsTools(server: McpServer, _config: AirMcpConfig): voi
       title: "Drop Pin",
       description: "Drop a pin at specific coordinates in Apple Maps.",
       inputSchema: {
-        latitude: z.number().describe("Latitude coordinate"),
-        longitude: z.number().describe("Longitude coordinate"),
+        // Bare `z.number()` accepts ±Infinity (and any finite value) — JXA
+        // would receive the literal `Infinity` keyword and silently produce
+        // garbage map state. Match `reverse_geocode`'s bounds (line ~174)
+        // so every coordinate-shaped input across this module validates the
+        // same way; closes the consistency gap flagged in the 2026-05-13
+        // audit.
+        latitude: z.number().min(-90).max(90).describe("Latitude coordinate (degrees, -90 to 90)"),
+        longitude: z.number().min(-180).max(180).describe("Longitude coordinate (degrees, -180 to 180)"),
         label: z.string().max(500).optional().describe("Optional label for the pin"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -106,8 +112,16 @@ export function registerMapsTools(server: McpServer, _config: AirMcpConfig): voi
         "Search for places near a location in Apple Maps. If no coordinates are given, searches near the current location.",
       inputSchema: {
         query: z.string().max(500).describe("What to search for (e.g. 'coffee shops', 'gas stations')"),
-        latitude: z.number().optional().describe("Latitude of the center point"),
-        longitude: z.number().optional().describe("Longitude of the center point"),
+        // Optional but still bounded — an undefined coordinate falls back to
+        // the device's current location; a finite-but-out-of-range one would
+        // silently produce nonsense.
+        latitude: z.number().min(-90).max(90).optional().describe("Latitude of the center point (degrees, -90 to 90)"),
+        longitude: z
+          .number()
+          .min(-180)
+          .max(180)
+          .optional()
+          .describe("Longitude of the center point (degrees, -180 to 180)"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
@@ -126,8 +140,8 @@ export function registerMapsTools(server: McpServer, _config: AirMcpConfig): voi
       title: "Share Location",
       description: "Generate a shareable Apple Maps link for a location.",
       inputSchema: {
-        latitude: z.number().describe("Latitude coordinate"),
-        longitude: z.number().describe("Longitude coordinate"),
+        latitude: z.number().min(-90).max(90).describe("Latitude coordinate (degrees, -90 to 90)"),
+        longitude: z.number().min(-180).max(180).describe("Longitude coordinate (degrees, -180 to 180)"),
         label: z.string().max(500).optional().describe("Optional label for the location"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },

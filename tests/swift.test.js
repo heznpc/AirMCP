@@ -346,7 +346,8 @@ describe('swift bridge', () => {
       const { promise: p } = await ready(proc, 'sh-j');
       proc.stdout.emit('data', 'BAD\n{"id":"sh-j","result":"ok"}\n');
       expect(await p).toBe('ok');
-      expect(spy).toHaveBeenCalledWith('[AirMCP Swift] Invalid response:', expect.stringContaining('BAD'));
+      expect(spy).toHaveBeenCalledWith(expect.stringContaining('invalid response'));
+      expect(spy).toHaveBeenCalledWith(expect.stringContaining('BAD'));
       spy.mockRestore();
     });
 
@@ -354,7 +355,7 @@ describe('swift bridge', () => {
       const { promise: p } = await ready(proc, 'sh-o');
       proc.stdout.emit('data', 'x'.repeat(600) + '\n{"id":"sh-o","result":"s"}\n');
       expect(await p).toBe('s');
-      expect(spy).toHaveBeenCalledWith(expect.stringContaining('Dropping oversized'));
+      expect(spy).toHaveBeenCalledWith(expect.stringContaining('dropping oversized'));
       spy.mockRestore();
     });
   });

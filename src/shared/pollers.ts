@@ -1,5 +1,6 @@
 import type { AirMCPEventType } from "./event-bus.js";
 import { assertTestMode } from "./errors.js";
+import { log, errToCtx } from "./logger.js";
 
 /**
  * Node-side poller registry. Feature modules (mail, music, …) import
@@ -119,7 +120,7 @@ function resetErrorThrottle(): void {
 export function createPollerLogger(name: string): (e: unknown) => void {
   return (e: unknown) => {
     if (shouldLogError(name)) {
-      console.error(`[AirMCP pollers] ${name} poll failed: ${e instanceof Error ? e.message : String(e)}`);
+      log.warn("poller failed", { poller: name, err: errToCtx(e) });
     }
   };
 }

@@ -11,7 +11,7 @@ import {
   toolError,
 } from "../shared/result.js";
 import { TIMEOUT } from "../shared/constants.js";
-import { zFilePath } from "../shared/validate.js";
+import { zFilePath, resolveAndGuard } from "../shared/validate.js";
 import {
   listChatsScript,
   readChatScript,
@@ -187,6 +187,12 @@ export function registerMessagesTools(server: McpServer, config: AirMcpConfig): 
       if (!allowSendMessages)
         return errPermission("Sending messages is disabled. Set AIRMCP_ALLOW_SEND_MESSAGES=true to enable.");
       try {
+        // Symlink hardening: zFilePath only blocks `..` lexically. A symlink
+        // inside HOME pointing at /etc/secrets would slip past — realpath it
+        // and require resolution stays inside HOME. Without this guard a
+        // malicious caller could exfiltrate arbitrary files by sending them
+        // as iMessage attachments to themselves.
+        resolveAndGuard(filePath);
         await runAppleScript(sendFileScript(target, filePath), { app: "Messages", timeout: TIMEOUT.MESSAGE_SEND });
         return ok({ sent: true, to: target, file: filePath });
       } catch (e) {

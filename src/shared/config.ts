@@ -3,8 +3,8 @@ import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { release } from "node:os";
 import { HOME, PATHS } from "./constants.js";
-import { formatError } from "./errors.js";
 import { HEALTHKIT_MIN_MACOS, type CompatibilityEnv } from "./compatibility.js";
+import { log, errToCtx } from "./logger.js";
 
 /**
  * Return the macOS major version number.
@@ -224,7 +224,7 @@ function loadFileConfig(): LoadResult {
     const data = readFileSync(PATHS.CONFIG, "utf-8");
     const raw: unknown = JSON.parse(data);
     if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
-      console.error("[AirMCP] config.json must be a JSON object — using defaults");
+      log.warn("config.json must be a JSON object — using defaults");
       return { config: {}, fileExists: true };
     }
     const obj = raw as Record<string, unknown>;
@@ -272,7 +272,7 @@ function loadFileConfig(): LoadResult {
   } catch (err) {
     // Distinguish "file not found" from "file exists but parse failed"
     if (err instanceof SyntaxError || (err instanceof Error && err.message.includes("JSON"))) {
-      console.error(`[AirMCP] Failed to parse config.json: ${formatError(err)} — using defaults`);
+      log.warn("failed to parse config.json — using defaults", { err: errToCtx(err) });
       return { config: {}, fileExists: true };
     }
     return { config: {}, fileExists: false };
@@ -303,16 +303,17 @@ export function parseConfig(): AirMcpConfig {
   if (file.disabledModules) {
     for (const mod of file.disabledModules) {
       if (!(MODULE_NAMES as readonly string[]).includes(mod)) {
-        console.error(`[AirMCP] Unknown module in disabledModules: "${mod}" — ignored`);
+        log.warn("unknown module in disabledModules — ignored", { module: mod });
       }
     }
   }
 
   // Validate hitl.level: warn if not a valid level
   if (file.hitl?.level !== undefined && !HITL_LEVELS.includes(file.hitl.level)) {
-    console.error(
-      `[AirMCP] Invalid hitl.level "${file.hitl.level}" — expected one of: ${HITL_LEVELS.join(", ")}. Using default "destructive-only"`,
-    );
+    log.warn("invalid hitl.level — using default 'destructive-only'", {
+      provided: file.hitl.level,
+      expected: HITL_LEVELS,
+    });
   }
 
   // Validate boolean fields: warn if non-boolean values are present in the raw config
@@ -320,7 +321,7 @@ export function parseConfig(): AirMcpConfig {
     const boolFields = ["includeShared", "allowSendMessages", "allowSendMail", "allowRunJavascript"] as const;
     for (const field of boolFields) {
       if (field in rawObj && typeof rawObj[field] !== "boolean") {
-        console.error(`[AirMCP] Config field "${field}" should be boolean, got ${typeof rawObj[field]} — ignored`);
+        log.warn("config field has wrong type — ignored", { field, expected: "boolean", got: typeof rawObj[field] });
       }
     }
   }

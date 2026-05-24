@@ -92,7 +92,7 @@ describe('loadSkillFile', () => {
 
     expect(result).toBeNull();
     expect(console.error).toHaveBeenCalledWith(
-      expect.stringContaining('Skill file too large'),
+      expect.stringContaining('skill file too large'),
     );
   });
 
@@ -112,7 +112,7 @@ steps:
 
     expect(result).toBeNull();
     expect(console.error).toHaveBeenCalledWith(
-      expect.stringContaining('Invalid skill'),
+      expect.stringContaining('invalid skill'),
     );
   });
 
@@ -130,7 +130,7 @@ steps: []
 
     expect(result).toBeNull();
     expect(console.error).toHaveBeenCalledWith(
-      expect.stringContaining('Invalid skill'),
+      expect.stringContaining('invalid skill'),
     );
   });
 
@@ -141,7 +141,7 @@ steps: []
 
     expect(result).toBeNull();
     expect(console.error).toHaveBeenCalledWith(
-      expect.stringContaining('Failed to load skill'),
+      expect.stringContaining('failed to load skill'),
     );
   });
 
@@ -206,7 +206,7 @@ steps:
     const result = loadSkillFile('/path/to/collision.yaml');
     expect(result).toBeNull();
     expect(console.error).toHaveBeenCalledWith(
-      expect.stringContaining('input name(s) collide with step id(s): search'),
+      expect.stringContaining('"collisions":["search"]'),
     );
   });
 
@@ -244,7 +244,7 @@ steps:
 
     expect(result).toBeNull();
     expect(console.error).toHaveBeenCalledWith(
-      expect.stringContaining('Invalid skill'),
+      expect.stringContaining('invalid skill'),
     );
   });
 });
@@ -352,7 +352,7 @@ describe('mergeSkills', () => {
     expect(result).toHaveLength(2);
     expect(result.map((s) => s.name)).toEqual(['daily-briefing', 'custom-skill']);
     expect(console.error).toHaveBeenCalledWith(
-      expect.stringContaining('conflicts with built-in skill'),
+      expect.stringContaining('user skill conflicts with built-in'),
     );
   });
 

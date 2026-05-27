@@ -82,6 +82,13 @@ jobs:
       - name: Smoke — boot server + tools/list round-trip
         run: npm run smoke
 
+      # Drives the official @modelcontextprotocol/inspector CLI against the
+      # built dist/index.js. Catches manifest / JSON-RPC envelope drift before
+      # plugin submission to anthropics/claude-plugins-community. Exit code
+      # is the contract; stdout (the 6K-line tools/list) is discarded.
+      - name: MCP Inspector validate
+        run: npm run mcp:validate
+
       - name: Verify tool manifest (RFC 0007 A.0)
         run: |
           npm run gen:manifest

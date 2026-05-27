@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "airmcp": {
+      "command": "npx",
+      "args": ["-y", "airmcp"]
+    }
+  }
+}

@@ -2,7 +2,7 @@
   "mcpServers": {
     "airmcp": {
       "command": "npx",
-      "args": ["-y", "airmcp"]
+      "args": ["-y", "airmcp@2.12.0"]
     }
   }
 }

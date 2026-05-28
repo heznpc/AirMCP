@@ -82,11 +82,15 @@ jobs:
       - name: Smoke — boot server + tools/list round-trip
         run: npm run smoke
 
-      # Drives the official @modelcontextprotocol/inspector CLI against the
-      # built dist/index.js. Catches manifest / JSON-RPC envelope drift before
-      # plugin submission to anthropics/claude-plugins-community. Exit code
-      # is the contract; stdout (the 6K-line tools/list) is discarded.
+      # Drives a pinned @modelcontextprotocol/inspector --cli against the
+      # built dist/index.js (scripts/mcp-validate.mjs). Catches JSON-RPC
+      # envelope drift, embedded error envelopes, and zero-tool responses
+      # before plugin submission to anthropics/claude-plugins-community.
+      # Wrapper captures stdout AND stderr and parses the response — exit
+      # code alone is not the contract. timeout-minutes bounds a teardown
+      # bug at 2 min instead of GitHub's default 6 h.
       - name: MCP Inspector validate
+        timeout-minutes: 2
         run: npm run mcp:validate
 
       - name: Verify tool manifest (RFC 0007 A.0)

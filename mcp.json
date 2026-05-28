@@ -2,9 +2,13 @@
   "mcpServers": {
     "airmcp": {
       "command": "npx",
-      "args": ["-y", "airmcp"],
+      "args": [
+        "-y",
+        "airmcp"
+      ],
       "description": "MCP server for the entire Apple ecosystem — 272 tools across 29 modules. macOS only.",
       "env": {}
     }
-  }
+  },
+  "version": "2.12.0"
 }

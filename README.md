@@ -156,11 +156,17 @@ These are just starting points — with 272 tools across 29 Apple apps, the comb
 | i18n                              | ❌                      | ❌                | ?                          | ❌                         | **9 languages**                                                                                   |
 | Maintenance                       | —                       | Apple             | Active                     | ❌ **Archived 2026-01-01** | **Active (v2.12+)**                                                                              |
 
+**Adjacent but narrower** (not in the table — different category): [`mb-dev/macos-ui-automation-mcp`](https://github.com/mb-dev/macos-ui-automation-mcp) is a Playwright-style macOS UI automation MCP server (6 tools, single-domain accessibility-API automation, no audit / HITL / scope-gating, last release 2025-08-02). AirMCP's `UI Automation` module covers the same surface as 10 of its 272 tools, with the External Content layer governance primitives on top.
+
 ### Why this position holds
 
 - **Tool surface is leverage, not the moat.** Apple's eventual system MCP will replace many AppleScript wrappers; AirMCP's *workflow engine + safety + memory + multi-client + Google Workspace* layer survives as the integration above the OS.
 - **Open source**: every line auditable, modifiable, forkable. Apple's closed alternative won't have this.
 - **First-mover momentum on integrated depth**: [research from Apr 2026](https://www.local-mcp.com/guides/best-mcp-server-mac) notes — _"Outside the archived apple-mcp, no implementation exceeds 5 stars. Most have single-digit commits and single contributors."_ AirMCP holds the slot with active development at v2.12+.
+- **On-device WWDC alignment** ([pre-WWDC 2026 reporting](https://www.macrumors.com/2026/05/28/apple-to-make-on-device-ai-key-focus/), 2026-05-28 — D-10 from June 8 keynote): Apple's expected WWDC focus is on-device Foundation Models v10 (Gemini-backbone, confirmed via Bloomberg). AirMCP's local-first, Apple-native runtime requires no architectural shift on that move — the existing Swift `FoundationModels` bridge + Gemini embeddings two-track is the same surface area Apple is targeting. If Apple announces a system MCP on June 8, AirMCP's External Content layer governance (HMAC chain, per-call HITL, scope gate) sits cleanly above it.
+
+<!-- WWDC-2026-keynote-response: activated within 24h of the June 8 keynote with the actual announcement scope. Slot is intentional — leaving it inert pre-keynote keeps the README factual. -->
+
 
 ---
 

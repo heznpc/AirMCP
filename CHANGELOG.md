@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Distribution
+- **Claude Code plugin package** at repo root (`.claude-plugin/plugin.json` + `.mcp.json`) ready for submission to `anthropics/claude-plugins-community`. The npm version that `.mcp.json` invokes is pinned to the same value as the plugin manifest, so the marketplace SHA approval and the runtime users actually run can never diverge.
+- **`npm run mcp:validate`** + new CI step `MCP Inspector validate` (timeout-minutes 2). Wraps a pinned `@modelcontextprotocol/inspector --cli` against `dist/index.js`, captures both stdout and stderr, and exits non-zero on non-zero child exit, embedded `"error"` / `"isError":true` envelopes, zero-tool responses, or unparseable JSON. Wire-shape gate, not a substitute for the HMAC / HITL / audit test suites.
+- **`scripts/sync-version.mjs` extended** to cover `mcp.json`, `.claude-plugin/plugin.json`, and `.mcp.json`'s `airmcp@<version>` pin. Closes the gap where `npm run version:patch` silently left those three files at the old version.
+- **`scripts/count-stats.mjs` extended** to cover `.claude-plugin/plugin.json` description for the `(N) tools across (M) modules` drift check.
+- **`src/shared/banner.ts` skips the ANSI logo + typewriter delays when `process.stderr.isTTY` is false** (plugin host pipe, log collector, non-interactive CI). Pipe consumers now see a single plain identity line instead of raw ANSI control bytes and seconds of artificial startup latency.
+
 ### Security / Privacy — closes 12 findings from the 2026-05-13 code audit
 
 Each entry below corresponds to a finding in the audit report. Severity classes:

@@ -216,6 +216,9 @@ const registryPattern = [
 syncFile("mcp.json", registryPattern);
 syncFile("glama.json", registryPattern);
 syncFile("smithery.yaml", registryPattern);
+// .claude-plugin/plugin.json description carries the counts on the public
+// marketplace listing page — same drift class as the registry manifests.
+syncFile(".claude-plugin/plugin.json", registryPattern);
 // Anthropic MCP Registry manifest — only the description carries
 // the counts (version/package fields live outside the pattern scope).
 syncFile("server.json", [

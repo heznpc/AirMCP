@@ -101,6 +101,17 @@ async function animateModules(modules: string[], perModuleDelay: number): Promis
 // ── Main banner ──────────────────────────────────────────────────────
 
 export async function printBanner(info: BannerInfo): Promise<void> {
+  // When stderr is piped (plugin host, log collector, non-interactive CI),
+  // skip the ANSI logo + per-character typewriter delays. Pipe consumers see
+  // raw ANSI bytes as garbage and pay seconds of artificial startup latency
+  // before tools/list can complete. logger.ts:60 already branches the same
+  // way for log format. Emit a single plain identity line so the host's log
+  // viewer still surfaces which server booted.
+  if (!process.stderr.isTTY) {
+    write(`[airmcp] booted v${info.version} · transport=${info.transport} · ${info.modulesEnabled.length} modules\n`);
+    return;
+  }
+
   write("\n");
 
   // Logo — each line types in fast

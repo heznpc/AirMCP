@@ -3,7 +3,7 @@ import { z } from "zod";
 export const SkillStepSchema = z.object({
   id: z.string().regex(/^[a-z][a-z0-9_]*$/, "Step ID must be lowercase alphanumeric with underscores"),
   tool: z.string().min(1, "Tool name is required"),
-  args: z.record(z.unknown()).optional(),
+  args: z.record(z.string(), z.unknown()).optional(),
   only_if: z.string().optional(),
   skip_if: z.string().optional(),
   parallel: z.boolean().optional(),

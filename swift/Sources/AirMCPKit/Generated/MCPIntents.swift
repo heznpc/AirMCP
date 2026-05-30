@@ -78,8 +78,8 @@ public struct MCPDiscoverToolsOutput: Codable, Sendable {
 public struct MCPGetBatteryStatusOutput: Codable, Sendable {
     public let percentage: String
     public let charging: Bool
-    public let source: String?
-    public let timeRemaining: String?
+    public let source: String
+    public let timeRemaining: String
     public let raw: String
 }
 
@@ -143,13 +143,13 @@ public struct MCPGetFrontmostAppOutput: Codable, Sendable {
 // Output type for: get_photo_info
 public struct MCPGetPhotoInfoOutput: Codable, Sendable {
     public let id: String
-    public let filename: String?
-    public let name: String?
-    public let description: String?
-    public let date: String?
+    public let filename: String
+    public let name: String
+    public let description: String
+    public let date: String
     public let width: Double
     public let height: Double
-    public let altitude: Double?
+    public let altitude: String
     public let location: String
     public let favorite: Bool
     public let keywords: String
@@ -168,7 +168,7 @@ public struct MCPGetRatingOutput: Codable, Sendable {
 public struct MCPGetScreenInfoOutput: Codable, Sendable {
     public struct DisplaysItem: Codable, Sendable {
         public let name: String
-        public let resolution: String?
+        public let resolution: String
         public let pixelWidth: String
         public let pixelHeight: String
         public let retina: Bool
@@ -199,7 +199,7 @@ public struct MCPGetTrackInfoOutput: Codable, Sendable {
     public let rating: Int
     public let favorited: Bool
     public let disliked: Bool
-    public let dateAdded: String?
+    public let dateAdded: String
     public let sampleRate: Int
     public let bitRate: Int
     public let size: Double
@@ -243,11 +243,11 @@ public struct MCPGetVolumeOutput: Codable, Sendable {
 
 // Output type for: get_wifi_status
 public struct MCPGetWifiStatusOutput: Codable, Sendable {
-    public let ssid: String?
-    public let bssid: String?
+    public let ssid: String
+    public let bssid: String
     public let signalStrength: String
     public let noiseLevel: String
-    public let channel: String?
+    public let channel: String
     public let connected: Bool
     public let raw: String
 }
@@ -256,16 +256,16 @@ public struct MCPGetWifiStatusOutput: Codable, Sendable {
 public struct MCPIsAppRunningOutput: Codable, Sendable {
     public let running: Bool
     public let name: String
-    public let bundleIdentifier: String?
+    public let bundleIdentifier: String
     public let pid: String
-    public let visible: Bool?
+    public let visible: String
 }
 
 // Output type for: list_accounts
 public struct MCPListAccountsOutput: Codable, Sendable {
     public struct AccountsItem: Codable, Sendable {
         public let name: String
-        public let fullName: String?
+        public let fullName: String
         public let emailAddresses: [String]
     }
 
@@ -292,8 +292,8 @@ public struct MCPListBluetoothDevicesOutput: Codable, Sendable {
     public struct DevicesItem: Codable, Sendable {
         public let name: String
         public let connected: Bool
-        public let address: String?
-        public let type: String?
+        public let address: String
+        public let type: String
     }
 
     public let total: Int
@@ -317,7 +317,7 @@ public struct MCPListCalendarsOutput: Codable, Sendable {
     public struct CalendarsItem: Codable, Sendable {
         public let id: String
         public let name: String
-        public let color: String?
+        public let color: String
         public let writable: Bool
     }
 
@@ -328,14 +328,14 @@ public struct MCPListCalendarsOutput: Codable, Sendable {
 public struct MCPListChatsOutput: Codable, Sendable {
     public struct ChatsItem: Codable, Sendable {
         public struct ParticipantsItem: Codable, Sendable {
-            public let name: String?
-            public let handle: String?
+            public let name: String
+            public let handle: String
         }
 
         public let id: String
-        public let name: String?
+        public let name: String
         public let participants: [ParticipantsItem]
-        public let updated: String?
+        public let updated: String
     }
 
     public let total: Double
@@ -348,8 +348,8 @@ public struct MCPListContactsOutput: Codable, Sendable {
     public struct ContactsItem: Codable, Sendable {
         public let id: String
         public let name: String
-        public let email: String?
-        public let phone: String?
+        public let email: String
+        public let phone: String
     }
 
     public let total: Double
@@ -393,9 +393,9 @@ public struct MCPListEventsOutput: Codable, Sendable {
 public struct MCPListFavoritesOutput: Codable, Sendable {
     public struct PhotosItem: Codable, Sendable {
         public let id: String
-        public let filename: String?
-        public let name: String?
-        public let date: String?
+        public let filename: String
+        public let name: String
+        public let date: String
         public let width: Double
         public let height: Double
         public let favorite: Bool
@@ -424,8 +424,8 @@ public struct MCPListGroupMembersOutput: Codable, Sendable {
     public struct ContactsItem: Codable, Sendable {
         public let id: String
         public let name: String
-        public let email: String?
-        public let phone: String?
+        public let email: String
+        public let phone: String
     }
 
     public let group: String
@@ -461,7 +461,7 @@ public struct MCPListMessagesOutput: Codable, Sendable {
         public let id: String
         public let subject: String
         public let sender: String
-        public let dateReceived: String?
+        public let dateReceived: String
         public let read: Bool
         public let flagged: Bool
     }
@@ -492,12 +492,12 @@ public struct MCPListNotesOutput: Codable, Sendable {
 // Output type for: list_participants
 public struct MCPListParticipantsOutput: Codable, Sendable {
     public struct ParticipantsItem: Codable, Sendable {
-        public let name: String?
-        public let handle: String?
+        public let name: String
+        public let handle: String
     }
 
     public let chatId: String
-    public let chatName: String?
+    public let chatName: String
     public let participants: [ParticipantsItem]
 }
 
@@ -505,9 +505,9 @@ public struct MCPListParticipantsOutput: Codable, Sendable {
 public struct MCPListPhotosOutput: Codable, Sendable {
     public struct PhotosItem: Codable, Sendable {
         public let id: String
-        public let filename: String?
-        public let name: String?
-        public let date: String?
+        public let filename: String
+        public let name: String
+        public let date: String
         public let width: Double
         public let height: Double
         public let favorite: Bool
@@ -559,7 +559,7 @@ public struct MCPListRemindersOutput: Codable, Sendable {
         public let id: String
         public let name: String
         public let completed: Bool
-        public let dueDate: String?
+        public let dueDate: String
         public let priority: Double
         public let flagged: Bool
         public let list: String
@@ -607,12 +607,12 @@ public struct MCPListTracksOutput: Codable, Sendable {
     public struct TracksItem: Codable, Sendable {
         public let id: String
         public let name: String
-        public let artist: String?
-        public let album: String?
-        public let duration: Double?
-        public let trackNumber: Double?
-        public let genre: String?
-        public let year: Double?
+        public let artist: String
+        public let album: String
+        public let duration: String
+        public let trackNumber: String
+        public let genre: String
+        public let year: String
     }
 
     public let total: Double
@@ -680,23 +680,23 @@ public struct MCPNowPlayingOutput: Codable, Sendable {
 // Output type for: numbers_get_cell
 public struct MCPNumbersGetCellOutput: Codable, Sendable {
     public let address: String
-    public let value: String?
-    public let formattedValue: String?
+    public let value: String
+    public let formattedValue: String
 }
 
 // Output type for: numbers_get_formula
 public struct MCPNumbersGetFormulaOutput: Codable, Sendable {
     public let address: String
-    public let formula: String?
-    public let value: String?
-    public let formattedValue: String?
+    public let formula: String
+    public let value: String
+    public let formattedValue: String
 }
 
 // Output type for: numbers_list_documents
 public struct MCPNumbersListDocumentsOutput: Codable, Sendable {
     public struct DocumentsItem: Codable, Sendable {
         public let name: String
-        public let path: String?
+        public let path: String
         public let modified: Bool
     }
 
@@ -753,14 +753,14 @@ public struct MCPProactiveContextOutput: Codable, Sendable {
 // Output type for: read_chat
 public struct MCPReadChatOutput: Codable, Sendable {
     public struct ParticipantsItem: Codable, Sendable {
-        public let name: String?
-        public let handle: String?
+        public let name: String
+        public let handle: String
     }
 
     public let id: String
-    public let name: String?
+    public let name: String
     public let participants: [ParticipantsItem]
-    public let updated: String?
+    public let updated: String
 }
 
 // Output type for: read_contact
@@ -786,10 +786,10 @@ public struct MCPReadContactOutput: Codable, Sendable {
     public let name: String
     public let firstName: String
     public let lastName: String
-    public let organization: String?
-    public let jobTitle: String?
-    public let department: String?
-    public let note: String?
+    public let organization: String
+    public let jobTitle: String
+    public let department: String
+    public let note: String
     public let emails: [EmailsItem]
     public let phones: [PhonesItem]
     public let addresses: [AddressesItem]
@@ -798,20 +798,20 @@ public struct MCPReadContactOutput: Codable, Sendable {
 // Output type for: read_event
 public struct MCPReadEventOutput: Codable, Sendable {
     public struct AttendeesItem: Codable, Sendable {
-        public let name: String?
-        public let email: String?
-        public let status: String?
+        public let name: String
+        public let email: String
+        public let status: String
     }
 
     public let id: String
     public let summary: String
-    public let description: String?
-    public let location: String?
+    public let description: String
+    public let location: String
     public let startDate: String
     public let endDate: String
     public let allDay: Bool
-    public let recurrence: String?
-    public let url: String?
+    public let recurrence: String
+    public let url: String
     public let calendar: String
     public let attendees: [AttendeesItem]
 }
@@ -819,12 +819,12 @@ public struct MCPReadEventOutput: Codable, Sendable {
 // Output type for: read_message
 public struct MCPReadMessageOutput: Codable, Sendable {
     public struct ToItem: Codable, Sendable {
-        public let name: String?
-        public let address: String?
+        public let name: String
+        public let address: String
     }
     public struct CcItem: Codable, Sendable {
-        public let name: String?
-        public let address: String?
+        public let name: String
+        public let address: String
     }
 
     public let id: String
@@ -833,7 +833,7 @@ public struct MCPReadMessageOutput: Codable, Sendable {
     public let to: [ToItem]
     public let cc: [CcItem]
     public let dateReceived: String
-    public let dateSent: String?
+    public let dateSent: String
     public let read: Bool
     public let flagged: Bool
     public let content: String
@@ -868,10 +868,10 @@ public struct MCPReadReminderOutput: Codable, Sendable {
     public let name: String
     public let body: String
     public let completed: Bool
-    public let completionDate: String?
+    public let completionDate: String
     public let creationDate: String
     public let modificationDate: String
-    public let dueDate: String?
+    public let dueDate: String
     public let priority: Double
     public let flagged: Bool
     public let list: String
@@ -911,14 +911,14 @@ public struct MCPScanNotesOutput: Codable, Sendable {
 public struct MCPSearchChatsOutput: Codable, Sendable {
     public struct ChatsItem: Codable, Sendable {
         public struct ParticipantsItem: Codable, Sendable {
-            public let name: String?
-            public let handle: String?
+            public let name: String
+            public let handle: String
         }
 
         public let id: String
-        public let name: String?
+        public let name: String
         public let participants: [ParticipantsItem]
-        public let updated: String?
+        public let updated: String
     }
 
     public let total: Double
@@ -931,9 +931,9 @@ public struct MCPSearchContactsOutput: Codable, Sendable {
     public struct ContactsItem: Codable, Sendable {
         public let id: String
         public let name: String
-        public let organization: String?
-        public let email: String?
-        public let phone: String?
+        public let organization: String
+        public let email: String
+        public let phone: String
         public let matchedField: String
     }
 
@@ -976,7 +976,7 @@ public struct MCPSearchMessagesOutput: Codable, Sendable {
         public let id: String
         public let subject: String
         public let sender: String
-        public let dateReceived: String?
+        public let dateReceived: String
         public let read: Bool
     }
 
@@ -1005,11 +1005,11 @@ public struct MCPSearchNotesOutput: Codable, Sendable {
 public struct MCPSearchPhotosOutput: Codable, Sendable {
     public struct PhotosItem: Codable, Sendable {
         public let id: String
-        public let filename: String?
-        public let name: String?
-        public let date: String?
+        public let filename: String
+        public let name: String
+        public let date: String
         public let favorite: Bool
-        public let description: String?
+        public let description: String
     }
 
     public let total: Double
@@ -1022,7 +1022,7 @@ public struct MCPSearchRemindersOutput: Codable, Sendable {
         public let id: String
         public let name: String
         public let completed: Bool
-        public let dueDate: String?
+        public let dueDate: String
         public let priority: Double
         public let flagged: Bool
         public let list: String
@@ -1269,10 +1269,10 @@ public struct ActivateTabIntent: AppIntent {
 
     public init() {}
 
-    @Parameter(title: "Window index (default: 0)", default: 0)
+    @Parameter(title: "Window index (default: 0)", default: 0, inclusiveRange: (0, 9007199254740991))
     public var windowIndex: Int
 
-    @Parameter(title: "Tab index")
+    @Parameter(title: "Tab index", inclusiveRange: (0, 9007199254740991))
     public var tabIndex: Int
 
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
@@ -1475,7 +1475,7 @@ public struct AiPlanMetricsIntent: AppIntent {
     @Parameter(title: "Number of cases to sample from GOLDEN_PLANS (default: 5, max: 50).", default: 5, inclusiveRange: (1, 50))
     public var limit: Int
 
-    @Parameter(title: "Deterministic seed for case selection (default: time-based). Fixing this is usef")
+    @Parameter(title: "Deterministic seed for case selection (default: time-based). Fixing this is usef", inclusiveRange: (-9007199254740991, 9007199254740991))
     public var seed: Int?
 
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
@@ -1646,7 +1646,7 @@ public struct CaptureScreenIntent: AppIntent {
 
     public init() {}
 
-    @Parameter(title: "Display number for multi-monitor setups (1 = main display). Omit for default dis")
+    @Parameter(title: "Display number for multi-monitor setups (1 = main display). Omit for default dis", inclusiveRange: (1, 9007199254740991))
     public var display: Int?
 
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
@@ -3448,7 +3448,7 @@ public struct KeynoteGetSlideIntent: AppIntent {
     @Parameter(title: "Document name")
     public var document: String
 
-    @Parameter(title: "Slide number (1-based)")
+    @Parameter(title: "Slide number (1-based)", inclusiveRange: (1, 9007199254740991))
     public var slideNumber: Int
 
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
@@ -3508,7 +3508,7 @@ public struct KeynoteSetPresenterNotesIntent: AppIntent {
     @Parameter(title: "Document name")
     public var document: String
 
-    @Parameter(title: "Slide number (1-based)")
+    @Parameter(title: "Slide number (1-based)", inclusiveRange: (1, 9007199254740991))
     public var slideNumber: Int
 
     @Parameter(title: "Presenter notes text")
@@ -3534,7 +3534,7 @@ public struct KeynoteStartSlideshowIntent: AppIntent {
     @Parameter(title: "Document name")
     public var document: String
 
-    @Parameter(title: "Start from slide number (default: 1)", default: 1)
+    @Parameter(title: "Start from slide number (default: 1)", default: 1, inclusiveRange: (1, 9007199254740991))
     public var fromSlide: Int
 
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
@@ -3759,7 +3759,7 @@ public struct ListContactsIntent: AppIntent {
     @Parameter(title: "Max contacts (default: 100)", default: 100, inclusiveRange: (1, 1000))
     public var limit: Int
 
-    @Parameter(title: "Skip N contacts (default: 0)", default: 0)
+    @Parameter(title: "Skip N contacts (default: 0)", default: 0, inclusiveRange: (0, 9007199254740991))
     public var offset: Int
 
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
@@ -3834,7 +3834,7 @@ public struct ListEventsIntent: AppIntent {
     @Parameter(title: "Max events to return (default: 100)", default: 100, inclusiveRange: (1, 1000))
     public var limit: Int
 
-    @Parameter(title: "Number of events to skip (default: 0)", default: 0)
+    @Parameter(title: "Number of events to skip (default: 0)", default: 0, inclusiveRange: (0, 9007199254740991))
     public var offset: Int
 
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
@@ -4023,7 +4023,7 @@ public struct ListMessagesIntent: AppIntent {
     @Parameter(title: "Max messages (default: 50)", default: 50, inclusiveRange: (1, 200))
     public var limit: Int
 
-    @Parameter(title: "Pagination offset (default: 0)", default: 0)
+    @Parameter(title: "Pagination offset (default: 0)", default: 0, inclusiveRange: (0, 9007199254740991))
     public var offset: Int
 
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
@@ -4064,7 +4064,7 @@ public struct ListNotesIntent: AppIntent {
     @Parameter(title: "Max number of notes to return (default: 200)", default: 200, inclusiveRange: (1, 1000))
     public var limit: Int
 
-    @Parameter(title: "Number of notes to skip for pagination (default: 0)", default: 0)
+    @Parameter(title: "Number of notes to skip for pagination (default: 0)", default: 0, inclusiveRange: (0, 9007199254740991))
     public var offset: Int
 
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
@@ -4134,7 +4134,7 @@ public struct ListPhotosIntent: AppIntent {
     @Parameter(title: "Max photos (default: 50)", default: 50, inclusiveRange: (1, 500))
     public var limit: Int
 
-    @Parameter(title: "Offset for pagination (default: 0)", default: 0)
+    @Parameter(title: "Offset for pagination (default: 0)", default: 0, inclusiveRange: (0, 9007199254740991))
     public var offset: Int
 
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
@@ -4294,7 +4294,7 @@ public struct ListRemindersIntent: AppIntent {
     @Parameter(title: "Max number of reminders to return (default: 200)", default: 200, inclusiveRange: (1, 1000))
     public var limit: Int
 
-    @Parameter(title: "Number of reminders to skip for pagination (default: 0)", default: 0)
+    @Parameter(title: "Number of reminders to skip for pagination (default: 0)", default: 0, inclusiveRange: (0, 9007199254740991))
     public var offset: Int
 
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
@@ -4711,10 +4711,10 @@ public struct MoveWindowIntent: AppIntent {
     @Parameter(title: "Application name (e.g. 'Safari')")
     public var appName: String
 
-    @Parameter(title: "X coordinate for top-left corner")
+    @Parameter(title: "X coordinate for top-left corner", inclusiveRange: (-9007199254740991, 9007199254740991))
     public var x: Int
 
-    @Parameter(title: "Y coordinate for top-left corner")
+    @Parameter(title: "Y coordinate for top-left corner", inclusiveRange: (-9007199254740991, 9007199254740991))
     public var y: Int
 
     @Parameter(title: "Specific window title. If omitted, targets the first window.")
@@ -4994,16 +4994,16 @@ public struct NumbersReadCellsIntent: AppIntent {
     @Parameter(title: "Sheet name")
     public var sheet: String
 
-    @Parameter(title: "Start row index (0-based)")
+    @Parameter(title: "Start row index (0-based)", inclusiveRange: (0, 9007199254740991))
     public var startRow: Int
 
-    @Parameter(title: "Start column index (0-based)")
+    @Parameter(title: "Start column index (0-based)", inclusiveRange: (0, 9007199254740991))
     public var startCol: Int
 
-    @Parameter(title: "End row index (inclusive)")
+    @Parameter(title: "End row index (inclusive)", inclusiveRange: (0, 9007199254740991))
     public var endRow: Int
 
-    @Parameter(title: "End column index (inclusive)")
+    @Parameter(title: "End column index (inclusive)", inclusiveRange: (0, 9007199254740991))
     public var endCol: Int
 
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
@@ -5595,10 +5595,10 @@ public struct ReadPageContentIntent: AppIntent {
 
     public init() {}
 
-    @Parameter(title: "Window index (default: 0)", default: 0)
+    @Parameter(title: "Window index (default: 0)", default: 0, inclusiveRange: (0, 9007199254740991))
     public var windowIndex: Int
 
-    @Parameter(title: "Tab index (default: 0)", default: 0)
+    @Parameter(title: "Tab index (default: 0)", default: 0, inclusiveRange: (0, 9007199254740991))
     public var tabIndex: Int
 
     @Parameter(title: "Max content length (default: 10000)", default: 10000, inclusiveRange: (100, 50000))
@@ -5661,8 +5661,8 @@ public struct RecentFilesIntent: AppIntent {
 
     public init() {}
 
-    @Parameter(title: "Folder to search (default: home)", default: "~")
-    public var folder: String
+    @Parameter(title: "Folder to search (default: home)")
+    public var folder: String?
 
     @Parameter(title: "Modified within N days (default: 7)", default: 7, inclusiveRange: (1, 365))
     public var days: Int
@@ -5671,9 +5671,13 @@ public struct RecentFilesIntent: AppIntent {
     public var limit: Int
 
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        if let v = folder { args["folder"] = v }
+        args["days"] = days
+        args["limit"] = limit
         let result = try await MCPIntentRouter.shared.call(
             tool: "recent_files",
-            args: ["folder": folder, "days": days, "limit": limit]
+            args: args
         )
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "recent_files", message: "empty result from router")
@@ -5700,10 +5704,10 @@ public struct ResizeWindowIntent: AppIntent {
     @Parameter(title: "Application name (e.g. 'Safari')")
     public var appName: String
 
-    @Parameter(title: "Window width in pixels")
+    @Parameter(title: "Window width in pixels", inclusiveRange: (1, 9007199254740991))
     public var width: Int
 
-    @Parameter(title: "Window height in pixels")
+    @Parameter(title: "Window height in pixels", inclusiveRange: (1, 9007199254740991))
     public var height: Int
 
     @Parameter(title: "Specific window title. If omitted, targets the first window.")
@@ -5823,7 +5827,7 @@ public struct ScanNotesIntent: AppIntent {
     @Parameter(title: "Max number of notes to return (default: 100)", default: 100, inclusiveRange: (1, 500))
     public var limit: Int
 
-    @Parameter(title: "Number of notes to skip for pagination (default: 0)", default: 0)
+    @Parameter(title: "Number of notes to skip for pagination (default: 0)", default: 0, inclusiveRange: (0, 9007199254740991))
     public var offset: Int
 
     @Parameter(title: "Preview text length in characters (default: 300)", default: 300, inclusiveRange: (1, 5000))
@@ -5969,16 +5973,20 @@ public struct SearchFilesIntent: AppIntent {
     @Parameter(title: "Search query (Spotlight syntax)")
     public var query: String
 
-    @Parameter(title: "Folder to search in (default: home)", default: "~")
-    public var folder: String
+    @Parameter(title: "Folder to search in (default: home)")
+    public var folder: String?
 
     @Parameter(title: "Max results (default: 50)", default: 50, inclusiveRange: (1, 200))
     public var limit: Int
 
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["query"] = query
+        if let v = folder { args["folder"] = v }
+        args["limit"] = limit
         let result = try await MCPIntentRouter.shared.call(
             tool: "search_files",
-            args: ["query": query, "folder": folder, "limit": limit]
+            args: args
         )
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "search_files", message: "empty result from router")
@@ -6094,7 +6102,7 @@ public struct SearchNotesIntent: AppIntent {
     @Parameter(title: "Max results to return (default: 50)", default: 50, inclusiveRange: (1, 500))
     public var limit: Int
 
-    @Parameter(title: "Number of matching results to skip (for pagination)", default: 0)
+    @Parameter(title: "Number of matching results to skip (for pagination)", default: 0, inclusiveRange: (0, 9007199254740991))
     public var offset: Int
 
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
@@ -7359,7 +7367,7 @@ public struct UiTraverseIntent: AppIntent {
     @Parameter(title: "App name to traverse. If omitted, uses frontmost app.")
     public var app: String?
 
-    @Parameter(title: "Process ID for precise targeting (overrides app name lookup)")
+    @Parameter(title: "Process ID for precise targeting (overrides app name lookup)", inclusiveRange: (-9007199254740991, 9007199254740991))
     public var pid: Int?
 
     @Parameter(title: "Max traversal depth (default: 5)", default: 5, inclusiveRange: (1, 15))
@@ -7611,14 +7619,14 @@ public struct MCPGetBatteryStatusSnippetView: View {
             HStack {
                 Text("Source")
                 Spacer()
-                Text((data.source ?? "—"))
+                Text(String(describing: data.source))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
             HStack {
                 Text("Time Remaining")
                 Spacer()
-                Text((data.timeRemaining ?? "—"))
+                Text(String(describing: data.timeRemaining))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -7868,28 +7876,28 @@ public struct MCPGetPhotoInfoSnippetView: View {
             HStack {
                 Text("Filename")
                 Spacer()
-                Text((data.filename ?? "—"))
+                Text(String(describing: data.filename))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
             HStack {
                 Text("Name")
                 Spacer()
-                Text((data.name ?? "—"))
+                Text(String(describing: data.name))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
             HStack {
                 Text("Description")
                 Spacer()
-                Text((data.description ?? "—"))
+                Text(String(describing: data.description))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
             HStack {
                 Text("Date")
                 Spacer()
-                Text((data.date ?? "—"))
+                Text(String(describing: data.date))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -7910,7 +7918,7 @@ public struct MCPGetPhotoInfoSnippetView: View {
             HStack {
                 Text("Altitude")
                 Spacer()
-                Text((data.altitude?.formatted() ?? "—"))
+                Text(String(describing: data.altitude))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -8138,7 +8146,7 @@ public struct MCPGetTrackInfoSnippetView: View {
             HStack {
                 Text("Date Added")
                 Spacer()
-                Text((data.dateAdded ?? "—"))
+                Text(String(describing: data.dateAdded))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -8248,14 +8256,14 @@ public struct MCPGetWifiStatusSnippetView: View {
             HStack {
                 Text("Ssid")
                 Spacer()
-                Text((data.ssid ?? "—"))
+                Text(String(describing: data.ssid))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
             HStack {
                 Text("Bssid")
                 Spacer()
-                Text((data.bssid ?? "—"))
+                Text(String(describing: data.bssid))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -8276,7 +8284,7 @@ public struct MCPGetWifiStatusSnippetView: View {
             HStack {
                 Text("Channel")
                 Spacer()
-                Text((data.channel ?? "—"))
+                Text(String(describing: data.channel))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -8323,7 +8331,7 @@ public struct MCPIsAppRunningSnippetView: View {
             HStack {
                 Text("Bundle Identifier")
                 Spacer()
-                Text((data.bundleIdentifier ?? "—"))
+                Text(String(describing: data.bundleIdentifier))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -8337,7 +8345,7 @@ public struct MCPIsAppRunningSnippetView: View {
             HStack {
                 Text("Visible")
                 Spacer()
-                Text((data.visible.map { $0 ? "Yes" : "No" } ?? "—"))
+                Text(String(describing: data.visible))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -8440,7 +8448,7 @@ public struct MCPListChatsSnippetView: View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(data.chats, id: \.id) { row in
                 Button(intent: _mkReadChatIntent_chatId(chatId: row.id)) {
-                    Text((row.name ?? ""))
+                    Text(row.id)
                         .font(.body)
                         .lineLimit(1)
                 }
@@ -8516,7 +8524,7 @@ public struct MCPListFavoritesSnippetView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(Array(data.photos.enumerated()), id: \.offset) { _, row in
-                Text((row.filename ?? ""))
+                Text(row.id)
                     .font(.body)
                     .lineLimit(1)
             }
@@ -8641,7 +8649,7 @@ public struct MCPListParticipantsSnippetView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(Array(data.participants.enumerated()), id: \.offset) { _, row in
-                Text((row.name ?? ""))
+                Text("(row)")
                     .font(.body)
                     .lineLimit(1)
             }
@@ -8658,7 +8666,7 @@ public struct MCPListPhotosSnippetView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(Array(data.photos.enumerated()), id: \.offset) { _, row in
-                Text((row.filename ?? ""))
+                Text(row.id)
                     .font(.body)
                     .lineLimit(1)
             }
@@ -8946,7 +8954,7 @@ public struct MCPNumbersGetCellSnippetView: View {
             HStack {
                 Text("Formatted Value")
                 Spacer()
-                Text((data.formattedValue ?? "—"))
+                Text(String(describing: data.formattedValue))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -8972,7 +8980,7 @@ public struct MCPNumbersGetFormulaSnippetView: View {
             HStack {
                 Text("Formula")
                 Spacer()
-                Text((data.formula ?? "—"))
+                Text(String(describing: data.formula))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -8986,7 +8994,7 @@ public struct MCPNumbersGetFormulaSnippetView: View {
             HStack {
                 Text("Formatted Value")
                 Spacer()
-                Text((data.formattedValue ?? "—"))
+                Text(String(describing: data.formattedValue))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -9134,7 +9142,7 @@ public struct MCPReadChatSnippetView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(Array(data.participants.enumerated()), id: \.offset) { _, row in
-                Text((row.name ?? ""))
+                Text("(row)")
                     .font(.body)
                     .lineLimit(1)
             }
@@ -9181,28 +9189,28 @@ public struct MCPReadContactSnippetView: View {
             HStack {
                 Text("Organization")
                 Spacer()
-                Text((data.organization ?? "—"))
+                Text(String(describing: data.organization))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
             HStack {
                 Text("Job Title")
                 Spacer()
-                Text((data.jobTitle ?? "—"))
+                Text(String(describing: data.jobTitle))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
             HStack {
                 Text("Department")
                 Spacer()
-                Text((data.department ?? "—"))
+                Text(String(describing: data.department))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
             HStack {
                 Text("Note")
                 Spacer()
-                Text((data.note ?? "—"))
+                Text(String(describing: data.note))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -9240,7 +9248,7 @@ public struct MCPReadEventSnippetView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(Array(data.attendees.enumerated()), id: \.offset) { _, row in
-                Text((row.name ?? ""))
+                Text("(row)")
                     .font(.body)
                     .lineLimit(1)
             }
@@ -9301,7 +9309,7 @@ public struct MCPReadMessageSnippetView: View {
             HStack {
                 Text("Date Sent")
                 Spacer()
-                Text((data.dateSent ?? "—"))
+                Text(String(describing: data.dateSent))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -9498,7 +9506,7 @@ public struct MCPReadReminderSnippetView: View {
             HStack {
                 Text("Completion Date")
                 Spacer()
-                Text((data.completionDate ?? "—"))
+                Text(String(describing: data.completionDate))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -9519,7 +9527,7 @@ public struct MCPReadReminderSnippetView: View {
             HStack {
                 Text("Due Date")
                 Spacer()
-                Text((data.dueDate ?? "—"))
+                Text(String(describing: data.dueDate))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -9592,7 +9600,7 @@ public struct MCPSearchChatsSnippetView: View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(data.chats, id: \.id) { row in
                 Button(intent: _mkReadChatIntent_chatId(chatId: row.id)) {
-                    Text((row.name ?? ""))
+                    Text(row.id)
                         .font(.body)
                         .lineLimit(1)
                 }
@@ -9705,7 +9713,7 @@ public struct MCPSearchPhotosSnippetView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(Array(data.photos.enumerated()), id: \.offset) { _, row in
-                Text((row.filename ?? ""))
+                Text(row.id)
                     .font(.body)
                     .lineLimit(1)
             }

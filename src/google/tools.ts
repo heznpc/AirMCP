@@ -469,12 +469,12 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
           .describe("Resource (e.g. 'users.messages', 'files', 'spreadsheets.values')"),
         method: z.string().min(1).max(64).describe("Method (e.g. 'list', 'get', 'create', 'update', 'delete')"),
         params: z
-          .record(z.unknown())
+          .record(z.string(), z.unknown())
           .optional()
           .refine((v) => !v || JSON.stringify(v).length <= 10_000, "params must be under 10KB")
           .describe("URL/query parameters as JSON"),
         body: z
-          .record(z.unknown())
+          .record(z.string(), z.unknown())
           .optional()
           .refine((v) => !v || JSON.stringify(v).length <= 100_000, "body must be under 100KB")
           .describe("Request body as JSON"),

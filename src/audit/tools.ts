@@ -57,7 +57,7 @@ export function registerAuditTools(server: McpServer, _config: AirMcpConfig): vo
             tool: z.string(),
             status: z.enum(["ok", "error"]),
             durationMs: z.number().optional(),
-            args: z.record(z.unknown()).optional(),
+            args: z.record(z.string(), z.unknown()).optional(),
           }),
         ),
       },

@@ -450,7 +450,7 @@ export async function createServer(
         "Useful in autonomous/Cowork environments where prompts cannot be invoked directly.",
       inputSchema: {
         name: z.string().min(1).max(500).describe("Prompt name (e.g. 'daily-briefing', 'dev-session')"),
-        args: z.record(z.string()).optional().describe("Prompt arguments as key-value pairs"),
+        args: z.record(z.string(), z.string()).optional().describe("Prompt arguments as key-value pairs"),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },

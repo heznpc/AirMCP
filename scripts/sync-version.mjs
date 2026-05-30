@@ -9,6 +9,9 @@
  *   4. scripts/bundle-app.sh               (CFBundleShortVersionString)
  *   5. docs/PRIVACY_POLICY.md              (version header)
  *   6. .github/ISSUE_TEMPLATE/bug_report.yml (placeholder version)
+ *   7. mcp.json                            (MCP Registry submission manifest)
+ *   8. .claude-plugin/plugin.json          (Claude Code plugin manifest)
+ *   9. .mcp.json                           (Claude Code project/plugin MCP config — pinned npm version)
  *
  * Usage:
  *   node scripts/sync-version.mjs           # sync all files
@@ -136,6 +139,54 @@ syncFile(".github/ISSUE_TEMPLATE/bug_report.yml", [
     pattern: /placeholder: "[\d.]+"/,
     replacement: `placeholder: "${VERSION}"`,
     label: "bug report placeholder",
+  },
+]);
+
+// 7. mcp.json — MCP Registry submission manifest (top-level "version" field).
+const mcpJsonPath = resolve(root, "mcp.json");
+if (existsSync(mcpJsonPath)) {
+  const mj = JSON.parse(readFileSync(mcpJsonPath, "utf8"));
+  if (mj.version !== VERSION) {
+    if (checkMode) {
+      console.error("  STALE: mcp.json");
+      dirty = true;
+    } else {
+      mj.version = VERSION;
+      writeFileSync(mcpJsonPath, JSON.stringify(mj, null, 2) + "\n");
+      console.log("  sync: mcp.json");
+    }
+  } else {
+    console.log("  ok:   mcp.json");
+  }
+}
+
+// 8. .claude-plugin/plugin.json — Claude Code plugin manifest.
+const pluginJsonPath = resolve(root, ".claude-plugin/plugin.json");
+if (existsSync(pluginJsonPath)) {
+  const pj = JSON.parse(readFileSync(pluginJsonPath, "utf8"));
+  if (pj.version !== VERSION) {
+    if (checkMode) {
+      console.error("  STALE: .claude-plugin/plugin.json");
+      dirty = true;
+    } else {
+      pj.version = VERSION;
+      writeFileSync(pluginJsonPath, JSON.stringify(pj, null, 2) + "\n");
+      console.log("  sync: .claude-plugin/plugin.json");
+    }
+  } else {
+    console.log("  ok:   .claude-plugin/plugin.json");
+  }
+}
+
+// 9. .mcp.json — Claude Code plugin MCP config. The npx invocation is
+//    pinned to the current package version so a marketplace install at
+//    plugin version X runs the npm tarball at version X (not whatever
+//    `dist-tags.latest` happens to point at).
+syncFile(".mcp.json", [
+  {
+    pattern: /"airmcp@[\d.]+"/,
+    replacement: `"airmcp@${VERSION}"`,
+    label: ".mcp.json airmcp version pin",
   },
 ]);
 

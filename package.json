@@ -75,6 +75,8 @@
     "start": "node dist/index.js",
     "test": "node --experimental-vm-modules node_modules/.bin/jest",
     "smoke": "node scripts/smoke-mcp.mjs",
+    "premcp:validate": "npm run build",
+    "mcp:validate": "node scripts/mcp-validate.mjs",
     "build:mcpb": "node scripts/build-mcpb.mjs",
     "build:mcpb:check": "node scripts/build-mcpb.mjs --check",
     "gen:manifest": "node scripts/dump-tool-manifest.mjs",
@@ -127,7 +129,7 @@
     "express": "5.2.1",
     "jose": "6.2.3",
     "yaml": "2.8.4",
-    "zod": "~3.25.76"
+    "zod": "~4.4.3"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.0.0",
@@ -142,7 +144,7 @@
     "globals": "^17.4.0",
     "husky": "^9.1.7",
     "jest": "^30.3.0",
-    "lint-staged": "^16.4.0",
+    "lint-staged": "^17.0.5",
     "prettier": "^3.8.1",
     "tsx": "^4.19.0",
     "typescript": "^6.0.2",

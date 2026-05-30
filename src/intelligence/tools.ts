@@ -192,6 +192,7 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
           .describe("Optional system instruction to guide output format"),
         schema: z
           .record(
+            z.string(),
             z.object({
               type: z.string().max(1000).describe("JSON type: string, number, boolean, array, object"),
               description: z.string().max(5000).optional().describe("Description of this field"),

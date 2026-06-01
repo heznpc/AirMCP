@@ -39,7 +39,7 @@
 - **JXA + Swift 6.2 bridge** — JXA for basic automation, Swift 6 strict concurrency with EventKit/PhotoKit/HealthKit/Vision/FoundationModels
 - **Apple Intelligence** — On-device summarize / rewrite / proofread / `ai_agent` / `ai_plan_metrics` (planner regression catcher) — all via Foundation Models (macOS 26+). Per pre-WWDC 2026 reporting, Apple is moving Foundation Models to a Gemini backbone on-device + in Private Cloud Compute; AirMCP's two-track design — Swift FoundationModels for on-device + Gemini embeddings (semantic memory) — requires no migration on this transition.
 - **Context memory** — `memory_put`/`query`/`forget`/`stats` + `memory://recent` resource for facts/entities/episodes, surviving restarts
-- **Native menubar app** — SwiftUI companion with onboarding wizard, auto-start, log viewer, update notifications, permission setup, server crash auto-restart. Current release builds are ad-hoc signed; Developer ID codesigning + notarization (Gatekeeper-green) are in progress and not yet shipped (see `CHANGELOG.md`).
+- **Native menubar app** — SwiftUI companion with onboarding wizard, auto-start, log viewer, update notifications, permission setup, server crash auto-restart. Current release builds are ad-hoc signed; Developer ID codesigning + notarization (Gatekeeper-green) are wired in `.github/workflows/release-app.yml` but gated on Apple signing secrets, so they have not shipped yet.
 - **One-click setup** — `setup_permissions` tool or menubar app to request all macOS permissions at once
 - **Dual transport** — stdio (default) + HTTP/SSE (`--http`) with token auth, origin allow-list, and startup invariants that refuse to boot misconfigured servers
 
@@ -144,7 +144,7 @@ The point is the combination in one auditable codebase, not any single capabilit
 - **272 tools across 29 modules** — Apple app CRUD + system control + Apple Intelligence + iWork + Google Workspace + dynamic Shortcuts.
 - **Skills DSL workflow engine** — `parallel` / `loop` / `on_error` / `retry` / 9 event triggers.
 - **Semantic memory** — Gemini + on-device Swift embeddings, persistent across restarts.
-- **Production safety primitives** — per-call HITL, HMAC-chained audit log (tamper-detection asserted in `tests/audit-tamper-detection.test.js`), rate limiting, emergency stop, OAuth 2.1 + Resource Indicators (RS256/ES256 JWT + RFC 8707 audience + RFC 9728 PRM + DPoP).
+- **Production safety primitives** — per-call HITL, HMAC-chained audit log (tamper-detection asserted in `tests/audit-tamper-detection.test.js`), rate limiting, emergency stop, OAuth 2.1 + Resource Indicators (RS256/ES256 JWT + RFC 8707 audience + RFC 9728 PRM + DPoP advertisement). DPoP is advertised in the `.well-known` card, not enforced — `dpop_bound_access_tokens_required: false`; tokens are not yet bound to a proof.
 - **Input validation** — Zod on every tool + outputSchema on reads + script↔schema contract tests.
 - **Native Swift API depth** — direct EventKit / HealthKit / PhotoKit / Vision / Foundation Models, not an `osascript` wrapper.
 - **iOS surface** — 232 auto-generated AppIntents + AppShortcutsProvider (RFC 0007); `AskAirMCPIntent` → Foundation Models tool calling (iOS 26+).

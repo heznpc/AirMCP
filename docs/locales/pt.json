@@ -1,5 +1,5 @@
 {
-  "meta_title": "AirMCP — Better Siri, powered by open source",
+  "meta_title": "AirMCP — More than Siri",
   "meta_description": "Extraia tarefas das notas da reunião da semana passada, leve-as para Lembretes e receba um aviso quando forem concluídas. AirMCP é a ferramenta de código aberto que conecta seu ecossistema Apple a qualquer cliente de IA — 29 módulos, 262 ferramentas.",
   "nav_modules": "Módulos",
   "nav_beyond": "Beyond Siri",
@@ -7,7 +7,7 @@
   "nav_install": "Instalar",
   "lang_label": "PT",
   "hero_tag": "npx airmcp init → conectado",
-  "hero_tagline": "Better Siri, powered by open source.",
+  "hero_tagline": "More than Siri.",
   "hero_sub": "Extraia tarefas das notas da reunião da semana passada, leve-as para Lembretes e receba um aviso quando forem concluídas.",
   "hero_cta": "Começar",
   "hero_discussions": "Discussões",

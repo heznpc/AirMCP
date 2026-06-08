@@ -1,5 +1,5 @@
 {
-  "meta_title": "AirMCP — Better Siri, powered by open source",
+  "meta_title": "AirMCP — More than Siri",
   "meta_description": "從上週的會議備忘錄中擷取待辦事項，放入提醒事項，完成後通知你。AirMCP是將Apple生態系統連接到任何AI用戶端的開源工具——29個模組、262個工具。",
   "nav_modules": "模組",
   "nav_beyond": "Beyond Siri",
@@ -7,7 +7,7 @@
   "nav_install": "安裝",
   "lang_label": "繁中",
   "hero_tag": "npx airmcp init → 連接完成",
-  "hero_tagline": "Better Siri, powered by open source.",
+  "hero_tagline": "More than Siri.",
   "hero_sub": "從上週的會議備忘錄中擷取待辦事項，放入提醒事項，完成後通知你。",
   "hero_cta": "開始使用",
   "hero_discussions": "討論區",

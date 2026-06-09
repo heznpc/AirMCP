@@ -125,6 +125,26 @@ describe("doc drift: README prose vs manifest", () => {
   });
 });
 
+describe("doc honesty: default surface vs full count, and the optional Swift bridge", () => {
+  // RFC 0014 root-cause: the "272 tools" headline is the --full / registered
+  // count, but a default `npx -y airmcp` loads the STARTER preset (~125), and
+  // the Swift binary is NOT in the npm tarball. These greppable invariants stop
+  // the README silently drifting back to advertising the full native surface as
+  // the out-of-box default.
+  test("README documents the starter-default vs --full distinction", () => {
+    expect(readmeSrc).toMatch(/\bstarter\b/i);
+    expect(readmeSrc).toMatch(/--full/);
+  });
+
+  test("README marks the Swift bridge as optional / not shipped in npm", () => {
+    // Wherever the native Swift bridge is presented as a capability, the README
+    // must also state it is optional and requires a build (npm run swift-build)
+    // or the .mcpb bundle — i.e. not shipped in the npm tarball.
+    expect(readmeSrc).toMatch(/optional/i);
+    expect(readmeSrc).toMatch(/npm run swift-build/);
+  });
+});
+
 describe("doc drift: README prose vs generated Swift artifact", () => {
   test('README "<N> Shortcuts / Siri AppIntents" equals generated `: AppIntent` structs', () => {
     const generated = (swiftSrc.match(/:\s*AppIntent\b/g) ?? []).length;

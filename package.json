@@ -77,6 +77,7 @@
     "smoke": "node scripts/smoke-mcp.mjs",
     "premcp:validate": "npm run build",
     "mcp:validate": "node scripts/mcp-validate.mjs",
+    "verify:package": "node scripts/verify-published-package.mjs",
     "build:mcpb": "node scripts/build-mcpb.mjs",
     "build:mcpb:check": "node scripts/build-mcpb.mjs --check",
     "gen:manifest": "node scripts/dump-tool-manifest.mjs",

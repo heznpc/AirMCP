@@ -17,10 +17,11 @@
  *    both streams, exits non-zero on (a) child exit != 0, (b) any `"error"`
  *    or `"isError":true` token in the response, (c) zero-tool response.
  *
- * 3. Sets AIRMCP_TEST_MODE=1 to match scripts/smoke-mcp.mjs. The two CI steps
- *    that boot dist/index.js used to disagree on this env; aligning them
- *    keeps the contract symmetric so future TEST_MODE-gated startup paths
- *    don't drift between the two gates.
+ * 3. Boots via cleanBootEnv (scripts/lib/clean-boot-env.mjs) — the shared env
+ *    for all three boot gates (smoke-mcp / verify-published / here). It strips
+ *    host AIRMCP_*, pins a STARTER config path, and sets AIRMCP_TEST_MODE=1, so
+ *    the three gates measure the same default surface instead of drifting on
+ *    whatever the host has configured.
  *
  * 4. Bounded by an internal timeout (INSPECTOR_TIMEOUT_MS). Inspector usually
  *    exits cleanly after `--method tools/list`, but a teardown bug in the
@@ -31,6 +32,7 @@
 import { spawn } from "node:child_process";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { cleanBootEnv } from "./lib/clean-boot-env.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, "..");
@@ -48,7 +50,7 @@ function run() {
       ["-y", INSPECTOR_PKG, "--cli", "node", resolve(REPO_ROOT, "dist/index.js"), "--method", "tools/list"],
       {
         cwd: REPO_ROOT,
-        env: { ...process.env, AIRMCP_TEST_MODE: "1" },
+        env: cleanBootEnv(),
         stdio: ["ignore", "pipe", "pipe"],
       },
     );

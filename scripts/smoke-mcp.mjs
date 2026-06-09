@@ -10,13 +10,13 @@
 // tool handler that needs TCC permissions; the handshake + tools/list
 // round-trip is the contract it guards.
 //
-// The server only registers modules whose runtime gates pass (macOS version,
-// Swift bridge availability, HealthKit, OAuth credentials, etc.), so the
-// registered count is smaller than the static `count-stats` total. On a
-// vanilla CI runner without the Swift bridge, ~111 tools register; a
-// healthy macOS with the bridge built + default config lands closer to 200.
-// SMOKE_MIN_TOOLS defaults to 100 — enough to catch a broken-boot regression
-// without flaking on partial-environment runners.
+// Boots at the DEFAULT (STARTER) surface via cleanBootEnv (see
+// scripts/lib/clean-boot-env.mjs): the host's config.json and AIRMCP_* are
+// stripped, so the registered count is the deterministic ~111-tool starter set
+// on any runner (local or CI), not whatever the host has enabled — the smaller
+// surface vs the static `count-stats` total is by design. SMOKE_MIN_TOOLS
+// defaults to 100 — headroom under the ~111 starter floor to catch a
+// broken-boot regression (top-level throw, dead registration path).
 //
 // Env knobs:
 //   SMOKE_MIN_TOOLS  — minimum tools/list length to pass (default: 100)
@@ -24,13 +24,14 @@
 
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
+import { cleanBootEnv } from "./lib/clean-boot-env.mjs";
 
 const MIN_TOOLS = Number(process.env.SMOKE_MIN_TOOLS ?? 100);
 const TIMEOUT_MS = Number(process.env.SMOKE_TIMEOUT_MS ?? 20_000);
 
 const server = spawn("node", ["dist/index.js"], {
   stdio: ["pipe", "pipe", "inherit"],
-  env: { ...process.env, AIRMCP_TEST_MODE: "1" },
+  env: cleanBootEnv(),
 });
 
 const rl = createInterface({ input: server.stdout });

@@ -28,7 +28,7 @@
 ## Features
 
 - **272 tools** (29 modules) — Apple app CRUD + system control + Apple Intelligence + UI Automation + Screen Capture + Maps + Podcasts + Weather + iWork (Pages/Numbers/Keynote) + Google Workspace + dynamic shortcuts + context memory + audit introspection
-- **232 Shortcuts / Siri AppIntents** — auto-generated from the tool manifest (50 Interactive Snippet views + 17 AppEnum pickers); `AskAirMCPIntent` natural-language agent on iOS 26+/macOS 26+ via FoundationModels
+- **232 Shortcuts / Siri AppIntents** — auto-generated from the tool manifest (82 Interactive Snippet views + 13 AppEnum pickers); `AskAirMCPIntent` natural-language agent on iOS 26+/macOS 26+ via FoundationModels
 - **32 prompts + 14 YAML skill built-ins** — per-app workflows + cross-module + developer workflows + Skills DSL (`inputs` / `parallel` / `loop` / `on_error` / `retry` / 9 event triggers)
 - **9 MCP resources** — Notes, Calendar, Reminders, Music, Mail, System, Context Memory + unified `context://snapshot/{depth}`
 - **3 interactive MCP Apps** — `calendar_week_view`, `music_player`, `timeline_today` (fuses events + reminders on one day-axis)
@@ -848,7 +848,7 @@ Or edit `~/.config/airmcp/config.json` directly:
 | `npx airmcp doctor`    | Diagnose installation issues      |
 | `npx airmcp`           | Start MCP server (stdio, default) |
 | `npx airmcp --version` | Print version and exit            |
-| `npx airmcp --full`    | Start with all 27 modules enabled |
+| `npx airmcp --full`    | Start with all 29 modules enabled |
 | `npx airmcp --http`    | Start as HTTP server (port 3847)  |
 
 ## Configuration

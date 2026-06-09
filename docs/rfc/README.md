@@ -94,6 +94,9 @@ Draft ──► Proposed ──► Accepted ──► Implemented
 | [0011](./0011-post-wwdc-2026.md)            | Post-WWDC 2026 positioning (placeholder)                      | Placeholder | TBD (post June 8-12 WWDC keynote)              |
 | [0008](./0008-elicitation.md)               | MCP Elicitation for destructive tools                         | Phase 1 Implemented | v2.13.0 (Phase 1 ✅) · v3.0.0 (Phase 2) |
 | [0009](./0009-iwork-depth.md)               | iWork (Pages / Numbers / Keynote) coverage depth              | Draft  | v2.13.0 (Phase 1) · v3.0.0 (Phase 2)               |
+| 0012 _(reserved)_                           | Daemon mode — autonomous scheduler (code prep in `src/skills/scheduler/*`; RFC doc pending) | Reserved | — |
+| [0013](./0013-review-process.md)            | Stratified review process for a broad codebase                | Accepted | Process                                           |
+| [0014](./0014-scope-review.md)              | Tool-surface scope review (post-WWDC 2026)                    | Accepted | v3.0.0                                            |
 
 ## 관련 문서
 

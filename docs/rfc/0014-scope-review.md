@@ -1,4 +1,4 @@
-# RFC 0012 — Tool-surface scope review (post-WWDC 2026)
+# RFC 0014 — Tool-surface scope review (post-WWDC 2026)
 
 - **Status**: Accepted (review framework) — per-item actions tracked in §4
 - **Author**: heznpc + Claude + Codex

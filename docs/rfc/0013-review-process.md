@@ -3,7 +3,7 @@
 - **Status**: Accepted (process) — referenced from `CONTRIBUTING.md`
 - **Author**: heznpc + Claude
 - **Created**: 2026-06-09
-- **Relationship**: operationalizes the work-depth rule in `CLAUDE.md`; consumes RFC 0012 (scope tiers)
+- **Relationship**: operationalizes the work-depth rule in `CLAUDE.md`; consumes RFC 0014 (scope tiers)
 
 ---
 
@@ -33,7 +33,7 @@ floor that must hold underneath, and the cadence — including deep-auditing
 | Tier | What | Failure mode | Review depth |
 |---|---|---|---|
 | **T0 — Critical infra** | `src/shared/` audit (HMAC chain), HITL gate, rate-limit, OAuth verifier + scope gate, `allowNetwork` policy, tool-registry interceptor, structured-content validators, `esc`/JXA escaping; `src/server/` transport + boot invariants; the codegen *contract* (tool-manifest ↔ generated AppIntents ↔ runtime). | **Silent, systemic** — removes a safety property everywhere without erroring. | **Max** — `/code-review` at max effort on every diff + periodic deep audit of unchanged code (§5) + a behaviour-asserting contract test per invariant (§4). |
-| **T1 — High-blast-radius surface** | `system` (27t), `ui` (10t), `finder`, `shortcuts` — the *agent-drives-the-Mac* surface — plus the HTTP transport. | **Loud but destructive** — a real action on the user's machine. | **High** — review + verify HITL coverage, `destructiveHint` annotations, scope-gate mapping, rate-limit tier (this is RFC 0012 §4.5). |
+| **T1 — High-blast-radius surface** | `system` (27t), `ui` (10t), `finder`, `shortcuts` — the *agent-drives-the-Mac* surface — plus the HTTP transport. | **Loud but destructive** — a real action on the user's machine. | **High** — review + verify HITL coverage, `destructiveHint` annotations, scope-gate mapping, rate-limit tier (this is RFC 0014 §4.5). |
 | **T2 — JXA-thin tool modules** | PIM + media + iWork modules (`notes`, `calendar`, `mail`, `music`, …). | **Fails loud, blast = 1 call.** | **Light** — the drift/contract tests are the floor; diff-review checks escaping + the `okUntrusted`/`toolError` shape, not deep logic. |
 | **T3 — Generated / vendored** | `swift/.../Generated/`, lockfiles, `dist/`. | Wrong only if the *generator* is wrong. | **Review the generator + the drift guard, never the output.** |
 

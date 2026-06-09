@@ -64,10 +64,28 @@ function sh(cmd, args, opts = {}) {
 
 function bootAndList(entry, cwd) {
   return new Promise((done) => {
+    // Measure the DEFAULT user surface deterministically, regardless of the
+    // host's ~/.config/airmcp/config.json or any exported AIRMCP_* — the same
+    // pollution-free discipline as the clean-room recipe (env -i + fresh HOME),
+    // applied surgically: strip every AIRMCP_* from the inherited env, then pin
+    // the config path to a guaranteed-absent file so loadConfig falls through to
+    // the STARTER preset (config.ts loadFileConfig → fileExists:false, parseConfig
+    // applies the preset). Non-AIRMCP env (PATH/HOME/npm_config_*) is preserved so
+    // npx and the npm cache keep working on any runner; AIRMCP_TEST_MODE=1 is
+    // re-set to stay symmetric with smoke-mcp / mcp-validate. Without this, a dev
+    // box whose config.json disables modules would make this gate measure a
+    // polluted surface — and could false-fail the >=100 floor — instead of the
+    // ~111-tool starter default a fresh `npx -y airmcp` user actually gets.
+    const env = { ...process.env };
+    for (const k of Object.keys(env)) {
+      if (k.startsWith("AIRMCP_")) delete env[k];
+    }
+    env.AIRMCP_TEST_MODE = "1";
+    env.AIRMCP_CONFIG_PATH = join(cwd, "airmcp-no-config-here.json"); // absent → STARTER preset
     const proc = spawn(
       "npx",
       ["-y", INSPECTOR_PKG, "--cli", "node", entry, "--method", "tools/list"],
-      { cwd, env: { ...process.env, AIRMCP_TEST_MODE: "1" }, stdio: ["ignore", "pipe", "pipe"] },
+      { cwd, env, stdio: ["ignore", "pipe", "pipe"] },
     );
     let stdout = "";
     let stderr = "";

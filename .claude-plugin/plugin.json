@@ -1,9 +1,11 @@
 {
   "name": "airmcp",
+  "displayName": "AirMCP",
   "description": "Apple-native MCP server with production governance built in — HMAC-chained audit log, per-call HITL, OAuth 2.1 + Resource Indicators, scope gate, rate limit, emergency stop file. 272 tools across 29 modules: Calendar, Notes, Mail, Reminders, Contacts, Messages, Music, Finder, Safari, Photos, Maps, Podcasts, Weather, iWork, Google Workspace, Apple Intelligence, UI Automation, Shortcuts, Context Memory. Native Swift bridges into EventKit, HealthKit, PhotoKit, Vision, Foundation Models. macOS local-first, multi-client (Claude, Codex, opencode, Gemini CLI, Antigravity, Cursor, Zed, Cline, ChatGPT MCP Apps).",
   "version": "2.12.0",
   "author": {
-    "name": "heznpc"
+    "name": "heznpc",
+    "url": "https://github.com/heznpc"
   },
   "homepage": "https://github.com/heznpc/AirMCP",
   "repository": "https://github.com/heznpc/AirMCP",

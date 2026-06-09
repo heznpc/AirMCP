@@ -9,7 +9,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/heznpc/AirMCP)](https://github.com/heznpc/AirMCP/stargazers)
 
-**Apple-native agent runtime for any MCP client.** Skills DSL workflow engine, semantic memory, OAuth 2.1, HMAC-chained audit log — over native Swift bridges into EventKit, HealthKit, PhotoKit, Vision, and Foundation Models. 272 tools across 29 Apple + Google Workspace modules. Connect Claude, Codex, opencode, Gemini CLI, Antigravity, Cursor, Zed, Cline, JetBrains Air, OpenClaw — any MCP-capable AI.
+**Open action runtime for Apple-native agents.** Skills DSL workflow engine, semantic memory, OAuth 2.1, HMAC-chained audit log — over native Swift bridges into EventKit, HealthKit, PhotoKit, Vision, and Foundation Models. 272 tools across 29 Apple + Google Workspace modules. Connect Claude, Codex, opencode, Gemini CLI, Antigravity, Cursor, Zed, Cline, JetBrains Air, OpenClaw, and Xcode 27 agents (which speak MCP since 26.3) — any MCP-capable AI.
 
 **Part of:** Human-Controlled AI Systems · Research Program 1 (anchor — Apple-side agent governance).
 

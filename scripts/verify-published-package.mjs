@@ -42,7 +42,7 @@ const INSPECTOR_TIMEOUT_MS = 120_000;
 
 // Surface floor for the DEFAULT boot. A plain `npx -y airmcp` (no --full, no
 // config.json) applies the STARTER preset (config.ts:339) — a curated subset,
-// ~125 tools here — NOT all 272. The "272 tools" headline is the --full /
+// ~111 tools here — NOT all 272. The "272 tools" headline is the --full /
 // registered count (owned by count-stats + tool-count-drift). This gate tests
 // the *default user experience*, so the floor only needs to catch "booted to
 // near-empty" (a broken/incomplete package), robust to per-machine gating.

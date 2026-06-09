@@ -13,7 +13,7 @@
 // The server only registers modules whose runtime gates pass (macOS version,
 // Swift bridge availability, HealthKit, OAuth credentials, etc.), so the
 // registered count is smaller than the static `count-stats` total. On a
-// vanilla CI runner without the Swift bridge, ~125 tools register; a
+// vanilla CI runner without the Swift bridge, ~111 tools register; a
 // healthy macOS with the bridge built + default config lands closer to 200.
 // SMOKE_MIN_TOOLS defaults to 100 — enough to catch a broken-boot regression
 // without flaking on partial-environment runners.

@@ -127,7 +127,7 @@ describe("doc drift: README prose vs manifest", () => {
 
 describe("doc honesty: default surface vs full count, and the optional Swift bridge", () => {
   // RFC 0014 root-cause: the "272 tools" headline is the --full / registered
-  // count, but a default `npx -y airmcp` loads the STARTER preset (~125), and
+  // count, but a default `npx -y airmcp` loads the STARTER preset (~111), and
   // the Swift binary is NOT in the npm tarball. These greppable invariants stop
   // the README silently drifting back to advertising the full native surface as
   // the out-of-box default.

@@ -40,8 +40,10 @@ llms-full.txt
 .env.local
 .vscode/
 
-# Claude Code local worktrees + project state
-.claude/
+# Claude Code local worktrees + project state (keep local) — but DO share the
+# repo review command, which is part of the RFC 0013 review process.
+.claude/*
+!.claude/commands/
 
 # Local design-rationale notes (not for publication)
 CLAUDE.md

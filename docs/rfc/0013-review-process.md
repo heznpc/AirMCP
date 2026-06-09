@@ -69,13 +69,14 @@ T0 is, in fact, well-covered by behaviour tests — audit (6), HITL (3), OAuth (
 network/transport (1), tool-registry (2), outputSchema (8), escaping (3), codegen
 (3). The floor is real, not aspirational.
 
-**One real gap:** the **manifest ↔ doc drift guard** (`tests/tool-count-drift.test.js`)
-is **uncommitted** and, per the 2026-06-09 `/code-review`, carries a **false
-invariant** (asserts README tool count `== manifest.toolCount`, i.e. 272 == 285 —
-unsatisfiable, since the manifest counts a superset incl. 9 `skill_*` + 3 MCP-app
-tools). Until it's fixed and committed, README↔manifest drift has only the CI
-`stats:check` / `llms:check` guards, which cover *counts* but not the
-generated-Swift sub-numbers (SnippetView / AppEnum). **Floor-fix backlog item #1.**
+**Floor-fix #1 — CLOSED.** The **manifest ↔ doc drift guard**
+(`tests/tool-count-drift.test.js`) was uncommitted and carried a false invariant
+(README tool count `== manifest.toolCount`, i.e. 272 == 285 — unsatisfiable, since
+the manifest is a superset incl. `skill_*` + MCP-app tools). It is now committed,
+the assertion rewritten to the true superset relationship, and the stale
+README sub-numbers (SnippetView 50→82, AppEnum 17→13) reconciled — so README ↔
+manifest ↔ generated-Swift drift is caught on every CI run. The T0 floor now has
+no known gap.
 
 ## 4. The automated floor is non-negotiable
 
@@ -103,13 +104,25 @@ So:
 - **Floor maintenance**: any time a §2 guard is found missing or wrong (e.g. the
   drift test in §3), fixing it outranks new feature review.
 
-## 6. How to invoke `/code-review` under this process
+## 6. How to invoke it — this is executable, not prose
 
-- Pass the **tier** and the **failure-mode catalog rows** for the touched area,
-  not just the diff. "Review at T0 depth; hunt audit-seal + HITL-bypass."
-- For a T0 deep audit, scope it to `src/shared/<area>` + the catalog, *not* a diff.
-- For T2 diffs, the ask is narrow: "escaping + result-shape + does the contract
-  test still pass" — don't spend max effort here.
+The tiers + failure-mode catalog above are encoded in **`scripts/review-route.mjs`**,
+so routing is mechanical, not a thing you remember to do:
+
+- **`npm run review:route`** (or `node scripts/review-route.mjs --base <ref>`) —
+  classifies the diff, prints each file's tier, the *specific* failure modes to
+  hunt per touched T0/T1 area, the guard tests that must stay green, and a ⚠ for
+  any T0 file changed without touching its guard test. `--json` drives tooling;
+  `--check --strict` exits non-zero on an unguarded T0 change.
+- **`npm run review:audit`** — the RFC §5 cadence: emits the full T0 deep-audit
+  plan over *unchanged* infra, independent of any diff.
+- **`/review`** (`.claude/commands/review.md`) — runs the router, then reviews at
+  the routed depth instead of scanning uniformly.
+- **CI** runs the router on every PR (informational step in `ci.yml`), so the
+  tier plan + hunt list + unguarded-T0 warnings are visible on each change.
+
+Keep `scripts/review-route.mjs`'s tier lists + catalog in sync with §1/§2 — when
+a T0 invariant is added, add its row there *and* its behaviour test (§4).
 
 ## 7. Non-goals
 

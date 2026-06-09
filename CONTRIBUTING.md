@@ -262,6 +262,18 @@ refactor: extract shared pagination logic
 - Every tool must have `annotations` with `readOnlyHint` or `destructiveHint`
 - Destructive tools should validate input before executing
 
+## Review process
+
+Review is **routed by risk tier**, not spread evenly across the 272-tool surface
+— see **[RFC 0013 — Stratified review process](docs/rfc/0013-review-process.md)**.
+In short: the critical infra layer (`src/shared/` audit / HITL / OAuth / rate-limit
+/ registry, the transport, the codegen contract) is **T0** and gets max-effort
+review + a behaviour-asserting contract test per invariant; the agent-controls-the-
+Mac surface (`system`, `ui`) is **T1**; JXA-thin tool modules are **T2** (the drift
+tests are the floor). When opening or reviewing a PR, tag the touched tier so
+review depth matches the blast radius. RFC 0013 §2 lists the per-area failure
+modes to hunt.
+
 ## Questions?
 
 Open an [issue](https://github.com/heznpc/AirMCP/issues) for bugs, feature requests, or questions.

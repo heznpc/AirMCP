@@ -47,3 +47,8 @@ llms-full.txt
 
 # Local design-rationale notes (not for publication)
 CLAUDE.md
+# Codex local agent config: the root AGENTS.md is the gitignored twin of
+# CLAUDE.md (the published agent guide lives at .github/AGENTS.md); .codex/ is
+# the Codex analog of .claude/* above. Not for publication.
+/AGENTS.md
+.codex/

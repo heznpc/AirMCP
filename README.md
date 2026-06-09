@@ -13,7 +13,7 @@
 
 **Part of:** Human-Controlled AI Systems · Research Program 1 (anchor — Apple-side agent governance).
 
-**Requires**: macOS for the server. The default `npx -y airmcp` loads a curated **starter** module set (~125 tools); `--full` (or `AIRMCP_FULL=true`) enables all 29 modules / 272 tools. Most tools are pure JXA and work on macOS 14+ with no extra setup. **Swift-backed tools** — Apple Intelligence, HealthKit, on-device semantic search, recurring events/reminders, photo import/delete/classify, Vision, Speech, Location, Bluetooth — need the **optional Swift bridge** (`npm run swift-build`, or install via the `.mcpb` bundle); without it those tools return a clear "Swift bridge not found" error and everything else keeps working. Apple Intelligence additionally requires macOS 26+ on Apple Silicon.
+**Requires**: macOS for the server. The default `npx -y airmcp` loads a curated **starter** module set (~111 tools); `--full` (or `AIRMCP_FULL=true`) enables all 29 modules / 272 tools. Most tools are pure JXA and work on macOS 14+ with no extra setup. **Swift-backed tools** — Apple Intelligence, HealthKit, on-device semantic search, recurring events/reminders, photo import/delete/classify, Vision, Speech, Location, Bluetooth — need the **optional Swift bridge** (`npm run swift-build`, or install via the `.mcpb` bundle); without it those tools return a clear "Swift bridge not found" error and everything else keeps working. Apple Intelligence additionally requires macOS 26+ on Apple Silicon.
 
 > Available in multiple languages at the [project landing page](https://heznpc.github.io/AirMCP/).
 

@@ -705,4 +705,29 @@ describe('HitlClient', () => {
     expect(receivedRequest.openWorld).toBe(true);
     expect(receivedRequest.destructive).toBe(false);
   });
+
+  test('isReachable returns false when nothing listens on the socket path', async () => {
+    const client = new HitlClient({
+      socketPath: join(tmpdir(), `airmcp-missing-${randomUUID()}.sock`),
+      level: 'all',
+      timeout: 1,
+    });
+    cleanups.push(() => client.dispose());
+
+    await expect(client.isReachable()).resolves.toBe(false);
+  });
+
+  test('isReachable returns true when a listener is up, and the connection is reused', async () => {
+    const { server, socketPath } = await createTestSocket((req, conn) => {
+      conn.write(JSON.stringify({ id: req.id, type: 'hitl_response', approved: true }) + '\n');
+    });
+    cleanups.push(() => server.close());
+
+    const client = new HitlClient({ socketPath, level: 'all', timeout: 5 });
+    cleanups.push(() => client.dispose());
+
+    await expect(client.isReachable()).resolves.toBe(true);
+    // The probe's connection serves the subsequent approval request.
+    await expect(client.requestApproval('probe_then_ask', {}, false, false)).resolves.toBe(true);
+  });
 });

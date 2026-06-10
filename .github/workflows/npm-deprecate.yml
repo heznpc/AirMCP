@@ -1,0 +1,68 @@
+name: npm deprecate (maintenance)
+
+# Deprecate an npm package we own, using the same NPM_TOKEN that cd.yml already
+# publishes with (npm provenance on airmcp@2.12.0 proves the token works and
+# has bypass-2FA write access).
+#
+# Why: npm now mandates 2FA-or-bypass-token for ALL write operations. The
+# heznpc account currently has no 2FA configured, so local `npm deprecate`
+# fails with a hard 403 (no OTP prompt is even possible). Rather than handling
+# a fresh token on a laptop, reuse the already-provisioned CI secret in the
+# place it lives.
+#
+# First use: deprecate the two pre-rename zombie packages
+# (`@heznpc/imcp`, `iconnect-mcp`) pointing users at `airmcp`. Kept afterward
+# as a maintenance utility (it can also UN-deprecate: pass an empty-string
+# message via the undeprecate input).
+#
+# Inputs flow through `env:` and are referenced only as "$VAR" in run scripts
+# (never interpolated into the shell), so there is no command-injection surface.
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: "Package to deprecate (e.g. @heznpc/imcp or iconnect-mcp)"
+        required: true
+      message:
+        description: "Deprecation message shown on install"
+        required: true
+        default: "Renamed to airmcp — install airmcp instead"
+      undeprecate:
+        description: "Set true to REMOVE the deprecation instead (message is ignored)"
+        required: false
+        default: "false"
+
+jobs:
+  deprecate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: "lts/*"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Deprecate package
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          PKG: ${{ inputs.package }}
+          MSG: ${{ inputs.message }}
+          UNDO: ${{ inputs.undeprecate }}
+        run: |
+          if [ "$UNDO" = "true" ]; then
+            npm deprecate "$PKG" ""
+            echo "Removed deprecation from $PKG"
+          else
+            npm deprecate "$PKG" "$MSG"
+            echo "Deprecated $PKG"
+          fi
+
+      - name: Verify
+        env:
+          PKG: ${{ inputs.package }}
+        run: |
+          echo "deprecated field now reads:"
+          npm view "$PKG" deprecated || echo "(no deprecation set)"

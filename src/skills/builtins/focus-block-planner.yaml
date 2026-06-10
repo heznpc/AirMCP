@@ -1,12 +1,12 @@
 name: focus-block-planner
 title: "Focus Block Planner"
 description: >-
-  Walks today's open reminders and drops a calendar time-block for each
-  one. Uses `loop` with `on_error: continue` so a single failed event
-  creation (e.g. conflicting calendar, missing permission) doesn't abort
-  the rest of the plan — the skill result reports which reminders got
-  blocked and which didn't. DESTRUCTIVE: creates calendar events; each
-  insertion is gated by HITL approval.
+  Create a calendar time-block event for each of today's open reminders —
+  writes calendar events (each creation HITL-gated); reminders are only
+  read. Uses `loop` with `on_error: continue` so a single failed event
+  creation (conflicting calendar, missing permission) doesn't abort the
+  rest of the plan — the skill result reports which reminders got blocked
+  and which didn't.
 expose_as: tool
 steps:
   # 1) Pull the open-reminder backlog. `limit: 8` keeps the loop small

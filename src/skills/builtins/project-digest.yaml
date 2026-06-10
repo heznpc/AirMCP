@@ -1,10 +1,9 @@
 name: project-digest
 title: "Project Digest"
 description: >-
-  Semantic-search the user's indexed Apple data for a topic, then loop
-  over each match to pull semantically-related items — effectively a
-  cross-app "everything about this project" view. Demonstrates the
-  Skills DSL's loop construct and conditional execution.
+  Semantic-search indexed Apple data for a topic and expand each hit with
+  related items — a read-only cross-app digest; needs semantic_index first.
+  Demonstrates the Skills DSL's loop construct and conditional execution.
 expose_as: tool
 steps:
   # 1) Seed search: semantic_search returns { query, results[], total, ... }.

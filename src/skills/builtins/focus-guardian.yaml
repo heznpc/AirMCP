@@ -1,9 +1,9 @@
 name: focus-guardian
 title: "Focus Mode Guardian"
 description: >-
-  Auto-snapshots today's events and open reminders whenever the system
-  focus mode changes (entering/leaving Do Not Disturb, Work, Personal, etc.)
-  so the AI has fresh context right after you change mode. Showcases the
+  Snapshot today's events and open reminders whenever macOS Focus mode
+  changes (Do Not Disturb, Personal, etc.) — read-only, nothing is written.
+  Gives the AI fresh context right after a mode switch; showcases the
   `focus_mode_changed` event trigger plus parallel data gathering.
 expose_as: tool
 trigger:

@@ -769,7 +769,7 @@
     {
       "name": "capture_screenshot",
       "title": "Capture Screenshot",
-      "description": "Take a screenshot and save to the specified path. Supports full screen, window, or selection capture.",
+      "description": "Capture the screen to an image file at the given path — writes a file; needs macOS Screen Recording permission. Supports full screen, window, or selection capture.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -1195,7 +1195,7 @@
     {
       "name": "create_folder",
       "title": "Create Folder",
-      "description": "Create a new folder. Optionally specify which account to create it in.",
+      "description": "Create a new folder in Apple Notes — a non-destructive write. Optionally specify which account to create it in.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -1565,7 +1565,7 @@
     {
       "name": "create_shortcut",
       "title": "Create Shortcut",
-      "description": "Create a new Siri Shortcut by name. Uses UI automation to open the Shortcuts app and create a new empty shortcut. The shortcut must be further configured in the Shortcuts app.",
+      "description": "Create a new empty Siri Shortcut by name — drives the Shortcuts app via UI automation (needs Accessibility permission; the app opens and takes focus). The shortcut must be further configured in the Shortcuts app.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -2102,7 +2102,7 @@
     {
       "name": "find_related",
       "title": "Find Related Items",
-      "description": "Given a note, event, reminder, or email ID, find semantically related items across all indexed Apple apps. Discovers cross-app connections (e.g., a calendar event related to notes and reminders about the same topic).",
+      "description": "Find items semantically related to a note, event, reminder, or email ID across indexed Apple apps — read-only; requires semantic_index to be built first. Discovers cross-app connections (e.g., a calendar event related to notes and reminders about the same topic).",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -2909,7 +2909,7 @@
     {
       "name": "get_hourly_forecast",
       "title": "Get Hourly Forecast",
-      "description": "Get hourly weather forecast for a location.",
+      "description": "Get the hour-by-hour weather forecast (temperature, precipitation, wind) for a latitude/longitude via the Open-Meteo API — read-only, no API key needed.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -11495,7 +11495,7 @@
     {
       "name": "semantic_index",
       "title": "Build Semantic Index",
-      "description": "Index data from enabled Apple apps (Notes, Calendar, Reminders, Mail, Photos, Finder) into the local vector store for semantic search. Run this once, then use semantic_search. Replaces any existing index. Requires Swift bridge (npm run swift-build).",
+      "description": "Build the local vector index over enabled Apple apps for semantic search — replaces any existing index; embeddings need GEMINI_API_KEY or the Swift bridge. Covers Notes, Calendar, Reminders, Mail, Photos, and Finder. Run once, then use semantic_search.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -12156,7 +12156,7 @@
     {
       "name": "skill_clipboard-url-to-reading",
       "title": "Clipboard URL → Reading List",
-      "description": "[Skill] Listens for clipboard changes and, when a URL is on the pasteboard, pushes it into Safari's Reading List. Combines the `pasteboard_changed` event trigger with `on_error: continue` so non-URL clipboard content doesn't spam the user with errors — Safari's validator rejects the non-URL and the skill quietly moves on.",
+      "description": "[Skill] Watch the clipboard and add any copied URL to Safari's Reading List — writes to Reading List; non-URL clipboard content is ignored. Combines the `pasteboard_changed` event trigger with `on_error: continue` so Safari's validator rejects non-URLs and the skill quietly moves on.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -12175,7 +12175,7 @@
     {
       "name": "skill_daily-journal",
       "title": "Daily Journal → Memory",
-      "description": "[Skill] Captures today's events + open reminders, summarises them on-device, and persists the summary as a context-memory `episode` tagged `journal`. Demonstrates inputs + parallel + retry + the newly-exposed `memory_put` tool working together so ai_agent can later recall \"what did I do last Tuesday?\" via `memory_query`. DESTRUCTIVE: writes a memory entry (non-destructive to Apple apps).",
+      "description": "[Skill] Summarise today's events and open reminders on-device and save the result as a context-memory `episode` tagged `journal` — writes one memory entry. Nothing is written to Apple apps. Demonstrates inputs + parallel + retry + `memory_put` so ai_agent can later recall \"what did I do last Tuesday?\" via `memory_query`.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -12219,7 +12219,7 @@
     {
       "name": "skill_focus-block-planner",
       "title": "Focus Block Planner",
-      "description": "[Skill] Walks today's open reminders and drops a calendar time-block for each one. Uses `loop` with `on_error: continue` so a single failed event creation (e.g. conflicting calendar, missing permission) doesn't abort the rest of the plan — the skill result reports which reminders got blocked and which didn't. DESTRUCTIVE: creates calendar events; each insertion is gated by HITL approval.",
+      "description": "[Skill] Create a calendar time-block event for each of today's open reminders — writes calendar events (each creation HITL-gated); reminders are only read. Uses `loop` with `on_error: continue` so a single failed event creation (conflicting calendar, missing permission) doesn't abort the rest of the plan — the skill result reports which reminders got blocked and which didn't.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -12238,7 +12238,7 @@
     {
       "name": "skill_focus-guardian",
       "title": "Focus Mode Guardian",
-      "description": "[Skill] Auto-snapshots today's events and open reminders whenever the system focus mode changes (entering/leaving Do Not Disturb, Work, Personal, etc.) so the AI has fresh context right after you change mode. Showcases the `focus_mode_changed` event trigger plus parallel data gathering.",
+      "description": "[Skill] Snapshot today's events and open reminders whenever macOS Focus mode changes (Do Not Disturb, Personal, etc.) — read-only, nothing is written. Gives the AI fresh context right after a mode switch; showcases the `focus_mode_changed` event trigger plus parallel data gathering.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -12276,7 +12276,7 @@
     {
       "name": "skill_project-digest",
       "title": "Project Digest",
-      "description": "[Skill] Semantic-search the user's indexed Apple data for a topic, then loop over each match to pull semantically-related items — effectively a cross-app \"everything about this project\" view. Demonstrates the Skills DSL's loop construct and conditional execution.",
+      "description": "[Skill] Semantic-search indexed Apple data for a topic and expand each hit with related items — a read-only cross-app digest; needs semantic_index first. Demonstrates the Skills DSL's loop construct and conditional execution.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -12295,7 +12295,7 @@
     {
       "name": "skill_sender-to-tasks",
       "title": "Sender → Tasks",
-      "description": "[Skill] Scans mail for a keyword and turns each hit into a reminder so nothing in the inbox goes unresolved. Accepts runtime inputs so the same skill handles newsletter triage, a specific sender, or any ad-hoc query without editing YAML. Loop + `on_error: continue` means the rest of the batch still gets queued even if one reminder-create fails (HITL denial, Reminders permission, etc.). DESTRUCTIVE: creates reminders; each insertion is gated by HITL approval.",
+      "description": "[Skill] Scan Mail for a keyword or sender and create one reminder per matching message — writes reminders (each creation HITL-gated); mail is only read. Accepts runtime inputs so the same skill handles newsletter triage, a specific sender, or any ad-hoc query without editing YAML. Loop + `on_error: continue` means the rest of the batch still gets queued even if one reminder-create fails (HITL denial, Reminders permission, etc.).",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -12480,7 +12480,7 @@
     {
       "name": "summarize_context",
       "title": "Summarize Context",
-      "description": "Collect context from all enabled Apple apps and ask the client's LLM to produce a concise briefing. Uses MCP Sampling — works with any LLM the client is using. No API keys required.",
+      "description": "Gather recent context from enabled Apple apps and produce a concise briefing via MCP sampling — read-only; the connected client must support sampling. Works with whatever LLM the client is using; no API keys required.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -13640,7 +13640,7 @@
     {
       "name": "update_reminder",
       "title": "Update Reminder",
-      "description": "Update reminder properties. Only specified fields are changed. Set dueDate to null to clear it. Recurrence rules cannot be modified via automation.",
+      "description": "Update fields of an existing reminder in Apple Reminders — a write to user data; only the fields you pass change. Set dueDate to null to clear it. Recurrence rules cannot be modified via automation.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",

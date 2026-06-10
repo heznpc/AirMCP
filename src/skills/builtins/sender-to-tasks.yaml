@@ -1,13 +1,12 @@
 name: sender-to-tasks
 title: "Sender → Tasks"
 description: >-
-  Scans mail for a keyword and turns each hit into a reminder so nothing
-  in the inbox goes unresolved. Accepts runtime inputs so the same skill
-  handles newsletter triage, a specific sender, or any ad-hoc query
-  without editing YAML. Loop + `on_error: continue` means the rest of
-  the batch still gets queued even if one reminder-create fails (HITL
-  denial, Reminders permission, etc.). DESTRUCTIVE: creates reminders;
-  each insertion is gated by HITL approval.
+  Scan Mail for a keyword or sender and create one reminder per matching
+  message — writes reminders (each creation HITL-gated); mail is only read.
+  Accepts runtime inputs so the same skill handles newsletter triage, a
+  specific sender, or any ad-hoc query without editing YAML. Loop +
+  `on_error: continue` means the rest of the batch still gets queued even
+  if one reminder-create fails (HITL denial, Reminders permission, etc.).
 expose_as: tool
 inputs:
   query:

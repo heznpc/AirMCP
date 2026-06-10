@@ -44,12 +44,21 @@ if (!existsSync(MANIFEST)) {
 // Mirror src/shared/tool-filter.ts:compactDescription — keep them in
 // lockstep so the script's "after" matches what the LLM actually sees.
 function compactDescription(description) {
-  const match = description.match(/^(.*?[.!?])\s/);
-  const firstSentence = match?.[1] ?? description;
-  if (firstSentence.length > 80) {
-    return firstSentence.slice(0, 77) + "...";
+  const COMPACT_BUDGET = 160;
+  const text = description.trim();
+  if (text.length <= COMPACT_BUDGET) {
+    return /[.!?]$/.test(text) ? text : text + ".";
   }
-  return /[.!?]$/.test(firstSentence) ? firstSentence : firstSentence + ".";
+  const boundary = /[.!?](?=\s)/g;
+  let cutEnd = 0;
+  for (let m = boundary.exec(text); m !== null; m = boundary.exec(text)) {
+    if (m.index + 1 > COMPACT_BUDGET) break;
+    cutEnd = m.index + 1;
+  }
+  if (cutEnd > 0) return text.slice(0, cutEnd);
+  const head = text.slice(0, COMPACT_BUDGET - 1);
+  const lastSpace = head.lastIndexOf(" ");
+  return (lastSpace > 40 ? head.slice(0, lastSpace) : head).trimEnd() + "…";
 }
 
 function estTokens(s) {

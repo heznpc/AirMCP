@@ -365,7 +365,8 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
     "create_folder",
     {
       title: "Create Folder",
-      description: "Create a new folder. Optionally specify which account to create it in.",
+      description:
+        "Create a new folder in Apple Notes — a non-destructive write. Optionally specify which account to create it in.",
       inputSchema: {
         name: z.string().max(500).describe("Folder name"),
         account: z.string().max(500).optional().describe("Account name (e.g. 'iCloud'). Defaults to primary account."),

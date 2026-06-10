@@ -243,7 +243,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
     {
       title: "Update Reminder",
       description:
-        "Update reminder properties. Only specified fields are changed. Set dueDate to null to clear it. Recurrence rules cannot be modified via automation.",
+        "Update fields of an existing reminder in Apple Reminders — a write to user data; only the fields you pass change. Set dueDate to null to clear it. Recurrence rules cannot be modified via automation.",
       inputSchema: {
         id: z.string().max(500).describe("Reminder ID"),
         title: z.string().max(500).optional().describe("New title"),

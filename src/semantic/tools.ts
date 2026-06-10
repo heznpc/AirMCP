@@ -21,9 +21,8 @@ export function registerSemanticTools(server: McpServer, config: AirMcpConfig): 
     {
       title: "Build Semantic Index",
       description:
-        "Index data from enabled Apple apps (Notes, Calendar, Reminders, Mail, Photos, Finder) into the local " +
-        "vector store for semantic search. Run this once, then use semantic_search. Replaces any existing " +
-        "index. Requires Swift bridge (npm run swift-build).",
+        "Build the local vector index over enabled Apple apps for semantic search — replaces any existing index; embeddings need GEMINI_API_KEY or the Swift bridge. " +
+        "Covers Notes, Calendar, Reminders, Mail, Photos, and Finder. Run once, then use semantic_search.",
       inputSchema: {
         sources: z
           .array(z.enum(["notes", "calendar", "reminders", "mail", "photos", "finder"]))
@@ -96,7 +95,7 @@ export function registerSemanticTools(server: McpServer, config: AirMcpConfig): 
     {
       title: "Find Related Items",
       description:
-        "Given a note, event, reminder, or email ID, find semantically related items across all indexed Apple apps. " +
+        "Find items semantically related to a note, event, reminder, or email ID across indexed Apple apps — read-only; requires semantic_index to be built first. " +
         "Discovers cross-app connections (e.g., a calendar event related to notes and reminders about the same topic).",
       inputSchema: {
         id: z.string().max(500).describe("Item ID (as stored in the vector index)"),

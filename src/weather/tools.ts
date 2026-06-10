@@ -69,7 +69,8 @@ export function registerWeatherTools(server: McpServer, _config: AirMcpConfig): 
     "get_hourly_forecast",
     {
       title: "Get Hourly Forecast",
-      description: "Get hourly weather forecast for a location.",
+      description:
+        "Get the hour-by-hour weather forecast (temperature, precipitation, wind) for a latitude/longitude via the Open-Meteo API — read-only, no API key needed.",
       inputSchema: {
         latitude: z.number().min(-90).max(90).describe("Latitude coordinate"),
         longitude: z.number().min(-180).max(180).describe("Longitude coordinate"),

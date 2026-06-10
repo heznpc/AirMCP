@@ -1,12 +1,11 @@
 name: daily-journal
 title: "Daily Journal → Memory"
 description: >-
-  Captures today's events + open reminders, summarises them on-device,
-  and persists the summary as a context-memory `episode` tagged
-  `journal`. Demonstrates inputs + parallel + retry + the
-  newly-exposed `memory_put` tool working together so ai_agent can
-  later recall "what did I do last Tuesday?" via `memory_query`.
-  DESTRUCTIVE: writes a memory entry (non-destructive to Apple apps).
+  Summarise today's events and open reminders on-device and save the
+  result as a context-memory `episode` tagged `journal` — writes one
+  memory entry. Nothing is written to Apple apps. Demonstrates inputs +
+  parallel + retry + `memory_put` so ai_agent can later recall "what did
+  I do last Tuesday?" via `memory_query`.
 expose_as: tool
 inputs:
   note:

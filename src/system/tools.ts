@@ -322,7 +322,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
     {
       title: "Capture Screenshot",
       description:
-        "Take a screenshot and save to the specified path. Supports full screen, window, or selection capture.",
+        "Capture the screen to an image file at the given path — writes a file; needs macOS Screen Recording permission. Supports full screen, window, or selection capture.",
       inputSchema: {
         path: zFilePath.describe("Absolute file path to save the screenshot (e.g. '/tmp/screenshot.png')"),
         region: z

@@ -1,0 +1,55 @@
+name: Set MCP Registry server status
+
+# Manually set the lifecycle status (active / deprecated / deleted) of one of
+# our servers in the official MCP Registry — e.g. to deprecate a renamed entry.
+#
+# GitHub OIDC authorizes any server under the io.github.heznpc/* namespace (same
+# auth as publish-registry.yml) — no secret needed. Manual dispatch only.
+#
+# First use: deprecate the pre-rename io.github.heznpc/iconnect, pointing users
+# to io.github.heznpc/airmcp. Kept afterward as a maintenance utility.
+#
+# Inputs are passed through `env:` and referenced as "$VAR" in run scripts (never
+# interpolated directly into the shell), so there is no command-injection surface.
+
+on:
+  workflow_dispatch:
+    inputs:
+      server_name:
+        description: "Full server name (e.g. io.github.heznpc/iconnect)"
+        required: true
+      status:
+        description: "New lifecycle status"
+        required: true
+        type: choice
+        options: [active, deprecated, deleted]
+        default: deprecated
+      message:
+        description: "Optional message (not allowed when status=active)"
+        required: false
+
+jobs:
+  set-status:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # OIDC auth to the MCP Registry — no secret needed
+    steps:
+      - name: Install mcp-publisher (pinned)
+        env:
+          MCP_PUBLISHER_VERSION: v1.7.9
+        run: |
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+
+      - name: Authenticate to MCP Registry (GitHub OIDC)
+        run: ./mcp-publisher login github-oidc
+
+      - name: Set server status
+        env:
+          SERVER_NAME: ${{ inputs.server_name }}
+          NEW_STATUS: ${{ inputs.status }}
+          MSG: ${{ inputs.message }}
+        run: |
+          args=(--status "$NEW_STATUS" --all-versions --yes)
+          if [ -n "$MSG" ]; then args+=(--message "$MSG"); fi
+          ./mcp-publisher status "${args[@]}" "$SERVER_NAME"

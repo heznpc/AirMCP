@@ -4,6 +4,9 @@ import type { HitlClient } from "./hitl.js";
 import { errPermission } from "./result.js";
 import { traceApproval } from "./telemetry.js";
 
+/** Sentinel: elicitation offered no channel for this call — caller falls back. */
+const NOT_HANDLED = Symbol("hitl-elicitation-not-handled");
+
 interface ToolAnnotations {
   readOnlyHint?: boolean;
   destructiveHint?: boolean;
@@ -133,9 +136,20 @@ async function tryElicitApproval(
  * Monkey-patches server.registerTool so every subsequent registration
  * goes through HITL approval when the policy requires it.
  *
- * Approval priority:
- * 1. MCP Elicitation (form mode) — works with any MCP client that supports it
- * 2. Socket-based HITL — fallback for clients without elicitation support
+ * Channel order (per-call approval is preserved in every path — only the
+ * channel that answers differs by what is actually available):
+ * - non-managed clients: MCP elicitation → socket HITL → deny
+ * - managed clients:     socket HITL (if reachable) → MCP elicitation →
+ *                        deny with an actionable message
+ *
+ * Managed clients (the Claude family + AIRMCP_MANAGED_CLIENTS) run their own
+ * per-call permission prompt, so elicitation is skipped while the socket can
+ * answer — the menubar app stays the explicit approver when it is running.
+ * But in the default headless setup (`npx airmcp`, no companion app) nothing
+ * listens on that socket, and the old order hard-denied every gated tool out
+ * of the box — issue #28's reporter resolved it by setting hitl level "off",
+ * i.e. the safety feature got disabled by its own UX. Falling back to
+ * elicitation keeps a human in the loop instead (RFC 0008 Phase 1.5).
  */
 export function installHitlGuard(server: McpServer, hitlClient: HitlClient, config: AirMcpConfig): void {
   const original = server.registerTool.bind(server);
@@ -158,22 +172,44 @@ export function installHitlGuard(server: McpServer, hitlClient: HitlClient, conf
       const destructive = annotations.destructiveHint ?? false;
       const managed = isManagedClient(server);
 
-      // Skip MCP elicitation for clients with their own permission system
-      // (e.g. Claude Code) to avoid double-approval UX.
-      if (!managed) {
+      // Resolve the call through MCP elicitation. Returns NOT_HANDLED when the
+      // client offers no elicitation channel, so the caller can fall back.
+      const viaElicitation = async (): Promise<unknown> => {
         const elicitResult = await tryElicitApproval(server, name, toolArgs, destructive);
-        if (elicitResult !== undefined) {
-          if (telemetryEnabled) {
-            traceApproval(name, elicitResult ? "approved" : "denied", "elicitation", { destructive, managed });
-          }
-          if (!elicitResult) {
-            return errPermission(`Action denied: "${name}" was rejected via MCP elicitation.`);
-          }
-          return (callback as (...a: unknown[]) => unknown)(...args);
+        if (elicitResult === undefined) return NOT_HANDLED;
+        if (telemetryEnabled) {
+          traceApproval(name, elicitResult ? "approved" : "denied", "elicitation", { destructive, managed });
         }
+        if (!elicitResult) {
+          return errPermission(`Action denied: "${name}" was rejected via MCP elicitation.`);
+        }
+        return (callback as (...a: unknown[]) => unknown)(...args);
+      };
+
+      if (!managed) {
+        // Elicitation first — managed clients skip it here to avoid a double
+        // prompt on top of their own per-call permission UX.
+        const handled = await viaElicitation();
+        if (handled !== NOT_HANDLED) return handled;
+      } else if (!(await hitlClient.isReachable())) {
+        // Managed client, but nothing is listening on the approval socket
+        // (headless `npx airmcp` without the menubar app). Elicitation is the
+        // only channel that can still put a human in the loop — use it.
+        const handled = await viaElicitation();
+        if (handled !== NOT_HANDLED) return handled;
+        // No approval channel exists at all: deny this call, and say how to fix it.
+        if (telemetryEnabled) {
+          traceApproval(name, "denied", "unavailable", { destructive, managed });
+        }
+        return errPermission(
+          `Action denied: "${name}" requires per-call approval, but no approval channel is available. ` +
+            `Start the AirMCP menubar app, use an MCP client that supports elicitation, ` +
+            `or adjust hitl.whitelist / hitl.level in ~/.config/airmcp/config.json.`,
+        );
       }
 
-      // Fallback: socket-based HITL (separate channel — always available)
+      // Socket-based HITL (managed client with the app reachable, or fallback
+      // for non-managed clients without elicitation support).
       const approved = await hitlClient.requestApproval(
         name,
         toolArgs,

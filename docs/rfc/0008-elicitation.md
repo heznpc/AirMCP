@@ -1,11 +1,12 @@
 # RFC 0008 — MCP Elicitation for destructive tools
 
-- **Status**: Phase 1 Implemented (May 2026 — `tryElicitApproval` in `src/shared/hitl-guard.ts`). Phase 2 Draft.
+- **Status**: Phase 1 Implemented (May 2026 — `tryElicitApproval` in `src/shared/hitl-guard.ts`) · Phase 1.5 Implemented (June 2026 — managed-client headless fallback). Phase 2 Draft.
 - **Author**: heznpc + Claude
 - **Created**: 2026-05-07
 - **Target**: v2.13.0 (Phase 1 — confirmation prompts ✅) · v3.0.0 (Phase 2 — form/URL elicit)
 - **Amendment**:
   - 2026-05-07 — Phase 1 lands: capability gate + `AIRMCP_ELICITATION_DISABLE` env opt-out folded into the existing HITL guard's elicitation path. The previous draft assumed a fresh wrapper at the tool-registry layer; on review the `installHitlGuard` interceptor was already wiring `inner.elicitInput()` for destructive tools — the gap was just the negotiated-capability check + env switch. No new wrapper layer needed.
+  - 2026-06-10 — Phase 1.5: managed-client headless fallback. The managed-client elicitation skip (added to avoid double prompts) combined with the socket channel's deny-on-unreachable meant the default `npx airmcp` + Claude-family setup hard-denied every gated tool unless the menubar app was running — issue #28's reporter resolved it by turning HITL off entirely, i.e. the safety feature was being disabled by its own UX. Channel order for managed clients is now **socket (if reachable) → elicitation → deny with an actionable hint**; non-managed clients keep elicitation → socket → deny. Per-call granularity is unchanged in every path (CLAUDE.md escalation reviewed: this changes the approval *channel*, never the *granularity*). Implementation: `HitlClient.isReachable()` probe + `NOT_HANDLED` sentinel in the guard; new telemetry channel value `"unavailable"` for the no-channel deny.
 - **Related**: [`@modelcontextprotocol/sdk` 1.29.0 elicitInput API](https://github.com/modelcontextprotocol/typescript-sdk),
   [MCP Elicitation spec (draft)](https://modelcontextprotocol.io/specification/draft/client/elicitation),
   [GitHub Copilot blog — MCP elicitation](https://github.blog/ai-and-ml/github-copilot/building-smarter-interactions-with-mcp-elicitation-from-clunky-tool-calls-to-seamless-user-experiences/),

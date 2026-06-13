@@ -1,11 +1,10 @@
 name: clipboard-url-to-reading
 title: "Clipboard URL → Reading List"
 description: >-
-  Listens for clipboard changes and, when a URL is on the pasteboard,
-  pushes it into Safari's Reading List. Combines the `pasteboard_changed`
-  event trigger with `on_error: continue` so non-URL clipboard content
-  doesn't spam the user with errors — Safari's validator rejects the
-  non-URL and the skill quietly moves on.
+  Watch the clipboard and add any copied URL to Safari's Reading List —
+  writes to Reading List; non-URL clipboard content is ignored. Combines
+  the `pasteboard_changed` event trigger with `on_error: continue` so
+  Safari's validator rejects non-URLs and the skill quietly moves on.
 expose_as: tool
 trigger:
   event: pasteboard_changed

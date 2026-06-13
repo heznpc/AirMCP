@@ -28,6 +28,22 @@ export class HitlClient {
 
   constructor(private config: HitlConfig) {}
 
+  /**
+   * Probe whether anything is listening on the approval socket without
+   * sending a request. The HITL guard uses this to pick a channel for
+   * managed clients: socket when the menubar app is up, MCP elicitation
+   * otherwise (RFC 0008 §3.4 / Phase 1.5). A successful probe leaves the
+   * connection open for the subsequent requestApproval call.
+   */
+  async isReachable(): Promise<boolean> {
+    try {
+      await this.ensureConnected();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async requestApproval(
     tool: string,
     args: Record<string, unknown>,

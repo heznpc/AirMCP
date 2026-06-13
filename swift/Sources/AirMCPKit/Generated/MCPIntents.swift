@@ -1920,7 +1920,7 @@ public struct CreateEventIntent: AppIntent {
 // Tool: create_folder
 public struct CreateFolderIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Create Folder"
-    nonisolated(unsafe) public static var description = IntentDescription("Create a new folder. Optionally specify which account to create it in.")
+    nonisolated(unsafe) public static var description = IntentDescription("Create a new folder in Apple Notes — a non-destructive write. Optionally specify which account to create it in.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -2050,7 +2050,7 @@ public struct CreateReminderListIntent: AppIntent {
 // Tool: create_shortcut
 public struct CreateShortcutIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Create Shortcut"
-    nonisolated(unsafe) public static var description = IntentDescription("Create a new Siri Shortcut by name. Uses UI automation to open the Shortcuts app and create a new empty shortcut. The shortcut must be further configured in the Shortcuts app.")
+    nonisolated(unsafe) public static var description = IntentDescription("Create a new empty Siri Shortcut by name — drives the Shortcuts app via UI automation (needs Accessibility permission; the app opens and takes focus). The shortcut must be further configured in the Shortcuts app.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -2256,7 +2256,7 @@ public struct ExportShortcutIntent: AppIntent {
 // Tool: find_related
 public struct FindRelatedIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Find Related Items"
-    nonisolated(unsafe) public static var description = IntentDescription("Given a note, event, reminder, or email ID, find semantically related items across all indexed Apple apps. Discovers cross-app connections (e.g., a calendar event related to notes and reminders about the same topic).")
+    nonisolated(unsafe) public static var description = IntentDescription("Find items semantically related to a note, event, reminder, or email ID across indexed Apple apps — read-only; requires semantic_index to be built first. Discovers cross-app connections (e.g., a calendar event related to notes and reminders about the same topic).")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -2673,7 +2673,7 @@ public struct GetFrontmostAppIntent: AppIntent {
 // Tool: get_hourly_forecast
 public struct GetHourlyForecastIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Get Hourly Forecast"
-    nonisolated(unsafe) public static var description = IntentDescription("Get hourly weather forecast for a location.")
+    nonisolated(unsafe) public static var description = IntentDescription("Get the hour-by-hour weather forecast (temperature, precipitation, wind) for a latitude/longitude via the Open-Meteo API — read-only, no API key needed.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -6662,7 +6662,7 @@ public struct SkillCalendarAlertIntent: AppIntent {
 // Tool: skill_clipboard-url-to-reading
 public struct SkillClipboardUrlToReadingIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Clipboard URL → Reading List"
-    nonisolated(unsafe) public static var description = IntentDescription("[Skill] Listens for clipboard changes and, when a URL is on the pasteboard, pushes it into Safari's Reading List. Combines the `pasteboard_changed` event trigger with `on_error: continue` so non-URL clipboard content doesn't spam the user with errors — Safari's validator rejects the non-URL and the skill quietly moves on.")
+    nonisolated(unsafe) public static var description = IntentDescription("[Skill] Watch the clipboard and add any copied URL to Safari's Reading List — writes to Reading List; non-URL clipboard content is ignored. Combines the `pasteboard_changed` event trigger with `on_error: continue` so Safari's validator rejects non-URLs and the skill quietly moves on.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -6679,7 +6679,7 @@ public struct SkillClipboardUrlToReadingIntent: AppIntent {
 // Tool: skill_daily-journal
 public struct SkillDailyJournalIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Daily Journal → Memory"
-    nonisolated(unsafe) public static var description = IntentDescription("[Skill] Captures today's events + open reminders, summarises them on-device, and persists the summary as a context-memory `episode` tagged `journal`. Demonstrates inputs + parallel + retry + the newly-exposed `memory_put` tool working together so ai_agent can later recall \"what did I do last Tuesday?\" via `memory_query`. DESTRUCTIVE: writes a memory entry (non-destructive to Apple apps).")
+    nonisolated(unsafe) public static var description = IntentDescription("[Skill] Summarise today's events and open reminders on-device and save the result as a context-memory `episode` tagged `journal` — writes one memory entry. Nothing is written to Apple apps. Demonstrates inputs + parallel + retry + `memory_put` so ai_agent can later recall \"what did I do last Tuesday?\" via `memory_query`.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -6716,7 +6716,7 @@ public struct SkillEveningWinddownIntent: AppIntent {
 // Tool: skill_focus-block-planner
 public struct SkillFocusBlockPlannerIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Focus Block Planner"
-    nonisolated(unsafe) public static var description = IntentDescription("[Skill] Walks today's open reminders and drops a calendar time-block for each one. Uses `loop` with `on_error: continue` so a single failed event creation (e.g. conflicting calendar, missing permission) doesn't abort the rest of the plan — the skill result reports which reminders got blocked and which didn't. DESTRUCTIVE: creates calendar events; each insertion is gated by HITL approval.")
+    nonisolated(unsafe) public static var description = IntentDescription("[Skill] Create a calendar time-block event for each of today's open reminders — writes calendar events (each creation HITL-gated); reminders are only read. Uses `loop` with `on_error: continue` so a single failed event creation (conflicting calendar, missing permission) doesn't abort the rest of the plan — the skill result reports which reminders got blocked and which didn't.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -6733,7 +6733,7 @@ public struct SkillFocusBlockPlannerIntent: AppIntent {
 // Tool: skill_focus-guardian
 public struct SkillFocusGuardianIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Focus Mode Guardian"
-    nonisolated(unsafe) public static var description = IntentDescription("[Skill] Auto-snapshots today's events and open reminders whenever the system focus mode changes (entering/leaving Do Not Disturb, Work, Personal, etc.) so the AI has fresh context right after you change mode. Showcases the `focus_mode_changed` event trigger plus parallel data gathering.")
+    nonisolated(unsafe) public static var description = IntentDescription("[Skill] Snapshot today's events and open reminders whenever macOS Focus mode changes (Do Not Disturb, Personal, etc.) — read-only, nothing is written. Gives the AI fresh context right after a mode switch; showcases the `focus_mode_changed` event trigger plus parallel data gathering.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -6767,7 +6767,7 @@ public struct SkillInboxTriageIntent: AppIntent {
 // Tool: skill_project-digest
 public struct SkillProjectDigestIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Project Digest"
-    nonisolated(unsafe) public static var description = IntentDescription("[Skill] Semantic-search the user's indexed Apple data for a topic, then loop over each match to pull semantically-related items — effectively a cross-app \"everything about this project\" view. Demonstrates the Skills DSL's loop construct and conditional execution.")
+    nonisolated(unsafe) public static var description = IntentDescription("[Skill] Semantic-search indexed Apple data for a topic and expand each hit with related items — a read-only cross-app digest; needs semantic_index first. Demonstrates the Skills DSL's loop construct and conditional execution.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -6784,7 +6784,7 @@ public struct SkillProjectDigestIntent: AppIntent {
 // Tool: skill_sender-to-tasks
 public struct SkillSenderToTasksIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Sender → Tasks"
-    nonisolated(unsafe) public static var description = IntentDescription("[Skill] Scans mail for a keyword and turns each hit into a reminder so nothing in the inbox goes unresolved. Accepts runtime inputs so the same skill handles newsletter triage, a specific sender, or any ad-hoc query without editing YAML. Loop + `on_error: continue` means the rest of the batch still gets queued even if one reminder-create fails (HITL denial, Reminders permission, etc.). DESTRUCTIVE: creates reminders; each insertion is gated by HITL approval.")
+    nonisolated(unsafe) public static var description = IntentDescription("[Skill] Scan Mail for a keyword or sender and create one reminder per matching message — writes reminders (each creation HITL-gated); mail is only read. Accepts runtime inputs so the same skill handles newsletter triage, a specific sender, or any ad-hoc query without editing YAML. Loop + `on_error: continue` means the rest of the batch still gets queued even if one reminder-create fails (HITL denial, Reminders permission, etc.).")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -6897,7 +6897,7 @@ public struct SuggestNextToolsIntent: AppIntent {
 // Tool: summarize_context
 public struct SummarizeContextIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Summarize Context"
-    nonisolated(unsafe) public static var description = IntentDescription("Collect context from all enabled Apple apps and ask the client's LLM to produce a concise briefing. Uses MCP Sampling — works with any LLM the client is using. No API keys required.")
+    nonisolated(unsafe) public static var description = IntentDescription("Gather recent context from enabled Apple apps and produce a concise briefing via MCP sampling — read-only; the connected client must support sampling. Works with whatever LLM the client is using; no API keys required.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}

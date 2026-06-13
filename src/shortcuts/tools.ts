@@ -134,7 +134,7 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
     {
       title: "Create Shortcut",
       description:
-        "Create a new Siri Shortcut by name. Uses UI automation to open the Shortcuts app and create a new empty shortcut. The shortcut must be further configured in the Shortcuts app.",
+        "Create a new empty Siri Shortcut by name — drives the Shortcuts app via UI automation (needs Accessibility permission; the app opens and takes focus). The shortcut must be further configured in the Shortcuts app.",
       inputSchema: {
         name: z.string().max(500).describe("Name for the new shortcut"),
       },

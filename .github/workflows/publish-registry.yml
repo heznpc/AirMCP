@@ -1,0 +1,52 @@
+name: Publish to MCP Registry
+
+# Syncs the server METADATA (server.json) to the official MCP Registry
+# (registry.modelcontextprotocol.io). The npm package `airmcp` itself is
+# published by the existing release pipeline; this workflow only publishes the
+# manifest, which the registry verifies against the already-published npm
+# package (package.json carries the matching `mcpName: io.github.heznpc/airmcp`).
+#
+# Why this exists: the official registry had drifted — the only entry was the
+# pre-rename `io.github.heznpc/iconnect@0.1.1`, with no automation to update it,
+# so `io.github.heznpc/airmcp` was never published there. Downstream aggregators
+# (Glama, scorecards, directories) scrape the registry, so the stale name
+# propagated. This keeps the airmcp entry in sync from now on.
+#
+# Auth: GitHub OIDC proves this repo owns the io.github.heznpc/* namespace — no
+# secret required (`id-token: write` is the only permission needed).
+#
+# Triggers:
+#   - workflow_dispatch: run once now (Actions tab → Run workflow) to publish the
+#     CURRENT server.json version and unstick the iconnect@0.1.1 drift.
+#   - release published: keep the registry in sync on every future release.
+#     server.json's version is kept current by scripts/sync-version.mjs, so the
+#     released commit always carries the right version. If a release fires before
+#     the matching npm version is live, mcp-publisher fails loudly and the run is
+#     simply re-triggerable via workflow_dispatch — it never drifts silently.
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # OIDC auth to the MCP Registry — no secret needed
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Install mcp-publisher (pinned)
+        env:
+          MCP_PUBLISHER_VERSION: v1.7.9
+        run: |
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+
+      - name: Authenticate to MCP Registry (GitHub OIDC)
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish server.json
+        run: ./mcp-publisher publish

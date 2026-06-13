@@ -32,6 +32,7 @@ import { mkdtempSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { cleanBootEnv } from "./lib/clean-boot-env.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -42,7 +43,7 @@ const INSPECTOR_TIMEOUT_MS = 120_000;
 
 // Surface floor for the DEFAULT boot. A plain `npx -y airmcp` (no --full, no
 // config.json) applies the STARTER preset (config.ts:339) — a curated subset,
-// ~125 tools here — NOT all 272. The "272 tools" headline is the --full /
+// ~111 tools here — NOT all 272. The "272 tools" headline is the --full /
 // registered count (owned by count-stats + tool-count-drift). This gate tests
 // the *default user experience*, so the floor only needs to catch "booted to
 // near-empty" (a broken/incomplete package), robust to per-machine gating.
@@ -64,10 +65,15 @@ function sh(cmd, args, opts = {}) {
 
 function bootAndList(entry, cwd) {
   return new Promise((done) => {
+    // Boot the installed tarball at its DEFAULT (STARTER) surface, independent
+    // of host config / AIRMCP_* — see scripts/lib/clean-boot-env.mjs. This gate
+    // tests the *default user experience*, so the count must be the ~111-tool
+    // surface a fresh `npx -y airmcp` user gets, not whatever the host enables.
+    const env = cleanBootEnv();
     const proc = spawn(
       "npx",
       ["-y", INSPECTOR_PKG, "--cli", "node", entry, "--method", "tools/list"],
-      { cwd, env: { ...process.env, AIRMCP_TEST_MODE: "1" }, stdio: ["ignore", "pipe", "pipe"] },
+      { cwd, env, stdio: ["ignore", "pipe", "pipe"] },
     );
     let stdout = "";
     let stderr = "";

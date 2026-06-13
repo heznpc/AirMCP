@@ -21,8 +21,8 @@ export function registerCrossTools(mcpServer: McpServer, config: AirMcpConfig): 
     {
       title: "Summarize Context",
       description:
-        "Collect context from all enabled Apple apps and ask the client's LLM to produce a concise briefing. " +
-        "Uses MCP Sampling — works with any LLM the client is using. No API keys required.",
+        "Gather recent context from enabled Apple apps and produce a concise briefing via MCP sampling — read-only; the connected client must support sampling. " +
+        "Works with whatever LLM the client is using; no API keys required.",
       inputSchema: {
         focus: z
           .string()

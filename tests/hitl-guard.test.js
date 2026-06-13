@@ -53,10 +53,13 @@ function makeConfig(level, whitelist = []) {
   };
 }
 
-function makeMockHitlClient(autoApprove = true) {
+function makeMockHitlClient(autoApprove = true, reachable = true) {
   const calls = [];
   return {
     calls,
+    isReachable() {
+      return Promise.resolve(reachable);
+    },
     requestApproval(tool, args, destructive, openWorld) {
       calls.push({ tool, args, destructive, openWorld });
       return Promise.resolve(autoApprove);
@@ -287,6 +290,91 @@ describe('managed client detection', () => {
 
     expect(elicitCalls).toHaveLength(1); // not managed → elicitation attempted
     expect(hitl.calls).toHaveLength(0);
+  });
+});
+
+// ---------- managed client headless fallback (RFC 0008 Phase 1.5) ----------
+
+describe('managed client headless fallback', () => {
+  test('managed + socket unreachable + elicitation support → elicitation approves, tool runs', async () => {
+    const { server, registrations, elicitCalls } = makeMockServer({
+      clientName: 'claude-code',
+      withElicitation: true,
+    });
+    const hitl = makeMockHitlClient(true, /* reachable */ false);
+    const config = makeConfig('all');
+
+    installHitlGuard(server, hitl, config);
+
+    const original = () => 'ran';
+    server.registerTool('headless_tool', { annotations: { destructiveHint: true } }, original);
+    const result = await registrations[0].callback({ id: 1 });
+
+    expect(elicitCalls).toHaveLength(1); // elicitation used as the fallback channel
+    expect(hitl.calls).toHaveLength(0);  // the unreachable socket is never asked
+    expect(result).toBe('ran');
+  });
+
+  test('managed + socket unreachable + elicitation denial blocks the tool', async () => {
+    const registrations = [];
+    const server = {
+      registerTool(name, toolConfig, callback) {
+        registrations.push({ name, toolConfig, callback });
+      },
+      server: {
+        getClientVersion: () => ({ name: 'claude-desktop', version: '1.0' }),
+        elicitInput: jest.fn(async () => ({ action: 'reject', content: {} })),
+      },
+    };
+    const hitl = makeMockHitlClient(true, false);
+    const config = makeConfig('all');
+
+    installHitlGuard(server, hitl, config);
+
+    let ran = false;
+    server.registerTool('headless_denied', { annotations: { destructiveHint: true } }, () => { ran = true; });
+    const result = await registrations[0].callback({});
+
+    expect(ran).toBe(false);
+    expect(result).toHaveProperty('isError', true);
+    expect(hitl.calls).toHaveLength(0);
+  });
+
+  test('managed + socket unreachable + no elicitation → actionable deny, tool never runs', async () => {
+    const { server, registrations } = makeMockServer({ clientName: 'claude-cowork' }); // no elicitInput
+    const hitl = makeMockHitlClient(true, false);
+    const config = makeConfig('all');
+
+    installHitlGuard(server, hitl, config);
+
+    let ran = false;
+    server.registerTool('no_channel_tool', { annotations: { destructiveHint: true } }, () => { ran = true; });
+    const result = await registrations[0].callback({});
+
+    expect(ran).toBe(false);
+    expect(result).toHaveProperty('isError', true);
+    expect(result.content[0].text).toContain('no approval channel');
+    expect(result.content[0].text).toContain('menubar');
+    expect(hitl.calls).toHaveLength(0); // the doomed socket is not asked
+  });
+
+  test('managed + socket reachable keeps using the socket (no double prompt)', async () => {
+    const { server, registrations, elicitCalls } = makeMockServer({
+      clientName: 'claude-code',
+      withElicitation: true,
+    });
+    const hitl = makeMockHitlClient(true, true);
+    const config = makeConfig('all');
+
+    installHitlGuard(server, hitl, config);
+
+    const original = () => 'socket_ok';
+    server.registerTool('app_running_tool', { annotations: { destructiveHint: true } }, original);
+    const result = await registrations[0].callback({});
+
+    expect(elicitCalls).toHaveLength(0); // elicitation still skipped — app is the approver
+    expect(hitl.calls).toHaveLength(1);
+    expect(result).toBe('socket_ok');
   });
 });
 

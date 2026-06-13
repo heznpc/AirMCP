@@ -54,7 +54,7 @@ function getTracer(): Tracer | null | Promise<Tracer | null> {
 export async function traceApproval(
   toolName: string,
   decision: "approved" | "denied" | "skipped",
-  channel: "elicitation" | "socket",
+  channel: "elicitation" | "socket" | "unavailable",
   attrs?: { destructive?: boolean; managed?: boolean },
 ): Promise<void> {
   const t = await getTracer();

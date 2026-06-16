@@ -22,7 +22,7 @@ Apple caps `AppShortcutsProvider` at 10 entries per app. The default generated p
 8. Search Contacts
 9. Get Current Weather
 
-`Ask AirMCP` is a separate FoundationModels preview shortcut. It is compiled only in opt-in builds that define `AIRMCP_ENABLE_FOUNDATION_MODELS` with an iOS 26+/macOS 26+ SDK that includes the FoundationModels macro plugin.
+`Ask AirMCP` is a separate FoundationModels preview shortcut. It is compiled only in opt-in builds that define `AIRMCP_ENABLE_FOUNDATION_MODELS` with an iOS 26+/macOS 26+ SDK.
 
 The rest of the eligible intents are still discoverable inside the Shortcuts app — just not pinned as Siri-first phrases.
 

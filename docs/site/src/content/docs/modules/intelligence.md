@@ -38,6 +38,6 @@ description: Apple Intelligence preview features -- writing tools, text generati
 
 ## Permissions
 
-FoundationModels-backed tools require **macOS 26 (Tahoe) or later**, **Apple Silicon**, and a Swift bridge built with `AIRMCP_ENABLE_FOUNDATION_MODELS`. This is a preview path because some toolchains expose the FoundationModels SDK module without the macro plugin AirMCP needs. When enabled, processing runs on-device with no API keys required.
+FoundationModels-backed tools require **macOS 26 (Tahoe) or later**, **Apple Silicon**, and a Swift bridge built with `AIRMCP_ENABLE_FOUNDATION_MODELS`. This remains a preview path while Apple Intelligence host mode and AirMCP's local tool-loop guard mature. When enabled, processing runs on-device with no API keys required.
 
 The `scan_document` tool uses the Vision framework and works on macOS 14+ with the normal Swift bridge.

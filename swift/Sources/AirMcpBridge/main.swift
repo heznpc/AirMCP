@@ -163,11 +163,6 @@ private let healthService = HealthService()
 #endif
 private let eventObserver = EventObserver()
 
-#if AIRMCP_ENABLE_FOUNDATION_MODELS && canImport(FoundationModels) && compiler(>=6.3)
-@available(macOS 26, iOS 26, *)
-private let foundationBridge = FoundationModelsBridge()
-#endif
-
 // MARK: - Foundation Models guard helper
 
 #if AIRMCP_ENABLE_FOUNDATION_MODELS && canImport(FoundationModels) && compiler(>=6.3)
@@ -934,13 +929,15 @@ case "ai-status":
     let fmSupported = true
     let available = hasAppleSilicon && osVersion.majorVersion >= 26
     let message: String
-    if available {
-        message = "Apple Foundation Models are available and ready to use."
-    } else if !hasAppleSilicon {
+    #if arch(arm64)
+        if osVersion.majorVersion >= 26 {
+            message = "Apple Foundation Models are available and ready to use."
+        } else {
+            message = "Apple Foundation Models require macOS 26 or later. Current: macOS \(versionString)."
+        }
+    #else
         message = "Apple Foundation Models require Apple Silicon (M1 or later)."
-    } else {
-        message = "Apple Foundation Models require macOS 26 or later. Current: macOS \(versionString)."
-    }
+    #endif
     #else
     let fmSupported = false
     let available = false
@@ -1429,6 +1426,7 @@ case "ai-agent":
             return
         }
         do {
+            let foundationBridge = FoundationModelsBridge()
             let result = try await foundationBridge.run(prompt: input.text, systemInstruction: input.tone)
             try writeOutput(Output(output: result))
         } catch {

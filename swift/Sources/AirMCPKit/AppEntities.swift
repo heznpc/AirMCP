@@ -34,7 +34,9 @@ public struct AirMCPStringEntityQuery<Entity: AirMCPStringBackedEntity>: EntityS
     }
 
     public func entities(matching string: String) async throws -> [Entity] {
-        []
+        let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
+        return [Entity(id: trimmed, title: trimmed, subtitle: "AirMCP ID")]
     }
 
     public func suggestedEntities() async throws -> [Entity] {

@@ -49,6 +49,7 @@ import {
   enumTypeName,
   intentActionNameFor,
   swiftTypeFor,
+  appEntityTypeForParam,
   swiftDefaultLiteral,
   enumDefaultLiteral,
   wireExpr,
@@ -288,7 +289,8 @@ function generateIntent(tool) {
   for (const wireName of Object.keys(props)) {
     const prop = props[wireName];
     const enumInfo = toolEnums?.get(wireName);
-    const baseType = enumInfo?.typeName ?? swiftTypeFor(prop);
+    const entityType = enumInfo ? null : appEntityTypeForParam(tool.name, wireName, prop);
+    const baseType = enumInfo?.typeName ?? entityType ?? swiftTypeFor(prop);
     if (baseType === null) continue; // silently dropped — codegen will still compile
     const isRequired = required.has(wireName);
     decls.push({
@@ -296,13 +298,22 @@ function generateIntent(tool) {
       wireName,
       type: baseType,
       isEnum: Boolean(enumInfo),
+      isEntity: Boolean(entityType),
       isRequired,
       optional: !isRequired && prop.default === undefined,
     });
   }
 
   const paramDecls = decls
-    .map((d) => swiftParamDecl(d.name, props[d.wireName], d.isRequired, d.isEnum ? d.type : undefined))
+    .map((d) =>
+      swiftParamDecl(
+        d.name,
+        props[d.wireName],
+        d.isRequired,
+        d.isEnum ? d.type : undefined,
+        d.isEntity ? d.type : undefined,
+      ),
+    )
     .filter(Boolean)
     .join("\n\n");
   const { prelude, argsExpr } = buildArgsBlock(decls);
@@ -697,12 +708,18 @@ const snippetViews = typedTools.map((tool) => renderSnippetView(tool));
 // list_chats (→ read_chat.chatId) and list_events (→ read_event.id)
 // each get their own helper even when they share a target intent.
 const followUpFactories = followUpFactorySpecs.map(
-  ({ targetIntentName, targetParam }) => {
+  ({ target, targetIntentName, targetParam }) => {
     const paramIdent = swiftIdent(targetParam);
+    const targetTool = byName.get(target);
+    const prop = targetTool?.inputSchema?.properties?.[targetParam];
+    const entityType = appEntityTypeForParam(target, targetParam, prop);
+    const assignment = entityType
+      ? `${entityType}(id: ${paramIdent}, title: ${paramIdent}, subtitle: "AirMCP ID")`
+      : paramIdent;
     return `@available(macOS 26, iOS 26, *)
 fileprivate func _mk${targetIntentName}_${targetParam}(${paramIdent}: String) -> ${targetIntentName} {
     let intent = ${targetIntentName}()
-    intent.${paramIdent} = ${paramIdent}
+    intent.${paramIdent} = ${assignment}
     return intent
 }`;
   },

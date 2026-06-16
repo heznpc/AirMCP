@@ -7,6 +7,10 @@ const src = readFileSync(
   new URL("swift/Sources/AirMCPKit/AppEntities.swift", root),
   "utf8",
 );
+const generated = readFileSync(
+  new URL("swift/Sources/AirMCPKit/Generated/MCPIntents.swift", root),
+  "utf8",
+);
 
 describe("AirMCP AppEntity scaffold", () => {
   test("defines workflow-domain entities backed by EntityStringQuery", () => {
@@ -72,5 +76,22 @@ func probeAirMCPEntities() async throws {
 
     expect(result.stderr).toBe("");
     expect(result.status).toBe(0);
+  });
+
+  test("generated AppIntents use entity parameters but send string ids", () => {
+    expect(generated).toContain("public var id: AirMCPCalendarEventEntity");
+    expect(generated).toContain("public var id: AirMCPReminderEntity");
+    expect(generated).toContain("public var id: AirMCPContactEntity");
+    expect(generated).toContain('args: ["id": id.id]');
+    expect(generated).toContain('args: ["id": id.id, "completed": completed]');
+    expect(generated).toContain(
+      'intent.id = AirMCPCalendarEventEntity(id: id, title: id, subtitle: "AirMCP ID")',
+    );
+    expect(generated).toContain(
+      'intent.id = AirMCPReminderEntity(id: id, title: id, subtitle: "AirMCP ID")',
+    );
+    expect(generated).toContain(
+      'intent.id = AirMCPContactEntity(id: id, title: id, subtitle: "AirMCP ID")',
+    );
   });
 });

@@ -139,6 +139,26 @@ export function swiftTypeFor(propSchema) {
   return null;
 }
 
+export const APP_ENTITY_PARAM_TYPES = new Map([
+  ["read_event.id", "AirMCPCalendarEventEntity"],
+  ["delete_event.id", "AirMCPCalendarEventEntity"],
+  ["update_event.id", "AirMCPCalendarEventEntity"],
+  ["read_reminder.id", "AirMCPReminderEntity"],
+  ["complete_reminder.id", "AirMCPReminderEntity"],
+  ["delete_reminder.id", "AirMCPReminderEntity"],
+  ["update_reminder.id", "AirMCPReminderEntity"],
+  ["read_contact.id", "AirMCPContactEntity"],
+  ["add_contact_email.id", "AirMCPContactEntity"],
+  ["add_contact_phone.id", "AirMCPContactEntity"],
+  ["delete_contact.id", "AirMCPContactEntity"],
+  ["update_contact.id", "AirMCPContactEntity"],
+]);
+
+export function appEntityTypeForParam(toolName, wireName, propSchema) {
+  if (propSchema?.type !== "string") return null;
+  return APP_ENTITY_PARAM_TYPES.get(`${toolName}.${wireName}`) ?? null;
+}
+
 // Format a JSON-Schema `default` value as a Swift literal suitable for
 // `@Parameter(default: ...)`. Returns null when the default is absent
 // or doesn't match the target type — caller drops the `default:` clause.
@@ -159,10 +179,12 @@ export function enumDefaultLiteral(value, enumValues) {
 }
 
 // Render `varName` as the Swift expression the wire accepts for this
-// param's type. Date → ISO 8601 string. AppEnum → `.rawValue`.
-// Everything else → identity.
-export function wireExpr(type, varName, isEnum) {
+// param's type. Date -> ISO 8601 string. AppEnum -> `.rawValue`.
+// AppEntity wrappers carry AirMCP's existing string id over the wire.
+// Everything else -> identity.
+export function wireExpr(type, varName, isEnum, isEntity = false) {
   if (isEnum) return `${varName}.rawValue`;
+  if (isEntity) return `${varName}.id`;
   return type === "Date" ? `ISO8601DateFormatter().string(from: ${varName})` : varName;
 }
 
@@ -395,11 +417,19 @@ export const MAX_TITLE_LEN = 80;
 // Non-primitive or composite shapes return null; callers filter the
 // property out of the generated intent entirely.
 //
-// `enumTypeOverride` — when the caller has pre-resolved an AppEnum
+// `enumTypeOverride` - when the caller has pre-resolved an AppEnum
 // type for this param (via `collectEnums`), the declaration uses that
 // type and skips the redundant "Allowed: a, b, c" description tail.
-export function swiftParamDecl(propName, propSchema, isRequired, enumTypeOverride) {
-  const baseType = enumTypeOverride ?? swiftTypeFor(propSchema);
+// `valueTypeOverride` is for AppEntity-backed parameters whose wire
+// contract remains a string id.
+export function swiftParamDecl(
+  propName,
+  propSchema,
+  isRequired,
+  enumTypeOverride,
+  valueTypeOverride,
+) {
+  const baseType = enumTypeOverride ?? valueTypeOverride ?? swiftTypeFor(propSchema);
   if (baseType === null) return null;
 
   const descParts = [];
@@ -439,7 +469,7 @@ export function swiftParamDecl(propName, propSchema, isRequired, enumTypeOverrid
 // nil fields don't cross the wire as JSON `null` — the Node-side
 // JSON-Schema validator treats absent-vs-null differently for optionals.
 //
-// decls is an array of `{ name, wireName, type, isEnum, optional, ... }`
+// decls is an array of `{ name, wireName, type, isEnum, isEntity, optional, ... }`
 // objects produced by the generator when iterating `inputSchema.properties`.
 export function buildArgsBlock(decls) {
   if (decls.length === 0) {
@@ -448,16 +478,20 @@ export function buildArgsBlock(decls) {
 
   const allRequired = decls.every((d) => !d.optional);
   if (allRequired) {
-    const pairs = decls.map((d) => `"${d.wireName}": ${wireExpr(d.type, d.name, d.isEnum)}`).join(", ");
+    const pairs = decls
+      .map((d) => `"${d.wireName}": ${wireExpr(d.type, d.name, d.isEnum, d.isEntity)}`)
+      .join(", ");
     return { prelude: "", argsExpr: `[${pairs}]` };
   }
 
   const lines = [`var args: [String: any Sendable] = [:]`];
   for (const d of decls) {
     if (!d.optional) {
-      lines.push(`args["${d.wireName}"] = ${wireExpr(d.type, d.name, d.isEnum)}`);
+      lines.push(`args["${d.wireName}"] = ${wireExpr(d.type, d.name, d.isEnum, d.isEntity)}`);
     } else {
-      lines.push(`if let v = ${d.name} { args["${d.wireName}"] = ${wireExpr(d.type, "v", d.isEnum)} }`);
+      lines.push(
+        `if let v = ${d.name} { args["${d.wireName}"] = ${wireExpr(d.type, "v", d.isEnum, d.isEntity)} }`,
+      );
     }
   }
   return { prelude: lines.map((l) => `        ${l}`).join("\n"), argsExpr: "args" };
@@ -591,7 +625,7 @@ export function deriveFollowUpFactorySpecs(resolvedMap) {
     new Map(
       Object.values(resolvedMap).map((e) => [
         e.factoryKey,
-        { targetIntentName: e.targetIntentName, targetParam: e.targetParam },
+        { target: e.target, targetIntentName: e.targetIntentName, targetParam: e.targetParam },
       ]),
     ).values(),
   );

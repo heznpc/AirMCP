@@ -1294,7 +1294,7 @@ public struct AddContactEmailIntent: AppIntent {
     public init() {}
 
     @Parameter(title: "Contact ID")
-    public var id: String
+    public var id: AirMCPContactEntity
 
     @Parameter(title: "Email address to add")
     public var email: String
@@ -1306,7 +1306,7 @@ public struct AddContactEmailIntent: AppIntent {
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "add_contact_email",
-            args: ["id": id, "email": email, "label": label]
+            args: ["id": id.id, "email": email, "label": label]
         )
         return .result(value: result)
     }
@@ -1321,7 +1321,7 @@ public struct AddContactPhoneIntent: AppIntent {
     public init() {}
 
     @Parameter(title: "Contact ID")
-    public var id: String
+    public var id: AirMCPContactEntity
 
     @Parameter(title: "Phone number to add")
     public var phone: String
@@ -1333,7 +1333,7 @@ public struct AddContactPhoneIntent: AppIntent {
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "add_contact_phone",
-            args: ["id": id, "phone": phone, "label": label]
+            args: ["id": id.id, "phone": phone, "label": label]
         )
         return .result(value: result)
     }
@@ -1770,7 +1770,7 @@ public struct CompleteReminderIntent: AppIntent {
     public init() {}
 
     @Parameter(title: "Reminder ID")
-    public var id: String
+    public var id: AirMCPReminderEntity
 
     @Parameter(title: "Set to true to complete, false to un-complete (default: true)", default: true)
     public var completed: Bool
@@ -1779,7 +1779,7 @@ public struct CompleteReminderIntent: AppIntent {
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "complete_reminder",
-            args: ["id": id, "completed": completed]
+            args: ["id": id.id, "completed": completed]
         )
         return .result(value: result)
     }
@@ -5632,13 +5632,13 @@ public struct ReadContactIntent: AppIntent {
     public init() {}
 
     @Parameter(title: "Contact ID")
-    public var id: String
+    public var id: AirMCPContactEntity
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "read_contact",
-            args: ["id": id]
+            args: ["id": id.id]
         )
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "read_contact", message: "empty result from router")
@@ -5663,13 +5663,13 @@ public struct ReadEventIntent: AppIntent {
     public init() {}
 
     @Parameter(title: "Event UID")
-    public var id: String
+    public var id: AirMCPCalendarEventEntity
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "read_event",
-            args: ["id": id]
+            args: ["id": id.id]
         )
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "read_event", message: "empty result from router")
@@ -5796,13 +5796,13 @@ public struct ReadReminderIntent: AppIntent {
     public init() {}
 
     @Parameter(title: "Reminder ID")
-    public var id: String
+    public var id: AirMCPReminderEntity
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "read_reminder",
-            args: ["id": id]
+            args: ["id": id.id]
         )
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "read_reminder", message: "empty result from router")
@@ -7759,7 +7759,7 @@ import SwiftUI
 @available(macOS 26, iOS 26, *)
 fileprivate func _mkReadEventIntent_id(id: String) -> ReadEventIntent {
     let intent = ReadEventIntent()
-    intent.id = id
+    intent.id = AirMCPCalendarEventEntity(id: id, title: id, subtitle: "AirMCP ID")
     return intent
 }
 
@@ -7773,14 +7773,14 @@ fileprivate func _mkReadNoteIntent_id(id: String) -> ReadNoteIntent {
 @available(macOS 26, iOS 26, *)
 fileprivate func _mkReadReminderIntent_id(id: String) -> ReadReminderIntent {
     let intent = ReadReminderIntent()
-    intent.id = id
+    intent.id = AirMCPReminderEntity(id: id, title: id, subtitle: "AirMCP ID")
     return intent
 }
 
 @available(macOS 26, iOS 26, *)
 fileprivate func _mkReadContactIntent_id(id: String) -> ReadContactIntent {
     let intent = ReadContactIntent()
-    intent.id = id
+    intent.id = AirMCPContactEntity(id: id, title: id, subtitle: "AirMCP ID")
     return intent
 }
 

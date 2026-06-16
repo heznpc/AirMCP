@@ -198,34 +198,23 @@ final class HitlManager {
         receiveBuffers[connId] = Data(buffer)
     }
 
-    private func parseRequest(_ data: Data) -> ApprovalRequest? {
-        guard let json = try? JSONSerialization.jsonObject(with: Data(data)) as? [String: Any],
-              let id = json["id"] as? String,
-              let type = json["type"] as? String,
-              type == "hitl_request",
-              let tool = json["tool"] as? String
-        else {
-            return nil
-        }
-
-        var argsDict: [String: String] = [:]
-        if let args = json["args"] as? [String: Any] {
-            for (key, value) in args {
-                argsDict[key] = "\(value)"
-            }
-        }
-
-        let destructive = json["destructive"] as? Bool ?? false
-        let openWorld = json["openWorld"] as? Bool ?? false
-
+    static func parseApprovalRequest(
+        from data: Data,
+        timestamp: Date = Date()
+    ) -> ApprovalRequest? {
+        guard let parsed = HitlProtocol.parseApprovalRequest(from: data, timestamp: timestamp) else { return nil }
         return ApprovalRequest(
-            id: id,
-            tool: tool,
-            args: argsDict,
-            destructive: destructive,
-            openWorld: openWorld,
-            timestamp: Date()
+            id: parsed.id,
+            tool: parsed.tool,
+            args: parsed.args,
+            destructive: parsed.destructive,
+            openWorld: parsed.openWorld,
+            timestamp: parsed.timestamp
         )
+    }
+
+    private func parseRequest(_ data: Data) -> ApprovalRequest? {
+        Self.parseApprovalRequest(from: data)
     }
 
     // MARK: - Request Handling
@@ -271,21 +260,12 @@ final class HitlManager {
 
     // MARK: - Send Response
 
+    static func responsePayload(id: String, approved: Bool) -> Data? {
+        HitlProtocol.responsePayload(id: id, approved: approved)
+    }
+
     private func sendResponse(id: String, approved: Bool, on connection: NWConnection) {
-        let responseDict: [String: Any] = [
-            "id": id,
-            "type": "hitl_response",
-            "approved": approved,
-        ]
-
-        guard let jsonData = try? JSONSerialization.data(withJSONObject: responseDict),
-              var payload = String(data: jsonData, encoding: .utf8)
-        else {
-            return
-        }
-
-        payload += "\n"
-        guard let payloadData = payload.data(using: .utf8) else { return }
+        guard let payloadData = Self.responsePayload(id: id, approved: approved) else { return }
 
         connection.send(
             content: payloadData,

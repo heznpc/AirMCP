@@ -36,6 +36,8 @@
 
 ### 2.1 `allowNetwork` 선언형 모드
 
+`allowNetwork`는 AirMCP HTTP 서버를 **누가 inbound로 호출할 수 있는지** 정하는 노출 정책이다. 외부 API 호출을 제한하는 outbound egress allow-list가 아니다.
+
 config.json 또는 환경변수 `AIRMCP_ALLOW_NETWORK`:
 
 ```jsonc

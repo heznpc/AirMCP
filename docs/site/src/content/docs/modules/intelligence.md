@@ -1,6 +1,6 @@
 ---
 title: Intelligence
-description: Apple Intelligence features -- writing tools, text generation, image generation, document scanning, on-device AI chat, and planning.
+description: Apple Intelligence preview features -- writing tools, text generation, image generation, document scanning, on-device AI chat, and planning.
 ---
 
 ## Tools
@@ -38,4 +38,6 @@ description: Apple Intelligence features -- writing tools, text generation, imag
 
 ## Permissions
 
-Requires **macOS 26 (Tahoe) or later** with **Apple Silicon**. All processing runs entirely on-device via Apple Foundation Models. No API keys required. The `scan_document` tool uses the Vision framework and works on macOS 14+.
+FoundationModels-backed tools require **macOS 26 (Tahoe) or later**, **Apple Silicon**, and a Swift bridge built with `AIRMCP_ENABLE_FOUNDATION_MODELS`. This is a preview path because some toolchains expose the FoundationModels SDK module without the macro plugin AirMCP needs. When enabled, processing runs on-device with no API keys required.
+
+The `scan_document` tool uses the Vision framework and works on macOS 14+ with the normal Swift bridge.

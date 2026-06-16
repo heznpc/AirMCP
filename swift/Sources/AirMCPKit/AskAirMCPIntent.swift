@@ -19,7 +19,7 @@
 // Siri phrase registration happens in the AirMCPGeneratedShortcuts
 // provider (gen-swift-intents.mjs pins this intent as the first entry).
 
-#if canImport(AppIntents) && canImport(FoundationModels) && compiler(>=6.3)
+#if AIRMCP_ENABLE_FOUNDATION_MODELS && canImport(AppIntents) && canImport(FoundationModels) && compiler(>=6.3)
 import AppIntents
 import Foundation
 import FoundationModels

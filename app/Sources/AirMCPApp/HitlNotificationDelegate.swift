@@ -9,20 +9,17 @@ final class HitlNotificationDelegate: NSObject, UNUserNotificationCenterDelegate
         super.init()
     }
 
+    static func approvalDecision(for actionIdentifier: String) -> Bool {
+        HitlProtocol.approvalDecision(for: actionIdentifier)
+    }
+
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         let requestId = response.notification.request.identifier
-        switch response.actionIdentifier {
-        case "APPROVE":
-            onResponse(requestId, true)
-        case "DENY", UNNotificationDismissActionIdentifier:
-            onResponse(requestId, false)
-        default:
-            onResponse(requestId, false)
-        }
+        onResponse(requestId, Self.approvalDecision(for: response.actionIdentifier))
         completionHandler()
     }
 

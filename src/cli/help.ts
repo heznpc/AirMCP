@@ -14,6 +14,15 @@ export function runHelp(): void {
   console.log("");
   console.log(`    ${GREEN}$${RESET} npx airmcp ${BOLD}init${RESET}            ${DIM}Interactive setup wizard${RESET}`);
   console.log(`    ${GREEN}$${RESET} npx airmcp ${BOLD}doctor${RESET}          ${DIM}Diagnose installation${RESET}`);
+  console.log(
+    `    ${GREEN}$${RESET} npx airmcp ${BOLD}workflows${RESET}       ${DIM}Show high-value workflow examples${RESET}`,
+  );
+  console.log(
+    `    ${GREEN}$${RESET} npx airmcp ${BOLD}workflows daily-briefing --prompt${RESET} ${DIM}Print one copyable prompt${RESET}`,
+  );
+  console.log(
+    `    ${GREEN}$${RESET} npx airmcp ${BOLD}workflows daily-briefing --preview${RESET} ${DIM}Run a read-only local snapshot${RESET}`,
+  );
   console.log(`    ${GREEN}$${RESET} npx airmcp                  ${DIM}Start MCP server (stdio)${RESET}`);
   console.log(`    ${GREEN}$${RESET} npx airmcp ${BOLD}--http${RESET}          ${DIM}Start as HTTP server${RESET}`);
   console.log(`    ${GREEN}$${RESET} npx airmcp ${BOLD}--full${RESET}          ${DIM}Enable all modules${RESET}`);
@@ -29,6 +38,9 @@ export function runHelp(): void {
   console.log("");
   console.log(`    ${CYAN}init${RESET}       ${DIM}Choose language, select modules, configure MCP clients${RESET}`);
   console.log(`    ${CYAN}doctor${RESET}     ${DIM}Check Node.js, macOS, permissions, clients, modules${RESET}`);
+  console.log(
+    `    ${CYAN}workflows${RESET}  ${DIM}Show target workflows, prompts, modules, Siri phrases, safety notes${RESET}`,
+  );
   console.log("");
   console.log(`  ${BOLD}Environment Variables${RESET}`);
   console.log("");

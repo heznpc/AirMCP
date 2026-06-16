@@ -13,7 +13,7 @@ If a variable accepts a path, `~` expands to `$HOME`. Booleans are `"true"` / `"
 | Bind HTTP server to all interfaces with token auth | `AIRMCP_ALLOW_NETWORK=with-token` + `AIRMCP_HTTP_TOKEN=…` |
 | Bind HTTP server with OAuth 2.1 | `AIRMCP_ALLOW_NETWORK=with-oauth` + `AIRMCP_OAUTH_ISSUER=…` + `AIRMCP_OAUTH_AUDIENCE=…` |
 | Disable a flaky module without removing config | `AIRMCP_DEBUG_MODULES=notes,calendar` (whitelist) |
-| Send all 269 tools without compactDescription | `AIRMCP_COMPACT_TOOLS=false` |
+| Send all 272 tools without compactDescription | `AIRMCP_COMPACT_TOOLS=false` |
 | Increase audit-log signing strength for cross-host integrity | `AIRMCP_AUDIT_HMAC_KEY=<32+ random bytes>` |
 | Block every destructive tool on a panic | `touch ~/.config/airmcp/emergency-stop` |
 
@@ -23,7 +23,7 @@ If a variable accepts a path, `~` expands to `$HOME`. Booleans are `"true"` / `"
 
 | Variable | Default | Notes |
 |---|---|---|
-| `AIRMCP_ALLOW_NETWORK` | `loopback-only` | One of `loopback-only` / `with-token` / `with-token+origin` / `with-oauth` / `with-oauth+origin` / `unauthenticated`. Startup invariant refuses to boot a misconfigured server. |
+| `AIRMCP_ALLOW_NETWORK` | `loopback-only` | Inbound HTTP exposure policy. One of `loopback-only` / `with-token` / `with-token+origin` / `with-oauth` / `with-oauth+origin` / `unauthenticated`. Startup invariant refuses to boot a misconfigured server. Not an outbound egress allow-list. |
 | `AIRMCP_ALLOWED_ORIGINS` | (empty) | Comma-separated list. Required when `ALLOW_NETWORK` ends in `+origin`. |
 | `AIRMCP_HTTP_TOKEN` | (empty) | Bearer token. Required when `ALLOW_NETWORK=with-token*`. |
 | `AIRMCP_HTTP_PORT` | `3847` | TCP port for the HTTP transport. |

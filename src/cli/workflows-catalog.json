@@ -1,0 +1,65 @@
+[
+  {
+    "id": "daily-briefing",
+    "title": "Daily Briefing",
+    "bestFor": "Start the day with calendar, reminders, mail, and recent notes.",
+    "prompt": "Brief me on today's calendar, overdue reminders, unread mail, and recent notes.",
+    "siri": "Daily Briefing in AirMCP",
+    "tools": ["skill_daily-briefing", "summarize_context", "today_events", "list_reminders", "get_unread_count", "list_notes"],
+    "requiredModules": ["calendar", "reminders", "mail", "notes"],
+    "implementation": "built-in-skill",
+    "safety": "Read-only by default. Saving a note or reminder becomes a separate approved action."
+  },
+  {
+    "id": "inbox-triage",
+    "title": "Inbox Triage",
+    "bestFor": "Turn mail backlog into a small, reviewable set of follow-up tasks.",
+    "prompt": "Find emails from Alex about the project and create reminders for action items.",
+    "siri": "triage my inbox with AirMCP",
+    "tools": ["skill_inbox-triage", "skill_sender-to-tasks", "search_messages", "create_reminder"],
+    "requiredModules": ["mail", "reminders"],
+    "implementation": "built-in-skill",
+    "safety": "Reads mail first; reminder creation is a per-call write path and stays auditable."
+  },
+  {
+    "id": "meeting-prep",
+    "title": "Meeting Prep",
+    "bestFor": "Collect the context you need before the next meeting.",
+    "prompt": "For my next meeting, find related notes, contacts, files, and reminders.",
+    "tools": ["today_events", "search_notes", "search_contacts", "recent_files", "list_reminders"],
+    "requiredModules": ["calendar", "notes", "contacts", "finder", "reminders"],
+    "implementation": "prompt-recipe",
+    "safety": "Read-only prep flow. Creating agendas or tasks is an explicit follow-up write."
+  },
+  {
+    "id": "project-digest",
+    "title": "Project Digest",
+    "bestFor": "Summarize active project context across indexed Apple workspace data.",
+    "prompt": "Summarize what changed since yesterday on my current project.",
+    "siri": "Project Digest in AirMCP",
+    "tools": ["semantic_index", "skill_project-digest", "semantic_search", "find_related"],
+    "requiredModules": ["memory", "notes", "calendar", "reminders", "mail", "finder"],
+    "implementation": "built-in-skill",
+    "safety": "Digest is read-only after indexing; indexing writes only to AirMCP's local semantic store."
+  },
+  {
+    "id": "focus-blocks",
+    "title": "Focus Blocks",
+    "bestFor": "Turn open reminders into calendar time blocks.",
+    "prompt": "Plan focus blocks for today's open reminders, but ask before creating each event.",
+    "tools": ["skill_focus-block-planner", "list_reminders", "create_event"],
+    "requiredModules": ["reminders", "calendar"],
+    "implementation": "built-in-skill",
+    "safety": "Calendar event creation is non-destructive but non-idempotent; each event is auditable."
+  },
+  {
+    "id": "research-output",
+    "title": "Research to Output",
+    "bestFor": "Move from Safari, files, and notes into a draft note or email.",
+    "prompt": "Open the Apple developer docs in Safari, summarize the page, and draft a note.",
+    "tools": ["list_tabs", "read_page_content", "summarize_text", "create_note", "send_mail"],
+    "requiredModules": ["safari", "intelligence", "notes", "mail"],
+    "implementation": "prompt-recipe",
+    "safety": "Reading and summarizing are read-only. Sending or saving output is a separate write action."
+  }
+]

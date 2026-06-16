@@ -8,6 +8,7 @@
 
 /* Menu - Sections */
 "menu.modules" = "Modules";
+"menu.workflows" = "Workflows";
 "menu.settings" = "Settings";
 "menu.viewLogs" = "View Logs (%d)";
 "menu.quit" = "Quit";
@@ -30,6 +31,7 @@
 /* Menu - Config */
 "menu.copyClaudeConfig" = "Copy Claude Config";
 "menu.copyClaudeCodeConfig" = "Copy Claude Code Config";
+"menu.copyCodexConfig" = "Copy Codex Config";
 "menu.addWidget" = "Add Desktop Widget...";
 "menu.openDocumentation" = "Open Documentation";
 
@@ -37,6 +39,46 @@
 "menu.noLogs" = "No log entries yet";
 "menu.moreLines" = "%d more lines...";
 "menu.clearLogs" = "Clear Logs";
+
+/* Workflows */
+"workflow.menuHint" = "Copy a prompt or Siri phrase, then run it from your MCP client or Shortcuts.";
+"workflow.copyPrompt" = "Copy Prompt";
+"workflow.copySiriPhrase" = "Copy Siri Phrase";
+"workflow.copyToolList" = "Copy Tool List";
+"workflow.openShortcutsDoc" = "Open Shortcuts Guide";
+"workflow.dailyBriefing" = "Daily Briefing";
+"workflow.dailyBriefing.desc" = "Start the day with calendar, reminders, mail, and recent notes.";
+"workflow.dailyBriefing.prompt" = "Brief me on today's calendar, overdue reminders, unread mail, and recent notes.";
+"workflow.dailyBriefing.safety" = "Read-only by default. Saving a note or reminder becomes a separate approved action.";
+"workflow.dailyBriefing.access" = "Reads Calendar, Reminders, Mail, Notes. No writes first.";
+"workflow.dailyBriefing.siri" = "Daily Briefing in AirMCP";
+"workflow.inboxTriage" = "Inbox Triage";
+"workflow.inboxTriage.desc" = "Turn mail backlog into a small, reviewable set of follow-up tasks.";
+"workflow.inboxTriage.prompt" = "Find emails from Alex about the project and create reminders for action items.";
+"workflow.inboxTriage.safety" = "Reads mail first; reminder creation is a per-call write path and stays auditable.";
+"workflow.inboxTriage.access" = "Reads Mail. Reminders are created only after approval.";
+"workflow.inboxTriage.siri" = "triage my inbox with AirMCP";
+"workflow.meetingPrep" = "Meeting Prep";
+"workflow.meetingPrep.desc" = "Collect the context you need before the next meeting.";
+"workflow.meetingPrep.prompt" = "For my next meeting, find related notes, contacts, files, and reminders.";
+"workflow.meetingPrep.safety" = "Read-only prep flow. Creating agendas or tasks is an explicit follow-up write.";
+"workflow.meetingPrep.access" = "Reads Calendar, Notes, Contacts, Finder, Reminders.";
+"workflow.projectDigest" = "Project Digest";
+"workflow.projectDigest.desc" = "Summarize active project context across indexed Apple workspace data.";
+"workflow.projectDigest.prompt" = "Summarize what changed since yesterday on my current project.";
+"workflow.projectDigest.safety" = "Digest is read-only after indexing; indexing writes only to AirMCP's local semantic store.";
+"workflow.projectDigest.access" = "Indexes local context, then reads related items.";
+"workflow.projectDigest.siri" = "Project Digest in AirMCP";
+"workflow.focusBlocks" = "Focus Blocks";
+"workflow.focusBlocks.desc" = "Turn open reminders into calendar time blocks.";
+"workflow.focusBlocks.prompt" = "Plan focus blocks for today's open reminders, but ask before creating each event.";
+"workflow.focusBlocks.safety" = "Calendar event creation is non-destructive but non-idempotent; each event is auditable.";
+"workflow.focusBlocks.access" = "Reads Reminders. Calendar events ask before creation.";
+"workflow.researchOutput" = "Research to Output";
+"workflow.researchOutput.desc" = "Move from Safari, files, and notes into a draft note or email.";
+"workflow.researchOutput.prompt" = "Open the Apple developer docs in Safari, summarize the page, and draft a note.";
+"workflow.researchOutput.safety" = "Reading and summarizing are read-only. Sending or saving output is a separate write action.";
+"workflow.researchOutput.access" = "Reads Safari. Saving or sending stays separate.";
 
 /* Settings */
 "settings.autoStart" = "Start Server on Launch";
@@ -137,6 +179,9 @@
 "onboarding.nodeInstallHint" = "AirMCP requires Node.js to run. Please install it and relaunch the app.";
 "onboarding.nodeDownload" = "Download Node.js";
 "onboarding.nodeCheckAgain" = "Check Again";
+"onboarding.chooseWorkflow" = "What should AirMCP help with first?";
+"onboarding.chooseWorkflowDesc" = "Pick one starting goal. AirMCP will set up only the Mac apps it needs.";
+"onboarding.workflowPresetHint" = "%@ is selected. Adjust any app access before continuing.";
 "onboarding.chooseModules" = "Choose Modules";
 "onboarding.chooseModulesDesc" = "Select which Mac apps AirMCP can access. You can change these later in Settings.";
 "onboarding.enableAll" = "Enable All";
@@ -146,6 +191,9 @@
 "onboarding.openSettings" = "Open System Settings";
 "onboarding.connectClient" = "Connect to an AI Client";
 "onboarding.connectClientDesc" = "AirMCP detected the following MCP-compatible clients. Patch their config to add AirMCP automatically.";
+"onboarding.copyPrompt" = "Copy Prompt";
+"onboarding.copyCodexPrompt" = "Copy for Codex";
+"onboarding.copySiriPhrase" = "Copy Siri Phrase";
 "onboarding.noClients" = "No supported clients detected. You can configure manually later using the \"Copy Config\" menu items.";
 "onboarding.installed" = "Installed";
 "onboarding.notFound" = "Not found";

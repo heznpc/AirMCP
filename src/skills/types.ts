@@ -58,6 +58,15 @@ export const SkillInputSchema = z.object({
 
 export type SkillInput = z.infer<typeof SkillInputSchema>;
 
+export const SkillAnnotationsSchema = z
+  .object({
+    readOnlyHint: z.boolean().optional(),
+    destructiveHint: z.boolean().optional(),
+    idempotentHint: z.boolean().optional(),
+    openWorldHint: z.boolean().optional(),
+  })
+  .optional();
+
 export const SkillDefinitionSchema = z.object({
   name: z.string().regex(/^[a-z][a-z0-9-]*$/, "Skill name must be kebab-case"),
   title: z.string().min(1),
@@ -76,6 +85,13 @@ export const SkillDefinitionSchema = z.object({
       SkillInputSchema,
     )
     .optional(),
+  /**
+   * MCP tool annotations for `expose_as: tool` skills. Defaults preserve
+   * the original read-only local-workflow posture, while write-capable
+   * built-ins can now make their runtime contract explicit for AppIntents,
+   * MCP clients, and manifest consumers.
+   */
+  annotations: SkillAnnotationsSchema,
   trigger: z
     .object({
       event: z.enum([

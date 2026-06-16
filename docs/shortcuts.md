@@ -1,48 +1,51 @@
 # Using AirMCP with Siri · Shortcuts · Spotlight (iOS 17+, macOS 14+)
 
-AirMCP's 272 tools are auto-registered as Apple App Intents (read-only + non-destructive writes; destructive ones gate behind `AIRMCP_APPINTENTS_DESTRUCTIVE=true` at codegen time per RFC 0007 §6). Anything that speaks the Intents system — Siri, Shortcuts, Spotlight, the Action Button, Widgets — can call them directly, without opening the app.
+AirMCP's AppIntent-eligible tools and workflow skills are auto-registered as Apple App Intents (read-only + non-destructive writes; destructive ones gate behind `AIRMCP_APPINTENTS_DESTRUCTIVE=true` at codegen time per RFC 0007 §6). Anything that speaks the Intents system — Siri, Shortcuts, Spotlight, the Action Button, Widgets — can call them directly, without opening the app.
 
 This doc is for users wiring AirMCP into those flows. The codegen plumbing lives in [RFC 0007](rfc/0007-app-intent-bridge.md).
 
 ## What's registered
 
-At build time, `scripts/gen-swift-intents.mjs` reads `docs/tool-manifest.json` and emits one `AppIntent` struct per AppIntent-eligible MCP tool (229 of 277 eligible in v2.11; the remaining 5 ineligible tools have composite-object inputs that don't map cleanly to `@Parameter` types). Each intent routes through [`MCPIntentRouter`](../swift/Sources/AirMCPKit/MCPIntentRouter.swift) to whichever host is installed — on macOS that's the `airmcp` npm binary via stdio, on iOS it's the in-process `AirMCPServer`.
+At build time, `scripts/gen-swift-intents.mjs` reads `docs/tool-manifest.json` and emits one `AppIntent` struct per AppIntent-eligible MCP tool. Ineligible tools are recorded in the manifest with a reason, usually because a composite-object input does not map cleanly to `@Parameter` types. Each intent routes through [`MCPIntentRouter`](../swift/Sources/AirMCPKit/MCPIntentRouter.swift) to whichever host is installed — on macOS that's the `airmcp` npm binary via stdio, on iOS it's the in-process `AirMCPServer`.
 
-### AppShortcutsProvider (top-10 slots)
+### AppShortcutsProvider slots
 
-Apple caps `AppShortcutsProvider` at 10 entries per app. The curated top-10 (see `APP_SHORTCUTS_TOP` in the codegen) surfaces as Siri default phrases and Spotlight-first suggestions:
+Apple caps `AppShortcutsProvider` at 10 entries per app. The default generated provider uses nine workflow-first slots (see `APP_SHORTCUTS_TOP` in the codegen) rather than a random sample of low-level tools:
 
-1. **Ask AirMCP** (iOS 26+/macOS 26+ only; natural-language agent via Foundation Models)
-2. Today's Events
-3. List Calendars
-4. Search Notes
-5. Search Contacts
-6. List Reminder Lists
-7. List Shortcuts
-8. List Bookmarks
+1. Daily Briefing
+2. Today Timeline
+3. Inbox Triage
+4. Project Digest
+5. Today's Events
+6. Search Notes
+7. List Reminders
+8. Search Contacts
 9. Get Current Weather
-10. Summarize Context
 
-The other 219 intents are still discoverable inside the Shortcuts app — just not pinned as Siri-first phrases.
+`Ask AirMCP` is a separate FoundationModels preview shortcut. It is compiled only in opt-in builds that define `AIRMCP_ENABLE_FOUNDATION_MODELS` with an iOS 26+/macOS 26+ SDK that includes the FoundationModels macro plugin.
+
+The rest of the eligible intents are still discoverable inside the Shortcuts app — just not pinned as Siri-first phrases.
 
 ## Siri phrases (out of the box)
 
 Each shortcut ships with two phrases using `\(.applicationName)`. Examples:
 
 ```
-"Hey Siri, Today's Events in AirMCP"
-"Hey Siri, today events with AirMCP"
+"Hey Siri, Daily Briefing in AirMCP"
+"Hey Siri, triage my inbox with AirMCP"
 "Hey Siri, Search Notes in AirMCP"    → asks for the query
-"Hey Siri, Ask AirMCP about my day"   → iOS 26+ only
+"Hey Siri, Ask AirMCP about my day"   → FoundationModels opt-in build only
 ```
 
 No setup: phrases register the first time the app launches.
+
+The macOS menubar app also includes a **Workflows** menu with the same curated prompts, Siri phrases, core tools, and safety notes.
 
 ## Shortcuts app
 
 1. Open **Shortcuts** (iOS 17+ / macOS Sonoma+).
 2. Tap **+** → search "AirMCP".
-3. Every AirMCP tool appears as an action. Each accepts the same parameters the MCP inputSchema declares (`startDate: Date`, `query: String`, etc.).
+3. Every generated AirMCP intent appears as an action. Each accepts the same parameters the MCP inputSchema declares (`startDate: Date`, `query: String`, etc.).
 
 ### Example: daily briefing shortcut
 
@@ -72,19 +75,19 @@ Spotlight indexes every registered AppIntent. Typing any of these surfaces AirMC
 
 - tool title (e.g. "Today's Events")
 - tool name with underscores → spaces (e.g. "today events")
-- the **Ask AirMCP** intent's two phrases on iOS 26+
+- the **Ask AirMCP** intent's two phrases in FoundationModels opt-in builds
 
 Tap the Spotlight result to run the action inline.
 
 ## The iOS 26 "Use Model" action
 
-iOS 26 Shortcuts added a `Use Model` action that routes natural-language prompts to Apple Intelligence or ChatGPT. AirMCP's 154 AppIntents become tools that `Use Model` can pick autonomously — no extra wiring needed.
+iOS 26 Shortcuts added a `Use Model` action that routes natural-language prompts to Apple Intelligence or ChatGPT. AirMCP's generated AppIntents become tools that `Use Model` can pick autonomously — no extra wiring needed.
 
 Example: a Shortcut that answers "what's the weather tomorrow?" → `Use Model` picks up `AirMCP ▸ Get Daily Forecast` from the system-wide intent registry.
 
 ## iOS 26 Interactive Snippets (preview)
 
-Tools with typed output (50 of the 154) additionally emit a SwiftUI snippet view (`MCP<ToolName>SnippetView`) — the Shortcuts / Siri / Spotlight display will render results as structured views instead of a text block on iOS 26+. See [RFC 0007 §3.7](rfc/0007-app-intent-bridge.md#37-interactive-snippets-renderer-confirmed-ios-26-api). Wiring lands in axis 4.2.
+Tools with typed output additionally emit a SwiftUI snippet view (`MCP<ToolName>SnippetView`) — the Shortcuts / Siri / Spotlight display will render results as structured views instead of a text block on iOS 26+. See [RFC 0007 §3.7](rfc/0007-app-intent-bridge.md#37-interactive-snippets-renderer-confirmed-ios-26-api).
 
 ## Deep link: `airmcp://`
 
@@ -97,7 +100,7 @@ airmcp://…                 → see app/Sources/AirMCPApp/AirMCPApp.swift for t
 
 ## When the agent asks for a destructive tool
 
-All destructive tools (`create_*`, `delete_*`, `update_*`) stay out of the auto-generated AppShortcutsProvider until RFC 0007 §A.3 lands `requestConfirmation(actionName:snippetIntent:)` (iOS 26 API). Until then, destructive actions stay on the HTTP/stdio surface where AirMCP's HITL prompt handles approval.
+Destructive tools stay out of generated AppIntents by default. If you explicitly build with `AIRMCP_APPINTENTS_DESTRUCTIVE=true`, generated destructive intents include an AppIntent confirmation dialog before they call AirMCP. On the HTTP/stdio MCP surface, AirMCP's HITL guard remains the approval path.
 
 ## Troubleshooting
 
@@ -121,6 +124,7 @@ The tool's Router path is likely hitting a permission error. Check:
 ## Related
 
 - [RFC 0007 — MCP Tool ↔ App Intent auto-bridge](rfc/0007-app-intent-bridge.md)
+- [AirMCP Workflow Guide](workflows.md)
 - [ios-architecture.md §15 2026-Q2 ecosystem update](ios-architecture.md)
 - [Apple Developer — App Intents](https://developer.apple.com/documentation/appintents)
 - [Apple Developer — AppShortcutsProvider](https://developer.apple.com/documentation/appintents/appshortcutsprovider)

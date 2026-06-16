@@ -7,6 +7,13 @@ import { toolRegistry } from "../shared/tool-registry.js";
 import { z } from "zod";
 import { log } from "../shared/logger.js";
 
+type SkillToolAnnotations = {
+  readOnlyHint: boolean;
+  destructiveHint: boolean;
+  idempotentHint: boolean;
+  openWorldHint: boolean;
+};
+
 /**
  * Convert a skill's declared `inputs` into a Zod `inputSchema` record that
  * `server.registerTool` accepts. Mirrors the MCP convention:
@@ -109,6 +116,15 @@ function buildPromptArgsSchema(inputs: Record<string, SkillInput>): Record<strin
   return out;
 }
 
+function skillToolAnnotations(skill: SkillDefinition): SkillToolAnnotations {
+  return {
+    readOnlyHint: skill.annotations?.readOnlyHint ?? true,
+    destructiveHint: skill.annotations?.destructiveHint ?? false,
+    idempotentHint: skill.annotations?.idempotentHint ?? true,
+    openWorldHint: skill.annotations?.openWorldHint ?? false,
+  };
+}
+
 function registerAsPrompt(server: McpServer, skill: SkillDefinition): void {
   if (skill.inputs && Object.keys(skill.inputs).length > 0) {
     // Modern path — typed argsSchema exposed to the client, plus the
@@ -136,7 +152,7 @@ function registerAsTool(server: McpServer, skill: SkillDefinition): void {
       title: skill.title,
       description: `[Skill] ${skill.description}`,
       inputSchema,
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: skillToolAnnotations(skill),
     },
     async (args: Record<string, unknown> = {}) => {
       try {

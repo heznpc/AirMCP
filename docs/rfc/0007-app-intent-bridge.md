@@ -6,7 +6,8 @@
 - **Target**: v2.13.0 (Phase A — shipped ahead of target) · Apple-API-dependent (Phase B)
 - **Amendment history**:
   - 2026-04-23 — §R2 updated with confirmed `requestConfirmation(actionName:snippetIntent:)` API; §3.7 Interactive Snippets renderer added; rollout split into A.2a/A.2b/A.3 to match landed PRs #101-#103 and Interactive Snippets availability.
-  - 2026-04-23 (afternoon) — Axis 6 `AskAirMCPIntent` lands ahead of schedule: natural-language FoundationModels agent pinned as the first `AirMCPGeneratedShortcuts` entry on iOS 26+/macOS 26+ (gated by `#if canImport(FoundationModels) && compiler(>=6.3)`). Rollout row "Ax.6" added.
+  - 2026-04-23 (afternoon) — Axis 6 `AskAirMCPIntent` lands ahead of schedule: natural-language FoundationModels agent on iOS 26+/macOS 26+ (originally gated by `#if canImport(FoundationModels) && compiler(>=6.3)`). Rollout row "Ax.6" added.
+  - 2026-06-17 — `AskAirMCPIntent` moved behind explicit `AIRMCP_ENABLE_FOUNDATION_MODELS` compile-time opt-in after toolchains exposed the SDK module without the required FoundationModels macro plugin. The default `AirMCPGeneratedShortcuts` provider now ships nine workflow/read shortcuts; `Ask AirMCP` is a separate preview provider in opt-in builds.
   - 2026-04-24 — Phase A closed. Final tally: 229 auto-generated AppIntents, 50 Interactive Snippet views, 17 AppEnum pickers, destructive HITL via `requestConfirmation`, follow-up taps for list tools, codegen helpers extracted to `scripts/lib/codegen-helpers.mjs` with 134 unit tests + golden-sample regression check.
 - **Related**: [docs/ios-architecture.md §15.1](../ios-architecture.md), `app/Sources/AirMCPApp/AppIntents.swift`, `swift/Sources/AirMCPKit/`, `ios/Sources/AirMCPServer/`, RFC 0001 (error categories), RFC 0006 (Swift schema dump)
 
@@ -139,7 +140,7 @@ struct AirMCPShortcuts: AppShortcutsProvider {
 }
 ```
 
-Apple caps `AppShortcutsProvider` at **10 entries** per app historically. We pick the top-10 by usage (piggyback on the existing `usageTracker.getNextTools` data) and regenerate per release. The other ~230 stay as `AppIntent`s (discoverable in Shortcuts but not shown as first-class suggestions).
+Apple caps `AppShortcutsProvider` at **10 entries** per app historically. AirMCP now reserves the default provider for nine workflow/read shortcuts generated from `APP_SHORTCUTS_TOP`; the optional `Ask AirMCP` provider is compiled separately behind `AIRMCP_ENABLE_FOUNDATION_MODELS`. The other ~230 stay as `AppIntent`s (discoverable in Shortcuts but not shown as first-class suggestions).
 
 ### 3.6 Existing hand-written intents
 
@@ -208,7 +209,7 @@ Phase B is a line of Xcode config, not a refactor.
 ### R7. 10-tool cap on `AppShortcutsProvider` selection
 
 - **Open**: Do we pick top-N by usage, or let the user configure via AirMCP app UI?
-- **Proposed default**: Top-10 by usage, overridable via `AIRMCP_APP_SHORTCUTS` env / config. Revisit post-launch.
+- **Current default**: fixed workflow-first shortcuts from `APP_SHORTCUTS_TOP`, currently nine default entries so the optional FoundationModels `Ask AirMCP` provider can occupy the remaining platform slot in opt-in builds. A future AirMCP app UI can let users choose their own pinned shortcuts.
 
 ## 6. Rollout
 
@@ -217,9 +218,9 @@ Phase B is a line of Xcode config, not a refactor.
 | A.0     | `scripts/dump-tool-manifest.mjs` + `scripts/gen-swift-intents.mjs` + `tool-manifest.json` codegen + CI drift check. **No Swift build change yet.**                                                                                                                                  | v2.13.0             |
 | A.1     | `MCPIntentRouter` + macOS route (execFile). **10 hand-picked read-only tools** (notes/calendar/reminders/contacts list+read). App builds + `swift test` passes.                                                                                                                     | v2.13.0             |
 | A.2a    | `MCPIntentRouter` handler-injection + macOS execFile handler + iOS in-process `MCPServer.callToolText` handler. Same 10 tools as A.1.                                                                                                                                               | v2.13.0             |
-| A.2b.1  | Broaden to all read-only eligible tools (~154 of 282). Auto-filter + AppShortcutsProvider top-10.                                                                                                                                                                                   | v2.13.0 (PR #105)   |
+| A.2b.1  | Broaden to all read-only eligible tools (~154 of 282). Auto-filter + workflow-first AppShortcutsProvider slots.                                                                                                                                                                      | v2.13.0 (PR #105)   |
 | A.2b.2  | Codable output structs as drift guards. `ReturnsValue<T>` deferred (AppIntent requires `_IntentValue`; AppEntity wrapper separate phase).                                                                                                                                           | v2.13.0 (PR #106)   |
-| Ax.6    | `AskAirMCPIntent` natural-language agent via `FoundationModelsBridge`. Pinned first in `AirMCPGeneratedShortcuts` on iOS 26+/macOS 26+.                                                                                                                                             | v2.13.0             |
+| Ax.6    | `AskAirMCPIntent` natural-language agent via `FoundationModelsBridge`. Preview-only in `AIRMCP_ENABLE_FOUNDATION_MODELS` builds on iOS 26+/macOS 26+; not part of the default shortcut provider.                                                                                   | v2.13.0             |
 | A.3     | Destructive-tool support via iOS 26 `requestConfirmation(actionName:snippetIntent:)`. Codegen emits a confirmation-snippet branch for `destructiveHint: true` tools. **Write tools with `destructiveHint: false`** (~60) land in the same phase since they don't need confirmation. | v2.14.0             |
 | A.4     | **Write tools with `destructiveHint: true`** gated behind explicit config opt-in.                                                                                                                                                                                                   | v2.15.0             |
 | **B.1** | Inject `NSAppIntentsMCPExposure` (or whatever Apple ships) via `AIRMCP_EXPOSE_AS_MCP` build flag. **Triggered by Apple release note.**                                                                                                                                              | Apple-API-dependent |

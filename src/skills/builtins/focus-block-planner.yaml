@@ -8,6 +8,11 @@ description: >-
   rest of the plan — the skill result reports which reminders got blocked
   and which didn't.
 expose_as: tool
+annotations:
+  readOnlyHint: false
+  destructiveHint: false
+  idempotentHint: false
+  openWorldHint: false
 steps:
   # 1) Pull the open-reminder backlog. `limit: 8` keeps the loop small
   #    enough that HITL prompting stays tolerable.

@@ -98,6 +98,33 @@ describe('registerSkills', () => {
     );
   });
 
+  test('passes declared workflow safety annotations to registerTool', () => {
+    const skill = makeSkill({
+      expose_as: 'tool',
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+    });
+
+    registerSkills(server, [skill]);
+
+    expect(server.registerTool).toHaveBeenCalledWith(
+      'skill_test-skill',
+      expect.objectContaining({
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: false,
+          openWorldHint: false,
+        },
+      }),
+      expect.any(Function),
+    );
+  });
+
   test('registers a prompt-type skill via server.prompt', () => {
     const skill = makeSkill({ expose_as: 'prompt' });
 

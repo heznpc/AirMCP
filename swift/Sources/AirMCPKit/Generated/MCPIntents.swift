@@ -2,7 +2,7 @@
 //
 // Source: docs/tool-manifest.json
 // Generator: scripts/gen-swift-intents.mjs
-// RFC 0007 Phase A.2b.2 + A.4.1 — 232 auto-selected read-only
+// RFC 0007 Phase A.2b.2 + A.4.1 — 233 auto-selected read-only
 // tools (82 with typed drift-guards + Interactive Snippet
 // SwiftUI views) + 9 AppShortcutsProvider entries.
 // Run `npm run gen:intents` to refresh after tool metadata changes.
@@ -1275,6 +1275,7 @@ public struct ActivateTabIntent: AppIntent {
     @Parameter(title: "Tab index", inclusiveRange: (0, 9007199254740991))
     public var tabIndex: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "activate_tab",
@@ -1301,6 +1302,7 @@ public struct AddContactEmailIntent: AppIntent {
     @Parameter(title: "Email label (default: work)", default: "work")
     public var label: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "add_contact_email",
@@ -1327,6 +1329,7 @@ public struct AddContactPhoneIntent: AppIntent {
     @Parameter(title: "Phone label (default: mobile)", default: "mobile")
     public var label: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "add_contact_phone",
@@ -1350,6 +1353,7 @@ public struct AddToAlbumIntent: AppIntent {
     @Parameter(title: "Target album name")
     public var albumName: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "add_to_album",
@@ -1373,6 +1377,7 @@ public struct AddToPlaylistIntent: AppIntent {
     @Parameter(title: "Track name to add")
     public var trackName: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "add_to_playlist",
@@ -1396,6 +1401,7 @@ public struct AddToReadingListIntent: AppIntent {
     @Parameter(title: "Title for the Reading List item")
     public var title: String?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         args["url"] = url
@@ -1422,6 +1428,7 @@ public struct AiAgentIntent: AppIntent {
     @Parameter(title: "Optional system instruction for the AI agent")
     public var systemInstruction: String?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         args["prompt"] = prompt
@@ -1451,6 +1458,7 @@ public struct AiChatIntent: AppIntent {
     @Parameter(title: "Optional system instruction for this session")
     public var systemInstruction: String?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         args["sessionName"] = sessionName
@@ -1478,6 +1486,7 @@ public struct AiPlanMetricsIntent: AppIntent {
     @Parameter(title: "Deterministic seed for case selection (default: time-based). Fixing this is usef", inclusiveRange: (-9007199254740991, 9007199254740991))
     public var seed: Int?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         args["limit"] = limit
@@ -1508,6 +1517,7 @@ public struct AiStatusIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "ai_status",
@@ -1537,6 +1547,7 @@ public struct AuditLogIntent: AppIntent {
     @Parameter(title: "Max entries to return (default: 100, max: 1000).", default: 100, inclusiveRange: (1, 1000))
     public var limit: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         if let v = since { args["since"] = ISO8601DateFormatter().string(from: v) }
@@ -1565,6 +1576,7 @@ public struct AuditSummaryIntent: AppIntent {
     @Parameter(title: "Top-N busiest tools (default: 10).", default: 10, inclusiveRange: (1, 50))
     public var topN: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         if let v = since { args["since"] = ISO8601DateFormatter().string(from: v) }
@@ -1598,6 +1610,7 @@ public struct CalendarWeekViewIntent: AppIntent {
     @Parameter(title: "Start date (YYYY-MM-DD). Defaults to current week's Monday.")
     public var startDate: String?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         if let v = startDate { args["startDate"] = v }
@@ -1629,6 +1642,7 @@ public struct CaptureAreaIntent: AppIntent {
     @Parameter(title: "Height of the capture region in pixels")
     public var height: Double
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "capture_area",
@@ -1649,6 +1663,7 @@ public struct CaptureScreenIntent: AppIntent {
     @Parameter(title: "Display number for multi-monitor setups (1 = main display). Omit for default dis", inclusiveRange: (1, 9007199254740991))
     public var display: Int?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         if let v = display { args["display"] = v }
@@ -1671,6 +1686,7 @@ public struct CaptureWindowIntent: AppIntent {
     @Parameter(title: "Application name to activate before capture (e.g. 'Safari', 'Xcode'). If omitted")
     public var appName: String?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         if let v = appName { args["appName"] = v }
@@ -1696,6 +1712,7 @@ public struct ClassifyImageIntent: AppIntent {
     @Parameter(title: "Max labels (default: 10)", default: 10, inclusiveRange: (1, 50))
     public var maxResults: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "classify_image",
@@ -1713,6 +1730,7 @@ public struct CloudSyncStatusIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "cloud_sync_status",
@@ -1733,6 +1751,7 @@ public struct CompareNotesIntent: AppIntent {
     @Parameter(title: "Array of 2-5 note IDs to compare")
     public var ids: [String]
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "compare_notes",
@@ -1756,6 +1775,7 @@ public struct CompleteReminderIntent: AppIntent {
     @Parameter(title: "Set to true to complete, false to un-complete (default: true)", default: true)
     public var completed: Bool
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "complete_reminder",
@@ -1776,6 +1796,7 @@ public struct ConnectBluetoothIntent: AppIntent {
     @Parameter(title: "Peripheral UUID from scan results")
     public var identifier: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "connect_bluetooth",
@@ -1796,6 +1817,7 @@ public struct CreateAlbumIntent: AppIntent {
     @Parameter(title: "Album name")
     public var name: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "create_album",
@@ -1834,6 +1856,7 @@ public struct CreateContactIntent: AppIntent {
     @Parameter(title: "Notes")
     public var note: String?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         args["firstName"] = firstName
@@ -1862,6 +1885,7 @@ public struct CreateDirectoryIntent: AppIntent {
     @Parameter(title: "Absolute path of the folder to create")
     public var path: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "create_directory",
@@ -1900,6 +1924,7 @@ public struct CreateEventIntent: AppIntent {
     @Parameter(title: "Set as all-day event")
     public var allDay: Bool?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         args["summary"] = summary
@@ -1931,6 +1956,7 @@ public struct CreateFolderIntent: AppIntent {
     @Parameter(title: "Account name (e.g. 'iCloud'). Defaults to primary account.")
     public var account: String?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         args["name"] = name
@@ -1957,6 +1983,7 @@ public struct CreateNoteIntent: AppIntent {
     @Parameter(title: "Target folder name")
     public var folder: String?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         args["body"] = body
@@ -1980,6 +2007,7 @@ public struct CreatePlaylistIntent: AppIntent {
     @Parameter(title: "Name for the new playlist")
     public var name: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "create_playlist",
@@ -2012,6 +2040,7 @@ public struct CreateReminderIntent: AppIntent {
     @Parameter(title: "Target list name. Defaults to the default list.")
     public var list: String?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         args["title"] = title
@@ -2038,6 +2067,7 @@ public struct CreateReminderListIntent: AppIntent {
     @Parameter(title: "Name for the new list")
     public var name: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "create_reminder_list",
@@ -2058,6 +2088,7 @@ public struct CreateShortcutIntent: AppIntent {
     @Parameter(title: "Name for the new shortcut")
     public var name: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "create_shortcut",
@@ -2078,6 +2109,7 @@ public struct DisconnectBluetoothIntent: AppIntent {
     @Parameter(title: "Peripheral UUID to disconnect")
     public var identifier: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "disconnect_bluetooth",
@@ -2101,6 +2133,7 @@ public struct DiscoverToolsIntent: AppIntent {
     @Parameter(title: "Max results (default 20)", inclusiveRange: (1, 50))
     public var limit: Double?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         args["query"] = query
@@ -2140,6 +2173,7 @@ public struct DropPinIntent: AppIntent {
     @Parameter(title: "Optional label for the pin")
     public var label: String?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         args["latitude"] = latitude
@@ -2167,6 +2201,7 @@ public struct DuplicateShortcutIntent: AppIntent {
     @Parameter(title: "Name for the duplicated shortcut")
     public var newName: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "duplicate_shortcut",
@@ -2187,6 +2222,7 @@ public struct EditShortcutIntent: AppIntent {
     @Parameter(title: "Shortcut name to edit (exact match)")
     public var name: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "edit_shortcut",
@@ -2204,6 +2240,7 @@ public struct EventStatusIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "event_status",
@@ -2221,6 +2258,7 @@ public struct EventSubscribeIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "event_subscribe",
@@ -2244,6 +2282,7 @@ public struct ExportShortcutIntent: AppIntent {
     @Parameter(title: "File path to export the .shortcut file to (e.g. ~/Desktop/MyShortcut.shortcut)")
     public var outputPath: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "export_shortcut",
@@ -2270,6 +2309,7 @@ public struct FindRelatedIntent: AppIntent {
     @Parameter(title: "Minimum similarity (default 0.6)", inclusiveRange: (0, 1))
     public var threshold: Double?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         args["id"] = id
@@ -2297,6 +2337,7 @@ public struct FlagMessageIntent: AppIntent {
     @Parameter(title: "true=flag, false=unflag (default: true)", default: true)
     public var flagged: Bool
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "flag_message",
@@ -2323,6 +2364,7 @@ public struct GeneratePlanIntent: AppIntent {
     @Parameter(title: "List of available tool names to plan with. Defaults to common tools.")
     public var availableTools: [String]?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         args["goal"] = goal
@@ -2353,6 +2395,7 @@ public struct GenerateTextIntent: AppIntent {
     @Parameter(title: "Sampling temperature (0-2). Lower = more deterministic", inclusiveRange: (0, 2))
     public var temperature: Double?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         args["prompt"] = prompt
@@ -2377,6 +2420,7 @@ public struct GeocodeIntent: AppIntent {
     @Parameter(title: "Place name or address (e.g. 'Seoul', 'Tokyo Tower', '1600 Pennsylvania Ave')")
     public var query: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "geocode",
@@ -2394,6 +2438,7 @@ public struct GetBatteryStatusIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "get_battery_status",
@@ -2421,6 +2466,7 @@ public struct GetBluetoothStateIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "get_bluetooth_state",
@@ -2438,6 +2484,7 @@ public struct GetBrightnessIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "get_brightness",
@@ -2465,6 +2512,7 @@ public struct GetClipboardIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "get_clipboard",
@@ -2492,6 +2540,7 @@ public struct GetCurrentLocationIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "get_current_location",
@@ -2509,6 +2558,7 @@ public struct GetCurrentTabIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "get_current_tab",
@@ -2542,6 +2592,7 @@ public struct GetCurrentWeatherIntent: AppIntent {
     @Parameter(title: "Longitude coordinate", inclusiveRange: (-180, 180))
     public var longitude: Double
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "get_current_weather",
@@ -2578,6 +2629,7 @@ public struct GetDailyForecastIntent: AppIntent {
     @Parameter(title: "Number of forecast days (default: 7)", default: 7, inclusiveRange: (1, 16))
     public var days: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "get_daily_forecast",
@@ -2604,6 +2656,7 @@ public struct GetDirectionsIntent: AppIntent {
     @Parameter(title: "Mode of transport (default: driving)", default: .driving)
     public var transportType: GetDirectionsTransporttypeOption
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "get_directions",
@@ -2624,6 +2677,7 @@ public struct GetFileInfoIntent: AppIntent {
     @Parameter(title: "Absolute file path")
     public var path: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "get_file_info",
@@ -2651,6 +2705,7 @@ public struct GetFrontmostAppIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "get_frontmost_app",
@@ -2687,6 +2742,7 @@ public struct GetHourlyForecastIntent: AppIntent {
     @Parameter(title: "Number of forecast hours (default: 24)", default: 24, inclusiveRange: (1, 168))
     public var hours: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "get_hourly_forecast",
@@ -2704,6 +2760,7 @@ public struct GetLocationPermissionIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "get_location_permission",
@@ -2724,6 +2781,7 @@ public struct GetPhotoInfoIntent: AppIntent {
     @Parameter(title: "Photo media item ID")
     public var id: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "get_photo_info",
@@ -2754,6 +2812,7 @@ public struct GetRatingIntent: AppIntent {
     @Parameter(title: "Track name to look up")
     public var trackName: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "get_rating",
@@ -2781,6 +2840,7 @@ public struct GetScreenInfoIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "get_screen_info",
@@ -2811,6 +2871,7 @@ public struct GetShortcutDetailIntent: AppIntent {
     @Parameter(title: "Shortcut name (exact match)")
     public var name: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "get_shortcut_detail",
@@ -2841,6 +2902,7 @@ public struct GetTrackInfoIntent: AppIntent {
     @Parameter(title: "Track name to look up")
     public var trackName: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "get_track_info",
@@ -2868,6 +2930,7 @@ public struct GetUnreadCountIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "get_unread_count",
@@ -2898,6 +2961,7 @@ public struct GetUpcomingEventsIntent: AppIntent {
     @Parameter(title: "Max events to return (default: 10)", default: 10, inclusiveRange: (1, 500))
     public var limit: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "get_upcoming_events",
@@ -2925,6 +2989,7 @@ public struct GetVolumeIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "get_volume",
@@ -2952,6 +3017,7 @@ public struct GetWifiStatusIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "get_wifi_status",
@@ -2994,6 +3060,7 @@ public struct GwsCalendarCreateIntent: AppIntent {
     @Parameter(title: "Event location")
     public var location: String?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         args["summary"] = summary
@@ -3029,6 +3096,7 @@ public struct GwsCalendarListIntent: AppIntent {
     @Parameter(title: "End time (ISO 8601)")
     public var timeMax: String?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         args["maxResults"] = maxResults
@@ -3054,6 +3122,7 @@ public struct GwsDocsReadIntent: AppIntent {
     @Parameter(title: "Google Docs document ID")
     public var documentId: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "gws_docs_read",
@@ -3080,6 +3149,7 @@ public struct GwsDriveListIntent: AppIntent {
     @Parameter(title: "Sort order (e.g. 'modifiedTime desc', 'name')")
     public var orderBy: String?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         if let v = query { args["query"] = v }
@@ -3104,6 +3174,7 @@ public struct GwsDriveReadIntent: AppIntent {
     @Parameter(title: "Drive file ID")
     public var fileId: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "gws_drive_read",
@@ -3127,6 +3198,7 @@ public struct GwsDriveSearchIntent: AppIntent {
     @Parameter(title: "maxResults", default: 10, inclusiveRange: (1, 50))
     public var maxResults: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "gws_drive_search",
@@ -3150,6 +3222,7 @@ public struct GwsGmailListIntent: AppIntent {
     @Parameter(title: "Max messages to return", default: 20, inclusiveRange: (1, 100))
     public var maxResults: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         if let v = query { args["query"] = v }
@@ -3176,6 +3249,7 @@ public struct GwsGmailReadIntent: AppIntent {
     @Parameter(title: "Response format", default: .full)
     public var format: GwsGmailReadFormatOption
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "gws_gmail_read",
@@ -3199,6 +3273,7 @@ public struct GwsPeopleSearchIntent: AppIntent {
     @Parameter(title: "pageSize", default: 10, inclusiveRange: (1, 30))
     public var pageSize: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "gws_people_search",
@@ -3222,6 +3297,7 @@ public struct GwsSheetsReadIntent: AppIntent {
     @Parameter(title: "A1 range notation (e.g. 'Sheet1!A1:D10')", default: "Sheet1")
     public var range: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "gws_sheets_read",
@@ -3245,6 +3321,7 @@ public struct GwsSheetsWriteIntent: AppIntent {
     @Parameter(title: "A1 range (e.g. 'Sheet1!A1:B2')")
     public var range: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "gws_sheets_write",
@@ -3262,6 +3339,7 @@ public struct GwsStatusIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "gws_status",
@@ -3288,6 +3366,7 @@ public struct GwsTasksCreateIntent: AppIntent {
     @Parameter(title: "Due date (ISO 8601 or YYYY-MM-DD)")
     public var due: String?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         args["title"] = title
@@ -3315,6 +3394,7 @@ public struct GwsTasksListIntent: AppIntent {
     @Parameter(title: "Include completed tasks", default: false)
     public var showCompleted: Bool
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "gws_tasks_list",
@@ -3338,6 +3418,7 @@ public struct ImportPhotoIntent: AppIntent {
     @Parameter(title: "Album to add the imported photo to (must already exist)")
     public var albumName: String?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         args["filePath"] = filePath
@@ -3361,6 +3442,7 @@ public struct ImportShortcutIntent: AppIntent {
     @Parameter(title: "Path to the .shortcut file to import")
     public var filePath: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "import_shortcut",
@@ -3381,6 +3463,7 @@ public struct IsAppRunningIntent: AppIntent {
     @Parameter(title: "Application name to check (e.g. 'Safari')")
     public var name: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "is_app_running",
@@ -3411,6 +3494,7 @@ public struct KeynoteAddSlideIntent: AppIntent {
     @Parameter(title: "Document name")
     public var document: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "keynote_add_slide",
@@ -3428,6 +3512,7 @@ public struct KeynoteCreateDocumentIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "keynote_create_document",
@@ -3451,6 +3536,7 @@ public struct KeynoteGetSlideIntent: AppIntent {
     @Parameter(title: "Slide number (1-based)", inclusiveRange: (1, 9007199254740991))
     public var slideNumber: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "keynote_get_slide",
@@ -3468,6 +3554,7 @@ public struct KeynoteListDocumentsIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "keynote_list_documents",
@@ -3488,6 +3575,7 @@ public struct KeynoteListSlidesIntent: AppIntent {
     @Parameter(title: "Document name")
     public var document: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "keynote_list_slides",
@@ -3514,6 +3602,7 @@ public struct KeynoteSetPresenterNotesIntent: AppIntent {
     @Parameter(title: "Presenter notes text")
     public var notes: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "keynote_set_presenter_notes",
@@ -3537,6 +3626,7 @@ public struct KeynoteStartSlideshowIntent: AppIntent {
     @Parameter(title: "Start from slide number (default: 1)", default: 1, inclusiveRange: (1, 9007199254740991))
     public var fromSlide: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "keynote_start_slideshow",
@@ -3557,6 +3647,7 @@ public struct LaunchAppIntent: AppIntent {
     @Parameter(title: "Application name (e.g. 'Safari', 'Xcode') or bundle ID")
     public var name: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "launch_app",
@@ -3574,6 +3665,7 @@ public struct ListAccountsIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_accounts",
@@ -3601,6 +3693,7 @@ public struct ListAlbumsIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_albums",
@@ -3618,6 +3711,7 @@ public struct ListAllWindowsIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_all_windows",
@@ -3645,6 +3739,7 @@ public struct ListBluetoothDevicesIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_bluetooth_devices",
@@ -3672,6 +3767,7 @@ public struct ListBookmarksIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_bookmarks",
@@ -3699,6 +3795,7 @@ public struct ListCalendarsIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_calendars",
@@ -3729,6 +3826,7 @@ public struct ListChatsIntent: AppIntent {
     @Parameter(title: "Max chats to return (default: 50)", default: 50, inclusiveRange: (1, 200))
     public var limit: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_chats",
@@ -3762,6 +3860,7 @@ public struct ListContactsIntent: AppIntent {
     @Parameter(title: "Skip N contacts (default: 0)", default: 0, inclusiveRange: (0, 9007199254740991))
     public var offset: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_contacts",
@@ -3795,6 +3894,7 @@ public struct ListDirectoryIntent: AppIntent {
     @Parameter(title: "Max items to return (default: 100)", default: 100, inclusiveRange: (1, 500))
     public var limit: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_directory",
@@ -3837,6 +3937,7 @@ public struct ListEventsIntent: AppIntent {
     @Parameter(title: "Number of events to skip (default: 0)", default: 0, inclusiveRange: (0, 9007199254740991))
     public var offset: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         args["startDate"] = startDate
@@ -3873,6 +3974,7 @@ public struct ListFavoritesIntent: AppIntent {
     @Parameter(title: "Max photos (default: 50)", default: 50, inclusiveRange: (1, 500))
     public var limit: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_favorites",
@@ -3900,6 +4002,7 @@ public struct ListFoldersIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_folders",
@@ -3933,6 +4036,7 @@ public struct ListGroupMembersIntent: AppIntent {
     @Parameter(title: "Max contacts (default: 100)", default: 100, inclusiveRange: (1, 1000))
     public var limit: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_group_members",
@@ -3960,6 +4064,7 @@ public struct ListGroupsIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_groups",
@@ -3987,6 +4092,7 @@ public struct ListMailboxesIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_mailboxes",
@@ -4026,6 +4132,7 @@ public struct ListMessagesIntent: AppIntent {
     @Parameter(title: "Pagination offset (default: 0)", default: 0, inclusiveRange: (0, 9007199254740991))
     public var offset: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         args["mailbox"] = mailbox
@@ -4067,6 +4174,7 @@ public struct ListNotesIntent: AppIntent {
     @Parameter(title: "Number of notes to skip for pagination (default: 0)", default: 0, inclusiveRange: (0, 9007199254740991))
     public var offset: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         if let v = folder { args["folder"] = v }
@@ -4101,6 +4209,7 @@ public struct ListParticipantsIntent: AppIntent {
     @Parameter(title: "Chat ID")
     public var chatId: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_participants",
@@ -4137,6 +4246,7 @@ public struct ListPhotosIntent: AppIntent {
     @Parameter(title: "Offset for pagination (default: 0)", default: 0, inclusiveRange: (0, 9007199254740991))
     public var offset: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_photos",
@@ -4164,6 +4274,7 @@ public struct ListPlaylistsIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_playlists",
@@ -4197,6 +4308,7 @@ public struct ListPodcastEpisodesIntent: AppIntent {
     @Parameter(title: "Max episodes (default: 20)", default: 20, inclusiveRange: (1, 100))
     public var limit: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_podcast_episodes",
@@ -4214,6 +4326,7 @@ public struct ListPodcastShowsIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_podcast_shows",
@@ -4231,6 +4344,7 @@ public struct ListReadingListIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_reading_list",
@@ -4258,6 +4372,7 @@ public struct ListReminderListsIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_reminder_lists",
@@ -4297,6 +4412,7 @@ public struct ListRemindersIntent: AppIntent {
     @Parameter(title: "Number of reminders to skip for pagination (default: 0)", default: 0, inclusiveRange: (0, 9007199254740991))
     public var offset: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         if let v = list { args["list"] = v }
@@ -4329,6 +4445,7 @@ public struct ListRunningAppsIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_running_apps",
@@ -4356,6 +4473,7 @@ public struct ListShortcutsIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_shortcuts",
@@ -4383,6 +4501,7 @@ public struct ListTabsIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_tabs",
@@ -4416,6 +4535,7 @@ public struct ListTracksIntent: AppIntent {
     @Parameter(title: "Max tracks (default: 100)", default: 100, inclusiveRange: (1, 500))
     public var limit: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_tracks",
@@ -4443,6 +4563,7 @@ public struct ListTriggersIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_triggers",
@@ -4460,6 +4581,7 @@ public struct ListWindowsIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_windows",
@@ -4486,6 +4608,7 @@ public struct LocalLlmGenerateIntent: AppIntent {
     @Parameter(title: "System instruction for the model")
     public var system: String?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         args["prompt"] = prompt
@@ -4507,6 +4630,7 @@ public struct LocalLlmStatusIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "local_llm_status",
@@ -4530,6 +4654,7 @@ public struct MarkMessageReadIntent: AppIntent {
     @Parameter(title: "true=read, false=unread (default: true)", default: true)
     public var read: Bool
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "mark_message_read",
@@ -4568,6 +4693,7 @@ public struct MemoryPutIntent: AppIntent {
     @Parameter(title: "Self-expire after N milliseconds")
     public var ttl_ms: Int?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         args["kind"] = kind.rawValue
@@ -4618,6 +4744,7 @@ public struct MemoryQueryIntent: AppIntent {
     @Parameter(title: "Sort by updatedAt (default desc)")
     public var order: MemoryQueryOrderOption?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         if let v = kind { args["kind"] = v.rawValue }
@@ -4651,6 +4778,7 @@ public struct MemoryStatsIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "memory_stats",
@@ -4687,6 +4815,7 @@ public struct MinimizeWindowIntent: AppIntent {
     @Parameter(title: "Specific window title. If omitted, targets the first window.")
     public var windowTitle: String?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         args["appName"] = appName
@@ -4720,6 +4849,7 @@ public struct MoveWindowIntent: AppIntent {
     @Parameter(title: "Specific window title. If omitted, targets the first window.")
     public var windowTitle: String?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         args["appName"] = appName
@@ -4742,6 +4872,7 @@ public struct MusicPlayerIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "music_player",
@@ -4759,6 +4890,7 @@ public struct NowPlayingIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "now_playing",
@@ -4792,6 +4924,7 @@ public struct NumbersAddSheetIntent: AppIntent {
     @Parameter(title: "Name for the new sheet")
     public var sheetName: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "numbers_add_sheet",
@@ -4809,6 +4942,7 @@ public struct NumbersCreateDocumentIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "numbers_create_document",
@@ -4835,6 +4969,7 @@ public struct NumbersGetCellIntent: AppIntent {
     @Parameter(title: "Cell address (e.g. 'A1', 'B3')")
     public var cell: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "numbers_get_cell",
@@ -4871,6 +5006,7 @@ public struct NumbersGetFormulaIntent: AppIntent {
     @Parameter(title: "Cell address (e.g. 'A1')")
     public var cell: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "numbers_get_formula",
@@ -4898,6 +5034,7 @@ public struct NumbersListDocumentsIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "numbers_list_documents",
@@ -4928,6 +5065,7 @@ public struct NumbersListSheetsIntent: AppIntent {
     @Parameter(title: "Document name")
     public var document: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "numbers_list_sheets",
@@ -4961,6 +5099,7 @@ public struct NumbersListTablesIntent: AppIntent {
     @Parameter(title: "Sheet name")
     public var sheet: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "numbers_list_tables",
@@ -5006,6 +5145,7 @@ public struct NumbersReadCellsIntent: AppIntent {
     @Parameter(title: "End column index (inclusive)", inclusiveRange: (0, 9007199254740991))
     public var endCol: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "numbers_read_cells",
@@ -5042,6 +5182,7 @@ public struct NumbersRenameSheetIntent: AppIntent {
     @Parameter(title: "New sheet name")
     public var newName: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "numbers_rename_sheet",
@@ -5071,6 +5212,7 @@ public struct NumbersSetCellIntent: AppIntent {
     @Parameter(title: "Value to write")
     public var value: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "numbers_set_cell",
@@ -5091,6 +5233,7 @@ public struct OpenAddressIntent: AppIntent {
     @Parameter(title: "Address to open in Maps")
     public var address: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "open_address",
@@ -5111,6 +5254,7 @@ public struct OpenUrlIntent: AppIntent {
     @Parameter(title: "URL to open")
     public var url: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "open_url",
@@ -5128,6 +5272,7 @@ public struct PagesCreateDocumentIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "pages_create_document",
@@ -5148,6 +5293,7 @@ public struct PagesGetBodyTextIntent: AppIntent {
     @Parameter(title: "Document name (as shown in title bar)")
     public var document: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "pages_get_body_text",
@@ -5165,6 +5311,7 @@ public struct PagesListDocumentsIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "pages_list_documents",
@@ -5185,6 +5332,7 @@ public struct PagesOpenDocumentIntent: AppIntent {
     @Parameter(title: "Absolute file path to the .pages document")
     public var path: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "pages_open_document",
@@ -5208,6 +5356,7 @@ public struct PlayPlaylistIntent: AppIntent {
     @Parameter(title: "Enable or disable shuffle")
     public var shuffle: Bool?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         args["name"] = name
@@ -5234,6 +5383,7 @@ public struct PlayPodcastEpisodeIntent: AppIntent {
     @Parameter(title: "Show to search in (searches all shows if omitted)")
     public var showName: String?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         args["episodeName"] = episodeName
@@ -5260,6 +5410,7 @@ public struct PlayTrackIntent: AppIntent {
     @Parameter(title: "Playlist to search in (default: Library)")
     public var playlist: String?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         args["trackName"] = trackName
@@ -5283,6 +5434,7 @@ public struct PlaybackControlIntent: AppIntent {
     @Parameter(title: "Playback action")
     public var action: PlaybackControlActionOption
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "playback_control",
@@ -5300,6 +5452,7 @@ public struct PodcastNowPlayingIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "podcast_now_playing",
@@ -5320,6 +5473,7 @@ public struct PodcastPlaybackControlIntent: AppIntent {
     @Parameter(title: "Playback action")
     public var action: PodcastPlaybackControlActionOption
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "podcast_playback_control",
@@ -5340,6 +5494,7 @@ public struct PreventSleepIntent: AppIntent {
     @Parameter(title: "Duration in seconds (default: 3600 = 1 hour, max: 86400 = 24 hours)", default: 3600, inclusiveRange: (1, 86400))
     public var seconds: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "prevent_sleep",
@@ -5357,6 +5512,7 @@ public struct ProactiveContextIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "proactive_context",
@@ -5387,6 +5543,7 @@ public struct ProofreadTextIntent: AppIntent {
     @Parameter(title: "Text to proofread")
     public var text: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "proofread_text",
@@ -5419,6 +5576,7 @@ public struct QueryPhotosIntent: AppIntent {
     @Parameter(title: "Max results (default: 50)", default: 50, inclusiveRange: (1, 200))
     public var limit: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         if let v = mediaType { args["mediaType"] = v.rawValue }
@@ -5445,6 +5603,7 @@ public struct ReadChatIntent: AppIntent {
     @Parameter(title: "Chat ID")
     public var chatId: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "read_chat",
@@ -5475,6 +5634,7 @@ public struct ReadContactIntent: AppIntent {
     @Parameter(title: "Contact ID")
     public var id: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "read_contact",
@@ -5505,6 +5665,7 @@ public struct ReadEventIntent: AppIntent {
     @Parameter(title: "Event UID")
     public var id: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "read_event",
@@ -5538,6 +5699,7 @@ public struct ReadMessageIntent: AppIntent {
     @Parameter(title: "Max content length (default: 5000)", default: 5000, inclusiveRange: (100, 100000))
     public var maxLength: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "read_message",
@@ -5568,6 +5730,7 @@ public struct ReadNoteIntent: AppIntent {
     @Parameter(title: "Note ID (x-coredata:// format)")
     public var id: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "read_note",
@@ -5604,6 +5767,7 @@ public struct ReadPageContentIntent: AppIntent {
     @Parameter(title: "Max content length (default: 10000)", default: 10000, inclusiveRange: (100, 50000))
     public var maxLength: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "read_page_content",
@@ -5634,6 +5798,7 @@ public struct ReadReminderIntent: AppIntent {
     @Parameter(title: "Reminder ID")
     public var id: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "read_reminder",
@@ -5670,6 +5835,7 @@ public struct RecentFilesIntent: AppIntent {
     @Parameter(title: "Max results (default: 30)", default: 30, inclusiveRange: (1, 200))
     public var limit: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         if let v = folder { args["folder"] = v }
@@ -5713,6 +5879,7 @@ public struct ResizeWindowIntent: AppIntent {
     @Parameter(title: "Specific window title. If omitted, targets the first window.")
     public var windowTitle: String?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         args["appName"] = appName
@@ -5741,6 +5908,7 @@ public struct ReverseGeocodeIntent: AppIntent {
     @Parameter(title: "Longitude coordinate", inclusiveRange: (-180, 180))
     public var longitude: Double
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "reverse_geocode",
@@ -5764,6 +5932,7 @@ public struct RewriteTextIntent: AppIntent {
     @Parameter(title: "Target tone (default: professional)", default: .professional)
     public var tone: RewriteTextToneOption
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "rewrite_text",
@@ -5784,6 +5953,7 @@ public struct ScanBluetoothIntent: AppIntent {
     @Parameter(title: "Scan duration in seconds (1-30, default: 5)", default: 5, inclusiveRange: (1, 30))
     public var duration: Double
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "scan_bluetooth",
@@ -5804,6 +5974,7 @@ public struct ScanDocumentIntent: AppIntent {
     @Parameter(title: "Absolute path to the image file to scan")
     public var imagePath: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "scan_document",
@@ -5833,6 +6004,7 @@ public struct ScanNotesIntent: AppIntent {
     @Parameter(title: "Preview text length in characters (default: 300)", default: 300, inclusiveRange: (1, 5000))
     public var previewLength: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         if let v = folder { args["folder"] = v }
@@ -5871,6 +6043,7 @@ public struct SearchChatsIntent: AppIntent {
     @Parameter(title: "Max results (default: 20)", default: 20, inclusiveRange: (1, 100))
     public var limit: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "search_chats",
@@ -5904,6 +6077,7 @@ public struct SearchContactsIntent: AppIntent {
     @Parameter(title: "Max results (default: 50)", default: 50, inclusiveRange: (1, 500))
     public var limit: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "search_contacts",
@@ -5943,6 +6117,7 @@ public struct SearchEventsIntent: AppIntent {
     @Parameter(title: "Max results (default: 50)", default: 50, inclusiveRange: (1, 500))
     public var limit: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "search_events",
@@ -5979,6 +6154,7 @@ public struct SearchFilesIntent: AppIntent {
     @Parameter(title: "Max results (default: 50)", default: 50, inclusiveRange: (1, 200))
     public var limit: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         args["query"] = query
@@ -6013,6 +6189,7 @@ public struct SearchLocationIntent: AppIntent {
     @Parameter(title: "Location or place to search for")
     public var query: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "search_location",
@@ -6039,6 +6216,7 @@ public struct SearchMessagesIntent: AppIntent {
     @Parameter(title: "Max results (default: 30)", default: 30, inclusiveRange: (1, 200))
     public var limit: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "search_messages",
@@ -6075,6 +6253,7 @@ public struct SearchNearbyIntent: AppIntent {
     @Parameter(title: "Longitude of the center point (degrees, -180 to 180)", inclusiveRange: (-180, 180))
     public var longitude: Double?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         args["query"] = query
@@ -6105,6 +6284,7 @@ public struct SearchNotesIntent: AppIntent {
     @Parameter(title: "Number of matching results to skip (for pagination)", default: 0, inclusiveRange: (0, 9007199254740991))
     public var offset: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "search_notes",
@@ -6138,6 +6318,7 @@ public struct SearchPhotosIntent: AppIntent {
     @Parameter(title: "Max results (default: 30)", default: 30, inclusiveRange: (1, 200))
     public var limit: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "search_photos",
@@ -6171,6 +6352,7 @@ public struct SearchPodcastEpisodesIntent: AppIntent {
     @Parameter(title: "Max results (default: 20)", default: 20, inclusiveRange: (1, 100))
     public var limit: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "search_podcast_episodes",
@@ -6194,6 +6376,7 @@ public struct SearchRemindersIntent: AppIntent {
     @Parameter(title: "Max results (default: 30)", default: 30, inclusiveRange: (1, 500))
     public var limit: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "search_reminders",
@@ -6224,6 +6407,7 @@ public struct SearchShortcutsIntent: AppIntent {
     @Parameter(title: "Search keyword to match against shortcut names")
     public var query: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "search_shortcuts",
@@ -6254,6 +6438,7 @@ public struct SearchTabsIntent: AppIntent {
     @Parameter(title: "Search keyword to match against tab titles and URLs")
     public var query: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "search_tabs",
@@ -6287,6 +6472,7 @@ public struct SearchTracksIntent: AppIntent {
     @Parameter(title: "Max results (default: 30)", default: 30, inclusiveRange: (1, 200))
     public var limit: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "search_tracks",
@@ -6326,6 +6512,7 @@ public struct SemanticSearchIntent: AppIntent {
     @Parameter(title: "Minimum similarity (default 0.5)", inclusiveRange: (0, 1))
     public var threshold: Double?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         args["query"] = query
@@ -6348,6 +6535,7 @@ public struct SemanticStatusIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "semantic_status",
@@ -6368,6 +6556,7 @@ public struct SetBrightnessIntent: AppIntent {
     @Parameter(title: "Brightness level from 0.0 (darkest) to 1.0 (brightest)", inclusiveRange: (0, 1))
     public var level: Double
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "set_brightness",
@@ -6388,6 +6577,7 @@ public struct SetClipboardIntent: AppIntent {
     @Parameter(title: "Text to copy to the clipboard")
     public var text: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "set_clipboard",
@@ -6421,6 +6611,7 @@ public struct SetDislikedIntent: AppIntent {
     @Parameter(title: "Whether to mark as disliked")
     public var disliked: Bool
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "set_disliked",
@@ -6444,6 +6635,7 @@ public struct SetFavoritedIntent: AppIntent {
     @Parameter(title: "Whether to mark as favorited")
     public var favorited: Bool
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "set_favorited",
@@ -6467,6 +6659,7 @@ public struct SetFileTagsIntent: AppIntent {
     @Parameter(title: "Array of tag names to set")
     public var tags: [String]
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "set_file_tags",
@@ -6490,6 +6683,7 @@ public struct SetRatingIntent: AppIntent {
     @Parameter(title: "Rating value (0-100)", inclusiveRange: (0, 100))
     public var rating: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "set_rating",
@@ -6513,6 +6707,7 @@ public struct SetShuffleIntent: AppIntent {
     @Parameter(title: "Repeat mode")
     public var songRepeat: SetShuffleSongrepeatOption?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         if let v = shuffle { args["shuffle"] = v }
@@ -6539,6 +6734,7 @@ public struct SetVolumeIntent: AppIntent {
     @Parameter(title: "Whether to mute output audio")
     public var muted: Bool?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         if let v = volume { args["volume"] = v }
@@ -6569,6 +6765,7 @@ public struct SetupPermissionsIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "setup_permissions",
@@ -6595,6 +6792,7 @@ public struct ShareLocationIntent: AppIntent {
     @Parameter(title: "Optional label for the location")
     public var label: String?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         args["latitude"] = latitude
@@ -6628,6 +6826,7 @@ public struct ShowNotificationIntent: AppIntent {
     @Parameter(title: "Sound name to play (e.g. 'Frog', 'Glass', 'Hero')")
     public var sound: String?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         args["message"] = message
@@ -6650,6 +6849,7 @@ public struct SkillCalendarAlertIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "skill_calendar-alert",
@@ -6667,9 +6867,28 @@ public struct SkillClipboardUrlToReadingIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "skill_clipboard-url-to-reading",
+            args: [String: any Sendable]()
+        )
+        return .result(value: result)
+    }
+}
+
+// Tool: skill_daily-briefing
+public struct SkillDailyBriefingIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Daily Briefing"
+    nonisolated(unsafe) public static var description = IntentDescription("[Skill] Read today's calendar, open reminders, unread mail count, and recent notes for a safe morning overview. This skill performs no writes.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @MainActor
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "skill_daily-briefing",
             args: [String: any Sendable]()
         )
         return .result(value: result)
@@ -6687,6 +6906,7 @@ public struct SkillDailyJournalIntent: AppIntent {
     @Parameter(title: "Optional free-form note to prepend to the auto-generated summary.", default: "")
     public var note: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "skill_daily-journal",
@@ -6704,6 +6924,7 @@ public struct SkillEveningWinddownIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "skill_evening-winddown",
@@ -6721,6 +6942,7 @@ public struct SkillFocusBlockPlannerIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "skill_focus-block-planner",
@@ -6738,6 +6960,7 @@ public struct SkillFocusGuardianIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "skill_focus-guardian",
@@ -6755,6 +6978,7 @@ public struct SkillInboxTriageIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "skill_inbox-triage",
@@ -6772,6 +6996,7 @@ public struct SkillProjectDigestIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "skill_project-digest",
@@ -6798,6 +7023,7 @@ public struct SkillSenderToTasksIntent: AppIntent {
     @Parameter(title: "Max messages to process per run.", default: 10)
     public var limit: Double
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "skill_sender-to-tasks",
@@ -6815,6 +7041,7 @@ public struct SmartClipboardIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "smart_clipboard",
@@ -6832,6 +7059,7 @@ public struct SpeechAvailabilityIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "speech_availability",
@@ -6849,6 +7077,7 @@ public struct SpotlightSyncIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "spotlight_sync",
@@ -6872,6 +7101,7 @@ public struct SuggestNextToolsIntent: AppIntent {
     @Parameter(title: "Max suggestions (default 5)", inclusiveRange: (1, 20))
     public var limit: Double?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         args["after"] = after
@@ -6905,6 +7135,7 @@ public struct SummarizeContextIntent: AppIntent {
     @Parameter(title: "Optional focus area (e.g. 'meetings', 'overdue tasks', 'project X')")
     public var focus: String?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         if let v = focus { args["focus"] = v }
@@ -6927,6 +7158,7 @@ public struct SummarizeTextIntent: AppIntent {
     @Parameter(title: "Text to summarize")
     public var text: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "summarize_text",
@@ -6950,6 +7182,7 @@ public struct TagContentIntent: AppIntent {
     @Parameter(title: "List of tag/category names to classify the content against")
     public var tags: [String]
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "tag_content",
@@ -6967,6 +7200,7 @@ public struct TimelineTodayIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "timeline_today",
@@ -6984,6 +7218,7 @@ public struct TodayEventsIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "today_events",
@@ -7011,6 +7246,7 @@ public struct ToggleDarkModeIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "toggle_dark_mode",
@@ -7041,6 +7277,7 @@ public struct ToggleFocusModeIntent: AppIntent {
     @Parameter(title: "True to enable Do Not Disturb, false to disable")
     public var enable: Bool
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "toggle_focus_mode",
@@ -7064,6 +7301,7 @@ public struct TranscribeAudioIntent: AppIntent {
     @Parameter(title: "Language code (e.g. 'en-US', 'ko-KR', 'ja-JP'). Defaults to system language.")
     public var language: String?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         args["path"] = path
@@ -7084,6 +7322,7 @@ public struct TvListPlaylistsIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "tv_list_playlists",
@@ -7107,6 +7346,7 @@ public struct TvListTracksIntent: AppIntent {
     @Parameter(title: "Max items (default: 50)", default: 50, inclusiveRange: (1, 200))
     public var limit: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "tv_list_tracks",
@@ -7124,6 +7364,7 @@ public struct TvNowPlayingIntent: AppIntent {
 
     public init() {}
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "tv_now_playing",
@@ -7144,6 +7385,7 @@ public struct TvPlayIntent: AppIntent {
     @Parameter(title: "Movie or episode name")
     public var name: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "tv_play",
@@ -7164,6 +7406,7 @@ public struct TvPlaybackControlIntent: AppIntent {
     @Parameter(title: "Playback action")
     public var action: TvPlaybackControlActionOption
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "tv_playback_control",
@@ -7187,6 +7430,7 @@ public struct TvSearchIntent: AppIntent {
     @Parameter(title: "Max results (default: 20)", default: 20, inclusiveRange: (1, 100))
     public var limit: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "tv_search",
@@ -7231,6 +7475,7 @@ public struct UiAccessibilityQueryIntent: AppIntent {
     @Parameter(title: "Max tree depth to search (default: 8)", default: 8, inclusiveRange: (1, 15))
     public var maxDepth: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         if let v = app { args["app"] = v }
@@ -7264,6 +7509,7 @@ public struct UiDiffIntent: AppIntent {
     @Parameter(title: "App name to compare against")
     public var app: String?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         args["beforeSnapshot"] = beforeSnapshot
@@ -7287,6 +7533,7 @@ public struct UiOpenAppIntent: AppIntent {
     @Parameter(title: "Application name (e.g. 'Safari', 'Xcode') or bundle ID (e.g. 'com.apple.Safari')")
     public var appName: String
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await MCPIntentRouter.shared.call(
             tool: "ui_open_app",
@@ -7313,6 +7560,7 @@ public struct UiReadIntent: AppIntent {
     @Parameter(title: "Maximum number of UI elements to return (default: 200)", default: 200, inclusiveRange: (1, 1000))
     public var maxElements: Int
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         if let v = appName { args["appName"] = v }
@@ -7343,6 +7591,7 @@ public struct UiScrollIntent: AppIntent {
     @Parameter(title: "App name to activate before scrolling. If omitted, scrolls in the frontmost app.")
     public var appName: String?
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         args["direction"] = direction.rawValue
@@ -7379,6 +7628,7 @@ public struct UiTraverseIntent: AppIntent {
     @Parameter(title: "Only include elements with visible position/size", default: false)
     public var onlyVisible: Bool
 
+    @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         if let v = app { args["app"] = v }
@@ -7396,21 +7646,61 @@ public struct UiTraverseIntent: AppIntent {
 
 // MARK: - AppShortcutsProvider
 
+#if AIRMCP_ENABLE_FOUNDATION_MODELS && canImport(FoundationModels) && compiler(>=6.3)
+@available(macOS 26, iOS 26, *)
+public struct AirMCPAskShortcut: AppShortcutsProvider {
+    @AppShortcutsBuilder public static var appShortcuts: [AppShortcut] {
+        AppShortcut(
+            intent: AskAirMCPIntent(),
+            phrases: [
+                "Ask \(.applicationName)",
+                "Ask \(.applicationName) about my day",
+            ],
+            shortTitle: "Ask AirMCP",
+            systemImageName: "brain.head.profile"
+        )
+    }
+}
+#endif
+
 public struct AirMCPGeneratedShortcuts: AppShortcutsProvider {
     @AppShortcutsBuilder public static var appShortcuts: [AppShortcut] {
-        #if canImport(FoundationModels) && compiler(>=6.3)
-        if #available(macOS 26, iOS 26, *) {
-            AppShortcut(
-                intent: AskAirMCPIntent(),
-                phrases: [
-                    "Ask \(.applicationName)",
-                    "Ask \(.applicationName) about my day",
-                ],
-                shortTitle: "Ask AirMCP",
-                systemImageName: "brain.head.profile"
-            )
-        }
-        #endif
+        AppShortcut(
+            intent: SummarizeContextIntent(),
+            phrases: [
+                "Daily Briefing in \(.applicationName)",
+                "brief my day with \(.applicationName)",
+            ],
+            shortTitle: "Daily Briefing",
+            systemImageName: "sun.max"
+        )
+        AppShortcut(
+            intent: TimelineTodayIntent(),
+            phrases: [
+                "Today Timeline in \(.applicationName)",
+                "show my day with \(.applicationName)",
+            ],
+            shortTitle: "Today Timeline",
+            systemImageName: "calendar"
+        )
+        AppShortcut(
+            intent: SkillInboxTriageIntent(),
+            phrases: [
+                "Inbox Triage in \(.applicationName)",
+                "triage my inbox with \(.applicationName)",
+            ],
+            shortTitle: "Inbox Triage",
+            systemImageName: "tray.full"
+        )
+        AppShortcut(
+            intent: SkillProjectDigestIntent(),
+            phrases: [
+                "Project Digest in \(.applicationName)",
+                "summarize my project with \(.applicationName)",
+            ],
+            shortTitle: "Project Digest",
+            systemImageName: "folder"
+        )
         AppShortcut(
             intent: TodayEventsIntent(),
             phrases: [
@@ -7419,15 +7709,6 @@ public struct AirMCPGeneratedShortcuts: AppShortcutsProvider {
             ],
             shortTitle: "Today's Events",
             systemImageName: "calendar"
-        )
-        AppShortcut(
-            intent: ListCalendarsIntent(),
-            phrases: [
-                "List Calendars in \(.applicationName)",
-                "list calendars with \(.applicationName)",
-            ],
-            shortTitle: "List Calendars",
-            systemImageName: "calendar.badge.plus"
         )
         AppShortcut(
             intent: SearchNotesIntent(),
@@ -7439,6 +7720,15 @@ public struct AirMCPGeneratedShortcuts: AppShortcutsProvider {
             systemImageName: "note.text"
         )
         AppShortcut(
+            intent: ListRemindersIntent(),
+            phrases: [
+                "List Reminders in \(.applicationName)",
+                "list reminders with \(.applicationName)",
+            ],
+            shortTitle: "List Reminders",
+            systemImageName: "checklist"
+        )
+        AppShortcut(
             intent: SearchContactsIntent(),
             phrases: [
                 "Search Contacts in \(.applicationName)",
@@ -7448,33 +7738,6 @@ public struct AirMCPGeneratedShortcuts: AppShortcutsProvider {
             systemImageName: "person.crop.circle"
         )
         AppShortcut(
-            intent: ListReminderListsIntent(),
-            phrases: [
-                "List Reminder Lists in \(.applicationName)",
-                "list reminder lists with \(.applicationName)",
-            ],
-            shortTitle: "List Reminder Lists",
-            systemImageName: "checklist"
-        )
-        AppShortcut(
-            intent: ListShortcutsIntent(),
-            phrases: [
-                "List Shortcuts in \(.applicationName)",
-                "list shortcuts with \(.applicationName)",
-            ],
-            shortTitle: "List Shortcuts",
-            systemImageName: "square.stack.3d.up"
-        )
-        AppShortcut(
-            intent: ListBookmarksIntent(),
-            phrases: [
-                "List Bookmarks in \(.applicationName)",
-                "list bookmarks with \(.applicationName)",
-            ],
-            shortTitle: "List Bookmarks",
-            systemImageName: "safari"
-        )
-        AppShortcut(
             intent: GetCurrentWeatherIntent(),
             phrases: [
                 "Get Current Weather in \(.applicationName)",
@@ -7482,15 +7745,6 @@ public struct AirMCPGeneratedShortcuts: AppShortcutsProvider {
             ],
             shortTitle: "Get Current Weather",
             systemImageName: "cloud.sun"
-        )
-        AppShortcut(
-            intent: SummarizeContextIntent(),
-            phrases: [
-                "Summarize Context in \(.applicationName)",
-                "summarize context with \(.applicationName)",
-            ],
-            shortTitle: "Summarize Context",
-            systemImageName: "sparkles"
         )
     }
 }
@@ -7504,42 +7758,42 @@ import SwiftUI
 
 @available(macOS 26, iOS 26, *)
 fileprivate func _mkReadEventIntent_id(id: String) -> ReadEventIntent {
-    var intent = ReadEventIntent()
+    let intent = ReadEventIntent()
     intent.id = id
     return intent
 }
 
 @available(macOS 26, iOS 26, *)
 fileprivate func _mkReadNoteIntent_id(id: String) -> ReadNoteIntent {
-    var intent = ReadNoteIntent()
+    let intent = ReadNoteIntent()
     intent.id = id
     return intent
 }
 
 @available(macOS 26, iOS 26, *)
 fileprivate func _mkReadReminderIntent_id(id: String) -> ReadReminderIntent {
-    var intent = ReadReminderIntent()
+    let intent = ReadReminderIntent()
     intent.id = id
     return intent
 }
 
 @available(macOS 26, iOS 26, *)
 fileprivate func _mkReadContactIntent_id(id: String) -> ReadContactIntent {
-    var intent = ReadContactIntent()
+    let intent = ReadContactIntent()
     intent.id = id
     return intent
 }
 
 @available(macOS 26, iOS 26, *)
 fileprivate func _mkReadMessageIntent_id(id: String) -> ReadMessageIntent {
-    var intent = ReadMessageIntent()
+    let intent = ReadMessageIntent()
     intent.id = id
     return intent
 }
 
 @available(macOS 26, iOS 26, *)
 fileprivate func _mkReadChatIntent_chatId(chatId: String) -> ReadChatIntent {
-    var intent = ReadChatIntent()
+    let intent = ReadChatIntent()
     intent.chatId = chatId
     return intent
 }
@@ -8874,14 +9128,14 @@ public struct MCPMemoryStatsSnippetView: View {
             HStack {
                 Text("Oldest")
                 Spacer()
-                Text(data.oldest)
+                Text((data.oldest ?? "—"))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
             HStack {
                 Text("Newest")
                 Spacer()
-                Text(data.newest)
+                Text((data.newest ?? "—"))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }

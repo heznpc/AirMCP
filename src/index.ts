@@ -16,13 +16,23 @@ if (_sub === "--version" || _sub === "-v" || _sub === "-V") {
   console.log(v);
   process.exit(0);
 }
-if (_sub === "init" || _sub === "doctor" || _sub === "--help" || _sub === "-h" || _sub === "help") {
+if (
+  _sub === "init" ||
+  _sub === "doctor" ||
+  _sub === "workflows" ||
+  _sub === "--help" ||
+  _sub === "-h" ||
+  _sub === "help"
+) {
   if (_sub === "init") {
     const mod = await import("./cli/init.js");
     await mod.runInit();
   } else if (_sub === "doctor") {
     const mod = await import("./cli/doctor.js");
     await mod.runDoctor();
+  } else if (_sub === "workflows") {
+    const mod = await import("./cli/workflows.js");
+    await mod.runWorkflows();
   } else {
     const mod = await import("./cli/help.js");
     mod.runHelp();

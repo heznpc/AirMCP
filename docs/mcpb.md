@@ -14,7 +14,7 @@ AirMCP ships a `.mcpb` bundle with every release.
    | Field | What it does |
    |---|---|
    | **Gemini API Key** (optional, sensitive) | Enables cloud embeddings for semantic tool search + note search. Leave blank to use Apple's on-device `NLContextualEmbedding` — no cloud calls are made without this key. |
-   | **Load all 29 modules on startup** (default: off) | Off keeps AirMCP at the 7 starter modules (notes, calendar, reminders, contacts, mail, finder, system) — a small, fast-to-initialise surface. On registers every module (messages, music, safari, photos, shortcuts, Apple Intelligence, TV, maps, weather, iWork, Google Workspace, health, bluetooth, etc.). |
+   | **Load all 29 modules on startup** (default: off) | Off keeps AirMCP at the 7 starter modules (notes, reminders, calendar, shortcuts, system, finder, weather) — a small, fast-to-initialise surface. Workflows that use Mail, Contacts, Safari, semantic memory, or Apple Intelligence will enable/request those modules separately. On registers every module (contacts, mail, messages, music, safari, photos, Apple Intelligence, TV, maps, iWork, Google Workspace, health, bluetooth, etc.). |
 
 5. Claude Desktop launches AirMCP the first time you open a conversation. macOS will prompt for Contacts / Calendar / Reminders / Notes permissions as they're first used — grant each.
 

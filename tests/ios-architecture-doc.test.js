@@ -7,6 +7,10 @@ const rfc0007 = readFileSync(
   new URL("docs/rfc/0007-app-intent-bridge.md", root),
   "utf8",
 );
+const handwrittenIntents = readFileSync(
+  new URL("app/Sources/AirMCPApp/AppIntents.swift", root),
+  "utf8",
+);
 
 describe("iOS architecture doc honesty", () => {
   test("does not present App Intents as an automatic iOS MCP transport", () => {
@@ -30,5 +34,11 @@ describe("iOS architecture doc honesty", () => {
     expect(rfc0007).not.toContain("NSAppIntentsMCPExposure");
     expect(rfc0007).not.toContain("@MCPExposedIntent");
     expect(rfc0007).not.toContain("the system exposes it as an MCP tool");
+  });
+
+  test("keeps hand-written AppIntent comments out of the old MCP-bridge frame", () => {
+    expect(handwrittenIntents).toContain("MCP clients use the HTTP/stdio AirMCP surfaces");
+    expect(handwrittenIntents).not.toContain("system-level MCP↔App Intents bridge");
+    expect(handwrittenIntents).not.toContain("automatically be available to all MCP clients");
   });
 });

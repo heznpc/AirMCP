@@ -10,6 +10,7 @@ import { AirMcpConfig, isModuleEnabled } from "./config.js";
 import { LIMITS } from "./constants.js";
 import { resourceCache } from "./cache.js";
 import { getMemoryStore } from "../memory/instance.js";
+import { UNTRUSTED_CONTENT_META } from "./untrusted.js";
 // Memory reads are cheap (JSON file + in-memory cache) — resolved at
 // call site (not at module load) so the singleton is shared with the
 // memory_* tools and remains substitutable in tests via _resetMemoryStore.
@@ -26,6 +27,20 @@ const CACHE_TTL = {
 
 // ── Resource registration factory ──
 
+function untrustedJsonResourceResult(uri: string, text: string) {
+  return {
+    contents: [
+      {
+        uri,
+        mimeType: "application/json" as const,
+        text,
+        _meta: UNTRUSTED_CONTENT_META,
+      },
+    ],
+    _meta: UNTRUSTED_CONTENT_META,
+  };
+}
+
 /**
  * Register a static JSON resource with the standard pattern:
  * fetcher is called on each read, result is JSON-stringified.
@@ -37,15 +52,9 @@ function jsonResource(
   description: string,
   fetcher: () => Promise<unknown>,
 ): void {
-  server.registerResource(name, uri, { description, mimeType: "application/json" }, async (resourceUri) => ({
-    contents: [
-      {
-        uri: resourceUri.href,
-        mimeType: "application/json" as const,
-        text: JSON.stringify(await fetcher(), null, 2),
-      },
-    ],
-  }));
+  server.registerResource(name, uri, { description, mimeType: "application/json" }, async (resourceUri) =>
+    untrustedJsonResourceResult(resourceUri.href, JSON.stringify(await fetcher(), null, 2)),
+  );
 }
 
 // ── Context snapshot depth configs ──
@@ -168,9 +177,7 @@ export function registerResources(server: McpServer, config?: AirMcpConfig): voi
         const notes = await resourceCache.getOrSet(`notes:recent:${count}`, CACHE_TTL.NOTES, () =>
           fetchRecentNotes(count),
         );
-        return {
-          contents: [{ uri: uri.href, mimeType: "application/json", text: JSON.stringify(notes, null, 2) }],
-        };
+        return untrustedJsonResourceResult(uri.href, JSON.stringify(notes, null, 2));
       },
     );
   }
@@ -271,9 +278,7 @@ export function registerResources(server: McpServer, config?: AirMcpConfig): voi
       const text = await resourceCache.getOrSet(`snapshot:${depthKey}`, CACHE_TTL.SNAPSHOT, () =>
         buildSnapshot(enabled, dc),
       );
-      return {
-        contents: [{ uri: uri.href, mimeType: "application/json", text }],
-      };
+      return untrustedJsonResourceResult(uri.href, text);
     },
   );
 }

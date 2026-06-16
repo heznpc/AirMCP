@@ -1,6 +1,6 @@
-# RFC 0007 — MCP Tool ↔ App Intent Auto-Bridge (2-phase)
+# RFC 0007 — MCP Tool → App Intent Codegen
 
-- **Status**: Phase A Accepted (shipped in v2.10-v2.11 across PRs #101-#137). Phase B (stateful multi-step / Apple-API-dependent intents) deferred.
+- **Status**: Phase A Accepted (shipped in v2.10-v2.11 across PRs #101-#137). Former Phase B "system MCP exposure" is rejected after the WWDC26 first-party split: App Intents are the Siri/Shortcuts/Spotlight surface, not an MCP transport.
 - **Author**: heznpc + Claude
 - **Created**: 2026-04-23
 - **Target**: v2.13.0 (Phase A — shipped ahead of target) · Apple-API-dependent (Phase B)
@@ -9,6 +9,7 @@
   - 2026-04-23 (afternoon) — Axis 6 `AskAirMCPIntent` lands ahead of schedule: natural-language FoundationModels agent on iOS 26+/macOS 26+ (originally gated by `#if canImport(FoundationModels) && compiler(>=6.3)`). Rollout row "Ax.6" added.
   - 2026-06-17 — `AskAirMCPIntent` moved behind explicit `AIRMCP_ENABLE_FOUNDATION_MODELS` compile-time opt-in while the bridge still used Foundation Models macro-backed argument types. The default `AirMCPGeneratedShortcuts` provider now ships nine workflow/read shortcuts; `Ask AirMCP` is a separate preview provider in opt-in builds.
   - 2026-06-17 (later) — `FoundationModelsBridge` removed its `@Generable` / `@Guide` macro dependency by implementing `Generable` argument types directly, so the preview bridge can typecheck against the installed macOS 26.5 SDK without `FoundationModelsMacros`.
+  - 2026-06-17 — RFC retitled from "Auto-Bridge" to "Codegen" after Apple first-party WWDC26 material confirmed the split: consumer/Siri path = App Intents/App Schemas; developer/agent path = MCP/Xcode. No public iOS AppIntents→MCP auto-transport is assumed.
   - 2026-04-24 — Phase A closed. Final tally: 229 auto-generated AppIntents, 50 Interactive Snippet views, 17 AppEnum pickers, destructive HITL via `requestConfirmation`, follow-up taps for list tools, codegen helpers extracted to `scripts/lib/codegen-helpers.mjs` with 134 unit tests + golden-sample regression check.
 - **Related**: [docs/ios-architecture.md §15.1](../ios-architecture.md), `app/Sources/AirMCPApp/AppIntents.swift`, `swift/Sources/AirMCPKit/`, `ios/Sources/AirMCPServer/`, RFC 0001 (error categories), RFC 0006 (Swift schema dump)
 
@@ -16,28 +17,28 @@
 
 ## 1. Motivation
 
-Three independent signals make this the highest-leverage iOS axis for 2026:
+Three independent signals make this the highest-leverage Apple-system-surface axis for 2026:
 
-1. **Apple is building MCP into App Intents in iOS 26.1 beta** ([9to5Mac](https://9to5mac.com/2025/09/22/macos-tahoe-26-1-beta-1-mcp-integration/), [AppleInsider](https://appleinsider.com/articles/25/09/22/ios-26-could-get-a-major-ai-boost-with-the-model-context-protocol)). No new MCP-specific framework is planned; the path is "declare an `AppIntent` and the system exposes it as an MCP tool."
+1. **Apple's first-party WWDC26 material splits the surfaces**: consumer/Siri integration is App Intents/App Schemas, while public MCP support appears in the developer/agent layer through Xcode. AirMCP needs both: MCP HTTP/stdio for external agents, App Intents/App Schemas for Siri, Shortcuts, Spotlight, and Apple Intelligence.
 2. **The reference competitor ([supermemoryai/apple-mcp](https://github.com/supermemoryai/apple-mcp)) was archived on 2026-01-01** with 3.1k stars and macOS-only coverage. The "Apple-native MCP" reference slot is open.
 3. **AirMCP has 270+ tools registered in Node / TypeScript** but only 4 hand-written App Intents ([app/Sources/AirMCPApp/AppIntents.swift](../../app/Sources/AirMCPApp/AppIntents.swift)). Hand-porting is not an option — we need a build-time adapter that turns tool metadata into Swift `@AppIntent` declarations automatically.
 
 ### Why now, not later
 
-Waiting for Apple's official MCP API would be wrong because:
+Waiting for a consumer "system MCP" API is not a blocker for App Intents because:
 
-- The only developer-visible contract today **is** `AppIntent`. Apple's "MCP exposure" is a property of an AppIntent-declaring app, not a separate API surface. Anything we build on AppIntents is forward-compatible with the system MCP GA.
-- The one observed opt-in (`NSAppIntentsMCPExposure` Info.plist key, per [xugj520 analysis](https://www.xugj520.cn/en/archives/apple-mcp-ios-26-developer-guide.html)) is parameterizable — we treat it as a plist toggle, not a code change.
-- Shortcuts iOS 26's new "Use Model" action already routes to AppIntents. So even before system MCP GA, Phase A gives AirMCP tools in Shortcuts + Spotlight + Siri.
+- The developer-visible Apple-system contract is `AppIntent` / `AppEntity` / App Schemas. That gives Siri, Shortcuts, Spotlight, and Apple Intelligence reach today.
+- MCP clients still use the existing HTTP/stdio transport. App Intents are a second surface over the same tool metadata, not a replacement transport.
+- Shortcuts iOS 26's "Use Model" action routes to AppIntents, so Phase A gives AirMCP tools useful Apple-system reach without assuming MCP auto-exposure.
 
 ## 2. Goal
 
-`MCP tool in Node` → automatically registered `AppIntent` in Swift on iOS/macOS, without hand-porting. One metadata source, two call surfaces (HTTP/stdio + App Intents). No runtime translation cost at call time.
+`MCP tool in Node` → generated `AppIntent` / `AppEntity` Swift code on iOS/macOS, without hand-porting. One metadata source, two call surfaces (HTTP/stdio MCP + Apple App Intents). No runtime translation cost at call time.
 
 ### Non-goals
 
 - Auto-implementing tool **bodies** in Swift. The tool body still executes in Node (macOS) or via AirMCPKit Swift services (iOS Phase 3, tracked separately).
-- Replacing the Hummingbird HTTP server. Dual transport stays until Apple publishes the wire protocol.
+- Replacing the Hummingbird HTTP server. Dual transport stays unless Apple publishes a consumer MCP transport.
 - Solving HITL or elicitation in AppIntents (deferred — see §5).
 
 ## 3. Proposed Design — Phase A (buildable today)
@@ -164,15 +165,19 @@ The 4 intents in [app/Sources/AirMCPApp/AppIntents.swift](../../app/Sources/AirM
 
 Lands in **axis 4** after A.2b (which gives us `ReturnsValue<T>` + Codable structs to render against). Gated on `canImport(AppIntents) && #available(iOS 26, *)`.
 
-## 4. Proposed Design — Phase B (Apple-API-dependent)
+## 4. Proposed Design — Phase B (schema/toolchain-dependent)
 
-Once Apple publishes the actual MCP-exposure key (whether `NSAppIntentsMCPExposure` or something else) in a shipping iOS release note:
+Phase B extends the generated Apple-system surface once the local toolchain can
+compile the newer schema path:
 
-1. Inject the key into `ios/Resources/Info.plist` (driven by an `AIRMCP_EXPOSE_AS_MCP` build flag, default off until the key is stable)
-2. If Apple adds a compile-time attribute (e.g. `@MCPExposedIntent`), codegen picks it up automatically — one edit in `scripts/gen-swift-intents.mjs`
-3. No tool-level change. The 240+ generated intents inherit the exposure
+1. Add schema metadata only for workflow domains with real entities (Calendar,
+   Reminders, Contacts first; Mail/Notes after query/indexing design).
+2. Keep default artifacts on plain AppIntents while the installed CLT lacks
+   `AppIntentsMacros`; schema builds are opt-in until compile-verified.
+3. If Apple later publishes a consumer MCP transport, evaluate it in a new RFC
+   instead of silently folding it into AppIntents codegen.
 
-Phase B is a line of Xcode config, not a refactor.
+Phase B is schema enrichment, not a hidden MCP transport.
 
 ## 5. Risks / Open Questions
 
@@ -197,10 +202,10 @@ Phase B is a line of Xcode config, not a refactor.
 - **Risk**: `tool-manifest.json` and generated `.swift` drift from actual tools
 - **Mitigation**: A CI step runs `npm run gen:intents` and fails if the generated file differs from checked-in. Same pattern as `count-stats --check`. Same-PR self-healing regen is built in.
 
-### R5. Apple changes the approach mid-flight
+### R5. Apple publishes a consumer MCP transport later
 
-- **Risk**: Apple publishes a new `@MCPExposedIntent` macro or a separate MCP framework, obsoleting parts of §3
-- **Mitigation**: Phase A gives us Shortcuts/Siri/Spotlight value **independently** of the MCP exposure layer. Even if Apple pivots, the generated intents still work. Phase B absorbs the actual exposure mechanism.
+- **Risk**: Apple publishes a new consumer MCP framework or Info.plist exposure key after this RFC.
+- **Mitigation**: Phase A gives us Shortcuts/Siri/Spotlight value independently of any consumer MCP layer. A future Apple MCP transport gets a new RFC so it does not silently change AppIntents semantics.
 
 ### R6. Output schemas that are Swift-unfriendly
 
@@ -224,14 +229,14 @@ Phase B is a line of Xcode config, not a refactor.
 | Ax.6    | `AskAirMCPIntent` natural-language agent via `FoundationModelsBridge`. Preview-only in `AIRMCP_ENABLE_FOUNDATION_MODELS` builds on iOS 26+/macOS 26+; not part of the default shortcut provider.                                                                                   | v2.13.0             |
 | A.3     | Destructive-tool support via iOS 26 `requestConfirmation(actionName:snippetIntent:)`. Codegen emits a confirmation-snippet branch for `destructiveHint: true` tools. **Write tools with `destructiveHint: false`** (~60) land in the same phase since they don't need confirmation. | v2.14.0             |
 | A.4     | **Write tools with `destructiveHint: true`** gated behind explicit config opt-in.                                                                                                                                                                                                   | v2.15.0             |
-| **B.1** | Inject `NSAppIntentsMCPExposure` (or whatever Apple ships) via `AIRMCP_EXPOSE_AS_MCP` build flag. **Triggered by Apple release note.**                                                                                                                                              | Apple-API-dependent |
-| **B.2** | If Apple publishes a compile-time attribute (e.g. `@MCPExposedIntent`), codegen picks it up.                                                                                                                                                                                        | Apple-API-dependent |
+| **B.1** | Extend generated intents with App Schema / AppEntity metadata where the local toolchain can compile it. Default artifacts stay on plain AppIntents until `AppIntentsMacros` is available.                                                                                          | Toolchain-dependent |
+| **B.2** | If Apple later publishes a consumer MCP transport, evaluate it in a new RFC. Do not assume AppIntents auto-expose as MCP tools.                                                                                                                                                    | Apple-API-dependent |
 
 ## 7. Success Metrics
 
 - After A.1: `AppIntent`-conformant Swift code compiles on `swift build` for both `ios/` and `app/`. The 4 hand-written intents match the generated output byte-for-byte.
 - After A.2: "Hey Siri, list events with AirMCP" surfaces `list_events` on iOS 17+ devices. `AirMCP_list_events` appears in Shortcuts app. Spotlight query "list events" surfaces the intent.
-- After B.1: iOS 26.1+ devices list AirMCP tools in the system MCP clients list (Claude/ChatGPT host apps, once they consume the system channel).
+- After B.1: generated intents carry compile-verified App Schema / AppEntity metadata for the workflow domains that have real entities.
 - **Zero hand-written per-tool AppIntent code** post A.1, except the 4 golden samples kept for regression testing.
 - `npm run smoke` from PR #98 extended: spawns `airmcp` + asserts `AppIntent` registry listing (Node-side dump) matches codegen output.
 
@@ -239,15 +244,14 @@ Phase B is a line of Xcode config, not a refactor.
 
 - **Hand-port each tool as a bespoke AppIntent**: rejected. 270+ tools, non-linear maintenance cost, zero alignment with AirMCP's "metadata is source of truth" stance (RFC 0001).
 - **Swift runtime reflection to synthesize AppIntents at launch**: rejected. AppIntent schema is resolved at compile time for Shortcuts / Spotlight / Siri indexing. Runtime registration is not sufficient.
-- **Skip AppIntents entirely, stay HTTP-only**: rejected. Forfeits Shortcuts / Siri / Spotlight / future system MCP, i.e. forfeits the entire iOS distribution story. Would also concede the "Apple-native MCP reference" slot opened by supermemoryai/apple-mcp's archival.
-- **Wait for Apple's official MCP API**: rejected. The official API's surface is already AppIntent itself (per §1). Waiting adds latency without de-risking anything.
+- **Skip AppIntents entirely, stay HTTP-only**: rejected. Forfeits Shortcuts / Siri / Spotlight / Apple Intelligence reach, i.e. forfeits the iOS distribution story even though MCP HTTP still works.
+- **Wait for Apple's official consumer MCP API**: rejected as a blocker for AppIntents. If Apple publishes one, evaluate it separately; until then, AppIntents and MCP stay distinct surfaces.
 
 ## 9. References
 
-- [9to5Mac — MCP in iOS 26.1 beta (2025-09-22)](https://9to5mac.com/2025/09/22/macos-tahoe-26-1-beta-1-mcp-integration/)
-- [AppleInsider — iOS 26 MCP AI boost](https://appleinsider.com/articles/25/09/22/ios-26-could-get-a-major-ai-boost-with-the-model-context-protocol)
-- [fatbobman's Swift Weekly #104 — system-level MCP](https://fatbobman.com/en/weekly/issue-104/)
-- [xugj520 — iOS 26 MCP Developer Guide](https://www.xugj520.cn/en/archives/apple-mcp-ios-26-developer-guide.html) (sole source for `NSAppIntentsMCPExposure`; treat as unverified until Apple confirms)
+- [WWDC26 Apple Intelligence guide](https://developer.apple.com/wwdc26/guides/apple-intelligence/) — App Intents/App Schemas path.
+- [Platforms State of the Union 2026](https://developer.apple.com/videos/play/wwdc2026/102/) — MCP appears in the developer/agent/Xcode layer.
+- [Giving agentic coding tools access to Xcode](https://developer.apple.com/documentation/xcode/giving-agentic-coding-tools-access-to-xcode) — Xcode MCP server path.
 - [Apple App Intents framework](https://developer.apple.com/documentation/appintents)
 - [Apple Developer — Displaying static and interactive snippets](https://developer.apple.com/documentation/AppIntents/displaying-static-and-interactive-snippets) — source for §3.7 renderer + §R2 `requestConfirmation` mitigation
 - [Nutrient blog — WWDC25 interactive snippet intents](https://www.nutrient.io/blog/wwdc25-snippet-intents/)

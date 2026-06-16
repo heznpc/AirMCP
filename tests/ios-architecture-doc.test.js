@@ -3,6 +3,10 @@ import { describe, expect, test } from "@jest/globals";
 
 const root = new URL("..", import.meta.url);
 const doc = readFileSync(new URL("docs/ios-architecture.md", root), "utf8");
+const rfc0007 = readFileSync(
+  new URL("docs/rfc/0007-app-intent-bridge.md", root),
+  "utf8",
+);
 
 describe("iOS architecture doc honesty", () => {
   test("does not present App Intents as an automatic iOS MCP transport", () => {
@@ -18,5 +22,13 @@ describe("iOS architecture doc honesty", () => {
     expect(doc).toContain("developer/agent path = MCP/Xcode");
     expect(doc).toContain("HTTP MCP 서버 + App Intents/App Schemas");
     expect(doc).toContain("MCP 클라이언트는 계속 HTTP/stdio transport를 통해 붙고");
+  });
+
+  test("keeps RFC 0007 scoped to codegen, not an automatic MCP bridge", () => {
+    expect(rfc0007).toContain("MCP Tool → App Intent Codegen");
+    expect(rfc0007).toContain("App Intents are the Siri/Shortcuts/Spotlight surface");
+    expect(rfc0007).not.toContain("NSAppIntentsMCPExposure");
+    expect(rfc0007).not.toContain("@MCPExposedIntent");
+    expect(rfc0007).not.toContain("the system exposes it as an MCP tool");
   });
 });

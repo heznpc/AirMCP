@@ -703,6 +703,28 @@ struct MenuContent: View {
                 .foregroundStyle(.secondary)
         }
 
+        if !hitlManager.pendingRequests.isEmpty {
+            Divider()
+            Text(L("settings.pendingApprovals"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            ForEach(hitlManager.pendingRequests) { request in
+                VStack(alignment: .leading, spacing: 4) {
+                    Label(request.tool, systemImage: request.destructive ? "exclamationmark.triangle" : "questionmark.circle")
+                        .font(.caption)
+                        .foregroundStyle(request.destructive ? .orange : .primary)
+                    HStack {
+                        Button(L("hitl.approve")) {
+                            hitlManager.respond(id: request.id, approved: true, tool: request.tool)
+                        }
+                        Button(L("hitl.deny")) {
+                            hitlManager.respond(id: request.id, approved: false, tool: request.tool)
+                        }
+                    }
+                }
+            }
+        }
+
         if !hitlManager.recentRequests.isEmpty {
             Divider()
             Text(L("settings.recentApprovals"))

@@ -33,6 +33,7 @@ final class HitlManager {
     // MARK: - Observable State
 
     var state: ConnectionState = .idle
+    var pendingRequests: [ApprovalRequest] = []
     var recentRequests: [ApprovalRecord] = []
 
     // MARK: - Private
@@ -221,6 +222,8 @@ final class HitlManager {
 
     private func handleRequest(_ request: ApprovalRequest) {
         pendingTools[request.id] = request.tool
+        pendingRequests.removeAll { $0.id == request.id }
+        pendingRequests.insert(request, at: 0)
         postNotification(for: request)
 
         let timeout = DispatchWorkItem { [weak self] in
@@ -241,6 +244,7 @@ final class HitlManager {
         pendingTimers[id]?.cancel()
         pendingTimers.removeValue(forKey: id)
         pendingTools.removeValue(forKey: id)
+        pendingRequests.removeAll { $0.id == id }
 
         // Send the response over the socket
         if let connection = pendingConnections.removeValue(forKey: id) {

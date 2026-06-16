@@ -101,6 +101,7 @@
 "settings.hitlWaiting" = "HITL: 대기 중";
 "settings.hitlInactive" = "HITL: 비활성";
 "settings.recentApprovals" = "최근 승인 내역";
+"settings.pendingApprovals" = "대기 중인 승인";
 "settings.approved" = "승인됨";
 "settings.denied" = "거부됨";
 
@@ -187,7 +188,7 @@
 "onboarding.enableAll" = "모두 활성화";
 "onboarding.disableAll" = "모두 비활성화";
 "onboarding.permissions" = "macOS 권한";
-"onboarding.permissionsDesc" = "AirMCP는 AppleScript로 Mac 앱과 통신합니다. 각 앱에 처음 접근할 때 macOS가 권한을 요청합니다.";
+"onboarding.permissionsDesc" = "AirMCP는 워크플로에 필요한 순간에만 macOS 앱 권한을 요청합니다.";
 "onboarding.openSettings" = "시스템 설정 열기";
 "onboarding.connectClient" = "AI 클라이언트 연결";
 "onboarding.connectClientDesc" = "AirMCP가 다음 MCP 호환 클라이언트를 감지했습니다. 설정을 패치하여 AirMCP를 자동으로 추가할 수 있습니다.";
@@ -230,7 +231,7 @@
 
 /* Services Menu */
 "services.noText" = "선택된 텍스트 없음";
-"services.savedNoteTitle" = "AirMCP \u2014 저장된 텍스트";
+"services.savedNoteTitle" = "AirMCP - 저장된 텍스트";
 "services.saveNoteFailed" = "메모 저장 실패";
 "services.searchQuery" = "검색어 설정: %@...";
 "services.searchTitle" = "AirMCP 검색";

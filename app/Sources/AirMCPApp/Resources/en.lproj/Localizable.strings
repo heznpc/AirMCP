@@ -101,6 +101,7 @@
 "settings.hitlWaiting" = "HITL: Waiting";
 "settings.hitlInactive" = "HITL: Inactive";
 "settings.recentApprovals" = "Recent Approvals";
+"settings.pendingApprovals" = "Pending Approvals";
 "settings.approved" = "Approved";
 "settings.denied" = "Denied";
 
@@ -170,7 +171,7 @@
 "onboarding.next" = "Next";
 "onboarding.finish" = "Finish";
 "onboarding.welcome" = "Welcome to AirMCP";
-"onboarding.welcomeDesc" = "AirMCP lets AI assistants like Claude interact with your Mac apps \u2014 Notes, Calendar, Mail, Reminders, and more \u2014 through the Model Context Protocol (MCP).";
+"onboarding.welcomeDesc" = "AirMCP lets AI assistants like Claude interact with your Mac apps - Notes, Calendar, Mail, Reminders, and more - through the Model Context Protocol (MCP).";
 "onboarding.welcomeTime" = "This setup will take about a minute.";
 "onboarding.nodeRequired" = "Node.js Required";
 "onboarding.nodeChecking" = "Checking for Node.js...";
@@ -187,7 +188,7 @@
 "onboarding.enableAll" = "Enable All";
 "onboarding.disableAll" = "Disable All";
 "onboarding.permissions" = "macOS Permissions";
-"onboarding.permissionsDesc" = "AirMCP uses AppleScript to communicate with Mac apps. macOS will ask for permission the first time each app is accessed.";
+"onboarding.permissionsDesc" = "AirMCP asks macOS for app permissions only when a workflow needs them.";
 "onboarding.openSettings" = "Open System Settings";
 "onboarding.connectClient" = "Connect to an AI Client";
 "onboarding.connectClientDesc" = "AirMCP detected the following MCP-compatible clients. Patch their config to add AirMCP automatically.";
@@ -230,7 +231,7 @@
 
 /* Services Menu */
 "services.noText" = "No text selected";
-"services.savedNoteTitle" = "AirMCP \u2014 Saved Text";
+"services.savedNoteTitle" = "AirMCP - Saved Text";
 "services.saveNoteFailed" = "Failed to save note";
 "services.searchQuery" = "Search query set: %@...";
 "services.searchTitle" = "AirMCP Search";

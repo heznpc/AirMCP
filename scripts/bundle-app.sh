@@ -9,15 +9,21 @@ set -euo pipefail
 
 usage() {
   cat <<'USAGE_EOF'
-Usage: scripts/bundle-app.sh [bundle|run|verify|logs|telemetry|debug]
+Usage: scripts/bundle-app.sh [bundle|run|verify|verify-appintents|logs|telemetry|debug|widget-debug|widget-release]
 
 Modes:
   bundle     Build AirMCP.app only (default)
   run        Build AirMCP.app and launch it
   verify     Build, launch, and assert that the bundled app process is alive
+  verify-appintents
+             Require a trusted signing identity, then verify AppIntents registration
   logs       Build, launch, and stream logs for the AirMCP process
   telemetry  Build, launch, and stream logs for the AirMCP subsystem
   debug      Build, launch, and attach LLDB to the running app process
+  widget-debug
+             Build only the widget target in debug mode
+  widget-release
+             Build only the widget target in release mode
 
 Runtime modes skip the widget extension by default for fast app iteration.
 Set AIRMCP_SKIP_WIDGET=0 to force a widget build, or =1 to skip explicitly.
@@ -31,9 +37,12 @@ case "$MODE" in
   bundle|--bundle) MODE="bundle" ;;
   run|--run) MODE="run" ;;
   verify|--verify) MODE="verify" ;;
+  verify-appintents|--verify-appintents) MODE="verify-appintents" ;;
   logs|--logs) MODE="logs" ;;
   telemetry|--telemetry) MODE="telemetry" ;;
   debug|--debug) MODE="debug" ;;
+  widget-debug|--widget-debug) MODE="widget-debug" ;;
+  widget-release|--widget-release) MODE="widget-release" ;;
   -h|--help|help)
     usage
     exit 0
@@ -46,7 +55,7 @@ esac
 
 if [ -z "${AIRMCP_SKIP_WIDGET+x}" ]; then
   case "$MODE" in
-    run|verify|logs|telemetry|debug) AIRMCP_SKIP_WIDGET=1 ;;
+    run|verify|verify-appintents|logs|telemetry|debug) AIRMCP_SKIP_WIDGET=1 ;;
     *) AIRMCP_SKIP_WIDGET=0 ;;
   esac
 fi
@@ -60,6 +69,31 @@ APP_EXECUTABLE="AirMCP"
 APP_BINARY="$BUNDLE_DIR/Contents/MacOS/$APP_EXECUTABLE"
 LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
 SIGN_IDENTITY="${AIRMCP_SIGN_IDENTITY:--}"
+
+if [ "$MODE" = "verify-appintents" ]; then
+  if [ "$SIGN_IDENTITY" = "-" ]; then
+    echo "✗ AIRMCP_SIGN_IDENTITY is required for AppIntents registration verification." >&2
+    if security find-identity -v -p codesigning | grep -E "[0-9]+\\) [A-F0-9]+ " >/dev/null; then
+      echo "  Set it to one of the identities from: security find-identity -v -p codesigning" >&2
+    else
+      echo "  This machine currently has no trusted signing identity configured." >&2
+    fi
+    exit 1
+  fi
+  if ! security find-identity -v -p codesigning | grep -F "$SIGN_IDENTITY" >/dev/null; then
+    echo "✗ signing identity not found: $SIGN_IDENTITY" >&2
+    exit 1
+  fi
+fi
+
+if [ "$MODE" = "widget-debug" ] || [ "$MODE" = "widget-release" ]; then
+  WIDGET_CONFIG="debug"
+  if [ "$MODE" = "widget-release" ]; then
+    WIDGET_CONFIG="release"
+  fi
+  echo "Building AirMCPWidget ($WIDGET_CONFIG)..."
+  exec /usr/bin/time -p sh -c "cd \"$APP_DIR/widget\" && swift build -c \"$WIDGET_CONFIG\""
+fi
 
 echo "Building AirMCPApp..."
 (cd "$APP_DIR" && swift build -c release)
@@ -198,12 +232,16 @@ wait_for_pid() {
   return 1
 }
 
+check_gatekeeper() {
+  /usr/sbin/spctl --assess --type execute -vv "$BUNDLE_DIR" >/dev/null 2>&1
+}
+
 verify_running() {
   local pid
   if ! codesign --verify --deep --strict "$BUNDLE_DIR" 2>/dev/null; then
     echo "⚠ $BUNDLE_DIR did not pass strict code-sign verification" >&2
   fi
-  if ! /usr/sbin/spctl --assess --type execute -vv "$BUNDLE_DIR" >/dev/null 2>&1; then
+  if ! check_gatekeeper; then
     echo "⚠ Gatekeeper rejected this local build." >&2
     echo "  AppIntents/Shortcuts registration may fail with ad-hoc signing." >&2
     echo "  Set AIRMCP_SIGN_IDENTITY to a valid signing identity for full verification." >&2
@@ -230,6 +268,34 @@ verify_running() {
   fi
 }
 
+verify_appintents() {
+  if ! check_gatekeeper; then
+    echo "✗ Gatekeeper rejected $BUNDLE_DIR; AppIntents registration is not trustworthy." >&2
+    exit 1
+  fi
+
+  launch_app
+  wait_for_pid >/dev/null || {
+    echo "✗ $APP_EXECUTABLE did not start from $BUNDLE_DIR" >&2
+    exit 1
+  }
+  sleep 2
+
+  local intent_predicate
+  local intent_logs
+  intent_predicate="process == \"$APP_EXECUTABLE\" AND "
+  intent_predicate="$intent_predicate(eventMessage CONTAINS[c] \"Error registering app with intents\""
+  intent_predicate="$intent_predicate OR eventMessage CONTAINS[c] \"linkd.autoShortcut\")"
+  intent_logs="$(/usr/bin/log show --style compact --last 30s --predicate "$intent_predicate" 2>/dev/null || true)"
+  if echo "$intent_logs" | grep -q "Error registering app with intents"; then
+    echo "✗ AppIntents registration failed in runtime logs." >&2
+    echo "$intent_logs" >&2
+    exit 1
+  fi
+
+  echo "✓ AppIntents registration did not emit runtime errors."
+}
+
 echo ""
 echo "✓ AirMCP.app created at: $BUNDLE_DIR"
 echo "  Run with: open $BUNDLE_DIR"
@@ -244,6 +310,9 @@ case "$MODE" in
     ;;
   verify)
     verify_running
+    ;;
+  verify-appintents)
+    verify_appintents
     ;;
   logs)
     launch_app

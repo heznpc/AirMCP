@@ -16,6 +16,9 @@ describe("AirMCP AppEntity scaffold", () => {
   test("defines workflow-domain entities backed by EntityStringQuery", () => {
     expect(src).toContain("public protocol AirMCPStringBackedEntity: AppEntity");
     expect(src).toContain("public struct AirMCPStringEntityQuery");
+    expect(src).toContain("public struct AirMCPCalendarEventQuery");
+    expect(src).toContain("public struct AirMCPReminderQuery");
+    expect(src).toContain("public struct AirMCPContactQuery");
     expect(src).toContain("EntityStringQuery");
     expect(src).toContain("public struct AirMCPCalendarEventEntity");
     expect(src).toContain("public struct AirMCPReminderEntity");
@@ -49,6 +52,9 @@ func probeAirMCPEntities() async throws {
     let query = AirMCPStringEntityQuery<AirMCPCalendarEventEntity>()
     let events = try await query.entities(for: ["event-1"])
     _ = events.first?.displayRepresentation
+    _ = AirMCPCalendarEventEntity.defaultQuery
+    _ = AirMCPReminderEntity.defaultQuery
+    _ = AirMCPContactEntity.defaultQuery
     _ = AirMCPReminderEntity(id: "reminder-1", title: "Pay invoice", subtitle: "Today")
     _ = AirMCPContactEntity(id: "contact-1", title: "Ren", subtitle: nil)
 }
@@ -64,6 +70,9 @@ func probeAirMCPEntities() async throws {
         "arm64-apple-macos14.0",
         "-sdk",
         sdk.stdout.trim(),
+        "swift/Sources/AirMCPKit/Types.swift",
+        "swift/Sources/AirMCPKit/EventKitService.swift",
+        "swift/Sources/AirMCPKit/ContactsService.swift",
         "swift/Sources/AirMCPKit/AppEntities.swift",
         "-",
       ],

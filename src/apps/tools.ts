@@ -4,6 +4,7 @@ import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { registerAppTool, registerAppResource, RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
 import { runJxa } from "../shared/jxa.js";
+import { wrapUntrustedText, UNTRUSTED_CONTENT_META } from "../shared/untrusted.js";
 import { EXT_APPS } from "../shared/constants.js";
 import { listEventsScript, todayEventsScript } from "../calendar/scripts.js";
 import { nowPlayingScript } from "../music/scripts.js";
@@ -38,8 +39,9 @@ app.onhostcontextchanged=ctx=>{
   if(ctx.styles?.variables)Object.entries(ctx.styles.variables).forEach(([k,v])=>document.documentElement.style.setProperty(k,v));
 };
 app.ontoolresult=r=>{try{
-  const t=r.content?.find(c=>c.type==="text")?.text;
-  if(t)render(JSON.parse(t));
+  let d=r.structuredContent;
+  if(d==null){let t=r.content?.find(c=>c.type==="text")?.text;if(t){if(t.startsWith("[UNTRUSTED")){const a=t.indexOf("\\n"),b=t.lastIndexOf("\\n");if(a>-1&&b>a)t=t.slice(a+1,b);}d=JSON.parse(t);}}
+  if(d)render(d);
 }catch(e){document.getElementById("content").innerHTML='<div class="loading">Error</div>'}};
 function render(d){
   const{weekStart,events}=d,s=new Date(weekStart),days=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],
@@ -93,8 +95,9 @@ app.onhostcontextchanged=ctx=>{
   if(ctx.styles?.variables)Object.entries(ctx.styles.variables).forEach(([k,v])=>document.documentElement.style.setProperty(k,v));
 };
 app.ontoolresult=r=>{try{
-  const t=r.content?.find(c=>c.type==="text")?.text;
-  if(t)render(JSON.parse(t));
+  let d=r.structuredContent;
+  if(d==null){let t=r.content?.find(c=>c.type==="text")?.text;if(t){if(t.startsWith("[UNTRUSTED")){const a=t.indexOf("\\n"),b=t.lastIndexOf("\\n");if(a>-1&&b>a)t=t.slice(a+1,b);}d=JSON.parse(t);}}
+  if(d)render(d);
 }catch(e){document.getElementById("content").innerHTML='<div class="loading">Error</div>'}};
 function esc(s){const d=document.createElement("div");d.textContent=s||"";return d.innerHTML}
 function hhmm(iso){const d=new Date(iso);return d.getHours()*60+d.getMinutes()}
@@ -163,8 +166,9 @@ app.onhostcontextchanged=ctx=>{
   if(ctx.styles?.variables)Object.entries(ctx.styles.variables).forEach(([k,v])=>document.documentElement.style.setProperty(k,v));
 };
 app.ontoolresult=r=>{try{
-  const t=r.content?.find(c=>c.type==="text")?.text;
-  if(t)render(JSON.parse(t));
+  let d=r.structuredContent;
+  if(d==null){let t=r.content?.find(c=>c.type==="text")?.text;if(t){if(t.startsWith("[UNTRUSTED")){const a=t.indexOf("\\n"),b=t.lastIndexOf("\\n");if(a>-1&&b>a)t=t.slice(a+1,b);}d=JSON.parse(t);}}
+  if(d)render(d);
 }catch(e){}};
 function fmt(s){const m=Math.floor(s/60),sec=Math.floor(s%60);return m+":"+String(sec).padStart(2,"0")}
 function render(d){
@@ -225,13 +229,14 @@ export function registerApps(server: McpServer, opts: { calendar: boolean; music
         const endStr = weekEnd.toISOString().slice(0, 10);
         const raw = await runJxa(listEventsScript(weekStart, endStr, 50, 0));
         const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+        // Calendar event titles/locations/notes are attacker-controllable via
+        // external invites — fence the text the model sees. The widget renders
+        // from structuredContent (raw object), so the fence never reaches it.
+        const payload = { weekStart, events: parsed.events ?? [] };
         return {
-          content: [
-            {
-              type: "text" as const,
-              text: JSON.stringify({ weekStart, events: parsed.events ?? [] }),
-            },
-          ],
+          content: [{ type: "text" as const, text: wrapUntrustedText(JSON.stringify(payload)) }],
+          structuredContent: payload,
+          _meta: UNTRUSTED_CONTENT_META,
         };
       },
     );
@@ -268,13 +273,22 @@ export function registerApps(server: McpServer, opts: { calendar: boolean; music
       },
       async () => {
         const data = await runJxa(nowPlayingScript());
+        // Track/artist metadata can carry injected text — fence the model-facing
+        // copy; the widget reads the raw object from structuredContent.
+        let payload: Record<string, unknown>;
+        if (typeof data === "string") {
+          try {
+            payload = JSON.parse(data) as Record<string, unknown>;
+          } catch {
+            payload = { nowPlaying: data };
+          }
+        } else {
+          payload = (data ?? {}) as Record<string, unknown>;
+        }
         return {
-          content: [
-            {
-              type: "text" as const,
-              text: typeof data === "string" ? data : JSON.stringify(data),
-            },
-          ],
+          content: [{ type: "text" as const, text: wrapUntrustedText(JSON.stringify(payload)) }],
+          structuredContent: payload,
+          _meta: UNTRUSTED_CONTENT_META,
         };
       },
     );
@@ -336,17 +350,18 @@ export function registerApps(server: McpServer, opts: { calendar: boolean; music
               : (remindersRaw.value as { reminders?: unknown[] })
             : { reminders: [] };
         const today = new Date().toISOString().slice(0, 10);
+        // Event + reminder text is attacker-controllable (shared calendars /
+        // reminder lists) — fence the model-facing copy; the widget renders
+        // from structuredContent (raw object).
+        const payload = {
+          date: today,
+          events: eventsParsed.events ?? [],
+          reminders: remindersParsed.reminders ?? [],
+        };
         return {
-          content: [
-            {
-              type: "text" as const,
-              text: JSON.stringify({
-                date: today,
-                events: eventsParsed.events ?? [],
-                reminders: remindersParsed.reminders ?? [],
-              }),
-            },
-          ],
+          content: [{ type: "text" as const, text: wrapUntrustedText(JSON.stringify(payload)) }],
+          structuredContent: payload,
+          _meta: UNTRUSTED_CONTENT_META,
         };
       },
     );

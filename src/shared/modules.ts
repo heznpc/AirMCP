@@ -42,21 +42,16 @@ export const MODULE_MANIFEST: ReadonlyArray<ModuleManifestEntry> = [
   {
     name: "safari",
     compatibility: {
-      // Safari module remains stable, but the `add_bookmark` tool
-      // is deprecated on macOS 26+: Apple removed the `make new
-      // bookmark` JXA scripting verb (still works on ≤25). The tool
-      // itself runtime-gates so a degraded surface only shows up on
-      // 26+; the manifest entry surfaces that to discover_tools and
-      // RFC 0004's compatibility report.
+      // Safari module is STABLE on every host. Only the single `add_bookmark`
+      // TOOL broke on macOS 26 (Apple removed the `make new bookmark` JXA
+      // verb) — and that tool gates ITSELF off at the tool level
+      // (src/safari/tools.ts: registered only on macOS <26, returns
+      // errDeprecated and steers to add_to_reading_list). A module-level
+      // `brokenOn:[26]` here would skip the ENTIRE module on macOS 26,
+      // dropping all 11 working Safari tools (tabs / reading-list / page
+      // content / …), so it is deliberately NOT set — the breakage is
+      // tool-scoped, not module-scoped.
       status: "stable",
-      brokenOn: [26],
-      deprecation: {
-        since: "2.10.0",
-        removeAt: "3.0.0",
-        replacement: "add_to_reading_list",
-        reason:
-          "Safari removed bookmark scripting verbs in macOS 26 (rdar://undocumented). Reading List remains scriptable.",
-      },
     },
   },
   { name: "system" },

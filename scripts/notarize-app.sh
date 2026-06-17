@@ -64,27 +64,50 @@ fi
 # (notarization rejects un-timestamped signatures).
 echo "notarize-app: codesigning with $APPLE_DEVELOPER_ID …"
 
-# Strip ad-hoc signatures first so codesign --force doesn't trip on
-# signature format mismatch between the widget extension (ad-hoc) and
-# the replacement Developer ID.
+# Each embedded .appex carries its own entitlements (e.g. an app-group so the
+# widget can read the host app's shared container). `codesign --remove-signature`
+# drops the entitlements together with the signature, and re-signing WITHOUT
+# `--entitlements` silently ships a widget with none — `codesign --verify` still
+# passes, so the loss is invisible until the widget fails at runtime. So:
+# EXTRACT each appex's entitlements before stripping, then RE-APPLY them on the
+# Developer ID re-sign. (The plists persist on disk across the two find|while
+# subshells, keyed by a hash of the appex path.)
+ENT_DIR="$(mktemp -d)"
+trap 'rm -rf "$ENT_DIR"' EXIT
 find "$APP_BUNDLE" -name "*.appex" -print0 | while IFS= read -r -d '' appex; do
+  ent_file="$ENT_DIR/$(printf '%s' "$appex" | shasum -a 256 | cut -d' ' -f1).plist"
+  if codesign -d --entitlements - --xml "$appex" > "$ent_file" 2>/dev/null && plutil -lint "$ent_file" >/dev/null 2>&1; then
+    echo "  preserved entitlements: $appex"
+  else
+    rm -f "$ent_file" # no (valid) entitlements present — re-sign without
+  fi
   codesign --remove-signature "$appex" 2>/dev/null || true
 done
 codesign --remove-signature "$APP_BUNDLE" 2>/dev/null || true
 
-# Sign embedded extensions first (innermost-out). Each appex needs the
-# matching entitlements — the bundle script wrote them with ad-hoc sig,
-# so we re-extract from the existing sig when available.
+# Sign embedded extensions first (innermost-out), re-applying the entitlements
+# preserved above so the widget keeps its app-group / capabilities.
 find "$APP_BUNDLE" -name "*.appex" -print0 | while IFS= read -r -d '' appex; do
   echo "  signing $appex"
-  codesign --force --options=runtime --timestamp \
-    --sign "$APPLE_DEVELOPER_ID" \
-    "$appex"
+  ent_file="$ENT_DIR/$(printf '%s' "$appex" | shasum -a 256 | cut -d' ' -f1).plist"
+  if [ -f "$ent_file" ]; then
+    codesign --force --options=runtime --timestamp \
+      --entitlements "$ent_file" \
+      --sign "$APPLE_DEVELOPER_ID" \
+      "$appex"
+  else
+    codesign --force --options=runtime --timestamp \
+      --sign "$APPLE_DEVELOPER_ID" \
+      "$appex"
+  fi
 done
 
-# Finally sign the outer bundle. --deep catches anything the explicit
-# extension loop missed.
-codesign --force --deep --options=runtime --timestamp \
+# Finally sign the outer bundle WITHOUT --deep. The appex(es) were already
+# signed (with their entitlements) inside-out above, and `--deep` would RE-SIGN
+# them WITHOUT entitlements, silently undoing that preservation. The
+# `codesign --verify --deep --strict` below still validates the whole tree, so
+# any nested code that genuinely went unsigned is caught loudly, not shipped.
+codesign --force --options=runtime --timestamp \
   --sign "$APPLE_DEVELOPER_ID" \
   "$APP_BUNDLE"
 

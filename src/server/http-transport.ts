@@ -668,6 +668,11 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
     httpServer.once("error", reject);
     httpServer.once("listening", async () => {
       httpServer.off("error", reject);
+      // Keep a permanent error handler after the socket is bound. Without it a
+      // post-listen server "error" (accept failure under fd exhaustion, late
+      // EADDR change, etc.) has no listener, so Node throws it as an uncaught
+      // exception and the whole MCP server crashes. Log and keep serving.
+      httpServer.on("error", (err) => log.error("http server error (post-listen)", { err: errToCtx(err) }));
       try {
         const address = httpServer.address();
         bi.transport = "http";

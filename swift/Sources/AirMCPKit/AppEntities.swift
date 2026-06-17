@@ -13,8 +13,10 @@ public protocol AirMCPStringBackedEntity: AppEntity, Codable, Hashable, Sendable
     var id: String { get }
     var title: String { get }
     var subtitle: String? { get }
+    var isSynthetic: Bool { get }
 
     init(id: String, title: String, subtitle: String?)
+    init(id: String, title: String, subtitle: String?, isSynthetic: Bool)
 }
 
 public extension AirMCPStringBackedEntity {
@@ -48,8 +50,33 @@ public struct AirMCPStringEntityQuery<Entity: AirMCPStringBackedEntity>: EntityS
     public static func syntheticEntity(id: String) -> Entity {
         let trimmed = id.trimmingCharacters(in: .whitespacesAndNewlines)
         let stableId = trimmed.isEmpty ? "unknown" : trimmed
-        return Entity(id: stableId, title: stableId, subtitle: syntheticSubtitle)
+        return Entity(id: stableId, title: stableId, subtitle: syntheticSubtitle, isSynthetic: true)
     }
+}
+
+public enum AirMCPAppEntityResolutionError: LocalizedError, Sendable {
+    case unresolvedEntity(type: String, id: String, tool: String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .unresolvedEntity(let type, let id, let tool):
+            return "\(tool) requires a resolved \(type), but \(id) was not found."
+        }
+    }
+}
+
+public func requireResolvedAirMCPEntityId<Entity: AirMCPStringBackedEntity>(
+    _ entity: Entity,
+    tool: String
+) throws -> String {
+    guard !entity.isSynthetic else {
+        throw AirMCPAppEntityResolutionError.unresolvedEntity(
+            type: String(describing: Entity.self),
+            id: entity.id,
+            tool: tool
+        )
+    }
+    return entity.id
 }
 
 public struct AirMCPCalendarEventEntity: AirMCPStringBackedEntity {
@@ -59,11 +86,17 @@ public struct AirMCPCalendarEventEntity: AirMCPStringBackedEntity {
     public let id: String
     public let title: String
     public let subtitle: String?
+    public let isSynthetic: Bool
 
     public init(id: String, title: String, subtitle: String? = nil) {
+        self.init(id: id, title: title, subtitle: subtitle, isSynthetic: false)
+    }
+
+    public init(id: String, title: String, subtitle: String? = nil, isSynthetic: Bool) {
         self.id = id
         self.title = title
         self.subtitle = subtitle
+        self.isSynthetic = isSynthetic
     }
 }
 
@@ -74,11 +107,17 @@ public struct AirMCPReminderEntity: AirMCPStringBackedEntity {
     public let id: String
     public let title: String
     public let subtitle: String?
+    public let isSynthetic: Bool
 
     public init(id: String, title: String, subtitle: String? = nil) {
+        self.init(id: id, title: title, subtitle: subtitle, isSynthetic: false)
+    }
+
+    public init(id: String, title: String, subtitle: String? = nil, isSynthetic: Bool) {
         self.id = id
         self.title = title
         self.subtitle = subtitle
+        self.isSynthetic = isSynthetic
     }
 }
 
@@ -89,11 +128,17 @@ public struct AirMCPContactEntity: AirMCPStringBackedEntity {
     public let id: String
     public let title: String
     public let subtitle: String?
+    public let isSynthetic: Bool
 
     public init(id: String, title: String, subtitle: String? = nil) {
+        self.init(id: id, title: title, subtitle: subtitle, isSynthetic: false)
+    }
+
+    public init(id: String, title: String, subtitle: String? = nil, isSynthetic: Bool) {
         self.id = id
         self.title = title
         self.subtitle = subtitle
+        self.isSynthetic = isSynthetic
     }
 }
 

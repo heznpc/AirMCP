@@ -1,22 +1,22 @@
-import { describe, test, expect, jest, beforeEach, afterEach } from '@jest/globals';
-import { readFileSync } from 'node:fs';
+import { describe, test, expect, jest, beforeEach, afterEach } from "@jest/globals";
+import { readFileSync } from "node:fs";
 
 const mockBuildSnapshot = jest.fn();
-jest.unstable_mockModule('../dist/shared/resources.js', () => ({
+jest.unstable_mockModule("../dist/shared/resources.js", () => ({
   buildSnapshot: mockBuildSnapshot,
 }));
 
-const { WORKFLOWS, runWorkflows } = await import('../dist/cli/workflows.js');
-const { MODULE_NAMES, STARTER_MODULES } = await import('../dist/shared/config.js');
+const { WORKFLOWS, runWorkflows } = await import("../dist/cli/workflows.js");
+const { MODULE_NAMES, STARTER_MODULES } = await import("../dist/shared/config.js");
 
-describe('cli workflows command', () => {
+describe("cli workflows command", () => {
   let logSpy;
   let errSpy;
 
   beforeEach(() => {
     mockBuildSnapshot.mockReset();
-    logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-    errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
+    errSpy = jest.spyOn(console, "error").mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -25,35 +25,35 @@ describe('cli workflows command', () => {
     process.exitCode = undefined;
   });
 
-  test('prints curated workflow names and prompts', async () => {
+  test("prints curated workflow names and prompts", async () => {
     await runWorkflows([]);
 
-    const output = logSpy.mock.calls.map((call) => call.join(' ')).join('\n');
-    expect(output).toContain('AirMCP Workflows');
-    expect(output).toContain('Daily Briefing');
-    expect(output).toContain('Inbox Triage');
-    expect(output).toContain('Project Digest');
-    expect(output).toContain('triage my inbox');
+    const output = logSpy.mock.calls.map((call) => call.join(" ")).join("\n");
+    expect(output).toContain("AirMCP Workflows");
+    expect(output).toContain("Daily Briefing");
+    expect(output).toContain("Inbox Triage");
+    expect(output).toContain("Project Digest");
+    expect(output).toContain("triage my inbox");
   });
 
-  test('emits machine-readable JSON catalog', async () => {
-    await runWorkflows(['--json']);
+  test("emits machine-readable JSON catalog", async () => {
+    await runWorkflows(["--json"]);
 
     expect(logSpy).toHaveBeenCalledTimes(1);
     const parsed = JSON.parse(logSpy.mock.calls[0][0]);
     expect(parsed.workflows).toHaveLength(WORKFLOWS.length);
     expect(parsed.workflows.map((w) => w.id)).toEqual([
-      'daily-briefing',
-      'inbox-triage',
-      'meeting-prep',
-      'project-digest',
-      'focus-blocks',
-      'research-output',
+      "daily-briefing",
+      "inbox-triage",
+      "meeting-prep",
+      "project-digest",
+      "focus-blocks",
+      "research-output",
     ]);
   });
 
-  test('prints one copyable workflow prompt', async () => {
-    await runWorkflows(['daily-briefing', '--prompt']);
+  test("prints one copyable workflow prompt", async () => {
+    await runWorkflows(["daily-briefing", "--prompt"]);
 
     expect(logSpy).toHaveBeenCalledTimes(1);
     expect(logSpy.mock.calls[0][0]).toBe(
@@ -61,55 +61,63 @@ describe('cli workflows command', () => {
     );
   });
 
-  test('emits machine-readable JSON for one workflow', async () => {
-    await runWorkflows(['project-digest', '--json']);
+  test("emits machine-readable JSON for one workflow", async () => {
+    await runWorkflows(["project-digest", "--json"]);
 
     expect(logSpy).toHaveBeenCalledTimes(1);
     const parsed = JSON.parse(logSpy.mock.calls[0][0]);
     expect(parsed.workflow).toMatchObject({
-      id: 'project-digest',
-      title: 'Project Digest',
-      requiredModules: ['memory', 'notes', 'calendar', 'reminders', 'mail', 'finder'],
-      implementation: 'built-in-skill',
+      id: "project-digest",
+      title: "Project Digest",
+      requiredModules: ["memory", "notes", "calendar", "reminders", "mail", "finder"],
+      implementation: "built-in-skill",
     });
   });
 
-  test('prints one workflow module list', async () => {
-    await runWorkflows(['meeting-prep', '--modules']);
+  test("prints one workflow module list", async () => {
+    await runWorkflows(["meeting-prep", "--modules"]);
 
     expect(logSpy).toHaveBeenCalledTimes(1);
-    expect(logSpy.mock.calls[0][0]).toBe('calendar, notes, contacts, finder, reminders');
+    expect(logSpy.mock.calls[0][0]).toBe("calendar, notes, contacts, finder, reminders");
   });
 
-  test('runs a real read-only daily briefing preview path', async () => {
+  test("runs a real read-only daily briefing preview path", async () => {
     mockBuildSnapshot.mockResolvedValue('{"timestamp":"2026-06-17T00:00:00.000Z","depth":"brief","calendar":{}}');
 
-    await runWorkflows(['daily-briefing', '--preview']);
+    await runWorkflows(["daily-briefing", "--preview"]);
 
     expect(mockBuildSnapshot).toHaveBeenCalledTimes(1);
     const enabled = mockBuildSnapshot.mock.calls[0][0];
-    expect(enabled('calendar')).toBe(true);
-    expect(enabled('reminders')).toBe(true);
-    expect(enabled('mail')).toBe(true);
-    expect(enabled('notes')).toBe(true);
-    expect(enabled('weather')).toBe(false);
+    expect(enabled("calendar")).toBe(true);
+    expect(enabled("reminders")).toBe(true);
+    expect(enabled("mail")).toBe(true);
+    expect(enabled("notes")).toBe(true);
+    expect(enabled("weather")).toBe(false);
 
-    const output = logSpy.mock.calls.map((call) => call.join(' ')).join('\n');
-    expect(output).toContain('AirMCP read-only preview: Daily Briefing');
-    expect(output).toContain('Writes: none');
+    const output = logSpy.mock.calls.map((call) => call.join(" ")).join("\n");
+    expect(output).toContain("AirMCP read-only preview: Daily Briefing");
+    expect(output).toContain("Writes: none");
     expect(output).toContain('"depth":"brief"');
   });
 
-  test('unknown flags fail instead of falling through to the catalog', async () => {
-    await runWorkflows(['daily-briefing', '--promt']);
+  test("unknown flags fail instead of falling through to the catalog", async () => {
+    await runWorkflows(["daily-briefing", "--promt"]);
 
     expect(process.exitCode).toBe(1);
-    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('Unknown option'));
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining("Unknown option"));
     expect(logSpy).not.toHaveBeenCalled();
   });
 
-  test('references only tools that exist in the generated manifest', () => {
-    const manifest = JSON.parse(readFileSync(new URL('../docs/tool-manifest.json', import.meta.url), 'utf8'));
+  test("short help flag is accepted", async () => {
+    await runWorkflows(["-h"]);
+
+    expect(process.exitCode).toBeUndefined();
+    expect(errSpy).not.toHaveBeenCalled();
+    expect(logSpy).toHaveBeenCalled();
+  });
+
+  test("references only tools that exist in the generated manifest", () => {
+    const manifest = JSON.parse(readFileSync(new URL("../docs/tool-manifest.json", import.meta.url), "utf8"));
     const toolNames = new Set(manifest.tools.map((tool) => tool.name));
 
     for (const workflow of WORKFLOWS) {
@@ -119,7 +127,7 @@ describe('cli workflows command', () => {
     }
   });
 
-  test('references only modules that exist in config', () => {
+  test("references only modules that exist in config", () => {
     const moduleNames = new Set(MODULE_NAMES);
 
     for (const workflow of WORKFLOWS) {
@@ -130,8 +138,8 @@ describe('cli workflows command', () => {
     }
   });
 
-  test('keeps the workflow guide in sync with the CLI catalog', () => {
-    const guide = readFileSync(new URL('../docs/workflows.md', import.meta.url), 'utf8');
+  test("keeps the workflow guide in sync with the CLI catalog", () => {
+    const guide = readFileSync(new URL("../docs/workflows.md", import.meta.url), "utf8");
 
     for (const workflow of WORKFLOWS) {
       expect(guide).toContain(workflow.title);
@@ -142,22 +150,22 @@ describe('cli workflows command', () => {
       }
     }
 
-    expect(guide).toContain('AIRMCP_ENABLE_FOUNDATION_MODELS');
+    expect(guide).toContain("AIRMCP_ENABLE_FOUNDATION_MODELS");
   });
 
-  test('documents the actual starter module preset', () => {
-    const mcpb = readFileSync(new URL('../docs/mcpb.md', import.meta.url), 'utf8');
+  test("documents the actual starter module preset", () => {
+    const mcpb = readFileSync(new URL("../docs/mcpb.md", import.meta.url), "utf8");
 
     for (const moduleName of STARTER_MODULES) {
       expect(mcpb).toContain(moduleName);
     }
-    expect(mcpb).not.toContain('contacts, mail, finder, system');
+    expect(mcpb).not.toContain("contacts, mail, finder, system");
   });
 
-  test('keeps onboarding workflow cards aligned with the CLI catalog', () => {
+  test("keeps onboarding workflow cards aligned with the CLI catalog", () => {
     const onboarding = readFileSync(
-      new URL('../app/Sources/AirMCPApp/Views/OnboardingView.swift', import.meta.url),
-      'utf8',
+      new URL("../app/Sources/AirMCPApp/Views/OnboardingView.swift", import.meta.url),
+      "utf8",
     );
 
     for (const workflow of WORKFLOWS) {
@@ -170,10 +178,10 @@ describe('cli workflows command', () => {
     }
   });
 
-  test('onboarding exposes Codex CLI setup', () => {
+  test("onboarding exposes Codex CLI setup", () => {
     const onboarding = readFileSync(
-      new URL('../app/Sources/AirMCPApp/Views/OnboardingView.swift', import.meta.url),
-      'utf8',
+      new URL("../app/Sources/AirMCPApp/Views/OnboardingView.swift", import.meta.url),
+      "utf8",
     );
 
     expect(onboarding).toContain('id: "codex"');
@@ -181,14 +189,14 @@ describe('cli workflows command', () => {
     expect(onboarding).toContain('"mcp", "add", "airmcp", "--", "npx", "-y"');
   });
 
-  test('onboarding final step can copy the selected workflow prompt', () => {
+  test("onboarding final step can copy the selected workflow prompt", () => {
     const onboarding = readFileSync(
-      new URL('../app/Sources/AirMCPApp/Views/OnboardingView.swift', import.meta.url),
-      'utf8',
+      new URL("../app/Sources/AirMCPApp/Views/OnboardingView.swift", import.meta.url),
+      "utf8",
     );
 
-    expect(onboarding).toContain('selectedWorkflowActions');
-    expect(onboarding).toContain('AirMcpConstants.copyToClipboard(selectedWorkflow.prompt)');
+    expect(onboarding).toContain("selectedWorkflowActions");
+    expect(onboarding).toContain("AirMcpConstants.copyToClipboard(selectedWorkflow.prompt)");
     expect(onboarding).toContain('AirMcpConstants.copyToClipboard("Hey Siri, \\(siriPhrase)")');
   });
 });

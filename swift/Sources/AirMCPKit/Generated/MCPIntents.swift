@@ -1304,9 +1304,13 @@ public struct AddContactEmailIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["id"] = try requireResolvedAirMCPEntityId(id, tool: "add_contact_email")
+        args["email"] = email
+        args["label"] = label
         let result = try await MCPIntentRouter.shared.call(
             tool: "add_contact_email",
-            args: ["id": id.id, "email": email, "label": label]
+            args: args
         )
         return .result(value: result)
     }
@@ -1331,9 +1335,13 @@ public struct AddContactPhoneIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["id"] = try requireResolvedAirMCPEntityId(id, tool: "add_contact_phone")
+        args["phone"] = phone
+        args["label"] = label
         let result = try await MCPIntentRouter.shared.call(
             tool: "add_contact_phone",
-            args: ["id": id.id, "phone": phone, "label": label]
+            args: args
         )
         return .result(value: result)
     }
@@ -1777,9 +1785,12 @@ public struct CompleteReminderIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["id"] = try requireResolvedAirMCPEntityId(id, tool: "complete_reminder")
+        args["completed"] = completed
         let result = try await MCPIntentRouter.shared.call(
             tool: "complete_reminder",
-            args: ["id": id.id, "completed": completed]
+            args: args
         )
         return .result(value: result)
     }

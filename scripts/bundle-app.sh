@@ -205,35 +205,9 @@ fi
 /usr/libexec/PlistBuddy -c "Delete :NSMicrophoneUsageDescription" "$PLIST" 2>/dev/null || true
 /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string AirMCP uses the microphone for speech recognition." "$PLIST"
 
-require_plist_value() {
-  local key="$1"
-  local expected="$2"
-  local actual
-  actual="$(/usr/libexec/PlistBuddy -c "Print $key" "$PLIST" 2>/dev/null || true)"
-  if [ "$actual" != "$expected" ]; then
-    echo "✗ $PLIST has $key=$actual, expected $expected" >&2
-    exit 1
-  fi
-}
-
-verify_bundle_structure() {
-  if [ ! -x "$APP_BINARY" ]; then
-    echo "✗ app executable missing or not executable: $APP_BINARY" >&2
-    exit 1
-  fi
-  /usr/bin/plutil -lint "$PLIST" >/dev/null
-  require_plist_value ":CFBundleIdentifier" "$BUNDLE_ID"
-  require_plist_value ":CFBundleExecutable" "$APP_EXECUTABLE"
-  require_plist_value ":CFBundlePackageType" "APPL"
-  if ! codesign --verify --deep --strict "$BUNDLE_DIR" 2>/dev/null; then
-    echo "✗ $BUNDLE_DIR did not pass strict code-sign verification" >&2
-    exit 1
-  fi
-}
-
 # Sign the main app after embedding extensions.
 codesign --force --sign "$SIGN_IDENTITY" "$BUNDLE_DIR"
-verify_bundle_structure
+"$SCRIPT_DIR/verify-bundle-structure.sh" "$BUNDLE_DIR" "$BUNDLE_ID" "$APP_EXECUTABLE"
 if [ -x "$LSREGISTER" ]; then
   "$LSREGISTER" -f "$BUNDLE_DIR" 2>/dev/null || true
 fi

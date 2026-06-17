@@ -181,11 +181,11 @@ public final class SearchContactsTool: Tool {
     }
 }
 
-/// Create reminder tool.
+/// Disabled write stub for reminder creation.
 @available(macOS 26, iOS 26, *)
 public final class CreateReminderTool: Tool {
     public let name = "create_reminder"
-    public let description = "Create a new reminder with a title and optional due date."
+    public let description = "Reminder creation is disabled in Foundation Models until the call can route through AirMCP governance."
 
     public struct Arguments: Generable {
         public static var generationSchema: GenerationSchema {
@@ -232,11 +232,11 @@ public final class CreateReminderTool: Tool {
     }
 }
 
-/// Create note tool.
+/// Disabled write stub for note creation.
 @available(macOS 26, iOS 26, *)
 public final class CreateNoteTool: Tool {
     public let name = "create_note"
-    public let description = "Create a new Apple Note. Returns the requested content for confirmation — actual creation requires the MCP bridge."
+    public let description = "Note creation is disabled in Foundation Models until the call can route through AirMCP governance."
 
     public struct Arguments: Generable {
         public static var generationSchema: GenerationSchema {

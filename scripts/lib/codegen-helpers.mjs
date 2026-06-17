@@ -181,9 +181,14 @@ export function enumDefaultLiteral(value, enumValues) {
 // Render `varName` as the Swift expression the wire accepts for this
 // param's type. Date -> ISO 8601 string. AppEnum -> `.rawValue`.
 // AppEntity wrappers carry AirMCP's existing string id over the wire.
+// Write-capable intents can require the entity to have resolved through
+// EntityQuery instead of accepting a synthetic free-text fallback.
 // Everything else -> identity.
-export function wireExpr(type, varName, isEnum, isEntity = false) {
+export function wireExpr(type, varName, isEnum, isEntity = false, opts = {}) {
   if (isEnum) return `${varName}.rawValue`;
+  if (isEntity && opts.requireResolvedEntity) {
+    return `try requireResolvedAirMCPEntityId(${varName}, tool: "${swiftLit(opts.toolName ?? "unknown")}")`;
+  }
   if (isEntity) return `${varName}.id`;
   return type === "Date" ? `ISO8601DateFormatter().string(from: ${varName})` : varName;
 }
@@ -422,13 +427,7 @@ export const MAX_TITLE_LEN = 80;
 // type and skips the redundant "Allowed: a, b, c" description tail.
 // `valueTypeOverride` is for AppEntity-backed parameters whose wire
 // contract remains a string id.
-export function swiftParamDecl(
-  propName,
-  propSchema,
-  isRequired,
-  enumTypeOverride,
-  valueTypeOverride,
-) {
+export function swiftParamDecl(propName, propSchema, isRequired, enumTypeOverride, valueTypeOverride) {
   const baseType = enumTypeOverride ?? valueTypeOverride ?? swiftTypeFor(propSchema);
   if (baseType === null) return null;
 
@@ -476,21 +475,21 @@ export function buildArgsBlock(decls) {
     return { prelude: "", argsExpr: "[String: any Sendable]()" };
   }
 
-  const allRequired = decls.every((d) => !d.optional);
+  const requiresPrelude = decls.some((d) => d.optional || d.requireResolvedEntity);
+  const allRequired = !requiresPrelude;
   if (allRequired) {
-    const pairs = decls
-      .map((d) => `"${d.wireName}": ${wireExpr(d.type, d.name, d.isEnum, d.isEntity)}`)
-      .join(", ");
+    const pairs = decls.map((d) => `"${d.wireName}": ${wireExpr(d.type, d.name, d.isEnum, d.isEntity)}`).join(", ");
     return { prelude: "", argsExpr: `[${pairs}]` };
   }
 
   const lines = [`var args: [String: any Sendable] = [:]`];
   for (const d of decls) {
+    const opts = { requireResolvedEntity: d.requireResolvedEntity, toolName: d.toolName };
     if (!d.optional) {
-      lines.push(`args["${d.wireName}"] = ${wireExpr(d.type, d.name, d.isEnum, d.isEntity)}`);
+      lines.push(`args["${d.wireName}"] = ${wireExpr(d.type, d.name, d.isEnum, d.isEntity, opts)}`);
     } else {
       lines.push(
-        `if let v = ${d.name} { args["${d.wireName}"] = ${wireExpr(d.type, "v", d.isEnum, d.isEntity)} }`,
+        `if let v = ${d.name} { args["${d.wireName}"] = ${wireExpr(d.type, "v", d.isEnum, d.isEntity, opts)} }`,
       );
     }
   }
@@ -537,9 +536,7 @@ export function collectEnums(tools) {
 export function renderAppEnum(entry) {
   const { typeName, values, title } = entry;
   const caseList = values.map(enumCaseName).join(", ");
-  const caseMap = values
-    .map((v) => `        .${enumCaseName(v)}: "${enumCaseDisplayLabel(v)}"`)
-    .join(",\n");
+  const caseMap = values.map((v) => `        .${enumCaseName(v)}: "${enumCaseDisplayLabel(v)}"`).join(",\n");
   return `@available(iOS 16, macOS 13, *)
 public enum ${typeName}: String, AppEnum {
     case ${caseList}
@@ -584,9 +581,7 @@ export function resolveFollowUpMap(config, byName) {
 
     const info = detectSnippetShape(listTool.outputSchema ?? {});
     if (info.shape !== "list-object") {
-      throw new Error(
-        `FOLLOW_UP_MAP: ${listName} is not a list-object shape (got ${info.shape})`,
-      );
+      throw new Error(`FOLLOW_UP_MAP: ${listName} is not a list-object shape (got ${info.shape})`);
     }
 
     const itemProps = listTool.outputSchema?.properties?.[info.arrayField]?.items?.properties ?? {};
@@ -654,7 +649,11 @@ export function deriveFollowUpFactorySpecs(resolvedMap) {
 export function buildConfirmDialogBody(tool) {
   const titleSrc = (tool.title ?? tool.name ?? "").trim();
   const descSrc = (tool.description ?? "").trim();
-  const sanitize = (s) => s.replace(/[\r\n\\"]/g, " ").replace(/\s+/g, " ").trim();
+  const sanitize = (s) =>
+    s
+      .replace(/[\r\n\\"]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
   const safeTitle = sanitize(titleSrc);
   const safeDesc = sanitize(descSrc);
   const head = safeTitle ? `${safeTitle} with AirMCP?` : "Run this AirMCP action?";

@@ -32,6 +32,7 @@ const KNOWN_FLAGS = new Set([
   "--safety",
   "--preview",
   "--help",
+  "-h",
 ]);
 
 function hasFlag(args: string[], flag: string): boolean {

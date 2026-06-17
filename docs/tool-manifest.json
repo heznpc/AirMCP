@@ -601,6 +601,39 @@
               ],
               "additionalProperties": false
             }
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "verifiedFirstBreak": {
+            "type": "object",
+            "properties": {
+              "file": {
+                "type": "string"
+              },
+              "lineIndex": {
+                "type": "number"
+              },
+              "reason": {
+                "type": "string",
+                "enum": [
+                  "hmac_mismatch",
+                  "prev_mismatch",
+                  "malformed",
+                  "truncated",
+                  "checkpoint_forged"
+                ]
+              }
+            },
+            "required": [
+              "file",
+              "lineIndex",
+              "reason"
+            ],
+            "additionalProperties": false
+          },
+          "auditDisabled": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -609,7 +642,9 @@
           "errors",
           "errorRate",
           "scannedFiles",
-          "topTools"
+          "topTools",
+          "verified",
+          "auditDisabled"
         ],
         "additionalProperties": false
       },

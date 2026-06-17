@@ -107,7 +107,7 @@ export function registerAuditTools(server: McpServer, _config: AirMcpConfig): vo
           .object({
             file: z.string(),
             lineIndex: z.number(),
-            reason: z.enum(["hmac_mismatch", "prev_mismatch", "malformed"]),
+            reason: z.enum(["hmac_mismatch", "prev_mismatch", "malformed", "truncated", "checkpoint_forged"]),
           })
           .optional(),
         // Audit logging currently halted (disk full / permission / repeated

@@ -50,6 +50,11 @@ public struct MCPAuditSummaryOutput: Codable, Sendable {
         public let count: Double
         public let errors: Double
     }
+    public struct Verifiedfirstbreak: Codable, Sendable {
+        public let file: String
+        public let lineIndex: Double
+        public let reason: String
+    }
 
     public let since: String
     public let total: Double
@@ -57,6 +62,9 @@ public struct MCPAuditSummaryOutput: Codable, Sendable {
     public let errorRate: Double
     public let scannedFiles: Double
     public let topTools: [ToptoolsItem]
+    public let verified: Bool
+    public let verifiedFirstBreak: Verifiedfirstbreak?
+    public let auditDisabled: Bool
 }
 
 // Output type for: discover_tools

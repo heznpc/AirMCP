@@ -107,3 +107,21 @@ describe('resolveModuleCompatibility — healthkit boundary cases (env-driven)',
     expect(decision.reason).toMatch(/healthkit/i);
   });
 });
+
+describe('safari module — breakage is tool-scoped, not module-scoped', () => {
+  test('safari registers on macOS 26 (a module-level brokenOn would drop all 11 working tools)', async () => {
+    const { MODULE_MANIFEST } = await import('../dist/shared/modules.js');
+    const safari = MODULE_MANIFEST.find((m) => m.name === 'safari');
+    expect(safari).toBeDefined();
+    // Only the add_bookmark TOOL broke on macOS 26 (gated in src/safari/tools.ts);
+    // the module must NOT carry a brokenOn:[26], which would skip-broken the
+    // entire Safari surface (tabs / reading-list / page content / …).
+    expect(safari.compatibility?.brokenOn ?? []).not.toContain(26);
+    const decision = resolveModuleCompatibility('safari', safari.compatibility, {
+      osVersion: 26,
+      cpu: 'arm64',
+      healthkitAvailable: true,
+    });
+    expect(decision.decision).toBe('register');
+  });
+});

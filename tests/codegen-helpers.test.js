@@ -270,15 +270,9 @@ describe("swiftTypeFor", () => {
 
 describe("appEntityTypeForParam", () => {
   test("maps workflow-domain id params to AirMCP AppEntity wrappers", () => {
-    expect(appEntityTypeForParam("read_event", "id", { type: "string" })).toBe(
-      "AirMCPCalendarEventEntity",
-    );
-    expect(appEntityTypeForParam("complete_reminder", "id", { type: "string" })).toBe(
-      "AirMCPReminderEntity",
-    );
-    expect(appEntityTypeForParam("add_contact_email", "id", { type: "string" })).toBe(
-      "AirMCPContactEntity",
-    );
+    expect(appEntityTypeForParam("read_event", "id", { type: "string" })).toBe("AirMCPCalendarEventEntity");
+    expect(appEntityTypeForParam("complete_reminder", "id", { type: "string" })).toBe("AirMCPReminderEntity");
+    expect(appEntityTypeForParam("add_contact_email", "id", { type: "string" })).toBe("AirMCPContactEntity");
   });
 
   test("leaves unrelated string ids and non-string params alone", () => {
@@ -341,9 +335,7 @@ describe("wireExpr", () => {
   });
 
   test("Date → ISO8601 format call", () => {
-    expect(wireExpr("Date", "startDate", false)).toBe(
-      "ISO8601DateFormatter().string(from: startDate)",
-    );
+    expect(wireExpr("Date", "startDate", false)).toBe("ISO8601DateFormatter().string(from: startDate)");
   });
 
   test("enum → .rawValue regardless of underlying type name", () => {
@@ -356,6 +348,15 @@ describe("wireExpr", () => {
   test("AppEntity wrappers send their string id over the wire", () => {
     expect(wireExpr("AirMCPReminderEntity", "id", false, true)).toBe("id.id");
     expect(wireExpr("AirMCPContactEntity", "v", false, true)).toBe("v.id");
+  });
+
+  test("AppEntity write guards require resolved entities when requested", () => {
+    expect(
+      wireExpr("AirMCPReminderEntity", "id", false, true, {
+        requireResolvedEntity: true,
+        toolName: "complete_reminder",
+      }),
+    ).toBe('try requireResolvedAirMCPEntityId(id, tool: "complete_reminder")');
   });
 });
 
@@ -665,9 +666,9 @@ describe("renderAppEnum", () => {
   });
 
   test("throws on unsafe enum value (propagates from enumCaseName)", () => {
-    expect(() =>
-      renderAppEnum({ typeName: "X", values: ["next-track"], title: "bad" }),
-    ).toThrow(/not a safe Swift identifier/);
+    expect(() => renderAppEnum({ typeName: "X", values: ["next-track"], title: "bad" })).toThrow(
+      /not a safe Swift identifier/,
+    );
   });
 
   test("single-value enum still renders valid Swift", () => {
@@ -680,9 +681,7 @@ describe("renderAppEnum", () => {
 describe("swiftParamDecl", () => {
   test("required string param with description", () => {
     const decl = swiftParamDecl("query", { type: "string", description: "Search text" }, true);
-    expect(decl).toBe(
-      `    @Parameter(title: "Search text")\n    public var query: String`,
-    );
+    expect(decl).toBe(`    @Parameter(title: "Search text")\n    public var query: String`);
   });
 
   test("optional string param becomes String? without default", () => {
@@ -696,64 +695,42 @@ describe("swiftParamDecl", () => {
       { type: "integer", minimum: 1, maximum: 200, description: "Max results" },
       false,
     );
-    expect(decl).toContain("title: \"Max results\"");
+    expect(decl).toContain('title: "Max results"');
     expect(decl).toContain("inclusiveRange: (1, 200)");
     // Optional without default → Int?
     expect(decl).toContain("public var limit: Int?");
   });
 
   test("default literal makes the field non-optional even if unrequired", () => {
-    const decl = swiftParamDecl(
-      "limit",
-      { type: "integer", default: 50, minimum: 1, maximum: 200 },
-      false,
-    );
+    const decl = swiftParamDecl("limit", { type: "integer", default: 50, minimum: 1, maximum: 200 }, false);
     expect(decl).toContain("default: 50");
     expect(decl).toContain("public var limit: Int");
     expect(decl).not.toContain("public var limit: Int?");
   });
 
   test("date-time string → Date", () => {
-    const decl = swiftParamDecl(
-      "startDate",
-      { type: "string", format: "date-time", description: "Start" },
-      true,
-    );
+    const decl = swiftParamDecl("startDate", { type: "string", format: "date-time", description: "Start" }, true);
     expect(decl).toContain("public var startDate: Date");
   });
 
   test("string-array → [String]", () => {
-    const decl = swiftParamDecl(
-      "tags",
-      { type: "array", items: { type: "string" }, description: "Tags" },
-      true,
-    );
+    const decl = swiftParamDecl("tags", { type: "array", items: { type: "string" }, description: "Tags" }, true);
     expect(decl).toContain("public var tags: [String]");
   });
 
   test("Boolean with explicit true default", () => {
-    const decl = swiftParamDecl(
-      "flagged",
-      { type: "boolean", default: true, description: "Flag?" },
-      false,
-    );
+    const decl = swiftParamDecl("flagged", { type: "boolean", default: true, description: "Flag?" }, false);
     expect(decl).toContain("default: true");
     expect(decl).toContain("public var flagged: Bool");
   });
 
   test("composite shape → null (caller drops the property)", () => {
     expect(swiftParamDecl("x", { type: "object" }, true)).toBeNull();
-    expect(
-      swiftParamDecl("x", { type: "array", items: { type: "object" } }, true),
-    ).toBeNull();
+    expect(swiftParamDecl("x", { type: "array", items: { type: "object" } }, true)).toBeNull();
   });
 
   test("enum without override appends Allowed tail to title", () => {
-    const decl = swiftParamDecl(
-      "action",
-      { type: "string", enum: ["play", "pause"], description: "What to do" },
-      true,
-    );
+    const decl = swiftParamDecl("action", { type: "string", enum: ["play", "pause"], description: "What to do" }, true);
     expect(decl).toContain('title: "What to do · Allowed: play, pause"');
     expect(decl).toContain("public var action: String");
   });
@@ -828,9 +805,7 @@ describe("buildArgsBlock", () => {
   });
 
   test("single required string → inline literal dict", () => {
-    const out = buildArgsBlock([
-      { name: "query", wireName: "query", type: "String", isEnum: false, optional: false },
-    ]);
+    const out = buildArgsBlock([{ name: "query", wireName: "query", type: "String", isEnum: false, optional: false }]);
     expect(out.prelude).toBe("");
     expect(out.argsExpr).toBe(`["query": query]`);
   });
@@ -897,6 +872,32 @@ describe("buildArgsBlock", () => {
     expect(out.argsExpr).toBe(`["id": id.id]`);
   });
 
+  test("required write entity param uses prelude and rejects synthetic ids", () => {
+    const out = buildArgsBlock([
+      {
+        name: "id",
+        wireName: "id",
+        type: "AirMCPReminderEntity",
+        isEnum: false,
+        isEntity: true,
+        requireResolvedEntity: true,
+        toolName: "complete_reminder",
+        optional: false,
+      },
+      {
+        name: "completed",
+        wireName: "completed",
+        type: "Bool",
+        isEnum: false,
+        optional: false,
+      },
+    ]);
+    expect(out.argsExpr).toBe("args");
+    expect(out.prelude).toContain(`var args: [String: any Sendable] = [:]`);
+    expect(out.prelude).toContain(`args["id"] = try requireResolvedAirMCPEntityId(id, tool: "complete_reminder")`);
+    expect(out.prelude).toContain(`args["completed"] = completed`);
+  });
+
   test("optional entity param unwraps then sends id string", () => {
     const out = buildArgsBlock([
       {
@@ -913,9 +914,7 @@ describe("buildArgsBlock", () => {
   });
 
   test("prelude lines are indented 8 spaces (matches perform body formatting)", () => {
-    const out = buildArgsBlock([
-      { name: "a", wireName: "a", type: "String", isEnum: false, optional: true },
-    ]);
+    const out = buildArgsBlock([{ name: "a", wireName: "a", type: "String", isEnum: false, optional: true }]);
     // Every non-empty prelude line starts with exactly 8 spaces
     for (const line of out.prelude.split("\n")) {
       expect(line.startsWith("        ")).toBe(true);
@@ -956,35 +955,31 @@ describe("resolveFollowUpMap", () => {
 
   test("throws on missing list tool", () => {
     expect(() =>
-      resolveFollowUpMap(
-        { missing: { target: "read_event", itemField: "id", targetParam: "id" } },
-        new Map(),
-      ),
+      resolveFollowUpMap({ missing: { target: "read_event", itemField: "id", targetParam: "id" } }, new Map()),
     ).toThrow(/list tool missing: missing/);
   });
 
   test("throws on missing target tool", () => {
-    const byName = new Map([
-      ["list_events", makeListTool("list_events", { id: "string" })],
-    ]);
+    const byName = new Map([["list_events", makeListTool("list_events", { id: "string" })]]);
     expect(() =>
-      resolveFollowUpMap(
-        { list_events: { target: "read_missing", itemField: "id", targetParam: "id" } },
-        byName,
-      ),
+      resolveFollowUpMap({ list_events: { target: "read_missing", itemField: "id", targetParam: "id" } }, byName),
     ).toThrow(/target tool missing: read_missing/);
   });
 
   test("throws when list output is not list-object", () => {
     const byName = new Map([
-      ["not_list", { name: "not_list", inputSchema: {}, outputSchema: { type: "object", properties: { scalar: { type: "string" } } } }],
+      [
+        "not_list",
+        {
+          name: "not_list",
+          inputSchema: {},
+          outputSchema: { type: "object", properties: { scalar: { type: "string" } } },
+        },
+      ],
       ["read_event", makeReadTool("read_event", ["id"])],
     ]);
     expect(() =>
-      resolveFollowUpMap(
-        { not_list: { target: "read_event", itemField: "id", targetParam: "id" } },
-        byName,
-      ),
+      resolveFollowUpMap({ not_list: { target: "read_event", itemField: "id", targetParam: "id" } }, byName),
     ).toThrow(/is not a list-object shape \(got scalar\)/);
   });
 
@@ -994,10 +989,7 @@ describe("resolveFollowUpMap", () => {
       ["read_event", makeReadTool("read_event", ["id"])],
     ]);
     expect(() =>
-      resolveFollowUpMap(
-        { list_events: { target: "read_event", itemField: "id", targetParam: "id" } },
-        byName,
-      ),
+      resolveFollowUpMap({ list_events: { target: "read_event", itemField: "id", targetParam: "id" } }, byName),
     ).toThrow(/items have no string field "id" \(fields: summary\)/);
   });
 
@@ -1007,10 +999,7 @@ describe("resolveFollowUpMap", () => {
       ["read_event", makeReadTool("read_event", ["eventId"])], // no `id`
     ]);
     expect(() =>
-      resolveFollowUpMap(
-        { list_events: { target: "read_event", itemField: "id", targetParam: "id" } },
-        byName,
-      ),
+      resolveFollowUpMap({ list_events: { target: "read_event", itemField: "id", targetParam: "id" } }, byName),
     ).toThrow(/target read_event has no @Parameter named "id" \(params: eventId\)/);
   });
 
@@ -1089,15 +1078,11 @@ describe("isCodableSafe", () => {
   });
 
   test("additionalProperties: true rejects the schema", () => {
-    expect(
-      isCodableSafe({ type: "object", properties: {}, additionalProperties: true }),
-    ).toBe(false);
+    expect(isCodableSafe({ type: "object", properties: {}, additionalProperties: true })).toBe(false);
   });
 
   test("additionalProperties: {} (empty object) rejects the schema — record shape", () => {
-    expect(
-      isCodableSafe({ type: "object", properties: {}, additionalProperties: {} }),
-    ).toBe(false);
+    expect(isCodableSafe({ type: "object", properties: {}, additionalProperties: {} })).toBe(false);
   });
 
   test("additionalProperties: { type: 'string' } is accepted (constrained map)", () => {
@@ -1162,9 +1147,7 @@ describe("swiftOutputType", () => {
 
   test("array wraps element type", () => {
     const nested = [];
-    expect(
-      swiftOutputType({ type: "array", items: { type: "string" } }, "Tags", nested),
-    ).toBe("[String]");
+    expect(swiftOutputType({ type: "array", items: { type: "string" } }, "Tags", nested)).toBe("[String]");
   });
 
   test("array-of-object records nested struct named `<Path>Item`", () => {
@@ -1184,11 +1167,7 @@ describe("swiftOutputType", () => {
 
   test("object records nested struct + returns the path as type", () => {
     const nested = [];
-    const result = swiftOutputType(
-      { type: "object", properties: { foo: { type: "string" } } },
-      "Payload",
-      nested,
-    );
+    const result = swiftOutputType({ type: "object", properties: { foo: { type: "string" } } }, "Payload", nested);
     expect(result).toBe("Payload");
     expect(nested).toHaveLength(1);
     expect(nested[0].name).toBe("Payload");

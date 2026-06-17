@@ -299,6 +299,8 @@ function generateIntent(tool) {
       type: baseType,
       isEnum: Boolean(enumInfo),
       isEntity: Boolean(entityType),
+      requireResolvedEntity: Boolean(entityType) && tool.annotations?.readOnlyHint === false,
+      toolName: tool.name,
       isRequired,
       optional: !isRequired && prop.default === undefined,
     });
@@ -424,9 +426,7 @@ function generateAppShortcuts() {
     const label = APP_SHORTCUT_LABELS[tool.name] ?? {};
     const shortTitle = swiftLit(label.shortTitle ?? tool.title ?? tool.name);
     const phraseTitle = swiftLit(label.phraseTitle ?? label.shortTitle ?? tool.title ?? tool.name);
-    const phraseName = swiftLit(
-      label.phraseName ?? tool.name.replace(/^skill_/, "").replace(/[_-]/g, " "),
-    );
+    const phraseName = swiftLit(label.phraseName ?? tool.name.replace(/^skill_/, "").replace(/[_-]/g, " "));
     const img = label.systemImageName ?? systemImageFor(tool.name);
     // Two phrases per shortcut keeps suggestions broad enough for natural
     // Siri invocation. Apple recommends each phrase use .applicationName.
@@ -551,13 +551,9 @@ function renderScalarRow(key, propSchema, isRequired) {
 
   let valueExpr;
   if (schema.type === "boolean") {
-    valueExpr = isOptional
-      ? `(${accessor}.map { $0 ? "Yes" : "No" } ?? "—")`
-      : `(${accessor} ? "Yes" : "No")`;
+    valueExpr = isOptional ? `(${accessor}.map { $0 ? "Yes" : "No" } ?? "—")` : `(${accessor} ? "Yes" : "No")`;
   } else if (schema.type === "integer" || schema.type === "number") {
-    valueExpr = isOptional
-      ? `(${accessor}?.formatted() ?? "—")`
-      : `${accessor}.formatted()`;
+    valueExpr = isOptional ? `(${accessor}?.formatted() ?? "—")` : `${accessor}.formatted()`;
   } else if (schema.type === "string" && schema.format === "date-time") {
     // ISO8601DateFormatter is Sendable on modern SDKs and cheap to
     // instantiate once per render. The `?? raw` fallback keeps the UI
@@ -707,23 +703,21 @@ const snippetViews = typedTools.map((tool) => renderSnippetView(tool));
 // of the public surface. Factory name = `_mk<Intent>_<param>` so
 // list_chats (→ read_chat.chatId) and list_events (→ read_event.id)
 // each get their own helper even when they share a target intent.
-const followUpFactories = followUpFactorySpecs.map(
-  ({ target, targetIntentName, targetParam }) => {
-    const paramIdent = swiftIdent(targetParam);
-    const targetTool = byName.get(target);
-    const prop = targetTool?.inputSchema?.properties?.[targetParam];
-    const entityType = appEntityTypeForParam(target, targetParam, prop);
-    const assignment = entityType
-      ? `${entityType}(id: ${paramIdent}, title: ${paramIdent}, subtitle: "AirMCP ID")`
-      : paramIdent;
-    return `@available(macOS 26, iOS 26, *)
+const followUpFactories = followUpFactorySpecs.map(({ target, targetIntentName, targetParam }) => {
+  const paramIdent = swiftIdent(targetParam);
+  const targetTool = byName.get(target);
+  const prop = targetTool?.inputSchema?.properties?.[targetParam];
+  const entityType = appEntityTypeForParam(target, targetParam, prop);
+  const assignment = entityType
+    ? `AirMCPStringEntityQuery<${entityType}>.syntheticEntity(id: ${paramIdent})`
+    : paramIdent;
+  return `@available(macOS 26, iOS 26, *)
 fileprivate func _mk${targetIntentName}_${targetParam}(${paramIdent}: String) -> ${targetIntentName} {
     let intent = ${targetIntentName}()
     intent.${paramIdent} = ${assignment}
     return intent
 }`;
-  },
-);
+});
 
 const header = `// GENERATED — do not edit.
 //

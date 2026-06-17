@@ -207,6 +207,7 @@ fi
 
 # Sign the main app after embedding extensions.
 codesign --force --sign "$SIGN_IDENTITY" "$BUNDLE_DIR"
+"$SCRIPT_DIR/verify-bundle-structure.sh" "$BUNDLE_DIR" "$BUNDLE_ID" "$APP_EXECUTABLE"
 if [ -x "$LSREGISTER" ]; then
   "$LSREGISTER" -f "$BUNDLE_DIR" 2>/dev/null || true
 fi
@@ -238,9 +239,6 @@ check_gatekeeper() {
 
 verify_running() {
   local pid
-  if ! codesign --verify --deep --strict "$BUNDLE_DIR" 2>/dev/null; then
-    echo "⚠ $BUNDLE_DIR did not pass strict code-sign verification" >&2
-  fi
   if ! check_gatekeeper; then
     echo "⚠ Gatekeeper rejected this local build." >&2
     echo "  AppIntents/Shortcuts registration may fail with ad-hoc signing." >&2

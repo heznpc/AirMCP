@@ -2,10 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, test } from "@jest/globals";
 
 const root = new URL("..", import.meta.url);
-const src = readFileSync(
-  new URL("swift/Sources/AirMCPKit/FoundationModelsBridge.swift", root),
-  "utf8",
-);
+const src = readFileSync(new URL("swift/Sources/AirMCPKit/FoundationModelsBridge.swift", root), "utf8");
 
 describe("FoundationModelsBridge source contract", () => {
   test("defines explicit tool-loop limits", () => {
@@ -45,9 +42,7 @@ describe("FoundationModelsBridge source contract", () => {
   });
 
   test("registers only read-only tools with the model session", () => {
-    const allToolsBody = src.match(
-      /public func allTools\([\s\S]*?\n    \}/,
-    )?.[0] ?? "";
+    const allToolsBody = src.match(/public func allTools\([\s\S]*?\n    \}/)?.[0] ?? "";
 
     expect(allToolsBody).toContain("FoundationModelsToolBudget(limits: limits)");
     expect(allToolsBody).toContain("TodayEventsTool(budget: budget)");
@@ -57,13 +52,23 @@ describe("FoundationModelsBridge source contract", () => {
     expect(allToolsBody).not.toContain("CreateNoteTool(");
   });
 
+  test("write-capable Foundation Models tool stubs fail closed", () => {
+    expect(src).toContain("case writeToolUnavailable(tool: String)");
+    const createReminderBody =
+      src.match(/public final class CreateReminderTool[\s\S]*?public final class CreateNoteTool/)?.[0] ?? "";
+    const createNoteBody = src.match(/public final class CreateNoteTool[\s\S]*?\/\/ MARK: - Bridge/)?.[0] ?? "";
+
+    expect(createReminderBody).toContain("throw FoundationModelsBridgeError.writeToolUnavailable(tool: name)");
+    expect(createReminderBody).not.toContain("service.createReminder");
+    expect(createReminderBody).not.toContain("Create a new reminder with a title");
+    expect(createNoteBody).toContain("throw FoundationModelsBridgeError.writeToolUnavailable(tool: name)");
+    expect(createNoteBody).not.toContain("Note creation requested");
+    expect(createNoteBody).not.toContain("Create a new Apple Note");
+  });
+
   test("bounds the session response and uses the SDK initializer order", () => {
-    expect(src).toContain(
-      "let session = LanguageModelSession(tools: tools, instructions: instruction)",
-    );
-    expect(src).toContain(
-      "GenerationOptions(maximumResponseTokens: limits.maxResponseTokens)",
-    );
+    expect(src).toContain("let session = LanguageModelSession(tools: tools, instructions: instruction)");
+    expect(src).toContain("GenerationOptions(maximumResponseTokens: limits.maxResponseTokens)");
     expect(src).toContain("session.respond(to: prompt, options: options)");
   });
 });

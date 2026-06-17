@@ -23,13 +23,28 @@ const workflowCatalog = JSON.parse(
 export const WORKFLOWS: Workflow[] = workflowCatalog;
 
 const DAILY_BRIEFING_PREVIEW_MODULES = new Set(["calendar", "reminders", "mail", "notes"]);
+const KNOWN_FLAGS = new Set([
+  "--json",
+  "--prompt",
+  "--siri",
+  "--tools",
+  "--modules",
+  "--safety",
+  "--preview",
+  "--help",
+  "-h",
+]);
 
 function hasFlag(args: string[], flag: string): boolean {
   return args.includes(flag);
 }
 
 function workflowId(args: string[]): string | undefined {
-  return args.find((arg) => !arg.startsWith("--"));
+  return args.find((arg) => !arg.startsWith("-"));
+}
+
+function unknownFlags(args: string[]): string[] {
+  return args.filter((arg) => arg.startsWith("-") && !KNOWN_FLAGS.has(arg));
 }
 
 function findWorkflow(args: string[]): Workflow | undefined {
@@ -80,6 +95,13 @@ async function printReadOnlyPreview(workflow: Workflow): Promise<void> {
 }
 
 export async function runWorkflows(args = process.argv.slice(3)): Promise<void> {
+  const invalidFlags = unknownFlags(args);
+  if (invalidFlags.length > 0) {
+    console.error(`Unknown option${invalidFlags.length === 1 ? "" : "s"}: ${invalidFlags.join(", ")}`);
+    process.exitCode = 1;
+    return;
+  }
+
   const id = workflowId(args);
   const workflow = findWorkflow(args);
 

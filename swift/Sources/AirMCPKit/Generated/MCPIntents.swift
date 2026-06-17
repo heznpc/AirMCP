@@ -1304,9 +1304,13 @@ public struct AddContactEmailIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["id"] = try requireResolvedAirMCPEntityId(id, tool: "add_contact_email")
+        args["email"] = email
+        args["label"] = label
         let result = try await MCPIntentRouter.shared.call(
             tool: "add_contact_email",
-            args: ["id": id.id, "email": email, "label": label]
+            args: args
         )
         return .result(value: result)
     }
@@ -1331,9 +1335,13 @@ public struct AddContactPhoneIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["id"] = try requireResolvedAirMCPEntityId(id, tool: "add_contact_phone")
+        args["phone"] = phone
+        args["label"] = label
         let result = try await MCPIntentRouter.shared.call(
             tool: "add_contact_phone",
-            args: ["id": id.id, "phone": phone, "label": label]
+            args: args
         )
         return .result(value: result)
     }
@@ -1777,9 +1785,12 @@ public struct CompleteReminderIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["id"] = try requireResolvedAirMCPEntityId(id, tool: "complete_reminder")
+        args["completed"] = completed
         let result = try await MCPIntentRouter.shared.call(
             tool: "complete_reminder",
-            args: ["id": id.id, "completed": completed]
+            args: args
         )
         return .result(value: result)
     }
@@ -7759,7 +7770,7 @@ import SwiftUI
 @available(macOS 26, iOS 26, *)
 fileprivate func _mkReadEventIntent_id(id: String) -> ReadEventIntent {
     let intent = ReadEventIntent()
-    intent.id = AirMCPCalendarEventEntity(id: id, title: id, subtitle: "AirMCP ID")
+    intent.id = AirMCPStringEntityQuery<AirMCPCalendarEventEntity>.syntheticEntity(id: id)
     return intent
 }
 
@@ -7773,14 +7784,14 @@ fileprivate func _mkReadNoteIntent_id(id: String) -> ReadNoteIntent {
 @available(macOS 26, iOS 26, *)
 fileprivate func _mkReadReminderIntent_id(id: String) -> ReadReminderIntent {
     let intent = ReadReminderIntent()
-    intent.id = AirMCPReminderEntity(id: id, title: id, subtitle: "AirMCP ID")
+    intent.id = AirMCPStringEntityQuery<AirMCPReminderEntity>.syntheticEntity(id: id)
     return intent
 }
 
 @available(macOS 26, iOS 26, *)
 fileprivate func _mkReadContactIntent_id(id: String) -> ReadContactIntent {
     let intent = ReadContactIntent()
-    intent.id = AirMCPContactEntity(id: id, title: id, subtitle: "AirMCP ID")
+    intent.id = AirMCPStringEntityQuery<AirMCPContactEntity>.syntheticEntity(id: id)
     return intent
 }
 

@@ -714,7 +714,7 @@ const followUpFactories = followUpFactorySpecs.map(
     const prop = targetTool?.inputSchema?.properties?.[targetParam];
     const entityType = appEntityTypeForParam(target, targetParam, prop);
     const assignment = entityType
-      ? `${entityType}(id: ${paramIdent}, title: ${paramIdent}, subtitle: "AirMCP ID")`
+      ? `AirMCPStringEntityQuery<${entityType}>.syntheticEntity(id: ${paramIdent})`
       : paramIdent;
     return `@available(macOS 26, iOS 26, *)
 fileprivate func _mk${targetIntentName}_${targetParam}(${paramIdent}: String) -> ${targetIntentName} {

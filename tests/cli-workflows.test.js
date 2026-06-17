@@ -11,14 +11,17 @@ const { MODULE_NAMES, STARTER_MODULES } = await import('../dist/shared/config.js
 
 describe('cli workflows command', () => {
   let logSpy;
+  let errSpy;
 
   beforeEach(() => {
     mockBuildSnapshot.mockReset();
     logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
     logSpy.mockRestore();
+    errSpy.mockRestore();
     process.exitCode = undefined;
   });
 
@@ -95,6 +98,14 @@ describe('cli workflows command', () => {
     expect(output).toContain('AirMCP read-only preview: Daily Briefing');
     expect(output).toContain('Writes: none');
     expect(output).toContain('"depth":"brief"');
+  });
+
+  test('unknown flags fail instead of falling through to the catalog', async () => {
+    await runWorkflows(['daily-briefing', '--promt']);
+
+    expect(process.exitCode).toBe(1);
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('Unknown option'));
+    expect(logSpy).not.toHaveBeenCalled();
   });
 
   test('references only tools that exist in the generated manifest', () => {

@@ -57,6 +57,21 @@ describe("FoundationModelsBridge source contract", () => {
     expect(allToolsBody).not.toContain("CreateNoteTool(");
   });
 
+  test("write-capable Foundation Models tool stubs fail closed", () => {
+    expect(src).toContain("case writeToolUnavailable(tool: String)");
+    const createReminderBody = src.match(
+      /public final class CreateReminderTool[\s\S]*?public final class CreateNoteTool/,
+    )?.[0] ?? "";
+    const createNoteBody = src.match(
+      /public final class CreateNoteTool[\s\S]*?\/\/ MARK: - Bridge/,
+    )?.[0] ?? "";
+
+    expect(createReminderBody).toContain("throw FoundationModelsBridgeError.writeToolUnavailable(tool: name)");
+    expect(createReminderBody).not.toContain("service.createReminder");
+    expect(createNoteBody).toContain("throw FoundationModelsBridgeError.writeToolUnavailable(tool: name)");
+    expect(createNoteBody).not.toContain("Note creation requested");
+  });
+
   test("bounds the session response and uses the SDK initializer order", () => {
     expect(src).toContain(
       "let session = LanguageModelSession(tools: tools, instructions: instruction)",

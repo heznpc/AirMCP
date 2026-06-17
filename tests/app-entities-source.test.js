@@ -53,6 +53,9 @@ func probeAirMCPEntities() async throws {
     let query = AirMCPStringEntityQuery<AirMCPCalendarEventEntity>()
     let events = try await query.entities(for: ["event-1"])
     _ = events.first?.displayRepresentation
+    let synthetic = AirMCPStringEntityQuery<AirMCPReminderEntity>.syntheticEntity(id: " reminder-1 ")
+    assert(synthetic.id == "reminder-1")
+    assert(synthetic.subtitle == AirMCPStringEntityQuery<AirMCPReminderEntity>.syntheticSubtitle)
     _ = AirMCPCalendarEventEntity.defaultQuery
     _ = AirMCPReminderEntity.defaultQuery
     _ = AirMCPContactEntity.defaultQuery
@@ -95,13 +98,13 @@ func probeAirMCPEntities() async throws {
     expect(generated).toContain('args: ["id": id.id]');
     expect(generated).toContain('args: ["id": id.id, "completed": completed]');
     expect(generated).toContain(
-      'intent.id = AirMCPCalendarEventEntity(id: id, title: id, subtitle: "AirMCP ID")',
+      'intent.id = AirMCPStringEntityQuery<AirMCPCalendarEventEntity>.syntheticEntity(id: id)',
     );
     expect(generated).toContain(
-      'intent.id = AirMCPReminderEntity(id: id, title: id, subtitle: "AirMCP ID")',
+      'intent.id = AirMCPStringEntityQuery<AirMCPReminderEntity>.syntheticEntity(id: id)',
     );
     expect(generated).toContain(
-      'intent.id = AirMCPContactEntity(id: id, title: id, subtitle: "AirMCP ID")',
+      'intent.id = AirMCPStringEntityQuery<AirMCPContactEntity>.syntheticEntity(id: id)',
     );
   });
 });

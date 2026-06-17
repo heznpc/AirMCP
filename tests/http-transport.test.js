@@ -120,6 +120,52 @@ describe('resolveAllowNetwork', () => {
   });
 });
 
+describe('HTTP Origin allow-list helpers', () => {
+  let parseAllowedOrigins;
+  let isOriginAllowed;
+  beforeAll(async () => {
+    ({ parseAllowedOrigins, isOriginAllowed } = await import('../dist/server/http-transport.js'));
+  });
+
+  test('normalizes configured origins and ignores invalid entries', () => {
+    expect([...parseAllowedOrigins(' https://claude.ai/ ,not a url,http://localhost:5173 ')])
+      .toEqual(['https://claude.ai', 'http://localhost:5173']);
+  });
+
+  test('+origin policies require the explicit allow-list, even for localhost', () => {
+    const allowedOrigins = parseAllowedOrigins('https://claude.ai');
+    expect(isOriginAllowed('https://claude.ai', {
+      policy: 'with-token+origin',
+      bindAll: true,
+      allowedOrigins,
+    })).toBe(true);
+    expect(isOriginAllowed('http://localhost:5173', {
+      policy: 'with-token+origin',
+      bindAll: true,
+      allowedOrigins,
+    })).toBe(false);
+  });
+
+  test('rejects opaque or path-bearing Origin values defensively', () => {
+    const allowedOrigins = parseAllowedOrigins('https://claude.ai');
+    for (const origin of ['null', 'file://local', 'https://claude.ai/path', 'https://claude.ai?x=1']) {
+      expect(isOriginAllowed(origin, {
+        policy: 'with-token+origin',
+        bindAll: true,
+        allowedOrigins,
+      })).toBe(false);
+    }
+  });
+
+  test('non +origin bind-all policy keeps legacy token-only behavior', () => {
+    expect(isOriginAllowed('https://any-client.example', {
+      policy: 'with-token',
+      bindAll: true,
+      allowedOrigins: new Set(),
+    })).toBe(true);
+  });
+});
+
 describe('validateNetworkPolicy', () => {
   let validateNetworkPolicy;
   beforeAll(async () => {

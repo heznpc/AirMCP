@@ -27,6 +27,8 @@ public extension AirMCPStringBackedEntity {
 }
 
 public struct AirMCPStringEntityQuery<Entity: AirMCPStringBackedEntity>: EntityStringQuery {
+    public static var syntheticSubtitle: String { "Unresolved AirMCP ID" }
+
     public init() {}
 
     public func entities(for identifiers: [Entity.ID]) async throws -> [Entity] {
@@ -44,7 +46,9 @@ public struct AirMCPStringEntityQuery<Entity: AirMCPStringBackedEntity>: EntityS
     }
 
     public static func syntheticEntity(id: String) -> Entity {
-        Entity(id: id, title: id, subtitle: "AirMCP ID")
+        let trimmed = id.trimmingCharacters(in: .whitespacesAndNewlines)
+        let stableId = trimmed.isEmpty ? "unknown" : trimmed
+        return Entity(id: stableId, title: stableId, subtitle: syntheticSubtitle)
     }
 }
 

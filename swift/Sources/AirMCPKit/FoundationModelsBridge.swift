@@ -16,6 +16,7 @@ import FoundationModels
 public enum FoundationModelsBridgeError: LocalizedError, Sendable {
     case toolBudgetExceeded(maxCalls: Int)
     case toolOutputTooLarge(tool: String, maxCharacters: Int)
+    case writeToolUnavailable(tool: String)
 
     public var errorDescription: String? {
         switch self {
@@ -23,6 +24,8 @@ public enum FoundationModelsBridgeError: LocalizedError, Sendable {
             return "Foundation Models tool-call budget exceeded (\(maxCalls) calls)."
         case .toolOutputTooLarge(let tool, let maxCharacters):
             return "Foundation Models tool output too large for \(tool) (max \(maxCharacters) characters)."
+        case .writeToolUnavailable(let tool):
+            return "Foundation Models write tool \(tool) is disabled until AirMCP can route it through HITL, rate-limit, and audit."
         }
     }
 }
@@ -225,11 +228,7 @@ public final class CreateReminderTool: Tool {
     public init() {}
 
     public func call(arguments: Arguments) async throws -> String {
-        let service = EventKitService()
-        let input = CreateReminderInput(title: arguments.title, body: nil, dueDate: arguments.dueDate, priority: nil, list: nil)
-        let result = try await service.createReminder(input)
-        let data = try JSONEncoder().encode(result)
-        return String(data: data, encoding: .utf8) ?? "{}"
+        throw FoundationModelsBridgeError.writeToolUnavailable(tool: name)
     }
 }
 
@@ -280,8 +279,7 @@ public final class CreateNoteTool: Tool {
     public init() {}
 
     public func call(arguments: Arguments) async throws -> String {
-        // Notes API requires JXA on macOS — return instruction for the bridge
-        return "Note creation requested: \(arguments.body.prefix(100))"
+        throw FoundationModelsBridgeError.writeToolUnavailable(tool: name)
     }
 }
 

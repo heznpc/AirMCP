@@ -119,6 +119,44 @@ export function resolveAllowNetwork(opts: {
   return "loopback-only";
 }
 
+function normalizeOrigin(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed === "null") return null;
+  try {
+    const url = new URL(trimmed);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    if (url.pathname !== "/" || url.search || url.hash) return null;
+    return url.origin;
+  } catch {
+    return null;
+  }
+}
+
+export function parseAllowedOrigins(raw: string): Set<string> {
+  const origins = new Set<string>();
+  for (const part of raw.split(",")) {
+    const origin = normalizeOrigin(part);
+    if (origin) origins.add(origin);
+  }
+  return origins;
+}
+
+export function isOriginAllowed(
+  origin: string | undefined,
+  ctx: { policy: AllowNetwork; bindAll: boolean; allowedOrigins: Set<string> },
+): boolean {
+  if (!origin) return true;
+  const normalized = normalizeOrigin(origin);
+  if (!normalized) return false;
+
+  if (ctx.policy === "with-token+origin" || ctx.policy === "with-oauth+origin") {
+    return ctx.allowedOrigins.has(normalized);
+  }
+  if (LOCALHOST_ORIGIN_RE.test(normalized)) return true;
+  if (ctx.allowedOrigins.has(normalized)) return true;
+  return ctx.bindAll && ctx.allowedOrigins.size === 0;
+}
+
 /** Startup invariant check. Throws on misconfiguration so the process
  *  refuses to start rather than silently exposing the tool surface. */
 export function validateNetworkPolicy(ctx: {
@@ -212,7 +250,7 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
   app.use(express.json({ limit: "1mb" }));
 
   // Origin validation — MCP spec 2025-11-25 requires 403 for invalid Origin
-  const allowedOrigins = new Set<string>((process.env.AIRMCP_ALLOWED_ORIGINS ?? "").split(",").filter(Boolean));
+  const allowedOrigins = parseAllowedOrigins(process.env.AIRMCP_ALLOWED_ORIGINS ?? "");
 
   // Resolve and validate the declarative network policy before touching the
   // socket. Misconfiguration exits before any routes are mounted, so an
@@ -248,16 +286,8 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
   }
   app.use((req, res, next) => {
     if (req.path !== "/mcp") return next();
-    const origin = req.headers.origin;
-    if (!origin) return next();
-    if (LOCALHOST_ORIGIN_RE.test(origin)) return next();
-    if (allowedOrigins.has(origin)) return next();
-    // Reject unless bind-all with no explicit allow-list (operator chose open access)
-    if (!bindAll || allowedOrigins.size > 0) {
-      res.status(403).json({ error: "Forbidden: Origin not allowed" });
-      return;
-    }
-    next();
+    if (isOriginAllowed(req.headers.origin, { policy: allowNetwork, bindAll, allowedOrigins })) return next();
+    res.status(403).json({ error: "Forbidden: Origin not allowed" });
   });
 
   // Per-IP rate limiting (default 120 req/min) with standard RateLimit headers.

@@ -5,7 +5,8 @@
  * Runs every entry in GOLDEN_PLANS against the on-device Foundation Model
  * (via the Swift bridge), scores each plan with the eval harness, and prints
  * an aggregate report. Meant for local / nightly runs — requires macOS 26+
- * with Apple Silicon and `npm run swift-build` already done.
+ * with Apple Silicon and a Swift bridge built with:
+ *   cd swift && swift build -c release -Xswiftc -DAIRMCP_ENABLE_FOUNDATION_MODELS
  *
  * Usage:
  *   node scripts/eval-plans.mjs            # full sweep
@@ -36,7 +37,9 @@ async function main() {
   const bridgeErr = await checkSwiftBridge();
   if (bridgeErr) {
     console.error(`Swift bridge unavailable: ${bridgeErr}`);
-    console.error("Run `npm run swift-build` on macOS 26+ with Apple Silicon.");
+    console.error(
+      "Build the FoundationModels preview bridge on macOS 26+ Apple Silicon: cd swift && swift build -c release -Xswiftc -DAIRMCP_ENABLE_FOUNDATION_MODELS",
+    );
     process.exit(1);
   }
 

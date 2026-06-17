@@ -41,6 +41,26 @@ private struct ModuleInfo: Identifiable {
     private static let currentMacOSVersion = ProcessInfo.processInfo.operatingSystemVersion.majorVersion
 }
 
+private struct WorkflowInfo: Identifiable {
+    let id: String
+    let titleKey: String
+    let descKey: String
+    let promptKey: String
+    let safetyKey: String
+    let siriKey: String?
+    let icon: String
+    let tools: [String]
+
+    var title: String { L(titleKey) }
+    var localizedDescription: String { L(descKey) }
+    var prompt: String { L(promptKey) }
+    var safety: String { L(safetyKey) }
+    var siriPhrase: String? {
+        guard let siriKey else { return nil }
+        return L(siriKey)
+    }
+}
+
 private let allModules: [ModuleInfo] = [
     ModuleInfo(id: "notes", icon: "note.text", toolCount: 12),
     ModuleInfo(id: "reminders", icon: "checklist", toolCount: 11),
@@ -71,6 +91,69 @@ private let allModules: [ModuleInfo] = [
     ModuleInfo(id: "health", icon: "heart", toolCount: 5),
 ]
 
+private let featuredWorkflows: [WorkflowInfo] = [
+    WorkflowInfo(
+        id: "daily-briefing",
+        titleKey: "workflow.dailyBriefing",
+        descKey: "workflow.dailyBriefing.desc",
+        promptKey: "workflow.dailyBriefing.prompt",
+        safetyKey: "workflow.dailyBriefing.safety",
+        siriKey: "workflow.dailyBriefing.siri",
+        icon: "sun.max",
+        tools: ["summarize_context", "timeline_today", "today_events", "list_reminders", "get_unread_count"]
+    ),
+    WorkflowInfo(
+        id: "inbox-triage",
+        titleKey: "workflow.inboxTriage",
+        descKey: "workflow.inboxTriage.desc",
+        promptKey: "workflow.inboxTriage.prompt",
+        safetyKey: "workflow.inboxTriage.safety",
+        siriKey: "workflow.inboxTriage.siri",
+        icon: "tray.full",
+        tools: ["skill_inbox-triage", "skill_sender-to-tasks", "search_messages", "create_reminder"]
+    ),
+    WorkflowInfo(
+        id: "meeting-prep",
+        titleKey: "workflow.meetingPrep",
+        descKey: "workflow.meetingPrep.desc",
+        promptKey: "workflow.meetingPrep.prompt",
+        safetyKey: "workflow.meetingPrep.safety",
+        siriKey: nil,
+        icon: "person.2.wave.2",
+        tools: ["today_events", "search_notes", "search_contacts", "recent_files", "list_reminders"]
+    ),
+    WorkflowInfo(
+        id: "project-digest",
+        titleKey: "workflow.projectDigest",
+        descKey: "workflow.projectDigest.desc",
+        promptKey: "workflow.projectDigest.prompt",
+        safetyKey: "workflow.projectDigest.safety",
+        siriKey: "workflow.projectDigest.siri",
+        icon: "folder",
+        tools: ["semantic_index", "skill_project-digest", "semantic_search", "find_related"]
+    ),
+    WorkflowInfo(
+        id: "focus-blocks",
+        titleKey: "workflow.focusBlocks",
+        descKey: "workflow.focusBlocks.desc",
+        promptKey: "workflow.focusBlocks.prompt",
+        safetyKey: "workflow.focusBlocks.safety",
+        siriKey: nil,
+        icon: "calendar.badge.clock",
+        tools: ["skill_focus-block-planner", "list_reminders", "create_event"]
+    ),
+    WorkflowInfo(
+        id: "research-output",
+        titleKey: "workflow.researchOutput",
+        descKey: "workflow.researchOutput.desc",
+        promptKey: "workflow.researchOutput.prompt",
+        safetyKey: "workflow.researchOutput.safety",
+        siriKey: nil,
+        icon: "doc.text.magnifyingglass",
+        tools: ["list_tabs", "read_page_content", "summarize_text", "create_note", "send_mail"]
+    ),
+]
+
 // MARK: - Shared Constants
 
 enum AirMcpConstants {
@@ -89,6 +172,9 @@ enum AirMcpConstants {
       }
     }
     """
+
+    static let claudeCodeConfig = "claude mcp add airmcp -- npx -y \(npmPackageName)"
+    static let codexConfig = "codex mcp add airmcp -- npx -y \(npmPackageName)"
 
     static func copyToClipboard(_ text: String) {
         NSPasteboard.general.clearContents()
@@ -129,28 +215,31 @@ struct MenuContent: View {
         updateSection
         quickSetupSection
 
-        // ── 3. Modules ─────────────────────────────────────
+        // ── 3. Workflows ───────────────────────────────────
+        workflowsSection
+
+        // ── 4. Modules ─────────────────────────────────────
         modulesSection
 
-        // ── 4. Swift Bridge ────────────────────────────────
+        // ── 5. Swift Bridge ────────────────────────────────
         swiftBridgeStatus
 
         Divider()
 
-        // ── 5. Settings ────────────────────────────────────
+        // ── 6. Settings ────────────────────────────────────
         settingsMenu
 
         Divider()
 
-        // ── 6. Logs ────────────────────────────────────────
+        // ── 7. Logs ────────────────────────────────────────
         logsMenu
 
-        // ── 7. Configuration & Help ────────────────────────
+        // ── 8. Configuration & Help ────────────────────────
         configSection
 
         Divider()
 
-        // ── 8. Footer ──────────────────────────────────────
+        // ── 9. Footer ──────────────────────────────────────
         footerSection
     }
 
@@ -294,7 +383,58 @@ struct MenuContent: View {
         }
     }
 
-    // MARK: 3 - Modules
+    // MARK: 3 - Workflows
+
+    @ViewBuilder
+    private var workflowsSection: some View {
+        Menu(L("menu.workflows")) {
+            Text(L("workflow.menuHint"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Divider()
+
+            ForEach(featuredWorkflows) { workflow in
+                Menu {
+                    Text(workflow.localizedDescription)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Text(workflow.safety)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Divider()
+
+                    Button(L("workflow.copyPrompt")) {
+                        AirMcpConstants.copyToClipboard(workflow.prompt)
+                    }
+
+                    if let siriPhrase = workflow.siriPhrase {
+                        Button(L("workflow.copySiriPhrase")) {
+                            AirMcpConstants.copyToClipboard("Hey Siri, \(siriPhrase)")
+                        }
+                    }
+
+                    Button(L("workflow.copyToolList")) {
+                        AirMcpConstants.copyToClipboard(workflow.tools.joined(separator: ", "))
+                    }
+                } label: {
+                    Label(workflow.title, systemImage: workflow.icon)
+                }
+            }
+
+            Divider()
+
+            Button(L("workflow.openShortcutsDoc")) {
+                if let url = URL(string: "https://github.com/heznpc/AirMCP/blob/main/docs/shortcuts.md") {
+                    NSWorkspace.shared.open(url)
+                }
+            }
+        }
+    }
+
+    // MARK: 4 - Modules
 
     @ViewBuilder
     private var modulesSection: some View {
@@ -334,7 +474,7 @@ struct MenuContent: View {
         }
     }
 
-    // MARK: 4 - Swift Bridge
+    // MARK: 5 - Swift Bridge
 
     @ViewBuilder
     private var swiftBridgeStatus: some View {
@@ -350,7 +490,7 @@ struct MenuContent: View {
         }
     }
 
-    // MARK: 5 - Settings
+    // MARK: 6 - Settings
 
     @ViewBuilder
     private var settingsMenu: some View {
@@ -425,7 +565,7 @@ struct MenuContent: View {
         }
     }
 
-    // MARK: 6 - Logs
+    // MARK: 7 - Logs
 
     @ViewBuilder
     private var logsMenu: some View {
@@ -457,7 +597,7 @@ struct MenuContent: View {
         }
     }
 
-    // MARK: 7 - Configuration & Help
+    // MARK: 8 - Configuration & Help
 
     @ViewBuilder
     private var configSection: some View {
@@ -472,7 +612,11 @@ struct MenuContent: View {
         .keyboardShortcut("c")
 
         Button(L("menu.copyClaudeCodeConfig")) {
-            AirMcpConstants.copyToClipboard("claude mcp add airmcp -- npx -y \(AirMcpConstants.npmPackageName)")
+            AirMcpConstants.copyToClipboard(AirMcpConstants.claudeCodeConfig)
+        }
+
+        Button(L("menu.copyCodexConfig")) {
+            AirMcpConstants.copyToClipboard(AirMcpConstants.codexConfig)
         }
 
         Button(L("menu.addWidget")) {
@@ -488,7 +632,7 @@ struct MenuContent: View {
         }
     }
 
-    // MARK: 8 - Footer
+    // MARK: 9 - Footer
 
     @ViewBuilder
     private var footerSection: some View {
@@ -557,6 +701,28 @@ struct MenuContent: View {
         case .idle:
             Label(L("settings.hitlInactive"), systemImage: "antenna.radiowaves.left.and.right.slash")
                 .foregroundStyle(.secondary)
+        }
+
+        if !hitlManager.pendingRequests.isEmpty {
+            Divider()
+            Text(L("settings.pendingApprovals"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            ForEach(hitlManager.pendingRequests) { request in
+                VStack(alignment: .leading, spacing: 4) {
+                    Label(request.tool, systemImage: request.destructive ? "exclamationmark.triangle" : "questionmark.circle")
+                        .font(.caption)
+                        .foregroundStyle(request.destructive ? .orange : .primary)
+                    HStack {
+                        Button(L("hitl.approve")) {
+                            hitlManager.respond(id: request.id, approved: true, tool: request.tool)
+                        }
+                        Button(L("hitl.deny")) {
+                            hitlManager.respond(id: request.id, approved: false, tool: request.tool)
+                        }
+                    }
+                }
+            }
         }
 
         if !hitlManager.recentRequests.isEmpty {

@@ -6,6 +6,7 @@
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { randomUUID, timingSafeEqual, randomBytes, createHash } from "node:crypto";
+import type { Server as NodeHttpServer } from "node:http";
 import { NPM_PACKAGE_NAME } from "../shared/config.js";
 import { LIMITS, TIMEOUT } from "../shared/constants.js";
 import { log, errToCtx } from "./../shared/logger.js";
@@ -75,12 +76,11 @@ export interface HttpServerOptions extends CreateServerOptions {
   unsafeNoAuth?: boolean;
 }
 
-/** RFC 0005 Step 1 — OAuth issuer + audience. Read once at startup so
+/** RFC 0005 — OAuth issuer + audience. Read once at startup so
  *  subsequent handlers can reference them without re-probing env. Both
  *  are required when `allowNetwork` lands on `with-oauth*` (enforced by
- *  `validateNetworkPolicy`); Step 1 doesn't verify JWTs yet, but the
- *  discovery card emits them so MCP clients (including Managed Agents /
- *  Cowork) can bootstrap against the right authorization server. */
+ *  `validateNetworkPolicy`). The HTTP middleware verifies JWTs with this
+ *  same resource indicator before any protected MCP route runs. */
 export interface OAuthContext {
   issuer: string;
   /** Resource Indicators target per RFC 8707 — the `aud` claim a valid
@@ -160,7 +160,7 @@ export function validateNetworkPolicy(ctx: {
       return;
     case "with-oauth":
     case "with-oauth+origin":
-      // RFC 0005 Step 1 — discovery-only. Startup still refuses when
+      // OAuth policy validation. Startup refuses when
       // AIRMCP_OAUTH_ISSUER or AIRMCP_OAUTH_AUDIENCE is missing so the
       // .well-known/oauth-protected-resource card never goes live with
       // empty fields (clients that fetch it must see a pointer to a real
@@ -193,14 +193,6 @@ export function validateNetworkPolicy(ctx: {
       if (ctx.policy === "with-oauth+origin" && ctx.allowedOriginsCount === 0) {
         throw new Error("allowNetwork=with-oauth+origin requires AIRMCP_ALLOWED_ORIGINS.");
       }
-      // No token validation happens in Step 1 — middleware is a follow-up.
-      // The server will refuse tool calls until Step 2 lands; for now, the
-      // .well-known card advertises OAuth support so Managed Agents /
-      // discovery clients can see the auth model before they try.
-      log.warn("oauth in discovery-only mode (step 1)", {
-        policy: ctx.policy,
-        note: "Token validation middleware arrives in a follow-up; do NOT bind this to a public interface until the middleware lands.",
-      });
       return;
     case "unauthenticated":
       // No invariant — but loudly warn so the choice is visible.
@@ -211,7 +203,7 @@ export function validateNetworkPolicy(ctx: {
   }
 }
 
-export async function startHttpServer(options: HttpServerOptions): Promise<void> {
+export async function startHttpServer(options: HttpServerOptions): Promise<NodeHttpServer> {
   const { port, bindAll, httpToken, allowNetwork: explicitPolicy, unsafeNoAuth, ...serverOptions } = options;
   const { pkg } = serverOptions;
 
@@ -641,16 +633,27 @@ export async function startHttpServer(options: HttpServerOptions): Promise<void>
   // on this host (module enablement depends on config + OS gates).
   enabledModuleNames = bi.modulesEnabled;
   const host = bindAll ? "0.0.0.0" : "127.0.0.1";
-  const httpServer = app.listen(port, host, async () => {
-    bi.transport = "http";
-    bi.port = port;
-    await printBanner(bi);
-    if (bindAll)
-      log.warn("bound to all interfaces", {
-        host: "0.0.0.0",
-        port,
-        auth: httpToken ? "token" : "NONE",
-      });
+  const httpServer = app.listen(port, host);
+  await new Promise<void>((resolve, reject) => {
+    httpServer.once("error", reject);
+    httpServer.once("listening", async () => {
+      httpServer.off("error", reject);
+      try {
+        const address = httpServer.address();
+        bi.transport = "http";
+        bi.port = address && typeof address !== "string" ? address.port : port;
+        await printBanner(bi);
+        if (bindAll)
+          log.warn("bound to all interfaces", {
+            host: "0.0.0.0",
+            port,
+            auth: httpToken ? "token" : "NONE",
+          });
+        resolve();
+      } catch (e) {
+        reject(e);
+      }
+    });
   });
 
   // Release the listening socket and per-process timers on shutdown so
@@ -682,4 +685,5 @@ export async function startHttpServer(options: HttpServerOptions): Promise<void>
       setTimeout(done, 3000);
     });
   });
+  return httpServer;
 }

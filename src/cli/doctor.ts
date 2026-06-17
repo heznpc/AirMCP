@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import { MODULE_NAMES, STARTER_MODULES, NPM_PACKAGE_NAME, MCP_CLIENTS, getCompatibilityEnv } from "../shared/config.js";
 import { HOME, PATHS } from "../shared/constants.js";
+import { isCodexAirmcpConfigured, isCodexCliAvailable } from "./codex-mcp.js";
 import { LOGO_LINES, typeLine } from "../shared/banner.js";
 import { esc } from "../shared/esc.js";
 import { MODULE_MANIFEST } from "../shared/modules.js";
@@ -141,6 +142,14 @@ export async function runDoctor(): Promise<void> {
       } catch {
         meh(client.name, `config parse error`);
       }
+    }
+  }
+  if (isCodexCliAvailable()) {
+    anyClientFound = true;
+    if (isCodexAirmcpConfigured()) {
+      ok("Codex", `${GREEN}connected${RESET}`);
+    } else {
+      meh("Codex", `found but no airmcp entry`);
     }
   }
   if (!anyClientFound) {

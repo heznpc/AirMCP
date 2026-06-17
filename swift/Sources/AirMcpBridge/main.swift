@@ -20,7 +20,7 @@ import ImagePlayground
 //   Single-shot: AirMcpBridge <command>       (reads JSON from stdin, writes result, exits)
 //   Persistent:  AirMcpBridge --persistent    (newline-delimited JSON-RPC, keeps process alive)
 
-#if canImport(FoundationModels) && compiler(>=6.3)
+#if AIRMCP_ENABLE_FOUNDATION_MODELS && canImport(FoundationModels) && compiler(>=6.3)
 import FoundationModels
 #endif
 
@@ -163,14 +163,9 @@ private let healthService = HealthService()
 #endif
 private let eventObserver = EventObserver()
 
-#if canImport(FoundationModels) && compiler(>=6.3)
-@available(macOS 26, iOS 26, *)
-private let foundationBridge = FoundationModelsBridge()
-#endif
-
 // MARK: - Foundation Models guard helper
 
-#if canImport(FoundationModels) && compiler(>=6.3)
+#if AIRMCP_ENABLE_FOUNDATION_MODELS && canImport(FoundationModels) && compiler(>=6.3)
 /// Execute a closure that requires Foundation Models, with standardized error handling.
 @available(macOS 26, iOS 26, *)
 func runFoundationModels(_ body: () async throws -> Void) async {
@@ -819,7 +814,7 @@ case "summarize", "rewrite", "proofread":
         writeError("Invalid JSON input. Expected: {\"text\": \"...\", \"tone\": \"...\"}")
         return
     }
-    #if canImport(FoundationModels) && compiler(>=6.3)
+    #if AIRMCP_ENABLE_FOUNDATION_MODELS && canImport(FoundationModels) && compiler(>=6.3)
     if #available(macOS 26, *) { await runFoundationModels {
         let session = LanguageModelSession()
         let prompt: String
@@ -842,7 +837,7 @@ case "generate-text":
         writeError("Invalid JSON. Expected GenerateTextInput.")
         return
     }
-    #if canImport(FoundationModels) && compiler(>=6.3)
+    #if AIRMCP_ENABLE_FOUNDATION_MODELS && canImport(FoundationModels) && compiler(>=6.3)
     if #available(macOS 26, *) { await runFoundationModels {
         let session = LanguageModelSession(instructions: genInput.systemInstruction ?? "You are a helpful assistant.")
         let result = try await session.respond(to: genInput.prompt)
@@ -858,7 +853,7 @@ case "generate-structured":
         writeError("Invalid JSON. Expected GenerateStructuredInput.")
         return
     }
-    #if canImport(FoundationModels) && compiler(>=6.3)
+    #if AIRMCP_ENABLE_FOUNDATION_MODELS && canImport(FoundationModels) && compiler(>=6.3)
     if #available(macOS 26, *) { await runFoundationModels {
         let session = LanguageModelSession(instructions: structInput.systemInstruction ?? "You are a helpful assistant. Respond with valid JSON only.")
         let prompt: String
@@ -885,7 +880,7 @@ case "tag-content":
         writeError("Invalid JSON. Expected TagContentInput.")
         return
     }
-    #if canImport(FoundationModels) && compiler(>=6.3)
+    #if AIRMCP_ENABLE_FOUNDATION_MODELS && canImport(FoundationModels) && compiler(>=6.3)
     if #available(macOS 26, *) { await runFoundationModels {
         let tagList = tagInput.tags.joined(separator: ", ")
         let session = LanguageModelSession(instructions: "You are a content classification system. Classify text into the provided categories. Respond with ONLY a JSON object mapping each applicable tag to a confidence score between 0.0 and 1.0.")
@@ -906,7 +901,7 @@ case "ai-chat":
         writeError("Invalid JSON. Expected AiChatInput.")
         return
     }
-    #if canImport(FoundationModels) && compiler(>=6.3)
+    #if AIRMCP_ENABLE_FOUNDATION_MODELS && canImport(FoundationModels) && compiler(>=6.3)
     if #available(macOS 26, *) { await runFoundationModels {
         let session = LanguageModelSession(instructions: chatInput.systemInstruction ?? "You are a helpful on-device AI assistant.")
         let result = try await session.respond(to: chatInput.message)
@@ -930,17 +925,19 @@ case "ai-status":
     let hasAppleSilicon = false
     #endif
 
-    #if canImport(FoundationModels) && compiler(>=6.3)
+    #if AIRMCP_ENABLE_FOUNDATION_MODELS && canImport(FoundationModels) && compiler(>=6.3)
     let fmSupported = true
     let available = hasAppleSilicon && osVersion.majorVersion >= 26
     let message: String
-    if available {
-        message = "Apple Foundation Models are available and ready to use."
-    } else if !hasAppleSilicon {
+    #if arch(arm64)
+        if osVersion.majorVersion >= 26 {
+            message = "Apple Foundation Models are available and ready to use."
+        } else {
+            message = "Apple Foundation Models require macOS 26 or later. Current: macOS \(versionString)."
+        }
+    #else
         message = "Apple Foundation Models require Apple Silicon (M1 or later)."
-    } else {
-        message = "Apple Foundation Models require macOS 26 or later. Current: macOS \(versionString)."
-    }
+    #endif
     #else
     let fmSupported = false
     let available = false
@@ -1422,13 +1419,14 @@ case "pasteboard-smart":
 
 // --- Foundation Models: AI Agent (on-device LLM + AirMCP tools) ---
 case "ai-agent":
-    #if canImport(FoundationModels) && compiler(>=6.3)
+    #if AIRMCP_ENABLE_FOUNDATION_MODELS && canImport(FoundationModels) && compiler(>=6.3)
     if #available(macOS 26, iOS 26, *) {
         guard let input = try? JSONDecoder().decode(Input.self, from: stdinData) else {
             writeError("Invalid JSON. Expected {\"text\":\"...\"}")
             return
         }
         do {
+            let foundationBridge = FoundationModelsBridge()
             let result = try await foundationBridge.run(prompt: input.text, systemInstruction: input.tone)
             try writeOutput(Output(output: result))
         } catch {

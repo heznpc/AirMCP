@@ -65,6 +65,11 @@
     "build": "node scripts/build.mjs",
     "swift-build": "cd swift && swift build -c release",
     "app-build": "cd app && swift build -c release",
+    "app:run": "./scripts/bundle-app.sh run",
+    "app:verify": "./scripts/bundle-app.sh verify",
+    "app:verify:intents": "./scripts/bundle-app.sh verify-appintents",
+    "widget-build": "./scripts/bundle-app.sh widget-release",
+    "widget-build:debug": "./scripts/bundle-app.sh widget-debug",
     "clean": "rm -rf dist",
     "dev": "tsx src/index.ts",
     "lint": "eslint src/",
@@ -160,7 +165,7 @@
     "darwin"
   ],
   "overrides": {
-    "hono": "^4.12.13",
+    "hono": "^4.12.25",
     "@hono/node-server": "^1.19.13"
   },
   "lint-staged": {

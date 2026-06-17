@@ -10,6 +10,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, copyFileSync } from
 import { join } from "node:path";
 import { MODULE_NAMES, STARTER_MODULES, NPM_PACKAGE_NAME, MCP_CLIENTS } from "../shared/config.js";
 import { PATHS } from "../shared/constants.js";
+import { configureCodexAirmcp, isCodexCliAvailable } from "./codex-mcp.js";
 import { LOGO_LINES, typeLine, sleep, writeOut } from "../shared/banner.js";
 import { isPlainObject } from "../shared/validate.js";
 import { formatError } from "../shared/errors.js";
@@ -497,11 +498,29 @@ export async function runInit(): Promise<void> {
     }
   }
 
+  if (isCodexCliAvailable()) {
+    detectedClients.push("Codex");
+    process.stdout.write("  Configuring Codex...");
+
+    try {
+      const result = configureCodexAirmcp();
+      console.log(
+        ` ${GREEN}\u2713${RESET}${result === "already-configured" ? ` ${DIM}(already connected)${RESET}` : ""}`,
+      );
+      patchedClients++;
+    } catch (e) {
+      console.log(` ${YELLOW}\u26A0${RESET} ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
   if (detectedClients.length === 0) {
     console.log(`  ${YELLOW}\u26A0${RESET} No MCP clients detected.`);
     console.log("");
     console.log("  Add this to your MCP client config manually:");
     console.log(`  ${DIM}${JSON.stringify({ mcpServers: { airmcp: airmcpEntry } }, null, 2)}${RESET}`);
+    console.log("");
+    console.log("  Codex CLI:");
+    console.log(`  ${DIM}codex mcp add airmcp -- npx -y ${NPM_PACKAGE_NAME}${RESET}`);
   }
 
   // --- Done ---
@@ -518,6 +537,7 @@ export async function runInit(): Promise<void> {
   console.log(
     `    ${DIM}\u2022${RESET} Run ${BOLD}npx airmcp doctor --deep${RESET} for audit + Swift bridge + module-load probes`,
   );
+  console.log(`    ${DIM}\u2022${RESET} Run ${BOLD}npx airmcp workflows${RESET} to see target workflows and prompts`);
   console.log(`    ${DIM}\u2022${RESET} Re-run ${BOLD}npx airmcp init${RESET} anytime to change modules`);
   console.log(`    ${DIM}\u2022${RESET} Use ${BOLD}npx airmcp --full${RESET} to enable all modules temporarily`);
   console.log("");

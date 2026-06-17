@@ -21,6 +21,7 @@ import {
   enumTypeName,
   intentActionNameFor,
   swiftTypeFor,
+  appEntityTypeForParam,
   swiftDefaultLiteral,
   enumDefaultLiteral,
   wireExpr,
@@ -267,6 +268,26 @@ describe("swiftTypeFor", () => {
   });
 });
 
+describe("appEntityTypeForParam", () => {
+  test("maps workflow-domain id params to AirMCP AppEntity wrappers", () => {
+    expect(appEntityTypeForParam("read_event", "id", { type: "string" })).toBe(
+      "AirMCPCalendarEventEntity",
+    );
+    expect(appEntityTypeForParam("complete_reminder", "id", { type: "string" })).toBe(
+      "AirMCPReminderEntity",
+    );
+    expect(appEntityTypeForParam("add_contact_email", "id", { type: "string" })).toBe(
+      "AirMCPContactEntity",
+    );
+  });
+
+  test("leaves unrelated string ids and non-string params alone", () => {
+    expect(appEntityTypeForParam("read_note", "id", { type: "string" })).toBeNull();
+    expect(appEntityTypeForParam("read_event", "id", { type: "integer" })).toBeNull();
+    expect(appEntityTypeForParam("read_event", "eventId", { type: "string" })).toBeNull();
+  });
+});
+
 describe("swiftDefaultLiteral", () => {
   test("numeric defaults round-trip as Swift literals", () => {
     expect(swiftDefaultLiteral(50, "Int")).toBe("50");
@@ -330,6 +351,11 @@ describe("wireExpr", () => {
     // isEnum takes precedence over the Date branch (won't happen in practice,
     // but locks the priority)
     expect(wireExpr("Date", "v", true)).toBe("v.rawValue");
+  });
+
+  test("AppEntity wrappers send their string id over the wire", () => {
+    expect(wireExpr("AirMCPReminderEntity", "id", false, true)).toBe("id.id");
+    expect(wireExpr("AirMCPContactEntity", "v", false, true)).toBe("v.id");
   });
 });
 
@@ -756,6 +782,31 @@ describe("swiftParamDecl", () => {
     expect(decl).not.toContain("ActionOption?");
   });
 
+  test("value type override uses AppEntity type without enum semantics", () => {
+    const decl = swiftParamDecl(
+      "id",
+      { type: "string", description: "Reminder ID" },
+      true,
+      undefined,
+      "AirMCPReminderEntity",
+    );
+    expect(decl).toContain('title: "Reminder ID"');
+    expect(decl).toContain("public var id: AirMCPReminderEntity");
+    expect(decl).not.toContain("Allowed:");
+    expect(decl).not.toContain("default:");
+  });
+
+  test("optional value type override remains optional", () => {
+    const decl = swiftParamDecl(
+      "id",
+      { type: "string", description: "Contact ID" },
+      false,
+      undefined,
+      "AirMCPContactEntity",
+    );
+    expect(decl).toContain("public var id: AirMCPContactEntity?");
+  });
+
   test("title exceeding MAX_TITLE_LEN is sliced", () => {
     const longDesc = "x".repeat(200);
     const decl = swiftParamDecl("field", { type: "string", description: longDesc }, true);
@@ -829,6 +880,36 @@ describe("buildArgsBlock", () => {
       { name: "default_", wireName: "default", type: "String", isEnum: false, optional: false },
     ]);
     expect(out.argsExpr).toBe(`["default": default_]`);
+  });
+
+  test("required entity param sends id string", () => {
+    const out = buildArgsBlock([
+      {
+        name: "id",
+        wireName: "id",
+        type: "AirMCPReminderEntity",
+        isEnum: false,
+        isEntity: true,
+        optional: false,
+      },
+    ]);
+    expect(out.prelude).toBe("");
+    expect(out.argsExpr).toBe(`["id": id.id]`);
+  });
+
+  test("optional entity param unwraps then sends id string", () => {
+    const out = buildArgsBlock([
+      {
+        name: "id",
+        wireName: "id",
+        type: "AirMCPContactEntity",
+        isEnum: false,
+        isEntity: true,
+        optional: true,
+      },
+    ]);
+    expect(out.argsExpr).toBe("args");
+    expect(out.prelude).toContain(`if let v = id { args["id"] = v.id }`);
   });
 
   test("prelude lines are indented 8 spaces (matches perform body formatting)", () => {
@@ -958,7 +1039,11 @@ describe("deriveFollowUpFactorySpecs", () => {
     };
     const specs = deriveFollowUpFactorySpecs(resolved);
     expect(specs).toHaveLength(1);
-    expect(specs[0]).toEqual({ targetIntentName: "ReadEventIntent", targetParam: "id" });
+    expect(specs[0]).toEqual({
+      target: "read_event",
+      targetIntentName: "ReadEventIntent",
+      targetParam: "id",
+    });
   });
 
   test("same target + different param → two factories", () => {

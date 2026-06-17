@@ -16,18 +16,31 @@ if (_sub === "--version" || _sub === "-v" || _sub === "-V") {
   console.log(v);
   process.exit(0);
 }
-if (_sub === "init" || _sub === "doctor" || _sub === "--help" || _sub === "-h" || _sub === "help") {
+if (
+  _sub === "init" ||
+  _sub === "doctor" ||
+  _sub === "workflows" ||
+  _sub === "--help" ||
+  _sub === "-h" ||
+  _sub === "help"
+) {
   if (_sub === "init") {
     const mod = await import("./cli/init.js");
     await mod.runInit();
   } else if (_sub === "doctor") {
     const mod = await import("./cli/doctor.js");
     await mod.runDoctor();
+  } else if (_sub === "workflows") {
+    const mod = await import("./cli/workflows.js");
+    await mod.runWorkflows();
   } else {
     const mod = await import("./cli/help.js");
     mod.runHelp();
   }
-  process.exit(0);
+  // Respect a non-zero code a subcommand set via process.exitCode (e.g.
+  // `workflows <unknown>` / `--preview` errors). A blanket exit(0) would mask
+  // those and silently break `npx airmcp workflows … || exit 1` scripting.
+  process.exit(process.exitCode ?? 0);
 }
 // Reject unknown subcommands (anything that doesn't start with --)
 if (_sub && !_sub.startsWith("--")) {

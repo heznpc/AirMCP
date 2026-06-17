@@ -6,6 +6,11 @@ description: >-
   the `pasteboard_changed` event trigger with `on_error: continue` so
   Safari's validator rejects non-URLs and the skill quietly moves on.
 expose_as: tool
+annotations:
+  readOnlyHint: false
+  destructiveHint: false
+  idempotentHint: false
+  openWorldHint: false
 trigger:
   event: pasteboard_changed
   debounce_ms: 3000

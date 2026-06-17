@@ -49,6 +49,7 @@ import {
   enumTypeName,
   intentActionNameFor,
   swiftTypeFor,
+  appEntityTypeForParam,
   swiftDefaultLiteral,
   enumDefaultLiteral,
   wireExpr,
@@ -138,16 +139,43 @@ const INCLUDE_DESTRUCTIVE = /^(1|true|yes|on)$/i.test(process.env.AIRMCP_APPINTE
 // co-exist with it. The hand-written intent lives in
 // swift/Sources/AirMCPKit/AskAirMCPIntent.swift.
 const APP_SHORTCUTS_TOP = [
-  "today_events",
-  "list_calendars",
-  "search_notes",
-  "search_contacts",
-  "list_reminder_lists",
-  "list_shortcuts",
-  "list_bookmarks",
-  "get_current_weather",
   "summarize_context",
+  "timeline_today",
+  "skill_inbox-triage",
+  "skill_project-digest",
+  "today_events",
+  "search_notes",
+  "list_reminders",
+  "search_contacts",
+  "get_current_weather",
 ];
+
+const APP_SHORTCUT_LABELS = {
+  summarize_context: {
+    shortTitle: "Daily Briefing",
+    phraseTitle: "Daily Briefing",
+    phraseName: "brief my day",
+    systemImageName: "sun.max",
+  },
+  timeline_today: {
+    shortTitle: "Today Timeline",
+    phraseTitle: "Today Timeline",
+    phraseName: "show my day",
+    systemImageName: "calendar",
+  },
+  "skill_inbox-triage": {
+    shortTitle: "Inbox Triage",
+    phraseTitle: "Inbox Triage",
+    phraseName: "triage my inbox",
+    systemImageName: "tray.full",
+  },
+  "skill_project-digest": {
+    shortTitle: "Project Digest",
+    phraseTitle: "Project Digest",
+    phraseName: "summarize my project",
+    systemImageName: "folder",
+  },
+};
 
 // ── Load manifest ────────────────────────────────────────────────────
 let manifest;
@@ -261,7 +289,8 @@ function generateIntent(tool) {
   for (const wireName of Object.keys(props)) {
     const prop = props[wireName];
     const enumInfo = toolEnums?.get(wireName);
-    const baseType = enumInfo?.typeName ?? swiftTypeFor(prop);
+    const entityType = enumInfo ? null : appEntityTypeForParam(tool.name, wireName, prop);
+    const baseType = enumInfo?.typeName ?? entityType ?? swiftTypeFor(prop);
     if (baseType === null) continue; // silently dropped — codegen will still compile
     const isRequired = required.has(wireName);
     decls.push({
@@ -269,13 +298,22 @@ function generateIntent(tool) {
       wireName,
       type: baseType,
       isEnum: Boolean(enumInfo),
+      isEntity: Boolean(entityType),
       isRequired,
       optional: !isRequired && prop.default === undefined,
     });
   }
 
   const paramDecls = decls
-    .map((d) => swiftParamDecl(d.name, props[d.wireName], d.isRequired, d.isEnum ? d.type : undefined))
+    .map((d) =>
+      swiftParamDecl(
+        d.name,
+        props[d.wireName],
+        d.isRequired,
+        d.isEnum ? d.type : undefined,
+        d.isEntity ? d.type : undefined,
+      ),
+    )
     .filter(Boolean)
     .join("\n\n");
   const { prelude, argsExpr } = buildArgsBlock(decls);
@@ -364,7 +402,8 @@ ${availability}public struct ${structName}: AppIntent {
 
     public init() {}
 
-${paramDecls ? paramDecls + "\n\n" : ""}    public func perform() async throws -> ${returnClause} {
+${paramDecls ? paramDecls + "\n\n" : ""}    @MainActor
+    public func perform() async throws -> ${returnClause} {
 ${callBlock}
 ${tailBlock}
     }
@@ -382,45 +421,53 @@ ${tailBlock}
 function generateAppShortcuts() {
   const toolEntries = appShortcutsPicks.map((tool) => {
     const structName = intentStructName(tool.name);
-    const title = swiftLit(tool.title ?? tool.name);
-    const img = systemImageFor(tool.name);
+    const label = APP_SHORTCUT_LABELS[tool.name] ?? {};
+    const shortTitle = swiftLit(label.shortTitle ?? tool.title ?? tool.name);
+    const phraseTitle = swiftLit(label.phraseTitle ?? label.shortTitle ?? tool.title ?? tool.name);
+    const phraseName = swiftLit(
+      label.phraseName ?? tool.name.replace(/^skill_/, "").replace(/[_-]/g, " "),
+    );
+    const img = label.systemImageName ?? systemImageFor(tool.name);
     // Two phrases per shortcut keeps suggestions broad enough for natural
     // Siri invocation. Apple recommends each phrase use .applicationName.
-    const phrase1 = swiftLit(title);
-    const phrase2 = swiftLit(tool.name.replace(/_/g, " "));
     return `        AppShortcut(
             intent: ${structName}(),
             phrases: [
-                "${phrase1} in \\(.applicationName)",
-                "${phrase2} with \\(.applicationName)",
+                "${phraseTitle} in \\(.applicationName)",
+                "${phraseName} with \\(.applicationName)",
             ],
-            shortTitle: "${phrase1}",
+            shortTitle: "${shortTitle}",
             systemImageName: "${img}"
         )`;
   });
 
   // AskAirMCPIntent is the natural-language agent entry (axis 6 /
-  // FoundationModelsBridge). Pinned as the first Shortcuts suggestion
-  // on iOS 26+/macOS 26+ where FoundationModels is available. The
-  // #if guard matches AskAirMCPIntent.swift's availability conditions
-  // so the provider stays compileable on older SDKs.
-  const askShortcut = `        #if canImport(FoundationModels) && compiler(>=6.3)
-        if #available(macOS 26, iOS 26, *) {
-            AppShortcut(
-                intent: AskAirMCPIntent(),
-                phrases: [
-                    "Ask \\(.applicationName)",
-                    "Ask \\(.applicationName) about my day",
-                ],
-                shortTitle: "Ask AirMCP",
-                systemImageName: "brain.head.profile"
-            )
-        }
-        #endif`;
-
-  return `public struct AirMCPGeneratedShortcuts: AppShortcutsProvider {
+  // FoundationModelsBridge). It is emitted as a separate provider instead
+  // of a runtime `if #available` inside AppShortcutsBuilder: Swift 6.3
+  // treats that runtime branch as an array in builder context and fails
+  // with "cannot pass array of type '[AppShortcut]' as variadic arguments".
+  // The provider-level @available gate keeps older SDKs compileable.
+  const askShortcutProvider = `#if AIRMCP_ENABLE_FOUNDATION_MODELS && canImport(FoundationModels) && compiler(>=6.3)
+@available(macOS 26, iOS 26, *)
+public struct AirMCPAskShortcut: AppShortcutsProvider {
     @AppShortcutsBuilder public static var appShortcuts: [AppShortcut] {
-${askShortcut}
+        AppShortcut(
+            intent: AskAirMCPIntent(),
+            phrases: [
+                "Ask \\(.applicationName)",
+                "Ask \\(.applicationName) about my day",
+            ],
+            shortTitle: "Ask AirMCP",
+            systemImageName: "brain.head.profile"
+        )
+    }
+}
+#endif`;
+
+  return `${askShortcutProvider}
+
+public struct AirMCPGeneratedShortcuts: AppShortcutsProvider {
+    @AppShortcutsBuilder public static var appShortcuts: [AppShortcut] {
 ${toolEntries.join("\n")}
     }
 }`;
@@ -495,11 +542,11 @@ const FOLLOW_UP_MAP = {
  * Optional fields get an `?? "—"` fallback so nil values render as an em
  * dash rather than disappearing (keeps the row stable).
  */
-function renderScalarRow(key, propSchema) {
+function renderScalarRow(key, propSchema, isRequired) {
   const ident = swiftIdent(key);
   const label = humanizeKey(key);
   const schema = isNullableUnion(propSchema) ? { ...propSchema, type: nonNullType(propSchema) } : propSchema;
-  const isOptional = isNullableUnion(propSchema);
+  const isOptional = isNullableUnion(propSchema) || !isRequired;
   const accessor = `data.${ident}`;
 
   let valueExpr;
@@ -613,7 +660,8 @@ function renderSnippetView(tool) {
     // the schema declares `format: date-time`), and a `.lineLimit(1)`
     // tail truncation so long strings don't blow out the snippet card.
     const props = tool.outputSchema.properties ?? {};
-    const rows = Object.keys(props).map((k) => renderScalarRow(k, props[k]));
+    const required = new Set(tool.outputSchema.required ?? []);
+    const rows = Object.keys(props).map((k) => renderScalarRow(k, props[k], required.has(k)));
     body = `        VStack(alignment: .leading, spacing: 2) {
 ${rows.join("\n")}
         }
@@ -660,12 +708,18 @@ const snippetViews = typedTools.map((tool) => renderSnippetView(tool));
 // list_chats (→ read_chat.chatId) and list_events (→ read_event.id)
 // each get their own helper even when they share a target intent.
 const followUpFactories = followUpFactorySpecs.map(
-  ({ targetIntentName, targetParam }) => {
+  ({ target, targetIntentName, targetParam }) => {
     const paramIdent = swiftIdent(targetParam);
+    const targetTool = byName.get(target);
+    const prop = targetTool?.inputSchema?.properties?.[targetParam];
+    const entityType = appEntityTypeForParam(target, targetParam, prop);
+    const assignment = entityType
+      ? `${entityType}(id: ${paramIdent}, title: ${paramIdent}, subtitle: "AirMCP ID")`
+      : paramIdent;
     return `@available(macOS 26, iOS 26, *)
 fileprivate func _mk${targetIntentName}_${targetParam}(${paramIdent}: String) -> ${targetIntentName} {
-    var intent = ${targetIntentName}()
-    intent.${paramIdent} = ${paramIdent}
+    let intent = ${targetIntentName}()
+    intent.${paramIdent} = ${assignment}
     return intent
 }`;
   },

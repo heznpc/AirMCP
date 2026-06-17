@@ -33,7 +33,11 @@ jest.unstable_mockModule('../dist/server/mcp-setup.js', () => ({
   createServer: jest.fn(async () => ({
     server: { connect: jest.fn(), close: jest.fn(), sendResourceListChanged: jest.fn() },
     bannerInfo: { transport: 'http', version: '2.6.0', modulesEnabled: [] },
+    cleanupEventListeners: jest.fn(),
   })),
+}));
+jest.unstable_mockModule('../dist/server/shutdown.js', () => ({
+  registerShutdownHook: jest.fn(),
 }));
 // tool-registry's transitive deps (usage-tracker, audit) touch
 // PATHS + FS — not relevant to http-transport's surface tests, so
@@ -182,13 +186,29 @@ describe('resolveAllowNetwork integration with doctor', () => {
     expect(typeof mod.validateNetworkPolicy).toBe('function');
   });
 
-  test('all four policy values roundtrip through resolve+validate cleanly', () => {
+  test('network policy values roundtrip through resolve+validate cleanly', () => {
     // with-token+origin needs origins, with-token needs token, loopback-only
     // stands alone, unauthenticated is self-consistent.
     const cases = [
       { policy: 'loopback-only', bindAll: false, httpToken: '', origins: 0 },
       { policy: 'with-token', bindAll: true, httpToken: 't', origins: 0 },
       { policy: 'with-token+origin', bindAll: true, httpToken: 't', origins: 1 },
+      {
+        policy: 'with-oauth',
+        bindAll: true,
+        httpToken: '',
+        origins: 0,
+        oauthIssuer: 'https://auth.example.com',
+        oauthAudience: 'https://airmcp.example/mcp',
+      },
+      {
+        policy: 'with-oauth+origin',
+        bindAll: true,
+        httpToken: '',
+        origins: 1,
+        oauthIssuer: 'https://auth.example.com',
+        oauthAudience: 'https://airmcp.example/mcp',
+      },
       { policy: 'unauthenticated', bindAll: true, httpToken: '', origins: 0 },
     ];
     const err = jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -206,6 +226,8 @@ describe('resolveAllowNetwork integration with doctor', () => {
           bindAll: c.bindAll,
           httpToken: c.httpToken,
           allowedOriginsCount: c.origins,
+          oauthIssuer: c.oauthIssuer,
+          oauthAudience: c.oauthAudience,
         }),
       ).not.toThrow();
     }
@@ -271,15 +293,130 @@ describe('validateNetworkPolicy — OAuth branches (RFC 0005 Step 1)', () => {
     err.mockRestore();
   });
 
-  test('with-oauth prints Step-1 advisory (discovery-only) on startup', () => {
+  test('with-oauth accepts issuer + audience without stale discovery-only advisory', () => {
     const err = jest.spyOn(console, 'error').mockImplementation(() => {});
     validateNetworkPolicy({
       ...base,
       oauthIssuer: 'https://auth.example.com',
       oauthAudience: 'https://a/mcp',
     });
-    expect(err).toHaveBeenCalledWith(expect.stringContaining('discovery-only mode (step 1)'));
+    expect(err).not.toHaveBeenCalledWith(expect.stringContaining('discovery-only'));
     err.mockRestore();
+  });
+});
+
+describe('startHttpServer live middleware', () => {
+  let startHttpServer;
+  let errorSpy;
+
+  beforeAll(async () => {
+    ({ startHttpServer } = await import('../dist/server/http-transport.js'));
+  });
+
+  beforeEach(() => {
+    errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    errorSpy.mockRestore();
+    delete process.env.AIRMCP_ALLOWED_ORIGINS;
+    delete process.env.AIRMCP_OAUTH_ISSUER;
+    delete process.env.AIRMCP_OAUTH_AUDIENCE;
+  });
+
+  function options(overrides = {}) {
+    return {
+      port: 0,
+      bindAll: true,
+      httpToken: 'secret',
+      allowNetwork: 'with-token',
+      pkg: {
+        version: '9.9.9-test',
+        description: 'AirMCP test server',
+        license: 'MIT',
+        homepage: 'https://example.test',
+      },
+      ...overrides,
+    };
+  }
+
+  function serverUrl(server, path) {
+    const addr = server.address();
+    if (!addr || typeof addr === 'string') throw new Error('expected TCP test server');
+    return `http://127.0.0.1:${addr.port}${path}`;
+  }
+
+  async function closeServer(server) {
+    await new Promise((resolve) => server.close(resolve));
+  }
+
+  test('health stays public while /mcp requires the bearer token', async () => {
+    const server = await startHttpServer(options());
+    try {
+      const health = await fetch(serverUrl(server, '/health'));
+      expect(health.status).toBe(200);
+      expect(await health.json()).toEqual({ status: 'ok', version: '9.9.9-test' });
+
+      const protectedRoute = await fetch(serverUrl(server, '/mcp'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize' }),
+      });
+      expect(protectedRoute.status).toBe(401);
+      expect(await protectedRoute.json()).toEqual({ error: 'Unauthorized: invalid or missing Bearer token' });
+    } finally {
+      await closeServer(server);
+    }
+  });
+
+  test('with-token+origin rejects an unlisted Origin before MCP handling', async () => {
+    process.env.AIRMCP_ALLOWED_ORIGINS = 'https://allowed.example';
+    const server = await startHttpServer(options({ allowNetwork: 'with-token+origin' }));
+    try {
+      const response = await fetch(serverUrl(server, '/mcp'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer secret',
+          Origin: 'https://evil.example',
+        },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize' }),
+      });
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({ error: 'Forbidden: Origin not allowed' });
+    } finally {
+      await closeServer(server);
+    }
+  });
+
+  test('with-oauth rejects protected requests without a bearer token', async () => {
+    process.env.AIRMCP_OAUTH_ISSUER = 'https://auth.example.com';
+    process.env.AIRMCP_OAUTH_AUDIENCE = 'https://airmcp.example/mcp';
+    const server = await startHttpServer(
+      options({
+        allowNetwork: 'with-oauth',
+        httpToken: '',
+      }),
+    );
+    try {
+      const metadata = await fetch(serverUrl(server, '/.well-known/oauth-protected-resource'));
+      expect(metadata.status).toBe(200);
+      const card = await metadata.json();
+      expect(card.resource).toBe('https://airmcp.example/mcp');
+
+      const protectedRoute = await fetch(serverUrl(server, '/mcp'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize' }),
+      });
+      expect(protectedRoute.status).toBe(401);
+      expect(protectedRoute.headers.get('www-authenticate')).toContain(
+        'resource="https://airmcp.example/mcp"',
+      );
+      expect(await protectedRoute.json()).toEqual({ error: 'Unauthorized', code: 'invalid_request' });
+    } finally {
+      await closeServer(server);
+    }
   });
 });
 

@@ -68,21 +68,7 @@ struct AirMCPApp: App {
                 updateManager: updateManager
             )
             .onAppear {
-                serverManager.logManager = logManager
-                serverManager.startPolling()
-                if !hitlInitialized {
-                    hitlInitialized = true
-                    setupHitl()
-                }
-                if !appInitialized {
-                    appInitialized = true
-                    updateManager.startPeriodicChecks()
-                    if !UserDefaults.standard.bool(forKey: AirMcpConstants.keyOnboardingCompleted) {
-                        showOnboardingWindow()
-                    } else {
-                        serverManager.autoStartIfNeeded()
-                    }
-                }
+                initializeRuntimeIfNeeded()
             }
             .onReceive(NotificationCenter.default.publisher(for: .hitlNotificationResponse)) { notification in
                 guard let userInfo = notification.userInfo,
@@ -94,8 +80,29 @@ struct AirMCPApp: App {
             }
         } label: {
             Label("AirMCP", systemImage: "a.square.fill")
+                .onAppear {
+                    initializeRuntimeIfNeeded()
+                }
         }
         .menuBarExtraStyle(.menu)
+    }
+
+    private func initializeRuntimeIfNeeded() {
+        serverManager.logManager = logManager
+        serverManager.startPolling()
+        if !hitlInitialized {
+            hitlInitialized = true
+            setupHitl()
+        }
+        if !appInitialized {
+            appInitialized = true
+            updateManager.startPeriodicChecks()
+            if !UserDefaults.standard.bool(forKey: AirMcpConstants.keyOnboardingCompleted) {
+                showOnboardingWindow()
+            } else {
+                serverManager.autoStartIfNeeded()
+            }
+        }
     }
 
     private func setupHitl() {
@@ -104,6 +111,8 @@ struct AirMCPApp: App {
         hitlManager.timeoutSeconds = configManager.hitlTimeout
         if configManager.hitlLevel != .off {
             hitlManager.startListening()
+        } else {
+            hitlManager.stopListening()
         }
     }
 

@@ -7,6 +7,11 @@ description: >-
   `screen_locked` event trigger combined with `parallel` reads and
   `retry` on the on-device summariser.
 expose_as: tool
+annotations:
+  readOnlyHint: false
+  destructiveHint: false
+  idempotentHint: false
+  openWorldHint: false
 trigger:
   event: screen_locked
   # 5-min debounce because a laptop lid briefly closing during a

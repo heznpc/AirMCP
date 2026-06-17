@@ -8,6 +8,7 @@
 
 /* Menu - Sections */
 "menu.modules" = "모듈";
+"menu.workflows" = "워크플로우";
 "menu.settings" = "설정";
 "menu.viewLogs" = "로그 보기 (%d)";
 "menu.quit" = "종료";
@@ -30,6 +31,7 @@
 /* Menu - Config */
 "menu.copyClaudeConfig" = "Claude 설정 복사";
 "menu.copyClaudeCodeConfig" = "Claude Code 설정 복사";
+"menu.copyCodexConfig" = "Codex 설정 복사";
 "menu.addWidget" = "데스크탑 위젯 추가...";
 "menu.openDocumentation" = "문서 열기";
 
@@ -37,6 +39,46 @@
 "menu.noLogs" = "로그 없음";
 "menu.moreLines" = "%d줄 더...";
 "menu.clearLogs" = "로그 지우기";
+
+/* Workflows */
+"workflow.menuHint" = "프롬프트나 Siri 문구를 복사한 뒤 MCP 클라이언트나 단축어에서 실행하세요.";
+"workflow.copyPrompt" = "프롬프트 복사";
+"workflow.copySiriPhrase" = "Siri 문구 복사";
+"workflow.copyToolList" = "도구 목록 복사";
+"workflow.openShortcutsDoc" = "단축어 가이드 열기";
+"workflow.dailyBriefing" = "데일리 브리핑";
+"workflow.dailyBriefing.desc" = "캘린더, 미리알림, 메일, 최근 메모로 하루를 시작합니다.";
+"workflow.dailyBriefing.prompt" = "오늘 캘린더, 지난 미리알림, 읽지 않은 메일, 최근 메모를 브리핑해줘.";
+"workflow.dailyBriefing.safety" = "기본은 읽기 전용입니다. 메모나 미리알림 저장은 별도 승인되는 동작입니다.";
+"workflow.dailyBriefing.access" = "캘린더, 미리알림, 메일, 메모를 읽습니다. 첫 실행은 쓰기 없음.";
+"workflow.dailyBriefing.siri" = "AirMCP에서 데일리 브리핑";
+"workflow.inboxTriage" = "받은편지함 정리";
+"workflow.inboxTriage.desc" = "메일 backlog를 검토 가능한 후속 작업 목록으로 바꿉니다.";
+"workflow.inboxTriage.prompt" = "Alex가 프로젝트에 대해 보낸 메일을 찾아 action item을 미리알림으로 만들어줘.";
+"workflow.inboxTriage.safety" = "메일을 먼저 읽고, 미리알림 생성은 호출별 쓰기 경로로 감사 로그에 남습니다.";
+"workflow.inboxTriage.access" = "메일을 읽습니다. 미리알림 생성은 승인 후에만 실행됩니다.";
+"workflow.inboxTriage.siri" = "AirMCP로 받은편지함 정리";
+"workflow.meetingPrep" = "회의 준비";
+"workflow.meetingPrep.desc" = "다음 회의 전에 필요한 맥락을 모읍니다.";
+"workflow.meetingPrep.prompt" = "다음 회의에 관련된 메모, 연락처, 파일, 미리알림을 찾아줘.";
+"workflow.meetingPrep.safety" = "준비 흐름은 읽기 전용입니다. agenda나 task 생성은 명시적인 후속 쓰기입니다.";
+"workflow.meetingPrep.access" = "캘린더, 메모, 연락처, Finder, 미리알림을 읽습니다.";
+"workflow.projectDigest" = "프로젝트 다이제스트";
+"workflow.projectDigest.desc" = "인덱싱된 Apple workspace 데이터에서 활성 프로젝트 맥락을 요약합니다.";
+"workflow.projectDigest.prompt" = "현재 프로젝트에서 어제 이후 바뀐 내용을 요약해줘.";
+"workflow.projectDigest.safety" = "인덱싱 후 digest는 읽기 전용입니다. 인덱싱은 AirMCP의 로컬 semantic store에만 기록합니다.";
+"workflow.projectDigest.access" = "로컬 맥락을 인덱싱한 뒤 관련 항목을 읽습니다.";
+"workflow.projectDigest.siri" = "AirMCP에서 프로젝트 다이제스트";
+"workflow.focusBlocks" = "집중 블록";
+"workflow.focusBlocks.desc" = "열린 미리알림을 캘린더 시간 블록으로 바꿉니다.";
+"workflow.focusBlocks.prompt" = "오늘 열린 미리알림을 위한 집중 블록을 계획해줘. 각 이벤트 생성 전에는 물어봐.";
+"workflow.focusBlocks.safety" = "캘린더 이벤트 생성은 비파괴적이지만 비멱등 쓰기이며 감사 로그에 남습니다.";
+"workflow.focusBlocks.access" = "미리알림을 읽습니다. 캘린더 이벤트는 생성 전 물어봅니다.";
+"workflow.researchOutput" = "리서치에서 결과물까지";
+"workflow.researchOutput.desc" = "Safari, 파일, 메모에서 출발해 초안 메모나 메일로 이어갑니다.";
+"workflow.researchOutput.prompt" = "Safari에서 Apple developer docs를 열고 페이지를 요약한 뒤 메모 초안을 만들어줘.";
+"workflow.researchOutput.safety" = "읽기와 요약은 읽기 전용입니다. 전송이나 저장은 별도 쓰기 동작입니다.";
+"workflow.researchOutput.access" = "Safari를 읽습니다. 저장이나 전송은 별도 동작입니다.";
 
 /* Settings */
 "settings.autoStart" = "실행 시 서버 자동 시작";
@@ -59,6 +101,7 @@
 "settings.hitlWaiting" = "HITL: 대기 중";
 "settings.hitlInactive" = "HITL: 비활성";
 "settings.recentApprovals" = "최근 승인 내역";
+"settings.pendingApprovals" = "대기 중인 승인";
 "settings.approved" = "승인됨";
 "settings.denied" = "거부됨";
 
@@ -137,15 +180,21 @@
 "onboarding.nodeInstallHint" = "AirMCP를 실행하려면 Node.js가 필요합니다. 설치 후 앱을 다시 실행해주세요.";
 "onboarding.nodeDownload" = "Node.js 다운로드";
 "onboarding.nodeCheckAgain" = "다시 확인";
+"onboarding.chooseWorkflow" = "AirMCP로 먼저 무엇을 할까요?";
+"onboarding.chooseWorkflowDesc" = "시작할 목표 하나를 고르세요. AirMCP가 필요한 Mac 앱만 설정합니다.";
+"onboarding.workflowPresetHint" = "%@이 선택되었습니다. 계속하기 전에 앱 접근 범위를 조정할 수 있습니다.";
 "onboarding.chooseModules" = "모듈 선택";
 "onboarding.chooseModulesDesc" = "AirMCP가 접근할 Mac 앱을 선택하세요. 나중에 설정에서 변경할 수 있습니다.";
 "onboarding.enableAll" = "모두 활성화";
 "onboarding.disableAll" = "모두 비활성화";
 "onboarding.permissions" = "macOS 권한";
-"onboarding.permissionsDesc" = "AirMCP는 AppleScript로 Mac 앱과 통신합니다. 각 앱에 처음 접근할 때 macOS가 권한을 요청합니다.";
+"onboarding.permissionsDesc" = "AirMCP는 워크플로에 필요한 순간에만 macOS 앱 권한을 요청합니다.";
 "onboarding.openSettings" = "시스템 설정 열기";
 "onboarding.connectClient" = "AI 클라이언트 연결";
 "onboarding.connectClientDesc" = "AirMCP가 다음 MCP 호환 클라이언트를 감지했습니다. 설정을 패치하여 AirMCP를 자동으로 추가할 수 있습니다.";
+"onboarding.copyPrompt" = "프롬프트 복사";
+"onboarding.copyCodexPrompt" = "Codex용 복사";
+"onboarding.copySiriPhrase" = "Siri 문구 복사";
 "onboarding.noClients" = "지원되는 클라이언트가 감지되지 않았습니다. 나중에 '설정 복사' 메뉴에서 수동으로 설정할 수 있습니다.";
 "onboarding.installed" = "설치됨";
 "onboarding.notFound" = "미발견";
@@ -182,7 +231,7 @@
 
 /* Services Menu */
 "services.noText" = "선택된 텍스트 없음";
-"services.savedNoteTitle" = "AirMCP \u2014 저장된 텍스트";
+"services.savedNoteTitle" = "AirMCP - 저장된 텍스트";
 "services.saveNoteFailed" = "메모 저장 실패";
 "services.searchQuery" = "검색어 설정: %@...";
 "services.searchTitle" = "AirMCP 검색";

@@ -12,6 +12,10 @@ jest.unstable_mockModule('../dist/skills/executor.js', () => ({
 // pulls in tool-registry (which uses withResultSizeHint for size hints).
 jest.unstable_mockModule('../dist/shared/result.js', () => ({
   ok: jest.fn((data) => ({ content: [{ type: 'text', text: JSON.stringify(data) }] })),
+  okUntrusted: jest.fn((data) => ({
+    content: [{ type: 'text', text: `[UNTRUSTED]\n${JSON.stringify(data)}\n[/UNTRUSTED]` }],
+    _meta: { 'airmcp/untrustedContent': true },
+  })),
   err: jest.fn((msg) => ({ content: [{ type: 'text', text: msg }], isError: true })),
   errUpstream: jest.fn((msg) => ({
     content: [{ type: 'text', text: `[upstream_error] ${msg}` }],
@@ -38,7 +42,7 @@ jest.unstable_mockModule('../dist/shared/prompt.js', () => ({
 }));
 
 const { registerSkills } = await import('../dist/skills/register.js');
-const { ok, err, errUpstream } = await import('../dist/shared/result.js');
+const { ok, okUntrusted, err, errUpstream } = await import('../dist/shared/result.js');
 
 // ─── Helpers ────────────────────────────────────────────────────────────
 function makeSkill(overrides = {}) {
@@ -71,6 +75,7 @@ describe('registerSkills', () => {
     server = createMockServer();
     mockExecuteSkill.mockReset();
     ok.mockClear();
+    okUntrusted.mockClear();
     err.mockClear();
   });
 
@@ -91,6 +96,33 @@ describe('registerSkills', () => {
           readOnlyHint: true,
           destructiveHint: false,
           idempotentHint: true,
+          openWorldHint: false,
+        },
+      }),
+      expect.any(Function),
+    );
+  });
+
+  test('passes declared workflow safety annotations to registerTool', () => {
+    const skill = makeSkill({
+      expose_as: 'tool',
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+    });
+
+    registerSkills(server, [skill]);
+
+    expect(server.registerTool).toHaveBeenCalledWith(
+      'skill_test-skill',
+      expect.objectContaining({
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: false,
           openWorldHint: false,
         },
       }),
@@ -144,6 +176,7 @@ describe('registerAsTool handler', () => {
     server = createMockServer();
     mockExecuteSkill.mockReset();
     ok.mockClear();
+    okUntrusted.mockClear();
     err.mockClear();
   });
 
@@ -164,6 +197,27 @@ describe('registerAsTool handler', () => {
 
     expect(mockExecuteSkill).toHaveBeenCalledWith(server, skill, {});
     expect(ok).toHaveBeenCalledWith(skillResult);
+    expect(response.isError).toBeUndefined();
+  });
+
+  test('handler fences the result via okUntrusted when a step surfaced untrusted content', async () => {
+    const skillResult = {
+      skill: 'test-skill',
+      success: true,
+      untrusted: true,
+      steps: [{ id: 'step1', status: 'ok', data: 'external mail body' }],
+    };
+    mockExecuteSkill.mockResolvedValue(skillResult);
+
+    const skill = makeSkill();
+    registerSkills(server, [skill]);
+
+    const handler = server.registerTool.mock.calls[0][2];
+    const response = await handler();
+
+    expect(okUntrusted).toHaveBeenCalledWith(skillResult);
+    expect(ok).not.toHaveBeenCalled();
+    expect(response._meta?.['airmcp/untrustedContent']).toBe(true);
     expect(response.isError).toBeUndefined();
   });
 
@@ -299,6 +353,7 @@ describe('registerSkills — runtime inputs', () => {
     server = createMockServer();
     mockExecuteSkill.mockReset();
     ok.mockClear();
+    okUntrusted.mockClear();
     err.mockClear();
   });
 
@@ -362,6 +417,7 @@ describe('registerSkills — prompt arguments', () => {
     server = createMockServer();
     mockExecuteSkill.mockReset();
     ok.mockClear();
+    okUntrusted.mockClear();
     err.mockClear();
   });
 

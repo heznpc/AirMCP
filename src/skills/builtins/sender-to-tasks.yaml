@@ -8,6 +8,11 @@ description: >-
   `on_error: continue` means the rest of the batch still gets queued even
   if one reminder-create fails (HITL denial, Reminders permission, etc.).
 expose_as: tool
+annotations:
+  readOnlyHint: false
+  destructiveHint: false
+  idempotentHint: false
+  openWorldHint: false
 inputs:
   query:
     type: string

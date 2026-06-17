@@ -2,10 +2,17 @@ import type { McpServer } from "../shared/mcp.js";
 import type { SkillDefinition, SkillInput } from "./types.js";
 import { executeSkill } from "./executor.js";
 import { userPrompt } from "../shared/prompt.js";
-import { ok, errUpstream } from "../shared/result.js";
+import { ok, okUntrusted, errUpstream } from "../shared/result.js";
 import { toolRegistry } from "../shared/tool-registry.js";
 import { z } from "zod";
 import { log } from "../shared/logger.js";
+
+type SkillToolAnnotations = {
+  readOnlyHint: boolean;
+  destructiveHint: boolean;
+  idempotentHint: boolean;
+  openWorldHint: boolean;
+};
 
 /**
  * Convert a skill's declared `inputs` into a Zod `inputSchema` record that
@@ -109,6 +116,15 @@ function buildPromptArgsSchema(inputs: Record<string, SkillInput>): Record<strin
   return out;
 }
 
+function skillToolAnnotations(skill: SkillDefinition): SkillToolAnnotations {
+  return {
+    readOnlyHint: skill.annotations?.readOnlyHint ?? true,
+    destructiveHint: skill.annotations?.destructiveHint ?? false,
+    idempotentHint: skill.annotations?.idempotentHint ?? true,
+    openWorldHint: skill.annotations?.openWorldHint ?? false,
+  };
+}
+
 function registerAsPrompt(server: McpServer, skill: SkillDefinition): void {
   if (skill.inputs && Object.keys(skill.inputs).length > 0) {
     // Modern path — typed argsSchema exposed to the client, plus the
@@ -136,7 +152,7 @@ function registerAsTool(server: McpServer, skill: SkillDefinition): void {
       title: skill.title,
       description: `[Skill] ${skill.description}`,
       inputSchema,
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: skillToolAnnotations(skill),
     },
     async (args: Record<string, unknown> = {}) => {
       try {
@@ -145,7 +161,11 @@ function registerAsTool(server: McpServer, skill: SkillDefinition): void {
           const failedStep = result.steps.find((s) => s.status === "error");
           return errUpstream(`Skill "${skill.name}" failed at step "${failedStep?.id}": ${failedStep?.error}`);
         }
-        return ok(result);
+        // If any step surfaced untrusted external content, fence the whole
+        // skill result before it reaches the model — this is the egress the
+        // per-step taint tracking exists to protect. Trusted-only skills keep
+        // the plain payload.
+        return result.untrusted ? okUntrusted(result) : ok(result);
       } catch (e) {
         return errUpstream(`Skill "${skill.name}" failed: ${e instanceof Error ? e.message : String(e)}`);
       }

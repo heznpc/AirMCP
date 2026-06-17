@@ -6,8 +6,6 @@ import { LIMITS } from "../shared/constants.js";
 import {
   ok,
   okLinked,
-  okLinkedStructured,
-  okStructured,
   okUntrusted,
   okUntrustedStructured,
   okUntrustedLinkedStructured,
@@ -146,7 +144,7 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
         );
         result.notes = filterSharedAccess(result.notes, config, "notes");
         result.returned = result.notes.length;
-        return okLinkedStructured("list_notes", result);
+        return okUntrustedLinkedStructured("list_notes", result);
       } catch (e) {
         return errJxaFor("list notes", e);
       }
@@ -354,7 +352,7 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
     async () => {
       try {
         const result = await runJxa<FolderItem[]>(listFoldersScript());
-        return okStructured({ folders: filterSharedAccess(result, config, "notes") });
+        return okUntrustedStructured({ folders: filterSharedAccess(result, config, "notes") });
       } catch (e) {
         return errJxaFor("list folders", e);
       }

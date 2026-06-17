@@ -1,0 +1,30 @@
+name: daily-briefing
+title: "Daily Briefing"
+description: >-
+  Read today's calendar, open reminders, unread mail count, and recent notes
+  for a safe morning overview. This skill performs no writes.
+expose_as: tool
+annotations:
+  readOnlyHint: true
+  destructiveHint: false
+  idempotentHint: true
+  openWorldHint: false
+steps:
+  - id: events
+    tool: today_events
+    on_error: continue
+  - id: reminders
+    tool: list_reminders
+    on_error: continue
+    args:
+      completed: false
+      limit: 10
+  - id: mail
+    tool: get_unread_count
+    on_error: continue
+  - id: notes
+    tool: list_notes
+    on_error: continue
+    args:
+      limit: 5
+      offset: 0

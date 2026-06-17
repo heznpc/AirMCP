@@ -37,3 +37,7 @@ for (const entry of readdirSync(srcDir)) {
   if (!entry.endsWith(".yaml") && !entry.endsWith(".yml")) continue;
   copyFileSync(join(srcDir, entry), join(destDir, entry));
 }
+
+// Copy CLI runtime data files that are imported from compiled modules.
+mkdirSync("dist/cli", { recursive: true });
+copyFileSync("src/cli/workflows-catalog.json", "dist/cli/workflows-catalog.json");

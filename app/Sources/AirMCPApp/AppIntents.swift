@@ -4,8 +4,8 @@ import AirMCPKit
 
 // MARK: - AirMCP App Intents
 // These make AirMCP actions accessible via Siri, Spotlight, and Shortcuts.
-// When Apple ships the system-level MCP↔App Intents bridge (iOS 26.1),
-// these will automatically be available to all MCP clients.
+// MCP clients use the HTTP/stdio AirMCP surfaces; App Intents are the Apple
+// system-surface path for Siri, Shortcuts, Spotlight, and Apple Intelligence.
 
 // MARK: - Existing Intents
 

@@ -1,8 +1,8 @@
 {
   "generatedAt": "STABLE_PLACEHOLDER",
   "protocolVersion": "2025-06-18",
-  "toolCount": 285,
-  "eligibleCount": 280,
+  "toolCount": 286,
+  "eligibleCount": 281,
   "ineligibleCount": 5,
   "ineligibleByReason": {
     "object-param:recurrence": 2,
@@ -12164,6 +12164,25 @@
       },
       "outputSchema": null,
       "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "appIntentEligible": true,
+      "ineligibleReason": null
+    },
+    {
+      "name": "skill_daily-briefing",
+      "title": "Daily Briefing",
+      "description": "[Skill] Read today's calendar, open reminders, unread mail count, and recent notes for a safe morning overview. This skill performs no writes.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {}
+      },
+      "outputSchema": null,
+      "annotations": {
         "readOnlyHint": true,
         "destructiveHint": false,
         "idempotentHint": true,
@@ -12189,9 +12208,9 @@
       },
       "outputSchema": null,
       "annotations": {
-        "readOnlyHint": true,
+        "readOnlyHint": false,
         "destructiveHint": false,
-        "idempotentHint": true,
+        "idempotentHint": false,
         "openWorldHint": false
       },
       "appIntentEligible": true,
@@ -12208,9 +12227,9 @@
       },
       "outputSchema": null,
       "annotations": {
-        "readOnlyHint": true,
+        "readOnlyHint": false,
         "destructiveHint": false,
-        "idempotentHint": true,
+        "idempotentHint": false,
         "openWorldHint": false
       },
       "appIntentEligible": true,
@@ -12227,9 +12246,9 @@
       },
       "outputSchema": null,
       "annotations": {
-        "readOnlyHint": true,
+        "readOnlyHint": false,
         "destructiveHint": false,
-        "idempotentHint": true,
+        "idempotentHint": false,
         "openWorldHint": false
       },
       "appIntentEligible": true,
@@ -12319,9 +12338,9 @@
       },
       "outputSchema": null,
       "annotations": {
-        "readOnlyHint": true,
+        "readOnlyHint": false,
         "destructiveHint": false,
-        "idempotentHint": true,
+        "idempotentHint": false,
         "openWorldHint": false
       },
       "appIntentEligible": true,

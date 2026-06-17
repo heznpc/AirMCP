@@ -75,7 +75,7 @@ The default config file location is `~/.config/airmcp/config.json`. You can over
 | `AIRMCP_HTTP_PORT` | HTTP server port (default: `3847`) |
 | `AIRMCP_MAX_SESSIONS` | Max concurrent HTTP sessions (default: `50`) |
 | `AIRMCP_SESSION_IDLE_TTL` | Session idle timeout in ms (default: `300000` / 5 minutes) |
-| `AIRMCP_ALLOW_NETWORK` | Declarative network policy: `loopback-only` (default) / `with-token` / `with-token+origin` / `unauthenticated`. Startup refuses to bind inconsistent combinations. See RFC 0002. |
+| `AIRMCP_ALLOW_NETWORK` | Inbound HTTP exposure policy: `loopback-only` (default) / `with-token` / `with-token+origin` / `with-oauth` / `with-oauth+origin` / `unauthenticated`. This is not an outbound egress allow-list. Startup refuses to bind inconsistent combinations. See RFC 0002. |
 | `AIRMCP_ALLOWED_ORIGINS` | Comma-separated Origin allow-list (e.g. `https://claude.ai,https://cursor.sh`). Required for `with-token+origin`. |
 
 ### Browser-based MCP clients (Claude in Chrome, etc.)

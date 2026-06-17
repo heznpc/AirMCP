@@ -11,6 +11,28 @@ private struct OnboardingModule: Identifiable {
     var localizedDescription: String { L("module.\(id).desc") }
 }
 
+private struct OnboardingWorkflow: Identifiable {
+    let id: String
+    let titleKey: String
+    let descKey: String
+    let promptKey: String
+    let safetyKey: String
+    let accessKey: String
+    let siriKey: String?
+    let icon: String
+    let requiredModules: Set<String>
+
+    var title: String { L(titleKey) }
+    var localizedDescription: String { L(descKey) }
+    var prompt: String { L(promptKey) }
+    var safety: String { L(safetyKey) }
+    var accessSummary: String { L(accessKey) }
+    var siriPhrase: String? {
+        guard let siriKey else { return nil }
+        return L(siriKey)
+    }
+}
+
 // Order matters: the first block is what a typical first-run user wants
 // (Apple's built-in productivity apps), followed by Intelligence/automation
 // since v2.10 surfaced skills + context memory as first-class, and finally
@@ -48,13 +70,90 @@ private let onboardingModules: [OnboardingModule] = [
     OnboardingModule(id: "google", icon: "at"),
 ]
 
+private let onboardingModuleIds = Set(onboardingModules.map(\.id))
+
+private let onboardingWorkflows: [OnboardingWorkflow] = [
+    OnboardingWorkflow(
+        id: "daily-briefing",
+        titleKey: "workflow.dailyBriefing",
+        descKey: "workflow.dailyBriefing.desc",
+        promptKey: "workflow.dailyBriefing.prompt",
+        safetyKey: "workflow.dailyBriefing.safety",
+        accessKey: "workflow.dailyBriefing.access",
+        siriKey: "workflow.dailyBriefing.siri",
+        icon: "sun.max",
+        requiredModules: ["calendar", "reminders", "mail", "notes"]
+    ),
+    OnboardingWorkflow(
+        id: "inbox-triage",
+        titleKey: "workflow.inboxTriage",
+        descKey: "workflow.inboxTriage.desc",
+        promptKey: "workflow.inboxTriage.prompt",
+        safetyKey: "workflow.inboxTriage.safety",
+        accessKey: "workflow.inboxTriage.access",
+        siriKey: "workflow.inboxTriage.siri",
+        icon: "tray.full",
+        requiredModules: ["mail", "reminders"]
+    ),
+    OnboardingWorkflow(
+        id: "meeting-prep",
+        titleKey: "workflow.meetingPrep",
+        descKey: "workflow.meetingPrep.desc",
+        promptKey: "workflow.meetingPrep.prompt",
+        safetyKey: "workflow.meetingPrep.safety",
+        accessKey: "workflow.meetingPrep.access",
+        siriKey: nil,
+        icon: "person.2.wave.2",
+        requiredModules: ["calendar", "notes", "contacts", "finder", "reminders"]
+    ),
+    OnboardingWorkflow(
+        id: "project-digest",
+        titleKey: "workflow.projectDigest",
+        descKey: "workflow.projectDigest.desc",
+        promptKey: "workflow.projectDigest.prompt",
+        safetyKey: "workflow.projectDigest.safety",
+        accessKey: "workflow.projectDigest.access",
+        siriKey: "workflow.projectDigest.siri",
+        icon: "folder",
+        requiredModules: ["memory", "notes", "calendar", "reminders", "mail", "finder"]
+    ),
+    OnboardingWorkflow(
+        id: "focus-blocks",
+        titleKey: "workflow.focusBlocks",
+        descKey: "workflow.focusBlocks.desc",
+        promptKey: "workflow.focusBlocks.prompt",
+        safetyKey: "workflow.focusBlocks.safety",
+        accessKey: "workflow.focusBlocks.access",
+        siriKey: nil,
+        icon: "calendar.badge.clock",
+        requiredModules: ["reminders", "calendar"]
+    ),
+    OnboardingWorkflow(
+        id: "research-output",
+        titleKey: "workflow.researchOutput",
+        descKey: "workflow.researchOutput.desc",
+        promptKey: "workflow.researchOutput.prompt",
+        safetyKey: "workflow.researchOutput.safety",
+        accessKey: "workflow.researchOutput.access",
+        siriKey: nil,
+        icon: "doc.text.magnifyingglass",
+        requiredModules: ["safari", "intelligence", "notes", "mail"]
+    ),
+]
+
 // MARK: - MCP Client
+
+private enum MCPClientKind: Sendable {
+    case jsonConfig
+    case codexCli
+}
 
 private struct MCPClient: Identifiable {
     let id: String
     let name: String
     let icon: String
     let configPath: String
+    let kind: MCPClientKind
     var detected: Bool
 }
 
@@ -67,12 +166,19 @@ struct OnboardingView: View {
     @State private var currentStep = 0
     @State private var nodeAvailable = false
     @State private var nodeChecking = true
-    @State private var disabledModules: Set<String> = []
+    @State private var selectedWorkflowID = "daily-briefing"
+    @State private var disabledModules: Set<String> = onboardingModuleIds.subtracting(
+        onboardingWorkflows.first?.requiredModules ?? []
+    )
     @State private var mcpClients: [MCPClient] = []
     @State private var patchingClient: String?
     @State private var patchResults: [String: Bool] = [:]
 
-    private let totalSteps = 5
+    private let totalSteps = 6
+
+    private var selectedWorkflow: OnboardingWorkflow {
+        onboardingWorkflows.first { $0.id == selectedWorkflowID } ?? onboardingWorkflows[0]
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -92,9 +198,10 @@ struct OnboardingView: View {
                 switch currentStep {
                 case 0: welcomeStep
                 case 1: nodeCheckStep
-                case 2: moduleSelectionStep
-                case 3: permissionStep
-                case 4: clientDetectionStep
+                case 2: workflowSelectionStep
+                case 3: moduleSelectionStep
+                case 4: permissionStep
+                case 5: clientDetectionStep
                 default: EmptyView()
                 }
             }
@@ -208,7 +315,87 @@ struct OnboardingView: View {
         .task { await checkNode() }
     }
 
-    // MARK: - Step 3: Module Selection
+    // MARK: - Step 3: Workflow Selection
+
+    private var workflowSelectionStep: some View {
+        VStack(spacing: 12) {
+            Text(L("onboarding.chooseWorkflow"))
+                .font(.title2)
+                .fontWeight(.semibold)
+
+            Text(L("onboarding.chooseWorkflowDesc"))
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 420)
+
+            ScrollView {
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                    ForEach(onboardingWorkflows) { workflow in
+                        workflowCard(workflow)
+                    }
+                }
+                .padding(.horizontal, 4)
+            }
+            .frame(maxHeight: 300)
+        }
+        .padding(.horizontal, 24)
+    }
+
+    @ViewBuilder
+    private func workflowCard(_ workflow: OnboardingWorkflow) -> some View {
+        let isSelected = selectedWorkflowID == workflow.id
+
+        Button {
+            applyWorkflowPreset(workflow)
+        } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    Image(systemName: workflow.icon)
+                        .frame(width: 20)
+                        .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+
+                    Text(workflow.title)
+                        .font(.callout)
+                        .fontWeight(.semibold)
+                        .lineLimit(1)
+
+                    Spacer()
+
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .foregroundStyle(isSelected ? .green : .secondary)
+                }
+
+                Text(workflow.localizedDescription)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+
+                Label(workflow.accessSummary, systemImage: "checkmark.shield")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(2)
+            }
+            .frame(minHeight: 108, alignment: .top)
+            .padding(10)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(isSelected ? Color.accentColor.opacity(0.08) : Color.secondary.opacity(0.05))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(isSelected ? Color.accentColor.opacity(0.3) : Color.clear, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func applyWorkflowPreset(_ workflow: OnboardingWorkflow) {
+        selectedWorkflowID = workflow.id
+        disabledModules = onboardingModuleIds.subtracting(workflow.requiredModules)
+    }
+
+    // MARK: - Step 4: Module Selection
 
     private var moduleSelectionStep: some View {
         VStack(spacing: 12) {
@@ -221,6 +408,12 @@ struct OnboardingView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 400)
+
+            Text(L("onboarding.workflowPresetHint", selectedWorkflow.title))
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 420)
 
             ScrollView {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
@@ -290,7 +483,7 @@ struct OnboardingView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - Step 4: Permissions
+    // MARK: - Step 5: Permissions
 
     private var permissionStep: some View {
         VStack(spacing: 16) {
@@ -308,6 +501,7 @@ struct OnboardingView: View {
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: 400)
+                .fixedSize(horizontal: false, vertical: true)
 
             VStack(alignment: .leading, spacing: 10) {
                 permissionRow(
@@ -360,7 +554,7 @@ struct OnboardingView: View {
         }
     }
 
-    // MARK: - Step 5: Client Detection
+    // MARK: - Step 6: Client Detection
 
     private var clientDetectionStep: some View {
         VStack(spacing: 16) {
@@ -378,6 +572,8 @@ struct OnboardingView: View {
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: 400)
+
+            selectedWorkflowActions
 
             VStack(spacing: 8) {
                 ForEach($mcpClients) { $client in
@@ -398,6 +594,48 @@ struct OnboardingView: View {
         }
         .padding(.horizontal, 24)
         .task { detectClients() }
+    }
+
+    private var selectedWorkflowActions: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(selectedWorkflow.title, systemImage: selectedWorkflow.icon)
+                .font(.headline)
+
+            Text(selectedWorkflow.prompt)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+
+            HStack(spacing: 8) {
+                Button(L("onboarding.copyPrompt")) {
+                    AirMcpConstants.copyToClipboard(selectedWorkflow.prompt)
+                }
+                .controlSize(.small)
+
+                Button(L("onboarding.copyCodexPrompt")) {
+                    AirMcpConstants.copyToClipboard(selectedWorkflow.prompt)
+                }
+                .controlSize(.small)
+
+                if let siriPhrase = selectedWorkflow.siriPhrase {
+                    Button(L("onboarding.copySiriPhrase")) {
+                        AirMcpConstants.copyToClipboard("Hey Siri, \(siriPhrase)")
+                    }
+                    .controlSize(.small)
+                }
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.accentColor.opacity(0.08))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.accentColor.opacity(0.2), lineWidth: 1)
+        )
+        .padding(.horizontal, 24)
     }
 
     @ViewBuilder
@@ -465,6 +703,15 @@ struct OnboardingView: View {
                 name: "Claude Desktop",
                 icon: "message",
                 configPath: "\(home)/Library/Application Support/Claude/claude_desktop_config.json",
+                kind: .jsonConfig,
+                detected: false
+            ),
+            MCPClient(
+                id: "codex",
+                name: "Codex",
+                icon: "terminal",
+                configPath: "",
+                kind: .codexCli,
                 detected: false
             ),
             MCPClient(
@@ -472,6 +719,7 @@ struct OnboardingView: View {
                 name: "Cursor",
                 icon: "cursorarrow",
                 configPath: "\(home)/.cursor/mcp.json",
+                kind: .jsonConfig,
                 detected: false
             ),
             MCPClient(
@@ -479,12 +727,18 @@ struct OnboardingView: View {
                 name: "Windsurf",
                 icon: "wind",
                 configPath: "\(home)/.codeium/windsurf/mcp_config.json",
+                kind: .jsonConfig,
                 detected: false
             ),
         ]
 
         mcpClients = clients.map { client in
             var c = client
+            if client.kind == .codexCli {
+                c.detected = NodeEnvironment.findExecutable(named: "codex") != nil
+                return c
+            }
+
             // Check if the parent directory exists (app is installed even without config)
             let configDir = (client.configPath as NSString).deletingLastPathComponent
             let configExists = FileManager.default.fileExists(atPath: client.configPath)
@@ -498,10 +752,44 @@ struct OnboardingView: View {
         patchingClient = client.id
         Task {
             let success = await Task.detached {
-                Self.patchConfig(at: client.configPath)
+                switch client.kind {
+                case .jsonConfig:
+                    return Self.patchConfig(at: client.configPath)
+                case .codexCli:
+                    return Self.patchCodexConfig()
+                }
             }.value
             patchResults[client.id] = success
             patchingClient = nil
+        }
+    }
+
+    private nonisolated static func patchCodexConfig() -> Bool {
+        guard let codex = NodeEnvironment.findExecutable(named: "codex") else {
+            return false
+        }
+
+        if runProcess(codex, arguments: ["mcp", "get", "airmcp"]) {
+            return true
+        }
+
+        return runProcess(codex, arguments: ["mcp", "add", "airmcp", "--", "npx", "-y", AirMcpConstants.npmPackageName])
+    }
+
+    private nonisolated static func runProcess(_ executable: String, arguments: [String]) -> Bool {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = arguments
+        process.environment = NodeEnvironment.buildEnv()
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+            return process.terminationStatus == 0
+        } catch {
+            return false
         }
     }
 

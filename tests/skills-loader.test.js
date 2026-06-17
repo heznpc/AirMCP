@@ -42,6 +42,21 @@ steps:
     tool: calendar_list_events
 `;
 
+const VALID_YAML_WITH_ANNOTATIONS = `
+name: write-workflow
+title: Write Workflow
+description: Creates a reminder
+expose_as: tool
+annotations:
+  readOnlyHint: false
+  destructiveHint: false
+  idempotentHint: false
+  openWorldHint: false
+steps:
+  - id: create
+    tool: create_reminder
+`;
+
 const VALID_YAML_PROMPT = `
 name: morning-prompt
 title: Morning Prompt
@@ -83,6 +98,20 @@ describe('loadSkillFile', () => {
 
     expect(result).not.toBeNull();
     expect(result.trigger).toEqual({ event: 'calendar_changed', debounce_ms: 3000 });
+  });
+
+  test('loads skill annotations for workflow safety metadata', () => {
+    mockReadFileSync.mockReturnValue(VALID_YAML_WITH_ANNOTATIONS);
+
+    const result = loadSkillFile('/path/to/write-workflow.yaml');
+
+    expect(result).not.toBeNull();
+    expect(result.annotations).toEqual({
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    });
   });
 
   test('returns null for file exceeding MAX_SKILL_FILE_SIZE (256KB)', () => {

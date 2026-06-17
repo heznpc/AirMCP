@@ -208,4 +208,30 @@ describe("generated Swift dialogs (integration with AIRMCP_APPINTENTS_DESTRUCTIV
     const slice = generated.slice(idx, idx + 1500);
     expect(slice).not.toMatch(/requestConfirmation\(/);
   });
+
+  test("FoundationModels AppShortcut is behind the explicit preview compile flag", () => {
+    expect(generated).toContain(
+      "#if AIRMCP_ENABLE_FOUNDATION_MODELS && canImport(FoundationModels) && compiler(>=6.3)",
+    );
+    expect(generated).toContain("public struct AirMCPAskShortcut: AppShortcutsProvider");
+    expect(generated).not.toContain("if #available(macOS 26, iOS 26, *) {\n            AppShortcut(");
+  });
+
+  test("generated AppIntent perform methods run on the main actor for SwiftUI snippets", () => {
+    const marker = "// Tool: today_events";
+    const idx = generated.indexOf(marker);
+    expect(idx).toBeGreaterThan(-1);
+    const slice = generated.slice(idx, idx + 1600);
+    expect(slice).toContain("@MainActor\n    public func perform() async throws");
+    expect(slice).toContain("view: MCPTodayEventsSnippetView(data: decoded)");
+  });
+
+  test("optional scalar snippet fields render with nil fallbacks", () => {
+    const marker = "public struct MCPMemoryStatsSnippetView: View";
+    const idx = generated.indexOf(marker);
+    expect(idx).toBeGreaterThan(-1);
+    const slice = generated.slice(idx, idx + 1800);
+    expect(slice).toContain('Text((data.oldest ?? "—"))');
+    expect(slice).toContain('Text((data.newest ?? "—"))');
+  });
 });

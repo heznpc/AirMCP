@@ -7,6 +7,11 @@ description: >-
   parallel + retry + `memory_put` so ai_agent can later recall "what did
   I do last Tuesday?" via `memory_query`.
 expose_as: tool
+annotations:
+  readOnlyHint: false
+  destructiveHint: false
+  idempotentHint: false
+  openWorldHint: false
 inputs:
   note:
     type: string

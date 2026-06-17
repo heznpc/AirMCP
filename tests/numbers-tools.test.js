@@ -69,4 +69,35 @@ describe('Numbers tools registration', () => {
       expect(typeof config.annotations.destructiveHint).toBe('boolean');
     }
   });
+
+  describe('numbers_set_cell — native value typing (not text)', () => {
+    beforeEach(() => mockRunJxa.mockReset());
+
+    test('a number is written as a native numeric literal, not quoted text', async () => {
+      mockRunJxa.mockResolvedValueOnce('{"written":true,"address":"A1"}');
+      await server.callTool('numbers_set_cell', { document: 'D', sheet: 'S', cell: 'A1', value: 42 });
+      const script = mockRunJxa.mock.calls[0][0];
+      // The cell must receive the number 42, not the string "42" — a quoted
+      // value lands as text and breaks sorting / formula references.
+      expect(script).toContain('.value = 42;');
+      expect(script).not.toContain("= '42'");
+    });
+
+    test('a boolean is written as a native boolean literal', async () => {
+      mockRunJxa.mockResolvedValueOnce('{"written":true,"address":"B2"}');
+      await server.callTool('numbers_set_cell', { document: 'D', sheet: 'S', cell: 'B2', value: true });
+      expect(mockRunJxa.mock.calls[0][0]).toContain('.value = true;');
+    });
+
+    test('a string (incl. a formula) stays quoted + escaped', async () => {
+      mockRunJxa.mockResolvedValueOnce('{"written":true,"address":"C3"}');
+      await server.callTool('numbers_set_cell', {
+        document: 'D',
+        sheet: 'S',
+        cell: 'C3',
+        value: '=SUM(A1:A10)',
+      });
+      expect(mockRunJxa.mock.calls[0][0]).toContain(".value = '=SUM(A1:A10)';");
+    });
+  });
 });

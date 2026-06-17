@@ -5214,7 +5214,7 @@ public struct NumbersRenameSheetIntent: AppIntent {
 // Tool: numbers_set_cell
 public struct NumbersSetCellIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Set Numbers Cell"
-    nonisolated(unsafe) public static var description = IntentDescription("Write a value to a single cell.")
+    nonisolated(unsafe) public static var description = IntentDescription("Write a value to a single cell. Numbers and booleans land as native cell types (not text), so they sort and feed formulas correctly; strings are written verbatim and Numbers interprets a leading '=' as a formula.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -5228,7 +5228,7 @@ public struct NumbersSetCellIntent: AppIntent {
     @Parameter(title: "Cell address (e.g. 'A1')")
     public var cell: String
 
-    @Parameter(title: "Value to write")
+    @Parameter(title: "Value to write (number, boolean, or text)")
     public var value: String
 
     @MainActor

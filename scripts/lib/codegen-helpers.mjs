@@ -136,6 +136,17 @@ export function swiftTypeFor(propSchema) {
   if (propSchema.type === "number") return "Double";
   if (propSchema.type === "boolean") return "Bool";
   if (propSchema.type === "array" && propSchema.items?.type === "string") return "[String]";
+  // Scalar union (anyOf) — e.g. a cell value that may be string | number |
+  // boolean. The AppIntent surface projects it to a single typed @Parameter;
+  // prefer the string member (a text field can express any of them and the MCP
+  // layer coerces) so the param isn't dropped, else fall back to the first
+  // scalar member. Without this, an anyOf prop returns null and the parameter
+  // is silently skipped — losing it from the generated Siri/Shortcuts intent.
+  if (Array.isArray(propSchema.anyOf)) {
+    const members = propSchema.anyOf.map((m) => swiftTypeFor(m)).filter((t) => t !== null);
+    if (members.includes("String")) return "String";
+    return members[0] ?? null;
+  }
   return null;
 }
 

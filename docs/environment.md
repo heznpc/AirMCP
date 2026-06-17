@@ -13,7 +13,7 @@ If a variable accepts a path, `~` expands to `$HOME`. Booleans are `"true"` / `"
 | Bind HTTP server to all interfaces with token auth | `AIRMCP_ALLOW_NETWORK=with-token` + `AIRMCP_HTTP_TOKEN=…` |
 | Bind HTTP server with OAuth 2.1 | `AIRMCP_ALLOW_NETWORK=with-oauth` + `AIRMCP_OAUTH_ISSUER=…` + `AIRMCP_OAUTH_AUDIENCE=…` |
 | Disable a flaky module without removing config | `AIRMCP_DEBUG_MODULES=notes,calendar` (whitelist) |
-| Send all 272 tools without compactDescription | `AIRMCP_COMPACT_TOOLS=false` |
+| Send all 286 tools without compactDescription | `AIRMCP_COMPACT_TOOLS=false` |
 | Increase audit-log signing strength for cross-host integrity | `AIRMCP_AUDIT_HMAC_KEY=<32+ random bytes>` |
 | Block every destructive tool on a panic | `touch ~/.config/airmcp/emergency-stop` |
 

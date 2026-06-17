@@ -2,7 +2,7 @@ import type { McpServer } from "../shared/mcp.js";
 import type { SkillDefinition, SkillInput } from "./types.js";
 import { executeSkill } from "./executor.js";
 import { userPrompt } from "../shared/prompt.js";
-import { ok, errUpstream } from "../shared/result.js";
+import { ok, okUntrusted, errUpstream } from "../shared/result.js";
 import { toolRegistry } from "../shared/tool-registry.js";
 import { z } from "zod";
 import { log } from "../shared/logger.js";
@@ -161,7 +161,11 @@ function registerAsTool(server: McpServer, skill: SkillDefinition): void {
           const failedStep = result.steps.find((s) => s.status === "error");
           return errUpstream(`Skill "${skill.name}" failed at step "${failedStep?.id}": ${failedStep?.error}`);
         }
-        return ok(result);
+        // If any step surfaced untrusted external content, fence the whole
+        // skill result before it reaches the model — this is the egress the
+        // per-step taint tracking exists to protect. Trusted-only skills keep
+        // the plain payload.
+        return result.untrusted ? okUntrusted(result) : ok(result);
       } catch (e) {
         return errUpstream(`Skill "${skill.name}" failed: ${e instanceof Error ? e.message : String(e)}`);
       }

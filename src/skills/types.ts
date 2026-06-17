@@ -177,4 +177,8 @@ export interface SkillResult {
   partial?: boolean;
   /** IDs of steps that errored out. Empty when `success` is true. */
   failedSteps?: string[];
+  /** True when any step surfaced untrusted external content (a tool that
+   *  returned `okUntrusted*`). The skill's final result is fenced with
+   *  untrusted-content markers before it reaches the model. */
+  untrusted?: boolean;
 }

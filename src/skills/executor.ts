@@ -58,6 +58,15 @@ function materializeTemplateValue(value: unknown, wholeStringTemplate: boolean):
   if (!isTaintedValue(value)) return value;
   const raw = unwrapTaintedValue(value);
   if (typeof raw === "string") return isWrappedUntrustedText(raw) ? raw : wrapUntrustedText(raw);
+  // A whole-template reference preserves the raw object/array (carrying its
+  // non-enumerable taint marker) so it can still drive a downstream `loop:`
+  // or a structured tool arg and be re-tainted per field access. Fencing is
+  // applied where untrusted content actually reaches the model: a leaf
+  // stringified into a prompt (the embedded branch below) or the skill's
+  // final result (register.ts fences it via okUntrusted). Do NOT fence the
+  // whole object here — it would turn arrays/objects into strings and break
+  // loop sources (see tests/executor.test.js "untrusted array drives a later
+  // prompt step").
   if (wholeStringTemplate) return raw;
   return wrapUntrustedText(stringifyTemplateValue(raw, true));
 }
@@ -410,12 +419,12 @@ async function executeOneStep(
   server: McpServer,
   step: SkillStep,
   results: Map<string, unknown>,
-): Promise<{ stepResult: StepResult; data: unknown; templateData: unknown }> {
+): Promise<{ stepResult: StepResult; data: unknown; templateData: unknown; untrusted: boolean }> {
   if (step.only_if && !evaluateCondition(step.only_if, results)) {
-    return { stepResult: { id: step.id, status: "skipped" }, data: null, templateData: null };
+    return { stepResult: { id: step.id, status: "skipped" }, data: null, templateData: null, untrusted: false };
   }
   if (step.skip_if && evaluateCondition(step.skip_if, results)) {
-    return { stepResult: { id: step.id, status: "skipped" }, data: null, templateData: null };
+    return { stepResult: { id: step.id, status: "skipped" }, data: null, templateData: null, untrusted: false };
   }
 
   if (step.loop) {
@@ -425,6 +434,7 @@ async function executeOneStep(
         stepResult: { id: step.id, status: "error", error: `loop expression did not resolve to an array` },
         data: null,
         templateData: null,
+        untrusted: false,
       };
     }
 
@@ -437,6 +447,7 @@ async function executeOneStep(
         },
         data: null,
         templateData: null,
+        untrusted: false,
       };
     }
 
@@ -467,9 +478,11 @@ async function executeOneStep(
           stepResult: { id: step.id, status: "error", error },
           data: loopResults,
           templateData: loopTemplateResults,
+          untrusted: loopTemplateResults.some((d) => isTaintedValue(d)),
         };
       }
     }
+    const loopUntrusted = loopTemplateResults.some((d) => isTaintedValue(d));
     if (loopHadFailure) {
       // Loop finished but at least one iteration failed under `continue`
       // — surface it as a partial success so downstream steps / callers see
@@ -479,12 +492,14 @@ async function executeOneStep(
         stepResult: { id: step.id, status: "ok", data: loopResults },
         data: loopResults,
         templateData: loopTemplateResults,
+        untrusted: loopUntrusted,
       };
     }
     return {
       stepResult: { id: step.id, status: "ok", data: loopResults },
       data: loopResults,
       templateData: loopTemplateResults,
+      untrusted: loopUntrusted,
     };
   }
 
@@ -496,10 +511,11 @@ async function executeOneStep(
       stepResult: { id: step.id, status: "ok", data: parsed.data },
       data: parsed.data,
       templateData: parsed.templateData,
+      untrusted: isTaintedValue(parsed.templateData),
     };
   } catch (e) {
     const error = e instanceof Error ? e.message : String(e);
-    return { stepResult: { id: step.id, status: "error", error }, data: null, templateData: null };
+    return { stepResult: { id: step.id, status: "error", error }, data: null, templateData: null, untrusted: false };
   }
 }
 
@@ -518,6 +534,9 @@ export async function executeSkill(
   const stepResults: StepResult[] = [];
   const failedSteps: string[] = [];
   let i = 0;
+  // Set once any step surfaces untrusted external content; the registered
+  // skill tool fences the final result when this is true (see register.ts).
+  let sawUntrusted = false;
 
   // Build once: the terminal result shape when we need to bail early. Keeps
   // the two exit paths (hard abort / skip_remaining) in sync.
@@ -527,6 +546,7 @@ export async function executeSkill(
       res.partial = !success || failedSteps.length > 0;
       res.failedSteps = [...failedSteps];
     }
+    if (sawUntrusted) res.untrusted = true;
     return res;
   };
 
@@ -554,6 +574,7 @@ export async function executeSkill(
           stepResult = r.value.stepResult;
           data = r.value.data;
           templateData = r.value.templateData;
+          sawUntrusted = sawUntrusted || r.value.untrusted;
         } else {
           const error = r.reason instanceof Error ? r.reason.message : String(r.reason);
           stepResult = { id: s.id, status: "error", error };
@@ -580,6 +601,7 @@ export async function executeSkill(
 
     const result = await executeOneStep(server, step, results);
     stepResults.push(result.stepResult);
+    sawUntrusted = sawUntrusted || result.untrusted;
 
     if (result.stepResult.status === "error") {
       failedSteps.push(step.id);

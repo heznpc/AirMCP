@@ -503,6 +503,63 @@ describe('executeSkill – untrusted taint propagation', () => {
     expect(summaryText.split(UNTRUSTED_START_MARKER)).toHaveLength(2);
     expect(summaryText.split(UNTRUSTED_END_MARKER)).toHaveLength(2);
   });
+
+  test('marks the skill result untrusted when a step surfaces untrusted content', async () => {
+    mockCallTool.mockResolvedValueOnce(untrustedStructuredResponse({ items: [{ body: 'x' }] }));
+    const skill = {
+      name: 'taint-flag',
+      steps: [{ id: 'read', tool: 'scan_notes', args: {} }],
+    };
+    const result = await executeSkill(fakeServer, skill);
+    expect(result.success).toBe(true);
+    expect(result.untrusted).toBe(true);
+  });
+
+  test('leaves the skill result untrusted-flag unset for trusted-only skills', async () => {
+    mockCallTool.mockResolvedValueOnce(okResponse({ ok: true }));
+    const skill = {
+      name: 'trusted-only',
+      steps: [{ id: 'sys', tool: 'get_battery_status', args: {} }],
+    };
+    const result = await executeSkill(fakeServer, skill);
+    expect(result.success).toBe(true);
+    expect(result.untrusted).toBeUndefined();
+  });
+
+  test('marks the skill result untrusted when a LOOP step surfaces untrusted content', async () => {
+    mockCallTool
+      .mockResolvedValueOnce(okResponse({ items: ['a', 'b'] })) // search: trusted array to loop over
+      .mockResolvedValueOnce(untrustedStructuredResponse({ body: 'x' })) // loop iter 1: untrusted
+      .mockResolvedValueOnce(untrustedStructuredResponse({ body: 'y' })); // loop iter 2: untrusted
+    const skill = {
+      name: 'loop-untrusted',
+      steps: [
+        { id: 'search', tool: 'list_items', args: {} },
+        { id: 'read', tool: 'scan_notes', loop: '{{search.items}}', args: { q: '{{_item}}' } },
+      ],
+    };
+    const result = await executeSkill(fakeServer, skill);
+    expect(result.success).toBe(true);
+    expect(result.untrusted).toBe(true);
+  });
+
+  test('marks the skill result untrusted when a PARALLEL step surfaces untrusted content', async () => {
+    // One trusted + one untrusted parallel step; mock-consumption order is
+    // irrelevant since the skill flag is true if ANY step is untrusted.
+    mockCallTool
+      .mockResolvedValueOnce(okResponse({ ok: true }))
+      .mockResolvedValueOnce(untrustedStructuredResponse({ body: 'x' }));
+    const skill = {
+      name: 'parallel-untrusted',
+      steps: [
+        { id: 'sys', tool: 'get_battery_status', parallel: true, args: {} },
+        { id: 'read', tool: 'scan_notes', parallel: true, args: {} },
+      ],
+    };
+    const result = await executeSkill(fakeServer, skill);
+    expect(result.success).toBe(true);
+    expect(result.untrusted).toBe(true);
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════

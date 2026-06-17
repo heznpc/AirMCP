@@ -1,6 +1,6 @@
 import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
-import { ok, errInvalidInput, errUpstream, toolError, toolErr } from "../shared/result.js";
+import { ok, okUntrusted, errInvalidInput, errUpstream, toolError, toolErr } from "../shared/result.js";
 import { log, errToCtx } from "../shared/logger.js";
 import { buildSnapshot } from "../shared/resources.js";
 import type { AirMcpConfig } from "../shared/config.js";
@@ -111,7 +111,11 @@ export function registerCrossTools(mcpServer: McpServer, config: AirMcpConfig): 
           } catch {
             snapshot = snapshotText;
           }
-          return ok({
+          // The snapshot is raw external content (mail/calendar/notes) going
+          // straight to the agent — fence it as untrusted so injected
+          // instructions inside it are not followed. The sampling/FM paths
+          // above already fence via wrapUntrustedText + systemPrompt.
+          return okUntrusted({
             briefing: null,
             fallback: "Client does not support MCP Sampling and Foundation Models unavailable. Returning raw snapshot.",
             snapshot,

@@ -9,44 +9,69 @@ public class LocationFetcher: NSObject, CLLocationManagerDelegate, @unchecked Se
     private var continuation: CheckedContinuation<CLLocation, Error>?
     private var manager: CLLocationManager?
     private var timeoutWorkItem: DispatchWorkItem?
+    private var activeRequestID: UUID?
     private let queue = DispatchQueue(label: "com.airmcp.location")
 
     public override init() { super.init() }
 
     public func fetch(timeout: TimeInterval = 15) async throws -> CLLocation {
-        try await withTaskCancellationHandler {
+        let requestID = UUID()
+        let timeoutSeconds = max(timeout, 0.1)
+        return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { cont in
+                var accepted = false
+                queue.sync {
+                    if continuation == nil {
+                        continuation = cont
+                        activeRequestID = requestID
+                        accepted = true
+                    }
+                }
+
+                guard accepted else {
+                    cont.resume(throwing: AirMCPKitError.unsupported("Location request already in progress"))
+                    return
+                }
+
+                if Task.isCancelled {
+                    finish(.failure(AirMCPKitError.unsupported("Location request cancelled")))
+                    return
+                }
+
                 DispatchQueue.main.async {
-                    let mgr = CLLocationManager()
-                    mgr.delegate = self
-                    mgr.desiredAccuracy = kCLLocationAccuracyBest
-
-                    let timeoutItem = DispatchWorkItem { [weak self] in
-                        self?.finish(.failure(AirMCPKitError.unsupported("Location request timed out after \(Int(timeout))s")))
-                    }
-
-                    var accepted = false
-                    self.queue.sync {
-                        if self.continuation == nil {
-                            self.continuation = cont
-                            self.manager = mgr
-                            self.timeoutWorkItem = timeoutItem
-                            accepted = true
-                        }
-                    }
-
-                    guard accepted else {
-                        cont.resume(throwing: AirMCPKitError.unsupported("Location request already in progress"))
-                        return
-                    }
-
-                    DispatchQueue.main.asyncAfter(deadline: .now() + max(timeout, 0.1), execute: timeoutItem)
-                    mgr.requestLocation()
+                    self.startRequest(id: requestID, timeoutSeconds: timeoutSeconds)
                 }
             }
         } onCancel: {
             finish(.failure(AirMCPKitError.unsupported("Location request cancelled")))
         }
+    }
+
+    private func startRequest(id: UUID, timeoutSeconds: TimeInterval) {
+        let mgr = CLLocationManager()
+        mgr.delegate = self
+        mgr.desiredAccuracy = kCLLocationAccuracyBest
+
+        let timeoutItem = DispatchWorkItem { [weak self] in
+            self?.finish(.failure(AirMCPKitError.unsupported("Location request timed out after \(timeoutSeconds)s")))
+        }
+
+        var shouldStart = false
+        queue.sync {
+            if continuation != nil, activeRequestID == id, manager == nil {
+                manager = mgr
+                timeoutWorkItem = timeoutItem
+                shouldStart = true
+            }
+        }
+
+        guard shouldStart else {
+            mgr.delegate = nil
+            return
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + timeoutSeconds, execute: timeoutItem)
+        mgr.requestLocation()
     }
 
     public func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
@@ -73,11 +98,16 @@ public class LocationFetcher: NSObject, CLLocationManagerDelegate, @unchecked Se
             manager = nil
             timeoutItem = timeoutWorkItem
             timeoutWorkItem = nil
+            activeRequestID = nil
         }
 
         timeoutItem?.cancel()
-        mgr?.stopUpdatingLocation()
-        mgr?.delegate = nil
+        if let mgr {
+            DispatchQueue.main.async {
+                mgr.stopUpdatingLocation()
+                mgr.delegate = nil
+            }
+        }
 
         guard let cont else { return }
         switch result {

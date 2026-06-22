@@ -27,4 +27,24 @@ final class LocationServiceTests: XCTestCase {
         }
         XCTAssertLessThan(Date().timeIntervalSince(started), 2.0)
     }
+
+    func testCancelledFetchReturnsPromptly() async {
+        let fetcher = LocationFetcher()
+        let started = Date()
+        let task = Task {
+            try await fetcher.fetch(timeout: 10)
+        }
+
+        task.cancel()
+
+        do {
+            _ = try await task.value
+            XCTFail("Cancelled location fetch should not succeed")
+        } catch {
+            // The contract under test is that cancellation resumes the checked
+            // continuation promptly, even if the main-queue request has not started.
+        }
+
+        XCTAssertLessThan(Date().timeIntervalSince(started), 2.0)
+    }
 }

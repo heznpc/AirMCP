@@ -1,5 +1,5 @@
 import { describe, test, expect } from "@jest/globals";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 
@@ -18,25 +18,70 @@ const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const PLIST = join(ROOT, "app", "Sources", "AirMCPApp", "Resources", "Info.plist");
 const plist = readFileSync(PLIST, "utf-8");
 
-// Each entry: the usage-description key a TCC-gated tool family requires.
-// Cross-referenced against the TCC-gated frameworks the Swift bridge actually
-// uses (EventKit, Speech, PhotoKit, Contacts, CoreLocation). Speech was the only one that
-// HARD-CRASHED without its key (it calls requestAuthorization); PhotoKit /
-// Contacts degrade gracefully (empty / "Access Denied") but still cannot be
-// granted on the .app surface without a declaration, so the tools stay
-// non-functional there until these are present. (Location/CLLocationManager is
-// included because get_current_location prompts through CoreLocation.)
+function readSwiftFiles(dir) {
+  let out = "";
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) out += readSwiftFiles(full);
+    else if (entry.name.endsWith(".swift")) out += `\n// ${full}\n${readFileSync(full, "utf-8")}`;
+  }
+  return out;
+}
+
+const swiftBridgeSource = [join(ROOT, "swift", "Sources", "AirMCPKit"), join(ROOT, "swift", "Sources", "AirMcpBridge")]
+  .map(readSwiftFiles)
+  .join("\n");
+
+// Each entry maps a TCC-gated Swift framework/API the bridge actually uses to
+// the app Info.plist usage-description keys required for the signed .app
+// surface. This keeps the guard tied to runtime capability use instead of a
+// manually curated key list.
+const PRIVACY_REQUIREMENTS = [
+  {
+    name: "EventKit calendars/reminders",
+    uses: /\bEKEventStore\b|import EventKit/,
+    keys: ["NSCalendarsFullAccessUsageDescription", "NSRemindersFullAccessUsageDescription"],
+  },
+  {
+    name: "Speech",
+    uses: /\bSFSpeechRecognizer\b|import Speech/,
+    keys: ["NSSpeechRecognitionUsageDescription"],
+  },
+  {
+    name: "PhotoKit",
+    uses: /\bPHPhotoLibrary\b|import Photos/,
+    keys: ["NSPhotoLibraryUsageDescription", "NSPhotoLibraryAddUsageDescription"],
+  },
+  {
+    name: "Contacts",
+    uses: /\bCNContactStore\b|import Contacts/,
+    keys: ["NSContactsUsageDescription"],
+  },
+  {
+    name: "CoreLocation",
+    uses: /\bCLLocationManager\b|import CoreLocation/,
+    keys: ["NSLocationWhenInUseUsageDescription"],
+  },
+  {
+    name: "HealthKit read access",
+    uses: /\bHKHealthStore\b|import HealthKit/,
+    // AirMCP requests read-only health access (`toShare: []`), so the share/read
+    // usage string is required; NSHealthUpdateUsageDescription is only for writes.
+    keys: ["NSHealthShareUsageDescription"],
+  },
+];
+
 const REQUIRED = [
-  "NSCalendarsFullAccessUsageDescription",
-  "NSRemindersFullAccessUsageDescription",
-  "NSSpeechRecognitionUsageDescription",
-  "NSPhotoLibraryUsageDescription",
-  "NSPhotoLibraryAddUsageDescription",
-  "NSContactsUsageDescription",
-  "NSLocationWhenInUseUsageDescription",
+  ...new Set(
+    PRIVACY_REQUIREMENTS.flatMap((requirement) => (requirement.uses.test(swiftBridgeSource) ? requirement.keys : [])),
+  ),
 ];
 
 describe("app Info.plist — privacy usage descriptions for TCC-gated tools", () => {
+  test("derives at least one required key from Swift bridge privacy APIs", () => {
+    expect(REQUIRED.length).toBeGreaterThan(0);
+  });
+
   for (const key of REQUIRED) {
     test(`declares ${key} (missing → TCC crash or ungrantable app capability)`, () => {
       expect(plist).toContain(`<key>${key}</key>`);

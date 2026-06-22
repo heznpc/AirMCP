@@ -4,11 +4,10 @@ import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 
 // The macOS app's Info.plist MUST declare a usage description for every
-// privacy-gated (TCC) capability any tool touches. If the declaration is
-// MISSING, macOS does not return "permission denied" — it HARD-ABORTS the
-// process (SIGABRT / exit 134, "attempted to access privacy-sensitive data
-// without a usage description") the instant the API is touched, BEFORE the
-// Swift code's graceful `.notAuthorized` path can run.
+// privacy-gated (TCC) capability any tool touches. Missing declarations have
+// API-specific failure modes: Speech hard-aborted (SIGABRT / exit 134) when it
+// called requestAuthorization, while PhotoKit / Contacts degraded gracefully but
+// could not be granted on the .app surface.
 //
 // This is a registration-vs-runtime guard: `transcribe_audio` was a registered,
 // shipping tool whose NSSpeechRecognitionUsageDescription was absent repo-wide,
@@ -38,7 +37,7 @@ const REQUIRED = [
 
 describe("app Info.plist — privacy usage descriptions for TCC-gated tools", () => {
   for (const key of REQUIRED) {
-    test(`declares ${key} (missing → TCC 134 abort, not a graceful error)`, () => {
+    test(`declares ${key} (missing → TCC crash or ungrantable app capability)`, () => {
       expect(plist).toContain(`<key>${key}</key>`);
     });
   }

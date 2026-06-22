@@ -80,6 +80,15 @@ describe('registerNoteTools', () => {
       expect(tool.opts.annotations.readOnlyHint).toBe(false);
     }
   });
+
+  test('create tools are not destructive but require sensitive approval', () => {
+    const { server } = setup();
+    for (const name of ['create_note', 'create_folder']) {
+      const tool = server._tools.get(name);
+      expect(tool.opts.annotations.destructiveHint).toBe(false);
+      expect(tool.opts.annotations.sensitiveHint).toBe(true);
+    }
+  });
 });
 
 // ── list_notes ───────────────────────────────────────────────────────

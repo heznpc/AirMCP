@@ -2,7 +2,7 @@
  * Safety Annotations consistency test.
  *
  * Boots every module and verifies that tool annotations follow naming
- * conventions and that every tool has all four annotation fields defined.
+ * conventions and that every tool has the core annotation fields defined.
  */
 import { describe, test, expect, jest } from '@jest/globals';
 import { createMockServer } from './helpers/mock-server.js';
@@ -148,9 +148,9 @@ describe('Safety Annotations consistency', () => {
     return result;
   }
 
-  // ── 1. All tools must have all 4 annotation fields defined ────────
+  // ── 1. All tools must have core annotation fields defined ─────────
 
-  test('every tool has all 4 annotation fields defined', () => {
+  test('every tool has core annotation fields defined', () => {
     const tools = getAllTools();
     expect(tools.length).toBeGreaterThan(0);
 
@@ -166,6 +166,9 @@ describe('Safety Annotations consistency', () => {
         if (annotations[field] === undefined) {
           failures.push(`${name}: annotations.${field} is undefined`);
         }
+      }
+      if (annotations.sensitiveHint !== undefined && typeof annotations.sensitiveHint !== 'boolean') {
+        failures.push(`${name}: annotations.sensitiveHint is ${typeof annotations.sensitiveHint}`);
       }
     }
 
@@ -266,7 +269,53 @@ describe('Safety Annotations consistency', () => {
     }
   });
 
-  // ── 5. Read-only-prefix tools must have readOnlyHint: true ────────
+  // ── 5. Durable side-effect tools must be sensitive-gated ──────────
+
+  test('known durable create/enrich tools have sensitiveHint: true without destructiveHint', () => {
+    const SENSITIVE_SIDE_EFFECT_TOOLS = [
+      'add_contact_email',
+      'add_contact_phone',
+      'add_to_album',
+      'add_to_playlist',
+      'complete_reminder',
+      'create_album',
+      'create_contact',
+      'create_directory',
+      'create_event',
+      'create_folder',
+      'create_note',
+      'create_playlist',
+      'create_recurring_event',
+      'create_recurring_reminder',
+      'create_reminder',
+      'create_reminder_list',
+      'create_shortcut',
+    ];
+    const tools = getAllTools();
+    const failures = [];
+
+    for (const name of SENSITIVE_SIDE_EFFECT_TOOLS) {
+      const tool = tools.find((t) => t.name === name);
+      if (!tool) {
+        failures.push(`${name}: not registered`);
+        continue;
+      }
+      if (tool.annotations?.destructiveHint !== false) {
+        failures.push(`${name}: destructiveHint=${tool.annotations?.destructiveHint}`);
+      }
+      if (tool.annotations?.sensitiveHint !== true) {
+        failures.push(`${name}: sensitiveHint=${tool.annotations?.sensitiveHint}`);
+      }
+    }
+
+    if (failures.length > 0) {
+      throw new Error(
+        `sensitive side-effect tool(s) lack the expected annotations:\n  ${failures.join('\n  ')}`,
+      );
+    }
+  });
+
+  // ── 6. Read-only-prefix tools must have readOnlyHint: true ────────
 
   test('tools with list_/get_/search_/read_/today_/upcoming_ prefix have readOnlyHint: true', () => {
     const READ_ONLY_PREFIXES = ['list_', 'get_', 'search_', 'read_', 'today_', 'upcoming_'];
@@ -297,7 +346,7 @@ describe('Safety Annotations consistency', () => {
     }
   });
 
-  // ── 6. Read-only exceptions must have openWorldHint: true ──────────
+  // ── 7. Read-only exceptions must have openWorldHint: true ──────────
 
   test('read-only prefix exceptions have openWorldHint: true (justifying the override)', () => {
     const EXCEPTIONS = ['search_location', 'get_directions', 'search_nearby'];
@@ -324,7 +373,7 @@ describe('Safety Annotations consistency', () => {
     }
   });
 
-  // ── 7. run_javascript must have destructiveHint and openWorldHint ─
+  // ── 8. run_javascript must have destructiveHint and openWorldHint ─
 
   test('run_javascript has destructiveHint: true and openWorldHint: true', () => {
     const tools = getAllTools();
@@ -334,7 +383,7 @@ describe('Safety Annotations consistency', () => {
     expect(rj.annotations.openWorldHint).toBe(true);
   });
 
-  // ── 8. Summary: report total tools checked ────────────────────────
+  // ── 9. Summary: report total tools checked ────────────────────────
 
   test('registered tool count is at least 200', () => {
     const count = server._tools.size;

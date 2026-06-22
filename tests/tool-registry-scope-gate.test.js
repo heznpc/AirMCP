@@ -74,7 +74,7 @@ describe('tool-registry OAuth scope gate', () => {
       {
         title: 'Create reminder',
         description: 'd',
-        annotations: { readOnlyHint: false, destructiveHint: false },
+        annotations: { readOnlyHint: false, destructiveHint: false, sensitiveHint: true },
       },
       async () => ({ content: [{ type: 'text', text: 'ok' }] }),
     );
@@ -120,6 +120,14 @@ describe('tool-registry OAuth scope gate', () => {
         callToolThroughGate(server, 'create_reminder'),
       ),
     ).rejects.toThrow(/\[forbidden\] scope mcp:write required/);
+  });
+
+  test('mcp:write token allows sensitive non-destructive create_reminder', async () => {
+    const result = await runWithRequestContext(
+      { oauth: { subject: 'u', scopes: ['mcp:write'], raw: {} } },
+      () => callToolThroughGate(server, 'create_reminder'),
+    );
+    expect(result.content[0].text).toBe('ok');
   });
 
   test('mcp:write token denies delete_note', async () => {

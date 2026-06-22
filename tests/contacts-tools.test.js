@@ -91,9 +91,15 @@ describe('Contacts tools registration', () => {
     }
   });
 
-  test('create_contact is not destructive', () => {
+  test('contact creation and enrichment are not destructive but require sensitive approval', () => {
     const { config } = server.tools.get('create_contact');
     expect(config.annotations.destructiveHint).toBe(false);
+    expect(config.annotations.sensitiveHint).toBe(true);
+    for (const name of ['add_contact_email', 'add_contact_phone']) {
+      const { config: addConfig } = server.tools.get(name);
+      expect(addConfig.annotations.destructiveHint).toBe(false);
+      expect(addConfig.annotations.sensitiveHint).toBe(true);
+    }
   });
 });
 

@@ -101,13 +101,15 @@ describe('Reminders tools registration', () => {
   test('complete_reminder is not destructive', () => {
     const { config } = server.tools.get('complete_reminder');
     expect(config.annotations.destructiveHint).toBe(false);
+    expect(config.annotations.sensitiveHint).toBe(true);
   });
 
-  test('create tools are not destructive', () => {
+  test('create tools are not destructive but require sensitive approval', () => {
     const creates = ['create_reminder', 'create_reminder_list', 'create_recurring_reminder'];
     for (const name of creates) {
       const { config } = server.tools.get(name);
       expect(config.annotations.destructiveHint).toBe(false);
+      expect(config.annotations.sensitiveHint).toBe(true);
     }
   });
 });

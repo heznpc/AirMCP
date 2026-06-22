@@ -99,9 +99,10 @@ describe('Calendar tools registration', () => {
     }
   });
 
-  test('create_event is not destructive', () => {
+  test('create_event is not destructive but requires sensitive approval', () => {
     const { config } = server.tools.get('create_event');
     expect(config.annotations.destructiveHint).toBe(false);
+    expect(config.annotations.sensitiveHint).toBe(true);
   });
 });
 

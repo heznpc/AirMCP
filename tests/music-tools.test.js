@@ -138,4 +138,12 @@ describe('Music tools registration', () => {
       expect(config.annotations.destructiveHint).toBe(false);
     }
   });
+
+  test('playlist creation and additions require sensitive approval', () => {
+    for (const name of ['create_playlist', 'add_to_playlist']) {
+      const { config } = server.tools.get(name);
+      expect(config.annotations.destructiveHint).toBe(false);
+      expect(config.annotations.sensitiveHint).toBe(true);
+    }
+  });
 });

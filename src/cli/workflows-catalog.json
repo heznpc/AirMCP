@@ -5,7 +5,14 @@
     "bestFor": "Start the day with calendar, reminders, mail, and recent notes.",
     "prompt": "Brief me on today's calendar, overdue reminders, unread mail, and recent notes.",
     "siri": "Daily Briefing in AirMCP",
-    "tools": ["skill_daily-briefing", "summarize_context", "today_events", "list_reminders", "get_unread_count", "list_notes"],
+    "tools": [
+      "skill_daily-briefing",
+      "summarize_context",
+      "today_events",
+      "list_reminders",
+      "get_unread_count",
+      "list_notes"
+    ],
     "requiredModules": ["calendar", "reminders", "mail", "notes"],
     "implementation": "built-in-skill",
     "safety": "Read-only by default. Saving a note or reminder becomes a separate approved action."

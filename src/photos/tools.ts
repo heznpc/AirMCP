@@ -295,7 +295,13 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
       inputSchema: {
         name: z.string().max(500).describe("Album name"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
     },
     async ({ name }) => {
       try {
@@ -322,7 +328,13 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
         photoIds: z.array(z.string().max(500)).min(1).max(500).describe("Array of photo media item IDs (max 500)"),
         albumName: z.string().max(500).describe("Target album name"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
     },
     async ({ photoIds, albumName }) => {
       try {

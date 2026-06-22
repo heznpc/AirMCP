@@ -10,6 +10,7 @@ import { log } from "../shared/logger.js";
 type SkillToolAnnotations = {
   readOnlyHint: boolean;
   destructiveHint: boolean;
+  sensitiveHint: boolean;
   idempotentHint: boolean;
   openWorldHint: boolean;
 };
@@ -120,6 +121,7 @@ function skillToolAnnotations(skill: SkillDefinition): SkillToolAnnotations {
   return {
     readOnlyHint: skill.annotations?.readOnlyHint ?? true,
     destructiveHint: skill.annotations?.destructiveHint ?? false,
+    sensitiveHint: skill.annotations?.sensitiveHint ?? false,
     idempotentHint: skill.annotations?.idempotentHint ?? true,
     openWorldHint: skill.annotations?.openWorldHint ?? false,
   };

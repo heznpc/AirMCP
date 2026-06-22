@@ -13,6 +13,7 @@ final class HitlManager {
         let tool: String
         let args: [String: String]
         let destructive: Bool
+        let sensitive: Bool
         let openWorld: Bool
         let timestamp: Date
     }
@@ -209,6 +210,7 @@ final class HitlManager {
             tool: parsed.tool,
             args: parsed.args,
             destructive: parsed.destructive,
+            sensitive: parsed.sensitive,
             openWorld: parsed.openWorld,
             timestamp: parsed.timestamp
         )
@@ -281,7 +283,13 @@ final class HitlManager {
 
     private func postNotification(for request: ApprovalRequest) {
         let content = UNMutableNotificationContent()
-        content.title = request.destructive ? L("hitl.destructiveAction") : L("hitl.toolConfirmation")
+        if request.destructive {
+            content.title = L("hitl.destructiveAction")
+        } else if request.sensitive {
+            content.title = L("hitl.sensitiveAction")
+        } else {
+            content.title = L("hitl.toolConfirmation")
+        }
         content.body = L("hitl.toolPrefix", request.tool)
         if !request.args.isEmpty {
             let argsPreview = request.args

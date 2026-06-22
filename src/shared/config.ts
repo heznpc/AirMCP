@@ -77,7 +77,7 @@ export function getCompatibilityEnv(): CompatibilityEnv {
 /** npm package name — single source of truth for npx/install references */
 export const NPM_PACKAGE_NAME = "airmcp";
 
-export type HitlLevel = "off" | "destructive-only" | "all-writes" | "all";
+export type HitlLevel = "off" | "destructive-only" | "sensitive-only" | "all-writes" | "all";
 
 export interface HitlConfig {
   level: HitlLevel;
@@ -86,7 +86,7 @@ export interface HitlConfig {
   socketPath: string;
 }
 
-const HITL_LEVELS: readonly string[] = ["off", "destructive-only", "all-writes", "all"];
+const HITL_LEVELS: readonly string[] = ["off", "destructive-only", "sensitive-only", "all-writes", "all"];
 
 export const MODULE_NAMES = [
   "notes",
@@ -310,7 +310,7 @@ export function parseConfig(): AirMcpConfig {
 
   // Validate hitl.level: warn if not a valid level
   if (file.hitl?.level !== undefined && !HITL_LEVELS.includes(file.hitl.level)) {
-    log.warn("invalid hitl.level — using default 'destructive-only'", {
+    log.warn("invalid hitl.level — using default 'sensitive-only'", {
       provided: file.hitl.level,
       expected: HITL_LEVELS,
     });
@@ -391,8 +391,8 @@ export function parseConfig(): AirMcpConfig {
   }
 
   // HITL config: env var > JSON > default
-  const hitlLevelRaw = process.env.AIRMCP_HITL_LEVEL ?? file.hitl?.level ?? "destructive-only";
-  const hitlLevel: HitlLevel = HITL_LEVELS.includes(hitlLevelRaw) ? (hitlLevelRaw as HitlLevel) : "destructive-only";
+  const hitlLevelRaw = process.env.AIRMCP_HITL_LEVEL ?? file.hitl?.level ?? "sensitive-only";
+  const hitlLevel: HitlLevel = HITL_LEVELS.includes(hitlLevelRaw) ? (hitlLevelRaw as HitlLevel) : "sensitive-only";
   const hitlWhitelist = new Set<string>(file.hitl?.whitelist ?? []);
   const hitlTimeout = file.hitl?.timeout ?? 30;
   const hitlSocketPath = PATHS.HITL_SOCKET;

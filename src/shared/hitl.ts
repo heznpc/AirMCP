@@ -10,6 +10,7 @@ interface HitlRequest {
   args: Record<string, unknown>;
   module?: string;
   destructive: boolean;
+  sensitive: boolean;
   openWorld: boolean;
 }
 
@@ -49,6 +50,7 @@ export class HitlClient {
     args: Record<string, unknown>,
     destructive: boolean,
     openWorld: boolean,
+    sensitive = false,
   ): Promise<boolean> {
     try {
       await this.ensureConnected();
@@ -64,6 +66,7 @@ export class HitlClient {
       tool,
       args,
       destructive,
+      sensitive,
       openWorld,
     };
 

@@ -155,6 +155,7 @@ try {
       annotations: {
         readOnlyHint: t.annotations?.readOnlyHint ?? false,
         destructiveHint: t.annotations?.destructiveHint ?? false,
+        sensitiveHint: t.annotations?.sensitiveHint ?? false,
         idempotentHint: t.annotations?.idempotentHint ?? false,
         openWorldHint: t.annotations?.openWorldHint ?? true,
       },

@@ -94,6 +94,7 @@
 "settings.hitlLevel" = "수준";
 "settings.hitlOff" = "끄기";
 "settings.hitlDestructiveOnly" = "파괴적 작업만";
+"settings.hitlSensitiveOnly" = "민감 작업";
 "settings.hitlAllWrites" = "모든 쓰기";
 "settings.hitlAll" = "전체";
 "settings.hitlTimeout" = "타임아웃: %d초";
@@ -224,6 +225,7 @@
 
 /* HITL Notifications */
 "hitl.destructiveAction" = "파괴적 작업";
+"hitl.sensitiveAction" = "민감 작업";
 "hitl.toolConfirmation" = "도구 확인";
 "hitl.toolPrefix" = "도구: %@";
 "hitl.approve" = "승인";

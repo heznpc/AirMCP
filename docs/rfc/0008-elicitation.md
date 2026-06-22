@@ -30,7 +30,7 @@ Result of the existing `iwork_mcp` survey + Anthropic SDK 1.29.0 inspection:
 
 ## 2. Goal
 
-Wrap every tool whose `annotations.destructiveHint = true` with a **confirmation elicit** that fires automatically when the client supports elicitation, falls back to the existing HITL guard when it doesn't, and never blocks tools that aren't destructive.
+Wrap every tool selected by the active HITL level with a **confirmation elicit** that fires automatically when the client supports elicitation and falls back to the existing socket HITL guard when it doesn't. At the default `sensitive-only` level this includes tools with `annotations.destructiveHint = true` or `annotations.sensitiveHint = true`.
 
 ### Non-goals (Phase 1)
 

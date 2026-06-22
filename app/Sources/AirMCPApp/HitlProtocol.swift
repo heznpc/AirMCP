@@ -6,6 +6,7 @@ struct HitlApprovalRequestPayload: Equatable, Sendable {
     let tool: String
     let args: [String: String]
     let destructive: Bool
+    let sensitive: Bool
     let openWorld: Bool
     let timestamp: Date
 }
@@ -40,6 +41,7 @@ enum HitlProtocol {
             tool: tool,
             args: argsDict,
             destructive: json["destructive"] as? Bool ?? false,
+            sensitive: json["sensitive"] as? Bool ?? false,
             openWorld: json["openWorld"] as? Bool ?? false,
             timestamp: timestamp
         )

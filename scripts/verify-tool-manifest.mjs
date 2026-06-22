@@ -113,12 +113,12 @@ if (Array.isArray(manifest.tools)) {
       fail(path, `outputSchema must be null or an object`);
     }
 
-    // annotations — all 4 boolean hints required
+    // annotations — all boolean hints required
     const a = tool.annotations;
     if (typeof a !== "object" || a === null) {
       fail(path, `annotations missing`);
     } else {
-      for (const key of ["readOnlyHint", "destructiveHint", "idempotentHint", "openWorldHint"]) {
+      for (const key of ["readOnlyHint", "destructiveHint", "sensitiveHint", "idempotentHint", "openWorldHint"]) {
         if (typeof a[key] !== "boolean") {
           fail(`${path}.annotations.${key}`, `expected boolean, got ${typeof a[key]}`);
         }

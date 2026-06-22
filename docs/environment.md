@@ -65,7 +65,7 @@ If a variable accepts a path, `~` expands to `$HOME`. Booleans are `"true"` / `"
 
 | Variable | Default | Notes |
 |---|---|---|
-| `AIRMCP_HITL_LEVEL` | `destructive-only` | One of `off` / `destructive-only` / `all-writes` / `all`. Picks which tools require approval. |
+| `AIRMCP_HITL_LEVEL` | `sensitive-only` | One of `off` / `destructive-only` / `sensitive-only` / `all-writes` / `all`. Picks which tools require approval. |
 | `AIRMCP_ELICITATION_DISABLE` | (off) | `true` skips MCP elicitation prompts and falls through to socket HITL. Useful for fully-scripted destructive pipelines. |
 | `AIRMCP_MANAGED_CLIENTS` | (empty) | Comma-separated client names. Suppresses elicitation when these clients connect (they have their own approval UI). All Claude products are auto-detected via the `claude` prefix. |
 | `AIRMCP_SHARE_APPROVAL` | (off) | Per-tool share-guard approval flag. |

@@ -228,7 +228,13 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
         jobTitle: z.string().max(500).optional().describe("Job title"),
         note: z.string().max(5000).optional().describe("Notes"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
     },
     async ({ firstName, lastName, email, phone, organization, jobTitle, note }) => {
       try {
@@ -336,7 +342,13 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
         email: z.string().email().describe("Email address to add"),
         label: z.string().max(500).optional().default("work").describe("Email label (default: work)"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
     },
     async ({ id, email, label }) => {
       try {
@@ -361,7 +373,13 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
         phone: z.string().min(1).max(1000).describe("Phone number to add"),
         label: z.string().max(500).optional().default("mobile").describe("Phone label (default: mobile)"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
     },
     async ({ id, phone, label }) => {
       try {

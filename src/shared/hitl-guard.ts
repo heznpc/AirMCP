@@ -10,6 +10,7 @@ const NOT_HANDLED = Symbol("hitl-elicitation-not-handled");
 interface ToolAnnotations {
   readOnlyHint?: boolean;
   destructiveHint?: boolean;
+  sensitiveHint?: boolean;
   idempotentHint?: boolean;
   openWorldHint?: boolean;
 }
@@ -70,6 +71,8 @@ function shouldRequireApproval(
       return false;
     case "destructive-only":
       return annotations.destructiveHint === true;
+    case "sensitive-only":
+      return annotations.destructiveHint === true || annotations.sensitiveHint === true;
     case "all-writes":
       return annotations.readOnlyHint === false;
     case "all":
@@ -86,6 +89,7 @@ async function tryElicitApproval(
   toolName: string,
   toolArgs: Record<string, unknown>,
   destructive: boolean,
+  sensitive: boolean,
 ): Promise<boolean | undefined> {
   // RFC 0008 §3.3 — operator opt-out for end-to-end scripted pipelines
   // that don't want any user prompt. When set, every call falls through
@@ -104,7 +108,11 @@ async function tryElicitApproval(
     const caps = inner.getClientCapabilities?.();
     if (caps && !caps.elicitation) return undefined;
 
-    const label = destructive ? `⚠️ Destructive: ${toolName}` : `Approve: ${toolName}`;
+    const label = destructive
+      ? `⚠️ Destructive: ${toolName}`
+      : sensitive
+        ? `⚠️ Sensitive: ${toolName}`
+        : `Approve: ${toolName}`;
     const argsSummary = JSON.stringify(toolArgs, null, 2).slice(0, 500);
 
     const result = await inner.elicitInput({
@@ -170,12 +178,13 @@ export function installHitlGuard(server: McpServer, hitlClient: HitlClient, conf
     const wrapped = async (...args: unknown[]) => {
       const toolArgs = (args[0] ?? {}) as Record<string, unknown>;
       const destructive = annotations.destructiveHint ?? false;
+      const sensitive = annotations.sensitiveHint ?? false;
       const managed = isManagedClient(server);
 
       // Resolve the call through MCP elicitation. Returns NOT_HANDLED when the
       // client offers no elicitation channel, so the caller can fall back.
       const viaElicitation = async (): Promise<unknown> => {
-        const elicitResult = await tryElicitApproval(server, name, toolArgs, destructive);
+        const elicitResult = await tryElicitApproval(server, name, toolArgs, destructive, sensitive);
         if (elicitResult === undefined) return NOT_HANDLED;
         if (telemetryEnabled) {
           traceApproval(name, elicitResult ? "approved" : "denied", "elicitation", { destructive, managed });
@@ -215,6 +224,7 @@ export function installHitlGuard(server: McpServer, hitlClient: HitlClient, conf
         toolArgs,
         destructive,
         annotations.openWorldHint ?? false,
+        sensitive,
       );
       if (telemetryEnabled) {
         traceApproval(name, approved ? "approved" : "denied", "socket", { destructive, managed });

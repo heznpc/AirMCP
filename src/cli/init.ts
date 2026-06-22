@@ -374,7 +374,12 @@ export async function runInit(): Promise<void> {
   // --- Step 2: Security & privacy settings ---
   console.log("");
   const securityOptions: SelectOption[] = [
-    { label: "Recommended (destructive actions need approval)", value: "destructive-only", hint: "default" },
+    {
+      label: "Recommended (sensitive and destructive actions need approval)",
+      value: "sensitive-only",
+      hint: "default",
+    },
+    { label: "Minimal (destructive actions only)", value: "destructive-only" },
     { label: "Strict (all write operations need approval)", value: "all-writes" },
     { label: "Maximum (every tool call needs approval)", value: "all" },
     { label: "Off (no confirmations)", value: "off" },

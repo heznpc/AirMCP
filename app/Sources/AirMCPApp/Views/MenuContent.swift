@@ -573,6 +573,7 @@ struct MenuContent: View {
             )) {
                 Text(L("settings.hitlOff")).tag(HitlLevel.off)
                 Text(L("settings.hitlDestructiveOnly")).tag(HitlLevel.destructiveOnly)
+                Text(L("settings.hitlSensitiveOnly")).tag(HitlLevel.sensitiveOnly)
                 Text(L("settings.hitlAllWrites")).tag(HitlLevel.allWrites)
                 Text(L("settings.hitlAll")).tag(HitlLevel.all)
             }
@@ -742,9 +743,12 @@ struct MenuContent: View {
                 .foregroundStyle(.secondary)
             ForEach(hitlManager.pendingRequests) { request in
                 VStack(alignment: .leading, spacing: 4) {
-                    Label(request.tool, systemImage: request.destructive ? "exclamationmark.triangle" : "questionmark.circle")
+                    Label(
+                        request.tool,
+                        systemImage: request.destructive || request.sensitive ? "exclamationmark.triangle" : "questionmark.circle"
+                    )
                         .font(.caption)
-                        .foregroundStyle(request.destructive ? .orange : .primary)
+                        .foregroundStyle(request.destructive || request.sensitive ? .orange : .primary)
                     HStack {
                         Button(L("hitl.approve")) {
                             hitlManager.respond(id: request.id, approved: true, tool: request.tool)

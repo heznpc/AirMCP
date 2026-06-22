@@ -33,10 +33,12 @@ interface FileConfig {
 function clientRuntimeShape(entry: unknown): "app-owned" | "direct" | "unknown" {
   if (!entry || typeof entry !== "object") return "unknown";
   const record = entry as Record<string, unknown>;
-  if (record.url === CODEX_APP_OWNED_URL) return "app-owned";
   const command = typeof record.command === "string" ? record.command : "";
   const args = Array.isArray(record.args) ? record.args.filter((arg): arg is string => typeof arg === "string") : [];
-  if (args.includes("connect") && args.includes(CODEX_APP_OWNED_URL)) return "app-owned";
+  const env = record.env && typeof record.env === "object" ? (record.env as Record<string, unknown>) : {};
+  const hasToken = typeof env.AIRMCP_HTTP_TOKEN === "string" && env.AIRMCP_HTTP_TOKEN.length > 0;
+  if (args.includes("connect") && args.includes(CODEX_APP_OWNED_URL) && hasToken) return "app-owned";
+  if (args.includes("connect") && args.includes(CODEX_APP_OWNED_URL)) return "unknown";
   if (command === "npx" && args.some((arg) => arg === "airmcp" || arg.startsWith("airmcp@"))) return "direct";
   return "unknown";
 }
@@ -168,10 +170,7 @@ export async function runDoctor(): Promise<void> {
     if (shape === "app-owned") {
       ok("Codex", `${GREEN}connected${RESET} ${DIM}(AirMCP.app runtime)${RESET}`);
     } else if (shape === "direct") {
-      meh(
-        "Codex",
-        `connected via direct stdio — run: codex mcp remove airmcp && codex mcp add airmcp --url ${CODEX_APP_OWNED_URL}`,
-      );
+      meh("Codex", "connected via direct stdio — rerun init for token-gated AirMCP.app runtime");
     } else if (shape === "missing") {
       meh("Codex", `found but no airmcp entry`);
     } else {

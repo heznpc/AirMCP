@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { NPM_PACKAGE_NAME } from "../shared/config.js";
 import { IDENTITY } from "../shared/constants.js";
+import { ensureAppRuntimeToken } from "../shared/app-runtime-token.js";
 
 export const CODEX_APP_OWNED_URL = `http://127.0.0.1:${IDENTITY.HTTP_PORT}/mcp`;
 export type CodexAirmcpRuntimeShape = "app-owned" | "direct" | "unknown" | "missing";
@@ -37,7 +38,11 @@ export function isCodexAirmcpConfigured(): boolean {
 export function codexAirmcpRuntimeShape(): CodexAirmcpRuntimeShape {
   const config = getCodexAirmcpConfig();
   if (!config) return "missing";
-  if (config.includes(CODEX_APP_OWNED_URL) || config.includes("transport: streamable-http")) {
+  if (
+    config.includes(CODEX_APP_OWNED_URL) &&
+    config.includes("transport: stdio") &&
+    config.includes("AIRMCP_HTTP_TOKEN")
+  ) {
     return "app-owned";
   }
   if (config.includes("transport: stdio") || config.includes("command: npx")) {
@@ -47,17 +52,41 @@ export function codexAirmcpRuntimeShape(): CodexAirmcpRuntimeShape {
 }
 
 export function configureCodexAirmcp(): "already-configured" | "configured" {
+  const token = ensureAppRuntimeToken();
   if (isCodexAirmcpConfigured()) {
     runCodex(["mcp", "remove", "airmcp"]);
   }
-  runCodex(["mcp", "add", "airmcp", "--url", CODEX_APP_OWNED_URL]);
+  runCodex([
+    "mcp",
+    "add",
+    "--env",
+    `AIRMCP_HTTP_TOKEN=${token}`,
+    "airmcp",
+    "--",
+    "npx",
+    "-y",
+    NPM_PACKAGE_NAME,
+    "connect",
+    "--url",
+    CODEX_APP_OWNED_URL,
+  ]);
   return "configured";
 }
 
 export function codexManualSetupCommand(): string {
-  return `codex mcp add airmcp --url ${CODEX_APP_OWNED_URL}`;
+  return "codex mcp add --env AIRMCP_HTTP_TOKEN=<token> airmcp -- npx -y airmcp connect --url " + CODEX_APP_OWNED_URL;
 }
 
-export function stdioProxyArgs(): string[] {
-  return ["-y", NPM_PACKAGE_NAME, "connect", "--url", CODEX_APP_OWNED_URL];
+export function stdioProxyEntry(token = ensureAppRuntimeToken()): {
+  command: string;
+  args: string[];
+  env: Record<string, string>;
+} {
+  return {
+    command: "npx",
+    args: ["-y", NPM_PACKAGE_NAME, "connect", "--url", CODEX_APP_OWNED_URL],
+    env: {
+      AIRMCP_HTTP_TOKEN: token,
+    },
+  };
 }

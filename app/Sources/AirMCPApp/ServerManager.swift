@@ -187,6 +187,15 @@ final class ServerManager {
                     ))
                     return
                 }
+                let token: String
+                do {
+                    token = try AppRuntimeToken.ensure()
+                } catch {
+                    continuation.resume(returning: .failure(
+                        "Failed to prepare app runtime token: \(error.localizedDescription)"
+                    ))
+                    return
+                }
 
                 let process = Process()
                 process.executableURL = URL(fileURLWithPath: npxPath)
@@ -200,7 +209,8 @@ final class ServerManager {
                 process.standardOutput = stdoutPipe ?? FileHandle.nullDevice
                 process.standardError = stderrPipe ?? FileHandle.nullDevice
                 var env = NodeEnvironment.buildEnv()
-                env["AIRMCP_ALLOW_NETWORK"] = "loopback-only"
+                env["AIRMCP_ALLOW_NETWORK"] = "with-token"
+                env["AIRMCP_HTTP_TOKEN"] = token
                 env["AIRMCP_APP_OWNED_RUNTIME"] = "1"
                 process.environment = env
 

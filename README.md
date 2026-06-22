@@ -241,7 +241,7 @@ See [docs/shortcuts.md](docs/shortcuts.md) for the full guide + [RFC 0007](docs/
 
 ## Client Setup
 
-Works with any MCP-compatible client. Start AirMCP.app first. Clients with HTTP MCP support can connect directly to `http://127.0.0.1:3847/mcp`; stdio-only clients use `npx -y airmcp connect` as a proxy into the app-owned runtime.
+Works with any MCP-compatible client. Start AirMCP.app first; it owns the local Apple permissions and starts a token-gated HTTP runtime on `http://127.0.0.1:3847/mcp`. Stdio-only clients use `npx -y airmcp connect` as a proxy into that runtime with `AIRMCP_HTTP_TOKEN` set. The app and setup wizard generate the per-install token at `~/Library/Application Support/AirMCP/http-token`.
 
 ### Claude Desktop
 
@@ -252,7 +252,10 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
   "mcpServers": {
     "airmcp": {
       "command": "npx",
-      "args": ["-y", "airmcp", "connect", "--url", "http://127.0.0.1:3847/mcp"]
+      "args": ["-y", "airmcp", "connect", "--url", "http://127.0.0.1:3847/mcp"],
+      "env": {
+        "AIRMCP_HTTP_TOKEN": "<token>"
+      }
     }
   }
 }
@@ -261,13 +264,13 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 ### Claude Code
 
 ```bash
-claude mcp add airmcp -- npx -y airmcp connect --url http://127.0.0.1:3847/mcp
+claude mcp add --env AIRMCP_HTTP_TOKEN=<token> airmcp -- npx -y airmcp connect --url http://127.0.0.1:3847/mcp
 ```
 
 ### Codex
 
 ```bash
-codex mcp add airmcp --url http://127.0.0.1:3847/mcp
+codex mcp add --env AIRMCP_HTTP_TOKEN=<token> airmcp -- npx -y airmcp connect --url http://127.0.0.1:3847/mcp
 ```
 
 ### Cursor
@@ -279,7 +282,10 @@ Add to `.cursor/mcp.json`:
   "mcpServers": {
     "airmcp": {
       "command": "npx",
-      "args": ["-y", "airmcp", "connect", "--url", "http://127.0.0.1:3847/mcp"]
+      "args": ["-y", "airmcp", "connect", "--url", "http://127.0.0.1:3847/mcp"],
+      "env": {
+        "AIRMCP_HTTP_TOKEN": "<token>"
+      }
     }
   }
 }
@@ -294,7 +300,10 @@ Add to `~/.codeium/windsurf/mcp_config.json`:
   "mcpServers": {
     "airmcp": {
       "command": "npx",
-      "args": ["-y", "airmcp", "connect", "--url", "http://127.0.0.1:3847/mcp"]
+      "args": ["-y", "airmcp", "connect", "--url", "http://127.0.0.1:3847/mcp"],
+      "env": {
+        "AIRMCP_HTTP_TOKEN": "<token>"
+      }
     }
   }
 }
@@ -302,7 +311,7 @@ Add to `~/.codeium/windsurf/mcp_config.json`:
 
 ### Other MCP Clients
 
-Any client that supports the MCP stdio transport can use AirMCP. Use `npx -y airmcp connect --url http://127.0.0.1:3847/mcp` as the command when AirMCP.app owns the runtime. Use direct `npx -y airmcp` only when you intentionally want that client process to own a separate server instance.
+Any client that supports the MCP stdio transport can use AirMCP. Use `npx -y airmcp connect --url http://127.0.0.1:3847/mcp` with `AIRMCP_HTTP_TOKEN` set when AirMCP.app owns the runtime. Direct HTTP clients must send `Authorization: Bearer <token>`. Use direct `npx -y airmcp` only when you intentionally want that client process to own a separate server instance.
 
 ### Local Development
 

@@ -164,28 +164,49 @@ enum AirMcpConstants {
     static let appOwnedHealthURL = "http://127.0.0.1:\(appOwnedHttpPort)/health"
     static let keyAutoStart = "autoStartServer"
     static let keyOnboardingCompleted = "onboardingCompleted"
-    static let appOwnedProxyArgs = ["-y", npmPackageName, "connect", "--url", appOwnedHttpURL]
 
-    static var appOwnedProxyEntry: [String: Any] {
+    static var appOwnedProxyArgs: [String] {
+        ["-y", npmPackageName, "connect", "--url", appOwnedHttpURL]
+    }
+
+    static func appOwnedProxyEntry(token: String) -> [String: Any] {
         [
             "command": "npx",
             "args": appOwnedProxyArgs,
+            "env": [
+                "AIRMCP_HTTP_TOKEN": token,
+            ],
         ]
     }
 
-    static let claudeDesktopConfig = """
-    {
-      "mcpServers": {
-        "airmcp": {
-          "command": "npx",
-          "args": ["-y", "\(npmPackageName)", "connect", "--url", "\(appOwnedHttpURL)"]
-        }
-      }
+    static func tokenForConfig() -> String {
+        (try? AppRuntimeToken.ensure()) ?? "<token>"
     }
-    """
 
-    static let claudeCodeConfig = "claude mcp add airmcp -- npx -y \(npmPackageName) connect --url \(appOwnedHttpURL)"
-    static let codexConfig = "codex mcp add airmcp --url \(appOwnedHttpURL)"
+    static func claudeDesktopConfig() -> String {
+        let token = tokenForConfig()
+        return """
+        {
+          "mcpServers": {
+            "airmcp": {
+              "command": "npx",
+              "args": ["-y", "\(npmPackageName)", "connect", "--url", "\(appOwnedHttpURL)"],
+              "env": {
+                "AIRMCP_HTTP_TOKEN": "\(token)"
+              }
+            }
+          }
+        }
+        """
+    }
+
+    static func claudeCodeConfig() -> String {
+        "claude mcp add --env AIRMCP_HTTP_TOKEN=\(tokenForConfig()) airmcp -- npx -y \(npmPackageName) connect --url \(appOwnedHttpURL)"
+    }
+
+    static func codexConfig() -> String {
+        "codex mcp add --env AIRMCP_HTTP_TOKEN=\(tokenForConfig()) airmcp -- npx -y \(npmPackageName) connect --url \(appOwnedHttpURL)"
+    }
 
     static func copyToClipboard(_ text: String) {
         NSPasteboard.general.clearContents()
@@ -618,16 +639,16 @@ struct MenuContent: View {
         .disabled(permissionManager.isRunning)
 
         Button(L("menu.copyClaudeConfig")) {
-            AirMcpConstants.copyToClipboard(AirMcpConstants.claudeDesktopConfig)
+            AirMcpConstants.copyToClipboard(AirMcpConstants.claudeDesktopConfig())
         }
         .keyboardShortcut("c")
 
         Button(L("menu.copyClaudeCodeConfig")) {
-            AirMcpConstants.copyToClipboard(AirMcpConstants.claudeCodeConfig)
+            AirMcpConstants.copyToClipboard(AirMcpConstants.claudeCodeConfig())
         }
 
         Button(L("menu.copyCodexConfig")) {
-            AirMcpConstants.copyToClipboard(AirMcpConstants.codexConfig)
+            AirMcpConstants.copyToClipboard(AirMcpConstants.codexConfig())
         }
 
         Button(L("menu.addWidget")) {

@@ -25,10 +25,10 @@ async function getFreePort() {
   return address.port;
 }
 
-function spawnAirMcp(args) {
+function spawnAirMcp(args, envOverrides = {}) {
   const child = spawn(process.execPath, [DIST, ...args], {
     cwd: ROOT,
-    env: cleanBootEnv(),
+    env: { ...cleanBootEnv(), ...envOverrides },
     stdio: ["pipe", "pipe", "pipe"],
   });
   child.stderr.setEncoding("utf8");
@@ -123,12 +123,25 @@ afterEach(async () => {
 });
 
 describe("airmcp connect", () => {
-  test("bridges a stdio client to the app-owned HTTP runtime", async () => {
+  test("bridges a stdio client to the token-gated app-owned HTTP runtime", async () => {
     const port = await getFreePort();
-    const server = spawnAirMcp(["--http", "--port", String(port)]);
+    const token = "test-runtime-token";
+    const server = spawnAirMcp(["--http", "--port", String(port)], {
+      AIRMCP_ALLOW_NETWORK: "with-token",
+      AIRMCP_HTTP_TOKEN: token,
+    });
     await waitForHealth(port, server);
 
-    const proxy = spawnAirMcp(["connect", "--url", `http://127.0.0.1:${port}/mcp`]);
+    const unauthenticated = await fetch(`http://127.0.0.1:${port}/mcp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 99, method: "initialize" }),
+    });
+    expect(unauthenticated.status).toBe(401);
+
+    const proxy = spawnAirMcp(["connect", "--url", `http://127.0.0.1:${port}/mcp`], {
+      AIRMCP_HTTP_TOKEN: token,
+    });
     const reader = createJsonReader(proxy.stdout);
 
     const initialized = await request(proxy, reader, 1, "initialize", {

@@ -62,13 +62,13 @@ Use a workflow id with `--prompt`, `--siri`, `--tools`, `--modules`, `--safety`,
 For Codex:
 
 ```bash
-codex mcp add airmcp --url http://127.0.0.1:3847/mcp
+codex mcp add --env AIRMCP_HTTP_TOKEN=<token> airmcp -- npx -y airmcp connect --url http://127.0.0.1:3847/mcp
 ```
 
 For Claude Code:
 
 ```bash
-claude mcp add airmcp -- npx -y airmcp connect --url http://127.0.0.1:3847/mcp
+claude mcp add --env AIRMCP_HTTP_TOKEN=<token> airmcp -- npx -y airmcp connect --url http://127.0.0.1:3847/mcp
 ```
 
 For Siri and Shortcuts, see [shortcuts.md](shortcuts.md). The default AppShortcuts are workflow-first; `Ask AirMCP` is a separate FoundationModels preview shortcut that only appears in opt-in builds with `AIRMCP_ENABLE_FOUNDATION_MODELS`.

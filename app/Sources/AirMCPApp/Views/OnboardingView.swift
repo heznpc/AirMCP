@@ -768,9 +768,28 @@ struct OnboardingView: View {
         guard let codex = NodeEnvironment.findExecutable(named: "codex") else {
             return false
         }
+        guard let token = try? AppRuntimeToken.ensure() else {
+            return false
+        }
 
         _ = runProcess(codex, arguments: ["mcp", "remove", "airmcp"])
-        return runProcess(codex, arguments: ["mcp", "add", "airmcp", "--url", AirMcpConstants.appOwnedHttpURL])
+        return runProcess(
+            codex,
+            arguments: [
+                "mcp",
+                "add",
+                "--env",
+                "AIRMCP_HTTP_TOKEN=\(token)",
+                "airmcp",
+                "--",
+                "npx",
+                "-y",
+                AirMcpConstants.npmPackageName,
+                "connect",
+                "--url",
+                AirMcpConstants.appOwnedHttpURL,
+            ]
+        )
     }
 
     private nonisolated static func runProcess(_ executable: String, arguments: [String]) -> Bool {
@@ -807,8 +826,11 @@ struct OnboardingView: View {
             config = [:]
         }
 
-        // Build the airmcp entry
-        let airmcpEntry = AirMcpConstants.appOwnedProxyEntry
+        // Build the token-gated app-owned runtime entry
+        guard let token = try? AppRuntimeToken.ensure() else {
+            return false
+        }
+        let airmcpEntry = AirMcpConstants.appOwnedProxyEntry(token: token)
 
         // Merge into mcpServers
         var servers = config["mcpServers"] as? [String: Any] ?? [:]

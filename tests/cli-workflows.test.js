@@ -187,7 +187,12 @@ describe("cli workflows command", () => {
     expect(onboarding).toContain('id: "codex"');
     expect(onboarding).toContain('NodeEnvironment.findExecutable(named: "codex")');
     expect(onboarding).toContain('"mcp", "remove", "airmcp"');
-    expect(onboarding).toContain('"mcp", "add", "airmcp", "--url", AirMcpConstants.appOwnedHttpURL');
+    expect(onboarding).toContain('"mcp",');
+    expect(onboarding).toContain('"add",');
+    expect(onboarding).toContain('"--env"');
+    expect(onboarding).toContain('"AIRMCP_HTTP_TOKEN=\\(token)"');
+    expect(onboarding).toContain('"connect"');
+    expect(onboarding).toContain("AirMcpConstants.appOwnedProxyEntry(token: token)");
   });
 
   test("onboarding final step can copy the selected workflow prompt", () => {

@@ -151,7 +151,7 @@ Clients connect with:
 Authorization: Bearer my-secret-token
 ```
 
-Using `--bind-all` without `AIRMCP_HTTP_TOKEN` prints a security warning. On a trusted local network this may be acceptable, but for any internet-facing deployment, always set a token.
+Using `--bind-all` without `AIRMCP_HTTP_TOKEN` is rejected at startup. Use `AIRMCP_ALLOW_NETWORK=with-token` with a token for trusted network exposure, or `with-token+origin` / `with-oauth+origin` for browser-facing clients.
 
 ## Starter Modules
 

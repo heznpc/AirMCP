@@ -26,7 +26,7 @@ This will:
 
 ## Manual Setup
 
-If you prefer manual configuration, start AirMCP.app first. HTTP-capable clients connect to `http://127.0.0.1:3847/mcp`; stdio-only clients use `npx -y airmcp connect` as a proxy into that app-owned runtime.
+If you prefer manual configuration, start AirMCP.app first. It owns the local Apple permissions and starts a token-gated runtime on `http://127.0.0.1:3847/mcp`. Stdio-only clients use `npx -y airmcp connect` as a proxy into that runtime with `AIRMCP_HTTP_TOKEN` set. The app and setup wizard generate the per-install token at `~/Library/Application Support/AirMCP/http-token`.
 
 ### Claude Desktop
 
@@ -37,7 +37,10 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
   "mcpServers": {
     "airmcp": {
       "command": "npx",
-      "args": ["-y", "airmcp", "connect", "--url", "http://127.0.0.1:3847/mcp"]
+      "args": ["-y", "airmcp", "connect", "--url", "http://127.0.0.1:3847/mcp"],
+      "env": {
+        "AIRMCP_HTTP_TOKEN": "<token>"
+      }
     }
   }
 }
@@ -52,7 +55,10 @@ Edit `~/.claude/mcp.json`:
   "mcpServers": {
     "airmcp": {
       "command": "npx",
-      "args": ["-y", "airmcp", "connect", "--url", "http://127.0.0.1:3847/mcp"]
+      "args": ["-y", "airmcp", "connect", "--url", "http://127.0.0.1:3847/mcp"],
+      "env": {
+        "AIRMCP_HTTP_TOKEN": "<token>"
+      }
     }
   }
 }
@@ -67,7 +73,10 @@ Edit `~/.cursor/mcp.json`:
   "mcpServers": {
     "airmcp": {
       "command": "npx",
-      "args": ["-y", "airmcp", "connect", "--url", "http://127.0.0.1:3847/mcp"]
+      "args": ["-y", "airmcp", "connect", "--url", "http://127.0.0.1:3847/mcp"],
+      "env": {
+        "AIRMCP_HTTP_TOKEN": "<token>"
+      }
     }
   }
 }
@@ -82,7 +91,10 @@ Edit `~/.codeium/windsurf/mcp_config.json`:
   "mcpServers": {
     "airmcp": {
       "command": "npx",
-      "args": ["-y", "airmcp", "connect", "--url", "http://127.0.0.1:3847/mcp"]
+      "args": ["-y", "airmcp", "connect", "--url", "http://127.0.0.1:3847/mcp"],
+      "env": {
+        "AIRMCP_HTTP_TOKEN": "<token>"
+      }
     }
   }
 }

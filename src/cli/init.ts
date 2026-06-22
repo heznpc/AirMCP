@@ -10,7 +10,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, copyFileSync } from
 import { join } from "node:path";
 import { MODULE_NAMES, STARTER_MODULES, MCP_CLIENTS } from "../shared/config.js";
 import { PATHS } from "../shared/constants.js";
-import { codexManualSetupCommand, configureCodexAirmcp, isCodexCliAvailable, stdioProxyArgs } from "./codex-mcp.js";
+import { codexManualSetupCommand, configureCodexAirmcp, isCodexCliAvailable, stdioProxyEntry } from "./codex-mcp.js";
 import { LOGO_LINES, typeLine, sleep, writeOut } from "../shared/banner.js";
 import { isPlainObject } from "../shared/validate.js";
 import { formatError } from "../shared/errors.js";
@@ -450,10 +450,7 @@ export async function runInit(): Promise<void> {
   console.log(` ${GREEN}\u2713${RESET} ${PATHS.CONFIG}`);
 
   // --- Step 3: Auto-detect and patch MCP client configs ---
-  const airmcpEntry = {
-    command: "npx",
-    args: stdioProxyArgs(),
-  };
+  const airmcpEntry = stdioProxyEntry();
 
   let patchedClients = 0;
   const detectedClients: string[] = [];

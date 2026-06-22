@@ -25,6 +25,8 @@
     <string>AirMCP adds a photo to your library only when you ask it to import an image.</string>
     <key>NSContactsUsageDescription</key>
     <string>AirMCP reads and edits contacts you ask it to look up, create, or update.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>AirMCP reads your current location only when you explicitly ask for location-based tools.</string>
     <key>NSServices</key>
     <array>
         <dict>

@@ -26,7 +26,7 @@ describe("AirMCP AppEntity scaffold", () => {
     expect(src).not.toMatch(/Assistant(?:Intent|Entity|Enum)\(schema:/);
   });
 
-  test("does not enable schema macros until the local macro plugin is available", () => {
+  test("keeps workflow entities plain until matching schema constants are usable", () => {
     expect(src).not.toMatch(/@AppEntity\s*\(\s*schema:/);
     expect(generated).not.toMatch(/@AppIntent\s*\(\s*schema:/);
     expect(src).not.toMatch(/AssistantSchema\.(?:IntentSchema|EntitySchema)\s*\(/);

@@ -1,5 +1,9 @@
 import { execFileSync } from "node:child_process";
 import { NPM_PACKAGE_NAME } from "../shared/config.js";
+import { IDENTITY } from "../shared/constants.js";
+
+export const CODEX_APP_OWNED_URL = `http://127.0.0.1:${IDENTITY.HTTP_PORT}/mcp`;
+export type CodexAirmcpRuntimeShape = "app-owned" | "direct" | "unknown" | "missing";
 
 function runCodex(args: string[]): string {
   return execFileSync("codex", args, {
@@ -18,17 +22,42 @@ export function isCodexCliAvailable(): boolean {
   }
 }
 
-export function isCodexAirmcpConfigured(): boolean {
+export function getCodexAirmcpConfig(): string | null {
   try {
-    runCodex(["mcp", "get", "airmcp"]);
-    return true;
+    return runCodex(["mcp", "get", "airmcp"]);
   } catch {
-    return false;
+    return null;
   }
 }
 
+export function isCodexAirmcpConfigured(): boolean {
+  return getCodexAirmcpConfig() !== null;
+}
+
+export function codexAirmcpRuntimeShape(): CodexAirmcpRuntimeShape {
+  const config = getCodexAirmcpConfig();
+  if (!config) return "missing";
+  if (config.includes(CODEX_APP_OWNED_URL) || config.includes("transport: streamable-http")) {
+    return "app-owned";
+  }
+  if (config.includes("transport: stdio") || config.includes("command: npx")) {
+    return "direct";
+  }
+  return "unknown";
+}
+
 export function configureCodexAirmcp(): "already-configured" | "configured" {
-  if (isCodexAirmcpConfigured()) return "already-configured";
-  runCodex(["mcp", "add", "airmcp", "--", "npx", "-y", NPM_PACKAGE_NAME]);
+  if (isCodexAirmcpConfigured()) {
+    runCodex(["mcp", "remove", "airmcp"]);
+  }
+  runCodex(["mcp", "add", "airmcp", "--url", CODEX_APP_OWNED_URL]);
   return "configured";
+}
+
+export function codexManualSetupCommand(): string {
+  return `codex mcp add airmcp --url ${CODEX_APP_OWNED_URL}`;
+}
+
+export function stdioProxyArgs(): string[] {
+  return ["-y", NPM_PACKAGE_NAME, "connect", "--url", CODEX_APP_OWNED_URL];
 }

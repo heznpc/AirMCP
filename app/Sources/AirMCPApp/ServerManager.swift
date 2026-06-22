@@ -48,7 +48,7 @@ final class ServerManager {
 
     func checkStatus() {
         Task.detached {
-            let isRunning = Self.pgrepAirMcp()
+            let isRunning = await Self.httpServerHealthy()
             let newStatus: Status = isRunning ? .running : .stopped
             await MainActor.run { [weak self] in
                 guard let self else { return }
@@ -190,10 +190,19 @@ final class ServerManager {
 
                 let process = Process()
                 process.executableURL = URL(fileURLWithPath: npxPath)
-                process.arguments = ["-y", AirMcpConstants.npmPackageName]
+                process.arguments = [
+                    "-y",
+                    AirMcpConstants.npmPackageName,
+                    "--http",
+                    "--port",
+                    "\(AirMcpConstants.appOwnedHttpPort)",
+                ]
                 process.standardOutput = stdoutPipe ?? FileHandle.nullDevice
                 process.standardError = stderrPipe ?? FileHandle.nullDevice
-                process.environment = NodeEnvironment.buildEnv()
+                var env = NodeEnvironment.buildEnv()
+                env["AIRMCP_ALLOW_NETWORK"] = "loopback-only"
+                env["AIRMCP_APP_OWNED_RUNTIME"] = "1"
+                process.environment = env
 
                 do {
                     try process.run()
@@ -218,17 +227,13 @@ final class ServerManager {
 
     // MARK: - Process Utilities
 
-    private nonisolated static func pgrepAirMcp() -> Bool {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
-        process.arguments = ["-f", "node.*airmcp"]
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
-
+    private nonisolated static func httpServerHealthy() async -> Bool {
+        guard let url = URL(string: AirMcpConstants.appOwnedHealthURL) else { return false }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 1.0
         do {
-            try process.run()
-            process.waitUntilExit()
-            return process.terminationStatus == 0
+            let (_, response) = try await URLSession.shared.data(for: request)
+            return (response as? HTTPURLResponse)?.statusCode == 200
         } catch {
             return false
         }
@@ -237,7 +242,7 @@ final class ServerManager {
     private nonisolated static func pkillAirMcp() {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
-        process.arguments = ["-f", "node.*airmcp"]
+        process.arguments = ["-f", "airmcp.*--http.*--port \(AirMcpConstants.appOwnedHttpPort)"]
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
 

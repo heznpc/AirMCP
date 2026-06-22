@@ -11,7 +11,7 @@ description: How to install and set up AirMCP on your Mac.
 
 ## Quick Install
 
-The fastest way to get started is the interactive setup wizard:
+The recommended desktop runtime is AirMCP.app: start the menubar app once, then connect Claude, Codex, Cursor, Windsurf, or another MCP client to the app-owned loopback server. The CLI wizard configures detected clients for that shape:
 
 ```bash
 npx airmcp init
@@ -21,12 +21,12 @@ This will:
 
 1. Ask which modules you want to enable (or choose "all")
 2. Detect installed MCP clients (Claude Desktop, Claude Code, Cursor, Windsurf)
-3. Write the MCP server entry to each client's config file
+3. Write an AirMCP.app-owned runtime entry to each client's config file
 4. Create `~/.config/airmcp/config.json` with your module selection
 
 ## Manual Setup
 
-If you prefer manual configuration, add AirMCP to your MCP client's config file directly.
+If you prefer manual configuration, start AirMCP.app first. HTTP-capable clients connect to `http://127.0.0.1:3847/mcp`; stdio-only clients use `npx -y airmcp connect` as a proxy into that app-owned runtime.
 
 ### Claude Desktop
 
@@ -37,7 +37,7 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
   "mcpServers": {
     "airmcp": {
       "command": "npx",
-      "args": ["-y", "airmcp"]
+      "args": ["-y", "airmcp", "connect", "--url", "http://127.0.0.1:3847/mcp"]
     }
   }
 }
@@ -52,7 +52,7 @@ Edit `~/.claude/mcp.json`:
   "mcpServers": {
     "airmcp": {
       "command": "npx",
-      "args": ["-y", "airmcp"]
+      "args": ["-y", "airmcp", "connect", "--url", "http://127.0.0.1:3847/mcp"]
     }
   }
 }
@@ -67,7 +67,7 @@ Edit `~/.cursor/mcp.json`:
   "mcpServers": {
     "airmcp": {
       "command": "npx",
-      "args": ["-y", "airmcp"]
+      "args": ["-y", "airmcp", "connect", "--url", "http://127.0.0.1:3847/mcp"]
     }
   }
 }
@@ -82,7 +82,7 @@ Edit `~/.codeium/windsurf/mcp_config.json`:
   "mcpServers": {
     "airmcp": {
       "command": "npx",
-      "args": ["-y", "airmcp"]
+      "args": ["-y", "airmcp", "connect", "--url", "http://127.0.0.1:3847/mcp"]
     }
   }
 }
@@ -90,38 +90,23 @@ Edit `~/.codeium/windsurf/mcp_config.json`:
 
 ## Enable All Modules
 
-By default, AirMCP enables a starter set of modules (Notes, Reminders, Calendar, Shortcuts, System, Finder, Weather). To enable all 29 modules, use the `--full` flag:
+By default, AirMCP enables a starter set of modules when no config file exists. In the app-owned runtime, use the onboarding module picker or rerun the setup wizard and choose all modules:
 
-```json
-{
-  "mcpServers": {
-    "airmcp": {
-      "command": "npx",
-      "args": ["-y", "airmcp", "--full"]
-    }
-  }
-}
+```bash
+npx airmcp init
 ```
 
-Or set the environment variable:
+Or edit `~/.config/airmcp/config.json` directly:
 
 ```json
 {
-  "mcpServers": {
-    "airmcp": {
-      "command": "npx",
-      "args": ["-y", "airmcp"],
-      "env": {
-        "AIRMCP_FULL": "true"
-      }
-    }
-  }
+  "disabledModules": []
 }
 ```
 
 ## macOS Permissions
 
-AirMCP uses JXA (JavaScript for Automation) to control macOS apps. The first time you use a module, macOS will prompt you to grant Accessibility or Automation permissions to your terminal or MCP client.
+AirMCP uses JXA (JavaScript for Automation) to control macOS apps. In the recommended app-owned runtime, macOS permission prompts should be associated with AirMCP.app rather than every individual AI client. Direct `npx -y airmcp` launches remain useful for development, but the launching terminal or MCP client owns those prompts.
 
 To check permissions, run:
 

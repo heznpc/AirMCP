@@ -769,11 +769,8 @@ struct OnboardingView: View {
             return false
         }
 
-        if runProcess(codex, arguments: ["mcp", "get", "airmcp"]) {
-            return true
-        }
-
-        return runProcess(codex, arguments: ["mcp", "add", "airmcp", "--", "npx", "-y", AirMcpConstants.npmPackageName])
+        _ = runProcess(codex, arguments: ["mcp", "remove", "airmcp"])
+        return runProcess(codex, arguments: ["mcp", "add", "airmcp", "--url", AirMcpConstants.appOwnedHttpURL])
     }
 
     private nonisolated static func runProcess(_ executable: String, arguments: [String]) -> Bool {
@@ -811,10 +808,7 @@ struct OnboardingView: View {
         }
 
         // Build the airmcp entry
-        let airmcpEntry: [String: Any] = [
-            "command": "npx",
-            "args": ["-y", AirMcpConstants.npmPackageName],
-        ]
+        let airmcpEntry = AirMcpConstants.appOwnedProxyEntry
 
         // Merge into mcpServers
         var servers = config["mcpServers"] as? [String: Any] ?? [:]

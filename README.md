@@ -13,7 +13,7 @@
 
 **Part of:** Human-Controlled AI Systems · Research Program 1 (anchor — Apple-side agent governance).
 
-**Requires**: macOS for the server. The default `npx -y airmcp` loads a curated **starter** module set (~111 tools); `--full` (or `AIRMCP_FULL=true`) enables all 29 modules / 286 tools. Most tools are pure JXA and work on macOS 14+ with no extra setup. **Swift-backed tools** — HealthKit, on-device semantic search, recurring events/reminders, photo import/delete/classify, Vision, Speech, Location, Bluetooth, and Apple Intelligence previews — need the **optional Swift bridge** — build it from a source checkout with `npm run swift-build` (it is shipped in **neither** the npm tarball **nor** the `.mcpb` bundle; the bundled macOS app does carry it); without it those tools return a clear "Swift bridge not found" error and everything else keeps working. FoundationModels-backed Apple Intelligence and `AskAirMCPIntent` additionally require macOS 26+ on Apple Silicon and an opt-in Swift build with `AIRMCP_ENABLE_FOUNDATION_MODELS`.
+**Requires**: macOS for the server. The recommended desktop path is the AirMCP menubar app: it owns the loopback HTTP runtime, while Claude/Codex/Cursor attach to it as clients. The direct CLI server (`npx -y airmcp`) still works for development and loads a curated **starter** module set (~111 tools); `--full` (or `AIRMCP_FULL=true`) enables all 29 modules / 286 tools. Most tools are pure JXA and work on macOS 14+ with no extra setup. **Swift-backed tools** — HealthKit, on-device semantic search, recurring events/reminders, photo import/delete/classify, Vision, Speech, Location, Bluetooth, and Apple Intelligence previews — need the **optional Swift bridge** — build it from a source checkout with `npm run swift-build` (it is shipped in **neither** the npm tarball **nor** the `.mcpb` bundle; the bundled macOS app does carry it); without it those tools return a clear "Swift bridge not found" error and everything else keeps working. FoundationModels-backed Apple Intelligence and `AskAirMCPIntent` additionally require macOS 26+ on Apple Silicon and an opt-in Swift build with `AIRMCP_ENABLE_FOUNDATION_MODELS`.
 
 > Available in multiple languages at the [project landing page](https://heznpc.github.io/AirMCP/).
 
@@ -39,13 +39,13 @@
 - **JXA + Swift 6.2 bridge** — JXA for basic automation, Swift 6 strict concurrency with EventKit/PhotoKit/HealthKit/Vision, plus opt-in FoundationModels previews
 - **Apple Intelligence preview** — On-device summarize / rewrite / proofread / `ai_agent` / `ai_plan_metrics` (planner regression catcher) via Foundation Models. This path is macOS 26+ / Apple Silicon and compile-time opt-in (`AIRMCP_ENABLE_FOUNDATION_MODELS`). WWDC 2026 made the model layer officially pluggable: Foundation Models gained a `LanguageModel` protocol where on-device, Private Cloud Compute, and third-party cloud models back the same session API — Anthropic and Google publish Swift packages for their frontier models ([WWDC26 session 241](https://developer.apple.com/videos/play/wwdc2026/241/), first-party). Apple's own announcement names no Siri backbone vendor — the widely reported Gemini deal is press reporting, not Apple's wording — and AirMCP doesn't bet on one either way: the governance layer (per-call HITL, HMAC-chained audit, scope gate, rate limits) is model-agnostic, and the brains stay in whatever MCP client you connect.
 - **Context memory** — `memory_put`/`query`/`forget`/`stats` + `memory://recent` resource for facts/entities/episodes, surviving restarts
-- **Native menubar app** — SwiftUI companion with onboarding wizard, auto-start, log viewer, update notifications, permission setup, server crash auto-restart. Current release builds are ad-hoc signed; Developer ID codesigning + notarization (Gatekeeper-green) are wired in `.github/workflows/release-app.yml` but gated on Apple signing secrets, so they have not shipped yet.
+- **Native menubar app** — SwiftUI companion with onboarding wizard, auto-start, log viewer, update notifications, permission setup, server crash auto-restart, and app-owned loopback HTTP runtime for clients that should not each launch their own AirMCP server. Current release builds are ad-hoc signed; Developer ID codesigning + notarization (Gatekeeper-green) are wired in `.github/workflows/release-app.yml` but gated on Apple signing secrets, so they have not shipped yet.
 - **One-click setup** — `setup_permissions` tool or menubar app to request all macOS permissions at once
 - **Dual transport** — stdio (default) + HTTP/SSE (`--http`) with token auth, origin allow-list, and startup invariants that refuse to boot misconfigured servers
 
 ## Get Started
 
-Two paths. Claude Desktop users get one-click install via `.mcpb`. Agent-native Mac users use the CLI wizard, which configures detected Claude, Codex, Cursor, and Windsurf clients.
+Two paths. The menubar app is the recommended local runtime: start AirMCP.app once, then point Claude, Codex, Cursor, Windsurf, or other clients at that same loopback server. Claude Desktop users can also get one-click install via `.mcpb`, which is convenient but launches under Claude Desktop rather than the AirMCP.app-owned runtime.
 
 ### Option A — Claude Desktop one-click install (recommended for non-devs)
 
@@ -241,7 +241,7 @@ See [docs/shortcuts.md](docs/shortcuts.md) for the full guide + [RFC 0007](docs/
 
 ## Client Setup
 
-Works with any MCP-compatible client. Examples:
+Works with any MCP-compatible client. Start AirMCP.app first. Clients with HTTP MCP support can connect directly to `http://127.0.0.1:3847/mcp`; stdio-only clients use `npx -y airmcp connect` as a proxy into the app-owned runtime.
 
 ### Claude Desktop
 
@@ -252,7 +252,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
   "mcpServers": {
     "airmcp": {
       "command": "npx",
-      "args": ["-y", "airmcp"]
+      "args": ["-y", "airmcp", "connect", "--url", "http://127.0.0.1:3847/mcp"]
     }
   }
 }
@@ -261,13 +261,13 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 ### Claude Code
 
 ```bash
-claude mcp add airmcp -- npx -y airmcp
+claude mcp add airmcp -- npx -y airmcp connect --url http://127.0.0.1:3847/mcp
 ```
 
 ### Codex
 
 ```bash
-codex mcp add airmcp -- npx -y airmcp
+codex mcp add airmcp --url http://127.0.0.1:3847/mcp
 ```
 
 ### Cursor
@@ -279,7 +279,7 @@ Add to `.cursor/mcp.json`:
   "mcpServers": {
     "airmcp": {
       "command": "npx",
-      "args": ["-y", "airmcp"]
+      "args": ["-y", "airmcp", "connect", "--url", "http://127.0.0.1:3847/mcp"]
     }
   }
 }
@@ -294,7 +294,7 @@ Add to `~/.codeium/windsurf/mcp_config.json`:
   "mcpServers": {
     "airmcp": {
       "command": "npx",
-      "args": ["-y", "airmcp"]
+      "args": ["-y", "airmcp", "connect", "--url", "http://127.0.0.1:3847/mcp"]
     }
   }
 }
@@ -302,7 +302,7 @@ Add to `~/.codeium/windsurf/mcp_config.json`:
 
 ### Other MCP Clients
 
-Any client that supports the MCP stdio transport can use AirMCP. Use `npx -y airmcp` as the server command.
+Any client that supports the MCP stdio transport can use AirMCP. Use `npx -y airmcp connect --url http://127.0.0.1:3847/mcp` as the command when AirMCP.app owns the runtime. Use direct `npx -y airmcp` only when you intentionally want that client process to own a separate server instance.
 
 ### Local Development
 
@@ -867,6 +867,7 @@ Or edit `~/.config/airmcp/config.json` directly:
 | `npx airmcp --version` | Print version and exit            |
 | `npx airmcp --full`    | Start with all 29 modules enabled |
 | `npx airmcp --http`    | Start as HTTP server (port 3847)  |
+| `npx airmcp connect`   | Proxy stdio clients to AirMCP.app |
 
 ## Configuration
 
@@ -1051,7 +1052,7 @@ Modules with OS requirements (e.g., Intelligence requires macOS 26+) are automat
 
 ### Platform Constraints (macOS 26+)
 
-- **Safari bookmarks/reading list** — Apple removed JXA bookmark scripting classes in macOS 26. The plist fallback (`~/Library/Safari/Bookmarks.plist`) requires Full Disk Access, which TCC blocks for MCP server processes. Investigating Shortcuts-based or WebExtension bridge approaches.
+- **Safari bookmarks/reading list** — Apple removed JXA bookmark scripting classes in macOS 26. The plist fallback (`~/Library/Safari/Bookmarks.plist`) requires Full Disk Access, which TCC blocks for headless/direct MCP server processes. The app-owned runtime is the intended permission boundary, but signed-app runtime verification is still required for this surface. Investigating Shortcuts-based or WebExtension bridge approaches.
 - **Safari `add_bookmark`** — Legacy JXA `make new bookmark` no longer supported in macOS 26. No programmatic alternative available yet.
 - **Podcasts** — Apple removed the Podcasts JXA scripting dictionary entirely in macOS 26. All 6 Podcasts tools return errors. Investigating Shortcuts bridge or Media framework alternatives.
 

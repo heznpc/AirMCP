@@ -159,22 +159,33 @@ private let featuredWorkflows: [WorkflowInfo] = [
 enum AirMcpConstants {
     static let npmPackageName = "airmcp"
     static let mcpProtocolVersion = "2025-03-26"
+    static let appOwnedHttpPort = 3847
+    static let appOwnedHttpURL = "http://127.0.0.1:\(appOwnedHttpPort)/mcp"
+    static let appOwnedHealthURL = "http://127.0.0.1:\(appOwnedHttpPort)/health"
     static let keyAutoStart = "autoStartServer"
     static let keyOnboardingCompleted = "onboardingCompleted"
+    static let appOwnedProxyArgs = ["-y", npmPackageName, "connect", "--url", appOwnedHttpURL]
+
+    static var appOwnedProxyEntry: [String: Any] {
+        [
+            "command": "npx",
+            "args": appOwnedProxyArgs,
+        ]
+    }
 
     static let claudeDesktopConfig = """
     {
       "mcpServers": {
         "airmcp": {
           "command": "npx",
-          "args": ["-y", "\(npmPackageName)"]
+          "args": ["-y", "\(npmPackageName)", "connect", "--url", "\(appOwnedHttpURL)"]
         }
       }
     }
     """
 
-    static let claudeCodeConfig = "claude mcp add airmcp -- npx -y \(npmPackageName)"
-    static let codexConfig = "codex mcp add airmcp -- npx -y \(npmPackageName)"
+    static let claudeCodeConfig = "claude mcp add airmcp -- npx -y \(npmPackageName) connect --url \(appOwnedHttpURL)"
+    static let codexConfig = "codex mcp add airmcp --url \(appOwnedHttpURL)"
 
     static func copyToClipboard(_ text: String) {
         NSPasteboard.general.clearContents()

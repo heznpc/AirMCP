@@ -8,9 +8,9 @@
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync, copyFileSync } from "node:fs";
 import { join } from "node:path";
-import { MODULE_NAMES, STARTER_MODULES, NPM_PACKAGE_NAME, MCP_CLIENTS } from "../shared/config.js";
+import { MODULE_NAMES, STARTER_MODULES, MCP_CLIENTS } from "../shared/config.js";
 import { PATHS } from "../shared/constants.js";
-import { configureCodexAirmcp, isCodexCliAvailable } from "./codex-mcp.js";
+import { codexManualSetupCommand, configureCodexAirmcp, isCodexCliAvailable, stdioProxyArgs } from "./codex-mcp.js";
 import { LOGO_LINES, typeLine, sleep, writeOut } from "../shared/banner.js";
 import { isPlainObject } from "../shared/validate.js";
 import { formatError } from "../shared/errors.js";
@@ -452,7 +452,7 @@ export async function runInit(): Promise<void> {
   // --- Step 3: Auto-detect and patch MCP client configs ---
   const airmcpEntry = {
     command: "npx",
-    args: ["-y", NPM_PACKAGE_NAME],
+    args: stdioProxyArgs(),
   };
 
   let patchedClients = 0;
@@ -520,7 +520,7 @@ export async function runInit(): Promise<void> {
     console.log(`  ${DIM}${JSON.stringify({ mcpServers: { airmcp: airmcpEntry } }, null, 2)}${RESET}`);
     console.log("");
     console.log("  Codex CLI:");
-    console.log(`  ${DIM}codex mcp add airmcp -- npx -y ${NPM_PACKAGE_NAME}${RESET}`);
+    console.log(`  ${DIM}${codexManualSetupCommand()}${RESET}`);
   }
 
   // --- Done ---
@@ -529,7 +529,7 @@ export async function runInit(): Promise<void> {
     `  ${GREEN}\u2713${RESET} ${t("setup_complete", lang)} ${BOLD}${enabled.size} modules${RESET}, safety: ${BOLD}${hitlLevel}${RESET}, ${patchedClients} client(s) configured.`,
   );
   if (detectedClients.length > 0) {
-    console.log(`  ${DIM}Restart ${detectedClients.join(", ")} to connect AirMCP.${RESET}`);
+    console.log(`  ${DIM}Start AirMCP.app, then restart ${detectedClients.join(", ")} to connect.${RESET}`);
   }
   console.log("");
   console.log(`  ${DIM}${t("next_steps", lang)}:${RESET}`);

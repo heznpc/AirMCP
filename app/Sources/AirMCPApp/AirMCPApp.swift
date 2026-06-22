@@ -97,7 +97,9 @@ struct AirMCPApp: App {
         if !appInitialized {
             appInitialized = true
             updateManager.startPeriodicChecks()
-            if !UserDefaults.standard.bool(forKey: AirMcpConstants.keyOnboardingCompleted) {
+            if ProcessInfo.processInfo.environment[AirMcpConstants.envForceAppRuntime] == "1" {
+                serverManager.startServer()
+            } else if !UserDefaults.standard.bool(forKey: AirMcpConstants.keyOnboardingCompleted) {
                 showOnboardingWindow()
             } else {
                 serverManager.autoStartIfNeeded()

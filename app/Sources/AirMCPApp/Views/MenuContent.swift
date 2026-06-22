@@ -169,6 +169,7 @@ enum AirMcpConstants {
     static let appOwnedHealthURL = "http://127.0.0.1:\(appOwnedHttpPort)/health"
     static let keyAutoStart = "autoStartServer"
     static let keyOnboardingCompleted = "onboardingCompleted"
+    static let envForceAppRuntime = "AIRMCP_FORCE_APP_RUNTIME"
 
     static var appOwnedProxyArgs: [String] {
         ["-y", npmPackageSpecifier, "connect", "--url", appOwnedHttpURL]

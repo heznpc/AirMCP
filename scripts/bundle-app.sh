@@ -14,7 +14,7 @@ Usage: scripts/bundle-app.sh [bundle|run|verify|verify-appintents|logs|telemetry
 Modes:
   bundle     Build AirMCP.app only (default)
   run        Build AirMCP.app and launch it
-  verify     Build, launch, and assert that the bundled app process is alive
+  verify     Build, launch, and assert the app-owned HTTP runtime contract
   verify-appintents
              Require a trusted signing identity, then verify AppIntents registration
   logs       Build, launch, and stream logs for the AirMCP process
@@ -69,6 +69,13 @@ APP_EXECUTABLE="AirMCP"
 APP_BINARY="$BUNDLE_DIR/Contents/MacOS/$APP_EXECUTABLE"
 LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
 SIGN_IDENTITY="${AIRMCP_SIGN_IDENTITY:--}"
+APP_HEALTH_URL="http://127.0.0.1:3847/health"
+APP_MCP_URL="http://127.0.0.1:3847/mcp"
+TOKEN_FILE="$HOME/Library/Application Support/AirMCP/http-token"
+EXPECTED_VERSION="$(
+  node -e 'const fs = require("fs"); console.log(JSON.parse(fs.readFileSync(process.argv[1], "utf8")).version)' \
+    "$PROJECT_DIR/package.json"
+)"
 
 if [ "$MODE" = "verify-appintents" ]; then
   if [ "$SIGN_IDENTITY" = "-" ]; then
@@ -218,6 +225,9 @@ launch_app() {
     sleep 0.5
   fi
   export AIRMCP_NPM_PACKAGE_SPECIFIER="${AIRMCP_NPM_PACKAGE_SPECIFIER:-$PROJECT_DIR}"
+  case "$MODE" in
+    verify|verify-appintents) export AIRMCP_FORCE_APP_RUNTIME=1 ;;
+  esac
   /usr/bin/open -n "$BUNDLE_DIR"
 }
 
@@ -236,6 +246,79 @@ wait_for_pid() {
 
 check_gatekeeper() {
   /usr/sbin/spctl --assess --type execute -vv "$BUNDLE_DIR" >/dev/null 2>&1
+}
+
+wait_for_http_runtime() {
+  local health=""
+  for _ in $(seq 1 60); do
+    health="$(curl -fsS --max-time 1 "$APP_HEALTH_URL" 2>/dev/null || true)"
+    if [ -n "$health" ]; then
+      echo "$health"
+      return 0
+    fi
+    sleep 0.25
+  done
+  return 1
+}
+
+verify_app_owned_runtime() {
+  local health
+  local actual_version
+  local token_mode
+  local unauth_status
+  local token
+  local authed_status
+
+  health="$(wait_for_http_runtime)" || {
+    echo "✗ app-owned HTTP runtime did not become healthy at $APP_HEALTH_URL" >&2
+    exit 1
+  }
+
+  actual_version="$(
+    node -e 'const health = JSON.parse(process.argv[1]); process.stdout.write(String(health.version ?? ""));' "$health"
+  )"
+  if [ "$actual_version" != "$EXPECTED_VERSION" ]; then
+    echo "✗ app-owned runtime version mismatch: expected $EXPECTED_VERSION, got $actual_version" >&2
+    exit 1
+  fi
+  echo "✓ App-owned runtime is healthy (v$actual_version)"
+
+  if [ ! -f "$TOKEN_FILE" ]; then
+    echo "✗ app-owned runtime token missing: $TOKEN_FILE" >&2
+    exit 1
+  fi
+  token_mode="$(stat -f "%Lp" "$TOKEN_FILE")"
+  if [ "$token_mode" != "600" ]; then
+    echo "✗ app-owned runtime token permissions must be 600, got $token_mode" >&2
+    exit 1
+  fi
+  echo "✓ App-owned runtime token is private (0600)"
+
+  unauth_status="$(
+    curl -sS --max-time 2 -o /dev/null -w "%{http_code}" \
+      -X POST "$APP_MCP_URL" \
+      -H "Content-Type: application/json" \
+      --data '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"bundle-verify","version":"0"}}}' \
+      2>/dev/null || true
+  )"
+  if [ "$unauth_status" != "401" ]; then
+    echo "✗ unauthenticated /mcp request should return 401, got ${unauth_status:-no response}" >&2
+    exit 1
+  fi
+  echo "✓ Unauthenticated /mcp request is rejected (401)"
+
+  token="$(tr -d "\r\n" < "$TOKEN_FILE")"
+  authed_status="$(
+    curl -sS --max-time 2 -o /dev/null -w "%{http_code}" \
+      -X GET "$APP_MCP_URL" \
+      -H "Authorization: Bearer $token" \
+      2>/dev/null || true
+  )"
+  if [ "$authed_status" = "401" ] || [ -z "$authed_status" ] || [ "$authed_status" = "000" ]; then
+    echo "✗ token-authenticated /mcp request did not pass the auth gate (status ${authed_status:-no response})" >&2
+    exit 1
+  fi
+  echo "✓ Token-authenticated /mcp request passes auth gate (HTTP $authed_status)"
 }
 
 verify_running() {
@@ -265,6 +348,8 @@ verify_running() {
     echo "⚠ AppIntents registration failed in runtime logs." >&2
     echo "  This commonly happens for unsigned/ad-hoc local bundles." >&2
   fi
+
+  verify_app_owned_runtime
 }
 
 verify_appintents() {
@@ -278,6 +363,7 @@ verify_appintents() {
     echo "✗ $APP_EXECUTABLE did not start from $BUNDLE_DIR" >&2
     exit 1
   }
+  verify_app_owned_runtime
   sleep 2
 
   local intent_predicate

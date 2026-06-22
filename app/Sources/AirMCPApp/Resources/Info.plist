@@ -17,6 +17,8 @@
     <string>AirMCP shows your calendar events in the Daily Briefing widget and enables AI-powered calendar management.</string>
     <key>NSRemindersFullAccessUsageDescription</key>
     <string>AirMCP shows your reminders in the Daily Briefing widget and enables AI-powered reminder management.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>AirMCP transcribes audio files you explicitly provide, on-device, to return their text for your automation requests.</string>
     <key>NSServices</key>
     <array>
         <dict>

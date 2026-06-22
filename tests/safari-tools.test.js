@@ -125,6 +125,25 @@ describe('Safari tool gating', () => {
     expect(mockRunJxa).not.toHaveBeenCalled();
   });
 
+  test.each([
+    ['open_url', 'http://[::ffff:127.0.0.1]:3847/mcp?leak=secret', 'localhost'],
+    ['open_url', 'http://[::ffff:192.168.0.1]/private?leak=secret', 'internal network'],
+    ['open_url', 'http://localhost.:3847/mcp?leak=secret', 'localhost'],
+    ['add_to_reading_list', 'http://foo.localhost:3847/mcp?leak=secret', 'localhost'],
+    ['add_to_reading_list', 'http://localhost.localdomain:3847/mcp?leak=secret', 'localhost'],
+    ['add_to_reading_list', 'http://[::ffff:169.254.169.254]/latest/meta-data?leak=secret', 'link-local'],
+  ])('%s blocks internal or localhost alias destination %s before Safari automation runs', async (toolName, url, message) => {
+    mockRunJxa.mockReset();
+    const server = createMockServer();
+    registerSafariTools(server, {});
+
+    const result = await server.callTool(toolName, { url });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain(message);
+    expect(mockRunJxa).not.toHaveBeenCalled();
+  });
+
   test('add_to_reading_list blocks internal destinations before Safari automation runs', async () => {
     mockRunJxa.mockReset();
     const server = createMockServer();

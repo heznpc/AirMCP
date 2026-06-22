@@ -21,6 +21,7 @@ if (
   _sub === "doctor" ||
   _sub === "workflows" ||
   _sub === "connect" ||
+  _sub === "connect-clients" ||
   _sub === "--help" ||
   _sub === "-h" ||
   _sub === "help"
@@ -37,6 +38,9 @@ if (
   } else if (_sub === "connect") {
     const mod = await import("./cli/connect.js");
     await mod.runConnect();
+  } else if (_sub === "connect-clients") {
+    const mod = await import("./cli/connect-clients.js");
+    mod.runConnectClients();
   } else {
     const mod = await import("./cli/help.js");
     mod.runHelp();

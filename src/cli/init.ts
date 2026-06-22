@@ -6,11 +6,11 @@
  * 3. Auto-detect and patch MCP client configs (Claude Desktop, Cursor, Windsurf, etc.)
  */
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync, copyFileSync } from "node:fs";
-import { join } from "node:path";
-import { MODULE_NAMES, STARTER_MODULES, MCP_CLIENTS } from "../shared/config.js";
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { MODULE_NAMES, STARTER_MODULES } from "../shared/config.js";
 import { PATHS } from "../shared/constants.js";
-import { codexManualSetupCommand, configureCodexAirmcp, isCodexCliAvailable, stdioProxyEntry } from "./codex-mcp.js";
+import { codexManualSetupCommand, stdioProxyEntry } from "./codex-mcp.js";
+import { configureMcpClients } from "./client-config.js";
 import { LOGO_LINES, typeLine, sleep, writeOut } from "../shared/banner.js";
 import { isPlainObject } from "../shared/validate.js";
 import { formatError } from "../shared/errors.js";
@@ -456,63 +456,20 @@ export async function runInit(): Promise<void> {
 
   // --- Step 3: Auto-detect and patch MCP client configs ---
   const airmcpEntry = stdioProxyEntry();
-
+  const clientResults = configureMcpClients({ includeSkipped: false });
+  const detectedClients = clientResults.map((result) => result.name);
   let patchedClients = 0;
-  const detectedClients: string[] = [];
 
-  for (const client of MCP_CLIENTS) {
-    const configExists = existsSync(client.configPath);
-    const parentExists = existsSync(join(client.configPath, ".."));
-
-    // Only patch if the config file or its parent directory already exists (client is installed)
-    if (!configExists && !parentExists) continue;
-
-    detectedClients.push(client.name);
-    process.stdout.write(`  Configuring ${client.name}...`);
-
-    try {
-      let existing: Record<string, unknown> = {};
-      if (configExists) {
-        const parsed: unknown = JSON.parse(readFileSync(client.configPath, "utf-8"));
-        if (!isPlainObject(parsed)) {
-          throw new Error(`existing config is not a JSON object`);
-        }
-        existing = parsed;
-      }
-
-      const rawServers = existing[client.serversKey];
-      const servers: Record<string, unknown> = isPlainObject(rawServers) ? rawServers : {};
-      servers.airmcp = airmcpEntry;
-      existing[client.serversKey] = servers;
-
-      // Snapshot the original file before overwriting so users can recover
-      // if the wizard ever produces unexpected output. .bak.<timestamp> keeps
-      // older snapshots from being clobbered on repeated runs.
-      if (configExists) {
-        copyFileSync(client.configPath, `${client.configPath}.bak.${Date.now()}`);
-      }
-      mkdirSync(join(client.configPath, ".."), { recursive: true });
-      writeFileSync(client.configPath, JSON.stringify(existing, null, 2) + "\n");
-      console.log(` ${GREEN}\u2713${RESET}`);
-      patchedClients++;
-    } catch (e) {
-      console.log(` ${YELLOW}\u26A0${RESET} ${e instanceof Error ? e.message : String(e)}`);
+  for (const result of clientResults) {
+    process.stdout.write(`  Configuring ${result.name}...`);
+    if (result.status === "failed") {
+      console.log(` ${YELLOW}\u26A0${RESET} ${result.detail}`);
+      continue;
     }
-  }
-
-  if (isCodexCliAvailable()) {
-    detectedClients.push("Codex");
-    process.stdout.write("  Configuring Codex...");
-
-    try {
-      const result = configureCodexAirmcp();
-      console.log(
-        ` ${GREEN}\u2713${RESET}${result === "already-configured" ? ` ${DIM}(already connected)${RESET}` : ""}`,
-      );
-      patchedClients++;
-    } catch (e) {
-      console.log(` ${YELLOW}\u26A0${RESET} ${e instanceof Error ? e.message : String(e)}`);
-    }
+    console.log(
+      ` ${GREEN}\u2713${RESET}${result.status === "already-configured" ? ` ${DIM}(already connected)${RESET}` : ""}`,
+    );
+    patchedClients++;
   }
 
   if (detectedClients.length === 0) {

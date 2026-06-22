@@ -138,8 +138,8 @@ syncFile("app/Sources/AirMCPApp/Views/MenuContent.swift", [
 // 6. config.ts — app-owned proxy/runtime package pin.
 syncFile("src/shared/config.ts", [
   {
-    pattern: /export const NPM_PACKAGE_SPECIFIER = "airmcp@[^"]+"/,
-    replacement: `export const NPM_PACKAGE_SPECIFIER = "airmcp@${VERSION}"`,
+    pattern: /export const NPM_PACKAGE_SPECIFIER = process\.env\.AIRMCP_NPM_PACKAGE_SPECIFIER \|\| "airmcp@[^"]+"/,
+    replacement: `export const NPM_PACKAGE_SPECIFIER = process.env.AIRMCP_NPM_PACKAGE_SPECIFIER || "airmcp@${VERSION}"`,
     label: "NPM_PACKAGE_SPECIFIER",
   },
 ]);

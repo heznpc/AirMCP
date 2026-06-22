@@ -237,6 +237,7 @@ describe('Safety Annotations consistency', () => {
       'gws_raw',
       // Arbitrary action surfaces can route data through another app/site.
       'open_url',
+      'add_to_reading_list',
       'run_javascript',
       'run_shortcut',
       'ui_click',

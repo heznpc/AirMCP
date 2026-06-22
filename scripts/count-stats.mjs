@@ -165,7 +165,9 @@ syncFile("README.md", [
   { pattern: /\*\*(\d+) tools\*\*/, value: tools },
   { pattern: /(\d+) modules\)/g, value: modules },
   { pattern: /(\d+) Apple apps/g, value: modules },
+  { pattern: /(\d+) Shortcuts\/AppIntents/g, value: appIntents },
   { pattern: /\*\*(\d+) Shortcuts \/ Siri AppIntents\*\*/, value: appIntents },
+  { pattern: /(\d+) auto-generated AppIntents/g, value: appIntents },
   { pattern: /\*\*(\d+) prompts \+ /, value: prompts },
 ]);
 

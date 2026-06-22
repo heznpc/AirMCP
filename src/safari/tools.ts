@@ -26,6 +26,40 @@ import {
   addToReadingListScript,
 } from "./scripts.js";
 
+function validateExternalHttpUrl(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return `Only http:// and https:// URLs are allowed. Got: ${parsed.protocol}`;
+    }
+    const host = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+    // Loopback (entire 127.0.0.0/8 range, IPv6 ::1, "localhost")
+    if (host === "localhost" || host === "::1" || /^127(?:\.\d{1,3}){3}$/.test(host)) {
+      return "Opening localhost URLs is not allowed.";
+    }
+    // RFC1918 private networks
+    if (host.startsWith("10.") || host.startsWith("192.168.") || /^172\.(1[6-9]|2\d|3[01])\./.test(host)) {
+      return "Opening internal network URLs is not allowed.";
+    }
+    // Link-local: 169.254.0.0/16 — includes cloud metadata endpoints
+    // (169.254.169.254 on AWS/GCP/Azure) and IPv6 fe80::/10.
+    if (host.startsWith("169.254.") || host.startsWith("fe80:") || host.startsWith("fe80::")) {
+      return "Opening link-local / cloud metadata URLs is not allowed.";
+    }
+    // IPv6 unique local addresses fc00::/7 (fc00:: – fdff::)
+    if (/^f[cd][0-9a-f]{2}:/.test(host)) {
+      return "Opening IPv6 unique-local URLs is not allowed.";
+    }
+    // Unspecified address / mDNS
+    if (host === "0.0.0.0" || host === "::" || host.endsWith(".local")) {
+      return "Opening unspecified or mDNS URLs is not allowed.";
+    }
+    return null;
+  } catch {
+    return "Invalid URL format.";
+  }
+}
+
 export function registerSafariTools(server: McpServer, config: AirMcpConfig): void {
   const { allowRunJavascript } = config;
   server.registerTool(
@@ -127,36 +161,8 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
       // Block non-HTTP schemes and internal network addresses to prevent the
       // LLM caller from using Safari + read_page_content to exfiltrate
       // private/cloud-internal data through the user's browser.
-      try {
-        const parsed = new URL(url);
-        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-          return errInvalidInput(`Only http:// and https:// URLs are allowed. Got: ${parsed.protocol}`);
-        }
-        const host = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, "");
-        // Loopback (entire 127.0.0.0/8 range, IPv6 ::1, "localhost")
-        if (host === "localhost" || host === "::1" || /^127(?:\.\d{1,3}){3}$/.test(host)) {
-          return errInvalidInput("Opening localhost URLs is not allowed.");
-        }
-        // RFC1918 private networks
-        if (host.startsWith("10.") || host.startsWith("192.168.") || /^172\.(1[6-9]|2\d|3[01])\./.test(host)) {
-          return errInvalidInput("Opening internal network URLs is not allowed.");
-        }
-        // Link-local: 169.254.0.0/16 — includes cloud metadata endpoints
-        // (169.254.169.254 on AWS/GCP/Azure) and IPv6 fe80::/10
-        if (host.startsWith("169.254.") || host.startsWith("fe80:") || host.startsWith("fe80::")) {
-          return errInvalidInput("Opening link-local / cloud metadata URLs is not allowed.");
-        }
-        // IPv6 unique local addresses fc00::/7 (fc00:: – fdff::)
-        if (/^f[cd][0-9a-f]{2}:/.test(host)) {
-          return errInvalidInput("Opening IPv6 unique-local URLs is not allowed.");
-        }
-        // Unspecified address / mDNS
-        if (host === "0.0.0.0" || host === "::" || host.endsWith(".local")) {
-          return errInvalidInput("Opening unspecified or mDNS URLs is not allowed.");
-        }
-      } catch {
-        return errInvalidInput("Invalid URL format.");
-      }
+      const urlError = validateExternalHttpUrl(url);
+      if (urlError) return errInvalidInput(urlError);
       try {
         return ok(await runJxa(openUrlScript(url)));
       } catch (e) {
@@ -352,9 +358,11 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
         url: z.string().url().describe("URL to add to Reading List"),
         title: z.string().max(500).optional().describe("Title for the Reading List item"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
     async ({ url, title }) => {
+      const urlError = validateExternalHttpUrl(url);
+      if (urlError) return errInvalidInput(urlError);
       try {
         return ok(await runJxa(addToReadingListScript(url, title)));
       } catch (e) {

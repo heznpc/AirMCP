@@ -91,8 +91,8 @@ describe('Safari tools registration', () => {
     }
   });
 
-  test('open_url, close_tab, and run_javascript are destructive', () => {
-    for (const name of ['open_url', 'close_tab', 'run_javascript']) {
+  test('open_url, add_to_reading_list, close_tab, and run_javascript are destructive', () => {
+    for (const name of ['open_url', 'add_to_reading_list', 'close_tab', 'run_javascript']) {
       const { config } = server.tools.get(name);
       expect(config.annotations.destructiveHint).toBe(true);
     }
@@ -109,6 +109,34 @@ describe('Safari tool gating', () => {
     });
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('disabled');
+  });
+
+  test('open_url blocks internal destinations before Safari automation runs', async () => {
+    mockRunJxa.mockReset();
+    const server = createMockServer();
+    registerSafariTools(server, {});
+
+    const result = await server.callTool('open_url', {
+      url: 'http://127.0.0.1:3847/mcp?leak=secret',
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('localhost');
+    expect(mockRunJxa).not.toHaveBeenCalled();
+  });
+
+  test('add_to_reading_list blocks internal destinations before Safari automation runs', async () => {
+    mockRunJxa.mockReset();
+    const server = createMockServer();
+    registerSafariTools(server, {});
+
+    const result = await server.callTool('add_to_reading_list', {
+      url: 'http://169.254.169.254/latest/meta-data?leak=secret',
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('link-local');
+    expect(mockRunJxa).not.toHaveBeenCalled();
   });
 });
 

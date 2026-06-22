@@ -2,7 +2,7 @@
 //
 // Source: docs/tool-manifest.json
 // Generator: scripts/gen-swift-intents.mjs
-// RFC 0007 Phase A.2b.2 + A.4.1 — 229 auto-selected read-only
+// RFC 0007 Phase A.2b.2 + A.4.1 — 228 auto-selected read-only
 // tools (82 with typed drift-guards + Interactive Snippet
 // SwiftUI views) + 9 AppShortcutsProvider entries.
 // Run `npm run gen:intents` to refresh after tool metadata changes.
@@ -1398,33 +1398,6 @@ public struct AddToPlaylistIntent: AppIntent {
         let result = try await MCPIntentRouter.shared.call(
             tool: "add_to_playlist",
             args: ["playlistName": playlistName, "trackName": trackName]
-        )
-        return .result(value: result)
-    }
-}
-
-// Tool: add_to_reading_list
-public struct AddToReadingListIntent: AppIntent {
-    nonisolated(unsafe) public static var title: LocalizedStringResource = "Add to Reading List"
-    nonisolated(unsafe) public static var description = IntentDescription("Add a URL to Safari's Reading List with an optional title.")
-    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
-
-    public init() {}
-
-    @Parameter(title: "URL to add to Reading List")
-    public var url: String
-
-    @Parameter(title: "Title for the Reading List item")
-    public var title: String?
-
-    @MainActor
-    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
-        var args: [String: any Sendable] = [:]
-        args["url"] = url
-        if let v = title { args["title"] = v }
-        let result = try await MCPIntentRouter.shared.call(
-            tool: "add_to_reading_list",
-            args: args
         )
         return .result(value: result)
     }

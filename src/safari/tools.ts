@@ -1,4 +1,5 @@
 import type { McpServer } from "../shared/mcp.js";
+import { isIP } from "node:net";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import { getOsVersion, type AirMcpConfig } from "../shared/config.js";
@@ -26,24 +27,66 @@ import {
   addToReadingListScript,
 } from "./scripts.js";
 
+function ipv4MappedIpv6ToDotted(host: string): string | null {
+  const dotted = host.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i)?.[1];
+  if (dotted && isIP(dotted) === 4) return dotted;
+
+  const hex = host.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i);
+  const highGroup = hex?.[1];
+  const lowGroup = hex?.[2];
+  if (!highGroup || !lowGroup) return null;
+
+  const high = Number.parseInt(highGroup, 16);
+  const low = Number.parseInt(lowGroup, 16);
+  if (!Number.isInteger(high) || !Number.isInteger(low) || high > 0xffff || low > 0xffff) return null;
+
+  return `${(high >> 8) & 0xff}.${high & 0xff}.${(low >> 8) & 0xff}.${low & 0xff}`;
+}
+
+function ipv4Octets(host: string): [number, number, number, number] | null {
+  if (isIP(host) !== 4) return null;
+  const parts = host.split(".").map((part) => Number(part));
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
+    return null;
+  }
+  return [parts[0]!, parts[1]!, parts[2]!, parts[3]!];
+}
+
 function validateExternalHttpUrl(url: string): string | null {
   try {
     const parsed = new URL(url);
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
       return `Only http:// and https:// URLs are allowed. Got: ${parsed.protocol}`;
     }
-    const host = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, "");
-    // Loopback (entire 127.0.0.0/8 range, IPv6 ::1, "localhost")
-    if (host === "localhost" || host === "::1" || /^127(?:\.\d{1,3}){3}$/.test(host)) {
+    const host = parsed.hostname
+      .toLowerCase()
+      .replace(/^\[|\]$/g, "")
+      .replace(/\.$/, "");
+    const ipHost = ipv4MappedIpv6ToDotted(host) ?? host;
+    const octets = ipv4Octets(ipHost);
+    const [firstOctet, secondOctet] = octets ?? [-1, -1, -1, -1];
+
+    // Loopback (entire 127.0.0.0/8 range, IPv6 ::1, localhost aliases)
+    if (
+      host === "localhost" ||
+      host.endsWith(".localhost") ||
+      host === "localhost.localdomain" ||
+      host === "::1" ||
+      firstOctet === 127
+    ) {
       return "Opening localhost URLs is not allowed.";
     }
     // RFC1918 private networks
-    if (host.startsWith("10.") || host.startsWith("192.168.") || /^172\.(1[6-9]|2\d|3[01])\./.test(host)) {
+    if (
+      firstOctet === 10 ||
+      (firstOctet === 192 && secondOctet === 168) ||
+      (firstOctet === 172 && secondOctet >= 16 && secondOctet <= 31)
+    ) {
       return "Opening internal network URLs is not allowed.";
     }
     // Link-local: 169.254.0.0/16 — includes cloud metadata endpoints
     // (169.254.169.254 on AWS/GCP/Azure) and IPv6 fe80::/10.
-    if (host.startsWith("169.254.") || host.startsWith("fe80:") || host.startsWith("fe80::")) {
+    if ((firstOctet === 169 && secondOctet === 254) || host.startsWith("fe80:") || host.startsWith("fe80::")) {
       return "Opening link-local / cloud metadata URLs is not allowed.";
     }
     // IPv6 unique local addresses fc00::/7 (fc00:: – fdff::)
@@ -51,7 +94,7 @@ function validateExternalHttpUrl(url: string): string | null {
       return "Opening IPv6 unique-local URLs is not allowed.";
     }
     // Unspecified address / mDNS
-    if (host === "0.0.0.0" || host === "::" || host.endsWith(".local")) {
+    if (host === "::" || host.endsWith(".local") || (firstOctet === 0 && secondOctet === 0)) {
       return "Opening unspecified or mDNS URLs is not allowed.";
     }
     return null;

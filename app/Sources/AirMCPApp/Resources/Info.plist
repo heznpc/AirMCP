@@ -19,6 +19,12 @@
     <string>AirMCP shows your reminders in the Daily Briefing widget and enables AI-powered reminder management.</string>
     <key>NSSpeechRecognitionUsageDescription</key>
     <string>AirMCP transcribes audio files you explicitly provide, on-device, to return their text for your automation requests.</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>AirMCP reads photos you ask it to list, search, classify, or export from your library.</string>
+    <key>NSPhotoLibraryAddUsageDescription</key>
+    <string>AirMCP adds a photo to your library only when you ask it to import an image.</string>
+    <key>NSContactsUsageDescription</key>
+    <string>AirMCP reads and edits contacts you ask it to look up, create, or update.</string>
     <key>NSServices</key>
     <array>
         <dict>

@@ -20,12 +20,12 @@ const plist = readFileSync(PLIST, "utf-8");
 
 // Each entry: the usage-description key a TCC-gated tool family requires.
 // Cross-referenced against the TCC-gated frameworks the Swift bridge actually
-// uses (EventKit, Speech, PhotoKit, Contacts). Speech was the only one that
+// uses (EventKit, Speech, PhotoKit, Contacts, CoreLocation). Speech was the only one that
 // HARD-CRASHED without its key (it calls requestAuthorization); PhotoKit /
 // Contacts degrade gracefully (empty / "Access Denied") but still cannot be
 // granted on the .app surface without a declaration, so the tools stay
 // non-functional there until these are present. (Location/CLLocationManager is
-// tracked separately — it hangs rather than crashes and needs a Swift timeout.)
+// included because get_current_location prompts through CoreLocation.)
 const REQUIRED = [
   "NSCalendarsFullAccessUsageDescription",
   "NSRemindersFullAccessUsageDescription",
@@ -33,6 +33,7 @@ const REQUIRED = [
   "NSPhotoLibraryUsageDescription",
   "NSPhotoLibraryAddUsageDescription",
   "NSContactsUsageDescription",
+  "NSLocationWhenInUseUsageDescription",
 ];
 
 describe("app Info.plist — privacy usage descriptions for TCC-gated tools", () => {

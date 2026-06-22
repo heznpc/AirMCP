@@ -979,7 +979,11 @@ case "location-permission":
     } else {
         status = CLLocationManager.authorizationStatus()
     }
+    #if os(iOS)
+    let authorized = status == .authorizedAlways || status == .authorizedWhenInUse
+    #else
     let authorized = status == .authorizedAlways
+    #endif
     let output = LocationPermissionOutput(status: locationStatusString(status), authorized: authorized)
     do { try writeJSON(output) } catch { writeError("Location permission error: \(error.localizedDescription)") }
 

@@ -77,7 +77,7 @@ export function getCompatibilityEnv(): CompatibilityEnv {
 /** npm package name — single source of truth for npx/install references */
 export const NPM_PACKAGE_NAME = "airmcp";
 /** Version-pinned npm package specifier for app-owned proxy/runtime commands. */
-export const NPM_PACKAGE_SPECIFIER = "airmcp@2.12.1";
+export const NPM_PACKAGE_SPECIFIER = process.env.AIRMCP_NPM_PACKAGE_SPECIFIER || "airmcp@2.12.1";
 
 export type HitlLevel = "off" | "destructive-only" | "sensitive-only" | "all-writes" | "all";
 

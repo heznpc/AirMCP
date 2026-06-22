@@ -30,7 +30,7 @@ describe("app-owned runtime npm package pin", () => {
   });
 
   test("TypeScript app-owned proxy helper uses the same pinned package specifier", () => {
-    expect(config).toContain(`export const NPM_PACKAGE_SPECIFIER = "${expectedSpecifier}"`);
+    expect(config).toContain(`process.env.AIRMCP_NPM_PACKAGE_SPECIFIER || "${expectedSpecifier}"`);
   });
 
   test("local app verification can override npx to the checkout instead of unpublished npm versions", () => {

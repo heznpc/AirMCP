@@ -26,6 +26,9 @@ export function runHelp(): void {
   console.log(
     `    ${GREEN}$${RESET} npx airmcp ${BOLD}connect${RESET}         ${DIM}Proxy stdio clients to AirMCP.app local HTTP${RESET}`,
   );
+  console.log(
+    `    ${GREEN}$${RESET} npx airmcp ${BOLD}connect-clients${RESET} ${DIM}Repair client configs for AirMCP.app runtime${RESET}`,
+  );
   console.log(`    ${GREEN}$${RESET} npx airmcp                  ${DIM}Start MCP server (stdio)${RESET}`);
   console.log(`    ${GREEN}$${RESET} npx airmcp ${BOLD}--http${RESET}          ${DIM}Start as HTTP server${RESET}`);
   console.log(`    ${GREEN}$${RESET} npx airmcp ${BOLD}--full${RESET}          ${DIM}Enable all modules${RESET}`);
@@ -42,6 +45,9 @@ export function runHelp(): void {
   console.log(`    ${CYAN}init${RESET}       ${DIM}Choose language, select modules, configure MCP clients${RESET}`);
   console.log(`    ${CYAN}doctor${RESET}     ${DIM}Check Node.js, macOS, permissions, clients, modules${RESET}`);
   console.log(`    ${CYAN}connect${RESET}    ${DIM}Bridge stdio clients into the app-owned local runtime${RESET}`);
+  console.log(
+    `    ${CYAN}connect-clients${RESET} ${DIM}Configure installed clients to use that app-owned runtime${RESET}`,
+  );
   console.log(
     `    ${CYAN}workflows${RESET}  ${DIM}Show target workflows, prompts, modules, Siri phrases, safety notes${RESET}`,
   );
@@ -61,6 +67,9 @@ export function runHelp(): void {
   );
   console.log(
     `    ${WHITE}AIRMCP_HTTP_TOKEN${RESET}=${DIM}<secret>${RESET}       ${DIM}Bearer token for HTTP mode auth${RESET}`,
+  );
+  console.log(
+    `    ${WHITE}AIRMCP_NPM_PACKAGE_SPECIFIER${RESET}=${DIM}<specifier>${RESET} ${DIM}Override app-owned proxy package${RESET}`,
   );
   console.log("");
   console.log(`  ${BOLD}Config${RESET}  ${DIM}~/.config/airmcp/config.json${RESET}`);

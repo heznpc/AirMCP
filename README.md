@@ -877,6 +877,7 @@ Or edit `~/.config/airmcp/config.json` directly:
 | `npx airmcp --full`    | Start with all 29 modules enabled |
 | `npx airmcp --http`    | Start as HTTP server (port 3847)  |
 | `npx airmcp connect`   | Proxy stdio clients to AirMCP.app |
+| `npx airmcp connect-clients` | Repair installed client configs for AirMCP.app |
 
 ## Configuration
 
@@ -894,6 +895,7 @@ Or edit `~/.config/airmcp/config.json` directly:
 | `AIRMCP_EMBEDDING_DIM`       | `3072`                       | Embedding dimension (256/512/1024/2048/3072)                 |
 | `AIRMCP_EMBEDDING_PROVIDER`  | auto                         | Force provider: `gemini`, `swift`, `hybrid`, `none`          |
 | `AIRMCP_HTTP_TOKEN`          | —                            | Bearer token for HTTP mode authentication                    |
+| `AIRMCP_NPM_PACKAGE_SPECIFIER` | `airmcp@<current>`          | Override app-owned proxy/runtime package for local testing   |
 
 ### Config File
 

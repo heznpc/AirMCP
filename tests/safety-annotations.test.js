@@ -220,7 +220,52 @@ describe('Safety Annotations consistency', () => {
     }
   });
 
-  // ── 4. Read-only-prefix tools must have readOnlyHint: true ────────
+  // ── 4. External egress/action tools must be destructive-gated ─────
+
+  test('known external egress and agentic action tools have destructiveHint: true', () => {
+    const EGRESS_OR_ACTION_TOOLS = [
+      // Direct user-data egress.
+      'send_mail',
+      'reply_mail',
+      'send_message',
+      'send_file',
+      'gws_gmail_send',
+      // Cloud writes can persist attacker-controlled data outside the Mac.
+      'gws_sheets_write',
+      'gws_calendar_create',
+      'gws_tasks_create',
+      'gws_raw',
+      // Arbitrary action surfaces can route data through another app/site.
+      'open_url',
+      'run_javascript',
+      'run_shortcut',
+      'ui_click',
+      'ui_type',
+      'ui_press_key',
+      'ui_perform_action',
+    ];
+    const tools = getAllTools();
+    const failures = [];
+
+    for (const name of EGRESS_OR_ACTION_TOOLS) {
+      const tool = tools.find((t) => t.name === name);
+      if (!tool) {
+        failures.push(`${name}: not registered`);
+        continue;
+      }
+      if (tool.annotations?.destructiveHint !== true) {
+        failures.push(`${name}: destructiveHint=${tool.annotations?.destructiveHint}`);
+      }
+    }
+
+    if (failures.length > 0) {
+      throw new Error(
+        `egress/action tool(s) lack destructiveHint: true:\n  ${failures.join('\n  ')}`,
+      );
+    }
+  });
+
+  // ── 5. Read-only-prefix tools must have readOnlyHint: true ────────
 
   test('tools with list_/get_/search_/read_/today_/upcoming_ prefix have readOnlyHint: true', () => {
     const READ_ONLY_PREFIXES = ['list_', 'get_', 'search_', 'read_', 'today_', 'upcoming_'];
@@ -251,7 +296,7 @@ describe('Safety Annotations consistency', () => {
     }
   });
 
-  // ── 5. Read-only exceptions must have openWorldHint: true ──────────
+  // ── 6. Read-only exceptions must have openWorldHint: true ──────────
 
   test('read-only prefix exceptions have openWorldHint: true (justifying the override)', () => {
     const EXCEPTIONS = ['search_location', 'get_directions', 'search_nearby'];
@@ -278,7 +323,7 @@ describe('Safety Annotations consistency', () => {
     }
   });
 
-  // ── 6. run_javascript must have destructiveHint and openWorldHint ─
+  // ── 7. run_javascript must have destructiveHint and openWorldHint ─
 
   test('run_javascript has destructiveHint: true and openWorldHint: true', () => {
     const tools = getAllTools();
@@ -288,7 +333,7 @@ describe('Safety Annotations consistency', () => {
     expect(rj.annotations.openWorldHint).toBe(true);
   });
 
-  // ── 7. Summary: report total tools checked ────────────────────────
+  // ── 8. Summary: report total tools checked ────────────────────────
 
   test('registered tool count is at least 200', () => {
     const count = server._tools.size;

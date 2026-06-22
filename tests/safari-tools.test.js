@@ -91,8 +91,8 @@ describe('Safari tools registration', () => {
     }
   });
 
-  test('close_tab and run_javascript are destructive', () => {
-    for (const name of ['close_tab', 'run_javascript']) {
+  test('open_url, close_tab, and run_javascript are destructive', () => {
+    for (const name of ['open_url', 'close_tab', 'run_javascript']) {
       const { config } = server.tools.get(name);
       expect(config.annotations.destructiveHint).toBe(true);
     }

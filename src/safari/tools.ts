@@ -121,7 +121,7 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
       inputSchema: {
         url: z.string().url().describe("URL to open"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
     async ({ url }) => {
       // Block non-HTTP schemes and internal network addresses to prevent the

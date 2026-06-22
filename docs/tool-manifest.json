@@ -8450,8 +8450,8 @@
       "outputSchema": null,
       "annotations": {
         "readOnlyHint": false,
-        "destructiveHint": false,
-        "idempotentHint": true,
+        "destructiveHint": true,
+        "idempotentHint": false,
         "openWorldHint": true
       },
       "appIntentEligible": true,

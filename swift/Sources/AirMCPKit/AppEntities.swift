@@ -1,9 +1,11 @@
 // AirMCPKit - AppEntity scaffold for typed App Intents parameters.
 //
-// These entities intentionally avoid schema-annotated AppEntity macros for now. Apple's
-// public AppIntents SDK exposes schema macros only for official
-// AssistantSchemas constants; the Calendar / Reminders / Contacts domains
-// AirMCP needs first do not have public schema constants in the local SDK.
+// These entities intentionally avoid schema-annotated AppEntity macros for now. Full
+// Xcode toolchains can expand the non-deprecated App* schema macros, but Apple's
+// public AppIntents SDK exposes them only for official AssistantSchemas constants.
+// The Calendar / Reminders / Contacts workflow domains AirMCP needs first do not
+// have matching public schema constants in the local SDK, and the generated default
+// artifact still needs to compile under Command Line Tools.
 
 #if canImport(AppIntents)
 import AppIntents

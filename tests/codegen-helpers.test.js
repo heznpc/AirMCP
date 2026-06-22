@@ -266,6 +266,16 @@ describe("swiftTypeFor", () => {
     expect(swiftTypeFor({ type: "array", items: { type: "object" } })).toBeNull();
     expect(swiftTypeFor({ type: "unknown" })).toBeNull();
   });
+
+  test("scalar union (anyOf) → String when a string member exists, else first scalar", () => {
+    // The set_cell value param: string | number | boolean → projects to String
+    // so the AppIntent keeps the parameter (a text field expresses all three).
+    expect(swiftTypeFor({ anyOf: [{ type: "string" }, { type: "number" }, { type: "boolean" }] })).toBe("String");
+    // No string member → first usable scalar.
+    expect(swiftTypeFor({ anyOf: [{ type: "number" }, { type: "boolean" }] })).toBe("Double");
+    // A union of only composite members stays null (still dropped).
+    expect(swiftTypeFor({ anyOf: [{ type: "object" }] })).toBeNull();
+  });
 });
 
 describe("appEntityTypeForParam", () => {

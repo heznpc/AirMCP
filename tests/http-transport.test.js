@@ -164,6 +164,36 @@ describe('HTTP Origin allow-list helpers', () => {
       allowedOrigins: new Set(),
     })).toBe(true);
   });
+
+  test('a missing Origin is allowed by default (non-browser client, token-gated)', () => {
+    // A browser always sends Origin on a cross-origin request, so no Origin is
+    // a non-browser client the token / OAuth policy already gates. True across
+    // policies — denying it by default would break curl / native MCP clients.
+    for (const policy of ['with-token', 'with-token+origin', 'with-oauth+origin']) {
+      expect(isOriginAllowed(undefined, {
+        policy,
+        bindAll: true,
+        allowedOrigins: parseAllowedOrigins('https://claude.ai'),
+      })).toBe(true);
+    }
+  });
+
+  test('denyNoOrigin (AIRMCP_DENY_NO_ORIGIN) strict mode rejects a missing Origin', () => {
+    const allowedOrigins = parseAllowedOrigins('https://claude.ai');
+    expect(isOriginAllowed(undefined, {
+      policy: 'with-token+origin',
+      bindAll: true,
+      allowedOrigins,
+      denyNoOrigin: true,
+    })).toBe(false);
+    // A real allow-listed Origin still passes under strict mode.
+    expect(isOriginAllowed('https://claude.ai', {
+      policy: 'with-token+origin',
+      bindAll: true,
+      allowedOrigins,
+      denyNoOrigin: true,
+    })).toBe(true);
+  });
 });
 
 describe('validateNetworkPolicy', () => {

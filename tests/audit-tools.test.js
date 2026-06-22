@@ -9,6 +9,7 @@
  * exercised here.
  */
 import { describe, test, expect, beforeEach, afterEach, jest } from '@jest/globals';
+import { z } from 'zod';
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -137,6 +138,33 @@ describe('audit_summary tool', () => {
     expect(sc.errorRate).toBeCloseTo(0.25, 4);
     expect(sc.topTools[0]).toEqual({ tool: 'alpha', count: 3, errors: 1 });
     expect(sc.topTools[1]).toEqual({ tool: 'beta', count: 1, errors: 0 });
+    // Tamper-evidence surfaces in the summary. These un-chained legacy lines
+    // (no _hmac) don't break verification, so the chain reports verified.
+    expect(sc.verified).toBe(true);
+    expect(sc.auditDisabled).toBe(false);
+  });
+
+  test('exposes tamper-evidence (verified) as part of the declared contract', async () => {
+    const now = new Date().toISOString();
+    writeJsonl('audit.jsonl', [{ timestamp: now, tool: 'alpha', status: 'ok' }]);
+    const server = createMockServer();
+    registerAuditTools(server, createMockConfig());
+    const result = await server.callTool('audit_summary', {});
+
+    // The declared contract MUST carry `verified` — summarizeAuditEntries has
+    // always computed it, but before it was added to outputSchema the MCP SDK
+    // would strip it from structuredContent, hiding the strongest trust signal.
+    const outputSchema = server._tools.get('audit_summary').opts.outputSchema;
+    expect(Object.keys(outputSchema)).toContain('verified');
+
+    // structuredContent must conform EXACTLY (strict): every declared field
+    // present, no undeclared field the SDK would reject. This is the runtime
+    // contract — registration shape alone wouldn't catch a drift here.
+    const parsed = z.object(outputSchema).strict().safeParse(result.structuredContent);
+    if (!parsed.success) {
+      throw new Error(`audit_summary structuredContent breaks its outputSchema:\n${parsed.error}`);
+    }
+    expect(result.structuredContent.verified).toBe(true);
   });
 
   test('empty audit returns zeros without dividing by zero', async () => {

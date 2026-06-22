@@ -159,3 +159,76 @@ describe('audit chain tamper detection', () => {
     expect(summary.verified).toBe(false);
   });
 });
+
+const CHECKPOINT_PATH = join(workDir, 'audit.checkpoint');
+
+describe('audit chain tail-truncation detection (signed checkpoint)', () => {
+  beforeEach(async () => {
+    await seedFiveEntries();
+  });
+
+  test('flush writes a signed checkpoint and the clean chain verifies', async () => {
+    // Seeding flushed 5 sealed lines + a checkpoint anchoring the highest seq.
+    const ck = JSON.parse(await readFile(CHECKPOINT_PATH, 'utf-8'));
+    expect(ck.seq).toBe(4);
+    expect(ck.hmac).toMatch(/^[0-9a-f]{64}$/);
+    expect(ck.mac).toMatch(/^[0-9a-f]{64}$/);
+    const summary = await summarizeAuditEntries({ since: '2020-01-01T00:00:00Z' });
+    expect(summary.verified).toBe(true);
+    expect(summary.verifiedFirstBreak).toBeUndefined();
+  });
+
+  test('removing the last lines (valid shorter chain) → verified:false, truncated', async () => {
+    // Drop the final 2 lines. The remaining chain (seq 0..2) still verifies
+    // line-by-line — a plain replay would report verified:true. The checkpoint
+    // (seq=4) is what catches the missing tail.
+    const lines = (await readFile(AUDIT_PATH, 'utf-8')).trimEnd().split('\n');
+    expect(lines).toHaveLength(5);
+    await writeFile(AUDIT_PATH, lines.slice(0, 3).join('\n') + '\n', 'utf-8');
+
+    const summary = await summarizeAuditEntries({ since: '2020-01-01T00:00:00Z' });
+    expect(summary.verified).toBe(false);
+    expect(summary.verifiedFirstBreak).toBeDefined();
+    expect(summary.verifiedFirstBreak.reason).toBe('truncated');
+  });
+
+  test('editing the checkpoint MAC without the key → verified:false, checkpoint_forged', async () => {
+    const ck = JSON.parse(await readFile(CHECKPOINT_PATH, 'utf-8'));
+    ck.mac = 'a'.repeat(64); // valid hex shape, wrong MAC — forging it needs the key
+    await writeFile(CHECKPOINT_PATH, JSON.stringify(ck) + '\n', 'utf-8');
+
+    const summary = await summarizeAuditEntries({ since: '2020-01-01T00:00:00Z' });
+    expect(summary.verified).toBe(false);
+    expect(summary.verifiedFirstBreak.reason).toBe('checkpoint_forged');
+  });
+
+  test('a corrupt (unparseable) checkpoint degrades to chain-only (no false alarm)', async () => {
+    // A torn/corrupt checkpoint is indistinguishable from a partial write, so
+    // it's treated as absent rather than tampering — the moat must not cry
+    // wolf. The clean chain still verifies; truncation detection is simply off
+    // until the next flush rewrites the checkpoint.
+    await writeFile(CHECKPOINT_PATH, '{not valid json', 'utf-8');
+    const summary = await summarizeAuditEntries({ since: '2020-01-01T00:00:00Z' });
+    expect(summary.verified).toBe(true);
+  });
+
+  test('deleting the checkpoint disables only truncation — clean chain still verifies', async () => {
+    await rm(CHECKPOINT_PATH, { force: true });
+    const summary = await summarizeAuditEntries({ since: '2020-01-01T00:00:00Z' });
+    // Back-compat: a missing checkpoint must not turn a clean chain red.
+    expect(summary.verified).toBe(true);
+  });
+
+  test('truncation with the checkpoint also removed is NOT falsely flagged (documented limit)', async () => {
+    // Honest boundary: an attacker who removes BOTH the tail lines AND the
+    // checkpoint leaves a valid shorter chain with no anchor. The checkpoint
+    // raises the bar against naive log-doctoring; it is not an absolute
+    // guarantee against someone who can rewrite the whole directory. We assert
+    // the real behaviour rather than over-claiming detection.
+    const lines = (await readFile(AUDIT_PATH, 'utf-8')).trimEnd().split('\n');
+    await writeFile(AUDIT_PATH, lines.slice(0, 3).join('\n') + '\n', 'utf-8');
+    await rm(CHECKPOINT_PATH, { force: true });
+    const summary = await summarizeAuditEntries({ since: '2020-01-01T00:00:00Z' });
+    expect(summary.verified).toBe(true);
+  });
+});

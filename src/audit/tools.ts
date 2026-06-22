@@ -98,6 +98,22 @@ export function registerAuditTools(server: McpServer, _config: AirMcpConfig): vo
             errors: z.number(),
           }),
         ),
+        // Tamper-evidence — the strongest trust signal in the codebase. The
+        // HMAC chain is replayed on every summary; surfacing the verdict (and
+        // the first break location) in the tool contract lets a consumer act
+        // on `verified === false` instead of trusting the log blindly.
+        verified: z.boolean(),
+        verifiedFirstBreak: z
+          .object({
+            file: z.string(),
+            lineIndex: z.number(),
+            reason: z.enum(["hmac_mismatch", "prev_mismatch", "malformed", "truncated", "checkpoint_forged"]),
+          })
+          .optional(),
+        // Audit logging currently halted (disk full / permission / repeated
+        // flush failures). Surfaced so a doctor / health check can flag a gap
+        // in coverage rather than reading silence as "nothing happened".
+        auditDisabled: z.boolean(),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },

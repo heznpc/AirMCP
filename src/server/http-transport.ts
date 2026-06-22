@@ -143,9 +143,17 @@ export function parseAllowedOrigins(raw: string): Set<string> {
 
 export function isOriginAllowed(
   origin: string | undefined,
-  ctx: { policy: AllowNetwork; bindAll: boolean; allowedOrigins: Set<string> },
+  ctx: { policy: AllowNetwork; bindAll: boolean; allowedOrigins: Set<string>; denyNoOrigin?: boolean },
 ): boolean {
-  if (!origin) return true;
+  // A browser always attaches Origin to a cross-origin request, so a MISSING
+  // Origin is a non-browser client (curl, a native MCP client), never a browser
+  // CSRF / DNS-rebinding vector. Whatever else gates that client depends on the
+  // active policy — loopback-only relies on the 127.0.0.1 socket binding,
+  // with-token* / with-oauth* on the Bearer / JWT auth middleware — so allowing
+  // no-Origin here adds no browser-attack surface under any of them. Allowed by
+  // default; `denyNoOrigin` (AIRMCP_DENY_NO_ORIGIN) opts into a strict deny for
+  // deployments that only ever serve browser clients.
+  if (!origin) return !ctx.denyNoOrigin;
   const normalized = normalizeOrigin(origin);
   if (!normalized) return false;
 
@@ -284,9 +292,16 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
     log.error("FATAL — startup invariant failed", { reason: msg });
     process.exit(1);
   }
+  // Opt-in strict mode (default off): reject requests with no Origin header.
+  // Off by default because a missing Origin means a non-browser client gated by
+  // the active policy (127.0.0.1 binding for loopback-only, Bearer/JWT auth for
+  // token/OAuth) — denying it would break curl / native MCP clients for no
+  // security gain, since browsers always send Origin.
+  const denyNoOrigin = /^(1|true)$/i.test((process.env.AIRMCP_DENY_NO_ORIGIN ?? "").trim());
   app.use((req, res, next) => {
     if (req.path !== "/mcp") return next();
-    if (isOriginAllowed(req.headers.origin, { policy: allowNetwork, bindAll, allowedOrigins })) return next();
+    if (isOriginAllowed(req.headers.origin, { policy: allowNetwork, bindAll, allowedOrigins, denyNoOrigin }))
+      return next();
     res.status(403).json({ error: "Forbidden: Origin not allowed" });
   });
 

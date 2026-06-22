@@ -16,10 +16,13 @@
  *     the kid lookup, short-lived key caching, and background rotation
  *     internally. No bespoke cache layer — duplicating jose's
  *     battle-tested behaviour is a loss of investment.
- *   • Audience check: jose's built-in `audience` option accepts either a
- *     matching `aud` claim OR (per JWT spec) an array `aud` that
- *     includes the target. The RFC 8707 `resource` claim is also
- *     accepted as a fallback to match specs where both forms coexist.
+ *   • Audience check: jose's built-in `audience` option matches the
+ *     token's `aud` claim — accepting either a string `aud` equal to the
+ *     target OR (per JWT spec) an array `aud` that includes it. The RFC
+ *     8707 `resource` claim is NOT consulted for this decision; a token
+ *     whose `resource` matches but whose `aud` does not is still rejected
+ *     (`wrong_audience`). When present, `resource` rides along untouched
+ *     in `claims.raw` for downstream inspection.
  */
 import { createRemoteJWKSet, jwtVerify, errors as joseErrors } from "jose";
 import type { JWTPayload } from "jose";
@@ -114,14 +117,13 @@ function parseScopes(payload: JWTPayload): string[] {
   return [];
 }
 
-function claimsFromPayload(payload: JWTPayload, audience: string): OAuthClaims | null {
+function claimsFromPayload(payload: JWTPayload): OAuthClaims | null {
   if (typeof payload.sub !== "string" || payload.sub === "") return null;
-  // RFC 8707 `resource` fallback: some authorization servers return
-  // `resource` alongside `aud`. If `aud` already matched (jose verified
-  // that), `resource` is informational. If the token carried `resource`
-  // but not the audience claim form we recognize, we'd have bailed out
-  // in jose. Nothing to do here beyond surfacing it in `raw`.
-  void audience;
+  // The RFC 8707 `resource` claim is intentionally NOT used for the
+  // audience decision — jose already enforced `aud` above (a token whose
+  // `resource` matched but `aud` did not was rejected as wrong_audience
+  // before we reach here). When present, `resource` rides along untouched
+  // in `raw` for downstream inspection.
   return {
     subject: payload.sub,
     scopes: parseScopes(payload),
@@ -164,7 +166,7 @@ export async function verifyBearer(
       // widen the accepted set.
       return { ok: false, reason: "unsupported_alg", detail: `alg=${protectedHeader.alg} not permitted` };
     }
-    const claims = claimsFromPayload(payload, cfg.audience);
+    const claims = claimsFromPayload(payload);
     if (!claims) {
       return { ok: false, reason: "malformed_claims", detail: "missing sub claim" };
     }

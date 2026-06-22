@@ -124,12 +124,17 @@ export function registerNumbersTools(server: McpServer, _config: AirMcpConfig): 
     "numbers_set_cell",
     {
       title: "Set Numbers Cell",
-      description: "Write a value to a single cell.",
+      description:
+        "Write a value to a single cell. Numbers and booleans land as native cell types (not " +
+        "text), so they sort and feed formulas correctly; strings are written verbatim and " +
+        "Numbers interprets a leading '=' as a formula.",
       inputSchema: {
         document: z.string().max(500).describe("Document name"),
         sheet: z.string().max(500).describe("Sheet name"),
         cell: z.string().max(500).describe("Cell address (e.g. 'A1')"),
-        value: z.string().max(10000).describe("Value to write"),
+        value: z
+          .union([z.string().max(10000), z.number().finite(), z.boolean()])
+          .describe("Value to write (number, boolean, or text)"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },

@@ -1,6 +1,6 @@
 # AirMCP Skills Guide
 
-A practical guide for AI agents to effectively use AirMCP's 272 tools across 29 modules to orchestrate the Apple ecosystem via MCP.
+A practical guide for AI agents to effectively use AirMCP's 286 tools across 29 modules to orchestrate the Apple ecosystem via MCP.
 
 ## Overview
 

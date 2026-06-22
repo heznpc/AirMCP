@@ -30,6 +30,7 @@ const chmod = jest.fn();
 const rename = jest.fn();
 const readFile = jest.fn();
 const readdir = jest.fn();
+const writeFile = jest.fn();
 
 jest.unstable_mockModule('node:fs/promises', () => ({
   appendFile,
@@ -39,6 +40,7 @@ jest.unstable_mockModule('node:fs/promises', () => ({
   rename,
   readFile,
   readdir,
+  writeFile,
 }));
 
 const {
@@ -58,6 +60,7 @@ beforeEach(() => {
   rename.mockReset();
   readFile.mockReset();
   readdir.mockReset();
+  writeFile.mockReset();
 
   // Default happy-path mock behaviour. Individual tests override.
   appendFile.mockResolvedValue(undefined);
@@ -67,6 +70,7 @@ beforeEach(() => {
   rename.mockResolvedValue(undefined);
   readFile.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
   readdir.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
+  writeFile.mockResolvedValue(undefined);
 });
 
 // ── flushBuffer error paths ───────────────────────────────────────────

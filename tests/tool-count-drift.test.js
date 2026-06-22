@@ -101,16 +101,17 @@ describe("codegen drift: generated Swift intents vs manifest", () => {
 });
 
 describe("doc drift: README prose vs manifest", () => {
-  test("manifest.toolCount is a superset of the README headline tool count", () => {
-    // The README headline ("272 tools") counts `server.registerTool()` calls —
-    // that exact equality is already guarded by `stats:check` against the live
-    // registry, so re-asserting it here would be redundant. manifest.toolCount
-    // (285) is a deliberate SUPERSET: it additionally counts the `skill_*` and
-    // MCP-app tools that aren't part of the registerTool headline. The invariant
-    // that belongs here is therefore superset (≥), not equality — it fails if the
-    // manifest ever drops below the documented registered surface.
-    const readmeTools = readmeNum(/(\d+)\s+tools\b/);
-    expect(manifest.toolCount).toBeGreaterThanOrEqual(readmeTools);
+  test("README advertises the manifest tool count, and the starter is a subset", () => {
+    // Post-reconciliation: the README full-surface headline now EQUALS
+    // manifest.toolCount (registered + dynamic / `skill_*` / MCP-app tools), kept
+    // in sync by `stats:check` (count-stats reads manifest.toolCount → syncs the
+    // docs). Two invariants belong here:
+    //   1. README advertises exactly manifest.toolCount somewhere ("<N> tools").
+    //   2. the FIRST tools number in README is the starter preset (~111); the
+    //      full manifest count must never drop below it (full ≥ starter sanity).
+    const starter = readmeNum(/(\d+)\s+tools\b/); // first hit = the starter "~111 tools"
+    expect(manifest.toolCount).toBeGreaterThanOrEqual(starter);
+    expect(readmeSrc).toMatch(new RegExp(`\\b${manifest.toolCount}\\s+tools\\b`));
   });
 
   test('README "<N> modules" equals the module count in modules.ts', () => {
@@ -126,7 +127,7 @@ describe("doc drift: README prose vs manifest", () => {
 });
 
 describe("doc honesty: default surface vs full count, and the optional Swift bridge", () => {
-  // RFC 0014 root-cause: the "272 tools" headline is the --full / registered
+  // RFC 0014 root-cause: the "286 tools" headline is the --full / registered
   // count, but a default `npx -y airmcp` loads the STARTER preset (~111), and
   // the Swift binary is NOT in the npm tarball. These greppable invariants stop
   // the README silently drifting back to advertising the full native surface as

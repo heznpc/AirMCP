@@ -46,12 +46,23 @@ export function getCellScript(documentName: string, sheet: string, cell: string)
   `;
 }
 
-export function setCellScript(documentName: string, sheet: string, cell: string, value: string): string {
+export function setCellScript(
+  documentName: string,
+  sheet: string,
+  cell: string,
+  value: string | number | boolean,
+): string {
+  // Numbers and booleans are emitted as native JS literals so the cell holds a
+  // real number/boolean (sortable, formula-referenceable) instead of text. Only
+  // strings are quoted + escaped; a string like '=SUM(A1:A10)' is interpreted by
+  // Numbers as a formula on assignment. (value is constrained to a finite
+  // number / boolean / string by the tool's input schema.)
+  const valueLiteral = typeof value === "string" ? `'${esc(value)}'` : String(value);
   return `
     const Numbers = Application('com.apple.Numbers');
     ${iworkDocLookup("Numbers", documentName)}
     ${sheetTableLookup(sheet)}
-    table.cells['${esc(cell)}'].value = '${esc(value)}';
+    table.cells['${esc(cell)}'].value = ${valueLiteral};
     JSON.stringify({written: true, address: '${esc(cell)}'});
   `;
 }

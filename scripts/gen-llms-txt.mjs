@@ -33,6 +33,23 @@ const CANONICAL_MODULE_COUNT = (() => {
   }
 })();
 
+/**
+ * Headline tool count — the FULL runtime surface from the generated manifest
+ * (docs/tool-manifest.json), the same single source of truth count-stats.mjs
+ * uses. It includes the dynamically-registered + skill_* + MCP-app tools a
+ * `registerTool(` source regex undercounts, so this headline matches README /
+ * the registry manifests instead of drifting below them. Null (fresh checkout
+ * pre-codegen) falls back to the broad source count below.
+ */
+const HEADLINE_TOOL_COUNT = (() => {
+  try {
+    const manifest = JSON.parse(readFileSync(join(ROOT, "docs", "tool-manifest.json"), "utf-8"));
+    return typeof manifest.toolCount === "number" ? manifest.toolCount : null;
+  } catch {
+    return null;
+  }
+})();
+
 // Extract tool registrations from a file
 function extractTools(filePath) {
   const content = readFileSync(filePath, "utf-8");
@@ -79,15 +96,15 @@ const MODULE_NAMES = {
   cross: "Cross-Module", apps: "App Management", shared: "Setup",
 };
 
-// Collect all tools by module.
-// Authoritative counts use the same regex `count-stats.mjs` does. The
-// per-module list (built by `extractTools`) uses a stricter regex that
-// requires title + description to be co-located so we can render the
-// detailed per-tool entries in `llms-full.txt`. Drift between the two
-// (a tool whose registration spans the strict regex boundary so only
-// the broad regex catches it) used to push the headline numbers below
-// the canonical count — fixed by deriving totals from the broad pass
-// and treating `extractTools`'s output as a presentation projection.
+// Collect all tools by module for the per-module breakdown.
+// The HEADLINE count comes from the manifest (HEADLINE_TOOL_COUNT above) — the
+// full runtime surface count-stats.mjs also uses. The per-module list built by
+// `extractTools` is a presentation projection of the statically-defined catalog
+// (stricter regex requiring title + description co-located, also used for the
+// detailed `llms-full.txt` entries); it can sum to fewer than the headline
+// because dynamically-registered tools (skill_* runners, MCP-app views) have no
+// static registration the regex sees. `totalTools` (broad pass) is retained only
+// as the fresh-checkout fallback when the manifest isn't present.
 const TOOL_REGEX = /server\.registerTool\(/g;
 const PROMPT_REGEX = /server\.prompt\(/g;
 const modules = {};
@@ -119,12 +136,13 @@ function walkDir(dir) {
 }
 walkDir(SRC);
 const moduleCount = CANONICAL_MODULE_COUNT ?? Object.keys(modules).length;
+const headlineTools = HEADLINE_TOOL_COUNT ?? totalTools;
 
 // Generate llms.txt (summary)
 const REPO = "https://github.com/heznpc/AirMCP";
 let llmsTxt = `# AirMCP
 
-> MCP server for the entire Apple ecosystem. ${totalTools} tools across ${moduleCount} modules.
+> MCP server for the entire Apple ecosystem. ${headlineTools} tools across ${moduleCount} modules.
 
 ## Links
 
@@ -146,7 +164,7 @@ for (const [key, mod] of Object.entries(modules).sort(([a], [b]) => a.localeComp
 // Generate llms-full.txt (complete reference)
 let fullTxt = `# AirMCP — Full Tool Reference
 
-> ${totalTools} tools, ${totalPrompts} prompts across ${moduleCount} modules.
+> ${headlineTools} tools, ${totalPrompts} prompts across ${moduleCount} modules.
 > Auto-generated from source by scripts/gen-llms-txt.mjs
 
 `;
@@ -192,11 +210,11 @@ if (checkMode) {
     process.exit(1);
   }
   console.log(
-    `[gen-llms --check] OK — ${totalTools} tools / ${totalPrompts} prompts / ${moduleCount} modules`,
+    `[gen-llms --check] OK — ${headlineTools} tools / ${totalPrompts} prompts / ${moduleCount} modules`,
   );
 } else {
   writeFileSync(llmsPath, llmsTxt);
   writeFileSync(llmsFullPath, fullTxt);
   console.log(`Generated llms.txt (${llmsTxt.length} bytes) and llms-full.txt (${fullTxt.length} bytes)`);
-  console.log(`${totalTools} tools, ${totalPrompts} prompts across ${moduleCount} modules`);
+  console.log(`${headlineTools} tools, ${totalPrompts} prompts across ${moduleCount} modules`);
 }

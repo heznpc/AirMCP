@@ -1,4 +1,4 @@
-import { appendFile, chmod, mkdir, readdir, readFile, stat, rename } from "node:fs/promises";
+import { appendFile, chmod, mkdir, readdir, readFile, stat, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { hostname, platform } from "node:os";
 import { createHmac } from "node:crypto";
@@ -58,11 +58,16 @@ interface AuditEntry {
  *      (catching log doctoring after-the-fact) but explicitly NOT
  *      strong auth. For high-assurance, set the env.
  */
-const AUDIT_HMAC_KEY: Buffer = (() => {
-  const env = process.env.AIRMCP_AUDIT_HMAC_KEY;
-  if (env && env.length > 0) return Buffer.from(env, "utf-8");
-  return Buffer.from(`airmcp-audit::${hostname()}::${platform()}`, "utf-8");
-})();
+/** True when no AIRMCP_AUDIT_HMAC_KEY is set and the chain falls back to a
+ *  host-derived key — tamper-EVIDENT only, not strong auth (an attacker with
+ *  shell access can re-derive it). Surfaced as a one-time warning on first
+ *  flush so an operator in this mode knows it rather than over-trusting the
+ *  chain as cryptographic non-repudiation. */
+const AUDIT_USING_HOST_KEY = (process.env.AIRMCP_AUDIT_HMAC_KEY ?? "").length === 0;
+const AUDIT_HMAC_KEY: Buffer = AUDIT_USING_HOST_KEY
+  ? Buffer.from(`airmcp-audit::${hostname()}::${platform()}`, "utf-8")
+  : Buffer.from(process.env.AIRMCP_AUDIT_HMAC_KEY as string, "utf-8");
+let warnedHostKey = false;
 
 const HMAC_GENESIS = "0".repeat(64);
 
@@ -70,10 +75,34 @@ function computeHmac(prev: string, body: string): string {
   return createHmac("sha256", AUDIT_HMAC_KEY).update(prev).update("\0").update(body).digest("hex");
 }
 
+/**
+ * Tail-truncation anchor.
+ *
+ * The HMAC chain detects edits, insertions, reorders, and genesis-reroot —
+ * but NOT removal of the most recent lines: a truncated chain is still a valid
+ * shorter chain rooted at genesis. So every sealed line carries a monotonic
+ * `seq`, and on each flush we overwrite a single signed checkpoint recording
+ * the highest `seq` + chain head. `verifyAuditChain` reports
+ * `truncated` when the checkpoint references a `seq` past the chain's last
+ * line. The checkpoint's MAC is domain-separated from chain HMACs, so it can't
+ * be forged or rolled back without the key — same trust grade as the chain.
+ * Deleting the checkpoint disables only the truncation check; the rest of the
+ * chain still verifies.
+ */
+const CHECKPOINT_PATH = join(PATHS.VECTOR_STORE, "audit.checkpoint");
+const CHECKPOINT_DOMAIN = "airmcp-audit-checkpoint-v1";
+
+function checkpointMac(seq: number, hmac: string): string {
+  return computeHmac(CHECKPOINT_DOMAIN, `${seq}:${hmac}`);
+}
+
 /** In-memory chain head — updated on every appended line. Resumed from
  *  the on-disk tail at first flush so process restarts don't fork the
  *  chain. */
 let lastHmac: string = HMAC_GENESIS;
+/** Monotonic per-line sequence, resumed from the disk tail at first flush
+ *  alongside `lastHmac`. -1 means no chained line has been written yet. */
+let lastSeq = -1;
 let chainResumed = false;
 
 /**
@@ -229,9 +258,14 @@ async function scanFileForChainHead(path: string, isPrimary: boolean): Promise<b
     const line = lines[i];
     if (!line) continue;
     try {
-      const parsed = JSON.parse(line) as { _hmac?: string };
+      const parsed = JSON.parse(line) as { _hmac?: string; seq?: number };
       if (parsed._hmac && /^[0-9a-f]{64}$/.test(parsed._hmac)) {
         lastHmac = parsed._hmac;
+        // Resume the seq counter from the tail so it stays monotonic across
+        // restarts (the truncation checkpoint compares against it). A tail
+        // written before seq existed leaves lastSeq at -1 — new lines start
+        // numbering from 0 and the next flush's checkpoint anchors them.
+        if (typeof parsed.seq === "number" && Number.isInteger(parsed.seq)) lastSeq = parsed.seq;
         if (malformedCount > 0) {
           log.warn("audit: resumed chain past malformed lines — possible tampering or corruption", {
             lastHmacPrefix: parsed._hmac.slice(0, 8),
@@ -273,6 +307,10 @@ async function flushBuffer(): Promise<void> {
     try {
       const obj = JSON.parse(raw) as Record<string, unknown>;
       const prev = lastHmac;
+      // Stamp a monotonic seq into the SIGNED body (added last so the parsed-
+      // object insertion order the verifier relies on is preserved). The
+      // truncation checkpoint anchors against this seq.
+      obj.seq = ++lastSeq;
       // _hmac is computed from the body PRE-attachment. The signed payload is
       // the JSON without _hmac/_prev, so verifiers reconstruct the same body.
       const body = JSON.stringify(obj);
@@ -295,16 +333,19 @@ async function flushBuffer(): Promise<void> {
     }
   }
   const lines = sealedLines.join("\n") + "\n";
+  let appended = false;
   try {
     await ensureDir();
     await appendFile(AUDIT_PATH, lines, { encoding: "utf-8", mode: 0o600 });
     await rotateIfNeeded();
     consecutiveFlushFailures = 0;
+    appended = true;
   } catch {
     // Retry once
     try {
       await appendFile(AUDIT_PATH, lines, { encoding: "utf-8", mode: 0o600 });
       consecutiveFlushFailures = 0;
+      appended = true;
     } catch (retryErr) {
       consecutiveFlushFailures++;
       log.error("audit: flush failed", {
@@ -328,6 +369,41 @@ async function flushBuffer(): Promise<void> {
   } finally {
     flushing = false;
   }
+  // Outside the flush critical section: a checkpoint failure must never fail
+  // or retry the append. Anchors the truncation guard at the seq just sealed.
+  if (appended) {
+    await writeCheckpoint();
+    warnHostKeyOnce();
+  }
+}
+
+/** Persist the signed tail-truncation checkpoint (single small write — a
+ *  parse/shape failure on read is treated as "absent", not tampering, so a
+ *  rare torn write never produces a false alarm). Best-effort: a failure here
+ *  only weakens truncation detection until the next successful flush — it must
+ *  not disturb the append that already landed. */
+async function writeCheckpoint(): Promise<void> {
+  if (lastSeq < 0) return; // nothing chained yet
+  try {
+    const mac = checkpointMac(lastSeq, lastHmac);
+    const payload = JSON.stringify({ seq: lastSeq, hmac: lastHmac, mac }) + "\n";
+    await writeFile(CHECKPOINT_PATH, payload, { encoding: "utf-8", mode: 0o600 });
+  } catch (err) {
+    log.warn("audit: checkpoint write failed — tail-truncation detection degraded until next flush", {
+      err: errToCtx(err),
+    });
+  }
+}
+
+/** One-time warning when the chain is keyed off the host-derived fallback.
+ *  Fires on first successful flush (not at import) to avoid noise in tests
+ *  and short-lived CLI invocations that never write audit lines. */
+function warnHostKeyOnce(): void {
+  if (warnedHostKey || !AUDIT_USING_HOST_KEY) return;
+  warnedHostKey = true;
+  log.warn("audit: HMAC chain keyed off host-derived fallback — tamper-EVIDENT only, not strong auth", {
+    note: "an attacker with shell access can re-derive this key; set AIRMCP_AUDIT_HMAC_KEY for cross-machine / strong integrity",
+  });
 }
 
 async function rotateIfNeeded(): Promise<void> {
@@ -383,6 +459,8 @@ export function _testReset(): string[] {
   auditDisabled = false;
   auditDisabledSince = 0;
   lastHmac = HMAC_GENESIS;
+  lastSeq = -1;
+  warnedHostKey = false;
   chainResumed = false;
   return snapshot;
 }
@@ -526,6 +604,10 @@ export async function readAuditEntries(opts: ReadAuditOptions = {}): Promise<Rea
   return { entries: sliced, total: matched.length, returned: sliced.length, scannedFiles };
 }
 
+/** Why the HMAC chain failed to verify. `truncated` / `checkpoint_forged`
+ *  come from the tail-truncation checkpoint; the rest from chain replay. */
+export type AuditChainBreakReason = "hmac_mismatch" | "prev_mismatch" | "malformed" | "truncated" | "checkpoint_forged";
+
 export interface AuditSummary {
   since: string;
   total: number;
@@ -539,7 +621,7 @@ export interface AuditSummary {
    *  line was tampered with or removed. `verifiedFirstBreak` carries the
    *  file + line index of the first mismatch when verification fails. */
   verified: boolean;
-  verifiedFirstBreak?: { file: string; lineIndex: number; reason: "hmac_mismatch" | "prev_mismatch" | "malformed" };
+  verifiedFirstBreak?: { file: string; lineIndex: number; reason: AuditChainBreakReason };
   /** Audit logging is currently disabled (disk full / permission error /
    *  too many failures). Auto-recovery kicks in after the backoff window;
    *  the field surfaces the state so a doctor / health check can flag it. */
@@ -599,10 +681,14 @@ export async function summarizeAuditEntries(opts: { since?: string; topN?: numbe
  *  tampered insertion. */
 async function verifyAuditChain(): Promise<{
   verified: boolean;
-  firstBreak?: { file: string; lineIndex: number; reason: "hmac_mismatch" | "prev_mismatch" | "malformed" };
+  firstBreak?: { file: string; lineIndex: number; reason: AuditChainBreakReason };
 }> {
   let prev: string = HMAC_GENESIS;
   let chainStarted = false;
+  // Highest seq + head hmac seen in the chain — compared against the signed
+  // checkpoint after the walk to catch lines removed from the end.
+  let chainLastSeq = -1;
+  let chainHeadHmac: string = HMAC_GENESIS;
   for await (const { line, file, lineIndex } of readAllAuditLinesIndexed()) {
     let entry: Record<string, unknown>;
     try {
@@ -639,8 +725,58 @@ async function verifyAuditChain(): Promise<{
     }
     prev = hmacField;
     chainStarted = true;
+    chainHeadHmac = hmacField;
+    if (typeof entry.seq === "number" && Number.isInteger(entry.seq)) chainLastSeq = entry.seq;
+  }
+  // Tail-truncation check: the signed checkpoint records the highest seq +
+  // head sealed at the last flush. A chain that doesn't reach that seq means
+  // lines were removed from the end after they were anchored (a plain chain
+  // replay can't see this — a truncated chain is a valid shorter chain).
+  const ck = await readCheckpoint();
+  if (ck) {
+    if (ck.mac !== checkpointMac(ck.seq, ck.hmac)) {
+      // Present but the MAC (which needs the key) doesn't match → the
+      // checkpoint itself was edited / rolled back.
+      return { verified: false, firstBreak: { file: "audit.checkpoint", lineIndex: -1, reason: "checkpoint_forged" } };
+    }
+    if (ck.seq > chainLastSeq || (ck.seq === chainLastSeq && ck.hmac !== chainHeadHmac)) {
+      return { verified: false, firstBreak: { file: "audit.checkpoint", lineIndex: -1, reason: "truncated" } };
+    }
   }
   return { verified: true };
+}
+
+/** Read + shape-validate the truncation checkpoint. Returns null when absent
+ *  OR present-but-unparseable / wrong-shape — both degrade to "no truncation
+ *  check, chain still verifies on its own" rather than a false alarm (a torn
+ *  write is indistinguishable from corruption, and the moat must not cry wolf;
+ *  deleting the checkpoint is already an undetectable disable, documented).
+ *  A well-formed checkpoint with a WRONG MAC is the real forgery signal —
+ *  that's returned here so `verifyAuditChain` reports `checkpoint_forged`. */
+async function readCheckpoint(): Promise<{ seq: number; hmac: string; mac: string } | null> {
+  let raw: string;
+  try {
+    raw = await readFile(CHECKPOINT_PATH, "utf-8");
+  } catch {
+    return null;
+  }
+  try {
+    const obj = JSON.parse(raw.trim()) as { seq?: unknown; hmac?: unknown; mac?: unknown };
+    if (
+      typeof obj.seq === "number" &&
+      Number.isInteger(obj.seq) &&
+      obj.seq >= 0 &&
+      typeof obj.hmac === "string" &&
+      /^[0-9a-f]{64}$/.test(obj.hmac) &&
+      typeof obj.mac === "string" &&
+      /^[0-9a-f]{64}$/.test(obj.mac)
+    ) {
+      return { seq: obj.seq, hmac: obj.hmac, mac: obj.mac };
+    }
+  } catch {
+    // unparseable — fall through to absent
+  }
+  return null;
 }
 
 async function* readAllAuditLinesIndexed(): AsyncGenerator<{ line: string; file: string; lineIndex: number }> {

@@ -108,8 +108,11 @@ describe('Photos tools registration', () => {
     expect(config.annotations.destructiveHint).toBe(true);
   });
 
-  test('create_album is not marked destructive', () => {
-    const { config } = server.tools.get('create_album');
-    expect(config.annotations.destructiveHint).toBe(false);
+  test('album creation and additions are not destructive but require sensitive approval', () => {
+    for (const name of ['create_album', 'add_to_album']) {
+      const { config } = server.tools.get(name);
+      expect(config.annotations.destructiveHint).toBe(false);
+      expect(config.annotations.sensitiveHint).toBe(true);
+    }
   });
 });

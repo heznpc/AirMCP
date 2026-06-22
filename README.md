@@ -19,7 +19,7 @@
 
 ## What this is — at a glance
 
-- **Currently implemented** — 286 tools across 29 modules (a curated **starter** set loads by default; `--full` enables all; Swift-backed tools need the optional bridge, see Requires above); HMAC-chained audit log with tamper-detection test suite; HITL approval per destructive/sensitive call; rate limit (60/min + 10 destructive/hr); `allowNetwork` inbound HTTP exposure policy (RFC 0002); OAuth 2.1 + Resource Indicators (RFC 0005 Steps 1+2 — RS256/ES256 JWT, scope gate, `.well-known/oauth-protected-resource` per RFC 9728); sessionless `.well-known/mcp.json` discovery; 228 Shortcuts/AppIntents auto-generated from the tool manifest; native SwiftUI menubar app (ad-hoc signed; Developer ID notarization pending); Claude Code plugin package (`.claude-plugin/plugin.json` + `.mcp.json` at repo root, with the `.mcp.json` invocation pinned to the same npm version as the manifest so the marketplace SHA-approval and the installed runtime always agree). On every CI run, `npm run mcp:validate` boots the built `dist/index.js` under a pinned [`@modelcontextprotocol/inspector`](https://github.com/modelcontextprotocol/inspector) `--cli` and checks the `tools/list` response for JSON-RPC envelope drift, embedded error envelopes, and zero-tool responses — this is a wire-shape gate, not a substitute for the HMAC / HITL / audit primitives, which have their own tests.
+- **Currently implemented** — 286 tools across 29 modules (a curated **starter** set loads by default; `--full` enables all; Swift-backed tools need the optional bridge, see Requires above); HMAC-chained audit log with tamper-detection test suite; default HITL approval per destructive/sensitive call; rate limit (60/min + 10 destructive/hr); `allowNetwork` inbound HTTP exposure policy (RFC 0002); OAuth 2.1 + Resource Indicators (RFC 0005 Steps 1+2 — RS256/ES256 JWT, scope gate, `.well-known/oauth-protected-resource` per RFC 9728); sessionless `.well-known/mcp.json` discovery; 228 Shortcuts/AppIntents auto-generated from the tool manifest; native SwiftUI menubar app (ad-hoc signed; Developer ID notarization pending); Claude Code plugin package (`.claude-plugin/plugin.json` + `.mcp.json` at repo root, with the `.mcp.json` invocation pinned to the same npm version as the manifest so the marketplace SHA-approval and the installed runtime always agree). On every CI run, `npm run mcp:validate` boots the built `dist/index.js` under a pinned [`@modelcontextprotocol/inspector`](https://github.com/modelcontextprotocol/inspector) `--cli` and checks the `tools/list` response for JSON-RPC envelope drift, embedded error envelopes, and zero-tool responses — this is a wire-shape gate, not a substitute for the HMAC / HITL / audit primitives, which have their own tests.
 - **Planned** — RFC 0005 Step 3 browser PKCE guide; stateless streamable HTTP for horizontal scale per MCP 2026 roadmap; iOS/visionOS exploration (v3.0+); consolidated registry re-publishing across Anthropic MCP Registry, Smithery, PulseMCP, Glama, MCP Market, Cline Marketplace, LobeHub (the `.well-known/mcp.json` endpoint is published, `mcpName` is set, and past ad-hoc registrations exist on some registries but their versions/metadata have drifted out of date — a single self-publishing PR will re-push the current manifest to each); Claude Code Plugin submission to `anthropics/claude-plugins-community` (community marketplace launched 2026-05-22; the plugin package itself — `.claude-plugin/plugin.json` + `.mcp.json` — lives at repo root and is validated by CI; the remaining step is the operator-side submission via `clau.de/plugin-directory-submission`); App Schemas codegen (WWDC 2026 introduced App Schemas — a new agentic layer over App Intents + App Entities, plus a View Annotations API for on-screen awareness and an App Intents Testing framework; the installed SDK exposes the non-deprecated `@AppIntent(schema:)` / `@AppEntity(schema:)` / `@AppEnum(schema:)` macro declarations, and full Xcode can typecheck those macros, but the default Command Line Tools still lack `AppIntentsMacros` / `AppIntentsTesting`; Calendar events, Reminders, and Contacts also lack matching public AssistantSchemas constants in the local SDK, so AirMCP keeps the generated default artifact on plain AppIntents/AppEntities until CI has a schema-capable toolchain and each mapping targets an official schema constant). iOS companion server (`ios/Sources/AirMCPServer`, ~1500 LOC) is **preview**, not GA — macOS is the shipping surface.
 - **Design intent** — Core infra (HITL · audit · rate-limit · HMAC chain · network policy · OAuth scope gate) is the differentiated layer; the tool surface is broad and JXA-thin **by design**. JXA is the bridge, not the product. The interesting code lives in `src/shared/` (audit, rate-limit, HITL, network policy, OAuth gate, structured-content validators) and the Swift bridges (`swift/Sources/AirMCPKit`) for EventKit / HealthKit / PhotoKit / Vision / FoundationModels. Blast-radius unit is one tool call. Adjacent to — not a replacement for — the canonical [Model Context Protocol reference servers](https://github.com/modelcontextprotocol/servers) (Everything, Filesystem, Fetch, Git, Memory, Sequential Thinking, Time); AirMCP fills the Apple-native domain those references leave open. Aligned with Anthropic's three-layer containment doctrine ([*How we contain Claude across products*](https://anthropic.com/engineering/how-we-contain-claude), 2026-05-27 engineering blog): the Environment layer (sandbox / VM / egress controls) and Model layer (system prompts / classifiers) are Anthropic's host-side responsibility; AirMCP implements the **External Content layer** — tool-permission gating + MCP server auditing — for the Apple-native domain, complementary to (not replacing) Claude Code's process-level Seatbelt/bubblewrap sandbox. The same production governance primitives (sensitive-action HITL, scope-gated permissions, real-time tamper-evident audit, rate-limited destructive ops, emergency stop file) that high-stakes vertical MCP servers — financial trading, crypto exchange, supply-chain attestation — build per-deployment are surfaced once here as OSS reference.
 - **Non-goals** — Per-session batched approval that covers "the next N calls" (failure mode this project is built around). Editable or skippable audit entries (the chain is load-bearing). Promising iOS parity on the public surface (preview only). Replacing native Apple apps — AirMCP automates them, it does not reimplement them. Headless / non-Apple platforms beyond what Google Workspace already provides.
@@ -216,7 +216,7 @@ User-authored skills land in `~/.config/airmcp/skills/*.yaml` and hot-reload.
 
 AirMCP runs with access to 286 tools on your machine. A few layers keep a buggy agent plan from turning into an incident:
 
-- **HITL approval** — every destructive tool prompts before firing (via MCP Elicitation or a Unix socket fallback). Per-call, per-scope.
+- **HITL approval** — at the default level, every sensitive or destructive tool prompts before firing (via MCP Elicitation or a Unix socket fallback). Per-call, per-scope.
 - **Rate limit** — 60 tool calls/minute globally, 10 destructive/hour. Token-bucket so bursts are fine; sustained rate isn't.
 - **Emergency stop** — `touch ~/.config/airmcp/emergency-stop` blocks every destructive tool immediately with a 1-second probe cache. No restart needed. `rm` the file to resume.
 - **Audit log** — every tool call lands in `~/.airmcp/audit.jsonl` with PII-scrubbed args, 0600 perms, 10MB rotation. Query it via `audit_log` / `audit_summary` tools. Each entry carries an HMAC chain (single-line tamper detection — `AIRMCP_AUDIT_HMAC_KEY` for cross-machine integrity) and a **correlation ID** that threads the entry, any thrown error, and the OpenTelemetry span (when enabled) for the same call — so a failing tool can be traced across log lines with one `grep`. **Every env knob lives in [docs/environment.md](docs/environment.md)** (77 vars indexed by category).
@@ -906,7 +906,7 @@ Or edit `~/.config/airmcp/config.json` directly:
   "allowSendMessages": false,
   "allowSendMail": false,
   "hitl": {
-    "level": "destructive-only",
+    "level": "sensitive-only",
     "timeout": 30
   }
 }
@@ -914,18 +914,18 @@ Or edit `~/.config/airmcp/config.json` directly:
 
 ### Human-in-the-Loop (HITL)
 
-Require manual approval before destructive operations:
+Require manual approval before sensitive or destructive operations:
 
 ```json
 {
   "hitl": {
-    "level": "destructive-only",
+    "level": "sensitive-only",
     "timeout": 30
   }
 }
 ```
 
-Levels: `off`, `destructive-only`, `all-writes`, `all`
+Levels: `off`, `destructive-only`, `sensitive-only`, `all-writes`, `all`
 
 ### Semantic Search (Optional)
 
@@ -974,7 +974,7 @@ Modules with OS requirements (e.g., Intelligence requires macOS 26+) are automat
 
 - **JXA/AppleScript dependency** — Core automation relies on Apple's scripting dictionaries. While these have been stable for 10+ years, macOS updates can theoretically break individual modules. Circuit breaker (3 failures → 60s auto-disable) isolates failures. UI Automation tools (6 tools) are inherently more brittle and separated into their own module.
 - **Input sanitization** — `run_javascript` blocks `javascript:` and `data:` URL schemes to prevent code injection. `escJxaShell` strips control characters from shell arguments.
-- **Read data exposure** — Destructive operations require HITL approval, but read operations (mail, messages, contacts) are not rate-limited. When connected to cloud LLMs, sensitive data passes through the LLM provider. Mitigations: PII scrubbing in logs, pagination limits, sensitive modules (mail, messages) require explicit opt-in.
+- **Read data exposure** — Sensitive and destructive operations require HITL approval by default, but read operations (mail, messages, contacts) do not. When connected to cloud LLMs, sensitive data passes through the LLM provider. Mitigations: PII scrubbing in logs, pagination limits, sensitive modules (mail, messages) require explicit opt-in.
 - **IPC overhead** — Multi-process path (Client → Node.js → osascript/Swift CLI → macOS app). Each JXA call adds ~50ms overhead. Pagination prevents bulk data transfers. Swift bridge path bypasses JXA for EventKit/PhotoKit operations.
 - **Scope** — 286 tools across 29 modules follow 5 repeating patterns (JXA CRUD, Swift bridge, HTTP API, System Events, CLI wrapper), keeping maintenance proportional to pattern count, not tool count.
 

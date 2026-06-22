@@ -138,7 +138,13 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
       inputSchema: {
         name: z.string().max(500).describe("Name for the new shortcut"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
     },
     async ({ name }) => {
       try {

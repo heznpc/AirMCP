@@ -12,7 +12,7 @@ AirMCP bridges AI agents to native macOS applications through JXA (JavaScript fo
 2. **Cross-app linking** -- reference related IDs across modules. Mention a note ID in a reminder body; include an event ID in a follow-up note. This creates a traceable graph.
 3. **Batch over loops** -- prefer tools that return lists (`list_reminders`, `scan_notes`) over calling single-item tools repeatedly.
 4. **Check availability** -- not all modules may be enabled. Use `summarize_context` or check tool listing to confirm before attempting operations.
-5. **HITL for mutations** -- human-in-the-loop confirmation is enforced for destructive operations (delete, send, move). Always present a plan before executing writes.
+5. **HITL for sensitive mutations** -- human-in-the-loop confirmation is enforced for sensitive or destructive operations (create, send, delete, move). Always present a plan before executing writes.
 6. **Minimal privilege** -- read-only operations are always safe. Write operations may require user confirmation. Send/delete operations always require confirmation.
 
 ## Module Quick Reference

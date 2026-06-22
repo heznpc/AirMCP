@@ -29,11 +29,11 @@ These are the workflows AirMCP should make obvious in product, docs, demos, and 
 | Workflow | Type | Required modules | Core tools and skills | Safety shape |
 | --- | --- | --- | --- | --- |
 | Daily Briefing | built-in-skill | `calendar`, `reminders`, `mail`, `notes` | `skill_daily-briefing`, `summarize_context`, `today_events`, `list_reminders`, `get_unread_count`, `list_notes` | Read-only by default; saving a note or reminder is a separate write action. |
-| Inbox Triage | built-in-skill | `mail`, `reminders` | `skill_inbox-triage`, `skill_sender-to-tasks`, `search_messages`, `create_reminder` | Reads mail first; reminder creation is auditable and can be approved per call. |
+| Inbox Triage | built-in-skill | `mail`, `reminders` | `skill_inbox-triage`, `skill_sender-to-tasks`, `search_messages`, `create_reminder` | Reads mail first; reminder creation is auditable and prompts per call at the default HITL level. |
 | Meeting Prep | prompt-recipe | `calendar`, `notes`, `contacts`, `finder`, `reminders` | `today_events`, `search_notes`, `search_contacts`, `recent_files`, `list_reminders` | Read-only prep flow; agenda or task creation is an explicit follow-up write. |
 | Project Digest | built-in-skill | `memory`, `notes`, `calendar`, `reminders`, `mail`, `finder` | `semantic_index`, `skill_project-digest`, `semantic_search`, `find_related` | Digest is read-only after indexing; indexing writes only to AirMCP's local semantic store. |
-| Focus Blocks | built-in-skill | `reminders`, `calendar` | `skill_focus-block-planner`, `list_reminders`, `create_event` | Calendar writes are non-destructive but non-idempotent, so each created event remains auditable. |
-| Research to Output | prompt-recipe | `safari`, `intelligence`, `notes`, `mail` | `list_tabs`, `read_page_content`, `summarize_text`, `create_note`, `send_mail` | Reading and summarizing are read-only. Sending or saving output is a separate write action. |
+| Focus Blocks | built-in-skill | `reminders`, `calendar` | `skill_focus-block-planner`, `list_reminders`, `create_event` | Calendar writes are non-destructive but sensitive, so each created event prompts at the default HITL level. |
+| Research to Output | prompt-recipe | `safari`, `intelligence`, `notes`, `mail` | `list_tabs`, `read_page_content`, `summarize_text`, `create_note`, `send_mail` | Reading and summarizing are read-only. Sending or saving output is a separate HITL-gated action. |
 
 ## Copyable Prompts
 

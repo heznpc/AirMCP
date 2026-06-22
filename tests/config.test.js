@@ -305,9 +305,9 @@ describe('parseConfig() — HITL config parsing', () => {
     restoreEnv();
   });
 
-  test('HITL level defaults to "destructive-only"', () => {
+  test('HITL level defaults to "sensitive-only"', () => {
     const cfg = parseConfig();
-    expect(cfg.hitl.level).toBe('destructive-only');
+    expect(cfg.hitl.level).toBe('sensitive-only');
   });
 
   test('HITL timeout defaults to 30', () => {
@@ -343,10 +343,16 @@ describe('parseConfig() — HITL config parsing', () => {
     expect(cfg.hitl.level).toBe('all-writes');
   });
 
-  test('invalid HITL level falls back to "destructive-only"', () => {
+  test('AIRMCP_HITL_LEVEL=sensitive-only is accepted', () => {
+    process.env.AIRMCP_HITL_LEVEL = 'sensitive-only';
+    const cfg = parseConfig();
+    expect(cfg.hitl.level).toBe('sensitive-only');
+  });
+
+  test('invalid HITL level falls back to "sensitive-only"', () => {
     process.env.AIRMCP_HITL_LEVEL = 'invalid-value';
     const cfg = parseConfig();
-    expect(cfg.hitl.level).toBe('destructive-only');
+    expect(cfg.hitl.level).toBe('sensitive-only');
   });
 
   test('HITL config has expected shape', () => {

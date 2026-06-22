@@ -37,6 +37,7 @@ let requestJson = """
     "count": 2
   },
   "destructive": true,
+  "sensitive": true,
   "openWorld": false
 }
 """
@@ -54,6 +55,7 @@ require(request.args["id"] == "note-123", "arg id")
 require(request.args["force"] == "true", "arg bool")
 require(request.args["count"] == "2", "arg number")
 require(request.destructive, "destructive")
+require(request.sensitive, "sensitive")
 require(!request.openWorld, "openWorld")
 require(request.timestamp == timestamp, "timestamp")
 

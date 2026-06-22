@@ -112,7 +112,7 @@ All data returned by AirMCP tools is sent to the connected MCP client (AI model)
 ## Safety Controls
 
 - **Sending email/messages** is disabled by default (`allowSendMail: false`, `allowSendMessages: false`). You must explicitly enable these in config or via environment variables.
-- **Human-in-the-loop (HITL)** approval can be enabled to require confirmation before destructive operations (delete, send, move).
+- **Human-in-the-loop (HITL)** approval can be enabled to require confirmation before sensitive or destructive operations (create, send, delete, move).
 - **Destructive tools** are annotated with `destructiveHint: true` so MCP clients can warn before execution.
 
 ## Transport Modes

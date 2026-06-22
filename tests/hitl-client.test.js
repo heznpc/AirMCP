@@ -396,16 +396,15 @@ describe('HitlClient', () => {
     const bigChunk = 'x'.repeat(1_048_577 + 100);
     serverConn.write(bigChunk);
 
-    // Wait for the data to be processed
-    await new Promise((r) => setTimeout(r, 200));
-
-    console.error = origError;
-
-    const result = await resultPromise;
-    expect(result).toBe(false);
-    expect(consoleSpy.calls.some(c =>
-      typeof c[0] === 'string' && c[0].includes('buffer exceeded 1MB')
-    )).toBe(true);
+    try {
+      const result = await resultPromise;
+      expect(result).toBe(false);
+      expect(consoleSpy.calls.some(c =>
+        typeof c[0] === 'string' && c[0].includes('buffer exceeded 1MB')
+      )).toBe(true);
+    } finally {
+      console.error = origError;
+    }
   }, 10000);
 
   test('handles empty lines in response data', async () => {

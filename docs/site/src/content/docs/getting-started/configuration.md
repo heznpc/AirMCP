@@ -17,7 +17,7 @@ The default config file location is `~/.config/airmcp/config.json`. You can over
   "disabledModules": ["tv", "podcasts"],
   "shareApproval": ["notes", "calendar"],
   "hitl": {
-    "level": "destructive-only",
+    "level": "sensitive-only",
     "whitelist": ["list_notes", "search_notes"],
     "timeout": 30
   },
@@ -39,7 +39,7 @@ The default config file location is `~/.config/airmcp/config.json`. You can over
 | `allowSendMail` | boolean | `false` | Allow sending emails via the Mail module |
 | `disabledModules` | string[] | `[]` | List of module names to disable |
 | `shareApproval` | string[] | `[]` | Modules that require share approval before accessing |
-| `hitl.level` | string | `"off"` | Human-in-the-loop level: `off`, `destructive-only`, `all-writes`, `all` |
+| `hitl.level` | string | `"sensitive-only"` | Human-in-the-loop level: `off`, `destructive-only`, `sensitive-only`, `all-writes`, `all` |
 | `hitl.whitelist` | string[] | `[]` | Tool names that bypass HITL confirmation |
 | `hitl.timeout` | number | `30` | Seconds to wait for HITL confirmation |
 | `performance.embeddingProvider` | string | `"auto"` | Embedding provider: `gemini`, `swift`, `hybrid`, `none` |
@@ -65,7 +65,7 @@ The default config file location is `~/.config/airmcp/config.json`. You can over
 | `AIRMCP_ALLOW_SEND_MAIL=true` | Allow sending emails |
 | `AIRMCP_INCLUDE_SHARED=true` | Include shared Notes/folders |
 | `AIRMCP_SHARE_APPROVAL=notes,calendar` | Comma-separated list of modules requiring share approval |
-| `AIRMCP_HITL_LEVEL=destructive-only` | Human-in-the-loop confirmation level |
+| `AIRMCP_HITL_LEVEL=sensitive-only` | Human-in-the-loop confirmation level |
 
 ### HTTP Mode
 

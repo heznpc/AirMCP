@@ -218,6 +218,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
+        sensitiveHint: true,
         idempotentHint: false,
         openWorldHint: false,
       },
@@ -303,6 +304,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
+        sensitiveHint: true,
         idempotentHint: true,
         openWorldHint: false,
       },
@@ -408,6 +410,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
+        sensitiveHint: true,
         idempotentHint: false,
         openWorldHint: false,
       },
@@ -491,6 +494,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
+        sensitiveHint: true,
         idempotentHint: false,
         openWorldHint: false,
       },

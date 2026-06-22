@@ -95,6 +95,7 @@ describe('registerSkills', () => {
         annotations: {
           readOnlyHint: true,
           destructiveHint: false,
+          sensitiveHint: false,
           idempotentHint: true,
           openWorldHint: false,
         },
@@ -109,6 +110,7 @@ describe('registerSkills', () => {
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
+        sensitiveHint: true,
         idempotentHint: false,
         openWorldHint: false,
       },
@@ -122,6 +124,7 @@ describe('registerSkills', () => {
         annotations: {
           readOnlyHint: false,
           destructiveHint: false,
+          sensitiveHint: true,
           idempotentHint: false,
           openWorldHint: false,
         },

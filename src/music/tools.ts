@@ -283,7 +283,13 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
       inputSchema: {
         name: z.string().max(500).describe("Name for the new playlist"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
     },
     async ({ name }) => {
       try {
@@ -303,7 +309,13 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
         playlistName: z.string().max(500).describe("Playlist name"),
         trackName: z.string().max(500).describe("Track name to add"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
     },
     async ({ playlistName, trackName }) => {
       try {

@@ -3,6 +3,7 @@ import Foundation
 enum HitlLevel: String, Codable, Sendable, CaseIterable {
     case off = "off"
     case destructiveOnly = "destructive-only"
+    case sensitiveOnly = "sensitive-only"
     case allWrites = "all-writes"
     case all = "all"
 }
@@ -16,7 +17,7 @@ final class ConfigManager {
         var whitelist: [String]
         var timeout: Int
 
-        static let `default` = HitlConfig(level: .off, whitelist: [], timeout: 30)
+        static let `default` = HitlConfig(level: .sensitiveOnly, whitelist: [], timeout: 30)
     }
 
     struct Config: Codable, Sendable {
@@ -109,7 +110,7 @@ final class ConfigManager {
     }
 
     var hitlLevel: HitlLevel {
-        get { config.hitl?.level ?? .off }
+        get { config.hitl?.level ?? .sensitiveOnly }
         set {
             if config.hitl == nil { config.hitl = .default }
             config.hitl?.level = newValue

@@ -212,7 +212,13 @@ export function registerFinderTools(server: McpServer, _config: AirMcpConfig): v
       inputSchema: {
         path: zFilePath.describe("Absolute path of the folder to create"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async ({ path }) => {
       try {

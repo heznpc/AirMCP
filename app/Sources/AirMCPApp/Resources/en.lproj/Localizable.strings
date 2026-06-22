@@ -94,6 +94,7 @@
 "settings.hitlLevel" = "Level";
 "settings.hitlOff" = "Off";
 "settings.hitlDestructiveOnly" = "Destructive Only";
+"settings.hitlSensitiveOnly" = "Sensitive Actions";
 "settings.hitlAllWrites" = "All Writes";
 "settings.hitlAll" = "All";
 "settings.hitlTimeout" = "Timeout: %ds";
@@ -224,6 +225,7 @@
 
 /* HITL Notifications */
 "hitl.destructiveAction" = "Destructive Action";
+"hitl.sensitiveAction" = "Sensitive Action";
 "hitl.toolConfirmation" = "Tool Confirmation";
 "hitl.toolPrefix" = "Tool: %@";
 "hitl.approve" = "Approve";

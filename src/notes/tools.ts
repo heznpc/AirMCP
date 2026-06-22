@@ -254,6 +254,7 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
+        sensitiveHint: true,
         idempotentHint: false,
         openWorldHint: false,
       },
@@ -372,6 +373,7 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
+        sensitiveHint: true,
         idempotentHint: true,
         openWorldHint: false,
       },

@@ -60,8 +60,8 @@ function makeMockHitlClient(autoApprove = true, reachable = true) {
     isReachable() {
       return Promise.resolve(reachable);
     },
-    requestApproval(tool, args, destructive, openWorld) {
-      calls.push({ tool, args, destructive, openWorld });
+    requestApproval(tool, args, destructive, openWorld, sensitive = false) {
+      calls.push({ tool, args, destructive, openWorld, sensitive });
       return Promise.resolve(autoApprove);
     },
     dispose() {},
@@ -130,6 +130,69 @@ describe('level "destructive-only"', () => {
     for (const reg of registrations) {
       expect(reg.callback).toBe(original);
     }
+  });
+});
+
+// ---------- level: "sensitive-only" ----------
+
+describe('level "sensitive-only"', () => {
+  test('wraps destructive and sensitive tools', () => {
+    const { server, registrations } = makeMockServer();
+    const hitl = makeMockHitlClient();
+    const config = makeConfig('sensitive-only');
+
+    installHitlGuard(server, hitl, config);
+
+    const original = () => 'original';
+    server.registerTool('dangerous', { annotations: { destructiveHint: true } }, original);
+    server.registerTool('persisting_create', { annotations: { sensitiveHint: true, readOnlyHint: false } }, original);
+
+    expect(registrations).toHaveLength(2);
+    expect(registrations[0].callback).not.toBe(original);
+    expect(registrations[1].callback).not.toBe(original);
+  });
+
+  test('does NOT wrap generic non-sensitive writes or read-only tools', () => {
+    const { server, registrations } = makeMockServer();
+    const hitl = makeMockHitlClient();
+    const config = makeConfig('sensitive-only');
+
+    installHitlGuard(server, hitl, config);
+
+    const original = () => 'original';
+    server.registerTool('safe_write', { annotations: { readOnlyHint: false } }, original);
+    server.registerTool('reader', { annotations: { readOnlyHint: true } }, original);
+
+    for (const reg of registrations) {
+      expect(reg.callback).toBe(original);
+    }
+  });
+
+  test('sensitive approval is requested without marking the call destructive', async () => {
+    const { server, registrations } = makeMockServer();
+    const hitl = makeMockHitlClient(true);
+    const config = makeConfig('sensitive-only');
+
+    installHitlGuard(server, hitl, config);
+
+    server.registerTool(
+      'create_reminder',
+      { annotations: { readOnlyHint: false, destructiveHint: false, sensitiveHint: true, openWorldHint: false } },
+      () => 'created',
+    );
+
+    const result = await registrations[0].callback({ title: 'Follow up' });
+
+    expect(result).toBe('created');
+    expect(hitl.calls).toEqual([
+      {
+        tool: 'create_reminder',
+        args: { title: 'Follow up' },
+        destructive: false,
+        openWorld: false,
+        sensitive: true,
+      },
+    ]);
   });
 });
 
@@ -731,6 +794,38 @@ describe('elicitation paths', () => {
     await registrations[0].callback({});
 
     expect(elicitMessages[0]).toContain('Approve');
+    expect(elicitMessages[0]).not.toContain('Destructive');
+  });
+
+  test('elicitation with sensitiveHint uses sensitive label', async () => {
+    const elicitMessages = [];
+    const registrations = [];
+    const server = {
+      registerTool(name, toolConfig, callback) {
+        registrations.push({ name, toolConfig, callback });
+      },
+      server: {
+        getClientVersion: () => ({ name: 'cursor', version: '1.0' }),
+        elicitInput: jest.fn(async (req) => {
+          elicitMessages.push(req.message);
+          return { action: 'accept', content: { approve: true } };
+        }),
+      },
+    };
+    const hitl = makeMockHitlClient(true);
+    const config = makeConfig('sensitive-only');
+
+    installHitlGuard(server, hitl, config);
+
+    server.registerTool(
+      'create_reminder',
+      { annotations: { readOnlyHint: false, destructiveHint: false, sensitiveHint: true } },
+      () => 'ok',
+    );
+    await registrations[0].callback({ title: 'Follow up' });
+
+    expect(elicitMessages[0]).toContain('Sensitive');
+    expect(elicitMessages[0]).toContain('create_reminder');
     expect(elicitMessages[0]).not.toContain('Destructive');
   });
 });

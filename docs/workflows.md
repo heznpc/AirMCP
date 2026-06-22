@@ -4,7 +4,7 @@ AirMCP is useful when an AI client needs to work across your Apple workspace, no
 
 - Siri and Shortcuts can be the Apple-native front door.
 - Claude, Codex, Cursor, Raycast, and other MCP clients can be the external agent brain.
-- AirMCP supplies the local action runtime: Apple app access, workflow skills, semantic memory, per-call approvals, audit logs, rate limits, and OAuth scopes.
+- AirMCP supplies the local action runtime: Apple app access, workflow skills, semantic memory, approvals for sensitive actions, audit logs, rate limits, and OAuth scopes.
 
 This is not positioned as a Siri replacement. Siri can launch or phrase a workflow; AirMCP gives that workflow governed hands across Notes, Calendar, Reminders, Mail, Safari, Finder, Contacts, and the Swift-backed Apple frameworks.
 
@@ -89,6 +89,6 @@ The next product work should improve access and confidence around these workflow
 
 - Make the first-run experience ask "what workflow do you want AirMCP for?" instead of only "which modules do you want?"
 - Let the menubar app run or copy workflows for specific clients: Codex, Claude, Cursor, Raycast, and Shortcuts.
-- Keep approvals per-call. Do not solve approval fatigue by silently broadening approval scope; improve prompt wording, grouping, and denial recovery instead.
+- Keep required approvals scoped to the individual gated call. Do not solve approval fatigue by silently broadening approval scope; improve prompt wording, grouping, and denial recovery instead.
 - Make audit review human-readable for workflow runs, not just individual tool calls.
 - Treat FoundationModels host mode as preview until the Swift toolchain and platform APIs are stable enough for default builds.

@@ -2,7 +2,7 @@ import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { runJxa } from "../shared/jxa.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okStructured, okUntrustedLinkedStructured, errPermission, errJxaFor } from "../shared/result.js";
+import { ok, okUntrustedStructured, okUntrustedLinkedStructured, errPermission, errJxaFor } from "../shared/result.js";
 // Side-effect import: register the mail_unread poller with the shared registry
 // at module load time. The poller itself only starts when startPollers() is
 // invoked by the cross/event observer tool.
@@ -43,7 +43,7 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
     },
     async () => {
       try {
-        return okStructured(await runJxa(listMailboxesScript()));
+        return okUntrustedStructured(await runJxa(listMailboxesScript()));
       } catch (e) {
         return errJxaFor("list mailboxes", e);
       }
@@ -225,7 +225,7 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
     },
     async () => {
       try {
-        return okStructured(await runJxa(getUnreadCountScript()));
+        return okUntrustedStructured(await runJxa(getUnreadCountScript()));
       } catch (e) {
         return errJxaFor("get unread count", e);
       }
@@ -280,7 +280,7 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
           await runJxa<Array<{ name: string; fullName: string | null; emailAddresses: string[] }>>(
             listAccountsScript(),
           );
-        return okStructured({ accounts });
+        return okUntrustedStructured({ accounts });
       } catch (e) {
         return errJxaFor("list accounts", e);
       }

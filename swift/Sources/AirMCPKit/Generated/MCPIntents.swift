@@ -2,7 +2,7 @@
 //
 // Source: docs/tool-manifest.json
 // Generator: scripts/gen-swift-intents.mjs
-// RFC 0007 Phase A.2b.2 + A.4.1 — 233 auto-selected read-only
+// RFC 0007 Phase A.2b.2 + A.4.1 — 230 auto-selected read-only
 // tools (82 with typed drift-guards + Interactive Snippet
 // SwiftUI views) + 9 AppShortcutsProvider entries.
 // Run `npm run gen:intents` to refresh after tool metadata changes.
@@ -3056,45 +3056,6 @@ public struct GetWifiStatusIntent: AppIntent {
     }
 }
 
-// Tool: gws_calendar_create
-public struct GwsCalendarCreateIntent: AppIntent {
-    nonisolated(unsafe) public static var title: LocalizedStringResource = "Create Google Calendar Event"
-    nonisolated(unsafe) public static var description = IntentDescription("Create an event in Google Calendar.")
-    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
-
-    public init() {}
-
-    @Parameter(title: "Event title")
-    public var summary: String
-
-    @Parameter(title: "Start time (ISO 8601)")
-    public var start: String
-
-    @Parameter(title: "End time (ISO 8601)")
-    public var end: String
-
-    @Parameter(title: "Event description")
-    public var description: String?
-
-    @Parameter(title: "Event location")
-    public var location: String?
-
-    @MainActor
-    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
-        var args: [String: any Sendable] = [:]
-        args["summary"] = summary
-        args["start"] = start
-        args["end"] = end
-        if let v = description { args["description"] = v }
-        if let v = location { args["location"] = v }
-        let result = try await MCPIntentRouter.shared.call(
-            tool: "gws_calendar_create",
-            args: args
-        )
-        return .result(value: result)
-    }
-}
-
 // Tool: gws_calendar_list
 public struct GwsCalendarListIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "List Google Calendar Events"
@@ -3326,30 +3287,6 @@ public struct GwsSheetsReadIntent: AppIntent {
     }
 }
 
-// Tool: gws_sheets_write
-public struct GwsSheetsWriteIntent: AppIntent {
-    nonisolated(unsafe) public static var title: LocalizedStringResource = "Write to Google Sheet"
-    nonisolated(unsafe) public static var description = IntentDescription("Write values to a Google Sheets range.")
-    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
-
-    public init() {}
-
-    @Parameter(title: "Spreadsheet ID")
-    public var spreadsheetId: String
-
-    @Parameter(title: "A1 range (e.g. 'Sheet1!A1:B2')")
-    public var range: String
-
-    @MainActor
-    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
-        let result = try await MCPIntentRouter.shared.call(
-            tool: "gws_sheets_write",
-            args: ["spreadsheetId": spreadsheetId, "range": range]
-        )
-        return .result(value: result)
-    }
-}
-
 // Tool: gws_status
 public struct GwsStatusIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Google Workspace Status"
@@ -3363,37 +3300,6 @@ public struct GwsStatusIntent: AppIntent {
         let result = try await MCPIntentRouter.shared.call(
             tool: "gws_status",
             args: [String: any Sendable]()
-        )
-        return .result(value: result)
-    }
-}
-
-// Tool: gws_tasks_create
-public struct GwsTasksCreateIntent: AppIntent {
-    nonisolated(unsafe) public static var title: LocalizedStringResource = "Create Google Task"
-    nonisolated(unsafe) public static var description = IntentDescription("Create a task in Google Tasks.")
-    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
-
-    public init() {}
-
-    @Parameter(title: "Task title")
-    public var title: String
-
-    @Parameter(title: "Task notes/description")
-    public var notes: String?
-
-    @Parameter(title: "Due date (ISO 8601 or YYYY-MM-DD)")
-    public var due: String?
-
-    @MainActor
-    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
-        var args: [String: any Sendable] = [:]
-        args["title"] = title
-        if let v = notes { args["notes"] = v }
-        if let v = due { args["due"] = v }
-        let result = try await MCPIntentRouter.shared.call(
-            tool: "gws_tasks_create",
-            args: args
         )
         return .result(value: result)
     }

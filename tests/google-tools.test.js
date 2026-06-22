@@ -71,6 +71,15 @@ describe('Google Workspace tools registration', () => {
       expect(typeof config.annotations.destructiveHint).toBe('boolean');
     }
   });
+
+  test('cloud write tools require destructive-level approval/scope', () => {
+    for (const name of ['gws_sheets_write', 'gws_calendar_create', 'gws_tasks_create']) {
+      const { config } = server.tools.get(name);
+      expect(config.annotations.readOnlyHint).toBe(false);
+      expect(config.annotations.openWorldHint).toBe(true);
+      expect(config.annotations.destructiveHint).toBe(true);
+    }
+  });
 });
 
 describe('gws_raw security whitelist', () => {

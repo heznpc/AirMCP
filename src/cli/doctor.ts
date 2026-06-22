@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import { MODULE_NAMES, STARTER_MODULES, NPM_PACKAGE_NAME, MCP_CLIENTS, getCompatibilityEnv } from "../shared/config.js";
 import { HOME, PATHS } from "../shared/constants.js";
-import { isCodexAirmcpConfigured, isCodexCliAvailable } from "./codex-mcp.js";
+import { CODEX_APP_OWNED_URL, codexAirmcpRuntimeShape, isCodexCliAvailable } from "./codex-mcp.js";
 import { LOGO_LINES, typeLine } from "../shared/banner.js";
 import { esc } from "../shared/esc.js";
 import { MODULE_MANIFEST } from "../shared/modules.js";
@@ -28,6 +28,17 @@ interface FileConfig {
   includeShared?: boolean;
   allowSendMessages?: boolean;
   allowSendMail?: boolean;
+}
+
+function clientRuntimeShape(entry: unknown): "app-owned" | "direct" | "unknown" {
+  if (!entry || typeof entry !== "object") return "unknown";
+  const record = entry as Record<string, unknown>;
+  if (record.url === CODEX_APP_OWNED_URL) return "app-owned";
+  const command = typeof record.command === "string" ? record.command : "";
+  const args = Array.isArray(record.args) ? record.args.filter((arg): arg is string => typeof arg === "string") : [];
+  if (args.includes("connect") && args.includes(CODEX_APP_OWNED_URL)) return "app-owned";
+  if (command === "npx" && args.some((arg) => arg === "airmcp" || arg.startsWith("airmcp@"))) return "direct";
+  return "unknown";
 }
 
 export async function runDoctor(): Promise<void> {
@@ -135,7 +146,14 @@ export async function runDoctor(): Promise<void> {
         const raw = JSON.parse(readFileSync(client.configPath, "utf-8"));
         const servers = raw?.[client.serversKey] ?? {};
         if (servers.airmcp) {
-          ok(client.name, `${GREEN}connected${RESET}`);
+          const shape = clientRuntimeShape(servers.airmcp);
+          if (shape === "app-owned") {
+            ok(client.name, `${GREEN}connected${RESET} ${DIM}(AirMCP.app runtime)${RESET}`);
+          } else if (shape === "direct") {
+            meh(client.name, `connected via direct stdio — rerun init for AirMCP.app runtime`);
+          } else {
+            meh(client.name, `airmcp entry found, runtime shape unknown`);
+          }
         } else {
           meh(client.name, `found but no airmcp entry`);
         }
@@ -146,10 +164,18 @@ export async function runDoctor(): Promise<void> {
   }
   if (isCodexCliAvailable()) {
     anyClientFound = true;
-    if (isCodexAirmcpConfigured()) {
-      ok("Codex", `${GREEN}connected${RESET}`);
-    } else {
+    const shape = codexAirmcpRuntimeShape();
+    if (shape === "app-owned") {
+      ok("Codex", `${GREEN}connected${RESET} ${DIM}(AirMCP.app runtime)${RESET}`);
+    } else if (shape === "direct") {
+      meh(
+        "Codex",
+        `connected via direct stdio — run: codex mcp remove airmcp && codex mcp add airmcp --url ${CODEX_APP_OWNED_URL}`,
+      );
+    } else if (shape === "missing") {
       meh("Codex", `found but no airmcp entry`);
+    } else {
+      meh("Codex", `airmcp entry found, runtime shape unknown`);
     }
   }
   if (!anyClientFound) {

@@ -96,8 +96,8 @@ This is under development in the `ios/` directory.
 
 AirMCP supports two MCP transports:
 
-- **Stdio** (default) -- communicates via stdin/stdout. Used by Claude Desktop, Claude Code, Cursor, and most MCP clients.
-- **Streamable HTTP** (`--http` flag) -- Express-based HTTP server with session management. Supports multiple concurrent clients, SSE streaming, and bearer token authentication.
+- **Streamable HTTP** (`--http` flag) -- Express-based HTTP server with session management. This is the recommended AirMCP.app-owned local runtime on `127.0.0.1:3847`.
+- **Stdio** (default) -- communicates via stdin/stdout. Direct stdio is useful for development; stdio-only clients should use `npx -y airmcp connect --url http://127.0.0.1:3847/mcp` to proxy into the app-owned runtime.
 
 ### Module System
 

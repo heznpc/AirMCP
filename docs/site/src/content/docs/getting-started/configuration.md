@@ -120,6 +120,7 @@ npx airmcp --http             # Start as HTTP server
 npx airmcp --http --port 8080 # Custom port
 npx airmcp --http --bind-all  # Bind to 0.0.0.0 (all interfaces)
 npx airmcp --full             # Enable all modules
+npx airmcp connect            # Proxy stdio clients to AirMCP.app
 npx airmcp init               # Interactive setup wizard
 npx airmcp doctor             # Diagnose installation
 npx airmcp --help             # Show usage guide

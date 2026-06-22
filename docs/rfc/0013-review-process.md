@@ -49,7 +49,7 @@ a *specific* defect class and the test that guards it:
 | Area | Hunt for | Guarded by |
 |---|---|---|
 | Audit chain | seal/`_prev` mismatch, rotation re-anchor, genesis, tamper not detected | `audit-tamper-detection`, `audit-genesis-check`, `audit-rotation-resume`, `audit-recovery` |
-| HITL gate | per-call bypass, batched "next N calls" regression, deny-on-unreachable | `hitl-client`, `hitl-guard`, `skills-hitl-queue` |
+| HITL gate | gated-call bypass, batched "next N calls" regression, deny-on-unreachable | `hitl-client`, `hitl-guard`, `skills-hitl-queue` |
 | Rate limit | off-by-one, reset-window drift, counter race | `rate-limit` |
 | OAuth | alg confusion (`alg=none`/HS), scope-gate bypass, RFC 8707 audience, RFC 9728 PRM | `oauth-verifier`, `oauth-scope`, `well-known-card` |
 | Network policy | SSRF, allowlist bypass, Origin 403, bind-all-without-token | `http-transport` |

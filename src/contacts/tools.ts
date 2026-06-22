@@ -2,7 +2,7 @@ import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import { runAutomation } from "../shared/automation.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okStructured, okUntrustedStructured, okUntrustedLinkedStructured, errJxaFor } from "../shared/result.js";
+import { ok, okUntrustedStructured, okUntrustedLinkedStructured, errJxaFor } from "../shared/result.js";
 import {
   listContactsScript,
   searchContactsScript,
@@ -319,7 +319,7 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
           swift: { command: "list-groups" },
           jxa: () => listGroupsScript(),
         });
-        return okStructured({ groups: result });
+        return okUntrustedStructured({ groups: result });
       } catch (e) {
         return errJxaFor("list groups", e);
       }

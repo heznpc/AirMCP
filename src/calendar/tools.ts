@@ -3,7 +3,7 @@ import { z } from "zod";
 import { runAutomation } from "../shared/automation.js";
 import { runSwift } from "../shared/swift.js";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okStructured, okUntrustedStructured, okUntrustedLinkedStructured, errJxaFor } from "../shared/result.js";
+import { ok, okUntrustedStructured, okUntrustedLinkedStructured, errJxaFor } from "../shared/result.js";
 import {
   listCalendarsScript,
   listEventsScript,
@@ -119,7 +119,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
           swift: { command: "list-calendars" },
           jxa: () => listCalendarsScript(),
         });
-        return okStructured({ calendars: result });
+        return okUntrustedStructured({ calendars: result });
       } catch (e) {
         return errJxaFor("list calendars", e);
       }

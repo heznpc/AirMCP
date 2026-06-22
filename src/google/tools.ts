@@ -256,7 +256,7 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
         range: z.string().min(1).max(1000).describe("A1 range (e.g. 'Sheet1!A1:B2')"),
         values: z.array(z.array(z.string())).min(1).describe("2D array of cell values [[row1col1, row1col2], ...]"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
     async ({ spreadsheetId, range, values }) => {
       try {
@@ -326,7 +326,7 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
         description: z.string().max(5000).optional().describe("Event description"),
         location: z.string().max(5000).optional().describe("Event location"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
     async ({ summary, start, end, description, location }) => {
       try {
@@ -404,7 +404,7 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
         notes: z.string().max(5000).optional().describe("Task notes/description"),
         due: z.string().max(64).optional().describe("Due date (ISO 8601 or YYYY-MM-DD)"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
     async ({ title, notes, due }) => {
       try {

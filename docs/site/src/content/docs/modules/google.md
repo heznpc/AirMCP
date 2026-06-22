@@ -46,4 +46,4 @@ description: Google Workspace integration -- Gmail, Google Calendar, Drive, Shee
 
 ## Permissions
 
-Requires the **Google Workspace CLI** (`@googleworkspace/cli`) installed separately. Install with: `npm install -g @googleworkspace/cli && gws auth setup`. The `gws_gmail_send` tool and destructive `gws_raw` operations require `allowSendMail: true` in config or `AIRMCP_ALLOW_SEND_MAIL=true`.
+Requires the **Google Workspace CLI** (`@googleworkspace/cli`) installed separately. Install with: `npm install -g @googleworkspace/cli && gws auth setup`. Cloud write tools (`gws_gmail_send`, `gws_sheets_write`, `gws_calendar_create`, `gws_tasks_create`, and `gws_raw`) are marked as sensitive/destructive actions for HITL and OAuth scope gating. `gws_gmail_send` and destructive `gws_raw` operations also require `allowSendMail: true` in config or `AIRMCP_ALLOW_SEND_MAIL=true`.

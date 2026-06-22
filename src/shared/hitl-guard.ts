@@ -136,7 +136,7 @@ async function tryElicitApproval(
  * Monkey-patches server.registerTool so every subsequent registration
  * goes through HITL approval when the policy requires it.
  *
- * Channel order (per-call approval is preserved in every path — only the
+ * Channel order (gated-call approval is preserved in every path — only the
  * channel that answers differs by what is actually available):
  * - non-managed clients: MCP elicitation → socket HITL → deny
  * - managed clients:     socket HITL (if reachable) → MCP elicitation →
@@ -202,7 +202,7 @@ export function installHitlGuard(server: McpServer, hitlClient: HitlClient, conf
           traceApproval(name, "denied", "unavailable", { destructive, managed });
         }
         return errPermission(
-          `Action denied: "${name}" requires per-call approval, but no approval channel is available. ` +
+          `Action denied: "${name}" requires approval for this call, but no approval channel is available. ` +
             `Start the AirMCP menubar app, use an MCP client that supports elicitation, ` +
             `or adjust hitl.whitelist / hitl.level in ~/.config/airmcp/config.json.`,
         );

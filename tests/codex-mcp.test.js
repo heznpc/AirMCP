@@ -89,7 +89,7 @@ describe("codex MCP setup", () => {
         "--",
         "npx",
         "-y",
-        "airmcp",
+        "airmcp@2.12.1",
         "connect",
         "--url",
         CODEX_APP_OWNED_URL,
@@ -101,7 +101,7 @@ describe("codex MCP setup", () => {
   test("stdio clients use a token-gated proxy command rather than launching another server", () => {
     expect(stdioProxyEntry("test-token")).toEqual({
       command: "npx",
-      args: ["-y", "airmcp", "connect", "--url", CODEX_APP_OWNED_URL],
+      args: ["-y", "airmcp@2.12.1", "connect", "--url", CODEX_APP_OWNED_URL],
       env: { AIRMCP_HTTP_TOKEN: "test-token" },
     });
   });

@@ -7,11 +7,13 @@
  *   2. app/.../UpdateManager.swift          (menubar app update checker)
  *   3. src/shared/constants.ts              (User-Agent header)
  *   4. scripts/bundle-app.sh               (CFBundleShortVersionString)
- *   5. docs/PRIVACY_POLICY.md              (version header)
- *   6. .github/ISSUE_TEMPLATE/bug_report.yml (placeholder version)
- *   7. mcp.json                            (MCP Registry submission manifest)
- *   8. .claude-plugin/plugin.json          (Claude Code plugin manifest)
- *   9. .mcp.json                           (Claude Code project/plugin MCP config — pinned npm version)
+ *   5. app/.../MenuContent.swift            (pinned app-owned npm runtime)
+ *   6. src/shared/config.ts                 (pinned app-owned npm proxy)
+ *   7. docs/PRIVACY_POLICY.md              (version header)
+ *   8. .github/ISSUE_TEMPLATE/bug_report.yml (placeholder version)
+ *   9. mcp.json                            (MCP Registry submission manifest)
+ *   10. .claude-plugin/plugin.json         (Claude Code plugin manifest)
+ *   11. .mcp.json                          (Claude Code project/plugin MCP config — pinned npm version)
  *
  * Usage:
  *   node scripts/sync-version.mjs           # sync all files
@@ -124,7 +126,25 @@ syncFile("scripts/bundle-app.sh", [
   },
 ]);
 
-// 5. PRIVACY_POLICY.md — AirMCP vX.Y.Z
+// 5. MenuContent.swift — app-owned npx runtime pin.
+syncFile("app/Sources/AirMCPApp/Views/MenuContent.swift", [
+  {
+    pattern: /static let npmPackageVersion = "[^"]+"/,
+    replacement: `static let npmPackageVersion = "${VERSION}"`,
+    label: "app npmPackageVersion",
+  },
+]);
+
+// 6. config.ts — app-owned proxy/runtime package pin.
+syncFile("src/shared/config.ts", [
+  {
+    pattern: /export const NPM_PACKAGE_SPECIFIER = "airmcp@[^"]+"/,
+    replacement: `export const NPM_PACKAGE_SPECIFIER = "airmcp@${VERSION}"`,
+    label: "NPM_PACKAGE_SPECIFIER",
+  },
+]);
+
+// 7. PRIVACY_POLICY.md — AirMCP vX.Y.Z
 syncFile("docs/PRIVACY_POLICY.md", [
   {
     pattern: /AirMCP v[\d.]+/,
@@ -133,7 +153,7 @@ syncFile("docs/PRIVACY_POLICY.md", [
   },
 ]);
 
-// 6. bug_report.yml — placeholder version
+// 8. bug_report.yml — placeholder version
 syncFile(".github/ISSUE_TEMPLATE/bug_report.yml", [
   {
     pattern: /placeholder: "[\d.]+"/,
@@ -142,7 +162,7 @@ syncFile(".github/ISSUE_TEMPLATE/bug_report.yml", [
   },
 ]);
 
-// 7. mcp.json — MCP Registry submission manifest (top-level "version" field).
+// 9. mcp.json — MCP Registry submission manifest (top-level "version" field).
 const mcpJsonPath = resolve(root, "mcp.json");
 if (existsSync(mcpJsonPath)) {
   const mj = JSON.parse(readFileSync(mcpJsonPath, "utf8"));
@@ -160,7 +180,7 @@ if (existsSync(mcpJsonPath)) {
   }
 }
 
-// 8. .claude-plugin/plugin.json — Claude Code plugin manifest.
+// 10. .claude-plugin/plugin.json — Claude Code plugin manifest.
 const pluginJsonPath = resolve(root, ".claude-plugin/plugin.json");
 if (existsSync(pluginJsonPath)) {
   const pj = JSON.parse(readFileSync(pluginJsonPath, "utf8"));
@@ -178,7 +198,7 @@ if (existsSync(pluginJsonPath)) {
   }
 }
 
-// 9. .mcp.json — Claude Code plugin MCP config. The npx invocation is
+// 11. .mcp.json — Claude Code plugin MCP config. The npx invocation is
 //    pinned to the current package version so a marketplace install at
 //    plugin version X runs the npm tarball at version X (not whatever
 //    `dist-tags.latest` happens to point at).

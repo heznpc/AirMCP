@@ -217,6 +217,7 @@ launch_app() {
     pkill -x "$APP_EXECUTABLE" || true
     sleep 0.5
   fi
+  export AIRMCP_NPM_PACKAGE_SPECIFIER="${AIRMCP_NPM_PACKAGE_SPECIFIER:-$PROJECT_DIR}"
   /usr/bin/open -n "$BUNDLE_DIR"
 }
 

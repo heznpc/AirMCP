@@ -158,6 +158,11 @@ private let featuredWorkflows: [WorkflowInfo] = [
 
 enum AirMcpConstants {
     static let npmPackageName = "airmcp"
+    static let npmPackageVersion = "2.12.1"
+    static var npmPackageSpecifier: String {
+        ProcessInfo.processInfo.environment["AIRMCP_NPM_PACKAGE_SPECIFIER"]
+            ?? "\(npmPackageName)@\(npmPackageVersion)"
+    }
     static let mcpProtocolVersion = "2025-03-26"
     static let appOwnedHttpPort = 3847
     static let appOwnedHttpURL = "http://127.0.0.1:\(appOwnedHttpPort)/mcp"
@@ -166,7 +171,7 @@ enum AirMcpConstants {
     static let keyOnboardingCompleted = "onboardingCompleted"
 
     static var appOwnedProxyArgs: [String] {
-        ["-y", npmPackageName, "connect", "--url", appOwnedHttpURL]
+        ["-y", npmPackageSpecifier, "connect", "--url", appOwnedHttpURL]
     }
 
     static func appOwnedProxyEntry(token: String) -> [String: Any] {
@@ -190,7 +195,7 @@ enum AirMcpConstants {
           "mcpServers": {
             "airmcp": {
               "command": "npx",
-              "args": ["-y", "\(npmPackageName)", "connect", "--url", "\(appOwnedHttpURL)"],
+              "args": ["-y", "\(npmPackageSpecifier)", "connect", "--url", "\(appOwnedHttpURL)"],
               "env": {
                 "AIRMCP_HTTP_TOKEN": "\(token)"
               }
@@ -201,11 +206,11 @@ enum AirMcpConstants {
     }
 
     static func claudeCodeConfig() -> String {
-        "claude mcp add --env AIRMCP_HTTP_TOKEN=\(tokenForConfig()) airmcp -- npx -y \(npmPackageName) connect --url \(appOwnedHttpURL)"
+        "claude mcp add --env AIRMCP_HTTP_TOKEN=\(tokenForConfig()) airmcp -- npx -y \(npmPackageSpecifier) connect --url \(appOwnedHttpURL)"
     }
 
     static func codexConfig() -> String {
-        "codex mcp add --env AIRMCP_HTTP_TOKEN=\(tokenForConfig()) airmcp -- npx -y \(npmPackageName) connect --url \(appOwnedHttpURL)"
+        "codex mcp add --env AIRMCP_HTTP_TOKEN=\(tokenForConfig()) airmcp -- npx -y \(npmPackageSpecifier) connect --url \(appOwnedHttpURL)"
     }
 
     static func copyToClipboard(_ text: String) {

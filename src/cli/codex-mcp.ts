@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { NPM_PACKAGE_NAME } from "../shared/config.js";
+import { NPM_PACKAGE_SPECIFIER } from "../shared/config.js";
 import { IDENTITY } from "../shared/constants.js";
 import { ensureAppRuntimeToken } from "../shared/app-runtime-token.js";
 
@@ -65,7 +65,7 @@ export function configureCodexAirmcp(): "already-configured" | "configured" {
     "--",
     "npx",
     "-y",
-    NPM_PACKAGE_NAME,
+    NPM_PACKAGE_SPECIFIER,
     "connect",
     "--url",
     CODEX_APP_OWNED_URL,
@@ -74,7 +74,12 @@ export function configureCodexAirmcp(): "already-configured" | "configured" {
 }
 
 export function codexManualSetupCommand(): string {
-  return "codex mcp add --env AIRMCP_HTTP_TOKEN=<token> airmcp -- npx -y airmcp connect --url " + CODEX_APP_OWNED_URL;
+  return (
+    "codex mcp add --env AIRMCP_HTTP_TOKEN=<token> airmcp -- npx -y " +
+    NPM_PACKAGE_SPECIFIER +
+    " connect --url " +
+    CODEX_APP_OWNED_URL
+  );
 }
 
 export function stdioProxyEntry(token = ensureAppRuntimeToken()): {
@@ -84,7 +89,7 @@ export function stdioProxyEntry(token = ensureAppRuntimeToken()): {
 } {
   return {
     command: "npx",
-    args: ["-y", NPM_PACKAGE_NAME, "connect", "--url", CODEX_APP_OWNED_URL],
+    args: ["-y", NPM_PACKAGE_SPECIFIER, "connect", "--url", CODEX_APP_OWNED_URL],
     env: {
       AIRMCP_HTTP_TOKEN: token,
     },

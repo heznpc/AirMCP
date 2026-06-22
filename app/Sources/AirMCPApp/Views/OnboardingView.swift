@@ -784,7 +784,7 @@ struct OnboardingView: View {
                 "--",
                 "npx",
                 "-y",
-                AirMcpConstants.npmPackageName,
+                AirMcpConstants.npmPackageSpecifier,
                 "connect",
                 "--url",
                 AirMcpConstants.appOwnedHttpURL,

@@ -189,7 +189,7 @@ func installMCPIntentRouterForMacOS() {
 private func runAirMCPTool(_ toolName: String, args: [String: Any]) async throws -> String {
     let process = Process()
     process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-    process.arguments = ["npx", "-y", AirMcpConstants.npmPackageName]
+    process.arguments = ["npx", "-y", AirMcpConstants.npmPackageSpecifier]
 
     let stdinPipe = Pipe()
     let stdoutPipe = Pipe()

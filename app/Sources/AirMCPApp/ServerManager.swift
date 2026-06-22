@@ -201,7 +201,7 @@ final class ServerManager {
                 process.executableURL = URL(fileURLWithPath: npxPath)
                 process.arguments = [
                     "-y",
-                    AirMcpConstants.npmPackageName,
+                    AirMcpConstants.npmPackageSpecifier,
                     "--http",
                     "--port",
                     "\(AirMcpConstants.appOwnedHttpPort)",

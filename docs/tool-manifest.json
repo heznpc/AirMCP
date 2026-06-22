@@ -12413,7 +12413,7 @@
     {
       "name": "speech_availability",
       "title": "Speech Recognition Status",
-      "description": "Check if on-device speech recognition is available and authorized.",
+      "description": "Report whether this device supports on-device speech recognition. A true result is DEVICE capability only — NOT proof the caller is authorized: macOS gates transcription by Speech Recognition permission on the responsible process (the signed AirMCP app), so only a successful transcribe_audio confirms authorization.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -12861,7 +12861,7 @@
     {
       "name": "transcribe_audio",
       "title": "Transcribe Audio",
-      "description": "Transcribe an audio file to text using Apple's on-device speech recognition. Supports most audio formats (m4a, mp3, wav, caf).",
+      "description": "Transcribe an audio file to text using Apple's on-device speech recognition. Supports most audio formats (m4a, mp3, wav, caf). Requires the responsible process to hold macOS Speech Recognition permission (the signed AirMCP app surface); from an unentitled CLI caller it aborts with a permission error.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",

@@ -7073,7 +7073,7 @@ public struct SmartClipboardIntent: AppIntent {
 // Tool: speech_availability
 public struct SpeechAvailabilityIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Speech Recognition Status"
-    nonisolated(unsafe) public static var description = IntentDescription("Check if on-device speech recognition is available and authorized.")
+    nonisolated(unsafe) public static var description = IntentDescription("Report whether this device supports on-device speech recognition. A true result is DEVICE capability only — NOT proof the caller is authorized: macOS gates transcription by Speech Recognition permission on the responsible process (the signed AirMCP app), so only a successful transcribe_audio confirms authorization.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -7309,7 +7309,7 @@ public struct ToggleFocusModeIntent: AppIntent {
 // Tool: transcribe_audio
 public struct TranscribeAudioIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Transcribe Audio"
-    nonisolated(unsafe) public static var description = IntentDescription("Transcribe an audio file to text using Apple's on-device speech recognition. Supports most audio formats (m4a, mp3, wav, caf).")
+    nonisolated(unsafe) public static var description = IntentDescription("Transcribe an audio file to text using Apple's on-device speech recognition. Supports most audio formats (m4a, mp3, wav, caf). Requires the responsible process to hold macOS Speech Recognition permission (the signed AirMCP app surface); from an unentitled CLI caller it aborts with a permission error.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}

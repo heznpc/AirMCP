@@ -58,6 +58,19 @@ describe('Speech tools registration', () => {
       expect(typeof config.description).toBe('string');
     }
   });
+
+  test('speech descriptions do not overclaim authorization (responsible-process caveat)', () => {
+    const avail = server.tools.get('speech_availability').config.description;
+    const transcribe = server.tools.get('transcribe_audio').config.description;
+    // availability must NOT promise plain "available and authorized" — it can
+    // only report DEVICE capability; authorization is per responsible process
+    // and only confirmed by a successful transcribe_audio.
+    expect(avail).not.toMatch(/available and authorized/i);
+    expect(avail).toMatch(/permission|authoriz|responsible process/i);
+    // transcribe must state the permission requirement so a caller isn't
+    // surprised by a TCC abort from an unentitled CLI responsible process.
+    expect(transcribe).toMatch(/permission|responsible process|entitled/i);
+  });
 });
 
 describe('transcribe_audio', () => {
@@ -126,6 +139,12 @@ describe('speech_availability', () => {
     const parsed = JSON.parse(result.content[0].text);
     expect(parsed.available).toBe(true);
     expect(parsed.supportsOnDevice).toBe(true);
+    // Honesty caveat must travel WITH the result: available:true is device
+    // capability only, not proof the responsible process is TCC-authorized.
+    // (Empirically: availability returns true while transcribe_audio aborts
+    // 134 from an unentitled CLI responsible process.)
+    expect(typeof parsed.note).toBe('string');
+    expect(parsed.note).toMatch(/permission|responsible process|not guarantee/i);
   });
 
   test('returns error when swift bridge unavailable', async () => {

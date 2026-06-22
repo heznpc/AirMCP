@@ -10,7 +10,8 @@ export function registerSpeechTools(server: McpServer, _config: AirMcpConfig): v
     {
       title: "Transcribe Audio",
       description:
-        "Transcribe an audio file to text using Apple's on-device speech recognition. Supports most audio formats (m4a, mp3, wav, caf).",
+        "Transcribe an audio file to text using Apple's on-device speech recognition. Supports most audio formats (m4a, mp3, wav, caf). " +
+        "Requires the responsible process to hold macOS Speech Recognition permission (the signed AirMCP app surface); from an unentitled CLI caller it aborts with a permission error.",
       inputSchema: {
         path: z.string().max(1000).describe("Absolute path to the audio file"),
         language: z
@@ -39,7 +40,8 @@ export function registerSpeechTools(server: McpServer, _config: AirMcpConfig): v
     "speech_availability",
     {
       title: "Speech Recognition Status",
-      description: "Check if on-device speech recognition is available and authorized.",
+      description:
+        "Report whether this device supports on-device speech recognition. A true result is DEVICE capability only — NOT proof the caller is authorized: macOS gates transcription by Speech Recognition permission on the responsible process (the signed AirMCP app), so only a successful transcribe_audio confirms authorization.",
       inputSchema: {},
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
@@ -48,7 +50,19 @@ export function registerSpeechTools(server: McpServer, _config: AirMcpConfig): v
       if (bridgeErr) return errSwift(`Swift bridge required: ${bridgeErr}`);
       try {
         const result = await runSwift<{ available: boolean; supportsOnDevice: boolean }>("speech-availability", "{}");
-        return ok(result);
+        // `available`/`supportsOnDevice` report DEVICE capability only — not that
+        // the current responsible process is permitted. macOS TCC gates on-device
+        // transcription against the responsible process: the signed AirMCP app
+        // (NSSpeechRecognitionUsageDescription + a user-granted permission) can
+        // transcribe; a generic CLI parent (terminal/node) is not entitled and
+        // transcribe_audio aborts with a permission error. So availability is
+        // necessary but NOT sufficient — only a successful transcribe_audio proves
+        // the caller is authorized. Travel the caveat with the result so callers
+        // never read `available:true` as "transcription will work".
+        return ok({
+          ...result,
+          note: "available/supportsOnDevice = device capability only; transcription also requires the responsible process (the signed AirMCP app) to hold macOS Speech Recognition permission — a generic CLI caller is not entitled and transcribe_audio will fail. available:true does not guarantee transcription succeeds.",
+        });
       } catch (e) {
         return errSwiftFor("check speech availability", e);
       }

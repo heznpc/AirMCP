@@ -1,5 +1,32 @@
-import { describe, test, expect } from '@jest/globals';
-import { sanitizeToolName } from '../dist/shortcuts/tools.js';
+import { describe, test, expect, jest, beforeEach } from '@jest/globals';
+
+const mockExecFile = jest.fn();
+const mockRunJxa = jest.fn();
+
+jest.unstable_mockModule('node:child_process', () => ({
+  execFile: mockExecFile,
+}));
+
+jest.unstable_mockModule('../dist/shared/jxa.js', () => ({
+  runJxa: mockRunJxa,
+}));
+
+const { registerDynamicShortcutTools, sanitizeToolName } = await import('../dist/shortcuts/tools.js');
+
+function createMockServer() {
+  const tools = new Map();
+  return {
+    registerTool(name, config, handler) {
+      tools.set(name, { config, handler });
+    },
+    tools,
+  };
+}
+
+beforeEach(() => {
+  mockExecFile.mockReset();
+  mockRunJxa.mockReset();
+});
 
 describe('sanitizeToolName', () => {
   test('basic name with spaces', () => {
@@ -54,5 +81,23 @@ describe('sanitizeToolName', () => {
 
   test('uppercase is lowercased', () => {
     expect(sanitizeToolName('RUN FAST')).toBe('shortcut_run_fast');
+  });
+});
+
+describe('registerDynamicShortcutTools', () => {
+  test('dynamic shortcut tools are destructive-gated open-world actions', async () => {
+    mockExecFile.mockImplementation((_command, _args, _options, callback) => {
+      callback(null, { stdout: 'Send Secret\n한국어 단축어\n', stderr: '' });
+    });
+    const server = createMockServer();
+
+    const count = await registerDynamicShortcutTools(server);
+
+    expect(count).toBe(1);
+    expect(server.tools.has('shortcut_send_secret')).toBe(true);
+    const { config } = server.tools.get('shortcut_send_secret');
+    expect(config.annotations.readOnlyHint).toBe(false);
+    expect(config.annotations.destructiveHint).toBe(true);
+    expect(config.annotations.openWorldHint).toBe(true);
   });
 });

@@ -2,7 +2,7 @@
 //
 // Source: docs/tool-manifest.json
 // Generator: scripts/gen-swift-intents.mjs
-// RFC 0007 Phase A.2b.2 + A.4.1 — 230 auto-selected read-only
+// RFC 0007 Phase A.2b.2 + A.4.1 — 229 auto-selected read-only
 // tools (82 with typed drift-guards + Interactive Snippet
 // SwiftUI views) + 9 AppShortcutsProvider entries.
 // Run `npm run gen:intents` to refresh after tool metadata changes.
@@ -5163,27 +5163,6 @@ public struct OpenAddressIntent: AppIntent {
         let result = try await MCPIntentRouter.shared.call(
             tool: "open_address",
             args: ["address": address]
-        )
-        return .result(value: result)
-    }
-}
-
-// Tool: open_url
-public struct OpenUrlIntent: AppIntent {
-    nonisolated(unsafe) public static var title: LocalizedStringResource = "Open URL"
-    nonisolated(unsafe) public static var description = IntentDescription("Open a URL in Safari's frontmost window.")
-    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
-
-    public init() {}
-
-    @Parameter(title: "URL to open")
-    public var url: String
-
-    @MainActor
-    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
-        let result = try await MCPIntentRouter.shared.call(
-            tool: "open_url",
-            args: ["url": url]
         )
         return .result(value: result)
     }

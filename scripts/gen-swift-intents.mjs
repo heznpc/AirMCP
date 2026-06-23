@@ -54,7 +54,7 @@ import {
   enumDefaultLiteral,
   wireExpr,
   isNullableUnion,
-  nonNullType,
+  nonNullSchema,
   outputTypeNameFor,
   snippetViewNameFor,
   detectSnippetShape,
@@ -548,7 +548,7 @@ const FOLLOW_UP_MAP = {
 function renderScalarRow(key, propSchema, isRequired) {
   const ident = swiftIdent(key);
   const label = humanizeKey(key);
-  const schema = isNullableUnion(propSchema) ? { ...propSchema, type: nonNullType(propSchema) } : propSchema;
+  const schema = isNullableUnion(propSchema) ? nonNullSchema(propSchema) : propSchema;
   const isOptional = isNullableUnion(propSchema) || !isRequired;
   const accessor = `data.${ident}`;
 

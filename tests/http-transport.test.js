@@ -445,6 +445,40 @@ describe('startHttpServer live middleware', () => {
     }
   });
 
+  test('discovery card never serves bare empty modules during the warmup window', async () => {
+    // The card must be internally consistent at every instant after the socket
+    // binds: either the live module list is published, or a `warming` marker is
+    // set. It must never silently advertise `modules: []` with no warming flag,
+    // which is what a registry crawler hitting the warmup window used to see.
+    const { createServer } = await import('../dist/server/mcp-setup.js');
+    createServer.mockResolvedValueOnce({
+      server: { connect: jest.fn(), close: jest.fn(), sendResourceListChanged: jest.fn() },
+      bannerInfo: { transport: 'http', version: '2.6.0', modulesEnabled: ['calendar', 'reminders'] },
+      cleanupEventListeners: jest.fn(),
+    });
+    const server = await startHttpServer(options());
+    try {
+      // Immediately after bind: modules may not be resolved yet, but if they
+      // aren't, `warming` must be true (no bare empty list).
+      const early = await (await fetch(serverUrl(server, '/.well-known/mcp.json'))).json();
+      if (!Array.isArray(early.modules) || early.modules.length === 0) {
+        expect(early.warming).toBe(true);
+      }
+      // After warmup converges: the live module list is published and the
+      // warming marker is dropped.
+      let card;
+      for (let i = 0; i < 50; i += 1) {
+        card = await (await fetch(serverUrl(server, '/.well-known/mcp.json'))).json();
+        if (!card.warming) break;
+        await new Promise((r) => setTimeout(r, 10));
+      }
+      expect(card.warming).toBeUndefined();
+      expect(card.modules).toEqual(['calendar', 'reminders']);
+    } finally {
+      await closeServer(server);
+    }
+  });
+
   test('with-token+origin rejects an unlisted Origin before MCP handling', async () => {
     process.env.AIRMCP_ALLOWED_ORIGINS = 'https://allowed.example';
     const server = await startHttpServer(options({ allowNetwork: 'with-token+origin' }));

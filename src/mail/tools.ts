@@ -76,7 +76,13 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
           }),
         ),
       },
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async ({ mailbox, account, limit, offset }) => {
       try {
@@ -121,7 +127,13 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
         mailbox: z.string(),
         account: z.string(),
       },
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async ({ id, maxLength }) => {
       try {
@@ -154,7 +166,13 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
           }),
         ),
       },
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async ({ query, mailbox, limit }) => {
       try {

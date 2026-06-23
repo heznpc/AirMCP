@@ -66,7 +66,7 @@ final class ServerManager {
     // MARK: - Server Control
 
     func startServer() {
-        guard status != .running else { return }
+        guard status != .running, status != .checking else { return }
         status = .checking
 
         Task {

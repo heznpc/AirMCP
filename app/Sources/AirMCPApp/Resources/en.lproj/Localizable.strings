@@ -202,6 +202,14 @@
 "onboarding.patched" = "Patched";
 "onboarding.failed" = "Failed";
 "onboarding.autoPatch" = "Auto-Patch";
+"onboarding.firstRunWaiting" = "AirMCP will start the app-owned runtime before finishing setup.";
+"onboarding.firstRunStarting" = "Starting the app-owned runtime and preparing a private local token...";
+"onboarding.firstRunReady" = "Ready for first run";
+"onboarding.firstRunNotReady" = "First run not ready";
+"onboarding.firstRunReadyDesc" = "Runtime v%@ is reachable. Copy the %@ prompt into your client to run the first workflow.";
+"onboarding.firstRunRuntimeFailed" = "The local runtime did not become reachable. Keep AirMCP open, then check again.";
+"onboarding.firstRunTokenFailed" = "Could not create the local runtime token: %@";
+"onboarding.firstRunCheckAgain" = "Check Again";
 
 /* Log Viewer */
 "log.title" = "Server Logs";

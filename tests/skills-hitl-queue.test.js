@@ -18,7 +18,6 @@ const {
   expirePending,
   maybeRotate,
   parseTtl,
-  MAX_ENTRIES,
 } = await import('../dist/skills/scheduler/queue.js');
 
 let tempDir;
@@ -175,35 +174,43 @@ describe('maybeRotate', () => {
   });
 
   test('archives oldest resolved when over cap', async () => {
-    const ids = [];
-    // Seed slightly above the cap with resolved entries.
-    for (let i = 0; i < MAX_ENTRIES + 5; i++) {
-      const e = await appendToQueue(
-        entry({ skill: `s-${i}`, expiresAt: new Date(Date.now() + 60_000).toISOString() }),
-        queuePath,
+    const maxEntries = 50;
+    const future = new Date(Date.now() + 60_000).toISOString();
+    const lines = [];
+    for (let i = 0; i < maxEntries + 5; i++) {
+      lines.push(
+        JSON.stringify({
+          id: `r-${i}`,
+          enqueuedAt: `2026-05-11T00:00:${String(i).padStart(2, '0')}Z`,
+          skill: `s-${i}`,
+          tool: 'delete_note',
+          args: { id: `note-${i}` },
+          reason: 'seeded for rotation',
+          expiresAt: future,
+          status: i < 10 ? 'approved' : 'pending',
+          ...(i < 10 ? { resolvedAt: '2026-05-11T01:00:00Z' } : {}),
+        }),
       );
-      ids.push(e.id);
     }
-    // Resolve a chunk older than the overflow so they're eligible for archive.
-    for (let i = 0; i < 10; i++) {
-      await resolveQueueEntry(ids[i], 'approved', queuePath);
-    }
+    await fs.writeFile(queuePath, lines.join('\n') + '\n', 'utf8');
 
-    const result = await maybeRotate(queuePath, archivePath);
+    const result = await maybeRotate(queuePath, archivePath, maxEntries);
     expect(result.archived).toBe(5);
-    expect(result.kept).toBe(MAX_ENTRIES);
+    expect(result.kept).toBe(maxEntries);
     expect(result.pendingOverflow).toBe(0);
 
     const archive = await readQueue(archivePath);
     expect(archive).toHaveLength(5);
-  }, 30_000); // bigger seed; allow extra time
+    expect(archive.map((e) => e.id)).toEqual(['r-0', 'r-1', 'r-2', 'r-3', 'r-4']);
+  });
 
   test('reports pendingOverflow when too many pending entries to archive', async () => {
     // Hand-write a queue with all-pending entries > MAX_ENTRIES via direct fs
     // to skip the slow appendToQueue loop above.
+    const maxEntries = 50;
     const lines = [];
     const future = new Date(Date.now() + 60_000).toISOString();
-    for (let i = 0; i < MAX_ENTRIES + 3; i++) {
+    for (let i = 0; i < maxEntries + 3; i++) {
       lines.push(
         JSON.stringify({
           id: `p-${i}`,
@@ -219,7 +226,7 @@ describe('maybeRotate', () => {
     }
     await fs.writeFile(queuePath, lines.join('\n') + '\n', 'utf8');
 
-    const result = await maybeRotate(queuePath, archivePath);
+    const result = await maybeRotate(queuePath, archivePath, maxEntries);
     expect(result.archived).toBe(0);
     expect(result.pendingOverflow).toBe(3);
   });

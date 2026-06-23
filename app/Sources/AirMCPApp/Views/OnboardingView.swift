@@ -161,6 +161,7 @@ private struct MCPClient: Identifiable {
 
 struct OnboardingView: View {
     let configManager: ConfigManager
+    let serverManager: ServerManager
     let onComplete: () -> Void
 
     @State private var currentStep = 0
@@ -173,6 +174,9 @@ struct OnboardingView: View {
     @State private var mcpClients: [MCPClient] = []
     @State private var patchingClient: String?
     @State private var patchResults: [String: Bool] = [:]
+    @State private var firstRunChecking = false
+    @State private var firstRunReady = false
+    @State private var firstRunMessage = L("onboarding.firstRunWaiting")
 
     private let totalSteps = 6
 
@@ -229,11 +233,12 @@ struct OnboardingView: View {
                         saveAndComplete()
                     }
                     .keyboardShortcut(.defaultAction)
+                    .disabled(!firstRunReady)
                 }
             }
             .padding(20)
         }
-        .frame(width: 520, height: 480)
+        .frame(width: 540, height: 540)
     }
 
     // MARK: - Step 1: Welcome
@@ -575,6 +580,8 @@ struct OnboardingView: View {
 
             selectedWorkflowActions
 
+            firstRunStatusCard
+
             VStack(spacing: 8) {
                 ForEach($mcpClients) { $client in
                     clientRow(client: client)
@@ -593,7 +600,10 @@ struct OnboardingView: View {
             Spacer()
         }
         .padding(.horizontal, 24)
-        .task { detectClients() }
+        .task {
+            detectClients()
+            await prepareFirstRun()
+        }
     }
 
     private var selectedWorkflowActions: some View {
@@ -634,6 +644,45 @@ struct OnboardingView: View {
         .overlay(
             RoundedRectangle(cornerRadius: 8)
                 .stroke(Color.accentColor.opacity(0.2), lineWidth: 1)
+        )
+        .padding(.horizontal, 24)
+    }
+
+    private var firstRunStatusCard: some View {
+        HStack(alignment: .top, spacing: 10) {
+            if firstRunChecking {
+                ProgressView()
+                    .controlSize(.small)
+                    .frame(width: 18, height: 18)
+            } else {
+                Image(systemName: firstRunReady ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                    .foregroundStyle(firstRunReady ? .green : .orange)
+                    .frame(width: 18)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(firstRunReady ? L("onboarding.firstRunReady") : L("onboarding.firstRunNotReady"))
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                Text(firstRunMessage)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer()
+
+            Button(L("onboarding.firstRunCheckAgain")) {
+                Task { await prepareFirstRun(force: true) }
+            }
+            .controlSize(.small)
+            .disabled(firstRunChecking)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.secondary.opacity(0.05))
         )
         .padding(.horizontal, 24)
     }
@@ -761,6 +810,56 @@ struct OnboardingView: View {
             }.value
             patchResults[client.id] = success
             patchingClient = nil
+            await prepareFirstRun(force: true)
+        }
+    }
+
+    private func prepareFirstRun(force: Bool = false) async {
+        if firstRunChecking && !force { return }
+        firstRunChecking = true
+        firstRunReady = false
+        firstRunMessage = L("onboarding.firstRunStarting")
+
+        do {
+            _ = try AppRuntimeToken.ensure()
+        } catch {
+            firstRunChecking = false
+            firstRunMessage = L("onboarding.firstRunTokenFailed", error.localizedDescription)
+            return
+        }
+
+        serverManager.autoStartEnabled = true
+        if serverManager.status != .running {
+            serverManager.startServer()
+        }
+
+        for _ in 0..<24 {
+            if let version = await Self.runtimeHealthVersion() {
+                firstRunReady = true
+                firstRunChecking = false
+                firstRunMessage = L("onboarding.firstRunReadyDesc", version, selectedWorkflow.title)
+                return
+            }
+            try? await Task.sleep(nanoseconds: 500_000_000)
+        }
+
+        firstRunChecking = false
+        firstRunMessage = L("onboarding.firstRunRuntimeFailed")
+    }
+
+    private nonisolated static func runtimeHealthVersion() async -> String? {
+        guard let url = URL(string: AirMcpConstants.appOwnedHealthURL) else { return nil }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 1.0
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard (response as? HTTPURLResponse)?.statusCode == 200,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  (json["status"] as? String) == "ok"
+            else { return nil }
+            return (json["version"] as? String) ?? "unknown"
+        } catch {
+            return nil
         }
     }
 

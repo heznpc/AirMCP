@@ -119,7 +119,7 @@ struct AirMCPApp: App {
     }
 
     private func showOnboardingWindow() {
-        let onboardingView = OnboardingView(configManager: configManager) { [serverManager] in
+        let onboardingView = OnboardingView(configManager: configManager, serverManager: serverManager) { [serverManager] in
             // Enable auto-start by default after first onboarding
             serverManager.autoStartEnabled = true
             serverManager.autoStartIfNeeded()

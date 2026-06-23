@@ -665,18 +665,26 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
   app.get("/mcp", (req, res) => handleSessionRequest(req, res, "GET"));
   app.delete("/mcp", (req, res) => handleSessionRequest(req, res, "DELETE"));
 
-  // Pre-warm module registry + shortcuts cache (avoids per-session subprocess)
-  const {
-    bannerInfo: bi,
-    server: warmupServer,
-    cleanupEventListeners: warmupCleanup,
-  } = await createServer(serverOptions);
-  warmupCleanup();
-  warmupServer.close?.();
-  // Publish the resolved enabled-module list into the .well-known
-  // card's closure so registry crawlers see what's actually loaded
-  // on this host (module enablement depends on config + OS gates).
-  enabledModuleNames = bi.modulesEnabled;
+  // Pre-warm module registry + shortcuts cache in the background. The HTTP
+  // listener must bind before this heavier module pass so app-owned runtime
+  // probes can distinguish "socket is up" from "module warmup is still busy".
+  // First real MCP sessions still create their own server instance; prewarm is
+  // only a cache/discovery optimization.
+  let bannerPrinted = false;
+  const warmupPromise = (async () => {
+    const {
+      bannerInfo: bi,
+      server: warmupServer,
+      cleanupEventListeners: warmupCleanup,
+    } = await createServer(serverOptions);
+    warmupCleanup();
+    warmupServer.close?.();
+    // Publish the resolved enabled-module list into the .well-known
+    // card's closure so registry crawlers see what's actually loaded
+    // on this host (module enablement depends on config + OS gates).
+    enabledModuleNames = bi.modulesEnabled;
+    return bi;
+  })();
   const host = bindAll ? "0.0.0.0" : "127.0.0.1";
   const httpServer = app.listen(port, host);
   await new Promise<void>((resolve, reject) => {
@@ -689,10 +697,6 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
       // exception and the whole MCP server crashes. Log and keep serving.
       httpServer.on("error", (err) => log.error("http server error (post-listen)", { err: errToCtx(err) }));
       try {
-        const address = httpServer.address();
-        bi.transport = "http";
-        bi.port = address && typeof address !== "string" ? address.port : port;
-        await printBanner(bi);
         if (bindAll)
           log.warn("bound to all interfaces", {
             host: "0.0.0.0",
@@ -705,6 +709,24 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
       }
     });
   });
+  void warmupPromise
+    .then(async (bi) => {
+      if (bannerPrinted) return;
+      bannerPrinted = true;
+      const address = httpServer.address();
+      bi.transport = "http";
+      bi.port = address && typeof address !== "string" ? address.port : port;
+      await printBanner(bi);
+    })
+    .catch((err) => {
+      log.error("HTTP prewarm failed", { err: errToCtx(err) });
+      auditLog({
+        timestamp: new Date().toISOString(),
+        tool: "__http_prewarm_failed",
+        args: { transport: "http", error: err instanceof Error ? err.message : String(err) },
+        status: "error",
+      });
+    });
 
   // Release the listening socket and per-process timers on shutdown so
   // in-flight requests are not left dangling and the port can be reused.

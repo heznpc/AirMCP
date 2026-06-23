@@ -48,16 +48,20 @@ final class UpdateManager {
     // MARK: - Update
 
     func performUpdate() {
-        guard !isUpdating else { return }
+        // Pin to the exact version resolved during the update check so the install
+        // can't be redirected to a newer/compromised `@latest` between check and
+        // install (TOCTOU). No availableVersion → nothing to install.
+        guard !isUpdating, let target = availableVersion else { return }
         isUpdating = true
         updateError = nil
 
         Task {
-            let success = await Self.runNpmInstall()
+            let success = await Self.runNpmInstall(version: target)
             if success {
                 availableVersion = nil
             } else {
-                updateError = "Update failed. Run manually: npm install -g airmcp@latest"
+                updateError =
+                    "Update failed. Run manually: npm install -g \(AirMcpConstants.npmPackageName)@\(target) --ignore-scripts"
             }
             isUpdating = false
         }
@@ -100,7 +104,7 @@ final class UpdateManager {
         }
     }
 
-    private nonisolated static func runNpmInstall() async -> Bool {
+    private nonisolated static func runNpmInstall(version: String) async -> Bool {
         await withCheckedContinuation { continuation in
             DispatchQueue.global().async {
                 guard let npmPath = NodeEnvironment.findExecutable(named: "npm") else {
@@ -110,7 +114,16 @@ final class UpdateManager {
 
                 let process = Process()
                 process.executableURL = URL(fileURLWithPath: npmPath)
-                process.arguments = ["install", "-g", "\(AirMcpConstants.npmPackageName)@latest"]
+                // Pinned exact version + `--ignore-scripts`: a notarized app must not
+                // auto-execute an unpinned `@latest`, nor run arbitrary npm lifecycle
+                // (pre/post-install) scripts at update time. airmcp ships a prebuilt
+                // `dist/` bin and declares no (pre|post)install script, so skipping
+                // lifecycle scripts is safe and does not break the global install.
+                process.arguments = [
+                    "install", "-g",
+                    "\(AirMcpConstants.npmPackageName)@\(version)",
+                    "--ignore-scripts",
+                ]
                 process.environment = NodeEnvironment.buildEnv()
                 process.standardOutput = FileHandle.nullDevice
                 process.standardError = FileHandle.nullDevice

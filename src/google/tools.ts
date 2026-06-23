@@ -466,8 +466,20 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
           .string()
           .min(1)
           .max(500)
+          // Must start alphanumeric, then only [A-Za-z0-9._]. Blocks a leading '-'
+          // (or any flag-shaped value) from being parsed as an option by the gws
+          // CLI when forwarded as a positional arg (CWE-88 argument injection).
+          .regex(
+            /^[A-Za-z0-9][A-Za-z0-9._]*$/,
+            "resource must start alphanumeric and contain only letters, digits, '.', or '_'",
+          )
           .describe("Resource (e.g. 'users.messages', 'files', 'spreadsheets.values')"),
-        method: z.string().min(1).max(64).describe("Method (e.g. 'list', 'get', 'create', 'update', 'delete')"),
+        method: z
+          .string()
+          .min(1)
+          .max(64)
+          .regex(/^[A-Za-z0-9]+$/, "method must be alphanumeric (no leading '-' / flags)")
+          .describe("Method (e.g. 'list', 'get', 'create', 'update', 'delete')"),
         params: z
           .record(z.string(), z.unknown())
           .optional()

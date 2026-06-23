@@ -136,7 +136,10 @@ let flushTimer: ReturnType<typeof setTimeout> | null = null;
 
 async function ensureDir(): Promise<void> {
   if (initialized) return;
-  await mkdir(PATHS.VECTOR_STORE, { recursive: true });
+  // 0o700: the audit dir holds audit.jsonl + audit.checkpoint. Files are already
+  // 0600, but match the sibling app-runtime-token dir's owner-only mode so other
+  // local users can't even enumerate audit filenames / rotation timestamps.
+  await mkdir(PATHS.VECTOR_STORE, { recursive: true, mode: 0o700 });
   initialized = true;
 }
 

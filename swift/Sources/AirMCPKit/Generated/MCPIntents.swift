@@ -3,20 +3,20 @@
 // Source: docs/tool-manifest.json
 // Generator: scripts/gen-swift-intents.mjs
 // RFC 0007 Phase A.2b.2 + A.4.1 — 228 auto-selected read-only
-// tools (82 with typed drift-guards + Interactive Snippet
+// tools (79 with typed drift-guards + Interactive Snippet
 // SwiftUI views) + 9 AppShortcutsProvider entries.
 // Run `npm run gen:intents` to refresh after tool metadata changes.
 // CI guards against drift via `npm run gen:intents:check`.
 //
-// Router runtime is live as of PR #103 (A.2a): macOS execFile stdio and
-// iOS in-process MCPServer.callToolText. Every generated intent's
-// `perform()` hits that router. Typed intents additionally decode the
-// router's String result through JSONDecoder.
+// Router runtime is live as of PR #103 (A.2a): macOS app-owned HTTP with
+// stdio fallback and iOS in-process MCPServer.callToolText. Every generated
+// intent's `perform()` hits that router. Typed intents additionally decode
+// the router's String result through JSONDecoder.
 //
 // Snippet views (§3.7) are SwiftUI View structs matching each typed
-// output shape. A.4.1 ships the views; A.4.2 will plug them into the
-// intents' `.result(value:, view:)` overloads. Kept in a separate
-// #if so iOS 17 builds stay green.
+// output shape and typed intents already return them through
+// `.result(value:, view:)` overloads. Kept in a separate #if so iOS 17
+// builds stay green.
 
 #if canImport(AppIntents)
 import AppIntents
@@ -84,16 +84,16 @@ public struct MCPDiscoverToolsOutput: Codable, Sendable {
 
 // Output type for: get_battery_status
 public struct MCPGetBatteryStatusOutput: Codable, Sendable {
-    public let percentage: String
+    public let percentage: Int?
     public let charging: Bool
-    public let source: String
-    public let timeRemaining: String
+    public let source: String?
+    public let timeRemaining: String?
     public let raw: String
 }
 
 // Output type for: get_brightness
 public struct MCPGetBrightnessOutput: Codable, Sendable {
-    public let brightness: String
+    public let brightness: Double?
     public let raw: String
 }
 
@@ -151,16 +151,16 @@ public struct MCPGetFrontmostAppOutput: Codable, Sendable {
 // Output type for: get_photo_info
 public struct MCPGetPhotoInfoOutput: Codable, Sendable {
     public let id: String
-    public let filename: String
-    public let name: String
-    public let description: String
-    public let date: String
+    public let filename: String?
+    public let name: String?
+    public let description: String?
+    public let date: String?
     public let width: Double
     public let height: Double
-    public let altitude: String
-    public let location: String
+    public let altitude: Double?
+    public let location: [Double]?
     public let favorite: Bool
-    public let keywords: String
+    public let keywords: [String]?
 }
 
 // Output type for: get_rating
@@ -176,9 +176,9 @@ public struct MCPGetRatingOutput: Codable, Sendable {
 public struct MCPGetScreenInfoOutput: Codable, Sendable {
     public struct DisplaysItem: Codable, Sendable {
         public let name: String
-        public let resolution: String
-        public let pixelWidth: String
-        public let pixelHeight: String
+        public let resolution: String?
+        public let pixelWidth: Int?
+        public let pixelHeight: Int?
         public let retina: Bool
     }
 
@@ -207,7 +207,7 @@ public struct MCPGetTrackInfoOutput: Codable, Sendable {
     public let rating: Int
     public let favorited: Bool
     public let disliked: Bool
-    public let dateAdded: String
+    public let dateAdded: String?
     public let sampleRate: Int
     public let bitRate: Int
     public let size: Double
@@ -251,11 +251,11 @@ public struct MCPGetVolumeOutput: Codable, Sendable {
 
 // Output type for: get_wifi_status
 public struct MCPGetWifiStatusOutput: Codable, Sendable {
-    public let ssid: String
-    public let bssid: String
-    public let signalStrength: String
-    public let noiseLevel: String
-    public let channel: String
+    public let ssid: String?
+    public let bssid: String?
+    public let signalStrength: Int?
+    public let noiseLevel: Int?
+    public let channel: String?
     public let connected: Bool
     public let raw: String
 }
@@ -264,16 +264,16 @@ public struct MCPGetWifiStatusOutput: Codable, Sendable {
 public struct MCPIsAppRunningOutput: Codable, Sendable {
     public let running: Bool
     public let name: String
-    public let bundleIdentifier: String
-    public let pid: String
-    public let visible: String
+    public let bundleIdentifier: String?
+    public let pid: Int?
+    public let visible: Bool?
 }
 
 // Output type for: list_accounts
 public struct MCPListAccountsOutput: Codable, Sendable {
     public struct AccountsItem: Codable, Sendable {
         public let name: String
-        public let fullName: String
+        public let fullName: String?
         public let emailAddresses: [String]
     }
 
@@ -286,8 +286,8 @@ public struct MCPListAllWindowsOutput: Codable, Sendable {
         public let app: String
         public let pid: Int
         public let title: String
-        public let position: String
-        public let size: String
+        public let position: [Double]?
+        public let size: [Double]?
         public let minimized: Bool
     }
 
@@ -300,8 +300,8 @@ public struct MCPListBluetoothDevicesOutput: Codable, Sendable {
     public struct DevicesItem: Codable, Sendable {
         public let name: String
         public let connected: Bool
-        public let address: String
-        public let type: String
+        public let address: String?
+        public let type: String?
     }
 
     public let total: Int
@@ -325,7 +325,7 @@ public struct MCPListCalendarsOutput: Codable, Sendable {
     public struct CalendarsItem: Codable, Sendable {
         public let id: String
         public let name: String
-        public let color: String
+        public let color: String?
         public let writable: Bool
     }
 
@@ -336,14 +336,14 @@ public struct MCPListCalendarsOutput: Codable, Sendable {
 public struct MCPListChatsOutput: Codable, Sendable {
     public struct ChatsItem: Codable, Sendable {
         public struct ParticipantsItem: Codable, Sendable {
-            public let name: String
-            public let handle: String
+            public let name: String?
+            public let handle: String?
         }
 
         public let id: String
-        public let name: String
+        public let name: String?
         public let participants: [ParticipantsItem]
-        public let updated: String
+        public let updated: String?
     }
 
     public let total: Double
@@ -356,8 +356,8 @@ public struct MCPListContactsOutput: Codable, Sendable {
     public struct ContactsItem: Codable, Sendable {
         public let id: String
         public let name: String
-        public let email: String
-        public let phone: String
+        public let email: String?
+        public let phone: String?
     }
 
     public let total: Double
@@ -401,9 +401,9 @@ public struct MCPListEventsOutput: Codable, Sendable {
 public struct MCPListFavoritesOutput: Codable, Sendable {
     public struct PhotosItem: Codable, Sendable {
         public let id: String
-        public let filename: String
-        public let name: String
-        public let date: String
+        public let filename: String?
+        public let name: String?
+        public let date: String?
         public let width: Double
         public let height: Double
         public let favorite: Bool
@@ -432,8 +432,8 @@ public struct MCPListGroupMembersOutput: Codable, Sendable {
     public struct ContactsItem: Codable, Sendable {
         public let id: String
         public let name: String
-        public let email: String
-        public let phone: String
+        public let email: String?
+        public let phone: String?
     }
 
     public let group: String
@@ -469,7 +469,7 @@ public struct MCPListMessagesOutput: Codable, Sendable {
         public let id: String
         public let subject: String
         public let sender: String
-        public let dateReceived: String
+        public let dateReceived: String?
         public let read: Bool
         public let flagged: Bool
     }
@@ -500,12 +500,12 @@ public struct MCPListNotesOutput: Codable, Sendable {
 // Output type for: list_participants
 public struct MCPListParticipantsOutput: Codable, Sendable {
     public struct ParticipantsItem: Codable, Sendable {
-        public let name: String
-        public let handle: String
+        public let name: String?
+        public let handle: String?
     }
 
     public let chatId: String
-    public let chatName: String
+    public let chatName: String?
     public let participants: [ParticipantsItem]
 }
 
@@ -513,9 +513,9 @@ public struct MCPListParticipantsOutput: Codable, Sendable {
 public struct MCPListPhotosOutput: Codable, Sendable {
     public struct PhotosItem: Codable, Sendable {
         public let id: String
-        public let filename: String
-        public let name: String
-        public let date: String
+        public let filename: String?
+        public let name: String?
+        public let date: String?
         public let width: Double
         public let height: Double
         public let favorite: Bool
@@ -567,7 +567,7 @@ public struct MCPListRemindersOutput: Codable, Sendable {
         public let id: String
         public let name: String
         public let completed: Bool
-        public let dueDate: String
+        public let dueDate: String?
         public let priority: Double
         public let flagged: Bool
         public let list: String
@@ -615,12 +615,12 @@ public struct MCPListTracksOutput: Codable, Sendable {
     public struct TracksItem: Codable, Sendable {
         public let id: String
         public let name: String
-        public let artist: String
-        public let album: String
-        public let duration: String
-        public let trackNumber: String
-        public let genre: String
-        public let year: String
+        public let artist: String?
+        public let album: String?
+        public let duration: Double?
+        public let trackNumber: Double?
+        public let genre: String?
+        public let year: Double?
     }
 
     public let total: Double
@@ -681,30 +681,23 @@ public struct MCPMemoryStatsOutput: Codable, Sendable {
 
 // Output type for: now_playing
 public struct MCPNowPlayingOutput: Codable, Sendable {
+    public struct Track: Codable, Sendable {
+        public let name: String
+        public let artist: String
+        public let album: String
+        public let duration: Double
+        public let playerPosition: Double
+    }
+
     public let playerState: String
-    public let track: String
-}
-
-// Output type for: numbers_get_cell
-public struct MCPNumbersGetCellOutput: Codable, Sendable {
-    public let address: String
-    public let value: String
-    public let formattedValue: String
-}
-
-// Output type for: numbers_get_formula
-public struct MCPNumbersGetFormulaOutput: Codable, Sendable {
-    public let address: String
-    public let formula: String
-    public let value: String
-    public let formattedValue: String
+    public let track: Track?
 }
 
 // Output type for: numbers_list_documents
 public struct MCPNumbersListDocumentsOutput: Codable, Sendable {
     public struct DocumentsItem: Codable, Sendable {
         public let name: String
-        public let path: String
+        public let path: String?
         public let modified: Bool
     }
 
@@ -732,15 +725,6 @@ public struct MCPNumbersListTablesOutput: Codable, Sendable {
     public let tables: [TablesItem]
 }
 
-// Output type for: numbers_read_cells
-public struct MCPNumbersReadCellsOutput: Codable, Sendable {
-    public let rows: [[String]]
-    public let startRow: Int
-    public let startCol: Int
-    public let endRow: Int
-    public let endCol: Int
-}
-
 // Output type for: proactive_context
 public struct MCPProactiveContextOutput: Codable, Sendable {
     public struct Timecontext: Codable, Sendable {
@@ -761,14 +745,14 @@ public struct MCPProactiveContextOutput: Codable, Sendable {
 // Output type for: read_chat
 public struct MCPReadChatOutput: Codable, Sendable {
     public struct ParticipantsItem: Codable, Sendable {
-        public let name: String
-        public let handle: String
+        public let name: String?
+        public let handle: String?
     }
 
     public let id: String
-    public let name: String
+    public let name: String?
     public let participants: [ParticipantsItem]
-    public let updated: String
+    public let updated: String?
 }
 
 // Output type for: read_contact
@@ -794,10 +778,10 @@ public struct MCPReadContactOutput: Codable, Sendable {
     public let name: String
     public let firstName: String
     public let lastName: String
-    public let organization: String
-    public let jobTitle: String
-    public let department: String
-    public let note: String
+    public let organization: String?
+    public let jobTitle: String?
+    public let department: String?
+    public let note: String?
     public let emails: [EmailsItem]
     public let phones: [PhonesItem]
     public let addresses: [AddressesItem]
@@ -806,20 +790,20 @@ public struct MCPReadContactOutput: Codable, Sendable {
 // Output type for: read_event
 public struct MCPReadEventOutput: Codable, Sendable {
     public struct AttendeesItem: Codable, Sendable {
-        public let name: String
-        public let email: String
-        public let status: String
+        public let name: String?
+        public let email: String?
+        public let status: String?
     }
 
     public let id: String
     public let summary: String
-    public let description: String
-    public let location: String
+    public let description: String?
+    public let location: String?
     public let startDate: String
     public let endDate: String
     public let allDay: Bool
-    public let recurrence: String
-    public let url: String
+    public let recurrence: String?
+    public let url: String?
     public let calendar: String
     public let attendees: [AttendeesItem]
 }
@@ -827,12 +811,12 @@ public struct MCPReadEventOutput: Codable, Sendable {
 // Output type for: read_message
 public struct MCPReadMessageOutput: Codable, Sendable {
     public struct ToItem: Codable, Sendable {
-        public let name: String
-        public let address: String
+        public let name: String?
+        public let address: String?
     }
     public struct CcItem: Codable, Sendable {
-        public let name: String
-        public let address: String
+        public let name: String?
+        public let address: String?
     }
 
     public let id: String
@@ -841,7 +825,7 @@ public struct MCPReadMessageOutput: Codable, Sendable {
     public let to: [ToItem]
     public let cc: [CcItem]
     public let dateReceived: String
-    public let dateSent: String
+    public let dateSent: String?
     public let read: Bool
     public let flagged: Bool
     public let content: String
@@ -876,10 +860,10 @@ public struct MCPReadReminderOutput: Codable, Sendable {
     public let name: String
     public let body: String
     public let completed: Bool
-    public let completionDate: String
+    public let completionDate: String?
     public let creationDate: String
     public let modificationDate: String
-    public let dueDate: String
+    public let dueDate: String?
     public let priority: Double
     public let flagged: Bool
     public let list: String
@@ -919,14 +903,14 @@ public struct MCPScanNotesOutput: Codable, Sendable {
 public struct MCPSearchChatsOutput: Codable, Sendable {
     public struct ChatsItem: Codable, Sendable {
         public struct ParticipantsItem: Codable, Sendable {
-            public let name: String
-            public let handle: String
+            public let name: String?
+            public let handle: String?
         }
 
         public let id: String
-        public let name: String
+        public let name: String?
         public let participants: [ParticipantsItem]
-        public let updated: String
+        public let updated: String?
     }
 
     public let total: Double
@@ -939,9 +923,9 @@ public struct MCPSearchContactsOutput: Codable, Sendable {
     public struct ContactsItem: Codable, Sendable {
         public let id: String
         public let name: String
-        public let organization: String
-        public let email: String
-        public let phone: String
+        public let organization: String?
+        public let email: String?
+        public let phone: String?
         public let matchedField: String
     }
 
@@ -984,7 +968,7 @@ public struct MCPSearchMessagesOutput: Codable, Sendable {
         public let id: String
         public let subject: String
         public let sender: String
-        public let dateReceived: String
+        public let dateReceived: String?
         public let read: Bool
     }
 
@@ -1013,11 +997,11 @@ public struct MCPSearchNotesOutput: Codable, Sendable {
 public struct MCPSearchPhotosOutput: Codable, Sendable {
     public struct PhotosItem: Codable, Sendable {
         public let id: String
-        public let filename: String
-        public let name: String
-        public let date: String
+        public let filename: String?
+        public let name: String?
+        public let date: String?
         public let favorite: Bool
-        public let description: String
+        public let description: String?
     }
 
     public let total: Double
@@ -1030,7 +1014,7 @@ public struct MCPSearchRemindersOutput: Codable, Sendable {
         public let id: String
         public let name: String
         public let completed: Bool
-        public let dueDate: String
+        public let dueDate: String?
         public let priority: Double
         public let flagged: Bool
         public let list: String
@@ -5048,16 +5032,6 @@ public struct NumbersGetCellIntent: AppIntent {
             tool: "numbers_get_cell",
             args: ["document": document, "sheet": sheet, "cell": cell]
         )
-        guard let data = result.data(using: .utf8) else {
-            throw MCPIntentError.toolCallFailed(tool: "numbers_get_cell", message: "empty result from router")
-        }
-        let decoded = try JSONDecoder().decode(MCPNumbersGetCellOutput.self, from: data)
-        #if canImport(SwiftUI) && compiler(>=6.3)
-        if #available(macOS 26, iOS 26, *) {
-            return .result(value: result, view: MCPNumbersGetCellSnippetView(data: decoded))
-        }
-        #endif
-        _ = decoded
         return .result(value: result)
     }
 }
@@ -5085,16 +5059,6 @@ public struct NumbersGetFormulaIntent: AppIntent {
             tool: "numbers_get_formula",
             args: ["document": document, "sheet": sheet, "cell": cell]
         )
-        guard let data = result.data(using: .utf8) else {
-            throw MCPIntentError.toolCallFailed(tool: "numbers_get_formula", message: "empty result from router")
-        }
-        let decoded = try JSONDecoder().decode(MCPNumbersGetFormulaOutput.self, from: data)
-        #if canImport(SwiftUI) && compiler(>=6.3)
-        if #available(macOS 26, iOS 26, *) {
-            return .result(value: result, view: MCPNumbersGetFormulaSnippetView(data: decoded))
-        }
-        #endif
-        _ = decoded
         return .result(value: result)
     }
 }
@@ -5224,16 +5188,6 @@ public struct NumbersReadCellsIntent: AppIntent {
             tool: "numbers_read_cells",
             args: ["document": document, "sheet": sheet, "startRow": startRow, "startCol": startCol, "endRow": endRow, "endCol": endCol]
         )
-        guard let data = result.data(using: .utf8) else {
-            throw MCPIntentError.toolCallFailed(tool: "numbers_read_cells", message: "empty result from router")
-        }
-        let decoded = try JSONDecoder().decode(MCPNumbersReadCellsOutput.self, from: data)
-        #if canImport(SwiftUI) && compiler(>=6.3)
-        if #available(macOS 26, iOS 26, *) {
-            return .result(value: result, view: MCPNumbersReadCellsSnippetView(data: decoded))
-        }
-        #endif
-        _ = decoded
         return .result(value: result)
     }
 }
@@ -9306,79 +9260,6 @@ public struct MCPNowPlayingSnippetView: View {
     }
 }
 
-// Snippet view for: numbers_get_cell  (shape: scalar)
-@available(macOS 26, iOS 26, *)
-public struct MCPNumbersGetCellSnippetView: View {
-    public let data: MCPNumbersGetCellOutput
-    public init(data: MCPNumbersGetCellOutput) { self.data = data }
-    public var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack {
-                Text("Address")
-                Spacer()
-                Text(data.address)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-            }
-            HStack {
-                Text("Value")
-                Spacer()
-                Text(String(describing: data.value))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-            }
-            HStack {
-                Text("Formatted Value")
-                Spacer()
-                Text(String(describing: data.formattedValue))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-            }
-        }
-        .padding()
-    }
-}
-
-// Snippet view for: numbers_get_formula  (shape: scalar)
-@available(macOS 26, iOS 26, *)
-public struct MCPNumbersGetFormulaSnippetView: View {
-    public let data: MCPNumbersGetFormulaOutput
-    public init(data: MCPNumbersGetFormulaOutput) { self.data = data }
-    public var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack {
-                Text("Address")
-                Spacer()
-                Text(data.address)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-            }
-            HStack {
-                Text("Formula")
-                Spacer()
-                Text(String(describing: data.formula))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-            }
-            HStack {
-                Text("Value")
-                Spacer()
-                Text(String(describing: data.value))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-            }
-            HStack {
-                Text("Formatted Value")
-                Spacer()
-                Text(String(describing: data.formattedValue))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-            }
-        }
-        .padding()
-    }
-}
-
 // Snippet view for: numbers_list_documents  (shape: list-object)
 @available(macOS 26, iOS 26, *)
 public struct MCPNumbersListDocumentsSnippetView: View {
@@ -9424,53 +9305,6 @@ public struct MCPNumbersListTablesSnippetView: View {
                 Text(row.name)
                     .font(.body)
                     .lineLimit(1)
-            }
-        }
-        .padding()
-    }
-}
-
-// Snippet view for: numbers_read_cells  (shape: scalar)
-@available(macOS 26, iOS 26, *)
-public struct MCPNumbersReadCellsSnippetView: View {
-    public let data: MCPNumbersReadCellsOutput
-    public init(data: MCPNumbersReadCellsOutput) { self.data = data }
-    public var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack {
-                Text("Rows")
-                Spacer()
-                Text(String(describing: data.rows))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-            }
-            HStack {
-                Text("Start Row")
-                Spacer()
-                Text(data.startRow.formatted())
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-            }
-            HStack {
-                Text("Start Col")
-                Spacer()
-                Text(data.startCol.formatted())
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-            }
-            HStack {
-                Text("End Row")
-                Spacer()
-                Text(data.endRow.formatted())
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-            }
-            HStack {
-                Text("End Col")
-                Spacer()
-                Text(data.endCol.formatted())
-                    .lineLimit(1)
-                    .truncationMode(.tail)
             }
         }
         .padding()

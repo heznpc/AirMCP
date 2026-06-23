@@ -116,6 +116,25 @@ async function request(child, reader, id, method, params = {}) {
   return reader.read((message) => message.id === id);
 }
 
+function parseStreamableHttpJson(body) {
+  try {
+    return JSON.parse(body);
+  } catch {
+    // Streamable HTTP commonly returns `text/event-stream` for JSON-RPC
+    // responses. AppIntents.swift has a tiny parser for this exact shape;
+    // keep the runtime contract behavioral here so a server transport
+    // change fails before Shortcuts/Siri does.
+    for (const line of body.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("data:")) continue;
+      const payload = trimmed.slice("data:".length).trim();
+      if (!payload || payload === "[DONE]") continue;
+      return JSON.parse(payload);
+    }
+    throw new Error(`no JSON payload in Streamable HTTP response: ${body.slice(0, 200)}`);
+  }
+}
+
 afterEach(async () => {
   for (const child of children.splice(0)) {
     if (child.exitCode === null) child.kill();
@@ -144,6 +163,65 @@ describe("airmcp connect", () => {
     expect(probe.serverName).toBe("airmcp");
     expect(probe.toolCount).toBeGreaterThan(100);
     expect(probe.sampleTools.length).toBeGreaterThan(0);
+  }, 30_000);
+
+  test("manual Streamable HTTP sequence used by AppIntents returns session + SSE tool result", async () => {
+    const port = await getFreePort();
+    const token = "test-runtime-token";
+    const server = spawnAirMcp(["--http", "--port", String(port)], {
+      AIRMCP_ALLOW_NETWORK: "with-token",
+      AIRMCP_HTTP_TOKEN: token,
+    });
+    await waitForHealth(port, server);
+
+    const url = `http://127.0.0.1:${port}/mcp`;
+    const headers = {
+      "Content-Type": "application/json",
+      Accept: "application/json, text/event-stream",
+      Authorization: `Bearer ${token}`,
+    };
+    const initialized = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: {
+          protocolVersion: "2025-03-26",
+          capabilities: {},
+          clientInfo: { name: "airmcp-appintent-http-test", version: "0" },
+        },
+      }),
+    });
+    const sessionId = initialized.headers.get("mcp-session-id");
+    expect(initialized.status).toBe(200);
+    expect(sessionId).toBeTruthy();
+    expect(parseStreamableHttpJson(await initialized.text()).result.serverInfo.name).toBe("airmcp");
+
+    const sessionHeaders = { ...headers, "Mcp-Session-Id": sessionId };
+    const notification = await fetch(url, {
+      method: "POST",
+      headers: sessionHeaders,
+      body: JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized", params: {} }),
+    });
+    expect(notification.status).toBe(202);
+    expect(await notification.text()).toBe("");
+
+    const called = await fetch(url, {
+      method: "POST",
+      headers: sessionHeaders,
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 2,
+        method: "tools/call",
+        params: { name: "discover_tools", arguments: { query: "calendar", limit: 1 } },
+      }),
+    });
+    expect(called.status).toBe(200);
+    const result = parseStreamableHttpJson(await called.text()).result;
+    expect(result.content[0].type).toBe("text");
+    expect(result.content[0].text).toContain("calendar");
   }, 30_000);
 
   test("bridges a stdio client to the token-gated app-owned HTTP runtime", async () => {

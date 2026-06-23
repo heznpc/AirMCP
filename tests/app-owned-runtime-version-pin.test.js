@@ -29,6 +29,23 @@ describe("app-owned runtime npm package pin", () => {
     expect(onboarding).toContain("AirMcpConstants.npmPackageSpecifier");
   });
 
+  test("AppIntents prefer the token-gated app-owned HTTP runtime before stdio fallback", () => {
+    expect(appIntents).toContain("runAirMCPToolViaAppRuntime");
+    expect(appIntents).toContain("runAirMCPToolViaStdio");
+    expect(appIntents).toContain("return try await runAirMCPToolViaAppRuntime(toolName, args: args)");
+    expect(appIntents).toContain("return try await runAirMCPToolViaStdio(toolName, args: args)");
+    expect(appIntents).toContain("AppRuntimeToken.ensure()");
+    expect(appIntents).toContain("AirMcpConstants.appOwnedHttpURL");
+    expect(appIntents).toContain('request.setValue("Bearer \\(token)", forHTTPHeaderField: "Authorization")');
+    expect(appIntents).toContain('request.setValue(sessionID, forHTTPHeaderField: "Mcp-Session-Id")');
+    expect(appIntents).toContain('"application/json, text/event-stream"');
+    expect(appIntents).toContain('trimmed.hasPrefix("data:")');
+    expect(appIntents).toContain("allowsEmptyResponse: true");
+    expect(appIntents).toContain("case toolCallUncertain(Error)");
+    expect(appIntents).toContain("case .toolCallUncertain = transportError");
+    expect(appIntents).toContain("timeoutInterval: 30");
+  });
+
   test("TypeScript app-owned proxy helper uses the same pinned package specifier", () => {
     expect(config).toContain(`process.env.AIRMCP_NPM_PACKAGE_SPECIFIER || "${expectedSpecifier}"`);
   });

@@ -204,18 +204,44 @@ export function wireExpr(type, varName, isEnum, isEntity = false, opts = {}) {
   return type === "Date" ? `ISO8601DateFormatter().string(from: ${varName})` : varName;
 }
 
-// JSON Schema supports nullable via `type: ["string", "null"]` — we
-// treat anything matching that shape as optional. Alternate null
-// encodings (anyOf, oneOf) need explicit support if they ever appear
-// in the manifest.
+// JSON Schema supports nullable via either `type: ["string", "null"]`
+// or the draft-07 `anyOf: [{ type: "string" }, { type: "null" }]`
+// shape emitted by zod-to-json-schema. Both appear in the tool
+// manifest, so the AppIntent output bridge must unwrap both forms
+// before choosing a Swift Codable type.
 export function isNullableUnion(schema) {
-  if (!schema || !Array.isArray(schema.type)) return false;
-  return schema.type.length === 2 && schema.type.includes("null");
+  return nonNullSchema(schema) !== null;
 }
 
 export function nonNullType(schema) {
   if (!schema || !Array.isArray(schema.type)) return null;
   return schema.type.find((t) => t !== "null");
+}
+
+export function nonNullSchema(schema) {
+  if (!schema || typeof schema !== "object") return null;
+  if (Array.isArray(schema.type) && schema.type.length === 2 && schema.type.includes("null")) {
+    const inner = nonNullType(schema);
+    return inner ? { ...schema, type: inner } : null;
+  }
+  if (Array.isArray(schema.anyOf) && schema.anyOf.length === 2) {
+    const nonNullMembers = schema.anyOf.filter((member) => member?.type !== "null");
+    if (nonNullMembers.length === 1) return nonNullMembers[0];
+  }
+  return null;
+}
+
+function arrayItemSchema(schema) {
+  const items = schema?.items;
+  if (!Array.isArray(items)) return items ?? {};
+  if (items.length === 0) return {};
+  const types = items.map((item) => item?.type);
+  if (types.every((type) => type === "number" || type === "integer")) {
+    return types.includes("number") ? { type: "number" } : { type: "integer" };
+  }
+  if (types.every((type) => type === "string")) return { type: "string" };
+  if (types.every((type) => type === "boolean")) return { type: "boolean" };
+  return {};
 }
 
 // ── Naming helpers for generated Swift types ───────────────────────────
@@ -315,6 +341,9 @@ export function systemImageFor(toolName) {
 // anywhere in the tree.
 export function isCodableSafe(schema) {
   if (!schema || typeof schema !== "object") return true;
+  if (isNullableUnion(schema)) return isCodableSafe(nonNullSchema(schema));
+  if (Array.isArray(schema.anyOf)) return false;
+  if (!("type" in schema)) return false;
   if (schema.type === "object") {
     if (schema.additionalProperties === true) return false;
     if (
@@ -329,7 +358,7 @@ export function isCodableSafe(schema) {
     }
     return true;
   }
-  if (schema.type === "array") return isCodableSafe(schema.items);
+  if (schema.type === "array") return isCodableSafe(arrayItemSchema(schema));
   return true;
 }
 
@@ -340,15 +369,14 @@ export function isCodableSafe(schema) {
 // node — used to name nested structs deterministically.
 export function swiftOutputType(schema, path, nested) {
   if (isNullableUnion(schema)) {
-    const inner = nonNullType(schema);
-    return swiftOutputType({ ...schema, type: inner }, path, nested) + "?";
+    return swiftOutputType(nonNullSchema(schema), path, nested) + "?";
   }
   if (schema.type === "string") return "String";
   if (schema.type === "number") return "Double";
   if (schema.type === "integer") return "Int";
   if (schema.type === "boolean") return "Bool";
   if (schema.type === "array") {
-    const itemSchema = schema.items ?? {};
+    const itemSchema = arrayItemSchema(schema);
     const itemName = `${path}Item`;
     const itemType = swiftOutputType(itemSchema, itemName, nested);
     return `[${itemType}]`;

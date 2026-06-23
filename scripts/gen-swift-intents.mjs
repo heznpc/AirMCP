@@ -260,17 +260,17 @@ for (const name of APP_SHORTCUTS_TOP) {
 //
 // Limits (A.2b.2 scope):
 //   • Supports type: string / number / integer / boolean
-//   • Nullable union {type: [X, "null"]} → Optional<SwiftX>
-//   • array → [Element] (with Element recursively mapped)
+//   • Nullable union {type: [X, "null"]} or {anyOf: [X, null]} → Optional<SwiftX>
+//   • array → [Element] (with Element recursively mapped; homogeneous tuple
+//     arrays like items: [{number}, {number}] become [Double])
 //   • nested object → nested Swift struct (e.g. ListCalendarsOutput.CalendarsItem)
-//   • additionalProperties: true OR {} → the tool is flagged not-codable-safe
-//     and falls back to ReturnsValue<String>. Exactly one tool today
-//     (audit_log, because of the free-form 'args' field).
+//   • additionalProperties: true OR {} and unconstrained schema nodes ({}) →
+//     the tool is flagged not-codable-safe and falls back to ReturnsValue<String>.
 //
 // Everything else (oneOf, allOf, recursive refs) would require AnyCodable
 // or more elaborate machinery — out of A.2b.2 scope.
 
-// isNullableUnion, nonNullType, isCodableSafe, swiftOutputType,
+// isNullableUnion, nonNullType, nonNullSchema, isCodableSafe, swiftOutputType,
 // renderStruct, hasTypedOutput, outputTypeNameFor, buildConfirmDialogBody
 // all imported from scripts/lib/codegen-helpers.mjs. The dialog-body
 // helper lives in lib so the test suite can import it without
@@ -732,15 +732,15 @@ const header = `// GENERATED — do not edit.
 // Run \`npm run gen:intents\` to refresh after tool metadata changes.
 // CI guards against drift via \`npm run gen:intents:check\`.
 //
-// Router runtime is live as of PR #103 (A.2a): macOS execFile stdio and
-// iOS in-process MCPServer.callToolText. Every generated intent's
-// \`perform()\` hits that router. Typed intents additionally decode the
-// router's String result through JSONDecoder.
+// Router runtime is live as of PR #103 (A.2a): macOS app-owned HTTP with
+// stdio fallback and iOS in-process MCPServer.callToolText. Every generated
+// intent's \`perform()\` hits that router. Typed intents additionally decode
+// the router's String result through JSONDecoder.
 //
 // Snippet views (§3.7) are SwiftUI View structs matching each typed
-// output shape. A.4.1 ships the views; A.4.2 will plug them into the
-// intents' \`.result(value:, view:)\` overloads. Kept in a separate
-// #if so iOS 17 builds stay green.
+// output shape and typed intents already return them through
+// \`.result(value:, view:)\` overloads. Kept in a separate #if so iOS 17
+// builds stay green.
 
 #if canImport(AppIntents)
 import AppIntents

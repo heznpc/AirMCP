@@ -24,9 +24,12 @@ export function escAS(str: string): string {
     .replace(/"/g, '\\"')
     .replace(/\n/g, "\\n")
     .replace(/\r/g, "\\r")
-    .replace(/\t/g, "\\t")
-    .replace(/\u2028/g, "\\u2028")
-    .replace(/\u2029/g, "\\u2029");
+    .replace(/\t/g, "\\t");
+  // U+2028/U+2029 are intentionally NOT escaped for AppleScript. Unlike JS/JXA,
+  // AppleScript has no `\u` escape, so emitting "\u2028" produces an un-parseable
+  // token (osascript compile error -2741) and the send silently fails. Raw LS/PS
+  // are ordinary characters inside an AppleScript double-quoted literal \u2014 they do
+  // not terminate the string \u2014 so they pass through safely.
 }
 
 /** Escape a string for safe interpolation inside shell double-quoted arguments via doShellScript. */

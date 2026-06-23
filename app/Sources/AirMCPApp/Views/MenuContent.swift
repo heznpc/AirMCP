@@ -100,7 +100,7 @@ private let featuredWorkflows: [WorkflowInfo] = [
         safetyKey: "workflow.dailyBriefing.safety",
         siriKey: "workflow.dailyBriefing.siri",
         icon: "sun.max",
-        tools: ["summarize_context", "timeline_today", "today_events", "list_reminders", "get_unread_count"]
+        tools: ["skill_daily-briefing", "summarize_context", "today_events", "list_reminders", "get_unread_count", "list_notes"]
     ),
     WorkflowInfo(
         id: "inbox-triage",

@@ -1,5 +1,5 @@
 import { describe, test, expect, jest, beforeEach, afterEach } from "@jest/globals";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 const mockBuildSnapshot = jest.fn();
 jest.unstable_mockModule("../dist/shared/resources.js", () => ({
@@ -174,6 +174,38 @@ describe("cli workflows command", () => {
       expect(onboarding).toContain(`promptKey: "workflow.${camelId}.prompt"`);
       for (const moduleName of workflow.requiredModules) {
         expect(onboarding).toContain(`"${moduleName}"`);
+      }
+    }
+  });
+
+  test("keeps menubar workflow tools aligned with the CLI catalog", () => {
+    const menu = readFileSync(
+      new URL("../app/Sources/AirMCPApp/Views/MenuContent.swift", import.meta.url),
+      "utf8",
+    );
+
+    function menuToolsFor(id) {
+      const match = menu.match(new RegExp(`WorkflowInfo\\(\\s*id: "${id}"[\\s\\S]*?tools: \\[([^\\]]*)\\]`));
+      expect(match).not.toBeNull();
+      return [...match[1].matchAll(/"([^"]+)"/g)].map((tool) => tool[1]);
+    }
+
+    for (const workflow of WORKFLOWS) {
+      expect(menuToolsFor(workflow.id)).toEqual(workflow.tools);
+    }
+  });
+
+  test("built-in workflow catalog entries point at checked-in skill definitions", () => {
+    const builtinsDir = new URL("../src/skills/builtins/", import.meta.url);
+
+    for (const workflow of WORKFLOWS) {
+      const skillTools = workflow.tools.filter((tool) => tool.startsWith("skill_"));
+      if (workflow.implementation === "built-in-skill") {
+        expect(skillTools.length).toBeGreaterThan(0);
+      }
+      for (const tool of skillTools) {
+        const skillId = tool.replace(/^skill_/, "");
+        expect(existsSync(new URL(`${skillId}.yaml`, builtinsDir))).toBe(true);
       }
     }
   });

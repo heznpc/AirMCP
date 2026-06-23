@@ -113,6 +113,8 @@ Breaking을 포함한 minor/patch는 **금지**. 직전 메이저에 묶어 둘 
 - [ ] 공증 실패 시 Actions 로그의 `notarytool log` 출력에서 거부 사유 확인 (hardened runtime / timestamp / 빠진 entitlement 등)
 - [ ] 신호용 검증: `codesign -dv --verbose=4 AirMCP.app` 에서 `Authority=Developer ID Application: …` 확인
 - [ ] Gatekeeper 검증: `spctl -a -vvv AirMCP.app` → `accepted, source=Notarized Developer ID`
+- [ ] 배포 artifact 검증: `APP_BUNDLE_PATH=/path/to/AirMCP.app npm run app:verify:signed`
+  - 기존 번들을 다시 빌드하지 않고 Developer ID 서명, Gatekeeper, staple, app-owned runtime, 토큰 인증, AppIntents 런타임 로그를 한 번에 확인
 
 ### 3.5 GitHub Release notes
 - [ ] Release notes는 CHANGELOG 섹션 복사 (요약 강조, 이미지/GIF는 README 링크)

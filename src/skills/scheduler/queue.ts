@@ -154,13 +154,17 @@ export async function expirePending(filePath: string = DEFAULT_QUEUE_PATH, now: 
 export async function maybeRotate(
   filePath: string = DEFAULT_QUEUE_PATH,
   archivePath: string = DEFAULT_ARCHIVE_PATH,
+  maxEntries: number = MAX_ENTRIES,
 ): Promise<{ archived: number; kept: number; pendingOverflow: number }> {
+  if (!Number.isInteger(maxEntries) || maxEntries < 1) {
+    throw new Error(`maxEntries must be a positive integer, got ${maxEntries}`);
+  }
   const entries = await readQueue(filePath);
-  if (entries.length <= MAX_ENTRIES) {
+  if (entries.length <= maxEntries) {
     return { archived: 0, kept: entries.length, pendingOverflow: 0 };
   }
 
-  const overage = entries.length - MAX_ENTRIES;
+  const overage = entries.length - maxEntries;
   const candidates = entries.filter((e) => e.status !== "pending");
   const pendingCount = entries.length - candidates.length;
 
@@ -169,7 +173,7 @@ export async function maybeRotate(
   const toArchive = candidates.slice(0, Math.min(overage, candidates.length));
 
   if (toArchive.length === 0) {
-    return { archived: 0, kept: entries.length, pendingOverflow: pendingCount - MAX_ENTRIES };
+    return { archived: 0, kept: entries.length, pendingOverflow: Math.max(0, pendingCount - maxEntries) };
   }
 
   // Append to archive (idempotent if archived twice — archive is append-only).
@@ -183,7 +187,7 @@ export async function maybeRotate(
   return {
     archived: toArchive.length,
     kept: kept.length,
-    pendingOverflow: Math.max(0, pendingCount - MAX_ENTRIES),
+    pendingOverflow: Math.max(0, pendingCount - maxEntries),
   };
 }
 

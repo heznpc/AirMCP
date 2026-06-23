@@ -196,9 +196,82 @@ func installMCPIntentRouterForMacOS() {
 
 // MARK: - AirMCP Tool Runner
 
-/// Execute an AirMCP MCP tool by calling the Node.js server via stdio.
-/// This is a lightweight bridge: sends a JSON-RPC request to the airmcp process.
+private enum AppIntentMCPTransportError: Error {
+    case invalidRuntimeURL
+    case missingSessionID
+    case httpStatus(Int, String)
+    case invalidJSONResponse(String)
+    case rpcError(String)
+    case missingToolText
+    case toolCallUncertain(Error)
+}
+
+/// Execute an AirMCP MCP tool through the app-owned HTTP runtime when it is
+/// already available, then fall back to the legacy stdio bridge. The fallback
+/// keeps cold Shortcuts/Siri invocations working while the preferred path
+/// shares the same token-gated, app-owned runtime as Claude/Codex/Cursor.
 private func runAirMCPTool(_ toolName: String, args: [String: Any]) async throws -> String {
+    do {
+        return try await runAirMCPToolViaAppRuntime(toolName, args: args)
+    } catch {
+        if let transportError = error as? AppIntentMCPTransportError,
+           case .toolCallUncertain = transportError {
+            throw error
+        }
+        return try await runAirMCPToolViaStdio(toolName, args: args)
+    }
+}
+
+private func runAirMCPToolViaAppRuntime(_ toolName: String, args: [String: Any]) async throws -> String {
+    let token = try AppRuntimeToken.ensure()
+    let initResponse = try await postAppRuntimeMCPRequest(
+        [
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": [
+                "protocolVersion": AirMcpConstants.mcpProtocolVersion,
+                "capabilities": [:] as [String: Any],
+                "clientInfo": ["name": "AirMCPAppIntents", "version": "1.0"],
+            ],
+        ],
+        token: token
+    )
+    guard let sessionID = initResponse.sessionID else {
+        throw AppIntentMCPTransportError.missingSessionID
+    }
+    defer {
+        Task {
+            try? await closeAppRuntimeMCPSession(sessionID: sessionID, token: token)
+        }
+    }
+
+    _ = try await postAppRuntimeMCPRequest(
+        ["jsonrpc": "2.0", "method": "notifications/initialized", "params": [:] as [String: Any]],
+        token: token,
+        sessionID: sessionID,
+        allowsEmptyResponse: true
+    )
+
+    do {
+        let toolResponse = try await postAppRuntimeMCPRequest(
+            [
+                "jsonrpc": "2.0",
+                "id": 2,
+                "method": "tools/call",
+                "params": ["name": toolName, "arguments": args],
+            ],
+            token: token,
+            sessionID: sessionID,
+            timeoutInterval: 30
+        )
+        return try extractToolText(from: toolResponse.json)
+    } catch {
+        throw AppIntentMCPTransportError.toolCallUncertain(error)
+    }
+}
+
+private func runAirMCPToolViaStdio(_ toolName: String, args: [String: Any]) async throws -> String {
     let process = Process()
     process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
     process.arguments = ["npx", "-y", AirMcpConstants.npmPackageSpecifier]
@@ -257,4 +330,90 @@ private func runAirMCPTool(_ toolName: String, args: [String: Any]) async throws
     }
 
     return output.prefix(500).description
+}
+
+private func appRuntimeURL() throws -> URL {
+    guard let url = URL(string: AirMcpConstants.appOwnedHttpURL) else {
+        throw AppIntentMCPTransportError.invalidRuntimeURL
+    }
+    return url
+}
+
+private func postAppRuntimeMCPRequest(
+    _ payload: [String: Any],
+    token: String,
+    sessionID: String? = nil,
+    allowsEmptyResponse: Bool = false,
+    timeoutInterval: TimeInterval = 2
+) async throws -> (json: [String: Any], sessionID: String?) {
+    var request = URLRequest(url: try appRuntimeURL())
+    request.httpMethod = "POST"
+    request.timeoutInterval = timeoutInterval
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    request.setValue("application/json, text/event-stream", forHTTPHeaderField: "Accept")
+    request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+    if let sessionID {
+        request.setValue(sessionID, forHTTPHeaderField: "Mcp-Session-Id")
+    }
+    request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+
+    let (data, response) = try await URLSession.shared.data(for: request)
+    guard let http = response as? HTTPURLResponse else {
+        throw AppIntentMCPTransportError.invalidJSONResponse("missing HTTP response")
+    }
+    guard (200..<300).contains(http.statusCode) else {
+        let body = String(data: data, encoding: .utf8) ?? ""
+        throw AppIntentMCPTransportError.httpStatus(http.statusCode, body)
+    }
+    if data.isEmpty && allowsEmptyResponse {
+        return ([:], http.value(forHTTPHeaderField: "Mcp-Session-Id"))
+    }
+    let json = try decodeMCPHTTPBody(data, allowsEmptyResponse: allowsEmptyResponse)
+    return (json, http.value(forHTTPHeaderField: "Mcp-Session-Id"))
+}
+
+private func closeAppRuntimeMCPSession(sessionID: String, token: String) async throws {
+    var request = URLRequest(url: try appRuntimeURL())
+    request.httpMethod = "DELETE"
+    request.timeoutInterval = 1
+    request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+    request.setValue(sessionID, forHTTPHeaderField: "Mcp-Session-Id")
+    _ = try await URLSession.shared.data(for: request)
+}
+
+private func decodeMCPHTTPBody(_ data: Data, allowsEmptyResponse: Bool = false) throws -> [String: Any] {
+    if data.isEmpty {
+        if allowsEmptyResponse { return [:] }
+        throw AppIntentMCPTransportError.invalidJSONResponse("empty response")
+    }
+    if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+        return json
+    }
+    let text = String(data: data, encoding: .utf8) ?? ""
+    for line in text.split(separator: "\n") {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        guard trimmed.hasPrefix("data:") else { continue }
+        let payload = String(trimmed.dropFirst("data:".count)).trimmingCharacters(in: .whitespaces)
+        guard !payload.isEmpty, payload != "[DONE]" else { continue }
+        if let json = try? JSONSerialization.jsonObject(with: Data(payload.utf8)) as? [String: Any] {
+            return json
+        }
+    }
+    if allowsEmptyResponse { return [:] }
+    throw AppIntentMCPTransportError.invalidJSONResponse(String(text.prefix(500)))
+}
+
+private func extractToolText(from json: [String: Any]) throws -> String {
+    if let error = json["error"] as? [String: Any] {
+        let message = error["message"] as? String ?? String(describing: error)
+        throw AppIntentMCPTransportError.rpcError(message)
+    }
+    guard
+        let result = json["result"] as? [String: Any],
+        let content = result["content"] as? [[String: Any]],
+        let text = content.first?["text"] as? String
+    else {
+        throw AppIntentMCPTransportError.missingToolText
+    }
+    return text
 }

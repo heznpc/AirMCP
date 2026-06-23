@@ -27,6 +27,7 @@ import {
   wireExpr,
   isNullableUnion,
   nonNullType,
+  nonNullSchema,
   outputTypeNameFor,
   snippetViewNameFor,
   detectSnippetShape,
@@ -1137,6 +1138,38 @@ describe("isCodableSafe", () => {
     expect(isCodableSafe(null)).toBe(true);
     expect(isCodableSafe(undefined)).toBe(true);
   });
+
+  test("unconstrained schema nodes are not codable-safe", () => {
+    expect(isCodableSafe({})).toBe(false);
+    expect(
+      hasTypedOutput({
+        outputSchema: {
+          type: "object",
+          properties: { value: {} },
+          required: ["value"],
+        },
+      }),
+    ).toBe(false);
+  });
+
+  test("nullable anyOf recurses into its non-null member", () => {
+    expect(
+      isCodableSafe({
+        anyOf: [
+          {
+            type: "object",
+            properties: {},
+            additionalProperties: true,
+          },
+          { type: "null" },
+        ],
+      }),
+    ).toBe(false);
+  });
+
+  test("non-null anyOf output schemas fall back to string results", () => {
+    expect(isCodableSafe({ anyOf: [{ type: "string" }, { type: "number" }] })).toBe(false);
+  });
 });
 
 describe("swiftOutputType", () => {
@@ -1155,9 +1188,54 @@ describe("swiftOutputType", () => {
     expect(swiftOutputType({ type: ["null", "integer"] }, "Path", nested)).toBe("Int?");
   });
 
+  test("nullable anyOf adds Optional ? for required output fields", () => {
+    const nested = [];
+    expect(swiftOutputType({ anyOf: [{ type: "string" }, { type: "null" }] }, "Path", nested)).toBe("String?");
+    expect(swiftOutputType({ anyOf: [{ type: "integer" }, { type: "null" }] }, "Path", nested)).toBe("Int?");
+  });
+
+  test("nonNullSchema unwraps zod nullable anyOf without losing constraints", () => {
+    expect(
+      nonNullSchema({
+        anyOf: [
+          { type: "integer", minimum: 0, maximum: 100 },
+          { type: "null" },
+        ],
+      }),
+    ).toEqual({ type: "integer", minimum: 0, maximum: 100 });
+  });
+
   test("array wraps element type", () => {
     const nested = [];
     expect(swiftOutputType({ type: "array", items: { type: "string" } }, "Tags", nested)).toBe("[String]");
+  });
+
+  test("tuple-style homogeneous array items map to element arrays", () => {
+    const nested = [];
+    expect(
+      swiftOutputType(
+        {
+          type: "array",
+          items: [{ type: "number" }, { type: "number" }],
+        },
+        "Position",
+        nested,
+      ),
+    ).toBe("[Double]");
+  });
+
+  test("tuple-style mixed array items fall back to String element", () => {
+    const nested = [];
+    expect(
+      swiftOutputType(
+        {
+          type: "array",
+          items: [{ type: "string" }, { type: "number" }],
+        },
+        "Mixed",
+        nested,
+      ),
+    ).toBe("[String]");
   });
 
   test("array-of-object records nested struct named `<Path>Item`", () => {
@@ -1218,6 +1296,40 @@ describe("renderStruct", () => {
     // Wrong behavior would be `String??`; correct is single `?`.
     expect(swift).toContain("public let name: String?");
     expect(swift).not.toContain("String??");
+  });
+
+  test("required nullable anyOf field decodes as Optional<T>", () => {
+    const swift = renderStruct("BatteryOutput", {
+      type: "object",
+      properties: {
+        percentage: {
+          anyOf: [
+            { type: "integer", minimum: 0, maximum: 100 },
+            { type: "null" },
+          ],
+        },
+      },
+      required: ["percentage"],
+    });
+    expect(swift).toContain("public let percentage: Int?");
+    expect(swift).not.toContain("public let percentage: String");
+  });
+
+  test("required nullable tuple array field decodes as Optional<[Double]>", () => {
+    const swift = renderStruct("WindowOutput", {
+      type: "object",
+      properties: {
+        position: {
+          anyOf: [
+            { type: "array", items: [{ type: "number" }, { type: "number" }] },
+            { type: "null" },
+          ],
+        },
+      },
+      required: ["position"],
+    });
+    expect(swift).toContain("public let position: [Double]?");
+    expect(swift).not.toContain("public let position: [String]?");
   });
 
   test("nested object emits inner struct", () => {

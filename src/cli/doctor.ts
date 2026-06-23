@@ -19,6 +19,7 @@ import { MODULE_MANIFEST } from "../shared/modules.js";
 import { summarizeCompatibility } from "../shared/compatibility.js";
 import { RESET, BOLD, DIM, WHITE, GREEN, SYM, heading, line, divider, spinner, sleep } from "./style.js";
 import { APP_RUNTIME_TOKEN_PATH } from "../shared/app-runtime-token.js";
+import { probeAppRuntimeMcp } from "./app-runtime-probe.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 /** Package root — works in repo checkout, npm cache, and git worktrees. */
@@ -255,23 +256,18 @@ export async function runDoctor(): Promise<void> {
 
       if (appRuntimeToken) {
         try {
-          const authed = await fetchWithTimeout(
-            CODEX_APP_OWNED_URL,
-            {
-              method: "GET",
-              headers: {
-                Authorization: `Bearer ${appRuntimeToken}`,
-              },
-            },
-            1500,
-          );
-          if (authed.status === 401) {
-            bad("Runtime auth", "token-authenticated /mcp was rejected (401)");
-          } else {
-            ok("Runtime auth", `token-authenticated /mcp passed auth gate (HTTP ${authed.status})`);
-          }
+          const probe = await probeAppRuntimeMcp({
+            url: CODEX_APP_OWNED_URL,
+            token: appRuntimeToken,
+            clientName: "airmcp-doctor",
+            timeoutMs: 3_000,
+          });
+          ok("Runtime MCP", `initialize + tools/list ok (${probe.toolCount} tools)`);
         } catch (e) {
-          meh("Runtime auth", `token-authenticated probe failed: ${e instanceof Error ? e.message : String(e)}`);
+          bad(
+            "Runtime MCP",
+            `token-authenticated initialize/tools-list failed: ${e instanceof Error ? e.message : String(e)}`,
+          );
         }
       }
     }

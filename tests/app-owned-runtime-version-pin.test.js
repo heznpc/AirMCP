@@ -47,6 +47,7 @@ describe("app-owned runtime npm package pin", () => {
     expect(bundleScript).toContain("verify_app_owned_runtime");
     expect(bundleScript).toContain("app-owned runtime version mismatch");
     expect(bundleScript).toContain("unauthenticated /mcp request should return 401");
-    expect(bundleScript).toContain("token-authenticated /mcp request did not pass the auth gate");
+    expect(bundleScript).toContain("probe-app-runtime.mjs");
+    expect(bundleScript).toContain("token-authenticated MCP initialize/tools-list failed");
   });
 });

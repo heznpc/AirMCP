@@ -267,7 +267,6 @@ verify_app_owned_runtime() {
   local token_mode
   local unauth_status
   local token
-  local authed_status
 
   health="$(wait_for_http_runtime)" || {
     echo "✗ app-owned HTTP runtime did not become healthy at $APP_HEALTH_URL" >&2
@@ -308,17 +307,19 @@ verify_app_owned_runtime() {
   echo "✓ Unauthenticated /mcp request is rejected (401)"
 
   token="$(tr -d "\r\n" < "$TOKEN_FILE")"
-  authed_status="$(
-    curl -sS --max-time 2 -o /dev/null -w "%{http_code}" \
-      -X GET "$APP_MCP_URL" \
-      -H "Authorization: Bearer $token" \
-      2>/dev/null || true
-  )"
-  if [ "$authed_status" = "401" ] || [ -z "$authed_status" ] || [ "$authed_status" = "000" ]; then
-    echo "✗ token-authenticated /mcp request did not pass the auth gate (status ${authed_status:-no response})" >&2
+  local probe_output
+  if ! probe_output="$(
+    node "$SCRIPT_DIR/probe-app-runtime.mjs" \
+      --url "$APP_MCP_URL" \
+      --token "$token" \
+      --min-tools 1 \
+      --timeout-ms 5000 2>&1
+  )"; then
+    echo "✗ token-authenticated MCP initialize/tools-list failed" >&2
+    echo "$probe_output" >&2
     exit 1
   fi
-  echo "✓ Token-authenticated /mcp request passes auth gate (HTTP $authed_status)"
+  echo "✓ Token-authenticated MCP initialize + tools/list passes ($probe_output)"
 }
 
 verify_running() {

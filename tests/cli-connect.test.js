@@ -4,6 +4,7 @@ import { createServer } from "node:net";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import { cleanBootEnv } from "../scripts/lib/clean-boot-env.mjs";
+import { probeAppRuntimeMcp } from "../dist/cli/app-runtime-probe.js";
 
 const DIST = fileURLToPath(new URL("../dist/index.js", import.meta.url));
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
@@ -123,6 +124,28 @@ afterEach(async () => {
 });
 
 describe("airmcp connect", () => {
+  test("app runtime probe performs initialize and tools/list over token-gated HTTP", async () => {
+    const port = await getFreePort();
+    const token = "test-runtime-token";
+    const server = spawnAirMcp(["--http", "--port", String(port)], {
+      AIRMCP_ALLOW_NETWORK: "with-token",
+      AIRMCP_HTTP_TOKEN: token,
+    });
+    await waitForHealth(port, server);
+
+    const probe = await probeAppRuntimeMcp({
+      url: `http://127.0.0.1:${port}/mcp`,
+      token,
+      clientName: "airmcp-runtime-probe-test",
+      timeoutMs: 10_000,
+      minTools: 100,
+    });
+
+    expect(probe.serverName).toBe("airmcp");
+    expect(probe.toolCount).toBeGreaterThan(100);
+    expect(probe.sampleTools.length).toBeGreaterThan(0);
+  }, 30_000);
+
   test("bridges a stdio client to the token-gated app-owned HTTP runtime", async () => {
     const port = await getFreePort();
     const token = "test-runtime-token";

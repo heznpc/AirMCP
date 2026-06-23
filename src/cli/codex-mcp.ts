@@ -67,12 +67,38 @@ function sectionBody(toml: string, header: string): string {
   return body.join("\n");
 }
 
-export function codexConfigTomlRuntimeShape(toml: string): CodexConfigFileRuntimeShape {
+/** Extract the AIRMCP_HTTP_TOKEN value from a Codex `[mcp_servers.airmcp]`
+ *  block, covering BOTH the standalone `[mcp_servers.airmcp.env]` subsection
+ *  form and the inline-table `env = { AIRMCP_HTTP_TOKEN = "..." }` form.
+ *  Returns the literal token string, or null when absent. */
+function extractCodexHttpToken(serverBody: string, envBody: string): string | null {
+  // Standalone subsection: AIRMCP_HTTP_TOKEN = "value"
+  const subsection = envBody.match(/AIRMCP_HTTP_TOKEN\s*=\s*"([^"]*)"/);
+  if (subsection) return subsection[1] ?? null;
+  // Inline table on the server block: env = { ..., AIRMCP_HTTP_TOKEN = "value", ... }
+  const inline = serverBody.match(/AIRMCP_HTTP_TOKEN\s*=\s*"([^"]*)"/);
+  if (inline) return inline[1] ?? null;
+  return null;
+}
+
+/**
+ * Classify a Codex `config.toml`. When `liveToken` is provided, an app-owned
+ * proxy entry is only reported as `"app-owned"` if its stored token VALUE
+ * matches the live runtime token — a stale/wrong token falls through to
+ * `"unknown"` so the runtime repairs it. When `liveToken` is omitted the
+ * function is a pure structural parse (token presence only).
+ */
+export function codexConfigTomlRuntimeShape(toml: string, liveToken?: string): CodexConfigFileRuntimeShape {
   const server = sectionBody(toml, "[mcp_servers.airmcp]");
   if (!server) return "unknown";
   const env = sectionBody(toml, "[mcp_servers.airmcp.env]");
-  const hasToken = /AIRMCP_HTTP_TOKEN\s*=/.test(env);
-  if (server.includes(CODEX_APP_OWNED_URL) && server.includes('"connect"') && hasToken) return "app-owned";
+  const configToken = extractCodexHttpToken(server, env);
+  const hasToken = configToken !== null;
+  if (server.includes(CODEX_APP_OWNED_URL) && server.includes('"connect"') && hasToken) {
+    // Repair gate: a stale/wrong token must not pass as app-owned.
+    if (liveToken !== undefined && configToken !== liveToken) return "unknown";
+    return "app-owned";
+  }
   if (/command\s*=\s*"npx"/.test(server) && /airmcp(@|")/.test(server)) return "direct";
   return "unknown";
 }
@@ -80,7 +106,9 @@ export function codexConfigTomlRuntimeShape(toml: string): CodexConfigFileRuntim
 function codexConfigFileRuntimeShape(): CodexConfigFileRuntimeShape {
   try {
     if (!existsSync(CODEX_CONFIG_PATH)) return "unknown";
-    return codexConfigTomlRuntimeShape(readFileSync(CODEX_CONFIG_PATH, "utf8"));
+    // Pass the live runtime token so a config carrying a stale/wrong token
+    // is not classified app-owned — it falls through and gets repaired.
+    return codexConfigTomlRuntimeShape(readFileSync(CODEX_CONFIG_PATH, "utf8"), ensureAppRuntimeToken());
   } catch {
     return "unknown";
   }

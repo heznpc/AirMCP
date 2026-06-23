@@ -90,6 +90,9 @@ const { registerSpeechTools } = await import('../dist/speech/tools.js');
 const { registerCrossTools } = await import('../dist/cross/tools.js');
 const { registerSemanticTools } = await import('../dist/semantic/tools.js');
 const { registerMemoryTools } = await import('../dist/memory/tools.js');
+const { PRIVACY_READOUT_TOOLS, PRIVACY_READOUT_NAME_PATTERNS, PRIVACY_PATTERN_EXEMPT } = await import(
+  '../dist/shared/privacy-sensitive-tools.js'
+);
 
 // ── Test suite ──────────────────────────────────────────────────────
 
@@ -447,34 +450,28 @@ describe('Safety Annotations consistency', () => {
   });
 
   // ── 11. Live privacy readouts must be sensitive-gated ─────────────
+  //
+  // The privacy-readout list is the single source of truth in
+  // src/shared/privacy-sensitive-tools.ts. Three directions lock it
+  // against the drift that previously let smart_clipboard / memory_query
+  // / the mail / photo / chat readers slip through unmarked:
+  //   (a) forward  — every listed tool that is registered is gated;
+  //   (b) reverse  — every registered read-only + sensitive tool is listed;
+  //   (c) anti-drift — every registered read-only tool whose NAME matches an
+  //                    obvious privacy pattern is listed.
 
-  test('known live privacy readouts are gated by sensitive-only HITL', () => {
-    const LIVE_PRIVACY_READOUTS = [
-      'get_clipboard',
-      'list_all_windows',
-      'capture_screen',
-      'capture_window',
-      'capture_area',
-      'list_windows',
-      'health_summary',
-      'health_today_steps',
-      'health_heart_rate',
-      'health_sleep',
-      'health_authorize',
-      'get_current_location',
-      'ui_open_app',
-      'ui_read',
-      'ui_accessibility_query',
-      'ui_traverse',
-      'ui_diff',
-    ];
+  test('(a) every privacy readout in the SSOT is gated by sensitive-only HITL', () => {
     const tools = getAllTools();
     const failures = [];
 
-    for (const name of LIVE_PRIVACY_READOUTS) {
+    for (const name of PRIVACY_READOUT_TOOLS) {
       const tool = tools.find((t) => t.name === name);
+      // Some readouts (health_*) only register where the platform exposes
+      // them; skip names absent from this fully-registered test server only
+      // if genuinely unregistered. Here every module is registered, so an
+      // absent name is a real regression.
       if (!tool) {
-        failures.push(`${name}: not registered`);
+        failures.push(`${name}: in PRIVACY_READOUT_TOOLS but not registered`);
         continue;
       }
       if (tool.annotations?.destructiveHint !== true && tool.annotations?.sensitiveHint !== true) {
@@ -487,6 +484,45 @@ describe('Safety Annotations consistency', () => {
     if (failures.length > 0) {
       throw new Error(
         `live privacy readout tool(s) are not gated by sensitive-only HITL:\n  ${failures.join('\n  ')}`,
+      );
+    }
+  });
+
+  test('(b) every registered read-only + sensitive tool is in the privacy-readout SSOT', () => {
+    const tools = getAllTools();
+    const orphans = tools
+      .filter(
+        (t) =>
+          t.annotations?.readOnlyHint === true &&
+          t.annotations?.sensitiveHint === true &&
+          !PRIVACY_READOUT_TOOLS.has(t.name),
+      )
+      .map((t) => t.name);
+
+    if (orphans.length > 0) {
+      throw new Error(
+        `read-only + sensitive tool(s) missing from PRIVACY_READOUT_TOOLS ` +
+          `(add them to src/shared/privacy-sensitive-tools.ts):\n  ${orphans.join('\n  ')}`,
+      );
+    }
+  });
+
+  test('(c) read-only tools whose name matches a privacy pattern are in the SSOT', () => {
+    const tools = getAllTools();
+    const matched = tools.filter(
+      (t) =>
+        t.annotations?.readOnlyHint === true &&
+        PRIVACY_READOUT_NAME_PATTERNS.some((re) => re.test(t.name)),
+    );
+    const unlisted = matched
+      .filter((t) => !PRIVACY_READOUT_TOOLS.has(t.name) && !PRIVACY_PATTERN_EXEMPT.has(t.name))
+      .map((t) => t.name);
+
+    if (unlisted.length > 0) {
+      throw new Error(
+        `read-only tool(s) look like privacy readers by name but are not in ` +
+          `PRIVACY_READOUT_TOOLS — mark them sensitiveHint:true and add them, ` +
+          `or tighten the pattern in src/shared/privacy-sensitive-tools.ts:\n  ${unlisted.join('\n  ')}`,
       );
     }
   });

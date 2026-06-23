@@ -104,12 +104,57 @@ describe("codex MCP setup", () => {
         `args = ["-y", "/Users/ren/IdeaProjects/MCP/AirMCP", "connect", "--url", "${CODEX_APP_OWNED_URL}"]`,
         "",
         "[mcp_servers.airmcp.env]",
-        'AIRMCP_HTTP_TOKEN = "token"',
+        'AIRMCP_HTTP_TOKEN = "test-runtime-token"',
         "",
       ].join("\n"),
     );
 
     expect(codexAirmcpRuntimeShape()).toBe("app-owned-pending-restart");
+  });
+
+  test("treats a config.toml carrying a stale token as not-app-owned so it gets repaired", () => {
+    // CLI output is stale-direct; config.toml has the app-owned proxy shape but
+    // a token that no longer matches the live runtime token. The runtime path
+    // must NOT report app-owned (which would suppress repair).
+    codexGetOutput = ["airmcp", "  transport: stdio", "  command: npx", "  args: -y airmcp@2.12.0"].join("\n");
+    writeFileSync(
+      process.env.AIRMCP_CODEX_CONFIG_PATH,
+      [
+        "[mcp_servers.airmcp]",
+        'command = "npx"',
+        `args = ["-y", "airmcp", "connect", "--url", "${CODEX_APP_OWNED_URL}"]`,
+        "",
+        "[mcp_servers.airmcp.env]",
+        'AIRMCP_HTTP_TOKEN = "stale-old-token"',
+        "",
+      ].join("\n"),
+    );
+
+    expect(codexAirmcpRuntimeShape()).toBe("direct");
+  });
+
+  test("detects the inline-table env form of the app-owned proxy", () => {
+    expect(
+      codexConfigTomlRuntimeShape(
+        [
+          "[mcp_servers.airmcp]",
+          'command = "npx"',
+          `args = ["-y", "airmcp", "connect", "--url", "${CODEX_APP_OWNED_URL}"]`,
+          'env = { AIRMCP_HTTP_TOKEN = "token" }',
+        ].join("\n"),
+      ),
+    ).toBe("app-owned");
+  });
+
+  test("compares the inline-table token value against the live token", () => {
+    const toml = [
+      "[mcp_servers.airmcp]",
+      'command = "npx"',
+      `args = ["-y", "airmcp", "connect", "--url", "${CODEX_APP_OWNED_URL}"]`,
+      'env = { AIRMCP_HTTP_TOKEN = "live-token" }',
+    ].join("\n");
+    expect(codexConfigTomlRuntimeShape(toml, "live-token")).toBe("app-owned");
+    expect(codexConfigTomlRuntimeShape(toml, "different-token")).toBe("unknown");
   });
 
   test("parses Codex config.toml app-owned proxy shape", () => {

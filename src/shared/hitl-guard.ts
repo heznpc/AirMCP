@@ -59,7 +59,13 @@ function isManagedClient(server: McpServer): boolean {
   }
 }
 
-function shouldRequireApproval(
+/**
+ * Pure gating predicate: does a tool with these annotations require HITL
+ * approval at the given level? Exported so tests can lock the monotonic
+ * ordering off ⊆ destructive-only ⊆ sensitive-only ⊆ all-writes ⊆ all
+ * (review finding #3/#5). No side effects.
+ */
+export function shouldRequireApproval(
   level: HitlLevel,
   annotations: ToolAnnotations,
   whitelist: Set<string>,
@@ -74,7 +80,15 @@ function shouldRequireApproval(
     case "sensitive-only":
       return annotations.destructiveHint === true || annotations.sensitiveHint === true;
     case "all-writes":
-      return annotations.readOnlyHint === false;
+      // Must be a superset of "sensitive-only": the init wizard presents
+      // Recommended(sensitive-only) then Strict(all-writes) as increasing
+      // strictness, so anything sensitive-only gates must also gate here.
+      // Plain `readOnlyHint === false` missed sensitive-but-readonly tools
+      // (health_*, get_clipboard, capture_screen, ui_read) which carry
+      // readOnlyHint: true + sensitiveHint: true — breaking monotonicity.
+      return (
+        annotations.readOnlyHint === false || annotations.destructiveHint === true || annotations.sensitiveHint === true
+      );
     case "all":
       return true;
   }

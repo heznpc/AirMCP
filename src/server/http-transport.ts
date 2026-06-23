@@ -466,29 +466,35 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
   // enabled-module list via closure so it reflects the live module
   // selection once `createServer` runs (depends on config + OS gates).
   let enabledModuleNames: string[] = [];
+  // True until the background warmup resolves the live module list. While
+  // false the module list is not yet known, so the discovery card must NOT
+  // claim `modules: []` — it advertises a `warming` status instead so a
+  // crawler hitting the warmup window can distinguish "no modules" from
+  // "not resolved yet". Tools are read live from toolRegistry and stay valid.
+  let modulesWarming = true;
   app.get("/.well-known/mcp.json", (_req, res) => {
-    res.json(
-      buildServerCard({
-        name: NPM_PACKAGE_NAME,
-        version: pkg.version,
-        description: pkg.description,
-        license: pkg.license,
-        homepage: pkg.homepage,
-        websiteUrl: WEBSITE_URL,
-        icon: SERVER_ICON,
-        httpToken,
-        allowNetwork,
-        allowedOrigins: [...allowedOrigins],
-        // Read tool inventory at request time so a hot-reload or a
-        // later `listChanged` notification doesn't leave the card stale.
-        tools: {
-          count: toolRegistry.getToolCount(),
-          names: toolRegistry.getToolNames(),
-        },
-        modules: enabledModuleNames,
-        oauth: oauth ?? undefined,
-      }),
-    );
+    const card = buildServerCard({
+      name: NPM_PACKAGE_NAME,
+      version: pkg.version,
+      description: pkg.description,
+      license: pkg.license,
+      homepage: pkg.homepage,
+      websiteUrl: WEBSITE_URL,
+      icon: SERVER_ICON,
+      httpToken,
+      allowNetwork,
+      allowedOrigins: [...allowedOrigins],
+      // Read tool inventory at request time so a hot-reload or a
+      // later `listChanged` notification doesn't leave the card stale.
+      tools: {
+        count: toolRegistry.getToolCount(),
+        names: toolRegistry.getToolNames(),
+      },
+      modules: enabledModuleNames,
+      oauth: oauth ?? undefined,
+    });
+    if (modulesWarming) card.warming = true;
+    res.json(card);
   });
 
   // RFC 9728 — OAuth protected resource metadata. Emitted only when
@@ -670,7 +676,6 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
   // probes can distinguish "socket is up" from "module warmup is still busy".
   // First real MCP sessions still create their own server instance; prewarm is
   // only a cache/discovery optimization.
-  let bannerPrinted = false;
   const warmupPromise = (async () => {
     const {
       bannerInfo: bi,
@@ -683,6 +688,7 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
     // card's closure so registry crawlers see what's actually loaded
     // on this host (module enablement depends on config + OS gates).
     enabledModuleNames = bi.modulesEnabled;
+    modulesWarming = false;
     return bi;
   })();
   const host = bindAll ? "0.0.0.0" : "127.0.0.1";
@@ -711,8 +717,6 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
   });
   void warmupPromise
     .then(async (bi) => {
-      if (bannerPrinted) return;
-      bannerPrinted = true;
       const address = httpServer.address();
       bi.transport = "http";
       bi.port = address && typeof address !== "string" ? address.port : port;

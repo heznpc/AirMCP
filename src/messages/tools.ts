@@ -84,7 +84,13 @@ export function registerMessagesTools(server: McpServer, config: AirMcpConfig): 
         limit: z.number().int().min(1).max(200).optional().default(50).describe("Max chats to return (default: 50)"),
       },
       outputSchema: chatListShape,
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async ({ limit }) => {
       try {
@@ -104,7 +110,13 @@ export function registerMessagesTools(server: McpServer, config: AirMcpConfig): 
         chatId: z.string().max(500).describe("Chat ID"),
       },
       outputSchema: chatSchema.shape,
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async ({ chatId }) => {
       try {
@@ -125,7 +137,13 @@ export function registerMessagesTools(server: McpServer, config: AirMcpConfig): 
         limit: z.number().int().min(1).max(100).optional().default(20).describe("Max results (default: 20)"),
       },
       outputSchema: chatListShape,
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async ({ query, limit }) => {
       try {
@@ -203,7 +221,13 @@ export function registerMessagesTools(server: McpServer, config: AirMcpConfig): 
         chatId: z.string().max(500).describe("Chat ID"),
       },
       outputSchema: listParticipantsShape,
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async ({ chatId }) => {
       try {

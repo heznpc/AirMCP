@@ -147,7 +147,13 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
           }),
         ),
       },
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async ({ album, limit, offset }) => {
       try {
@@ -187,7 +193,13 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
           }),
         ),
       },
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async ({ query, limit }) => {
       try {
@@ -228,7 +240,13 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
         favorite: z.boolean(),
         keywords: z.array(z.string()).nullable(),
       },
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async ({ id }) => {
       try {
@@ -269,7 +287,13 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
           }),
         ),
       },
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async ({ limit }) => {
       try {
@@ -423,7 +447,13 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
         favorites: z.boolean().optional().describe("Only favorites"),
         limit: z.number().int().min(1).max(200).optional().default(50).describe("Max results (default: 50)"),
       },
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async ({ mediaType, startDate, endDate, favorites, limit }) => {
       try {

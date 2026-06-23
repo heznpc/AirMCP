@@ -2867,6 +2867,7 @@ public struct GetLocationPermissionIntent: AppIntent {
 }
 
 // Tool: get_photo_info
+@available(iOS 18, macOS 15, *)
 public struct GetPhotoInfoIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Get Photo Info"
     nonisolated(unsafe) public static var description = IntentDescription("Get detailed metadata for a specific photo by ID.")
@@ -2879,6 +2880,10 @@ public struct GetPhotoInfoIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Get Photo Info with AirMCP? Get detailed metadata for a specific photo by ID.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "get_photo_info",
             args: ["id": id]
@@ -3848,6 +3853,7 @@ public struct ListCalendarsIntent: AppIntent {
 }
 
 // Tool: list_chats
+@available(iOS 18, macOS 15, *)
 public struct ListChatsIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "List Chats"
     nonisolated(unsafe) public static var description = IntentDescription("List recent chats in Messages with participants and last update time.")
@@ -3860,6 +3866,10 @@ public struct ListChatsIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("List Chats with AirMCP? List recent chats in Messages with participants and last update time.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_chats",
             args: ["limit": limit]
@@ -3996,6 +4006,7 @@ public struct ListEventsIntent: AppIntent {
 }
 
 // Tool: list_favorites
+@available(iOS 18, macOS 15, *)
 public struct ListFavoritesIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "List Favorite Photos"
     nonisolated(unsafe) public static var description = IntentDescription("List photos marked as favorites.")
@@ -4008,6 +4019,10 @@ public struct ListFavoritesIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("List Favorite Photos with AirMCP? List photos marked as favorites.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_favorites",
             args: ["limit": limit]
@@ -4145,6 +4160,7 @@ public struct ListMailboxesIntent: AppIntent {
 }
 
 // Tool: list_messages
+@available(iOS 18, macOS 15, *)
 public struct ListMessagesIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "List Messages"
     nonisolated(unsafe) public static var description = IntentDescription("List recent messages in a mailbox (e.g. 'INBOX'). Returns subject, sender, date, read status.")
@@ -4171,6 +4187,10 @@ public struct ListMessagesIntent: AppIntent {
         if let v = account { args["account"] = v }
         args["limit"] = limit
         args["offset"] = offset
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("List Messages with AirMCP? List recent messages in a mailbox (e.g. 'INBOX'). Returns subject, sender, date, read status.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_messages",
             args: args
@@ -4231,6 +4251,7 @@ public struct ListNotesIntent: AppIntent {
 }
 
 // Tool: list_participants
+@available(iOS 18, macOS 15, *)
 public struct ListParticipantsIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "List Chat Participants"
     nonisolated(unsafe) public static var description = IntentDescription("List all participants in a specific chat.")
@@ -4243,6 +4264,10 @@ public struct ListParticipantsIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("List Chat Participants with AirMCP? List all participants in a specific chat.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_participants",
             args: ["chatId": chatId]
@@ -4262,6 +4287,7 @@ public struct ListParticipantsIntent: AppIntent {
 }
 
 // Tool: list_photos
+@available(iOS 18, macOS 15, *)
 public struct ListPhotosIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "List Photos"
     nonisolated(unsafe) public static var description = IntentDescription("List photos in an album with metadata. Use list_albums to find album names first.")
@@ -4280,6 +4306,10 @@ public struct ListPhotosIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("List Photos with AirMCP? List photos in an album with metadata. Use list_albums to find album names first.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_photos",
             args: ["album": album, "limit": limit, "offset": offset]
@@ -4769,6 +4799,7 @@ public struct MemoryPutIntent: AppIntent {
 }
 
 // Tool: memory_query
+@available(iOS 18, macOS 15, *)
 public struct MemoryQueryIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Query Context Memory"
     nonisolated(unsafe) public static var description = IntentDescription("List non-expired memory entries. All filters are AND-combined. Returns entries sorted by `updatedAt` descending by default. Safe read-only — use before composing LLM prompts so recent user-supplied context is recalled.")
@@ -4799,6 +4830,10 @@ public struct MemoryQueryIntent: AppIntent {
         if let v = tags { args["tags"] = v }
         if let v = limit { args["limit"] = v }
         if let v = order { args["order"] = v.rawValue }
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Query Context Memory with AirMCP? List non-expired memory entries. All filters are AND-combined. Returns entries sorted by `updatedAt` descending by default. Safe read-only — use before composing LLM prompts so recent…")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "memory_query",
             args: args
@@ -5575,6 +5610,7 @@ public struct ProofreadTextIntent: AppIntent {
 }
 
 // Tool: query_photos
+@available(iOS 18, macOS 15, *)
 public struct QueryPhotosIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Query Photos"
     nonisolated(unsafe) public static var description = IntentDescription("Query the Photos library with filters: media type, date range, favorites. Returns photo metadata (identifier, filename, date, dimensions). Requires Swift bridge.")
@@ -5605,6 +5641,10 @@ public struct QueryPhotosIntent: AppIntent {
         if let v = endDate { args["endDate"] = v }
         if let v = favorites { args["favorites"] = v }
         args["limit"] = limit
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Query Photos with AirMCP? Query the Photos library with filters: media type, date range, favorites. Returns photo metadata (identifier, filename, date, dimensions). Requires Swift bridge.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "query_photos",
             args: args
@@ -5614,6 +5654,7 @@ public struct QueryPhotosIntent: AppIntent {
 }
 
 // Tool: read_chat
+@available(iOS 18, macOS 15, *)
 public struct ReadChatIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Read Chat"
     nonisolated(unsafe) public static var description = IntentDescription("Read chat details including participants and last update time by chat ID.")
@@ -5626,6 +5667,10 @@ public struct ReadChatIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Read Chat with AirMCP? Read chat details including participants and last update time by chat ID.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "read_chat",
             args: ["chatId": chatId]
@@ -5707,6 +5752,7 @@ public struct ReadEventIntent: AppIntent {
 }
 
 // Tool: read_message
+@available(iOS 18, macOS 15, *)
 public struct ReadMessageIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Read Message"
     nonisolated(unsafe) public static var description = IntentDescription("Read full content of an email message by ID. Content length is configurable (default: 5000 chars, max: 100000).")
@@ -5722,6 +5768,10 @@ public struct ReadMessageIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Read Message with AirMCP? Read full content of an email message by ID. Content length is configurable (default: 5000 chars, max: 100000).")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "read_message",
             args: ["id": id, "maxLength": maxLength]
@@ -6051,6 +6101,7 @@ public struct ScanNotesIntent: AppIntent {
 }
 
 // Tool: search_chats
+@available(iOS 18, macOS 15, *)
 public struct SearchChatsIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Search Chats"
     nonisolated(unsafe) public static var description = IntentDescription("Search chats by participant name, handle, or chat name.")
@@ -6066,6 +6117,10 @@ public struct SearchChatsIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Search Chats with AirMCP? Search chats by participant name, handle, or chat name.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "search_chats",
             args: ["query": query, "limit": limit]
@@ -6221,6 +6276,7 @@ public struct SearchLocationIntent: AppIntent {
 }
 
 // Tool: search_messages
+@available(iOS 18, macOS 15, *)
 public struct SearchMessagesIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Search Messages"
     nonisolated(unsafe) public static var description = IntentDescription("Search messages by keyword in subject or sender within a mailbox.")
@@ -6239,6 +6295,10 @@ public struct SearchMessagesIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Search Messages with AirMCP? Search messages by keyword in subject or sender within a mailbox.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "search_messages",
             args: ["query": query, "mailbox": mailbox, "limit": limit]
@@ -6326,6 +6386,7 @@ public struct SearchNotesIntent: AppIntent {
 }
 
 // Tool: search_photos
+@available(iOS 18, macOS 15, *)
 public struct SearchPhotosIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Search Photos"
     nonisolated(unsafe) public static var description = IntentDescription("Search photos by filename, name, or description keyword.")
@@ -6341,6 +6402,10 @@ public struct SearchPhotosIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Search Photos with AirMCP? Search photos by filename, name, or description keyword.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "search_photos",
             args: ["query": query, "limit": limit]
@@ -7080,6 +7145,7 @@ public struct SkillSenderToTasksIntent: AppIntent {
 }
 
 // Tool: smart_clipboard
+@available(iOS 18, macOS 15, *)
 public struct SmartClipboardIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Smart Clipboard"
     nonisolated(unsafe) public static var description = IntentDescription("Get clipboard content with automatic type detection (text, URL, email, phone, date, file path, image). More structured than raw clipboard access.")
@@ -7089,6 +7155,10 @@ public struct SmartClipboardIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Smart Clipboard with AirMCP? Get clipboard content with automatic type detection (text, URL, email, phone, date, file path, image). More structured than raw clipboard access.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "smart_clipboard",
             args: [String: any Sendable]()
@@ -7935,7 +8005,7 @@ public struct MCPGetBatteryStatusSnippetView: View {
             HStack {
                 Text("Percentage")
                 Spacer()
-                Text(String(describing: data.percentage))
+                Text((data.percentage?.formatted() ?? "—"))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -7949,14 +8019,14 @@ public struct MCPGetBatteryStatusSnippetView: View {
             HStack {
                 Text("Source")
                 Spacer()
-                Text(String(describing: data.source))
+                Text((data.source ?? "—"))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
             HStack {
                 Text("Time Remaining")
                 Spacer()
-                Text(String(describing: data.timeRemaining))
+                Text((data.timeRemaining ?? "—"))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -7982,7 +8052,7 @@ public struct MCPGetBrightnessSnippetView: View {
             HStack {
                 Text("Brightness")
                 Spacer()
-                Text(String(describing: data.brightness))
+                Text((data.brightness?.formatted() ?? "—"))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -8206,28 +8276,28 @@ public struct MCPGetPhotoInfoSnippetView: View {
             HStack {
                 Text("Filename")
                 Spacer()
-                Text(String(describing: data.filename))
+                Text((data.filename ?? "—"))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
             HStack {
                 Text("Name")
                 Spacer()
-                Text(String(describing: data.name))
+                Text((data.name ?? "—"))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
             HStack {
                 Text("Description")
                 Spacer()
-                Text(String(describing: data.description))
+                Text((data.description ?? "—"))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
             HStack {
                 Text("Date")
                 Spacer()
-                Text(String(describing: data.date))
+                Text((data.date ?? "—"))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -8248,7 +8318,7 @@ public struct MCPGetPhotoInfoSnippetView: View {
             HStack {
                 Text("Altitude")
                 Spacer()
-                Text(String(describing: data.altitude))
+                Text((data.altitude?.formatted() ?? "—"))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -8476,7 +8546,7 @@ public struct MCPGetTrackInfoSnippetView: View {
             HStack {
                 Text("Date Added")
                 Spacer()
-                Text(String(describing: data.dateAdded))
+                Text((data.dateAdded ?? "—"))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -8586,35 +8656,35 @@ public struct MCPGetWifiStatusSnippetView: View {
             HStack {
                 Text("Ssid")
                 Spacer()
-                Text(String(describing: data.ssid))
+                Text((data.ssid ?? "—"))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
             HStack {
                 Text("Bssid")
                 Spacer()
-                Text(String(describing: data.bssid))
+                Text((data.bssid ?? "—"))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
             HStack {
                 Text("Signal Strength")
                 Spacer()
-                Text(String(describing: data.signalStrength))
+                Text((data.signalStrength?.formatted() ?? "—"))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
             HStack {
                 Text("Noise Level")
                 Spacer()
-                Text(String(describing: data.noiseLevel))
+                Text((data.noiseLevel?.formatted() ?? "—"))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
             HStack {
                 Text("Channel")
                 Spacer()
-                Text(String(describing: data.channel))
+                Text((data.channel ?? "—"))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -8661,21 +8731,21 @@ public struct MCPIsAppRunningSnippetView: View {
             HStack {
                 Text("Bundle Identifier")
                 Spacer()
-                Text(String(describing: data.bundleIdentifier))
+                Text((data.bundleIdentifier ?? "—"))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
             HStack {
                 Text("Pid")
                 Spacer()
-                Text(String(describing: data.pid))
+                Text((data.pid?.formatted() ?? "—"))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
             HStack {
                 Text("Visible")
                 Spacer()
-                Text(String(describing: data.visible))
+                Text((data.visible.map { $0 ? "Yes" : "No" } ?? "—"))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -9399,28 +9469,28 @@ public struct MCPReadContactSnippetView: View {
             HStack {
                 Text("Organization")
                 Spacer()
-                Text(String(describing: data.organization))
+                Text((data.organization ?? "—"))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
             HStack {
                 Text("Job Title")
                 Spacer()
-                Text(String(describing: data.jobTitle))
+                Text((data.jobTitle ?? "—"))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
             HStack {
                 Text("Department")
                 Spacer()
-                Text(String(describing: data.department))
+                Text((data.department ?? "—"))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
             HStack {
                 Text("Note")
                 Spacer()
-                Text(String(describing: data.note))
+                Text((data.note ?? "—"))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -9519,7 +9589,7 @@ public struct MCPReadMessageSnippetView: View {
             HStack {
                 Text("Date Sent")
                 Spacer()
-                Text(String(describing: data.dateSent))
+                Text((data.dateSent ?? "—"))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -9716,7 +9786,7 @@ public struct MCPReadReminderSnippetView: View {
             HStack {
                 Text("Completion Date")
                 Spacer()
-                Text(String(describing: data.completionDate))
+                Text((data.completionDate ?? "—"))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -9737,7 +9807,7 @@ public struct MCPReadReminderSnippetView: View {
             HStack {
                 Text("Due Date")
                 Spacer()
-                Text(String(describing: data.dueDate))
+                Text((data.dueDate ?? "—"))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }

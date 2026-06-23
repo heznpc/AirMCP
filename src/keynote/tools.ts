@@ -40,7 +40,13 @@ export function registerKeynoteTools(server: McpServer, _config: AirMcpConfig): 
       title: "Create Keynote Presentation",
       description: "Create a new blank Keynote presentation.",
       inputSchema: {},
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
     },
     async () => {
       try {
@@ -98,7 +104,13 @@ export function registerKeynoteTools(server: McpServer, _config: AirMcpConfig): 
       inputSchema: {
         document: z.string().max(500).describe("Document name"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
     },
     async ({ document }) => {
       try {
@@ -119,7 +131,13 @@ export function registerKeynoteTools(server: McpServer, _config: AirMcpConfig): 
         slideNumber: z.number().int().min(1).describe("Slide number (1-based)"),
         notes: z.string().max(5000).describe("Presenter notes text"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async ({ document, slideNumber, notes }) => {
       try {

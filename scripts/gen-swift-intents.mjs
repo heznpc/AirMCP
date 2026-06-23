@@ -100,8 +100,9 @@ const CHECK_ONLY = process.argv.includes("--check");
 
 // ── A.2b.1 + A.3 + A.4 selection ─────────────────────────────────────
 // Automatic filter: every AppIntent-eligible tool.
-//   • readOnly → direct call, no confirmation
-//   • write (non-destructive) → direct call, no confirmation
+//   • readOnly, non-sensitive → direct call, no confirmation
+//   • write (non-destructive, non-sensitive) → direct call, no confirmation
+//   • sensitive → requestConfirmation before the router call
 //   • destructive → gated behind AIRMCP_APPINTENTS_DESTRUCTIVE=true (A.4).
 //     Default OFF per RFC 0007 §6 — destructive tools don't appear in
 //     Shortcuts / Siri unless explicitly opted in, which yields a safer
@@ -320,13 +321,15 @@ function generateIntent(tool) {
     .join("\n\n");
   const { prelude, argsExpr } = buildArgsBlock(decls);
 
-  // A.3: destructive tools block on a `requestConfirmation` call before
-  // reaching the router. The `(actionName:dialog:)` overload we use is
-  // iOS 18+/macOS 15+, so the whole destructive intent struct carries
-  // `@available(iOS 18, macOS 15, *)` below — on iOS 17 / macOS 14 the
-  // destructive intent simply doesn't exist, which is the correct
-  // security posture (better than shipping an unconfirmed destructive
-  // path to paper over the availability gap).
+  const needsConfirmation = tool.annotations.destructiveHint || tool.annotations.sensitiveHint;
+
+  // A.3: destructive and sensitive tools block on a `requestConfirmation`
+  // call before reaching the router. The `(actionName:dialog:)` overload
+  // we use is iOS 18+/macOS 15+, so the whole confirmed intent struct
+  // carries `@available(iOS 18, macOS 15, *)` below — on iOS 17 / macOS
+  // 14 the confirmed intent simply doesn't exist, which is safer than
+  // shipping an unconfirmed sensitive/destructive path to paper over the
+  // availability gap.
   //
   // Dialog body is built from the tool's `description` so the user sees
   // the actual consequence ("…moved to Recently Deleted, removed after
@@ -340,7 +343,7 @@ function generateIntent(tool) {
   // Parameter values — the interesting structured part (which event,
   // which file) — are rendered by Shortcuts automatically next to the
   // dialog, so we don't try to inject them into the prose.
-  const confirmBlock = tool.annotations.destructiveHint
+  const confirmBlock = needsConfirmation
     ? `        try await requestConfirmation(
             actionName: ${intentActionNameFor(tool.name)},
             dialog: IntentDialog("${buildConfirmDialogBody(tool)}")
@@ -393,8 +396,8 @@ ${confirmBlock}        let result = try await MCPIntentRouter.shared.call(
         return .result(value: result)`
     : `        return .result(value: result)`;
 
-  // @available gate for destructive intents — see `confirmBlock` comment.
-  const availability = tool.annotations.destructiveHint ? "@available(iOS 18, macOS 15, *)\n" : "";
+  // @available gate for confirmed intents — see `confirmBlock` comment.
+  const availability = needsConfirmation ? "@available(iOS 18, macOS 15, *)\n" : "";
 
   return `// Tool: ${tool.name}
 ${availability}public struct ${structName}: AppIntent {

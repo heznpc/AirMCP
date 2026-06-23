@@ -89,6 +89,7 @@ const { registerGoogleTools } = await import('../dist/google/tools.js');
 const { registerSpeechTools } = await import('../dist/speech/tools.js');
 const { registerCrossTools } = await import('../dist/cross/tools.js');
 const { registerSemanticTools } = await import('../dist/semantic/tools.js');
+const { registerMemoryTools } = await import('../dist/memory/tools.js');
 
 // ── Test suite ──────────────────────────────────────────────────────
 
@@ -132,6 +133,7 @@ describe('Safety Annotations consistency', () => {
     registerBluetoothTools(server, config);
     registerGoogleTools(server, config);
     registerSpeechTools(server, config);
+    registerMemoryTools(server, config);
 
     // Extra non-manifest modules
     registerCrossTools(server, config);
@@ -389,5 +391,103 @@ describe('Safety Annotations consistency', () => {
     const count = server._tools.size;
     // Sanity check: we expect ~262 tools from 27+ modules
     expect(count).toBeGreaterThanOrEqual(200);
+  });
+
+  // ── 10. Persistent user-data writes must be sensitive or destructive ─
+
+  test('known persistent user-data writes are gated by sensitive-only HITL', () => {
+    const PERSISTENT_USER_DATA_WRITES = [
+      'mark_message_read',
+      'flag_message',
+      'set_clipboard',
+      'set_file_tags',
+      'memory_put',
+      'import_photo',
+      'spotlight_sync',
+      'export_shortcut',
+      'import_shortcut',
+      'duplicate_shortcut',
+      'edit_shortcut',
+      'pages_create_document',
+      'numbers_create_document',
+      'numbers_set_cell',
+      'numbers_add_sheet',
+      'numbers_rename_sheet',
+      'keynote_create_document',
+      'keynote_add_slide',
+      'keynote_set_presenter_notes',
+      'set_rating',
+      'set_favorited',
+      'set_disliked',
+    ];
+    const tools = getAllTools();
+    const failures = [];
+
+    for (const name of PERSISTENT_USER_DATA_WRITES) {
+      const tool = tools.find((t) => t.name === name);
+      if (!tool) {
+        failures.push(`${name}: not registered`);
+        continue;
+      }
+      const gated =
+        tool.annotations?.destructiveHint === true ||
+        tool.annotations?.sensitiveHint === true;
+      if (!gated) {
+        failures.push(
+          `${name}: destructiveHint=${tool.annotations?.destructiveHint}, sensitiveHint=${tool.annotations?.sensitiveHint}`,
+        );
+      }
+    }
+
+    if (failures.length > 0) {
+      throw new Error(
+        `persistent write tool(s) are not gated by sensitive-only HITL:\n  ${failures.join('\n  ')}`,
+      );
+    }
+  });
+
+  // ── 11. Live privacy readouts must be sensitive-gated ─────────────
+
+  test('known live privacy readouts are gated by sensitive-only HITL', () => {
+    const LIVE_PRIVACY_READOUTS = [
+      'get_clipboard',
+      'list_all_windows',
+      'capture_screen',
+      'capture_window',
+      'capture_area',
+      'list_windows',
+      'health_summary',
+      'health_today_steps',
+      'health_heart_rate',
+      'health_sleep',
+      'health_authorize',
+      'get_current_location',
+      'ui_open_app',
+      'ui_read',
+      'ui_accessibility_query',
+      'ui_traverse',
+      'ui_diff',
+    ];
+    const tools = getAllTools();
+    const failures = [];
+
+    for (const name of LIVE_PRIVACY_READOUTS) {
+      const tool = tools.find((t) => t.name === name);
+      if (!tool) {
+        failures.push(`${name}: not registered`);
+        continue;
+      }
+      if (tool.annotations?.destructiveHint !== true && tool.annotations?.sensitiveHint !== true) {
+        failures.push(
+          `${name}: destructiveHint=${tool.annotations?.destructiveHint}, sensitiveHint=${tool.annotations?.sensitiveHint}`,
+        );
+      }
+    }
+
+    if (failures.length > 0) {
+      throw new Error(
+        `live privacy readout tool(s) are not gated by sensitive-only HITL:\n  ${failures.join('\n  ')}`,
+      );
+    }
   });
 });

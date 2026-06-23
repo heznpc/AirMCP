@@ -40,7 +40,12 @@ export function registerPagesTools(server: McpServer, _config: AirMcpConfig): vo
       inputSchema: {
         path: zFilePath.describe("Absolute file path to the .pages document"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
     },
     async ({ path }) => {
       try {
@@ -57,7 +62,13 @@ export function registerPagesTools(server: McpServer, _config: AirMcpConfig): vo
       title: "Create Pages Document",
       description: "Create a new blank Pages document.",
       inputSchema: {},
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
     },
     async () => {
       try {

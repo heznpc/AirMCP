@@ -64,6 +64,7 @@ export function registerScreenTools(server: McpServer, _config: AirMcpConfig): v
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
+        sensitiveHint: true,
         idempotentHint: true,
         openWorldHint: true,
       },
@@ -95,6 +96,7 @@ export function registerScreenTools(server: McpServer, _config: AirMcpConfig): v
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
+        sensitiveHint: true,
         idempotentHint: true,
         openWorldHint: true,
       },
@@ -123,6 +125,7 @@ export function registerScreenTools(server: McpServer, _config: AirMcpConfig): v
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
+        sensitiveHint: true,
         idempotentHint: true,
         openWorldHint: true,
       },
@@ -146,6 +149,7 @@ export function registerScreenTools(server: McpServer, _config: AirMcpConfig): v
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
+        sensitiveHint: true,
         idempotentHint: true,
         openWorldHint: true,
       },

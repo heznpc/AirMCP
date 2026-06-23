@@ -670,7 +670,12 @@ export function buildConfirmDialogBody(tool) {
   const head = safeTitle ? `${safeTitle} with AirMCP?` : "Run this AirMCP action?";
   // No description → fall back to the historical generic body. Keeps
   // future description-less tools from rendering a stub dialog.
-  if (!safeDesc) return `${head} This action is destructive and cannot be undone.`;
+  if (!safeDesc) {
+    const fallback = tool.annotations?.sensitiveHint
+      ? "This action may expose or change sensitive local data."
+      : "This action is destructive and cannot be undone.";
+    return `${head} ${fallback}`;
+  }
   const body = `${head} ${safeDesc}`;
   return body.length > 220 ? body.slice(0, 217).trimEnd() + "…" : body;
 }

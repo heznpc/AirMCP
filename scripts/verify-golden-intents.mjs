@@ -82,6 +82,11 @@ try {
 
 const manifestByName = new Map(manifest.tools.map((t) => [t.name, t]));
 const srcRegisteredTools = collectRegisteredToolNames();
+const sensitiveGoldenTools = new Set([
+  // Hardware-gated tools can be absent from the reproducible manifest dump
+  // even though their hand-written AppIntent still ships in the app target.
+  "health_summary",
+]);
 
 // Extract every `runAirMCPTool("name", ...)` call from golden. The regex
 // is intentionally tight — we want to miss if someone ever renames the
@@ -113,6 +118,14 @@ const skips = [];
 
 for (const toolName of [...goldenTools].sort()) {
   const entry = manifestByName.get(toolName);
+  const mustConfirm = Boolean(entry?.annotations?.destructiveHint || entry?.annotations?.sensitiveHint || sensitiveGoldenTools.has(toolName));
+  const callSite = golden.indexOf(`runAirMCPTool("${toolName}"`);
+  const confirmationSlice = golden.slice(Math.max(0, callSite - 1600), callSite);
+  if (mustConfirm && !confirmationSlice.includes("requestConfirmation(")) {
+    failures.push(
+      `tool "${toolName}" is sensitive/destructive but its hand-written AppIntent calls runAirMCPTool without requestConfirmation`,
+    );
+  }
   if (!entry) {
     // Some tools are hardware-gated (health_*, apple-silicon-only modules)
     // and therefore absent from the manifest dump env (which forces

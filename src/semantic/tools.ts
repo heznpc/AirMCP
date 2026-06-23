@@ -124,7 +124,13 @@ export function registerSemanticTools(server: McpServer, config: AirMcpConfig): 
         "Run after semantic_index to expose your notes, events, reminders, and emails to system-wide search. " +
         "Requires Swift bridge (npm run swift-build).",
       inputSchema: {},
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async () => {
       try {

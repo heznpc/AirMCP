@@ -264,7 +264,12 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
         shuffle: z.boolean().optional().describe("Enable or disable shuffle"),
         songRepeat: z.enum(["off", "one", "all"]).optional().describe("Repeat mode"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async ({ shuffle, songRepeat }) => {
       try {
@@ -401,7 +406,13 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
         trackName: z.string().max(500).describe("Track name"),
         rating: z.number().int().min(0).max(100).describe("Rating value (0-100)"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async ({ trackName, rating }) => {
       try {
@@ -421,7 +432,13 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
         trackName: z.string().max(500).describe("Track name"),
         favorited: z.boolean().describe("Whether to mark as favorited"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async ({ trackName, favorited }) => {
       try {
@@ -441,7 +458,13 @@ export function registerMusicTools(server: McpServer, _config: AirMcpConfig): vo
         trackName: z.string().max(500).describe("Track name"),
         disliked: z.boolean().describe("Whether to mark as disliked"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async ({ trackName, disliked }) => {
       try {

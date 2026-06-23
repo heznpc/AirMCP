@@ -64,6 +64,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
+        sensitiveHint: true,
         idempotentHint: true,
         openWorldHint: false,
       },
@@ -97,6 +98,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
+        sensitiveHint: true,
         idempotentHint: true,
         openWorldHint: false,
       },
@@ -691,7 +693,12 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
         pid: z.number().int().nullable(),
         visible: z.boolean().nullable(),
       },
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async ({ name }) => {
       try {
@@ -723,7 +730,13 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
           }),
         ),
       },
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async () => {
       try {

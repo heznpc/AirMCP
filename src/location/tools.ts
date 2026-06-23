@@ -29,6 +29,7 @@ export function registerLocationTools(server: McpServer, _config: AirMcpConfig):
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
+        sensitiveHint: true,
         idempotentHint: false,
         openWorldHint: false,
       },

@@ -17,6 +17,7 @@ struct SearchNotesIntent: AppIntent {
     @Parameter(title: "Query")
     var query: String
 
+    @MainActor
     func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await runAirMCPTool("search_notes", args: ["query": query])
         return .result(value: result)
@@ -28,6 +29,7 @@ struct DailyBriefingIntent: AppIntent {
     nonisolated(unsafe) static var description = IntentDescription("Get today's events, reminders, and notes summary")
     nonisolated(unsafe) static var openAppWhenRun: Bool = false
 
+    @MainActor
     func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let result = try await runAirMCPTool("summarize_context", args: [:])
         return .result(value: result)
@@ -45,6 +47,7 @@ struct CheckCalendarIntent: AppIntent {
     }
 }
 
+@available(iOS 18, macOS 15, *)
 struct CreateReminderIntent: AppIntent {
     nonisolated(unsafe) static var title: LocalizedStringResource = "Create Reminder"
     nonisolated(unsafe) static var description = IntentDescription("Create a new reminder via AirMCP")
@@ -61,6 +64,10 @@ struct CreateReminderIntent: AppIntent {
         if let date = dueDate {
             args["dueDate"] = ISO8601DateFormatter().string(from: date)
         }
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Create Reminder with AirMCP? Create a new reminder via AirMCP.")
+        )
         let result = try await runAirMCPTool("create_reminder", args: args)
         return .result(value: result)
     }
@@ -114,6 +121,7 @@ struct ListCalendarsIntent: AppIntent {
 }
 
 #if canImport(HealthKit)
+@available(iOS 18, macOS 15, *)
 struct HealthSummaryIntent: AppIntent {
     nonisolated(unsafe) static var title: LocalizedStringResource = "Health Summary"
     nonisolated(unsafe) static var description = IntentDescription(
@@ -122,6 +130,10 @@ struct HealthSummaryIntent: AppIntent {
     nonisolated(unsafe) static var openAppWhenRun: Bool = false
 
     func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Health Summary with AirMCP? Get an aggregated health summary including steps, heart rate, sleep, and exercise.")
+        )
         let result = try await runAirMCPTool("health_summary", args: [:])
         return .result(value: result)
     }

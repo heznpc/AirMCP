@@ -80,7 +80,13 @@ export function registerHealthTools(server: McpServer, _config: AirMcpConfig): v
         "Get a combined health dashboard: today's steps, 7-day average heart rate, last night's sleep, active energy burned, and exercise minutes. All data is aggregated — no raw samples or timestamps.",
       inputSchema: {},
       outputSchema: healthSummaryShape,
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async () => {
       const bridgeErr = await checkSwiftBridge();
@@ -101,7 +107,13 @@ export function registerHealthTools(server: McpServer, _config: AirMcpConfig): v
       description: "Get aggregated step count for today from HealthKit.",
       inputSchema: {},
       outputSchema: healthStepsShape,
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async () => {
       const bridgeErr = await checkSwiftBridge();
@@ -122,7 +134,13 @@ export function registerHealthTools(server: McpServer, _config: AirMcpConfig): v
       description: "Get average resting heart rate over the last 7 days (bpm) from HealthKit.",
       inputSchema: {},
       outputSchema: healthHeartRateShape,
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async () => {
       const bridgeErr = await checkSwiftBridge();
@@ -149,7 +167,13 @@ export function registerHealthTools(server: McpServer, _config: AirMcpConfig): v
           .describe("ISO 8601 date (e.g. '2026-03-22'). Defaults to today (last night's sleep)."),
       },
       outputSchema: healthSleepShape,
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async ({ date }: { date?: string }) => {
       const bridgeErr = await checkSwiftBridge();
@@ -171,7 +195,13 @@ export function registerHealthTools(server: McpServer, _config: AirMcpConfig): v
       description:
         "Request read-only HealthKit authorization. Call this first if other health tools return permission errors.",
       inputSchema: {},
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async () => {
       const bridgeErr = await checkSwiftBridge();

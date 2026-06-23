@@ -174,7 +174,13 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
         id: z.string().max(500).regex(/^\d+$/, "Message ID must be numeric").describe("Message ID"),
         read: z.boolean().optional().default(true).describe("true=read, false=unread (default: true)"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async ({ id, read }) => {
       try {
@@ -194,7 +200,13 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
         id: z.string().max(500).regex(/^\d+$/, "Message ID must be numeric").describe("Message ID"),
         flagged: z.boolean().optional().default(true).describe("true=flag, false=unflag (default: true)"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async ({ id, flagged }) => {
       try {

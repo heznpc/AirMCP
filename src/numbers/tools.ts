@@ -53,7 +53,13 @@ export function registerNumbersTools(server: McpServer, _config: AirMcpConfig): 
       title: "Create Numbers Document",
       description: "Create a new blank Numbers spreadsheet.",
       inputSchema: {},
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
     },
     async () => {
       try {
@@ -136,7 +142,13 @@ export function registerNumbersTools(server: McpServer, _config: AirMcpConfig): 
           .union([z.string().max(10000), z.number().finite(), z.boolean()])
           .describe("Value to write (number, boolean, or text)"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async ({ document, sheet, cell, value }) => {
       try {
@@ -191,7 +203,13 @@ export function registerNumbersTools(server: McpServer, _config: AirMcpConfig): 
         document: z.string().max(500).describe("Document name"),
         sheetName: z.string().max(500).describe("Name for the new sheet"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
     },
     async ({ document, sheetName }) => {
       try {
@@ -319,7 +337,13 @@ export function registerNumbersTools(server: McpServer, _config: AirMcpConfig): 
         sheet: z.string().max(500).describe("Current sheet name"),
         newName: z.string().min(1).max(500).describe("New sheet name"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
     },
     async ({ document, sheet, newName }) => {
       try {

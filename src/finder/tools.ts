@@ -89,7 +89,13 @@ export function registerFinderTools(server: McpServer, _config: AirMcpConfig): v
         path: zFilePath.describe("Absolute file path"),
         tags: z.array(z.string()).describe("Array of tag names to set"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async ({ path, tags }) => {
       try {

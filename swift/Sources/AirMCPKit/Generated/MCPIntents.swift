@@ -1294,6 +1294,7 @@ public struct ActivateTabIntent: AppIntent {
 }
 
 // Tool: add_contact_email
+@available(iOS 18, macOS 15, *)
 public struct AddContactEmailIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Add Contact Email"
     nonisolated(unsafe) public static var description = IntentDescription("Add an email address to an existing contact.")
@@ -1316,6 +1317,10 @@ public struct AddContactEmailIntent: AppIntent {
         args["id"] = try requireResolvedAirMCPEntityId(id, tool: "add_contact_email")
         args["email"] = email
         args["label"] = label
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Add Contact Email with AirMCP? Add an email address to an existing contact.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "add_contact_email",
             args: args
@@ -1325,6 +1330,7 @@ public struct AddContactEmailIntent: AppIntent {
 }
 
 // Tool: add_contact_phone
+@available(iOS 18, macOS 15, *)
 public struct AddContactPhoneIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Add Contact Phone"
     nonisolated(unsafe) public static var description = IntentDescription("Add a phone number to an existing contact.")
@@ -1347,6 +1353,10 @@ public struct AddContactPhoneIntent: AppIntent {
         args["id"] = try requireResolvedAirMCPEntityId(id, tool: "add_contact_phone")
         args["phone"] = phone
         args["label"] = label
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Add Contact Phone with AirMCP? Add a phone number to an existing contact.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "add_contact_phone",
             args: args
@@ -1356,6 +1366,7 @@ public struct AddContactPhoneIntent: AppIntent {
 }
 
 // Tool: add_to_album
+@available(iOS 18, macOS 15, *)
 public struct AddToAlbumIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Add Photos to Album"
     nonisolated(unsafe) public static var description = IntentDescription("Add photos to an existing album by photo IDs and album name.")
@@ -1371,6 +1382,10 @@ public struct AddToAlbumIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Add Photos to Album with AirMCP? Add photos to an existing album by photo IDs and album name.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "add_to_album",
             args: ["photoIds": photoIds, "albumName": albumName]
@@ -1380,6 +1395,7 @@ public struct AddToAlbumIntent: AppIntent {
 }
 
 // Tool: add_to_playlist
+@available(iOS 18, macOS 15, *)
 public struct AddToPlaylistIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Add to Playlist"
     nonisolated(unsafe) public static var description = IntentDescription("Add a track to an existing playlist.")
@@ -1395,6 +1411,10 @@ public struct AddToPlaylistIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Add to Playlist with AirMCP? Add a track to an existing playlist.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "add_to_playlist",
             args: ["playlistName": playlistName, "trackName": trackName]
@@ -1612,6 +1632,7 @@ public struct CalendarWeekViewIntent: AppIntent {
 }
 
 // Tool: capture_area
+@available(iOS 18, macOS 15, *)
 public struct CaptureAreaIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Capture Screen Area"
     nonisolated(unsafe) public static var description = IntentDescription("Capture a screenshot of a specific rectangular region of the screen. Coordinates are in screen pixels with origin at top-left. Requires Screen Recording permission.")
@@ -1633,6 +1654,10 @@ public struct CaptureAreaIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Capture Screen Area with AirMCP? Capture a screenshot of a specific rectangular region of the screen. Coordinates are in screen pixels with origin at top-left. Requires Screen Recording permission.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "capture_area",
             args: ["x": x, "y": y, "width": width, "height": height]
@@ -1642,6 +1667,7 @@ public struct CaptureAreaIntent: AppIntent {
 }
 
 // Tool: capture_screen
+@available(iOS 18, macOS 15, *)
 public struct CaptureScreenIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Capture Screen"
     nonisolated(unsafe) public static var description = IntentDescription("Capture a full-screen screenshot as a PNG image. Optionally specify a display number for multi-monitor setups (1 = main display). Requires Screen Recording permission.")
@@ -1656,6 +1682,10 @@ public struct CaptureScreenIntent: AppIntent {
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         if let v = display { args["display"] = v }
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Capture Screen with AirMCP? Capture a full-screen screenshot as a PNG image. Optionally specify a display number for multi-monitor setups (1 = main display). Requires Screen Recording permission.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "capture_screen",
             args: args
@@ -1665,6 +1695,7 @@ public struct CaptureScreenIntent: AppIntent {
 }
 
 // Tool: capture_window
+@available(iOS 18, macOS 15, *)
 public struct CaptureWindowIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Capture Window"
     nonisolated(unsafe) public static var description = IntentDescription("Capture a screenshot of the frontmost window. Optionally specify an app name to activate that app first and capture its window. Requires Screen Recording permission.")
@@ -1679,6 +1710,10 @@ public struct CaptureWindowIntent: AppIntent {
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         if let v = appName { args["appName"] = v }
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Capture Window with AirMCP? Capture a screenshot of the frontmost window. Optionally specify an app name to activate that app first and capture its window. Requires Screen Recording permission.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "capture_window",
             args: args
@@ -1751,6 +1786,7 @@ public struct CompareNotesIntent: AppIntent {
 }
 
 // Tool: complete_reminder
+@available(iOS 18, macOS 15, *)
 public struct CompleteReminderIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Complete Reminder"
     nonisolated(unsafe) public static var description = IntentDescription("Mark a reminder as completed or un-complete it.")
@@ -1769,6 +1805,10 @@ public struct CompleteReminderIntent: AppIntent {
         var args: [String: any Sendable] = [:]
         args["id"] = try requireResolvedAirMCPEntityId(id, tool: "complete_reminder")
         args["completed"] = completed
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Complete Reminder with AirMCP? Mark a reminder as completed or un-complete it.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "complete_reminder",
             args: args
@@ -1799,6 +1839,7 @@ public struct ConnectBluetoothIntent: AppIntent {
 }
 
 // Tool: create_album
+@available(iOS 18, macOS 15, *)
 public struct CreateAlbumIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Create Album"
     nonisolated(unsafe) public static var description = IntentDescription("Create a new photo album.")
@@ -1811,6 +1852,10 @@ public struct CreateAlbumIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Create Album with AirMCP? Create a new photo album.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "create_album",
             args: ["name": name]
@@ -1820,6 +1865,7 @@ public struct CreateAlbumIntent: AppIntent {
 }
 
 // Tool: create_contact
+@available(iOS 18, macOS 15, *)
 public struct CreateContactIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Create Contact"
     nonisolated(unsafe) public static var description = IntentDescription("Create a new contact with name and optional email, phone, organization.")
@@ -1858,6 +1904,10 @@ public struct CreateContactIntent: AppIntent {
         if let v = organization { args["organization"] = v }
         if let v = jobTitle { args["jobTitle"] = v }
         if let v = note { args["note"] = v }
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Create Contact with AirMCP? Create a new contact with name and optional email, phone, organization.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "create_contact",
             args: args
@@ -1867,6 +1917,7 @@ public struct CreateContactIntent: AppIntent {
 }
 
 // Tool: create_directory
+@available(iOS 18, macOS 15, *)
 public struct CreateDirectoryIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Create Directory"
     nonisolated(unsafe) public static var description = IntentDescription("Create a new directory (and intermediate directories if needed).")
@@ -1879,6 +1930,10 @@ public struct CreateDirectoryIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Create Directory with AirMCP? Create a new directory (and intermediate directories if needed).")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "create_directory",
             args: ["path": path]
@@ -1888,6 +1943,7 @@ public struct CreateDirectoryIntent: AppIntent {
 }
 
 // Tool: create_event
+@available(iOS 18, macOS 15, *)
 public struct CreateEventIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Create Event"
     nonisolated(unsafe) public static var description = IntentDescription("Create a new calendar event. Recurring events cannot be created via automation. Attendees cannot be added programmatically.")
@@ -1926,6 +1982,10 @@ public struct CreateEventIntent: AppIntent {
         if let v = description { args["description"] = v }
         if let v = calendar { args["calendar"] = v }
         if let v = allDay { args["allDay"] = v }
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Create Event with AirMCP? Create a new calendar event. Recurring events cannot be created via automation. Attendees cannot be added programmatically.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "create_event",
             args: args
@@ -1935,6 +1995,7 @@ public struct CreateEventIntent: AppIntent {
 }
 
 // Tool: create_folder
+@available(iOS 18, macOS 15, *)
 public struct CreateFolderIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Create Folder"
     nonisolated(unsafe) public static var description = IntentDescription("Create a new folder in Apple Notes — a non-destructive write. Optionally specify which account to create it in.")
@@ -1953,6 +2014,10 @@ public struct CreateFolderIntent: AppIntent {
         var args: [String: any Sendable] = [:]
         args["name"] = name
         if let v = account { args["account"] = v }
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Create Folder with AirMCP? Create a new folder in Apple Notes — a non-destructive write. Optionally specify which account to create it in.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "create_folder",
             args: args
@@ -1962,6 +2027,7 @@ public struct CreateFolderIntent: AppIntent {
 }
 
 // Tool: create_note
+@available(iOS 18, macOS 15, *)
 public struct CreateNoteIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Create Note"
     nonisolated(unsafe) public static var description = IntentDescription("Create a new note with HTML body. The first line of the body becomes the note title automatically. Optionally specify a target folder.")
@@ -1980,6 +2046,10 @@ public struct CreateNoteIntent: AppIntent {
         var args: [String: any Sendable] = [:]
         args["body"] = body
         if let v = folder { args["folder"] = v }
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Create Note with AirMCP? Create a new note with HTML body. The first line of the body becomes the note title automatically. Optionally specify a target folder.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "create_note",
             args: args
@@ -1989,6 +2059,7 @@ public struct CreateNoteIntent: AppIntent {
 }
 
 // Tool: create_playlist
+@available(iOS 18, macOS 15, *)
 public struct CreatePlaylistIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Create Playlist"
     nonisolated(unsafe) public static var description = IntentDescription("Create a new playlist in Music.")
@@ -2001,6 +2072,10 @@ public struct CreatePlaylistIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Create Playlist with AirMCP? Create a new playlist in Music.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "create_playlist",
             args: ["name": name]
@@ -2010,6 +2085,7 @@ public struct CreatePlaylistIntent: AppIntent {
 }
 
 // Tool: create_reminder
+@available(iOS 18, macOS 15, *)
 public struct CreateReminderIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Create Reminder"
     nonisolated(unsafe) public static var description = IntentDescription("Create a new reminder. Optionally set notes, due date, priority (0=none, 1-4=high, 5=medium, 6-9=low), and target list. Recurrence rules cannot be set via automation.")
@@ -2040,6 +2116,10 @@ public struct CreateReminderIntent: AppIntent {
         if let v = dueDate { args["dueDate"] = v }
         if let v = priority { args["priority"] = v }
         if let v = list { args["list"] = v }
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Create Reminder with AirMCP? Create a new reminder. Optionally set notes, due date, priority (0=none, 1-4=high, 5=medium, 6-9=low), and target list. Recurrence rules cannot be set via automation.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "create_reminder",
             args: args
@@ -2049,6 +2129,7 @@ public struct CreateReminderIntent: AppIntent {
 }
 
 // Tool: create_reminder_list
+@available(iOS 18, macOS 15, *)
 public struct CreateReminderListIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Create Reminder List"
     nonisolated(unsafe) public static var description = IntentDescription("Create a new reminder list.")
@@ -2061,6 +2142,10 @@ public struct CreateReminderListIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Create Reminder List with AirMCP? Create a new reminder list.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "create_reminder_list",
             args: ["name": name]
@@ -2070,6 +2155,7 @@ public struct CreateReminderListIntent: AppIntent {
 }
 
 // Tool: create_shortcut
+@available(iOS 18, macOS 15, *)
 public struct CreateShortcutIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Create Shortcut"
     nonisolated(unsafe) public static var description = IntentDescription("Create a new empty Siri Shortcut by name — drives the Shortcuts app via UI automation (needs Accessibility permission; the app opens and takes focus). The shortcut must be further configured in the Shortcuts app.")
@@ -2082,6 +2168,10 @@ public struct CreateShortcutIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Create Shortcut with AirMCP? Create a new empty Siri Shortcut by name — drives the Shortcuts app via UI automation (needs Accessibility permission; the app opens and takes focus). The shortcut must be further configur…")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "create_shortcut",
             args: ["name": name]
@@ -2180,6 +2270,7 @@ public struct DropPinIntent: AppIntent {
 }
 
 // Tool: duplicate_shortcut
+@available(iOS 18, macOS 15, *)
 public struct DuplicateShortcutIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Duplicate Shortcut"
     nonisolated(unsafe) public static var description = IntentDescription("Duplicate an existing Siri Shortcut. Exports the shortcut to a temporary file and re-imports it with a new name.")
@@ -2195,6 +2286,10 @@ public struct DuplicateShortcutIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Duplicate Shortcut with AirMCP? Duplicate an existing Siri Shortcut. Exports the shortcut to a temporary file and re-imports it with a new name.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "duplicate_shortcut",
             args: ["name": name, "newName": newName]
@@ -2204,6 +2299,7 @@ public struct DuplicateShortcutIntent: AppIntent {
 }
 
 // Tool: edit_shortcut
+@available(iOS 18, macOS 15, *)
 public struct EditShortcutIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Edit Shortcut"
     nonisolated(unsafe) public static var description = IntentDescription("Open a Siri Shortcut in the Shortcuts app for manual editing. Uses UI automation (System Events) to activate the app, search for the shortcut, and open it. The user can then edit the shortcut in the Shortcuts app UI.")
@@ -2216,6 +2312,10 @@ public struct EditShortcutIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Edit Shortcut with AirMCP? Open a Siri Shortcut in the Shortcuts app for manual editing. Uses UI automation (System Events) to activate the app, search for the shortcut, and open it. The user can then edit the shortcu…")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "edit_shortcut",
             args: ["name": name]
@@ -2261,6 +2361,7 @@ public struct EventSubscribeIntent: AppIntent {
 }
 
 // Tool: export_shortcut
+@available(iOS 18, macOS 15, *)
 public struct ExportShortcutIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Export Shortcut"
     nonisolated(unsafe) public static var description = IntentDescription("Export a Siri Shortcut to a .shortcut file. Uses the macOS shortcuts CLI to save the shortcut to the specified output path.")
@@ -2276,6 +2377,10 @@ public struct ExportShortcutIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Export Shortcut with AirMCP? Export a Siri Shortcut to a .shortcut file. Uses the macOS shortcuts CLI to save the shortcut to the specified output path.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "export_shortcut",
             args: ["name": name, "outputPath": outputPath]
@@ -2316,6 +2421,7 @@ public struct FindRelatedIntent: AppIntent {
 }
 
 // Tool: flag_message
+@available(iOS 18, macOS 15, *)
 public struct FlagMessageIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Flag Message"
     nonisolated(unsafe) public static var description = IntentDescription("Flag or unflag an email message.")
@@ -2331,6 +2437,10 @@ public struct FlagMessageIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Flag Message with AirMCP? Flag or unflag an email message.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "flag_message",
             args: ["id": id, "flagged": flagged]
@@ -2497,6 +2607,7 @@ public struct GetBrightnessIntent: AppIntent {
 }
 
 // Tool: get_clipboard
+@available(iOS 18, macOS 15, *)
 public struct GetClipboardIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Get Clipboard"
     nonisolated(unsafe) public static var description = IntentDescription("Read the current text content of the system clipboard.")
@@ -2506,6 +2617,10 @@ public struct GetClipboardIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Get Clipboard with AirMCP? Read the current text content of the system clipboard.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "get_clipboard",
             args: [String: any Sendable]()
@@ -2525,6 +2640,7 @@ public struct GetClipboardIntent: AppIntent {
 }
 
 // Tool: get_current_location
+@available(iOS 18, macOS 15, *)
 public struct GetCurrentLocationIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Get Current Location"
     nonisolated(unsafe) public static var description = IntentDescription("Get the device's current geographic location (latitude, longitude, altitude). Requires Location Services permission. First use triggers a macOS permission dialog.")
@@ -2534,6 +2650,10 @@ public struct GetCurrentLocationIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Get Current Location with AirMCP? Get the device's current geographic location (latitude, longitude, altitude). Requires Location Services permission. First use triggers a macOS permission dialog.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "get_current_location",
             args: [String: any Sendable]()
@@ -3303,6 +3423,7 @@ public struct GwsTasksListIntent: AppIntent {
 }
 
 // Tool: import_photo
+@available(iOS 18, macOS 15, *)
 public struct ImportPhotoIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Import Photo"
     nonisolated(unsafe) public static var description = IntentDescription("Import a photo from a file path into Photos library. Optionally add to an existing album. Requires macOS 26+ Swift bridge.")
@@ -3321,6 +3442,10 @@ public struct ImportPhotoIntent: AppIntent {
         var args: [String: any Sendable] = [:]
         args["filePath"] = filePath
         if let v = albumName { args["albumName"] = v }
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Import Photo with AirMCP? Import a photo from a file path into Photos library. Optionally add to an existing album. Requires macOS 26+ Swift bridge.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "import_photo",
             args: args
@@ -3330,6 +3455,7 @@ public struct ImportPhotoIntent: AppIntent {
 }
 
 // Tool: import_shortcut
+@available(iOS 18, macOS 15, *)
 public struct ImportShortcutIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Import Shortcut"
     nonisolated(unsafe) public static var description = IntentDescription("Import a .shortcut file into Siri Shortcuts. Uses the macOS shortcuts CLI to import the shortcut from the specified file path.")
@@ -3342,6 +3468,10 @@ public struct ImportShortcutIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Import Shortcut with AirMCP? Import a .shortcut file into Siri Shortcuts. Uses the macOS shortcuts CLI to import the shortcut from the specified file path.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "import_shortcut",
             args: ["filePath": filePath]
@@ -3382,6 +3512,7 @@ public struct IsAppRunningIntent: AppIntent {
 }
 
 // Tool: keynote_add_slide
+@available(iOS 18, macOS 15, *)
 public struct KeynoteAddSlideIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Add Keynote Slide"
     nonisolated(unsafe) public static var description = IntentDescription("Add a new slide to a Keynote presentation.")
@@ -3394,6 +3525,10 @@ public struct KeynoteAddSlideIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Add Keynote Slide with AirMCP? Add a new slide to a Keynote presentation.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "keynote_add_slide",
             args: ["document": document]
@@ -3403,6 +3538,7 @@ public struct KeynoteAddSlideIntent: AppIntent {
 }
 
 // Tool: keynote_create_document
+@available(iOS 18, macOS 15, *)
 public struct KeynoteCreateDocumentIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Create Keynote Presentation"
     nonisolated(unsafe) public static var description = IntentDescription("Create a new blank Keynote presentation.")
@@ -3412,6 +3548,10 @@ public struct KeynoteCreateDocumentIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Create Keynote Presentation with AirMCP? Create a new blank Keynote presentation.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "keynote_create_document",
             args: [String: any Sendable]()
@@ -3484,6 +3624,7 @@ public struct KeynoteListSlidesIntent: AppIntent {
 }
 
 // Tool: keynote_set_presenter_notes
+@available(iOS 18, macOS 15, *)
 public struct KeynoteSetPresenterNotesIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Set Keynote Presenter Notes"
     nonisolated(unsafe) public static var description = IntentDescription("Set presenter notes on a specific slide.")
@@ -3502,6 +3643,10 @@ public struct KeynoteSetPresenterNotesIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Set Keynote Presenter Notes with AirMCP? Set presenter notes on a specific slide.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "keynote_set_presenter_notes",
             args: ["document": document, "slideNumber": slideNumber, "notes": notes]
@@ -3602,6 +3747,7 @@ public struct ListAlbumsIntent: AppIntent {
 }
 
 // Tool: list_all_windows
+@available(iOS 18, macOS 15, *)
 public struct ListAllWindowsIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "List All Windows"
     nonisolated(unsafe) public static var description = IntentDescription("List windows across all running applications with title, size, position, app name, and PID.")
@@ -3611,6 +3757,10 @@ public struct ListAllWindowsIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("List All Windows with AirMCP? List windows across all running applications with title, size, position, app name, and PID.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_all_windows",
             args: [String: any Sendable]()
@@ -4472,6 +4622,7 @@ public struct ListTriggersIntent: AppIntent {
 }
 
 // Tool: list_windows
+@available(iOS 18, macOS 15, *)
 public struct ListWindowsIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "List Windows"
     nonisolated(unsafe) public static var description = IntentDescription("List all visible windows across all running applications. Returns JSON with each window's app name, bundle ID, title, position, and size. Requires Accessibility permissions.")
@@ -4481,6 +4632,10 @@ public struct ListWindowsIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("List Windows with AirMCP? List all visible windows across all running applications. Returns JSON with each window's app name, bundle ID, title, position, and size. Requires Accessibility permissions.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "list_windows",
             args: [String: any Sendable]()
@@ -4539,6 +4694,7 @@ public struct LocalLlmStatusIntent: AppIntent {
 }
 
 // Tool: mark_message_read
+@available(iOS 18, macOS 15, *)
 public struct MarkMessageReadIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Mark Message Read/Unread"
     nonisolated(unsafe) public static var description = IntentDescription("Mark an email message as read or unread.")
@@ -4554,6 +4710,10 @@ public struct MarkMessageReadIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Mark Message Read/Unread with AirMCP? Mark an email message as read or unread.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "mark_message_read",
             args: ["id": id, "read": read]
@@ -4563,6 +4723,7 @@ public struct MarkMessageReadIntent: AppIntent {
 }
 
 // Tool: memory_put
+@available(iOS 18, macOS 15, *)
 public struct MemoryPutIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Remember a Fact, Entity, or Episode"
     nonisolated(unsafe) public static var description = IntentDescription("Insert or update a context-memory entry. Use `fact` for durable key→value notes, `entity` for named people/places/projects, and `episode` for time-anchored records. If you omit `id`, the key is used as the stable id (so a second call with the same key upserts). `ttl_ms` makes the entry self-expiring.")
@@ -4601,6 +4762,10 @@ public struct MemoryPutIntent: AppIntent {
         if let v = tags { args["tags"] = v }
         if let v = source { args["source"] = v }
         if let v = ttl_ms { args["ttl_ms"] = v }
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Remember a Fact, Entity, or Episode with AirMCP? Insert or update a context-memory entry. Use `fact` for durable key→value notes, `entity` for named people/places/projects, and `episode` for time-anchored records. If…")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "memory_put",
             args: args
@@ -4809,6 +4974,7 @@ public struct NowPlayingIntent: AppIntent {
 }
 
 // Tool: numbers_add_sheet
+@available(iOS 18, macOS 15, *)
 public struct NumbersAddSheetIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Add Numbers Sheet"
     nonisolated(unsafe) public static var description = IntentDescription("Add a new sheet to a Numbers spreadsheet.")
@@ -4824,6 +4990,10 @@ public struct NumbersAddSheetIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Add Numbers Sheet with AirMCP? Add a new sheet to a Numbers spreadsheet.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "numbers_add_sheet",
             args: ["document": document, "sheetName": sheetName]
@@ -4833,6 +5003,7 @@ public struct NumbersAddSheetIntent: AppIntent {
 }
 
 // Tool: numbers_create_document
+@available(iOS 18, macOS 15, *)
 public struct NumbersCreateDocumentIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Create Numbers Document"
     nonisolated(unsafe) public static var description = IntentDescription("Create a new blank Numbers spreadsheet.")
@@ -4842,6 +5013,10 @@ public struct NumbersCreateDocumentIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Create Numbers Document with AirMCP? Create a new blank Numbers spreadsheet.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "numbers_create_document",
             args: [String: any Sendable]()
@@ -5064,6 +5239,7 @@ public struct NumbersReadCellsIntent: AppIntent {
 }
 
 // Tool: numbers_rename_sheet
+@available(iOS 18, macOS 15, *)
 public struct NumbersRenameSheetIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Rename Numbers Sheet"
     nonisolated(unsafe) public static var description = IntentDescription("Rename a sheet in place. Numbers does NOT allow duplicate sheet names; the call fails with errJxa when the new name is taken.")
@@ -5082,6 +5258,10 @@ public struct NumbersRenameSheetIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Rename Numbers Sheet with AirMCP? Rename a sheet in place. Numbers does NOT allow duplicate sheet names; the call fails with errJxa when the new name is taken.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "numbers_rename_sheet",
             args: ["document": document, "sheet": sheet, "newName": newName]
@@ -5091,6 +5271,7 @@ public struct NumbersRenameSheetIntent: AppIntent {
 }
 
 // Tool: numbers_set_cell
+@available(iOS 18, macOS 15, *)
 public struct NumbersSetCellIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Set Numbers Cell"
     nonisolated(unsafe) public static var description = IntentDescription("Write a value to a single cell. Numbers and booleans land as native cell types (not text), so they sort and feed formulas correctly; strings are written verbatim and Numbers interprets a leading '=' as a formula.")
@@ -5112,6 +5293,10 @@ public struct NumbersSetCellIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Set Numbers Cell with AirMCP? Write a value to a single cell. Numbers and booleans land as native cell types (not text), so they sort and feed formulas correctly; strings are written verbatim and Numbers interprets a…")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "numbers_set_cell",
             args: ["document": document, "sheet": sheet, "cell": cell, "value": value]
@@ -5142,6 +5327,7 @@ public struct OpenAddressIntent: AppIntent {
 }
 
 // Tool: pages_create_document
+@available(iOS 18, macOS 15, *)
 public struct PagesCreateDocumentIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Create Pages Document"
     nonisolated(unsafe) public static var description = IntentDescription("Create a new blank Pages document.")
@@ -5151,6 +5337,10 @@ public struct PagesCreateDocumentIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Create Pages Document with AirMCP? Create a new blank Pages document.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "pages_create_document",
             args: [String: any Sendable]()
@@ -6444,6 +6634,7 @@ public struct SetBrightnessIntent: AppIntent {
 }
 
 // Tool: set_clipboard
+@available(iOS 18, macOS 15, *)
 public struct SetClipboardIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Set Clipboard"
     nonisolated(unsafe) public static var description = IntentDescription("Write text to the system clipboard, replacing its current content.")
@@ -6456,6 +6647,10 @@ public struct SetClipboardIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Set Clipboard with AirMCP? Write text to the system clipboard, replacing its current content.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "set_clipboard",
             args: ["text": text]
@@ -6475,6 +6670,7 @@ public struct SetClipboardIntent: AppIntent {
 }
 
 // Tool: set_disliked
+@available(iOS 18, macOS 15, *)
 public struct SetDislikedIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Set Disliked"
     nonisolated(unsafe) public static var description = IntentDescription("Mark or unmark a track as disliked.")
@@ -6490,6 +6686,10 @@ public struct SetDislikedIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Set Disliked with AirMCP? Mark or unmark a track as disliked.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "set_disliked",
             args: ["trackName": trackName, "disliked": disliked]
@@ -6499,6 +6699,7 @@ public struct SetDislikedIntent: AppIntent {
 }
 
 // Tool: set_favorited
+@available(iOS 18, macOS 15, *)
 public struct SetFavoritedIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Set Favorited"
     nonisolated(unsafe) public static var description = IntentDescription("Mark or unmark a track as favorited (loved).")
@@ -6514,6 +6715,10 @@ public struct SetFavoritedIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Set Favorited with AirMCP? Mark or unmark a track as favorited (loved).")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "set_favorited",
             args: ["trackName": trackName, "favorited": favorited]
@@ -6523,6 +6728,7 @@ public struct SetFavoritedIntent: AppIntent {
 }
 
 // Tool: set_file_tags
+@available(iOS 18, macOS 15, *)
 public struct SetFileTagsIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Set File Tags"
     nonisolated(unsafe) public static var description = IntentDescription("Set Finder tags on a file. Replaces all existing tags.")
@@ -6538,6 +6744,10 @@ public struct SetFileTagsIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Set File Tags with AirMCP? Set Finder tags on a file. Replaces all existing tags.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "set_file_tags",
             args: ["path": path, "tags": tags]
@@ -6547,6 +6757,7 @@ public struct SetFileTagsIntent: AppIntent {
 }
 
 // Tool: set_rating
+@available(iOS 18, macOS 15, *)
 public struct SetRatingIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Set Rating"
     nonisolated(unsafe) public static var description = IntentDescription("Set the star rating (0-100) for a track. Use multiples of 20 for full stars (0, 20, 40, 60, 80, 100).")
@@ -6562,6 +6773,10 @@ public struct SetRatingIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Set Rating with AirMCP? Set the star rating (0-100) for a track. Use multiples of 20 for full stars (0, 20, 40, 60, 80, 100).")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "set_rating",
             args: ["trackName": trackName, "rating": rating]
@@ -6947,6 +7162,7 @@ public struct SpeechAvailabilityIntent: AppIntent {
 }
 
 // Tool: spotlight_sync
+@available(iOS 18, macOS 15, *)
 public struct SpotlightSyncIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Sync to Spotlight"
     nonisolated(unsafe) public static var description = IntentDescription("Push semantically indexed data to macOS Core Spotlight, making it discoverable via Spotlight search and Siri. Run after semantic_index to expose your notes, events, reminders, and emails to system-wide search. Requires Swift bridge (npm run swift-build).")
@@ -6956,6 +7172,10 @@ public struct SpotlightSyncIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Sync to Spotlight with AirMCP? Push semantically indexed data to macOS Core Spotlight, making it discoverable via Spotlight search and Siri. Run after semantic_index to expose your notes, events, reminders, and emails…")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "spotlight_sync",
             args: [String: any Sendable]()
@@ -7318,6 +7538,7 @@ public struct TvSearchIntent: AppIntent {
 }
 
 // Tool: ui_accessibility_query
+@available(iOS 18, macOS 15, *)
 public struct UiAccessibilityQueryIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Query UI Elements"
     nonisolated(unsafe) public static var description = IntentDescription("Search for UI elements by accessibility attributes (role, title, value, description, identifier). More precise than ui_read — returns only matching elements with full attribute data. Works on any app, including those without AppleScript support. Requires Accessibility permissions.")
@@ -7364,6 +7585,10 @@ public struct UiAccessibilityQueryIntent: AppIntent {
         if let v = label { args["label"] = v }
         args["maxResults"] = maxResults
         args["maxDepth"] = maxDepth
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Query UI Elements with AirMCP? Search for UI elements by accessibility attributes (role, title, value, description, identifier). More precise than ui_read — returns only matching elements with full attribute data. Wor…")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "ui_accessibility_query",
             args: args
@@ -7373,6 +7598,7 @@ public struct UiAccessibilityQueryIntent: AppIntent {
 }
 
 // Tool: ui_diff
+@available(iOS 18, macOS 15, *)
 public struct UiDiffIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Compare UI State"
     nonisolated(unsafe) public static var description = IntentDescription("Compare the current UI state against a previous snapshot to detect changes. Pass the 'elements' array from a previous ui_traverse result as beforeSnapshot. Returns added, removed, and changed elements. Useful for verifying action results.")
@@ -7391,6 +7617,10 @@ public struct UiDiffIntent: AppIntent {
         var args: [String: any Sendable] = [:]
         args["beforeSnapshot"] = beforeSnapshot
         if let v = app { args["app"] = v }
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Compare UI State with AirMCP? Compare the current UI state against a previous snapshot to detect changes. Pass the 'elements' array from a previous ui_traverse result as beforeSnapshot. Returns added, removed, and cha…")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "ui_diff",
             args: args
@@ -7400,6 +7630,7 @@ public struct UiDiffIntent: AppIntent {
 }
 
 // Tool: ui_open_app
+@available(iOS 18, macOS 15, *)
 public struct UiOpenAppIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Open App (UI Automation)"
     nonisolated(unsafe) public static var description = IntentDescription("Open an application by name or bundle ID and return an accessibility tree summary of its windows and top-level UI elements. Requires Accessibility permissions.")
@@ -7412,6 +7643,10 @@ public struct UiOpenAppIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Open App (UI Automation) with AirMCP? Open an application by name or bundle ID and return an accessibility tree summary of its windows and top-level UI elements. Requires Accessibility permissions.")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "ui_open_app",
             args: ["appName": appName]
@@ -7421,6 +7656,7 @@ public struct UiOpenAppIntent: AppIntent {
 }
 
 // Tool: ui_read
+@available(iOS 18, macOS 15, *)
 public struct UiReadIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Read Accessibility Tree"
     nonisolated(unsafe) public static var description = IntentDescription("Read the accessibility tree of the frontmost app (or specified app). Returns structured data about all visible UI elements including their roles, names, values, positions, and hierarchy. Use this to understand what UI elements are available before interacting with them. Requires Accessibility permissions.")
@@ -7443,6 +7679,10 @@ public struct UiReadIntent: AppIntent {
         if let v = appName { args["appName"] = v }
         args["maxDepth"] = maxDepth
         args["maxElements"] = maxElements
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("Read Accessibility Tree with AirMCP? Read the accessibility tree of the frontmost app (or specified app). Returns structured data about all visible UI elements including their roles, names, values, positions, and hier…")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "ui_read",
             args: args
@@ -7483,6 +7723,7 @@ public struct UiScrollIntent: AppIntent {
 }
 
 // Tool: ui_traverse
+@available(iOS 18, macOS 15, *)
 public struct UiTraverseIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "BFS Traverse UI Tree"
     nonisolated(unsafe) public static var description = IntentDescription("Breadth-first traversal of the accessibility tree. Returns a flat list of all UI elements with parent-child relationships, positions, sizes, and states. Supports PID targeting and visible-only filtering. More thorough than ui_read. Requires Accessibility permissions.")
@@ -7513,6 +7754,10 @@ public struct UiTraverseIntent: AppIntent {
         args["maxDepth"] = maxDepth
         args["maxElements"] = maxElements
         args["onlyVisible"] = onlyVisible
+        try await requestConfirmation(
+            actionName: .go,
+            dialog: IntentDialog("BFS Traverse UI Tree with AirMCP? Breadth-first traversal of the accessibility tree. Returns a flat list of all UI elements with parent-child relationships, positions, sizes, and states. Supports PID targeting and vis…")
+        )
         let result = try await MCPIntentRouter.shared.call(
             tool: "ui_traverse",
             args: args

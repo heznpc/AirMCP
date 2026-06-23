@@ -187,7 +187,13 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
           "File path to export the .shortcut file to (e.g. ~/Desktop/MyShortcut.shortcut)",
         ),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async ({ name, outputPath }) => {
       try {
@@ -212,7 +218,13 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
       inputSchema: {
         filePath: zFilePath.describe("Path to the .shortcut file to import"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
     },
     async ({ filePath }) => {
       try {
@@ -238,7 +250,13 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
         name: z.string().max(500).describe("Name of the shortcut to duplicate (exact match)"),
         newName: z.string().max(500).describe("Name for the duplicated shortcut"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
     },
     async ({ name, newName }) => {
       try {
@@ -258,7 +276,13 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
       inputSchema: {
         name: z.string().max(500).describe("Shortcut name to edit (exact match)"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
     },
     async ({ name }) => {
       try {

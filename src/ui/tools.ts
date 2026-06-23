@@ -29,6 +29,7 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
+        sensitiveHint: true,
         idempotentHint: true,
         openWorldHint: true,
       },
@@ -220,6 +221,7 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
+        sensitiveHint: true,
         idempotentHint: true,
         openWorldHint: true,
       },
@@ -278,7 +280,13 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
           .default(8)
           .describe("Max tree depth to search (default: 8)"),
       },
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
     async ({ app, role, title, value, description, identifier, label, maxResults, maxDepth }) => {
       try {
@@ -381,7 +389,13 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
           .describe("Max elements to collect (default: 500)"),
         onlyVisible: z.boolean().optional().default(false).describe("Only include elements with visible position/size"),
       },
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
     async ({ app, pid, maxDepth, maxElements, onlyVisible }) => {
       try {
@@ -408,7 +422,13 @@ export function registerUiTools(server: McpServer, _config: AirMcpConfig): void 
           .describe("JSON string of previous UI tree snapshot (elements array from ui_traverse)"),
         app: z.string().max(500).optional().describe("App name to compare against"),
       },
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        sensitiveHint: true,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
     async ({ beforeSnapshot, app }) => {
       try {

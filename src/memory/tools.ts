@@ -60,6 +60,7 @@ export function registerMemoryTools(server: McpServer, _config: AirMcpConfig): v
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
+        sensitiveHint: true,
         idempotentHint: true,
         openWorldHint: false,
       },

@@ -73,6 +73,13 @@ describe("buildConfirmDialogBody (unit)", () => {
     );
   });
 
+  test("uses a sensitive fallback for sensitive non-destructive tools", () => {
+    const tool = { name: "read_private_state", title: "Read Private State", description: "", annotations: { sensitiveHint: true } };
+    expect(buildConfirmDialogBody(tool)).toBe(
+      "Read Private State with AirMCP? This action may expose or change sensitive local data.",
+    );
+  });
+
   test('sanitizes characters that would break the Swift string literal', () => {
     const tool = {
       name: "weird",
@@ -197,15 +204,19 @@ describe("generated Swift dialogs (integration with AIRMCP_APPINTENTS_DESTRUCTIV
     });
   }
 
-  test("non-destructive write tools have NO requestConfirmation block", () => {
-    // `create_event` is a write tool with destructiveHint: false —
-    // per RFC 0007 §6 it lands in Phase A.3 same as destructives but
-    // skips the confirmation. Pin that the confirmBlock truly only
-    // fires for destructiveHint: true.
+  test("sensitive non-destructive tools have a requestConfirmation block", () => {
     const marker = "// Tool: create_event";
     const idx = generated.indexOf(marker);
     expect(idx).toBeGreaterThan(-1);
-    const slice = generated.slice(idx, idx + 1500);
+    const slice = generated.slice(idx, idx + 3200);
+    expect(slice).toMatch(/requestConfirmation\(/);
+  });
+
+  test("non-sensitive non-destructive write tools have NO requestConfirmation block", () => {
+    const marker = "// Tool: set_volume";
+    const idx = generated.indexOf(marker);
+    expect(idx).toBeGreaterThan(-1);
+    const slice = generated.slice(idx, idx + 3200);
     expect(slice).not.toMatch(/requestConfirmation\(/);
   });
 

@@ -365,6 +365,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
+        sensitiveHint: true,
         idempotentHint: false,
         openWorldHint: false,
       },

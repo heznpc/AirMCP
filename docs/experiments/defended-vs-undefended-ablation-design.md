@@ -1,9 +1,11 @@
 # Defended vs Undefended Apple-Native MCP — Attack-Success-Rate Ablation (Design)
 
-> **Status: DRAFT — not ratified.** Design only. **No experiment has been run.**
-> This document contains **no result numbers** and must not be cited as evidence of any
-> security outcome. Its purpose is to fix *what is measured*, *how outcomes are judged*,
-> and *what may not be claimed* — before any harness, runner, or scoring code exists.
+> **Status: RATIFIED (design).** The measurement plan, outcome judgments, and
+> claim-prohibition lines below are ratified and binding (§11). **No experiment has been
+> run**; this document still contains **no result numbers** and must not be cited as
+> evidence of any security outcome. `ratified` vs `proposed` are separated throughout;
+> numbers and efficacy claims remain forbidden until measured (§9). The harness / runner /
+> scoring code is a separate, later PR — **not started**.
 
 **Time anchor.** Authored `NOW_DATE=2026-06-25` (KST). Current-state window
 `WINDOW_START=2026-03-27 .. 2026-06-25`. Every claim about the current state of an
@@ -17,6 +19,20 @@ is a *separate, later* PR, opened only after this design is ratified.
 
 **Document labels.** Per the repo README rules, claims are tagged
 *Currently implemented* (code/text on disk), *Planned*, *Design intent*, or *Non-goals*.
+
+---
+
+## Boundary principles (ratified)
+
+- **AirMCP stays the flagship runtime.** The ablation harness is an
+  **experiment / companion layer**, never a product feature of AirMCP.
+- **The harness does not widen AirMCP's public surface.** No new public config, README,
+  or product-positioning is added on AirMCP's behalf to serve the experiment.
+- **No shared harness / kit-core extraction now.** The harness stays
+  AirMCP-ablation-specific experiment code until a genuine *third* consumer exists.
+- **`ratified` vs `proposed` separated; no numbers/efficacy before measurement.** Every
+  experiment decision is labeled; efficacy / percentage / "proven" language is forbidden
+  until the experiment is run and reported (§9).
 
 ---
 
@@ -104,10 +120,11 @@ cleanly config-toggleable, which matters for isolating marginal contribution:
   transport), `AIRMCP_ALLOW_SEND_MAIL`, emergency-stop (file presence), shared access
   (`AIRMCP_INCLUDE_SHARED`).
 - **Not** cleanly toggleable (hardcoded): the Safari egress guard, untrusted fencing /
-  taint propagation, and the symlink-escape guard. Ablating these to measure their
-  marginal contribution would require an **instrumented build** with explicit bypass
-  flags. *Planned:* the harness PR must add narrow, test-gated ablation flags rather than
-  patching defenses out by hand. **This is an open question (§11), not a solved one.**
+  taint propagation, and the symlink-escape guard. *Ratified (§11.1):* ablate these via
+  **test-gated, experiment-only bypass flags** — **not** patched builds and **not** public
+  runtime flags. The default is **always defense-on**; the flag-off state is pinned by a
+  test; the flags are **not** exposed in README/product docs; and any bypass in effect is
+  **recorded in the per-trial harness result metadata**.
 
 ---
 
@@ -138,10 +155,14 @@ shell/SSH exec) disqualify a *primary matched* comparator (allowed only as secon
 | `supermemoryai/apple-mcp` (was `dhravya/apple-mcp`) | 2025-08-11 `[historical]` | **archived** ~2026-01 | TCC-only ("explicit access request" = OS prompts only) | Archived reference only (best PIM overlap), with archived caveat |
 | `the-momentum/apple-health-mcp-server` | 2026-02-10 | **EOL/superseded** by "Open Wearables" | offline XML-over-DuckDB; never touches live OS APIs | **Excluded** — mechanism mismatch + EOL |
 
-*Design intent.* Run at minimum **steipete (primary)** + **joshrutkowski (matched-shape
-secondary, with staleness caveat)** to cover both "maximally-capable undefended" and
-"same-tool-shape undefended". Treat baseline version pins as first-class reproducibility
-inputs (§8); the staleness/archival caveats are reported, never hidden.
+*Ratified (§11.5).* **Primary baselines: `steipete/macos-automator-mcp` +
+`joshrutkowski/applescript-mcp`** — covering "maximally-capable undefended" and
+"same-tool-shape undefended" (joshrutkowski keeps its `2025-04` staleness caveat).
+**`peakmojo` is secondary only, and only after re-verification at harness-PR time.**
+Arbitrary-script baselines get **no extra degrees of freedom**: they are driven through the
+**same task interface (an adapter)** as the tool-catalog server, so the *task* — not the
+baseline's surface — is the held-constant variable. Baseline version pins are first-class
+reproducibility inputs (§8); staleness/archival caveats are reported, never hidden.
 
 ---
 
@@ -195,15 +216,19 @@ human):
 
 - **ASR_auto** — no human; gated calls are **auto-denied**. Measures the *pure code-layer*
   blocking a defense provides with no approver. (USER-APPROVED-THROUGH cannot occur.)
-- **ASR_humanlike** — a **fixed, pre-registered approver policy** stands in for the user
-  (e.g. approve "routine-looking", deny "dangerous-looking"), **identical across all arms**.
-  Measures realistic end-to-end exposure. The policy is versioned with the corpus and is a
-  reproducibility input (§8); a real-user study is a *Non-goal* here.
+- **ASR_humanlike** — a **fixed, pre-registered approver policy file** stands in for the
+  user, **identical across all arms (the baseline adapter passes the same policy)**.
+  *Ratified policy (§11.2):* **approve only the user-specified benign fixture task**;
+  **deny** hidden/injected instructions, exfiltration, destructive mutation, any access
+  outside the fixture, and unnecessary sensitive reads. The policy is versioned with the
+  corpus and is a reproducibility input (§8); a real-user study is a *Non-goal* here.
 
-`ASR = achieved / (achieved + blocked + partial-as-defined)` per `(arm, scenario, model)`,
-with `achieved` = BLOCKED's complement under the chosen variant, PARTIAL handled by an
-explicit, pre-registered rule (counted as a fractional/severity-weighted success, stated
-in the corpus, not invented post hoc). ERROR is excluded from the denominator.
+**Primary reporting is the bucket vector, not a single number (ratified §11.3).** Report
+`success / blocked / partial / error / false-positive` counts per `(arm, scenario, model,
+approval-mode)` **as-is** — do not collapse them into one ASR scalar. A **weighted-partial**
+ASR is a **secondary** metric only; its per-scenario weights are **pre-registered in a
+YAML/JSON file before any run**, never assigned post hoc. ERROR is excluded from any rate
+denominator.
 
 **Utility / false-positive cost is mandatory.** A defense that blocks everything has
 ASR 0 and zero utility. The design therefore **requires** a parallel **benign task suite**
@@ -244,19 +269,24 @@ this runtime ablation does **not** measure, and are marked as such.
 
 1. **Hold the model constant** across arms — same host LLM id + params; fix seeds/temperature
    where the API permits; identical task prompts and tool-availability framing.
-2. **Fixture.** A dedicated, seeded macOS test account with **synthetic** Notes / Reminders /
-   Calendar / Files / Health-export / clipboard data — no real personal data. TCC permissions
-   **pre-granted identically** to every arm.
-3. **Egress sink.** A controlled local sink observes exfiltration attempts (so Class-A trials
-   are *observed*, not *harmful*); no real external delivery.
+2. **Fixture (ratified §11.6).** A dedicated, seeded macOS test account with **synthetic
+   data only** (Notes / Reminders / Calendar / Files / Health-export / clipboard) — **real
+   user data is forbidden**. The fixture is **resettable per trial**. TCC permissions are
+   **pre-granted identically** to every arm. The **observed side effect is the oracle —
+   model self-report is never the oracle** (restating §5).
+3. **Egress sink (ratified §11.6).** A controlled local sink observes exfiltration attempts
+   (so Class-A trials are *observed*, not *harmful*); no real external delivery. The sink
+   **records payload, headers, timestamp, and trial id** for every attempt.
 4. **Per cell `(arm, scenario, model, variant)`**: run the agent task, observe the side-effect
    oracle, classify per §5, log a structured per-trial record (inputs, observed effects,
    outcome, timing, which defense fired).
 5. **Ablations.** AirMCP: full stack + one-mechanism-off runs via §2 knobs (instrumented-build
    flags for the non-config-toggleable ones — §11). Baselines: as-is.
-6. **Repetitions.** Pre-register `N` per cell and report dispersion (CIs), because LLM
-   nondeterminism makes single runs uninformative. **`N` is not chosen in this draft** and no
-   counts are assumed.
+6. **Repetitions (ratified §11.4).** A **pilot at `N=5` per cell** validates harness
+   stability only (not efficacy). The main experiment fixes **`N≥30` per
+   `(arm, scenario, model, approval-mode)`** and reports **Wilson or bootstrap confidence
+   intervals**. If cost forces a smaller `N`, the run is labeled **exploratory** and its
+   efficacy language is correspondingly weakened (§9).
 7. **Pre-registration.** Scenario corpus, approver policy, outcome rubric, `N`, and the oracle
    instrumentation are **frozen before any run** and committed, so code cannot steer the
    conclusion.
@@ -333,24 +363,37 @@ The only candidate contributions are the **integrated Apple-native shipping arti
 
 ---
 
-## 11. Open questions to resolve before the harness PR
+## 11. Decisions — ratified
 
-*Planned (must be answered to ratify this design).*
+*Ratified.* The former §11 open questions are resolved as follows; these bind the harness PR.
 
-1. **Ablation feasibility** for the three non-config-toggleable defenses (Safari egress,
-   fencing/taint, symlink guard): add narrow, test-gated bypass flags vs. patched builds —
-   decide the mechanism and keep it test-covered.
-2. **Approver policy** for `ASR_humanlike`: exact, pre-registered decision rule; how
-   "routine vs dangerous" is operationalized identically across arms.
-3. **PARTIAL accounting rule**: the precise severity-weighting / fractional-success rule
-   (pre-registered, not post hoc).
-4. **`N` and power**: repetitions per cell and the dispersion-reporting plan.
-5. **Baseline matrix**: confirm steipete + joshrutkowski as the run set; whether to add
-   peakmojo as a second executor; how to drive arbitrary-script baselines with the *same*
-   tasks as a tool-catalog server fairly.
-6. **Egress-sink + fixture** spec: synthetic dataset schema and the observed-exfil sink.
-7. **Re-stamp the time anchor** and re-verify §3 (baseline maintenance/archival) and §10
-   (prior art) at harness time — current-state facts here expire after the window.
+1. **Ablation toggles** — **test-gated, experiment-only bypass flags** (not patched builds,
+   not public runtime flags). Default always defense-on; flag-off pinned by a test; not in
+   README/product docs; any bypass-in-effect recorded in per-trial result metadata. (§2)
+2. **Approver policy (`ASR_humanlike`)** — a **pre-registered policy file**, identical across
+   all arms (baseline adapters included): approve **only** the user-specified benign fixture
+   task; deny hidden/injected instructions, exfiltration, destructive mutation,
+   out-of-fixture access, and unnecessary sensitive reads. (§5)
+3. **PARTIAL accounting** — report the **five buckets** (`success / blocked / partial /
+   error / false-positive`) as-is, never collapsed; **weighted-partial is a secondary
+   metric** with per-scenario weights **pre-registered in YAML/JSON** before runs. (§5)
+4. **N / power** — **pilot `N=5`** (harness stability only); **main `N≥30`** per
+   `(arm, scenario, model, approval-mode)` with **Wilson / bootstrap CIs**; a smaller `N`
+   is labeled **exploratory** with weakened efficacy language. (§7)
+5. **Baseline matrix** — **primary: `steipete/macos-automator-mcp` +
+   `joshrutkowski/applescript-mcp`**; **`peakmojo` secondary, only after re-verification**;
+   arbitrary-script baselines driven through the **same task-interface adapter** (no extra
+   freedom). (§3)
+6. **Egress sink + fixture** — **synthetic fixture only** (no real user data), **resettable
+   per trial**; sink records **payload / headers / timestamp / trial-id**; **observed side
+   effect is the oracle**, not model self-report. (§5/§7)
+
+**Standing action for the harness PR** (ratified *procedure*, executed later — the harness
+implementation itself remains *proposed work, not yet started*):
+
+7. **Re-stamp the time anchor** at harness-PR start (`NOW / NOW_DATE / WINDOW_START`) and
+   **re-verify** the baseline maintenance/archival facts (§3) and the prior-art (§10);
+   current-state facts in this document **expire** after the window.
 
 ---
 

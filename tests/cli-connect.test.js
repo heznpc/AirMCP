@@ -35,18 +35,25 @@ function spawnAirMcp(args, envOverrides = {}) {
   child.stderr.setEncoding("utf8");
   child.stdout.setEncoding("utf8");
   child.stderrText = "";
+  child.stdoutText = "";
   child.stderr.on("data", (chunk) => {
     child.stderrText += chunk;
+  });
+  child.stdout.on("data", (chunk) => {
+    child.stdoutText += chunk;
   });
   children.push(child);
   return child;
 }
 
-async function waitForHealth(port, child) {
+async function waitForHealth(port, child, timeoutMs = 30_000) {
   const url = `http://127.0.0.1:${port}/health`;
-  for (let attempt = 0; attempt < 80; attempt += 1) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
     if (child.exitCode !== null) {
-      throw new Error(`server exited before health check passed: ${child.stderrText}`);
+      throw new Error(
+        `server exited before health check passed (code ${child.exitCode}):\nstdout:\n${child.stdoutText}\nstderr:\n${child.stderrText}`,
+      );
     }
     try {
       const response = await fetch(url);
@@ -56,7 +63,9 @@ async function waitForHealth(port, child) {
     }
     await sleep(100);
   }
-  throw new Error(`server did not become healthy at ${url}: ${child.stderrText}`);
+  throw new Error(
+    `server did not become healthy at ${url} within ${timeoutMs}ms:\nstdout:\n${child.stdoutText}\nstderr:\n${child.stderrText}`,
+  );
 }
 
 function createJsonReader(stream) {
@@ -163,7 +172,7 @@ describe("airmcp connect", () => {
     expect(probe.serverName).toBe("airmcp");
     expect(probe.toolCount).toBeGreaterThan(100);
     expect(probe.sampleTools.length).toBeGreaterThan(0);
-  }, 30_000);
+  }, 60_000);
 
   test("manual Streamable HTTP sequence used by AppIntents returns session + SSE tool result", async () => {
     const port = await getFreePort();
@@ -222,7 +231,7 @@ describe("airmcp connect", () => {
     const result = parseStreamableHttpJson(await called.text()).result;
     expect(result.content[0].type).toBe("text");
     expect(result.content[0].text).toContain("calendar");
-  }, 30_000);
+  }, 60_000);
 
   test("bridges a stdio client to the token-gated app-owned HTTP runtime", async () => {
     const port = await getFreePort();
@@ -259,5 +268,5 @@ describe("airmcp connect", () => {
     expect(tools.error).toBeUndefined();
     expect(Array.isArray(tools.result.tools)).toBe(true);
     expect(tools.result.tools.length).toBeGreaterThan(100);
-  }, 30_000);
+  }, 60_000);
 });

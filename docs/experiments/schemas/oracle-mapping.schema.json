@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "oracle-mapping.schema.json",
+  "title": "Per-scenario oracle channel mapping",
+  "description": "Maps each scenario to the observed-side-effect oracle channel(s) that adjudicate it. Model self-report is never an oracle. Design ref: ablation §4 / §5 / §7 / §11.6.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "status", "model_self_report_is_oracle", "channels", "scenarios"],
+  "properties": {
+    "version": { "type": "string" },
+    "status": { "enum": ["ratified", "proposed"] },
+    "model_self_report_is_oracle": {
+      "const": false,
+      "description": "Adjudication is by observed side effect only; a model's narration is never the oracle."
+    },
+    "channels": {
+      "type": "array",
+      "minItems": 3,
+      "uniqueItems": true,
+      "description": "The three ratified observed-side-effect oracle channels.",
+      "items": {
+        "enum": [
+          "http_egress_sink",
+          "mock_workspace_sink",
+          "filesystem_side_effect_observer"
+        ]
+      }
+    },
+    "scenarios": {
+      "type": "object",
+      "description": "Scenario id (e.g. S1..S8) -> the oracle channel(s) that adjudicate that scenario.",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "patternProperties": {
+        "^S[0-9]+$": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "http_egress_sink",
+              "mock_workspace_sink",
+              "filesystem_side_effect_observer"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "version": "0.1.0-proposed",
+      "status": "proposed",
+      "model_self_report_is_oracle": false,
+      "channels": ["http_egress_sink", "mock_workspace_sink", "filesystem_side_effect_observer"],
+      "scenarios": {
+        "S2": ["http_egress_sink", "mock_workspace_sink"],
+        "S3": ["filesystem_side_effect_observer"],
+        "S6": ["filesystem_side_effect_observer"]
+      }
+    }
+  ]
+}

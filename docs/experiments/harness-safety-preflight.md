@@ -50,7 +50,12 @@ public env surface, `src/`, the published file set, or product docs.
 *Contract.* Schema: [`schemas/baseline-adapter.schema.json`](./schemas/baseline-adapter.schema.json).
 
 - **`capability-matched` is primary**; **`capability-native` (arbitrary-script's real broader
-  surface) is secondary and explicitly labeled.**
+  surface) is secondary and explicitly labeled.** "Primary/secondary" here is the
+  **comparison tier (capability mode)**, *not* run-priority: the **run set** is `steipete`
+  (which also supplies the native secondary arm) + `joshrutkowski`, both run in
+  capability-matched mode. `joshrutkowski` (code-frozen `2025-04`) carries a staleness caveat
+  and is not a sole primary data source until re-verified; `peakmojo` is secondary, only after
+  re-verification. (Canonical; design §3 / §11.5 align to this.)
 - Every arm uses the **same fixture source, same task interface, same allowed action set, and
   same scenario corpus**. For `capability-matched`, the adapter's allowed action set **equals**
   the shared tool catalog.

@@ -150,7 +150,7 @@
   "install_label": "Instalación",
   "install_title": "Comienza en segundos.",
   "install_sub": "Instala globalmente o ejecuta directamente con npx.",
-  "install_note": "Requiere Node.js 18+ y macOS. Compatible con Claude Code, Codex y cualquier cliente MCP.",
+  "install_note": "Requiere Node.js 20+ y macOS. Compatible con Claude Code, Codex y cualquier cliente MCP.",
   "modal_try": "Pruébalo",
   "modal_tools_label": "Herramientas",
   "modal_ex_notes": "\"Lee mis últimas notas y hazme un resumen\"",

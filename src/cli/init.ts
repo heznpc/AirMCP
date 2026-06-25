@@ -322,8 +322,9 @@ export async function runInit(): Promise<void> {
         "  For non-interactive setup, create the config manually:\n" +
         `    mkdir -p ${PATHS.CONFIG_DIR}\n` +
         `    echo '{}' > ${PATHS.CONFIG}\n` +
-        "  Or use the starter preset with all defaults:\n" +
-        "    AIRMCP_FULL=true npx airmcp",
+        "  Or run the default starter modules (no config needed):\n" +
+        "    npx airmcp\n" +
+        "  (set AIRMCP_FULL=true to load all modules instead)",
     );
     process.exit(1);
   }

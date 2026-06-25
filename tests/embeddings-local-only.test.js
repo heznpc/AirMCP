@@ -38,6 +38,13 @@ jest.unstable_mockModule('../dist/shared/swift.js', () => swiftMock);
 
 const embeddings = await import('../dist/semantic/embeddings.js');
 
+// Capture the real fetch once. Each test installs a deterministic stub by
+// assigning globalThis.fetch directly and afterEach restores this original.
+// (jest.spyOn(globalThis,'fetch')+mockRestore is fragile: Node's global fetch
+// is a lazy getter, so restoring it can leave `fetch` undefined for the next
+// test — the isolation failure this guards against.)
+const originalFetch = globalThis.fetch;
+
 const savedEnv = {};
 function setEnv(key, value) {
   if (!(key in savedEnv)) savedEnv[key] = process.env[key];
@@ -57,6 +64,7 @@ afterEach(() => {
     else process.env[k] = v;
   }
   for (const k of Object.keys(savedEnv)) delete savedEnv[k];
+  globalThis.fetch = originalFetch;
 });
 
 describe('detectProvider — LOCAL_ONLY semantics', () => {
@@ -130,10 +138,11 @@ describe('embedText hybrid — fallback audit + LOCAL_ONLY refusal', () => {
     // First runSwift call is the swift embed → throws; the gemini path
     // is exercised via global fetch which we stub.
     swiftMock.runSwift.mockRejectedValue(new Error('swift bridge transient failure'));
-    const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue({
+    const fetchSpy = jest.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ embedding: { values: [0.1, 0.2, 0.3] } }),
     });
+    globalThis.fetch = fetchSpy;
     try {
       const v = await embeddings.embedText('hello world', 'hybrid');
       expect(v).toEqual([0.1, 0.2, 0.3]);
@@ -147,7 +156,7 @@ describe('embedText hybrid — fallback audit + LOCAL_ONLY refusal', () => {
       expect(auditCalls[0].args.reason.length).toBeLessThanOrEqual(200);
       expect(auditCalls[0].status).toBe('ok');
     } finally {
-      fetchSpy.mockRestore();
+      globalThis.fetch = originalFetch;
     }
   });
 
@@ -155,10 +164,11 @@ describe('embedText hybrid — fallback audit + LOCAL_ONLY refusal', () => {
     setEnv('AIRMCP_LOCAL_ONLY', 'true');
     setEnv('GEMINI_API_KEY', 'fake-key');
     swiftMock.runSwift.mockRejectedValue(new Error('swift bridge transient failure'));
-    const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue({
+    const fetchSpy = jest.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ embedding: { values: [0.1] } }),
     });
+    globalThis.fetch = fetchSpy;
     try {
       // Use a distinct text so the embedCache from the previous test
       // doesn't short-circuit this one (cache key includes the text).
@@ -168,7 +178,7 @@ describe('embedText hybrid — fallback audit + LOCAL_ONLY refusal', () => {
       expect(fetchSpy).not.toHaveBeenCalled();
       expect(auditCalls).toHaveLength(0);
     } finally {
-      fetchSpy.mockRestore();
+      globalThis.fetch = originalFetch;
     }
   });
 });

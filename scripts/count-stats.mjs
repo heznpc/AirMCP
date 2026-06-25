@@ -16,11 +16,7 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = join(ROOT, "src");
-const mode = process.argv.includes("--check")
-  ? "check"
-  : process.argv.includes("--sync")
-    ? "sync"
-    : "print";
+const mode = process.argv.includes("--check") ? "check" : process.argv.includes("--sync") ? "sync" : "print";
 
 // ── Count from source ──────────────────────────────────────────────
 
@@ -95,12 +91,8 @@ for (const line of resLines) {
 }
 
 const configContent = readFileSync(join(SRC, "shared", "config.ts"), "utf-8");
-const moduleBlock = configContent.match(
-  /export const MODULE_NAMES = \[([\s\S]*?)\] as const/,
-);
-const modules = moduleBlock
-  ? (moduleBlock[1].match(/"/g) || []).length / 2
-  : 0;
+const moduleBlock = configContent.match(/export const MODULE_NAMES = \[([\s\S]*?)\] as const/);
+const modules = moduleBlock ? (moduleBlock[1].match(/"/g) || []).length / 2 : 0;
 
 const stats = { tools, prompts, resources, modules, mcpApps, appIntents };
 
@@ -192,8 +184,12 @@ for (const page of docsPages) {
 }
 
 // MCPB manifest template — the long_description string lives in the user
-// install dialog, so a stale count is highly visible.
+// install dialog, so a stale count is highly visible. Guard the tool /
+// module / AppIntent counts so the blurb can't re-drift (e.g. the old
+// "270+ tools" that slipped past this guard before).
 syncFile("mcpb/manifest.template.json", [
+  { pattern: /(\d+) tools across/g, value: tools },
+  { pattern: /across (\d+) modules/g, value: modules },
   { pattern: /(\d+) auto-generated Apple App Intents/g, value: appIntents },
 ]);
 
@@ -202,12 +198,8 @@ syncFile("docs/skills.md", [
   { pattern: /(\d+) tools/g, value: tools },
   { pattern: /(\d+) modules/g, value: modules },
 ]);
-syncFile("docs/shortcuts.md", [
-  { pattern: /(\d+) tools are auto-registered/g, value: tools },
-]);
-syncFile("docs/REGISTRY_SUBMISSIONS.md", [
-  { pattern: /(\d+) AppIntents/g, value: appIntents },
-]);
+syncFile("docs/shortcuts.md", [{ pattern: /(\d+) tools are auto-registered/g, value: tools }]);
+syncFile("docs/REGISTRY_SUBMISSIONS.md", [{ pattern: /(\d+) AppIntents/g, value: appIntents }]);
 syncFile("docs/TERMS_OF_SERVICE.md", [
   { pattern: /(\d+) tools/g, value: tools },
   { pattern: /(\d+) modules/g, value: modules },
@@ -242,8 +234,7 @@ syncFile("server.json", [
 // Locale files — each uses different words for "modules"
 const localeDir = join(ROOT, "docs", "locales");
 if (existsSync(localeDir)) {
-  const moduleWords =
-    /(\d+)([\s\u00a0]*(?:modules?|개 모듈|モジュール|个模块|個模組|Modulen|módulos))/g;
+  const moduleWords = /(\d+)([\s\u00a0]*(?:modules?|개 모듈|モジュール|个模块|個模組|Modulen|módulos))/g;
   for (const f of readdirSync(localeDir).filter((f) => f.endsWith(".json"))) {
     syncFile(`docs/locales/${f}`, [{ pattern: moduleWords, value: modules }]);
   }
@@ -252,9 +243,7 @@ if (existsSync(localeDir)) {
 console.log("");
 
 if (mode === "check" && dirty) {
-  console.error(
-    "Stats mismatch detected. Run: node scripts/count-stats.mjs --sync",
-  );
+  console.error("Stats mismatch detected. Run: node scripts/count-stats.mjs --sync");
   process.exit(1);
 }
 

@@ -7,7 +7,7 @@
  * pass or must be rejected. Design ref: harness-safety-preflight §2; ablation §3/§11.5.
  */
 import { describe, test, expect } from "@jest/globals";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import Ajv2020 from "ajv/dist/2020.js";
@@ -99,6 +99,24 @@ describe("baseline-adapter schema — negative fixtures are rejected", () => {
   for (const [name, instance] of Object.entries(INVALID)) {
     test(name, () => {
       expect(validate(instance)).toBe(false);
+    });
+  }
+});
+
+describe("baseline-adapter schema — on-disk baseline instances conform", () => {
+  const dir = join(ROOT, "docs", "experiments", "baselines");
+  const files = existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith(".json")) : [];
+
+  test("at least one baseline instance exists", () => {
+    expect(files.length).toBeGreaterThan(0);
+  });
+
+  for (const f of files) {
+    test(`${f} conforms to baseline-adapter.schema.json`, () => {
+      const instance = JSON.parse(readFileSync(join(dir, f), "utf8"));
+      const ok = validate(instance);
+      if (!ok) console.error(f, validate.errors);
+      expect(ok).toBe(true);
     });
   }
 });

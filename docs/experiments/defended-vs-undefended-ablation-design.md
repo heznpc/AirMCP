@@ -166,6 +166,17 @@ caveat and is **not a sole primary data source until re-verified**. **`peakmojo`
 only, after re-verification at harness-PR time.** Baseline version pins are first-class
 reproducibility inputs (§8); staleness/archival caveats are reported, never hidden.
 
+*Re-verified 2026-06-25* (§11.7 receipt: [`baselines/REVERIFY-2026-06-25.md`](./baselines/REVERIFY-2026-06-25.md); per-baseline instances under [`baselines/`](./baselines/)). Outcome:
+`steipete` **`re_verified=true`** (pushed 2026-06-23, npm 0.4.3, maintained, TCC-only) → eligible
+`sole_primary_data_source`; `joshrutkowski` (code-frozen 2025-04-19) and `peakmojo` (pushed
+2026-02-22, pre-window; shell/SSH) stay **`re_verified=false` / not sole-primary**. New-entrant
+scan flag: **`griches/apple-mcp` is a *defended* Apple-native server** (read-only +
+confirm-destructive HITL, note/PIM-only, no integrated governance stack) — it is **not** an
+undefended baseline and must never be classified as one; new *undefended* candidates
+(`sweetrb/apple-notes-mcp`, `FradSer/mcp-server-apple-events`) are eligible but add no surface
+beyond the set. Prior-art line re-checked: **still current, no scoop** — the Apple-native
+defended-vs-undefended ASR gap is intact (§10).
+
 ---
 
 ## 4. Scenario set
@@ -419,7 +430,10 @@ implementation itself remains *proposed work, not yet started*):
 
 7. **Re-stamp the time anchor** at harness-PR start (`NOW / NOW_DATE / WINDOW_START`) and
    **re-verify** the baseline maintenance/archival facts (§3) and the prior-art (§10);
-   current-state facts in this document **expire** after the window.
+   current-state facts in this document **expire** after the window. **Performed once on
+   2026-06-25** — receipt + per-baseline instances under [`baselines/`](./baselines/)
+   (steipete `re_verified=true`; joshrutkowski/peakmojo `false`; prior-art intact, no scoop;
+   `griches/apple-mcp` flagged *defended*). **Re-run when the window moves** before the harness runs.
 
 ---
 

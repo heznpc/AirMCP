@@ -35,6 +35,18 @@ afterEach(() => {
   else process.env.AIRMCP_TEST_MODE = ORIG_TEST_MODE;
 });
 
+// Deterministic clock seam — replaces real setTimeout waits so the
+// open->half_open eligibility never races under CI load.
+function clock(start = 0) {
+  let t = start;
+  return {
+    now: () => t,
+    advance: (ms) => {
+      t += ms;
+    },
+  };
+}
+
 describe("CircuitBreaker", () => {
   test("CLOSED stays CLOSED on success", async () => {
     const b = new CircuitBreaker({ failureThreshold: 3, openMs: 1000, name: "t" });
@@ -79,12 +91,13 @@ describe("CircuitBreaker", () => {
   });
 
   test("OPEN → HALF_OPEN → CLOSED on successful probe", async () => {
-    const b = new CircuitBreaker({ failureThreshold: 1, openMs: 10, name: "t" });
+    const c = clock();
+    const b = new CircuitBreaker({ failureThreshold: 1, openMs: 10, name: "t", now: c.now });
     await expect(b.execute(async () => { throw new Error("trip"); })).rejects.toThrow("trip");
     expect(b.getState()).toBe("open");
 
-    // Wait past openMs.
-    await new Promise((r) => setTimeout(r, 20));
+    // Advance past openMs deterministically.
+    c.advance(20);
 
     // First post-openMs call: probe runs, succeeds → state should close.
     const r = await b.execute(async () => "probe-ok");
@@ -94,11 +107,12 @@ describe("CircuitBreaker", () => {
   });
 
   test("OPEN → HALF_OPEN → OPEN on failed probe", async () => {
-    const b = new CircuitBreaker({ failureThreshold: 1, openMs: 10, name: "t" });
+    const c = clock();
+    const b = new CircuitBreaker({ failureThreshold: 1, openMs: 10, name: "t", now: c.now });
     await expect(b.execute(async () => { throw new Error("trip"); })).rejects.toThrow("trip");
     expect(b.getState()).toBe("open");
 
-    await new Promise((r) => setTimeout(r, 20));
+    c.advance(20);
 
     // Probe fails — back to OPEN immediately.
     await expect(b.execute(async () => { throw new Error("probe-fail"); })).rejects.toThrow("probe-fail");
@@ -130,10 +144,11 @@ describe("CircuitBreaker", () => {
     // Regression for the 2nd-pass audit (2026-05-21) — prior implementation
     // let two concurrent callers both transition to HALF_OPEN and both run
     // their fn() in parallel, violating the single-probe contract.
-    const b = new CircuitBreaker({ failureThreshold: 1, openMs: 10, name: "race" });
+    const c = clock();
+    const b = new CircuitBreaker({ failureThreshold: 1, openMs: 10, name: "race", now: c.now });
     await expect(b.execute(async () => { throw new Error("trip"); })).rejects.toThrow("trip");
     expect(b.getState()).toBe("open");
-    await new Promise((r) => setTimeout(r, 20));
+    c.advance(20);
 
     let probeCalls = 0;
     const slowProbe = async () => {
@@ -164,9 +179,10 @@ describe("CircuitBreaker", () => {
     // the in-flight flag (it transitions back to OPEN, so subsequent
     // callers get a normal BreakerOpenError with retryInMs > 0, not an
     // immediate-retry response based on a stuck flag).
-    const b = new CircuitBreaker({ failureThreshold: 1, openMs: 10, name: "race-fail" });
+    const c = clock();
+    const b = new CircuitBreaker({ failureThreshold: 1, openMs: 10, name: "race-fail", now: c.now });
     await expect(b.execute(async () => { throw new Error("trip"); })).rejects.toThrow("trip");
-    await new Promise((r) => setTimeout(r, 20));
+    c.advance(20);
 
     await expect(b.execute(async () => { throw new Error("probe-fail"); })).rejects.toThrow("probe-fail");
     expect(b.getState()).toBe("open");

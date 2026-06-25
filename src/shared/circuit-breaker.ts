@@ -43,6 +43,8 @@ export interface BreakerOptions {
   openMs: number;
   /** Optional identifier for log lines (e.g. "open-meteo"). */
   name?: string;
+  /** Test seam: monotonic clock source in ms. Default: `Date.now`. */
+  now?: () => number;
 }
 
 export class BreakerOpenError extends Error {
@@ -69,17 +71,19 @@ export class CircuitBreaker {
   private readonly name: string;
   private readonly failureThreshold: number;
   private readonly openMs: number;
+  private readonly now: () => number;
 
   constructor(opts: BreakerOptions) {
     this.name = opts.name ?? "anonymous";
     this.failureThreshold = opts.failureThreshold;
     this.openMs = opts.openMs;
+    this.now = opts.now ?? Date.now;
   }
 
   /** Run `fn` through the breaker. Throws `BreakerOpenError` when OPEN. */
   async execute<T>(fn: () => Promise<T>): Promise<T> {
     if (this.state === "open") {
-      const elapsed = Date.now() - this.openedAt;
+      const elapsed = this.now() - this.openedAt;
       if (elapsed < this.openMs) {
         throw new BreakerOpenError(this.name, this.openMs - elapsed);
       }
@@ -148,7 +152,7 @@ export class CircuitBreaker {
 
   private trip(reason: "probe-failed" | "threshold-reached"): void {
     this.state = "open";
-    this.openedAt = Date.now();
+    this.openedAt = this.now();
     this.probeInFlight = false;
     const event = reason === "probe-failed" ? "re-opened" : "tripped — opening";
     log.warn(`circuit breaker ${event}`, {
@@ -176,6 +180,7 @@ export function getBreaker(name: string, opts?: Partial<BreakerOptions>): Circui
       failureThreshold: opts?.failureThreshold ?? 5,
       openMs: opts?.openMs ?? 30_000,
       name,
+      now: opts?.now,
     });
     breakers.set(name, b);
   }

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "partial-weights.schema.json",
+  "title": "Per-scenario PARTIAL credit weights (PROPOSED — no final values)",
+  "description": "Weights for the SECONDARY weighted-partial metric. They are pre-registered before any run. In this preflight they are PROPOSED placeholders and MUST NOT carry final values. Primary reporting is always the five-bucket vector (success/blocked/partial/error/false-positive), never a single number. Design ref: ablation §5 / §11.3.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "status", "metric_tier", "weights"],
+  "properties": {
+    "version": { "type": "string" },
+    "status": {
+      "const": "proposed",
+      "description": "MUST remain 'proposed' until weights are pre-registered in a later PR. This preflight ships shape only."
+    },
+    "metric_tier": {
+      "const": "secondary",
+      "description": "Weighted-partial is a secondary metric; it never replaces the primary bucket vector."
+    },
+    "weights": {
+      "type": "object",
+      "description": "Scenario id (e.g. S1..S8) -> partial-credit weight in [0,1]. PLACEHOLDER: values are null until pre-registered.",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^S[0-9]+$": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1,
+          "description": "null = not yet pre-registered (proposed). A concrete value is only set in a later, ratified PR."
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "version": "0.0.0-proposed",
+      "status": "proposed",
+      "metric_tier": "secondary",
+      "weights": { "S1": null, "S2": null, "S3": null, "S6": null }
+    }
+  ]
+}

@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "baseline-adapter.schema.json",
+  "title": "Baseline adapter capability contract",
+  "description": "Fairness contract for each baseline arm driven through the shared task interface. Design ref: ablation §3 / §11.5.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "status",
+    "baseline_id",
+    "role",
+    "capability_mode",
+    "same_fixture_source",
+    "same_task_interface",
+    "same_allowed_action_set",
+    "same_scenario_corpus",
+    "no_per_scenario_exploit",
+    "no_per_arm_exploit"
+  ],
+  "properties": {
+    "version": { "type": "string" },
+    "status": { "enum": ["ratified", "proposed"] },
+    "baseline_id": {
+      "type": "string",
+      "description": "e.g. steipete/macos-automator-mcp, joshrutkowski/applescript-mcp, peakmojo/applescript-mcp"
+    },
+    "role": { "enum": ["primary", "secondary"] },
+    "capability_mode": {
+      "enum": ["capability-matched", "capability-native"],
+      "description": "capability-matched: allowed action set equals the shared catalog (primary, clean ablation). capability-native: the baseline's real broader surface (secondary, labeled)."
+    },
+    "same_fixture_source": { "const": true },
+    "same_task_interface": { "const": true },
+    "same_allowed_action_set": {
+      "type": "boolean",
+      "description": "MUST be true for capability-matched. capability-native MAY exceed the shared catalog but only as role=secondary."
+    },
+    "same_scenario_corpus": { "const": true },
+    "no_per_scenario_exploit": {
+      "const": true,
+      "description": "Injection vectors come only from the shared fixture/scenario corpus — no scenario-specific hand-tuned exploit."
+    },
+    "no_per_arm_exploit": {
+      "const": true,
+      "description": "No arm receives a bespoke attack; the corpus is applied identically."
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "capability_mode": { "const": "capability-native" } } },
+      "then": { "properties": { "role": { "const": "secondary" } } }
+    },
+    {
+      "if": { "properties": { "capability_mode": { "const": "capability-matched" } } },
+      "then": { "properties": { "same_allowed_action_set": { "const": true } } }
+    }
+  ],
+  "examples": [
+    {
+      "version": "0.1.0-proposed",
+      "status": "proposed",
+      "baseline_id": "steipete/macos-automator-mcp",
+      "role": "primary",
+      "capability_mode": "capability-matched",
+      "same_fixture_source": true,
+      "same_task_interface": true,
+      "same_allowed_action_set": true,
+      "same_scenario_corpus": true,
+      "no_per_scenario_exploit": true,
+      "no_per_arm_exploit": true
+    }
+  ]
+}

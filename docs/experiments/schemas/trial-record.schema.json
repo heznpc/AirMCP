@@ -1,11 +1,20 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "trial-record.schema.json",
-  "title": "Per-trial record (runner-zero format)",
-  "description": "The shape of one ablation trial record. Outcome/observation fields are null until run time (no execution in runner-zero). `additionalProperties:false` deliberately forbids any asr / score / percentage field — result numbers are not permitted until the experiment is run and reported (design §9). Design ref: §5 (outcome taxonomy + block_source), §7 (per-trial record), §11.",
+  "title": "Per-trial record (consistency-guarded format)",
+  "description": "One ablation trial record. STRUCTURAL cross-field invariants are enforced here by `allOf` if/then. `counts_as_airmcp_defense` is NOT a field — it is DERIVED from block_source via countsAsAirmcpDefense() at scoring time, so a stored value can never contradict the record. `additionalProperties:false` forbids any asr/score field AND a stored counts field. Invariants the schema cannot express (date ordering inside baseline_snapshot) live in trialRecordInvariantErrors(); the runner must call assertValidTrialRecord() (validate-or-die) before recording any trial. baseline_snapshot FRESHNESS (window still covers NOW) is a RUNNER-TIME fail-closed gate (isBaselineSnapshotFresh), NOT enforced statically here. Design ref: §5 / §7 / §9 / §11.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema", "trial_id", "arm", "scenario", "model", "approval_mode", "status"],
+  "required": [
+    "schema",
+    "trial_id",
+    "arm",
+    "scenario",
+    "model",
+    "approval_mode",
+    "status",
+    "pre_run_recheck_required"
+  ],
   "properties": {
     "schema": { "const": "trial-record/v0" },
     "trial_id": { "type": "string" },
@@ -14,13 +23,8 @@
     "model": { "type": "string" },
     "approval_mode": { "enum": ["ASR_auto", "ASR_humanlike"] },
     "status": { "enum": ["planned", "ran", "errored"] },
-    "outcome": {
-      "type": ["string", "null"],
-      "enum": ["success", "blocked", "partial", "false_positive", "error", null],
-      "description": "The five-bucket outcome; null until run."
-    },
+    "outcome": { "enum": ["success", "blocked", "partial", "false_positive", "error", null] },
     "block_source": {
-      "type": ["string", "null"],
       "enum": [
         "hitl_deny",
         "scope_403",
@@ -34,11 +38,7 @@
         "none",
         null
       ],
-      "description": "Which guard fired. Only the first five (named server guards) count as AirMCP defense."
-    },
-    "counts_as_airmcp_defense": {
-      "type": ["boolean", "null"],
-      "description": "true ONLY when block_source is a named server guard; null until run."
+      "description": "Which guard fired. counts_as_airmcp_defense is DERIVED from this (named server guard => true); never stored."
     },
     "oracle_channels": {
       "type": "array",
@@ -56,18 +56,127 @@
       }
     },
     "observed_side_effect": {
-      "description": "The oracle observation (object) or null. Model self-report is NEVER an oracle.",
-      "type": ["object", "null"]
+      "type": ["object", "null"],
+      "description": "The oracle observation (object) or null. Model self-report is NEVER an oracle."
     },
     "bypass_in_effect": {
       "type": "array",
       "items": { "type": "string" },
       "description": "§11.1 metadata: experiment-layer defenses bypassed this trial; [] for non-ablation."
     },
+    "pre_run_recheck_required": {
+      "type": "boolean",
+      "description": "Mirrored from the run-matrix cell. When true, a fresh baseline_snapshot must be attached before the trial may run (fail-closed)."
+    },
     "baseline_snapshot": {
       "type": ["object", "null"],
-      "description": "Provenance: the arm's re_verified / pushed_at at run time."
+      "description": "Provenance attached at run time: pushed_at / re_verified_at / window. Internal date ordering is checked by trialRecordInvariantErrors; freshness vs NOW is a runner-time gate."
     },
     "timing_ms": { "type": ["number", "null"] }
-  }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "planned" } } },
+      "then": {
+        "properties": {
+          "outcome": { "const": null },
+          "block_source": { "const": null },
+          "observed_side_effect": { "const": null },
+          "oracle_channels": { "maxItems": 0 },
+          "timing_ms": { "const": null }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "errored" } } },
+      "then": {
+        "required": ["outcome"],
+        "properties": {
+          "outcome": { "const": "error" },
+          "block_source": { "const": "env_error" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "ran" } } },
+      "then": {
+        "required": ["outcome"],
+        "properties": { "outcome": { "enum": ["success", "blocked", "partial", "false_positive"] } }
+      }
+    },
+    {
+      "if": { "properties": { "outcome": { "const": "error" } } },
+      "then": { "properties": { "status": { "const": "errored" } } }
+    },
+    {
+      "if": { "properties": { "block_source": { "const": "env_error" } } },
+      "then": { "properties": { "status": { "const": "errored" } } }
+    },
+    {
+      "if": { "properties": { "outcome": { "const": "success" } } },
+      "then": { "properties": { "block_source": { "const": "none" } } }
+    },
+    {
+      "if": { "properties": { "outcome": { "const": "blocked" } } },
+      "then": {
+        "properties": {
+          "block_source": {
+            "enum": [
+              "hitl_deny",
+              "scope_403",
+              "rate_limit",
+              "egress_reject",
+              "escaper",
+              "harness_auto_deny",
+              "model_no_tool_call",
+              "os_tcc"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "outcome": { "const": "false_positive" } } },
+      "then": {
+        "properties": {
+          "block_source": {
+            "enum": [
+              "hitl_deny",
+              "scope_403",
+              "rate_limit",
+              "egress_reject",
+              "escaper",
+              "harness_auto_deny",
+              "model_no_tool_call",
+              "os_tcc"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": { "const": "ran" },
+          "pre_run_recheck_required": { "const": true }
+        },
+        "required": ["status", "pre_run_recheck_required"]
+      },
+      "then": {
+        "required": ["baseline_snapshot"],
+        "properties": {
+          "baseline_snapshot": {
+            "type": "object",
+            "required": ["pushed_at", "re_verified_at", "window_start", "window_end"],
+            "properties": {
+              "pushed_at": { "type": "string" },
+              "re_verified_at": { "type": "string" },
+              "window_start": { "type": "string" },
+              "window_end": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

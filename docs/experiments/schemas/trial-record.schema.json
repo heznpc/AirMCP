@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "trial-record.schema.json",
   "title": "Per-trial record (consistency-guarded format)",
-  "description": "One ablation trial record. STRUCTURAL cross-field invariants are enforced here by `allOf` if/then. `counts_as_airmcp_defense` is NOT a field — it is DERIVED from block_source via countsAsAirmcpDefense() at scoring time, so a stored value can never contradict the record. `additionalProperties:false` forbids any asr/score field AND a stored counts field. Invariants the schema cannot express (date ordering inside baseline_snapshot) live in trialRecordInvariantErrors(); the runner must call assertValidTrialRecord() (validate-or-die) before recording any trial. baseline_snapshot FRESHNESS (window still covers NOW) is a RUNNER-TIME fail-closed gate (isBaselineSnapshotFresh), NOT enforced statically here. Design ref: §5 / §7 / §9 / §11.",
+  "description": "One ablation trial record. EVERY format field is base-`required` (nullable where applicable) so a field can never be absent — this both rejects malformed records and removes the JSON-Schema vacuous-`if`-match class (an `if`/`then` can't silently pass on a missing field). Each `if` additionally carries `required` for the field it tests. `counts_as_airmcp_defense` is NOT a field — it is DERIVED from block_source via countsAsAirmcpDefense() at scoring time, so a stored value can never contradict the record. `additionalProperties:false` forbids any asr/score field AND a stored counts field. Invariants the schema cannot express (date ordering inside baseline_snapshot) live in trialRecordInvariantErrors(); the runner must call assertValidTrialRecord() (validate-or-die) before recording any trial. baseline_snapshot FRESHNESS (window still covers NOW) is a RUNNER-TIME fail-closed gate (isBaselineSnapshotFresh), NOT enforced statically. Design ref: §5 / §7 / §9 / §11.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -13,7 +13,14 @@
     "model",
     "approval_mode",
     "status",
-    "pre_run_recheck_required"
+    "outcome",
+    "block_source",
+    "oracle_channels",
+    "observed_side_effect",
+    "bypass_in_effect",
+    "pre_run_recheck_required",
+    "baseline_snapshot",
+    "timing_ms"
   ],
   "properties": {
     "schema": { "const": "trial-record/v0" },
@@ -76,7 +83,7 @@
   },
   "allOf": [
     {
-      "if": { "properties": { "status": { "const": "planned" } } },
+      "if": { "required": ["status"], "properties": { "status": { "const": "planned" } } },
       "then": {
         "properties": {
           "outcome": { "const": null },
@@ -88,9 +95,9 @@
       }
     },
     {
-      "if": { "properties": { "status": { "const": "errored" } } },
+      "if": { "required": ["status"], "properties": { "status": { "const": "errored" } } },
       "then": {
-        "required": ["outcome"],
+        "required": ["outcome", "block_source"],
         "properties": {
           "outcome": { "const": "error" },
           "block_source": { "const": "env_error" }
@@ -98,27 +105,28 @@
       }
     },
     {
-      "if": { "properties": { "status": { "const": "ran" } } },
+      "if": { "required": ["status"], "properties": { "status": { "const": "ran" } } },
       "then": {
         "required": ["outcome"],
         "properties": { "outcome": { "enum": ["success", "blocked", "partial", "false_positive"] } }
       }
     },
     {
-      "if": { "properties": { "outcome": { "const": "error" } } },
-      "then": { "properties": { "status": { "const": "errored" } } }
+      "if": { "required": ["outcome"], "properties": { "outcome": { "const": "error" } } },
+      "then": { "required": ["status"], "properties": { "status": { "const": "errored" } } }
     },
     {
-      "if": { "properties": { "block_source": { "const": "env_error" } } },
-      "then": { "properties": { "status": { "const": "errored" } } }
+      "if": { "required": ["block_source"], "properties": { "block_source": { "const": "env_error" } } },
+      "then": { "required": ["status"], "properties": { "status": { "const": "errored" } } }
     },
     {
-      "if": { "properties": { "outcome": { "const": "success" } } },
-      "then": { "properties": { "block_source": { "const": "none" } } }
+      "if": { "required": ["outcome"], "properties": { "outcome": { "const": "success" } } },
+      "then": { "required": ["block_source"], "properties": { "block_source": { "const": "none" } } }
     },
     {
-      "if": { "properties": { "outcome": { "const": "blocked" } } },
+      "if": { "required": ["outcome"], "properties": { "outcome": { "const": "blocked" } } },
       "then": {
+        "required": ["block_source"],
         "properties": {
           "block_source": {
             "enum": [
@@ -136,8 +144,30 @@
       }
     },
     {
-      "if": { "properties": { "outcome": { "const": "false_positive" } } },
+      "if": { "required": ["outcome"], "properties": { "outcome": { "const": "false_positive" } } },
       "then": {
+        "required": ["block_source"],
+        "properties": {
+          "block_source": {
+            "enum": [
+              "hitl_deny",
+              "scope_403",
+              "rate_limit",
+              "egress_reject",
+              "escaper",
+              "harness_auto_deny",
+              "model_no_tool_call",
+              "os_tcc"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": { "required": ["outcome"], "properties": { "outcome": { "const": "partial" } } },
+      "then": {
+        "required": ["block_source"],
+        "description": "Ratified: a partial trial means part of the objective was achieved and part was stopped, so a real guard fired — block_source must be one of the eight guard sources (never none / env_error / null).",
         "properties": {
           "block_source": {
             "enum": [
@@ -156,11 +186,11 @@
     },
     {
       "if": {
+        "required": ["status", "pre_run_recheck_required"],
         "properties": {
           "status": { "const": "ran" },
           "pre_run_recheck_required": { "const": true }
-        },
-        "required": ["status", "pre_run_recheck_required"]
+        }
       },
       "then": {
         "required": ["baseline_snapshot"],

@@ -57,6 +57,7 @@ describe("trial-record — valid records pass schema + invariants", () => {
     "ran / success / none": ran(),
     "ran / blocked / hitl_deny": ran({ outcome: "blocked", block_source: "hitl_deny" }),
     "ran / false_positive / escaper": ran({ outcome: "false_positive", block_source: "escaper" }),
+    "ran / partial / rate_limit": ran({ outcome: "partial", block_source: "rate_limit" }),
     "errored / error / env_error": ran({ status: "errored", outcome: "error", block_source: "env_error" }),
     "ran + recheck + fresh snapshot": ran({ pre_run_recheck_required: true, baseline_snapshot: FRESH_SNAP }),
   };
@@ -83,12 +84,44 @@ describe("trial-record — contradictory records are rejected by the schema", ()
     "ran + recheck without a baseline_snapshot": ran({ pre_run_recheck_required: true, baseline_snapshot: null }),
     "no stored counts_as_airmcp_defense field": ran({ counts_as_airmcp_defense: true }),
     "no stored asr/score field": ran({ asr: 0.42 }),
+    "errored with block_source null (must be env_error)": ran({ status: "errored", outcome: "error", block_source: null }),
+    "partial cannot be block_source=none": ran({ outcome: "partial", block_source: "none" }),
+    "partial cannot be block_source=env_error": ran({ outcome: "partial", block_source: "env_error" }),
   };
   for (const [name, rec] of Object.entries(cases)) {
     test(name, () => {
       expect(validate(rec)).toBe(false);
     });
   }
+});
+
+describe("trial-record — missing format fields are rejected (no vacuous if-match)", () => {
+  const drop = (rec, key) => {
+    const r = { ...rec };
+    delete r[key];
+    return r;
+  };
+  // Every format field is base-required, so a missing field is malformed AND can't trigger a
+  // vacuous if/then match (the P1 the prior schema had).
+  for (const key of [
+    "status",
+    "outcome",
+    "block_source",
+    "oracle_channels",
+    "observed_side_effect",
+    "timing_ms",
+    "pre_run_recheck_required",
+    "baseline_snapshot",
+  ]) {
+    test(`missing "${key}" is rejected`, () => {
+      expect(validate(drop(ran(), key))).toBe(false);
+    });
+  }
+
+  test("errored with block_source MISSING is rejected (the P1 vacuous-match case)", () => {
+    const rec = drop(ran({ status: "errored", outcome: "error", block_source: "env_error" }), "block_source");
+    expect(validate(rec)).toBe(false);
+  });
 });
 
 describe("trial-record — relational invariant (schema can't express date ordering)", () => {

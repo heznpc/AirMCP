@@ -134,9 +134,7 @@ describe("mcpb manifest template — tools_generated / prompts_generated", () =>
 
 describe("mcpb manifest template — well-formedness", () => {
   test("renders to valid JSON with no leftover template placeholders", () => {
-    const rendered = template
-      .replaceAll("{{VERSION}}", "1.0.0")
-      .replaceAll("{{DESCRIPTION}}", "test");
+    const rendered = template.replaceAll("{{VERSION}}", "1.0.0").replaceAll("{{DESCRIPTION}}", "test");
     expect(rendered).not.toContain("{{");
     expect(() => JSON.parse(rendered)).not.toThrow();
   });
@@ -157,5 +155,21 @@ describe("mcpb manifest template — well-formedness", () => {
     const m = render();
     expect(Array.isArray(m.privacy_policies)).toBe(true);
     expect(m.privacy_policies[0]).toMatch(/^https:\/\//);
+  });
+});
+
+describe("mcpb manifest template — long_description count tracks the canonical surface", () => {
+  // Guards the "270+ tools" drift class: the install-dialog blurb must track
+  // docs/tool-manifest.json (the generated SSOT), not be hand-set. count-stats
+  // also syncs this file, but pin it in the suite so `npm test` catches drift.
+  const manifestSurface = JSON.parse(readFileSync(join(ROOT, "docs", "tool-manifest.json"), "utf-8"));
+  const canonicalToolCount =
+    typeof manifestSurface.toolCount === "number" ? manifestSurface.toolCount : (manifestSurface.tools?.length ?? 0);
+
+  test("'N tools across' in long_description equals the generated tool count", () => {
+    const m = render();
+    const match = /(\d+) tools across/.exec(m.long_description);
+    expect(match).not.toBeNull();
+    expect(Number(match[1])).toBe(canonicalToolCount);
   });
 });

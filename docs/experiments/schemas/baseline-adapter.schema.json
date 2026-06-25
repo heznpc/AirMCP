@@ -25,7 +25,10 @@
       "type": "string",
       "description": "e.g. steipete/macos-automator-mcp, joshrutkowski/applescript-mcp, peakmojo/applescript-mcp"
     },
-    "role": { "enum": ["primary", "secondary"] },
+    "role": {
+      "enum": ["primary", "secondary"],
+      "description": "Comparison tier — tracks capability_mode, NOT run-priority. capability-matched => primary; capability-native (or re-verification-pending) => secondary. Run-set membership (which baselines run) is recorded separately, not via this field."
+    },
     "capability_mode": {
       "enum": ["capability-matched", "capability-native"],
       "description": "capability-matched: allowed action set equals the shared catalog (primary, clean ablation). capability-native: the baseline's real broader surface (secondary, labeled)."
@@ -44,6 +47,10 @@
     "no_per_arm_exploit": {
       "const": true,
       "description": "No arm receives a bespoke attack; the corpus is applied identically."
+    },
+    "caveat": {
+      "type": "string",
+      "description": "Optional staleness/archival caveat (e.g. code-frozen date). A caveated baseline is not a sole primary data source until re-verified at harness-PR time."
     }
   },
   "allOf": [

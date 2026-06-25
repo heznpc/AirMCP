@@ -147,21 +147,23 @@ push well outside window — metadata bumps don't count); non-overlapping/offlin
 (e.g. static export query); already defended; surface-broadening confounds (e.g. added
 shell/SSH exec) disqualify a *primary matched* comparator (allowed only as secondary).
 
-| Candidate | `pushed_at` | Status | Safety model | Role |
+| Candidate | `pushed_at` | Status | Safety model | Role (comparison tier / run-set) |
 |---|---|---|---|---|
-| `steipete/macos-automator-mcp` | 2026-06-23 (in-window) | active | TCC-only; arbitrary AppleScript/JXA reaches the full scriptable surface | **Primary** (maintained, undefended, max-capability) |
-| `joshrutkowski/applescript-mcp` | 2025-04-19 `[historical]` | not archived but ~14mo stale | TCC-only; discrete typed tools (notes/reminders/calendar/clipboard/files/system) | **Secondary — matched-shape** (closest tool-catalog to AirMCP), with explicit staleness caveat |
-| `peakmojo/applescript-mcp` | 2026-02-22 (~4mo, just outside 90d) | active | TCC-only; **adds shell exec + SSH** | Secondary (second executor; surface-broadening flagged) |
+| `steipete/macos-automator-mcp` | 2026-06-23 (in-window) | active | TCC-only; arbitrary AppleScript/JXA reaches the full scriptable surface | **Run set**, `capability-matched`; also the `capability-native` **secondary** arm (its raw script surface) |
+| `joshrutkowski/applescript-mcp` | 2025-04-19 `[historical]` | not archived but ~14mo stale | TCC-only; discrete typed tools (notes/reminders/calendar/clipboard/files/system) | **Run set**, `capability-matched` (matched-shape); **staleness caveat — not a sole primary data source until re-verified** |
+| `peakmojo/applescript-mcp` | 2026-02-22 (~4mo, just outside 90d) | active | TCC-only; **adds shell exec + SSH** | Secondary, **only after re-verification** (surface-broadening flagged) |
 | `supermemoryai/apple-mcp` (was `dhravya/apple-mcp`) | 2025-08-11 `[historical]` | **archived** ~2026-01 | TCC-only ("explicit access request" = OS prompts only) | Archived reference only (best PIM overlap), with archived caveat |
 | `the-momentum/apple-health-mcp-server` | 2026-02-10 | **EOL/superseded** by "Open Wearables" | offline XML-over-DuckDB; never touches live OS APIs | **Excluded** — mechanism mismatch + EOL |
 
-*Ratified (§11.5).* **Primary baselines: `steipete/macos-automator-mcp` +
-`joshrutkowski/applescript-mcp`** — covering "maximally-capable undefended" and
-"same-tool-shape undefended" (joshrutkowski keeps its `2025-04` staleness caveat).
-**`peakmojo` is secondary only, and only after re-verification at harness-PR time.**
-Arbitrary-script baselines get **no extra degrees of freedom**: they are driven through the
-**same task interface (an adapter)** as the tool-catalog server, so the *task* — not the
-baseline's surface — is the held-constant variable. Baseline version pins are first-class
+*Ratified (§11.5).* The **primary comparison is `capability-matched`**: every baseline is
+driven through the **same task interface (an adapter)** with the **same allowed action set**
+as AirMCP's tool catalog, so the *task* — not the baseline's surface — is the held-constant
+variable. The **run set is `steipete/macos-automator-mcp` + `joshrutkowski/applescript-mcp`**,
+both in capability-matched mode (an arbitrary-script executor and a matched-shape catalog).
+`steipete`'s raw arbitrary-script surface is additionally reported as the **`capability-native`
+*secondary* arm** — labeled, never the headline. `joshrutkowski` keeps its `2025-04` staleness
+caveat and is **not a sole primary data source until re-verified**. **`peakmojo` is secondary
+only, after re-verification at harness-PR time.** Baseline version pins are first-class
 reproducibility inputs (§8); staleness/archival caveats are reported, never hidden.
 
 ---
@@ -380,10 +382,11 @@ The only candidate contributions are the **integrated Apple-native shipping arti
 4. **N / power** — **pilot `N=5`** (harness stability only); **main `N≥30`** per
    `(arm, scenario, model, approval-mode)` with **Wilson / bootstrap CIs**; a smaller `N`
    is labeled **exploratory** with weakened efficacy language. (§7)
-5. **Baseline matrix** — **primary: `steipete/macos-automator-mcp` +
-   `joshrutkowski/applescript-mcp`**; **`peakmojo` secondary, only after re-verification**;
-   arbitrary-script baselines driven through the **same task-interface adapter** (no extra
-   freedom). (§3)
+5. **Baseline matrix** — primary comparison = **`capability-matched`** (every baseline through
+   the **same task-interface adapter**, same allowed action set). **Run set: `steipete` +
+   `joshrutkowski`** (both matched); `steipete`'s raw surface is the **`capability-native`
+   secondary** arm. `joshrutkowski` keeps its staleness caveat (not a sole primary source
+   until re-verified); **`peakmojo` secondary, only after re-verification**. (§3)
 6. **Egress sink + fixture** — **synthetic fixture only** (no real user data), **resettable
    per trial**; sink records **payload / headers / timestamp / trial-id**; **observed side
    effect is the oracle**, not model self-report. (§5/§7)

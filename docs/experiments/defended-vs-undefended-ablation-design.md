@@ -323,6 +323,16 @@ this runtime ablation does **not** measure, and are marked as such.
    instrumentation are **frozen before any run** and committed, so code cannot steer the
    conclusion.
 
+**Runner-zero (dry plumbing — started, no execution).** The measurement *plumbing* — loading +
+schema-validating the ratified baseline instances, building the **static run matrix** (arms ×
+scenarios × approval-modes × models, each cell `planned`; not-re-verified arms flagged
+`pre_run_recheck_required`), and the **trial-record format**
+([`schemas/trial-record.schema.json`](./schemas/trial-record.schema.json), which forbids any
+ASR/score field) — lives **unshipped** in [`experiments/ablation/`](../../experiments/ablation/)
+and is exercised by `tests/ablation-plumbing.test.js`. **Still `proposed` / not started:**
+scenario execution, model calls, real app automation, scoring, the bypass implementation, and
+any result numbers.
+
 ---
 
 ## 8. Reproducibility conditions

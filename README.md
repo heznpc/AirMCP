@@ -220,7 +220,7 @@ AirMCP runs with access to 286 tools on your machine. A few layers keep a buggy 
 - **Rate limit** — 60 tool calls/minute globally, 10 destructive/hour. Token-bucket so bursts are fine; sustained rate isn't.
 - **Emergency stop** — `touch ~/.config/airmcp/emergency-stop` blocks every destructive tool immediately with a 1-second probe cache. No restart needed. `rm` the file to resume.
 - **Audit log** — every tool call lands in `~/.airmcp/audit.jsonl` with PII-scrubbed args, 0600 perms, 10MB rotation. Query it via `audit_log` / `audit_summary` tools. Each entry carries an HMAC chain (single-line tamper detection — `AIRMCP_AUDIT_HMAC_KEY` for cross-machine integrity) and a **correlation ID** that threads the entry, any thrown error, and the OpenTelemetry span (when enabled) for the same call — so a failing tool can be traced across log lines with one `grep`. **Every env knob lives in [docs/environment.md](docs/environment.md)** (77 vars indexed by category).
-- **Inbound HTTP exposure policy** (RFC 0002) — `AIRMCP_ALLOW_NETWORK` = `loopback-only` (default) / `with-token` / `with-token+origin` / `with-oauth` / `with-oauth+origin` / `unauthenticated`. This controls who can reach AirMCP's HTTP server; it is not an outbound egress allow-list. Startup invariant refuses to boot a misconfigured server. Reverse-proxy header detection warns when a `loopback-only` server sees `X-Forwarded-*` so silently-public deploys get caught.
+- **Inbound HTTP exposure policy** (RFC 0002) — `AIRMCP_ALLOW_NETWORK` = `loopback-only` (default) / `with-token` / `with-token+origin` / `with-oauth` / `with-oauth+origin` / `unauthenticated`. This controls who can reach AirMCP's HTTP server; it is not a general outbound egress allow-list (the only outbound-side filtering is the Safari URL guard on `open_url`/`add_to_reading_list`, which rejects non-`http(s)` schemes and loopback/RFC1918/link-local destinations). Startup invariant refuses to boot a misconfigured server. Reverse-proxy header detection warns when a `loopback-only` server sees `X-Forwarded-*` so silently-public deploys get caught.
 - **`npx airmcp doctor`** — runs all the above policy + macOS compatibility + permission checks in one command.
 
 ---
@@ -885,7 +885,7 @@ Or edit `~/.config/airmcp/config.json` directly:
 
 | Variable                     | Default                      | Description                                                  |
 | ---------------------------- | ---------------------------- | ------------------------------------------------------------ |
-| `AIRMCP_INCLUDE_SHARED`      | `false`                      | Include shared notes/folders                                 |
+| `AIRMCP_INCLUDE_SHARED`      | `false`                      | Include items shared/owned by others (off by default: shared items are filtered from reads and mutating them is denied, or routed through share-approval HITL when configured)                                 |
 | `AIRMCP_ALLOW_SEND_MESSAGES` | `false`                      | Allow sending iMessages (opt-in)                             |
 | `AIRMCP_ALLOW_SEND_MAIL`     | `false`                      | Allow sending emails (opt-in)                                |
 | `AIRMCP_FULL`                | `false`                      | Enable all modules (ignores preset)                          |
@@ -975,8 +975,8 @@ Modules with OS requirements (e.g., Intelligence requires macOS 26+) are automat
 ### Architecture & Security
 
 - **JXA/AppleScript dependency** — Core automation relies on Apple's scripting dictionaries. While these have been stable for 10+ years, macOS updates can theoretically break individual modules. Circuit breaker (3 failures → 60s auto-disable) isolates failures. UI Automation tools (6 tools) are inherently more brittle and separated into their own module.
-- **Input sanitization** — `run_javascript` blocks `javascript:` and `data:` URL schemes to prevent code injection. `escJxaShell` strips control characters from shell arguments.
-- **Read data exposure** — Sensitive and destructive operations require HITL approval by default, but read operations (mail, messages, contacts) do not. When connected to cloud LLMs, sensitive data passes through the LLM provider. Mitigations: PII scrubbing in logs, pagination limits, sensitive modules (mail, messages) require explicit opt-in.
+- **Input sanitization** — `open_url` and `add_to_reading_list` reject non-`http(s)` URL schemes and SSRF-style destinations (loopback, RFC1918, link-local / cloud-metadata) via `validateExternalHttpUrl`. `run_javascript` is off unless explicitly enabled (`AIRMCP_ALLOW_RUN_JAVASCRIPT`) and returns its output as untrusted content. `escJxaShell`/`escAS` strip control characters from shell/AppleScript arguments.
+- **Read data exposure** — At the default `sensitive-only` HITL level, destructive operations and privacy-sensitive reads (incl. mail/messages/contacts content, clipboard, health, precise location) require per-call HITL approval; only non-sensitive reads run without a prompt. When connected to cloud LLMs, returned data passes through the LLM provider. Mitigations: PII scrubbing in logs, pagination limits, sensitive modules (mail, messages) require explicit opt-in.
 - **IPC overhead** — Multi-process path (Client → Node.js → osascript/Swift CLI → macOS app). Each JXA call adds ~50ms overhead. Pagination prevents bulk data transfers. Swift bridge path bypasses JXA for EventKit/PhotoKit operations.
 - **Scope** — 286 tools across 29 modules follow 5 repeating patterns (JXA CRUD, Swift bridge, HTTP API, System Events, CLI wrapper), keeping maintenance proportional to pattern count, not tool count.
 
@@ -1021,7 +1021,7 @@ Modules with OS requirements (e.g., Intelligence requires macOS 26+) are automat
 ### Safari
 
 - Reading page content requires "Allow JavaScript from Apple Events" in Safari Developer menu.
-- `run_javascript` rejects `javascript:` and `data:` URLs to prevent injection attacks.
+- `run_javascript` is disabled unless `AIRMCP_ALLOW_RUN_JAVASCRIPT=true` (or `allowRunJavascript` in config); its output is returned as untrusted content. URL-scheme and SSRF rejection (non-`http(s)`, loopback/RFC1918/link-local) applies to `open_url` and `add_to_reading_list`, not to `run_javascript`.
 - **macOS 26+:** Bookmark and Reading List tools (`list_bookmarks`, `list_reading_list`, `add_bookmark`) use `Bookmarks.plist` instead of JXA (Apple removed bookmark scripting). Requires **Full Disk Access** for your terminal in System Settings > Privacy & Security. `add_bookmark` is not supported on macOS 26+.
 
 ### Podcasts

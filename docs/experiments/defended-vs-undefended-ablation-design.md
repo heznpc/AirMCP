@@ -326,10 +326,19 @@ this runtime ablation does **not** measure, and are marked as such.
 **Runner-zero (dry plumbing — started, no execution).** The measurement *plumbing* — loading +
 schema-validating the ratified baseline instances, building the **static run matrix** (arms ×
 scenarios × approval-modes × models, each cell `planned`; not-re-verified arms flagged
-`pre_run_recheck_required`), and the **trial-record format**
-([`schemas/trial-record.schema.json`](./schemas/trial-record.schema.json), which forbids any
-ASR/score field) — lives **unshipped** in [`experiments/ablation/`](../../experiments/ablation/)
-and is exercised by `tests/ablation-plumbing.test.js`. **Still `proposed` / not started:**
+`pre_run_recheck_required`), and the **consistency-guarded trial-record format** — live
+**unshipped** in [`experiments/ablation/`](../../experiments/ablation/), exercised by
+`tests/ablation-plumbing.test.js` + `tests/trial-record-consistency.test.js`. The trial record
+([`schemas/trial-record.schema.json`](./schemas/trial-record.schema.json)) forbids any ASR/score
+field and enforces cross-field consistency **four ways**: **structural** couplings via schema
+`if/then` (`planned` ⇒ measured fields null; `errored` ⇒ `outcome=error` + `block_source=env_error`;
+`success` ⇒ `block_source=none`; `blocked`/`false_positive` ⇒ a real guard); **derived** —
+`counts_as_airmcp_defense` is **not stored** but computed from `block_source` via
+`countsAsAirmcpDefense()` (named server guard ⇒ true), so it can never contradict the record;
+**relational** date ordering via `trialRecordInvariantErrors()`; and a **validate-or-die**
+contract (`assertValidTrialRecord()`) the runner must call before recording any trial.
+baseline-snapshot **freshness** (its window still covers `NOW`) is a **runner-time fail-closed
+gate** (`isBaselineSnapshotFresh()`), **not** a static invariant. **Still `proposed` / not started:**
 scenario execution, model calls, real app automation, scoring, the bypass implementation, and
 any result numbers.
 

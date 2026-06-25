@@ -1,22 +1,24 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "baseline-adapter.schema.json",
-  "title": "Baseline adapter capability contract",
-  "description": "Fairness contract for each baseline arm driven through the shared task interface. Design ref: ablation §3 / §11.5.",
+  "title": "Baseline adapter capability + conformance contract",
+  "description": "Per-baseline fairness AND behavioral-transparency contract for an arm driven through the shared task interface. The comparison tier is `capability_mode` ONLY — there is no `role` field (its prior overload of tier/run-priority caused drift; see ablation §3 / §11.5). Three orthogonal axes: capability_mode (comparison tier), re_verified (current-state verification), sole_primary_data_source (claim eligibility). Design ref: §3 / §5 / §11.5; preflight §2.",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "version",
     "status",
     "baseline_id",
-    "role",
     "capability_mode",
+    "re_verified",
+    "sole_primary_data_source",
     "same_fixture_source",
     "same_task_interface",
     "same_allowed_action_set",
     "same_scenario_corpus",
     "no_per_scenario_exploit",
-    "no_per_arm_exploit"
+    "no_per_arm_exploit",
+    "conformance"
   ],
   "properties": {
     "version": { "type": "string" },
@@ -25,57 +27,110 @@
       "type": "string",
       "description": "e.g. steipete/macos-automator-mcp, joshrutkowski/applescript-mcp, peakmojo/applescript-mcp"
     },
-    "role": {
-      "enum": ["primary", "secondary"],
-      "description": "Comparison tier — tracks capability_mode, NOT run-priority. capability-matched => primary; capability-native (or re-verification-pending) => secondary. Run-set membership (which baselines run) is recorded separately, not via this field."
-    },
     "capability_mode": {
       "enum": ["capability-matched", "capability-native"],
-      "description": "capability-matched: allowed action set equals the shared catalog (primary, clean ablation). capability-native: the baseline's real broader surface (secondary, labeled)."
+      "description": "The ONLY comparison-tier axis. capability-matched = same allowed action set as AirMCP's catalog (the primary comparison). capability-native = the baseline's real broader surface (secondary, labeled). Run-set membership is NOT recorded here — it belongs to a separate run-matrix instance."
+    },
+    "re_verified": {
+      "type": "boolean",
+      "description": "True once this baseline's facts (archived / pushed_at / safety model) were re-stamped and re-verified at harness-PR time (design §11.7). Until then, false."
+    },
+    "sole_primary_data_source": {
+      "type": "boolean",
+      "description": "May this single arm stand alone as a primary data source for a headline claim? Gated by the allOf rules below: false unless capability-matched AND re_verified."
+    },
+    "caveat": {
+      "type": "string",
+      "description": "Optional human-readable staleness/archival note (e.g. code-frozen date). Advisory only; the machine gate is re_verified + the allOf rule."
     },
     "same_fixture_source": { "const": true },
     "same_task_interface": { "const": true },
     "same_allowed_action_set": {
       "type": "boolean",
-      "description": "MUST be true for capability-matched. capability-native MAY exceed the shared catalog but only as role=secondary."
+      "description": "MUST be true for capability-matched. capability-native MAY exceed the shared catalog and is therefore never a sole primary data source."
     },
     "same_scenario_corpus": { "const": true },
     "no_per_scenario_exploit": {
       "const": true,
-      "description": "Injection vectors come only from the shared fixture/scenario corpus — no scenario-specific hand-tuned exploit."
+      "description": "Injection vectors come only from the shared corpus — no scenario-specific hand-tuned exploit."
     },
-    "no_per_arm_exploit": {
-      "const": true,
-      "description": "No arm receives a bespoke attack; the corpus is applied identically."
-    },
-    "caveat": {
-      "type": "string",
-      "description": "Optional staleness/archival caveat (e.g. code-frozen date). A caveated baseline is not a sole primary data source until re-verified at harness-PR time."
+    "no_per_arm_exploit": { "const": true, "description": "No arm receives a bespoke attack." },
+    "conformance": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Behavioral-transparency guarantees. The adapter faithfully brokers a permitted call and adds NO hidden defense. The only gating it may apply is delegation to the shared approver policy (approver-policy.schema.json). Out-of-set refusal is the common harness dispatcher's job, not the adapter's. A baseline's native OS TCC prompt is never counted as defense.",
+      "required": [
+        "no_content_modification",
+        "no_self_gating_beyond_shared_approver",
+        "no_sanitization_or_rewriting",
+        "passes_through_errors_and_results",
+        "out_of_set_refusal_owner",
+        "native_tcc_prompt_counts_as_defense"
+      ],
+      "properties": {
+        "no_content_modification": {
+          "const": true,
+          "description": "Request args (incl. injected/untrusted corpus content) reach the baseline byte-for-byte — no stripping, escaping, redacting, or summarizing."
+        },
+        "no_self_gating_beyond_shared_approver": {
+          "const": true,
+          "description": "The adapter adds no HITL/consent/allow-deny of its own; the ONLY permitted gate is delegating to the shared approver policy."
+        },
+        "no_sanitization_or_rewriting": {
+          "const": true,
+          "description": "No path/URL canonicalization, metacharacter escaping, instruction-detection rewriting, or defense-like normalization (those are AirMCP's OWN defenses, never the adapter's)."
+        },
+        "passes_through_errors_and_results": {
+          "const": true,
+          "description": "Baseline errors and outputs reach the oracle verbatim; the adapter never synthesizes a failure from a success or vice-versa."
+        },
+        "out_of_set_refusal_owner": {
+          "const": "harness_dispatcher",
+          "description": "Out-of-set tool refusal is owned by the common harness dispatcher, NOT the adapter, and is NOT counted as AirMCP server defense."
+        },
+        "native_tcc_prompt_counts_as_defense": {
+          "const": false,
+          "description": "A baseline's native OS TCC prompt is NOT a defense. TCC is pre-granted identically; a TCC prompt mid-trial is recorded as setup/env failure (os_tcc), never a defense success."
+        }
+      }
     }
   },
   "allOf": [
     {
-      "if": { "properties": { "capability_mode": { "const": "capability-native" } } },
-      "then": { "properties": { "role": { "const": "secondary" } } }
-    },
-    {
       "if": { "properties": { "capability_mode": { "const": "capability-matched" } } },
       "then": { "properties": { "same_allowed_action_set": { "const": true } } }
+    },
+    {
+      "if": { "properties": { "capability_mode": { "const": "capability-native" } } },
+      "then": { "properties": { "sole_primary_data_source": { "const": false } } }
+    },
+    {
+      "if": { "properties": { "re_verified": { "const": false } } },
+      "then": { "properties": { "sole_primary_data_source": { "const": false } } }
     }
   ],
   "examples": [
     {
-      "version": "0.1.0-proposed",
+      "version": "0.2.0-proposed",
       "status": "proposed",
       "baseline_id": "steipete/macos-automator-mcp",
-      "role": "primary",
       "capability_mode": "capability-matched",
+      "re_verified": false,
+      "sole_primary_data_source": false,
       "same_fixture_source": true,
       "same_task_interface": true,
       "same_allowed_action_set": true,
       "same_scenario_corpus": true,
       "no_per_scenario_exploit": true,
-      "no_per_arm_exploit": true
+      "no_per_arm_exploit": true,
+      "conformance": {
+        "no_content_modification": true,
+        "no_self_gating_beyond_shared_approver": true,
+        "no_sanitization_or_rewriting": true,
+        "passes_through_errors_and_results": true,
+        "out_of_set_refusal_owner": "harness_dispatcher",
+        "native_tcc_prompt_counts_as_defense": false
+      }
     }
   ]
 }

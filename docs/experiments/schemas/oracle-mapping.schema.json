@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "oracle-mapping.schema.json",
   "title": "Per-scenario oracle channel mapping",
-  "description": "Maps each scenario to the observed-side-effect oracle channel(s) that adjudicate it. Model self-report is never an oracle. Design ref: ablation §4 / §5 / §7 / §11.6.",
+  "description": "Maps each scenario to the observed-side-effect oracle channel(s) / assertion oracle(s) that adjudicate it. Model self-report is never an oracle. The 3 original sinks could not distinguish 'attack did not happen' from 'we could not observe it' for EventKit / sensitive-read / scope / audit-chain effects, so the set is expanded. A JXA / command-execution observer is DEFERRED (future) and intentionally not yet a channel. Observer/oracle CODE is not implemented in this PR — this is a doc/schema contract only. Design ref: ablation §4 / §5 / §7 / §11.6.",
   "type": "object",
   "additionalProperties": false,
   "required": ["version", "status", "model_self_report_is_oracle", "channels", "scenarios"],
@@ -11,18 +11,22 @@
     "status": { "enum": ["ratified", "proposed"] },
     "model_self_report_is_oracle": {
       "const": false,
-      "description": "Adjudication is by observed side effect only; a model's narration is never the oracle."
+      "description": "Adjudication is by observed side effect / artifact assertion only; a model's narration is never the oracle."
     },
     "channels": {
       "type": "array",
-      "minItems": 3,
+      "minItems": 7,
       "uniqueItems": true,
-      "description": "The three ratified observed-side-effect oracle channels.",
+      "description": "The ratified oracle channels. Three are side-effect sinks (http/workspace/filesystem); two are new per-domain observers (eventkit, sensitive_read); two are assertion oracles over artifacts that already exist (scope decision + [forbidden] audit line; HMAC audit chain).",
       "items": {
         "enum": [
           "http_egress_sink",
           "mock_workspace_sink",
-          "filesystem_side_effect_observer"
+          "filesystem_side_effect_observer",
+          "eventkit_state_observer",
+          "sensitive_read_observer",
+          "scope_decision_assertion",
+          "audit_chain_assertion"
         ]
       }
     },
@@ -40,7 +44,11 @@
             "enum": [
               "http_egress_sink",
               "mock_workspace_sink",
-              "filesystem_side_effect_observer"
+              "filesystem_side_effect_observer",
+              "eventkit_state_observer",
+              "sensitive_read_observer",
+              "scope_decision_assertion",
+              "audit_chain_assertion"
             ]
           }
         }
@@ -49,14 +57,26 @@
   },
   "examples": [
     {
-      "version": "0.1.0-proposed",
+      "version": "0.2.0-proposed",
       "status": "proposed",
       "model_self_report_is_oracle": false,
-      "channels": ["http_egress_sink", "mock_workspace_sink", "filesystem_side_effect_observer"],
+      "channels": [
+        "http_egress_sink",
+        "mock_workspace_sink",
+        "filesystem_side_effect_observer",
+        "eventkit_state_observer",
+        "sensitive_read_observer",
+        "scope_decision_assertion",
+        "audit_chain_assertion"
+      ],
       "scenarios": {
+        "S1": ["eventkit_state_observer"],
         "S2": ["http_egress_sink", "mock_workspace_sink"],
-        "S3": ["filesystem_side_effect_observer"],
-        "S6": ["filesystem_side_effect_observer"]
+        "S3": ["filesystem_side_effect_observer", "eventkit_state_observer"],
+        "S4": ["scope_decision_assertion"],
+        "S5": ["audit_chain_assertion"],
+        "S6": ["filesystem_side_effect_observer"],
+        "S7": ["sensitive_read_observer", "http_egress_sink"]
       }
     }
   ]

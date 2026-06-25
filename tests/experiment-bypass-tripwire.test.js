@@ -12,6 +12,7 @@
  */
 import { describe, test, expect } from "@jest/globals";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -81,5 +82,33 @@ describe("experiment-bypass tripwire", () => {
       expect(DEFENSE_BYPASS_PHRASE.test(text)).toBe(false);
       expect(DEFENSE_DISABLE_ENV.test(text)).toBe(false);
     }
+  });
+
+  // The .mcpb manifest template is where a reserved env / user_config key would
+  // actually be authored (it renders into the shipped manifest.json). The source
+  // scan above never opens it — close that hole.
+  test("mcpb manifest template carries no reserved bypass env / user_config key", () => {
+    const manifest = JSON.parse(readFileSync(join(ROOT, "mcpb", "manifest.template.json"), "utf8"));
+    const env = manifest.server?.mcp_config?.env ?? {};
+    const surface = [
+      ...Object.keys(env),
+      ...Object.values(env).map(String),
+      ...Object.keys(manifest.user_config ?? {}),
+    ];
+    const leaked = surface.filter((s) => RESERVED_ENV.test(s) || DEFENSE_DISABLE_ENV.test(s));
+    expect(leaked).toEqual([]);
+  });
+
+  // The actual published payload (not just the `files` array) must carry no
+  // experiment path. `--ignore-scripts` keeps it side-effect-free and offline.
+  test("npm pack payload contains no experiment/harness/ablation path", () => {
+    const out = execFileSync("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"], {
+      cwd: ROOT,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    const files = (JSON.parse(out)[0]?.files ?? []).map((f) => f.path);
+    expect(files.length).toBeGreaterThan(0);
+    expect(files.filter((p) => EXP_PATH.test(p))).toEqual([]);
   });
 });

@@ -1,0 +1,23 @@
+{
+  "version": "0.2.0-proposed",
+  "status": "proposed",
+  "baseline_id": "joshrutkowski/applescript-mcp",
+  "capability_mode": "capability-matched",
+  "re_verified": false,
+  "sole_primary_data_source": false,
+  "caveat": "Re-verified 2026-06-25 (GitHub API authoritative): not archived but code-frozen — pushed_at 2025-04-19 [historical, ~14mo]; updated_at 2026-06-22 is metadata-only (no in-window code activity, so no revival possible). Closest matched-shape baseline (discrete typed tools) and TCC-only undefended, but NOT re-verified as current, so it cannot be a sole primary data source until re-verified. NOTE: the date-anchored web-detail agent failed transiently; this determination rests on the authoritative GitHub API pushed_at, which conservatively yields re_verified=false.",
+  "same_fixture_source": true,
+  "same_task_interface": true,
+  "same_allowed_action_set": true,
+  "same_scenario_corpus": true,
+  "no_per_scenario_exploit": true,
+  "no_per_arm_exploit": true,
+  "conformance": {
+    "no_content_modification": true,
+    "no_self_gating_beyond_shared_approver": true,
+    "no_sanitization_or_rewriting": true,
+    "passes_through_errors_and_results": true,
+    "out_of_set_refusal_owner": "harness_dispatcher",
+    "native_tcc_prompt_counts_as_defense": false
+  }
+}

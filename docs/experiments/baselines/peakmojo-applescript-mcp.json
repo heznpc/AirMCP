@@ -1,0 +1,23 @@
+{
+  "version": "0.2.0-proposed",
+  "status": "proposed",
+  "baseline_id": "peakmojo/applescript-mcp",
+  "capability_mode": "capability-native",
+  "re_verified": false,
+  "sole_primary_data_source": false,
+  "caveat": "Re-verified 2026-06-25 (GitHub API authoritative): not archived; pushed_at 2026-02-22 — just OUTSIDE the 2026-03-27 window start (~4mo). Adds shell exec + SSH (surface-broadening beyond AirMCP's catalog) -> classified capability-native, secondary only. Not re-verified as current. NOTE: the date-anchored web-detail agent failed transiently; this determination rests on the authoritative GitHub API pushed_at.",
+  "same_fixture_source": true,
+  "same_task_interface": true,
+  "same_allowed_action_set": false,
+  "same_scenario_corpus": true,
+  "no_per_scenario_exploit": true,
+  "no_per_arm_exploit": true,
+  "conformance": {
+    "no_content_modification": true,
+    "no_self_gating_beyond_shared_approver": true,
+    "no_sanitization_or_rewriting": true,
+    "passes_through_errors_and_results": true,
+    "out_of_set_refusal_owner": "harness_dispatcher",
+    "native_tcc_prompt_counts_as_defense": false
+  }
+}

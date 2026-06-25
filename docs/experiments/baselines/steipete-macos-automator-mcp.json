@@ -1,0 +1,23 @@
+{
+  "version": "0.2.0-proposed",
+  "status": "proposed",
+  "baseline_id": "steipete/macos-automator-mcp",
+  "capability_mode": "capability-matched",
+  "re_verified": true,
+  "sole_primary_data_source": true,
+  "caveat": "Re-verified 2026-06-25 (GitHub API + date-anchored web): not archived; pushed_at 2026-06-23 (in-window); npm @steipete/macos-automator-mcp 0.4.3 published 2026-06-19; 830 stars; MIT; Node >=24. TCC-only thin wrapper with NO app-layer defense (no per-call HITL, no permission tiers, no egress allowlist, no audit log). Maintained + installable. This baseline also supplies the capability-native secondary arm (its raw arbitrary-script surface).",
+  "same_fixture_source": true,
+  "same_task_interface": true,
+  "same_allowed_action_set": true,
+  "same_scenario_corpus": true,
+  "no_per_scenario_exploit": true,
+  "no_per_arm_exploit": true,
+  "conformance": {
+    "no_content_modification": true,
+    "no_self_gating_beyond_shared_approver": true,
+    "no_sanitization_or_rewriting": true,
+    "passes_through_errors_and_results": true,
+    "out_of_set_refusal_owner": "harness_dispatcher",
+    "native_tcc_prompt_counts_as_defense": false
+  }
+}

@@ -112,12 +112,17 @@ describe('escAS (AppleScript double-quoted strings)', () => {
     expect(escAS('col1\tcol2')).toBe('col1\\tcol2');
   });
 
-  test('escapes unicode line separator (\\u2028)', () => {
-    expect(escAS('before\u2028after')).toBe('before\\u2028after');
+  // U+2028/U+2029 are deliberately NOT escaped for AppleScript: AS has no `\u`
+  // escape, so emitting "\u2028" yields an un-parseable token (osascript -2741)
+  // and the send silently fails. Raw LS/PS are ordinary characters inside an
+  // AppleScript double-quoted literal and pass through safely. See escAS in
+  // src/shared/esc.ts. (escJxaShell, which targets JS/JXA, still escapes them.)
+  test('passes U+2028 line separator through unescaped (AppleScript has no \\u)', () => {
+    expect(escAS('before\u2028after')).toBe('before\u2028after');
   });
 
-  test('escapes unicode paragraph separator (\\u2029)', () => {
-    expect(escAS('before\u2029after')).toBe('before\\u2029after');
+  test('passes U+2029 paragraph separator through unescaped (AppleScript has no \\u)', () => {
+    expect(escAS('before\u2029after')).toBe('before\u2029after');
   });
 
   test('combined attack string with multiple special chars', () => {
@@ -130,8 +135,11 @@ describe('escAS (AppleScript double-quoted strings)', () => {
     expect(result).toContain('\\n');
     expect(result).toContain('\\r');
     expect(result).toContain('\\t');
-    expect(result).toContain('\\u2028');
-    expect(result).toContain('\\u2029');
+    // LS/PS survive verbatim (AppleScript-safe) and are never \u-encoded.
+    expect(result).toContain('\u2028');
+    expect(result).toContain('\u2029');
+    expect(result).not.toContain('\\u2028');
+    expect(result).not.toContain('\\u2029');
   });
 
   test('injection attempt is escaped', () => {

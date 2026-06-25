@@ -308,7 +308,7 @@ Also check:
 
 | Error | Cause | Solution |
 |-------|-------|----------|
-| `--experimental-vm-modules is not available` | Node.js < 18 | Upgrade to Node.js >= 18 |
+| `--experimental-vm-modules is not available` | Node.js < 20 | Upgrade to Node.js >= 20 |
 | `Cannot find module '../dist/...'` | Missing build | Run `npm run build` before `npm test` |
 | `Error: Not authorized to send Apple events` | Missing Automation permission | System Settings > Privacy & Security > Automation |
 | `execution error: Application isn't running` | Target app not open | Open the app (Notes, Calendar, etc.) |

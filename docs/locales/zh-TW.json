@@ -150,7 +150,7 @@
   "install_label": "安裝",
   "install_title": "幾秒即可開始。",
   "install_sub": "全域安裝或透過npx直接執行。",
-  "install_note": "需要Node.js 18+和macOS。支援Claude Code、Codex及所有MCP用戶端。",
+  "install_note": "需要Node.js 20+和macOS。支援Claude Code、Codex及所有MCP用戶端。",
   "modal_try": "試試看",
   "modal_tools_label": "工具列表",
   "modal_ex_notes": "\"讀一下我最新的備忘錄，幫我摘要\"",

@@ -848,7 +848,7 @@ Designed for AI coding agents (Claude Code, Cursor, Copilot, etc.) to invoke via
 
 ## Module Presets
 
-By default, new installations start with 5 core modules (Notes, Reminders, Calendar, Shortcuts, System) to keep things simple. You can enable more anytime:
+By default, new installations start with 7 starter modules (Notes, Reminders, Calendar, Shortcuts, System, Finder, Weather) to keep things simple. You can enable more anytime:
 
 ```bash
 # Re-run the setup wizard to change modules
@@ -964,7 +964,7 @@ swift build -c release -Xswiftc -DAIRMCP_ENABLE_FOUNDATION_MODELS
 ## Requirements
 
 - macOS
-- Node.js >= 18
+- Node.js >= 20
 - Per-app automation permissions (prompted on first run) — use `setup_permissions` tool to request all at once
 - Apple Intelligence preview: macOS 26+ with Apple Silicon and `AIRMCP_ENABLE_FOUNDATION_MODELS`
 

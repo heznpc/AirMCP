@@ -150,7 +150,7 @@
   "install_label": "설치",
   "install_title": "몇 초면 시작.",
   "install_sub": "전역 설치하거나 npx로 바로 실행하세요.",
-  "install_note": "Node.js 18+와 macOS 필요. Claude Code, Codex 및 모든 MCP 클라이언트 지원.",
+  "install_note": "Node.js 20+와 macOS 필요. Claude Code, Codex 및 모든 MCP 클라이언트 지원.",
   "modal_try": "이렇게 말해보세요",
   "modal_tools_label": "도구 목록",
   "modal_ex_notes": "\"최근 메모를 읽고 요약해줘\"",

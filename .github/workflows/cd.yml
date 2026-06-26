@@ -60,6 +60,9 @@ jobs:
             exit 1
           fi
 
+      - name: Build .mcpb Desktop Extension
+        run: npm run build:mcpb
+
       - name: Publish with provenance
         run: npm publish --provenance --access public
         env:
@@ -71,3 +74,5 @@ jobs:
           tag_name: v${{ steps.pkg.outputs.version }}
           name: v${{ steps.pkg.outputs.version }}
           generate_release_notes: true
+          files: build/mcpb/airmcp-${{ steps.pkg.outputs.version }}.mcpb
+          fail_on_unmatched_files: true

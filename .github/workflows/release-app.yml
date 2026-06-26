@@ -141,33 +141,19 @@ jobs:
           ditto -c -k --keepParent AirMCP.app "AirMCP-${VERSION}.zip"
           ls -la "AirMCP-${VERSION}.zip"
 
-      # Also produce the .mcpb Desktop Extension bundle so the GitHub
-      # Release carries both artifacts. The .mcpb doesn't itself need
-      # notarization (it's a JS bundle, not a Mach-O executable), but
-      # shipping it from the same tagged build keeps the versions in
-      # lockstep with the signed .app.
-      - name: Build .mcpb bundle
-        run: npm run build:mcpb
-
-      # SLSA build provenance for the notarized .app archive + the .mcpb
-      # bundle. Lets downstream consumers verify the artifacts came from
-      # this repo + this workflow run (cosign / `gh attestation verify`).
-      # The cd.yml pipeline already gets provenance for free via npm's
-      # trusted publishing; this closes the same gap for the distributable
-      # binaries that ship outside npm.
+      # SLSA build provenance for the notarized .app archive. The `.mcpb`
+      # Desktop Extension is built and attached by cd.yml alongside the npm
+      # publish, because it needs no Apple signing secrets and should not be
+      # blocked on notarization.
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
         with:
-          subject-path: |
-            AirMCP-${{ steps.version.outputs.version }}.zip
-            build/mcpb/airmcp-${{ steps.version.outputs.version }}.mcpb
+          subject-path: AirMCP-${{ steps.version.outputs.version }}.zip
 
       - name: Attach artifacts to Release
         uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v2
         with:
           tag_name: v${{ steps.version.outputs.version }}
-          files: |
-            AirMCP-${{ steps.version.outputs.version }}.zip
-            build/mcpb/airmcp-${{ steps.version.outputs.version }}.mcpb
+          files: AirMCP-${{ steps.version.outputs.version }}.zip
           fail_on_unmatched_files: true
           generate_release_notes: true

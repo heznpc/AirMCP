@@ -31,13 +31,21 @@ Breaking을 포함한 minor/patch는 **금지**. 직전 메이저에 묶어 둘 
 - [ ] `npm run lint`
 - [ ] `npm run typecheck`
 - [ ] `npm run build`
-- [ ] `npm test` — 커버리지 게이트(현재 46/40/42/46) 통과 확인
-- [ ] macOS 환경이라면 `npm run swift-build` · `npm run swift-test`
+- [ ] `npm test`
+- [ ] `npm run smoke`
+- [ ] `npm run mcp:validate`
+- [ ] `npm run verify:package`
+- [ ] macOS 환경이라면 `npm run swift-build` · `cd swift && swift test` · `cd ios && swift test`
 - [ ] `npx airmcp doctor` 자체 실행이 성공 (CI 환경 외)
 
 ### 1.3 공개 계약 체크
-- [ ] `npm run count-stats` — 툴/모듈/리소스 수와 `server.json`·`glama.json`·README·docs/site·i18n이 일치
-- [ ] `npm run check-i18n` — 9 로케일 키 동기화 통과
+- [ ] `npm run stats:check` — 툴/모듈/리소스 수와 `server.json`·`glama.json`·README·docs/site·i18n이 일치
+- [ ] `npm run gen:manifest:check` — runtime tool schema와 `docs/tool-manifest.json` 일치
+- [ ] `npm run gen:intents:check` — generated AppIntents drift 없음
+- [ ] `npm run build:mcpb:check` — `.mcpb` manifest v0.3 substitution 일치
+- [ ] `npm run llms:check` — public LLM summary drift 없음
+- [ ] `npm run version:check` — package/app/plugin/config version pin 일치
+- [ ] `npm run i18n:check` — 9 로케일 키 동기화 통과
 - [ ] `outputSchema` 추가·변경이 있다면 Zod `.safeParse` 테스트가 성공 응답과 에러 응답 모두에 대해 도는지 확인
 
 ### 1.4 취약점
@@ -52,13 +60,13 @@ Breaking을 포함한 minor/patch는 **금지**. 직전 메이저에 묶어 둘 
 ### 2.1 CHANGELOG.md
 - [ ] `## [Unreleased]`에 기록된 항목을 새 버전 섹션으로 이동 (없으면 직접 작성)
 - [ ] 분류: `Added` / `Changed` / `Fixed` / `Security` / `Deprecated` / `Removed` / `Breaking Changes`
-- [ ] 테스트 변화가 크면 "Testing (N → M tests, coverage X → Y%)" 섹션 추가 (v2.7.2 포맷)
+- [ ] 테스트 변화가 크면 contract / artifact gate 변화와 총 테스트 수를 기록
 - [ ] Breaking 항목은 **마이그레이션 가이드** 포함 ("envvar/flag가 이렇게 바뀜")
 - [ ] 이슈·PR 번호(#NN) 참조
 
 ### 2.2 TODO.md (가장 자주 잊히는 곳)
 - [ ] CHANGELOG delta와 대조하여 **완료된 항목 체크오프**
-  - 테스트 커버리지 구체 수치(%) 갱신
+  - 새로 닫힌 contract / artifact gate 반영
   - "완료" 섹션 맨 위에 새 버전 한 줄 요약 추가
 - [ ] 새 버전에서 생긴 후속 작업 P0/P1/P2에 삽입
 - [ ] 헤더의 "X.Y.Z 기준 (YYYY-MM-DD 동기화)" 라인 갱신
@@ -84,22 +92,29 @@ Breaking을 포함한 minor/patch는 **금지**. 직전 메이저에 묶어 둘 
 
 ## 3. 릴리스 실행
 
-### 3.1 커밋
+### 3.1 Dry release preflight (publish 금지)
+- [ ] `npm run release:preflight` 로 npm tarball dry-run + packaged server boot + `.mcpb` 구조 검증
+- [ ] app 산출물까지 확인할 때는 `npm run release:preflight -- --app`
+- [ ] GitHub Actions **Release Preflight** workflow green 확인
+- [ ] workflow artifact에 `airmcp-X.Y.Z.mcpb`와 `AirMCP-X.Y.Z-adhoc.zip`이 생성되는지 확인
+- [ ] 이 단계는 태그·npm publish·GitHub Release를 만들지 않는다. 실패 시 publish 단계로 넘어가지 않는다.
+
+### 3.2 커밋
 - [ ] `chore(release): vX.Y.Z` 커밋에 위 모든 파일 동시 포함
 - [ ] `git tag vX.Y.Z` (서명 권장: `git tag -s`)
 - [ ] `git push origin main --tags`
 
-### 3.2 CI 통과 확인
+### 3.3 CI 통과 확인
 - [ ] `ci.yml` 전 단계 green
 - [ ] CodeQL·Scorecard 경고 신규 없음
 
-### 3.3 npm publish + .mcpb → GitHub Release
+### 3.4 npm publish + .mcpb → GitHub Release
 - [ ] CD workflow(`cd.yml`) 자동 트리거 확인, 또는 수동 `npm publish --provenance`
 - [ ] `npm view airmcp@X.Y.Z` 로 반영 검증
 - [ ] `npx -y airmcp@X.Y.Z --version` 스모크
 - [ ] Release에 `airmcp-X.Y.Z.mcpb`가 첨부되어 있는지 확인 (Claude Desktop 원클릭 설치용)
 
-### 3.4 Signed .app → GitHub Release
+### 3.5 Signed .app → GitHub Release
 - [ ] `release-app.yml` 워크플로가 태그 푸시로 자동 실행됐는지 확인 (Actions 탭)
 - [ ] 실패 시 **Missing required secrets** 에러면 아래 6개를 Settings → Secrets and variables → Actions에 등록:
   - `APPLE_DEVELOPER_ID` — Developer ID Application certificate 공통명 (예: `Developer ID Application: Jane Doe (A1B2C3D4E5)`)
@@ -117,7 +132,7 @@ Breaking을 포함한 minor/patch는 **금지**. 직전 메이저에 묶어 둘 
 - [ ] 배포 artifact 검증: `APP_BUNDLE_PATH=/path/to/AirMCP.app npm run app:verify:signed`
   - 기존 번들을 다시 빌드하지 않고 Developer ID 서명, Gatekeeper, staple, app-owned runtime, 토큰 인증, AppIntents 런타임 로그를 한 번에 확인
 
-### 3.5 GitHub Release notes
+### 3.6 GitHub Release notes
 - [ ] Release notes는 CHANGELOG 섹션 복사 (요약 강조, 이미지/GIF는 README 링크)
 - [ ] Breaking이 있으면 Release 제목에 `[BREAKING]` 프리픽스
 - [ ] `latest` 태그 갱신 확인
@@ -175,7 +190,10 @@ Breaking을 포함한 minor/patch는 **금지**. 직전 메이저에 묶어 둘 
 npm run lint && npm run typecheck && npm run build && npm test
 
 # 통계·i18n
-npm run count-stats && npm run check-i18n
+npm run stats:check && npm run i18n:check
+
+# dry release artifact
+npm run release:preflight
 
 # 취약점
 npm audit --audit-level=moderate

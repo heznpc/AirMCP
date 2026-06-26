@@ -84,6 +84,7 @@
     "premcp:validate": "npm run build",
     "mcp:validate": "node scripts/mcp-validate.mjs",
     "verify:package": "node scripts/verify-published-package.mjs",
+    "release:preflight": "node scripts/release-preflight.mjs",
     "build:mcpb": "node scripts/build-mcpb.mjs",
     "build:mcpb:check": "node scripts/build-mcpb.mjs --check",
     "gen:manifest": "node scripts/dump-tool-manifest.mjs",

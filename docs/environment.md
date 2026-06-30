@@ -201,7 +201,7 @@ It does not replace OS permissions, HITL approval, OAuth scopes, rate limits, or
 
 ## Module packs
 
-AirMCP module packs are the runtime contract for DLC-like installation. The current npm package still ships every built-in module, but `AIRMCP_MODULE_PACKS` lets operators activate only selected packs today and gives future split packages a tested boundary.
+AirMCP module packs are the runtime contract for DLC-like installation. The current npm package still ships every built-in module, but `AIRMCP_MODULE_PACKS` lets operators activate only selected packs today and gives future add-on packages a tested boundary. Future add-on package names intentionally omit the word "pack": for example `@heznpc/airmcp-productivity`, `@heznpc/airmcp-communications`, and `@heznpc/airmcp-spatial`.
 
 Built-in packs:
 
@@ -217,7 +217,7 @@ Built-in packs:
 - `google-workspace`: Google Workspace
 - `spatial`: experimental spatial prep
 
-Use `list_module_packs` to inspect the active pack set over MCP. `profile_status` also reports `modulePacksConfigured`, `modulePacksAvailable`, and `modulesMissingPacks` so a client can tell whether a module is disabled by profile/config or unavailable because its pack is not active.
+Use `list_module_packs` to inspect the active pack set and future add-on package names over MCP. `profile_status` also reports `modulePacksConfigured`, `modulePacksAvailable`, and `modulesMissingPacks` so a client can tell whether a module is disabled by profile/config or unavailable because its pack is not active.
 
 ---
 

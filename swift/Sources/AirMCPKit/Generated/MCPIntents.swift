@@ -484,6 +484,7 @@ public struct MCPListMessagesOutput: Codable, Sendable {
 public struct MCPListModulePacksOutput: Codable, Sendable {
     public struct PacksItem: Codable, Sendable {
         public let name: String
+        public let packageName: String
         public let title: String
         public let description: String
         public let modules: [String]

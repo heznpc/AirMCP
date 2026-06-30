@@ -122,6 +122,9 @@ export const MODULE_NAMES = [
   "audit",
 ] as const;
 
+export const OPT_IN_MODULE_NAMES = ["spatial_prep"] as const;
+export const KNOWN_MODULE_NAMES = [...MODULE_NAMES, ...OPT_IN_MODULE_NAMES] as const;
+
 /** Core modules enabled by default when no config.json exists */
 export const STARTER_MODULES: ReadonlySet<string> = new Set([
   "notes",
@@ -134,6 +137,7 @@ export const STARTER_MODULES: ReadonlySet<string> = new Set([
 ]);
 
 export type ModuleName = (typeof MODULE_NAMES)[number];
+export type KnownModuleName = (typeof KNOWN_MODULE_NAMES)[number];
 
 export interface McpClient {
   name: string;
@@ -304,7 +308,7 @@ export function parseConfig(): AirMcpConfig {
   // Validate disabledModules: warn about unknown module names
   if (file.disabledModules) {
     for (const mod of file.disabledModules) {
-      if (!(MODULE_NAMES as readonly string[]).includes(mod)) {
+      if (!(KNOWN_MODULE_NAMES as readonly string[]).includes(mod)) {
         log.warn("unknown module in disabledModules — ignored", { module: mod });
       }
     }
@@ -331,14 +335,19 @@ export function parseConfig(): AirMcpConfig {
   // Disabled modules: env vars override, then JSON fallback, then starter preset
   const disabledModules = new Set<string>();
   const fileDisabled = new Set(file.disabledModules ?? []);
-  for (const mod of MODULE_NAMES) {
+  const enabledProfiles = parseProfileEnv(process.env.AIRMCP_PROFILE);
+  for (const mod of KNOWN_MODULE_NAMES) {
     const envKey = `AIRMCP_DISABLE_${mod.toUpperCase()}`;
+    const enableEnvKey = `AIRMCP_ENABLE_${mod.toUpperCase()}`;
     const envVal = process.env[envKey];
+    const optInEnabled = process.env[enableEnvKey] === "true" || enabledProfiles.has(mod);
     if (envVal === "true") {
+      disabledModules.add(mod);
+    } else if ((OPT_IN_MODULE_NAMES as readonly string[]).includes(mod) && !optInEnabled) {
       disabledModules.add(mod);
     } else if (envVal === undefined && !fullMode && fileDisabled.has(mod)) {
       disabledModules.add(mod);
-    } else if (envVal === undefined && !fileExists && !fullMode && !STARTER_MODULES.has(mod)) {
+    } else if (envVal === undefined && !fileExists && !fullMode && !STARTER_MODULES.has(mod) && !optInEnabled) {
       // No config.json & not --full: apply starter preset
       disabledModules.add(mod);
     }
@@ -350,13 +359,13 @@ export function parseConfig(): AirMcpConfig {
   if (shareApprovalEnv) {
     for (const raw of shareApprovalEnv.split(",")) {
       const mod = raw.trim().toLowerCase();
-      if (mod && (MODULE_NAMES as readonly string[]).includes(mod)) {
+      if (mod && (KNOWN_MODULE_NAMES as readonly string[]).includes(mod)) {
         shareApprovalModules.add(mod);
       }
     }
   } else if (file.shareApproval) {
     for (const mod of file.shareApproval) {
-      if ((MODULE_NAMES as readonly string[]).includes(mod)) {
+      if ((KNOWN_MODULE_NAMES as readonly string[]).includes(mod)) {
         shareApprovalModules.add(mod);
       }
     }
@@ -429,6 +438,16 @@ export function parseConfig(): AirMcpConfig {
 
 export function isModuleEnabled(config: AirMcpConfig, moduleName: string): boolean {
   return !config.disabledModules.has(moduleName);
+}
+
+function parseProfileEnv(raw: string | undefined): Set<string> {
+  const profiles = new Set<string>();
+  if (!raw) return profiles;
+  for (const part of raw.split(",")) {
+    const profile = part.trim().toLowerCase();
+    if (profile) profiles.add(profile);
+  }
+  return profiles;
 }
 
 export function needsShareApproval(config: AirMcpConfig, moduleName: string): boolean {

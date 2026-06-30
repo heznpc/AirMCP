@@ -69,8 +69,9 @@ export async function createServer(
     installHitlGuard(lServer, hitlClient, config);
   }
 
-  // Dynamic module loading — only imports modules at startup
-  const MODULE_REGISTRY = await loadModuleRegistry();
+  // Dynamic module loading — disabled modules are filtered before import so
+  // opt-in surfaces stay zero-cost at startup.
+  const MODULE_REGISTRY = await loadModuleRegistry(config);
   setModuleRegistry(MODULE_REGISTRY);
 
   // RFC 0004: route every module through the compatibility resolver. The

@@ -62,7 +62,7 @@
     "load_all_modules": {
       "type": "boolean",
       "title": "Load all 29 modules on startup",
-      "description": "Off by default — only the 7 starter modules load (notes, reminders, calendar, shortcuts, system, finder, weather) to keep the surface small. Turn on to register all modules (contacts, mail, messages, music, safari, photos, apple intelligence, TV, maps, iWork, Google Workspace, health, bluetooth, etc.). Per-module disable can still be done via AIRMCP_DISABLE_<MODULE> env vars in advanced setups.",
+      "description": "Off by default — only the 7 starter modules load (notes, reminders, calendar, shortcuts, system, finder, weather) to keep the surface small. Turn on to register all standard modules (contacts, mail, messages, music, safari, photos, apple intelligence, TV, maps, iWork, Google Workspace, health, bluetooth, etc.). Experimental profile-only modules such as spatial_prep remain disabled. Per-module disable can still be done via AIRMCP_DISABLE_<MODULE> env vars in advanced setups.",
       "required": false,
       "default": false
     }

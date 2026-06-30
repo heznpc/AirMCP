@@ -53,7 +53,9 @@ The default config file location is `~/.config/airmcp/config.json`. You can over
 
 | Variable | Description |
 |----------|-------------|
-| `AIRMCP_FULL=true` | Enable all 29 modules (ignores disabledModules) |
+| `AIRMCP_FULL=true` | Enable all standard 29 modules (profile-only modules stay opt-in) |
+| `AIRMCP_PROFILE=spatial_prep` | Enable an experimental profile-only module |
+| `AIRMCP_ENABLE_SPATIAL_PREP=true` | Enable the experimental read-only spatial asset prep tools |
 | `AIRMCP_DISABLE_<MODULE>=true` | Disable a specific module (e.g. `AIRMCP_DISABLE_TV=true`) |
 | `AIRMCP_CONFIG_PATH` | Override config file path (default: `~/.config/airmcp/config.json`) |
 
@@ -165,4 +167,6 @@ When no `config.json` exists and `--full` is not used, AirMCP enables a curated 
 - **Finder** -- file search, directory listing, file operations
 - **Weather** -- current conditions and forecasts
 
-All other modules are disabled by default. Use `npx airmcp init` to customize, or pass `--full` to enable everything.
+All other standard modules are disabled by default. Use `npx airmcp init` to customize, or pass `--full` to enable the standard 29-module surface.
+
+Experimental profile-only modules, such as `spatial_prep`, stay disabled even with `--full`. Enable them explicitly with `AIRMCP_PROFILE=spatial_prep` or `AIRMCP_ENABLE_SPATIAL_PREP=true`.

@@ -888,7 +888,9 @@ Or edit `~/.config/airmcp/config.json` directly:
 | `AIRMCP_INCLUDE_SHARED`      | `false`                      | Include items shared/owned by others (off by default: shared items are filtered from reads and mutating them is denied, or routed through share-approval HITL when configured)                                 |
 | `AIRMCP_ALLOW_SEND_MESSAGES` | `false`                      | Allow sending iMessages (opt-in)                             |
 | `AIRMCP_ALLOW_SEND_MAIL`     | `false`                      | Allow sending emails (opt-in)                                |
-| `AIRMCP_FULL`                | `false`                      | Enable all modules (ignores preset)                          |
+| `AIRMCP_FULL`                | `false`                      | Enable all standard 29 modules (profile-only modules stay opt-in) |
+| `AIRMCP_PROFILE`             | —                            | Comma-separated experimental profiles/modules to opt into (e.g. `spatial_prep`) |
+| `AIRMCP_ENABLE_SPATIAL_PREP` | `false`                      | Enable the experimental read-only spatial asset prep tools    |
 | `AIRMCP_DISABLE_{MODULE}`    | —                            | Disable a specific module (e.g. `AIRMCP_DISABLE_MUSIC=true`) |
 | `GEMINI_API_KEY`             | —                            | Google Gemini API key for cloud embeddings (optional)        |
 | `AIRMCP_EMBEDDING_MODEL`     | `gemini-embedding-2-preview` | Gemini embedding model name                                  |
@@ -896,6 +898,10 @@ Or edit `~/.config/airmcp/config.json` directly:
 | `AIRMCP_EMBEDDING_PROVIDER`  | auto                         | Force provider: `gemini`, `swift`, `hybrid`, `none`          |
 | `AIRMCP_HTTP_TOKEN`          | —                            | Bearer token for HTTP mode authentication                    |
 | `AIRMCP_NPM_PACKAGE_SPECIFIER` | `airmcp@<current>`          | Override app-owned proxy/runtime package for local testing   |
+
+Experimental profile-only modules are not enabled by `--full` / `AIRMCP_FULL`.
+Enable them explicitly with `AIRMCP_PROFILE=<module>` or their dedicated
+`AIRMCP_ENABLE_<MODULE>` flag.
 
 ### Config File
 

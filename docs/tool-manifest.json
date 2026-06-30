@@ -9270,6 +9270,9 @@
           "toolExposure": {
             "type": "string"
           },
+          "requireToolSession": {
+            "type": "boolean"
+          },
           "modulesEnabled": {
             "type": "array",
             "items": {
@@ -9301,6 +9304,7 @@
         "required": [
           "profile",
           "toolExposure",
+          "requireToolSession",
           "modulesEnabled",
           "modulesDisabled",
           "toolsExposed",

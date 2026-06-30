@@ -760,6 +760,7 @@ public struct MCPProactiveContextOutput: Codable, Sendable {
 public struct MCPProfileStatusOutput: Codable, Sendable {
     public let profile: String
     public let toolExposure: String
+    public let requireToolSession: Bool
     public let modulesEnabled: [String]
     public let modulesDisabled: [String]
     public let toolsExposed: Double
@@ -9535,6 +9536,13 @@ public struct MCPProfileStatusSnippetView: View {
                 Text("Tool Exposure")
                 Spacer()
                 Text(data.toolExposure)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Require Tool Session")
+                Spacer()
+                Text((data.requireToolSession ? "Yes" : "No"))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }

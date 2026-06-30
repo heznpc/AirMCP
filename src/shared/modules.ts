@@ -1,5 +1,7 @@
 import type { ModuleRegistration } from "./registry.js";
 import type { ModuleCompatibility } from "./compatibility.js";
+import type { AirMcpConfig } from "./config.js";
+import { isModuleEnabled } from "./config.js";
 import { log, errToCtx } from "./logger.js";
 
 /**
@@ -106,6 +108,7 @@ export const MODULE_MANIFEST: ReadonlyArray<ModuleManifestEntry> = [
   },
   { name: "memory" },
   { name: "audit" },
+  { name: "spatial_prep" },
 ];
 
 /**
@@ -120,8 +123,6 @@ export const MODULE_MANIFEST: ReadonlyArray<ModuleManifestEntry> = [
  * Combine both for memory-safe debugging:
  *   AIRMCP_DEBUG_MODULES=notes AIRMCP_DEBUG_SEQUENTIAL=true
  */
-let cache: ModuleRegistration[] | null = null;
-
 /** Parse AIRMCP_DEBUG_MODULES into a whitelist Set, or null if unset. */
 function getDebugWhitelist(): Set<string> | null {
   const raw = process.env.AIRMCP_DEBUG_MODULES;
@@ -174,14 +175,15 @@ async function importModule(def: ModuleManifestEntry): Promise<ModuleRegistratio
   }
 }
 
-export async function loadModuleRegistry(): Promise<ModuleRegistration[]> {
-  if (cache) return cache;
+const cacheByKey = new Map<string, ModuleRegistration[]>();
 
+export async function loadModuleRegistry(config?: AirMcpConfig): Promise<ModuleRegistration[]> {
   const whitelist = getDebugWhitelist();
+  const targets = getTargetManifestEntries(config, whitelist);
+  const cacheKey = targets.map((m) => m.name).join(",");
+  if (cacheByKey.has(cacheKey)) return cacheByKey.get(cacheKey)!;
+
   const sequential = process.env.AIRMCP_DEBUG_SEQUENTIAL === "true";
-  const targets: ReadonlyArray<ModuleManifestEntry> = whitelist
-    ? MODULE_MANIFEST.filter((m) => whitelist.has(m.name))
-    : MODULE_MANIFEST;
 
   if (whitelist) {
     log.info("Debug mode: loading whitelist subset (sequential loading optional)", {
@@ -222,9 +224,20 @@ export async function loadModuleRegistry(): Promise<ModuleRegistration[]> {
     log.error("failed to load modules", { count: failed.length, modules: failed });
   }
 
-  cache = registry;
+  cacheByKey.set(cacheKey, registry);
 
   return registry;
+}
+
+function getTargetManifestEntries(
+  config: AirMcpConfig | undefined,
+  whitelist: Set<string> | null,
+): ReadonlyArray<ModuleManifestEntry> {
+  return MODULE_MANIFEST.filter((m) => {
+    if (whitelist && !whitelist.has(m.name)) return false;
+    if (config && !isModuleEnabled(config, m.name)) return false;
+    return true;
+  });
 }
 
 /** Find the first exported function whose name starts with "register". */

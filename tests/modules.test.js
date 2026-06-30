@@ -34,6 +34,7 @@ describe('getModuleNames()', () => {
     expect(names).toContain('location');
     expect(names).toContain('bluetooth');
     expect(names).toContain('google');
+    expect(names).toContain('spatial_prep');
   });
 
   test('returns consistent results on repeated calls', () => {
@@ -113,6 +114,34 @@ describe('loadModuleRegistry() — debug filtering', () => {
     } finally {
       console.error = origError;
     }
+  });
+
+  test('loadModuleRegistry skips config-disabled modules before import', async () => {
+    process.env.AIRMCP_DEBUG_MODULES = 'spatial_prep';
+    delete process.env.AIRMCP_DEBUG_SEQUENTIAL;
+
+    const { loadModuleRegistry } = await import(
+      `../dist/shared/modules.js?t=${Date.now()}${Math.random()}`
+    );
+
+    const registry = await loadModuleRegistry({
+      disabledModules: new Set(['spatial_prep']),
+      shareApprovalModules: new Set(),
+      includeShared: false,
+      allowSendMessages: false,
+      allowSendMail: false,
+      allowRunJavascript: false,
+      hitl: { level: 'sensitive-only', whitelist: new Set(), timeout: 30, socketPath: '/tmp/hitl.sock' },
+      features: {
+        auditLog: true,
+        usageTracking: true,
+        semanticToolSearch: true,
+        proactiveContext: true,
+        telemetry: false,
+      },
+    });
+
+    expect(registry.some((mod) => mod.name === 'spatial_prep')).toBe(false);
   });
 
   test('unknown module names in AIRMCP_DEBUG_MODULES are rejected with warning', async () => {

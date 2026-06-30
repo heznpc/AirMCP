@@ -117,7 +117,7 @@ Each module has:
 - `src/<name>/scripts.ts` -- JXA script generators (template-literal functions)
 - `src/<name>/prompts.ts` (optional) -- MCP prompt templates
 
-Modules are loaded dynamically at startup. The `loadModuleRegistry()` function imports each module and finds its register function by convention (any exported function starting with `register`).
+Modules are loaded dynamically at startup. The `loadModuleRegistry()` function applies debug/config filtering before import, then imports each selected module and finds its register function by convention (any exported function starting with `register`).
 
 ### Config Resolution
 

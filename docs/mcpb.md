@@ -14,7 +14,7 @@ AirMCP ships a `.mcpb` bundle with every release.
    | Field | What it does |
    |---|---|
    | **Gemini API Key** (optional, sensitive) | Enables cloud embeddings for semantic tool search + note search. Leave blank to use Apple's on-device `NLContextualEmbedding` — no cloud calls are made without this key. |
-   | **Load all 29 modules on startup** (default: off) | Off keeps AirMCP at the 7 starter modules (notes, reminders, calendar, shortcuts, system, finder, weather) — a small, fast-to-initialise surface. Workflows that use Mail, Contacts, Safari, semantic memory, or Apple Intelligence will enable/request those modules separately. On registers every module (contacts, mail, messages, music, safari, photos, Apple Intelligence, TV, maps, iWork, Google Workspace, health, bluetooth, etc.). |
+   | **Load all 29 modules on startup** (default: off) | Off keeps AirMCP at the 7 starter modules (notes, reminders, calendar, shortcuts, system, finder, weather) — a small, fast-to-initialise surface. Workflows that use Mail, Contacts, Safari, semantic memory, or Apple Intelligence will enable/request those modules separately. On registers every standard module (contacts, mail, messages, music, safari, photos, Apple Intelligence, TV, maps, iWork, Google Workspace, health, bluetooth, etc.). Experimental profile-only modules such as `spatial_prep` remain disabled. |
 
 5. Claude Desktop launches AirMCP the first time you open a conversation. macOS will prompt for Contacts / Calendar / Reminders / Notes permissions as they're first used — grant each.
 
@@ -68,7 +68,7 @@ AirMCP's tool list is dynamic (skills + dynamic shortcuts generate tools at runt
 
 ### "I want a specific module off"
 
-The UI only exposes the global "Load all 29 modules" toggle. For per-module disabling, drop the `.mcpb` path and use `npx airmcp init` instead (`~/.config/airmcp/config.json` has a module selection block).
+The UI only exposes the global "Load all 29 modules" toggle. For per-module disabling, or to opt into profile-only modules such as `spatial_prep`, drop the `.mcpb` path and use `npx airmcp init` / environment variables instead (`~/.config/airmcp/config.json` has a module selection block).
 
 ### Bundle is large (>5 MB)
 

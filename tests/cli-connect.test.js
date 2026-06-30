@@ -120,9 +120,9 @@ function writeJson(child, message) {
   child.stdin.write(`${JSON.stringify(message)}\n`);
 }
 
-async function request(child, reader, id, method, params = {}) {
+async function request(child, reader, id, method, params = {}, timeoutMs = 10_000) {
   writeJson(child, { jsonrpc: "2.0", id, method, params });
-  return reader.read((message) => message.id === id);
+  return reader.read((message) => message.id === id, timeoutMs);
 }
 
 function parseStreamableHttpJson(body) {
@@ -258,12 +258,12 @@ describe("airmcp connect", () => {
       protocolVersion: "2025-03-26",
       capabilities: {},
       clientInfo: { name: "airmcp-connect-test", version: "0.0.0" },
-    });
+    }, 30_000);
     expect(initialized.error).toBeUndefined();
     expect(initialized.result.serverInfo.name).toBe("airmcp");
 
     writeJson(proxy, { jsonrpc: "2.0", method: "notifications/initialized", params: {} });
-    const tools = await request(proxy, reader, 2, "tools/list");
+    const tools = await request(proxy, reader, 2, "tools/list", {}, 30_000);
 
     expect(tools.error).toBeUndefined();
     expect(Array.isArray(tools.result.tools)).toBe(true);

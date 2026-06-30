@@ -79,7 +79,9 @@ If a variable accepts a path, `~` expands to `$HOME`. Booleans are `"true"` / `"
 
 | Variable | Default | Notes |
 |---|---|---|
-| `AIRMCP_FULL` | (off) | `true` enables every module ignoring the config's `disabledModules`. Per-process flag for ad-hoc usage. |
+| `AIRMCP_FULL` | (off) | `true` enables every standard module ignoring the config's `disabledModules`. Profile-only modules stay opt-in. |
+| `AIRMCP_PROFILE` | (empty) | Comma-separated profile-only modules to opt into, such as `spatial_prep`. |
+| `AIRMCP_ENABLE_SPATIAL_PREP` | (off) | `true` enables the experimental read-only spatial asset prep tools. |
 | `AIRMCP_DEBUG_MODULES` | (empty) | Comma-separated whitelist. When set, only listed modules load — easier debugging of import / boot issues. |
 | `AIRMCP_DEBUG_SEQUENTIAL` | (off) | `true` loads modules one-by-one instead of `Promise.all()`. Memory-safe debugging. |
 | `AIRMCP_DISABLE_POLLERS` | (off) | `true` suppresses event poller registration (mail unread, focus mode, etc.). |
@@ -174,7 +176,7 @@ These are documented for completeness; you should rarely set them in production.
 |---|---|
 | `NODE_ENV=test` | Unlocks test-only reset hooks. |
 | `AIRMCP_TEST_MODE=1` | Same as above for callers without control over `NODE_ENV`. |
-| `AIRMCP_DISABLE_*` | Module-level kill switches surfaced via `npx airmcp --help` and validated against `MODULE_NAMES`. |
+| `AIRMCP_DISABLE_*` | Module-level kill switches surfaced via `npx airmcp --help` and validated against known module names. |
 
 ---
 

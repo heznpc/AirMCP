@@ -1,6 +1,8 @@
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import {
   MODULE_NAMES,
+  KNOWN_MODULE_NAMES,
+  OPT_IN_MODULE_NAMES,
   STARTER_MODULES,
   parseConfig,
   isModuleEnabled,
@@ -24,7 +26,9 @@ const ENV_KEYS = [
   'AIRMCP_SEMANTIC_SEARCH',
   'AIRMCP_PROACTIVE_CONTEXT',
   'AIRMCP_TELEMETRY',
-  ...MODULE_NAMES.map((m) => `AIRMCP_DISABLE_${m.toUpperCase()}`),
+  'AIRMCP_PROFILE',
+  ...KNOWN_MODULE_NAMES.map((m) => `AIRMCP_DISABLE_${m.toUpperCase()}`),
+  ...OPT_IN_MODULE_NAMES.map((m) => `AIRMCP_ENABLE_${m.toUpperCase()}`),
 ];
 
 let savedEnv;
@@ -290,6 +294,31 @@ describe('parseConfig() — module enable/disable logic', () => {
     for (const mod of STARTER_MODULES) {
       expect(cfg.disabledModules.has(mod)).toBe(true);
     }
+  });
+
+  test('AIRMCP_FULL=true does not enable opt-in modules', () => {
+    process.env.AIRMCP_FULL = 'true';
+    const cfg = parseConfig();
+    expect(isModuleEnabled(cfg, 'spatial_prep')).toBe(false);
+  });
+
+  test('AIRMCP_PROFILE=spatial_prep enables the spatial prep module', () => {
+    process.env.AIRMCP_PROFILE = 'spatial_prep';
+    const cfg = parseConfig();
+    expect(isModuleEnabled(cfg, 'spatial_prep')).toBe(true);
+  });
+
+  test('AIRMCP_ENABLE_SPATIAL_PREP=true enables the spatial prep module', () => {
+    process.env.AIRMCP_ENABLE_SPATIAL_PREP = 'true';
+    const cfg = parseConfig();
+    expect(isModuleEnabled(cfg, 'spatial_prep')).toBe(true);
+  });
+
+  test('AIRMCP_DISABLE_SPATIAL_PREP=true overrides profile opt-in', () => {
+    process.env.AIRMCP_PROFILE = 'spatial_prep';
+    process.env.AIRMCP_DISABLE_SPATIAL_PREP = 'true';
+    const cfg = parseConfig();
+    expect(isModuleEnabled(cfg, 'spatial_prep')).toBe(false);
   });
 });
 

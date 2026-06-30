@@ -33,6 +33,17 @@ const CANONICAL_MODULE_COUNT = (() => {
   }
 })();
 
+const OPT_IN_MODULES = (() => {
+  try {
+    const config = readFileSync(join(SRC, "shared", "config.ts"), "utf-8");
+    const m = config.match(/export const OPT_IN_MODULE_NAMES = \[([\s\S]*?)\] as const;/);
+    if (!m) return new Set();
+    return new Set((m[1].match(/"([^"]+)"/g) || []).map((s) => JSON.parse(s)));
+  } catch {
+    return new Set();
+  }
+})();
+
 /**
  * Headline tool count — the FULL runtime surface from the generated manifest
  * (docs/tool-manifest.json), the same single source of truth count-stats.mjs
@@ -139,6 +150,7 @@ function walkDir(dir, modules, counts) {
     if (entry.isDirectory()) walkDir(full, modules, counts);
     else if (entry.name.endsWith(".ts")) {
       const modDir = basename(dirname(full));
+      if (OPT_IN_MODULES.has(modDir)) continue;
       const content = readFileSync(full, "utf-8");
       counts.totalTools += (content.match(TOOL_REGEX) || []).length;
       counts.totalPrompts += (content.match(PROMPT_REGEX) || []).length;

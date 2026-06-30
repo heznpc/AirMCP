@@ -1,6 +1,6 @@
 {
   "name": "airmcp",
-  "version": "2.14.0",
+  "version": "2.15.0",
   "description": "Approval-gated local action runtime for Apple workspaces, with profile-based modules, progressive MCP tool exposure, audit logs, HITL approval, and Mac app automation.",
   "keywords": [
     "mcp",
@@ -86,6 +86,7 @@
     "profiles:check": "node scripts/verify-profiles.mjs",
     "verify:package": "node scripts/verify-published-package.mjs",
     "release:preflight": "node scripts/release-preflight.mjs",
+    "release:verify": "node scripts/verify-release-state.mjs",
     "build:mcpb": "node scripts/build-mcpb.mjs",
     "build:mcpb:check": "node scripts/build-mcpb.mjs --check",
     "gen:manifest": "node scripts/dump-tool-manifest.mjs",

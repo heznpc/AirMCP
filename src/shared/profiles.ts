@@ -109,6 +109,9 @@ export const DEFAULT_TOOL_EXPOSURE_BY_PROFILE: Record<AirMcpProfileName, ToolExp
 export const FRONT_DOOR_TOOLS = [
   "profile_status",
   "list_profiles",
+  "start_tool_session",
+  "tool_session_status",
+  "end_tool_session",
   "discover_tools",
   "run_tool",
   "get_workflow",

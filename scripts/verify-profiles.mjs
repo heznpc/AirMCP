@@ -136,6 +136,7 @@ function bootCase(testCase) {
 
     (async () => {
       try {
+        const bootStarted = process.hrtime.bigint();
         const initResp = await request(
           "initialize",
           {
@@ -146,9 +147,12 @@ function bootCase(testCase) {
           1,
         );
         if (!initResp.result) throw new Error(`initialize failed: ${JSON.stringify(initResp)}`);
+        const initializedAt = process.hrtime.bigint();
         notify("notifications/initialized");
 
+        const listStarted = process.hrtime.bigint();
         const listResp = await request("tools/list", {}, 2);
+        const listedAt = process.hrtime.bigint();
         const tools = listResp.result?.tools;
         if (!Array.isArray(tools)) throw new Error(`tools/list malformed: ${JSON.stringify(listResp)}`);
         const statusResp = await request("tools/call", { name: "profile_status", arguments: {} }, 3);
@@ -158,7 +162,43 @@ function bootCase(testCase) {
         const status = parseStructuredResult(statusResp);
         if (!status) throw new Error(`profile_status was not parseable: ${JSON.stringify(statusResp)}`);
 
-        resolve({ ok: true, testCase, tools, status, stderr });
+        if (testCase.name === "starter-progressive") {
+          const sessionResp = await request(
+            "tools/call",
+            { name: "start_tool_session", arguments: { tools: ["profile_status"], label: "profile-check", ttlSeconds: 60 } },
+            4,
+          );
+          const session = parseStructuredResult(sessionResp);
+          if (!session?.sessionId) throw new Error(`start_tool_session failed: ${JSON.stringify(sessionResp)}`);
+          const allowedResp = await request(
+            "tools/call",
+            { name: "run_tool", arguments: { name: "profile_status", sessionId: session.sessionId } },
+            5,
+          );
+          if (allowedResp.error || allowedResp.result?.isError) {
+            throw new Error(`run_tool session-allowed call failed: ${JSON.stringify(allowedResp)}`);
+          }
+          const deniedResp = await request(
+            "tools/call",
+            { name: "run_tool", arguments: { name: "list_notes", sessionId: session.sessionId } },
+            6,
+          );
+          if (!deniedResp.result?.isError) {
+            throw new Error(`run_tool session denied call unexpectedly succeeded: ${JSON.stringify(deniedResp)}`);
+          }
+        }
+
+        resolve({
+          ok: true,
+          testCase,
+          tools,
+          status,
+          stderr,
+          timings: {
+            initMs: Number((initializedAt - bootStarted) / 1_000_000n),
+            listMs: Number((listedAt - listStarted) / 1_000_000n),
+          },
+        });
       } catch (error) {
         resolve({ ok: false, name: testCase.name, error: error instanceof Error ? error.message : String(error), stderr });
       } finally {
@@ -204,6 +244,7 @@ for (const testCase of CASES) {
   } else {
     console.error(
       `[profiles] OK ${testCase.name}: ${result.tools.length} exposed / ${result.status.toolsRegistered} registered / ~${estimateDescriptionTokens(result.tools)} desc tokens`,
+      ` / init ${result.timings.initMs}ms / tools/list ${result.timings.listMs}ms`,
     );
   }
 }

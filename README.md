@@ -27,8 +27,9 @@
 
 ## Features
 
-- **289 tools** (29 modules) — Apple app CRUD + system control + Apple Intelligence + UI Automation + Screen Capture + Maps + Podcasts + Weather + iWork (Pages/Numbers/Keynote) + Google Workspace + dynamic shortcuts + context memory + audit introspection
+- **292 tools** (29 modules) — Apple app CRUD + system control + Apple Intelligence + UI Automation + Screen Capture + Maps + Podcasts + Weather + iWork (Pages/Numbers/Keynote) + Google Workspace + dynamic shortcuts + context memory + audit introspection
 - **Profile-first runtime** — `starter`, `communications-safe`, `productivity`, and `full` module profiles, plus `progressive` / `profile` / `full` tool exposure so clients can start thin and expand intentionally
+- **Task-scoped tool sessions** — `start_tool_session` lets a client give one task a short-lived tool allowlist; `discover_tools` and `run_tool` honor that `sessionId` so a broad runtime can still feel narrow in use
 - **230 Shortcuts / Siri AppIntents** — auto-generated from the tool manifest (81 Interactive Snippet views + 13 AppEnum pickers); workflow-first AppShortcuts ship by default, while `AskAirMCPIntent` is a FoundationModels preview gated behind `AIRMCP_ENABLE_FOUNDATION_MODELS`
 - **32 prompts + 14 YAML skill built-ins** — per-app workflows + cross-module + developer workflows + Skills DSL (`inputs` / `parallel` / `loop` / `on_error` / `retry` / 9 event triggers)
 - **9 MCP resources** — Notes, Calendar, Reminders, Music, Mail, System, Context Memory + unified `context://snapshot/{depth}`

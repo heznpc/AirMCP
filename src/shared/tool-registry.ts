@@ -124,13 +124,14 @@ class ToolRegistry {
   }
 
   /** Search tools by query string (substring match on name, title, description). */
-  searchTools(query: string, limit = 20): ToolInfo[] {
+  searchTools(query: string, limit = 20, options: { allowedToolNames?: Set<string> } = {}): ToolInfo[] {
     const q = query.toLowerCase();
     const words = q.split(/\s+/).filter(Boolean);
     const scored: Array<{ info: ToolInfo; score: number }> = [];
 
     for (const [name, entry] of this.tools) {
       if (!entry.enabled) continue;
+      if (options.allowedToolNames && !options.allowedToolNames.has(name)) continue;
       let score = 0;
       for (const w of words) {
         if (name.includes(w)) score += 3;

@@ -32,6 +32,7 @@ import { registerDynamicShortcutTools } from "../shortcuts/tools.js";
 import { HitlClient } from "../shared/hitl.js";
 import { installHitlGuard } from "../shared/hitl-guard.js";
 import { ToolInputValidationError, toolRegistry } from "../shared/tool-registry.js";
+import { TOOL_SESSION_CONTROL_TOOLS, toolSessions } from "../shared/tool-sessions.js";
 import { semanticToolSearch, isToolSearchIndexed, indexToolDescriptions } from "../shared/tool-search.js";
 import { isCompactMode } from "../shared/tool-filter.js";
 import { usageTracker } from "../shared/usage-tracker.js";
@@ -215,6 +216,7 @@ export async function createServer(
         modulesDisabled: z.array(z.string()),
         toolsExposed: z.number(),
         toolsRegistered: z.number(),
+        toolSessionsActive: z.number(),
         frontDoorTools: z.array(z.string()),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -227,13 +229,105 @@ export async function createServer(
         modulesDisabled: disabled,
         toolsExposed: toolRegistry.getExposedToolCount(),
         toolsRegistered: toolRegistry.getToolCount(),
+        toolSessionsActive: toolSessions.activeCount(),
         frontDoorTools: [...FRONT_DOOR_TOOLS],
       });
     },
   );
 
+  // start_tool_session: cooperative harness primitive for task-scoped tool
+  // allowlists. Clients can mint a short-lived session and pass sessionId to
+  // discover_tools/run_tool so a task only sees and runs the tools it needs.
+  lServer.registerTool(
+    "start_tool_session",
+    {
+      title: "Start Tool Session",
+      description:
+        "Create a short-lived allowlist for discover_tools and run_tool. Use this to keep a task scoped to the tools it actually needs.",
+      inputSchema: {
+        tools: z
+          .array(z.string().min(1).max(200))
+          .min(1)
+          .max(64)
+          .describe("Registered tool names allowed in this session"),
+        ttlSeconds: z
+          .number()
+          .int()
+          .min(30)
+          .max(3600)
+          .optional()
+          .describe("Session lifetime in seconds (default 900, max 3600)"),
+        label: z.string().max(120).optional().describe("Optional human-readable task label"),
+      },
+      outputSchema: {
+        sessionId: z.string(),
+        label: z.string().optional(),
+        allowedTools: z.array(z.string()),
+        createdAt: z.string(),
+        expiresAt: z.string(),
+        remainingSeconds: z.number(),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async ({ tools, ttlSeconds, label }) => {
+      const controlTools = new Set<string>(["run_tool", ...TOOL_SESSION_CONTROL_TOOLS]);
+      const unknown = tools.filter((name: string) => !toolRegistry.getToolInfo(name));
+      if (unknown.length) return errNotFound(`Unknown tools: ${unknown.join(", ")}`);
+      const blocked = tools.filter((name: string) => controlTools.has(name));
+      if (blocked.length) {
+        return errInvalidInput(`Tool sessions cannot delegate session-control tools: ${blocked.join(", ")}`);
+      }
+      return okStructured(toolSessions.start({ tools, ttlSeconds, label }));
+    },
+  );
+
+  lServer.registerTool(
+    "tool_session_status",
+    {
+      title: "Tool Session Status",
+      description: "Inspect one active tool session by id without listing other clients' sessions.",
+      inputSchema: {
+        sessionId: z.string().uuid().describe("Session id returned by start_tool_session"),
+      },
+      outputSchema: {
+        sessionId: z.string(),
+        label: z.string().optional(),
+        allowedTools: z.array(z.string()),
+        createdAt: z.string(),
+        expiresAt: z.string(),
+        remainingSeconds: z.number(),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ sessionId }) => {
+      const session = toolSessions.get(sessionId);
+      if (!session) return errNotFound(`Tool session "${sessionId}" was not found or has expired.`);
+      return okStructured(session);
+    },
+  );
+
+  lServer.registerTool(
+    "end_tool_session",
+    {
+      title: "End Tool Session",
+      description: "End a tool session before its TTL expires.",
+      inputSchema: {
+        sessionId: z.string().uuid().describe("Session id returned by start_tool_session"),
+      },
+      outputSchema: {
+        sessionId: z.string(),
+        ended: z.boolean(),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ sessionId }) => {
+      return okStructured({ sessionId, ended: toolSessions.end(sessionId) });
+    },
+  );
+
   // run_tool: dispatcher for progressive exposure. Hidden tools remain in the
-  // registry and are invoked through the same wrapped handler path.
+  // registry and are invoked through the same wrapped handler path. A caller
+  // may pass sessionId to constrain execution to a short-lived allowlist.
   lServer.registerTool(
     "run_tool",
     {
@@ -243,17 +337,20 @@ export async function createServer(
       inputSchema: {
         name: z.string().min(1).max(200).describe("Registered tool name to run"),
         args: z.record(z.string(), z.unknown()).optional().describe("Tool arguments as a JSON object"),
+        sessionId: z.string().uuid().optional().describe("Optional task-scoped tool session id"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
-    async ({ name, args }) => {
-      if (name === "run_tool") {
-        return errInvalidInput("run_tool cannot call itself");
+    async ({ name, args, sessionId }) => {
+      if (name === "run_tool" || (TOOL_SESSION_CONTROL_TOOLS as readonly string[]).includes(name)) {
+        return errInvalidInput("run_tool cannot call itself or session-control tools");
       }
       const info = toolRegistry.getToolInfo(name);
       if (!info) {
         return errNotFound(`Unknown tool "${name}". Use discover_tools to find available tools.`);
       }
+      const sessionGate = toolSessions.assertAllowed(sessionId, name);
+      if (!sessionGate.ok) return errInvalidInput(sessionGate.message);
       try {
         return await toolRegistry.callTool(name, args ?? {});
       } catch (e) {
@@ -276,6 +373,11 @@ export async function createServer(
       inputSchema: {
         query: z.string().min(1).max(500).describe("Search query — e.g. 'calendar', 'send email', 'music playback'"),
         limit: z.number().min(1).max(50).optional().describe("Max results (default 20)"),
+        sessionId: z
+          .string()
+          .uuid()
+          .optional()
+          .describe("Optional task-scoped tool session id; limits matches to the session allowlist"),
       },
       outputSchema: {
         query: z.string(),
@@ -292,9 +394,15 @@ export async function createServer(
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async ({ query, limit }) => {
+    async ({ query, limit, sessionId }) => {
       const maxResults = limit ?? 20;
-      const substringResults = toolRegistry.searchTools(query, maxResults);
+      const allowedToolNames = sessionId ? toolSessions.getAllowedTools(sessionId) : null;
+      if (sessionId && !allowedToolNames) {
+        return errNotFound(`Tool session "${sessionId}" was not found or has expired.`);
+      }
+      const substringResults = toolRegistry.searchTools(query, maxResults, {
+        ...(allowedToolNames ? { allowedToolNames } : {}),
+      });
 
       // If substring search found enough, return immediately
       if (substringResults.length >= 3 || !isToolSearchIndexed()) {
@@ -303,7 +411,9 @@ export async function createServer(
       }
 
       // Fallback to semantic search
-      const semanticResults = await semanticToolSearch(query, maxResults);
+      const semanticResults = (await semanticToolSearch(query, maxResults)).filter(
+        (result) => !allowedToolNames || allowedToolNames.has(result.name),
+      );
 
       // Merge: substring first, then semantic (deduplicated)
       const seen = new Set(substringResults.map((r) => r.name));

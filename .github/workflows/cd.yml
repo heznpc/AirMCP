@@ -45,6 +45,17 @@ jobs:
           cache: 'npm'
           registry-url: 'https://registry.npmjs.org'
 
+      - name: npm auth preflight
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -n "${NODE_AUTH_TOKEN:-}" ]; then
+            echo "NPM_TOKEN is set; validating npm identity before publish."
+            npm whoami
+          else
+            echo "::notice::NPM_TOKEN is empty. Publish will rely on npm trusted publishing for this GitHub environment/workflow."
+          fi
+
       - name: Install dependencies
         run: npm ci
 
@@ -76,3 +87,8 @@ jobs:
           generate_release_notes: true
           files: build/mcpb/airmcp-${{ steps.pkg.outputs.version }}.mcpb
           fail_on_unmatched_files: true
+
+      - name: Verify public release state
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: npm run release:verify

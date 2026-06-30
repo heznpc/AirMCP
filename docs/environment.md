@@ -181,10 +181,23 @@ These are documented for completeness; you should rarely set them in production.
 
 ---
 
+## Task-scoped tool sessions
+
+AirMCP's profile/exposure settings control what loads and what appears in `tools/list`. For a single agent task, clients can narrow further with the MCP tools `start_tool_session`, `discover_tools`, `run_tool`, `tool_session_status`, and `end_tool_session`:
+
+1. `start_tool_session({ tools: ["search_notes", "read_note"], ttlSeconds: 900 })`
+2. `discover_tools({ query: "notes", sessionId })` only searches that allowlist.
+3. `run_tool({ name: "read_note", args: {...}, sessionId })` refuses tools outside the allowlist.
+
+This is a cooperative harness contract for MCP clients and higher-level agent runners. It does not replace OS permissions, HITL approval, OAuth scopes, rate limits, or the emergency stop; those gates still run inside the target tool call.
+
+---
+
 ## Where to look in source
 
 - Defaults + parsers: [`src/shared/constants.ts`](../src/shared/constants.ts)
 - Config schema: [`src/shared/config.ts`](../src/shared/config.ts)
+- Tool sessions: [`src/shared/tool-sessions.ts`](../src/shared/tool-sessions.ts) + front-door registration in [`src/server/mcp-setup.ts`](../src/server/mcp-setup.ts)
 - Network policy: [`src/server/http-transport.ts`](../src/server/http-transport.ts) + RFC 0002
 - Rate limit: [`src/shared/rate-limit.ts`](../src/shared/rate-limit.ts)
 - Audit: [`src/shared/audit.ts`](../src/shared/audit.ts)

@@ -5,6 +5,8 @@ import { dirname, join } from "node:path";
 
 const originalHome = process.env.HOME;
 const tempHomes = [];
+const packageVersion = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
+const packageSpecifier = `airmcp@${packageVersion}`;
 
 async function loadClientConfig(home) {
   process.env.HOME = home;
@@ -72,7 +74,7 @@ describe("client config repair", () => {
     expect(updated.mcpServers.keep).toEqual({ command: "node", args: ["server.js"] });
     expect(updated.mcpServers.airmcp).toEqual({
       command: "npx",
-      args: ["-y", "airmcp@2.12.1", "connect", "--url", CODEX_APP_OWNED_URL],
+      args: ["-y", packageSpecifier, "connect", "--url", CODEX_APP_OWNED_URL],
       env: { AIRMCP_HTTP_TOKEN: "test-token" },
     });
   });

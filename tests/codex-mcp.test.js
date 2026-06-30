@@ -1,5 +1,5 @@
 import { afterAll, beforeEach, describe, expect, jest, test } from "@jest/globals";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -8,6 +8,8 @@ const originalCodexConfigPath = process.env.AIRMCP_CODEX_CONFIG_PATH;
 const testHome = mkdtempSync(join(tmpdir(), "airmcp-codex-mcp-"));
 process.env.HOME = testHome;
 process.env.AIRMCP_CODEX_CONFIG_PATH = join(testHome, "config.toml");
+const packageVersion = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
+const packageSpecifier = `airmcp@${packageVersion}`;
 
 const execFileSync = jest.fn();
 const ensureAppRuntimeToken = jest.fn(() => "test-runtime-token");
@@ -163,7 +165,7 @@ describe("codex MCP setup", () => {
         [
           "[mcp_servers.airmcp]",
           'command = "npx"',
-          `args = ["-y", "airmcp@2.12.1", "connect", "--url", "${CODEX_APP_OWNED_URL}"]`,
+          `args = ["-y", "${packageSpecifier}", "connect", "--url", "${CODEX_APP_OWNED_URL}"]`,
           "",
           "[mcp_servers.airmcp.env]",
           'AIRMCP_HTTP_TOKEN = "token"',
@@ -192,7 +194,7 @@ describe("codex MCP setup", () => {
         "--",
         "npx",
         "-y",
-        "airmcp@2.12.1",
+        packageSpecifier,
         "connect",
         "--url",
         CODEX_APP_OWNED_URL,
@@ -204,7 +206,7 @@ describe("codex MCP setup", () => {
   test("stdio clients use a token-gated proxy command rather than launching another server", () => {
     expect(stdioProxyEntry("test-token")).toEqual({
       command: "npx",
-      args: ["-y", "airmcp@2.12.1", "connect", "--url", CODEX_APP_OWNED_URL],
+      args: ["-y", packageSpecifier, "connect", "--url", CODEX_APP_OWNED_URL],
       env: { AIRMCP_HTTP_TOKEN: "test-token" },
     });
   });

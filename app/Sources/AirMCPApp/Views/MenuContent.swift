@@ -158,7 +158,7 @@ private let featuredWorkflows: [WorkflowInfo] = [
 
 enum AirMcpConstants {
     static let npmPackageName = "airmcp"
-    static let npmPackageVersion = "2.12.1"
+    static let npmPackageVersion = "2.13.0"
     static var npmPackageSpecifier: String {
         ProcessInfo.processInfo.environment["AIRMCP_NPM_PACKAGE_SPECIFIER"]
             ?? "\(npmPackageName)@\(npmPackageVersion)"

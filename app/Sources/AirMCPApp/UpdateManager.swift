@@ -10,7 +10,7 @@ final class UpdateManager {
 
     private var timer: Timer?
     private static let checkInterval: TimeInterval = 3600 // 1 hour
-    private let currentVersion = "2.12.1"
+    private let currentVersion = "2.13.0"
 
     var currentVersionString: String { currentVersion }
 

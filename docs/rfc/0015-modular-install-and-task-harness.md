@@ -1,6 +1,6 @@
 # RFC 0015 — Modular install and task-scoped harness
 
-Status: Draft
+Status: Pack Contract Implemented
 
 ## Problem
 
@@ -22,6 +22,15 @@ The first shipped slice is the task harness:
 
 This is a cooperative MCP-client contract. It is not a security boundary by itself; HITL, OAuth scopes, rate limits, audit, emergency stop, and macOS permissions remain the hard gates.
 
+The second shipped slice is the module-pack contract:
+
+- `src/shared/module-packs.ts` defines DLC-like packs (`core`, `communications`, `productivity`, `browser`, `media`, `visual`, `location`, `device`, `intelligence`, `google-workspace`, `spatial`),
+- `AIRMCP_MODULE_PACKS` and `config.json -> modulePacks` can restrict the available pack set while preserving `core`,
+- module loading skips enabled-profile modules whose pack is unavailable before dynamic import,
+- `list_module_packs` reports the active pack set over MCP,
+- `profile_status` reports `modulePacksConfigured`, `modulePacksAvailable`, and `modulesMissingPacks`,
+- `profiles:check` includes a real MCP wire case proving `productivity` remains available while `communications` modules become missing-pack modules when only `core,productivity` are active.
+
 ## Proposed install split
 
 Keep the npm package as the reliable universal runtime until demand proves a smaller package matrix is worth the maintenance cost. Add module packs in this order:
@@ -32,10 +41,11 @@ Keep the npm package as the reliable universal runtime until demand proves a sma
 | Optional bridges | source-built Swift bridge / future signed app component | Heavy native capability already differs from npm/MCPB distribution. |
 | Module packs | future `@airmcp/<module-pack>` packages or signed app downloadable components | Only after pack-boundary tests prove install size/startup gain beats release complexity. |
 
-## Acceptance gates before module-pack work
+## Acceptance gates before physical module-pack packages
 
-- `profiles:check` reports startup/list timings for starter/progressive vs full/full.
+- `profiles:check` reports startup/list timings for starter/progressive vs full/full and at least one restricted-pack profile.
 - `npm pack --dry-run --json` shows package size regressions per release.
+- `list_module_packs` and `profile_status.modulesMissingPacks` remain stable public truth surfaces.
 - At least one real user/workflow needs a smaller install, not only a smaller context window.
 - Pack boundaries have tests proving no profile loads a missing optional module by accident.
 

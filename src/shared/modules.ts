@@ -3,6 +3,13 @@ import type { ModuleCompatibility } from "./compatibility.js";
 import type { AirMcpConfig } from "./config.js";
 import { isModuleEnabled } from "./config.js";
 import { log, errToCtx } from "./logger.js";
+import {
+  getDefaultModulePacks,
+  getModulePackNameForModule,
+  getModulePackStatuses,
+  isModulePackAvailable,
+  type ModulePackStatus,
+} from "./module-packs.js";
 
 /**
  * Module manifest — the single source of truth for all AirMCP modules.
@@ -168,6 +175,7 @@ async function importModule(def: ModuleManifestEntry): Promise<ModuleRegistratio
       prompts: promptsFn,
       minMacosVersion: def.minMacosVersion,
       compatibility: def.compatibility,
+      pack: getModulePackNameForModule(def.name) ?? undefined,
     } as ModuleRegistration;
   } catch (e) {
     log.error("failed to load module", { module: def.name, err: errToCtx(e) });
@@ -236,8 +244,29 @@ function getTargetManifestEntries(
   return MODULE_MANIFEST.filter((m) => {
     if (whitelist && !whitelist.has(m.name)) return false;
     if (config && !isModuleEnabled(config, m.name)) return false;
+    if (config?.modulePacks && !isModulePackAvailable(m.name, config.modulePacks)) return false;
     return true;
   });
+}
+
+export function getModulePackPlan(config?: AirMcpConfig): {
+  packs: ModulePackStatus[];
+  modulesMissingPacks: string[];
+} {
+  const availablePacks = config?.modulePacks;
+  if (!availablePacks) {
+    return {
+      packs: getModulePackStatuses(getDefaultModulePacks()),
+      modulesMissingPacks: [],
+    };
+  }
+  const modulesMissingPacks = MODULE_MANIFEST.filter(
+    (m) => isModuleEnabled(config, m.name) && !isModulePackAvailable(m.name, availablePacks),
+  ).map((m) => m.name);
+  return {
+    packs: getModulePackStatuses(availablePacks),
+    modulesMissingPacks,
+  };
 }
 
 /** Find the first exported function whose name starts with "register". */

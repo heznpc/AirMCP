@@ -142,7 +142,7 @@ struct AirMCPShortcuts: AppShortcutsProvider {
 }
 ```
 
-Apple caps `AppShortcutsProvider` at **10 entries** per app historically. AirMCP now reserves the default provider for nine workflow/read shortcuts generated from `APP_SHORTCUTS_TOP`; the optional `Ask AirMCP` provider is compiled separately behind `AIRMCP_ENABLE_FOUNDATION_MODELS`. The other ~230 stay as `AppIntent`s (discoverable in Shortcuts but not shown as first-class suggestions).
+Apple caps `AppShortcutsProvider` at **10 entries** per app historically. AirMCP now reserves the default provider for nine workflow/read shortcuts generated from `APP_SHORTCUTS_TOP`; the optional `Ask AirMCP` provider is compiled separately behind `AIRMCP_ENABLE_FOUNDATION_MODELS`. The other ~231 stay as `AppIntent`s (discoverable in Shortcuts but not shown as first-class suggestions).
 
 ### 3.6 Existing hand-written intents
 

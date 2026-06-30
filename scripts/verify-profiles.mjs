@@ -34,7 +34,15 @@ const CASES = [
     exposure: "progressive",
     minTools: 10,
     maxTools: 40,
-    requiredTools: ["profile_status", "list_profiles", "discover_tools", "run_tool", "list_notes", "list_events"],
+    requiredTools: [
+      "profile_status",
+      "list_profiles",
+      "list_module_packs",
+      "discover_tools",
+      "run_tool",
+      "list_notes",
+      "list_events",
+    ],
     requiredModules: ["notes", "reminders", "calendar", "shortcuts", "system", "finder", "weather"],
   },
   {
@@ -47,6 +55,7 @@ const CASES = [
     requiredTools: [
       "profile_status",
       "list_profiles",
+      "list_module_packs",
       "start_tool_session",
       "discover_tools",
       "run_tool",
@@ -61,15 +70,36 @@ const CASES = [
     exposure: "progressive",
     minTools: 10,
     maxTools: 45,
-    requiredTools: ["profile_status", "list_profiles", "discover_tools", "run_tool"],
+    requiredTools: ["profile_status", "list_profiles", "list_module_packs", "discover_tools", "run_tool"],
     requiredModules: ["contacts", "mail", "messages"],
+  },
+  {
+    name: "productivity-pack-boundary",
+    profile: "productivity",
+    exposure: "profile",
+    modulePacks: "core,productivity",
+    minTools: 70,
+    requiredTools: ["profile_status", "list_profiles", "list_module_packs", "discover_tools", "run_tool"],
+    requiredModules: ["pages", "numbers", "keynote"],
+    forbiddenModules: ["contacts", "mail", "messages"],
+    requiredPacks: ["core", "productivity"],
+    unavailablePacks: ["communications"],
+    missingPackModules: ["contacts", "mail", "messages"],
   },
   {
     name: "productivity-profile",
     profile: "productivity",
     exposure: "profile",
     minTools: 90,
-    requiredTools: ["profile_status", "list_profiles", "discover_tools", "run_tool", "send_mail", "send_message"],
+    requiredTools: [
+      "profile_status",
+      "list_profiles",
+      "list_module_packs",
+      "discover_tools",
+      "run_tool",
+      "send_mail",
+      "send_message",
+    ],
     requiredModules: ["pages", "numbers", "keynote", "mail", "messages"],
   },
   {
@@ -77,7 +107,15 @@ const CASES = [
     profile: "full",
     exposure: "full",
     minTools: 220,
-    requiredTools: ["profile_status", "list_profiles", "discover_tools", "run_tool", "list_notes", "list_events"],
+    requiredTools: [
+      "profile_status",
+      "list_profiles",
+      "list_module_packs",
+      "discover_tools",
+      "run_tool",
+      "list_notes",
+      "list_events",
+    ],
     requiredModules: ["notes", "calendar", "finder", "safari", "system", "photos", "google"],
   },
 ];
@@ -110,6 +148,7 @@ function bootCase(testCase) {
       AIRMCP_TOOL_EXPOSURE: testCase.exposure,
       AIRMCP_FAKE_OS_VERSION: "0",
       AIRMCP_REQUIRE_TOOL_SESSION: testCase.requireToolSession ? "true" : "false",
+      ...(testCase.modulePacks ? { AIRMCP_MODULE_PACKS: testCase.modulePacks } : {}),
       AIRMCP_SEMANTIC_SEARCH: "false",
       AIRMCP_AUDIT_LOG: "false",
       AIRMCP_USAGE_TRACKING: "false",
@@ -184,6 +223,12 @@ function bootCase(testCase) {
         }
         const status = parseStructuredResult(statusResp);
         if (!status) throw new Error(`profile_status was not parseable: ${JSON.stringify(statusResp)}`);
+        const packsResp = await request("tools/call", { name: "list_module_packs", arguments: {} }, 11);
+        if (packsResp.error || packsResp.result?.isError) {
+          throw new Error(`list_module_packs failed: ${JSON.stringify(packsResp)}`);
+        }
+        const packs = parseStructuredResult(packsResp);
+        if (!packs) throw new Error(`list_module_packs was not parseable: ${JSON.stringify(packsResp)}`);
 
         if (testCase.name === "starter-progressive" || testCase.name === "starter-progressive-require-session") {
           const sessionResp = await request(
@@ -261,6 +306,7 @@ function bootCase(testCase) {
           testCase,
           tools,
           status,
+          packs,
           stderr,
           timings: {
             initMs: Number((initializedAt - bootStarted) / 1_000_000n),
@@ -296,6 +342,15 @@ for (const testCase of CASES) {
   const names = new Set(result.tools.map((t) => t.name));
   const missingTools = testCase.requiredTools.filter((name) => !names.has(name));
   const missingModules = testCase.requiredModules.filter((name) => !result.status.modulesEnabled.includes(name));
+  const unexpectedlyEnabledModules = (testCase.forbiddenModules ?? []).filter((name) =>
+    result.status.modulesEnabled.includes(name),
+  );
+  const missingPackModules = (testCase.missingPackModules ?? []).filter(
+    (name) => !result.status.modulesMissingPacks?.includes(name),
+  );
+  const activePacks = new Set(result.packs.active ?? []);
+  const missingPacks = (testCase.requiredPacks ?? []).filter((name) => !activePacks.has(name));
+  const unexpectedlyAvailablePacks = (testCase.unavailablePacks ?? []).filter((name) => activePacks.has(name));
   const problems = [];
   if (result.tools.length < testCase.minTools) problems.push(`only ${result.tools.length} tools exposed (floor ${testCase.minTools})`);
   if (testCase.maxTools !== undefined && result.tools.length > testCase.maxTools) {
@@ -308,6 +363,10 @@ for (const testCase of CASES) {
   }
   if (missingTools.length) problems.push(`missing tools: ${missingTools.join(", ")}`);
   if (missingModules.length) problems.push(`missing enabled modules: ${missingModules.join(", ")}`);
+  if (unexpectedlyEnabledModules.length) problems.push(`unexpected enabled modules: ${unexpectedlyEnabledModules.join(", ")}`);
+  if (missingPackModules.length) problems.push(`missing modulesMissingPacks: ${missingPackModules.join(", ")}`);
+  if (missingPacks.length) problems.push(`missing active packs: ${missingPacks.join(", ")}`);
+  if (unexpectedlyAvailablePacks.length) problems.push(`unexpected available packs: ${unexpectedlyAvailablePacks.join(", ")}`);
 
   if (problems.length) {
     failed = true;

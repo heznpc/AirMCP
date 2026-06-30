@@ -1,6 +1,6 @@
 {
   "meta_title": "AirMCP — More than Siri",
-  "meta_description": "Pull action items from last week's meeting notes, drop them into Reminders, get pinged when they're done. AirMCP is the approval-gated local action runtime for Apple workspaces — 29 modules, 289 tools.",
+  "meta_description": "Pull action items from last week's meeting notes, drop them into Reminders, get pinged when they're done. AirMCP is the approval-gated local action runtime for Apple workspaces — 29 modules, 293 tools.",
   "nav_modules": "Modules",
   "nav_beyond": "Beyond Siri",
   "nav_workflows": "Workflows",
@@ -137,7 +137,7 @@
   "why_label": "Why AirMCP?",
   "why_title": "The most complete Apple MCP server.",
   "why_sub": "See how AirMCP compares to the alternatives.",
-  "why_1_title": "289 tools across 29 modules",
+  "why_1_title": "293 tools across 29 modules",
   "why_1_desc": "Others offer 10-15 tools and stop updating. AirMCP covers every major Apple app — and keeps growing.",
   "why_2_title": "Security by default",
   "why_2_desc": "Human-in-the-loop confirmation, audit logging, and input validation. No silent writes.",
@@ -188,6 +188,6 @@
   "tryit_5": "\"Get my current location and show the weather here\"",
   "tryit_6_cat": "Cross-App",
   "tryit_6": "\"Check today's meetings, find related notes, and create a prep checklist in Reminders\"",
-  "tryit_footer": "289 tools. Endless combinations.",
+  "tryit_footer": "293 tools. Endless combinations.",
   "footer_tagline": "Built for Claude Code, Codex, and every MCP client."
 }

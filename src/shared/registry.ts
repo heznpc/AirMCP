@@ -10,4 +10,6 @@ export interface ModuleRegistration {
   minMacosVersion?: number;
   /** Full compatibility manifest per RFC 0004. */
   compatibility?: ModuleCompatibility;
+  /** DLC-like module pack this module belongs to. */
+  pack?: string;
 }

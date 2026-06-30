@@ -2,8 +2,8 @@
 //
 // Source: docs/tool-manifest.json
 // Generator: scripts/gen-swift-intents.mjs
-// RFC 0007 Phase A.2b.2 + A.4.1 — 230 auto-selected read-only
-// tools (81 with typed drift-guards + Interactive Snippet
+// RFC 0007 Phase A.2b.2 + A.4.1 — 231 auto-selected read-only
+// tools (82 with typed drift-guards + Interactive Snippet
 // SwiftUI views) + 9 AppShortcutsProvider entries.
 // Run `npm run gen:intents` to refresh after tool metadata changes.
 // CI guards against drift via `npm run gen:intents:check`.
@@ -480,6 +480,22 @@ public struct MCPListMessagesOutput: Codable, Sendable {
     public let messages: [MessagesItem]
 }
 
+// Output type for: list_module_packs
+public struct MCPListModulePacksOutput: Codable, Sendable {
+    public struct PacksItem: Codable, Sendable {
+        public let name: String
+        public let title: String
+        public let description: String
+        public let modules: [String]
+        public let available: Bool
+        public let required: Bool
+    }
+
+    public let configured: Bool
+    public let active: [String]
+    public let packs: [PacksItem]
+}
+
 // Output type for: list_notes
 public struct MCPListNotesOutput: Codable, Sendable {
     public struct NotesItem: Codable, Sendable {
@@ -760,6 +776,9 @@ public struct MCPProactiveContextOutput: Codable, Sendable {
 public struct MCPProfileStatusOutput: Codable, Sendable {
     public let profile: String
     public let toolExposure: String
+    public let modulePacksConfigured: Bool
+    public let modulePacksAvailable: [String]
+    public let modulesMissingPacks: [String]
     public let requireToolSession: Bool
     public let modulesEnabled: [String]
     public let modulesDisabled: [String]
@@ -4233,6 +4252,34 @@ public struct ListMessagesIntent: AppIntent {
         #if canImport(SwiftUI) && compiler(>=6.3)
         if #available(macOS 26, iOS 26, *) {
             return .result(value: result, view: MCPListMessagesSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
+        return .result(value: result)
+    }
+}
+
+// Tool: list_module_packs
+public struct ListModulePacksIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "List Module Packs"
+    nonisolated(unsafe) public static var description = IntentDescription("List DLC-like AirMCP module packs and whether each pack is available in the current runtime configuration.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @MainActor
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "list_module_packs",
+            args: [String: any Sendable]()
+        )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "list_module_packs", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPListModulePacksOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPListModulePacksSnippetView(data: decoded))
         }
         #endif
         _ = decoded
@@ -9108,6 +9155,39 @@ public struct MCPListMessagesSnippetView: View {
     }
 }
 
+// Snippet view for: list_module_packs  (shape: scalar)
+@available(macOS 26, iOS 26, *)
+public struct MCPListModulePacksSnippetView: View {
+    public let data: MCPListModulePacksOutput
+    public init(data: MCPListModulePacksOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text("Configured")
+                Spacer()
+                Text((data.configured ? "Yes" : "No"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Active")
+                Spacer()
+                Text(String(describing: data.active))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Packs")
+                Spacer()
+                Text(String(describing: data.packs))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+        }
+        .padding()
+    }
+}
+
 // Snippet view for: list_notes  (shape: list-object)
 @available(macOS 26, iOS 26, *)
 public struct MCPListNotesSnippetView: View {
@@ -9536,6 +9616,27 @@ public struct MCPProfileStatusSnippetView: View {
                 Text("Tool Exposure")
                 Spacer()
                 Text(data.toolExposure)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Module Packs Configured")
+                Spacer()
+                Text((data.modulePacksConfigured ? "Yes" : "No"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Module Packs Available")
+                Spacer()
+                Text(String(describing: data.modulePacksAvailable))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Modules Missing Packs")
+                Spacer()
+                Text(String(describing: data.modulesMissingPacks))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }

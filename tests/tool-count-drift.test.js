@@ -27,6 +27,7 @@ const RATE_LIMIT = join(ROOT, "src", "shared", "rate-limit.ts");
 const OAUTH = join(ROOT, "src", "server", "oauth-verifier.ts");
 const WELL_KNOWN = join(ROOT, "src", "server", "well-known-card.ts");
 const MODULES = join(ROOT, "src", "shared", "modules.ts");
+const APP_INTENT_SKIP_NAMES = new Set(["start_tool_session", "tool_session_status", "end_tool_session"]);
 
 let manifest;
 let swiftSrc;
@@ -74,13 +75,15 @@ describe("manifest internal consistency", () => {
 });
 
 describe("codegen drift: generated Swift intents vs manifest", () => {
-  // The generator (scripts/gen-swift-intents.mjs:167-171) selects:
-  //   appIntentEligible && !(destructiveHint && !INCLUDE_DESTRUCTIVE)
+  // The generator selects:
+  //   appIntentEligible
+  //   && !SKIP_NAMES.has(name)
+  //   && !(destructiveHint && !INCLUDE_DESTRUCTIVE)
   // The committed artifact is built with destructive OFF (RFC 0007 §6
-  // default), so the generated set == eligible-minus-destructive.
-  test("one `: AppIntent` struct per eligible non-destructive tool", () => {
+  // default), so the generated set == eligible-minus-destructive-minus-skip.
+  test("one `: AppIntent` struct per selected eligible non-destructive tool", () => {
     const predicted = manifest.tools.filter(
-      (t) => t.appIntentEligible && !(t.annotations && t.annotations.destructiveHint),
+      (t) => t.appIntentEligible && !APP_INTENT_SKIP_NAMES.has(t.name) && !(t.annotations && t.annotations.destructiveHint),
     ).length;
 
     const generated = (swiftSrc.match(/:\s*AppIntent\b/g) ?? []).length;

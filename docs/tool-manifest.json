@@ -1,8 +1,8 @@
 {
   "generatedAt": "STABLE_PLACEHOLDER",
   "protocolVersion": "2025-06-18",
-  "toolCount": 289,
-  "eligibleCount": 283,
+  "toolCount": 292,
+  "eligibleCount": 286,
   "ineligibleCount": 6,
   "ineligibleByReason": {
     "object-param:recurrence": 2,
@@ -1944,6 +1944,12 @@
             "type": "number",
             "minimum": 1,
             "maximum": 50
+          },
+          "sessionId": {
+            "description": "Optional task-scoped tool session id; limits matches to the session allowlist",
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           }
         },
         "required": [
@@ -2106,6 +2112,52 @@
         "sensitiveHint": true,
         "idempotentHint": false,
         "openWorldHint": true
+      },
+      "appIntentEligible": true,
+      "ineligibleReason": null
+    },
+    {
+      "name": "end_tool_session",
+      "title": "End Tool Session",
+      "description": "End a tool session before its TTL expires.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "description": "Session id returned by start_tool_session"
+          }
+        },
+        "required": [
+          "sessionId"
+        ]
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "ended": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "sessionId",
+          "ended"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "sensitiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
       },
       "appIntentEligible": true,
       "ineligibleReason": null
@@ -9236,6 +9288,9 @@
           "toolsRegistered": {
             "type": "number"
           },
+          "toolSessionsActive": {
+            "type": "number"
+          },
           "frontDoorTools": {
             "type": "array",
             "items": {
@@ -9250,6 +9305,7 @@
           "modulesDisabled",
           "toolsExposed",
           "toolsRegistered",
+          "toolSessionsActive",
           "frontDoorTools"
         ],
         "additionalProperties": false
@@ -10596,6 +10652,12 @@
               "type": "string"
             },
             "additionalProperties": {}
+          },
+          "sessionId": {
+            "description": "Optional task-scoped tool session id",
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           }
         },
         "required": [
@@ -12893,6 +12955,86 @@
       "ineligibleReason": null
     },
     {
+      "name": "start_tool_session",
+      "title": "Start Tool Session",
+      "description": "Create a short-lived allowlist for discover_tools and run_tool. Use this to keep a task scoped to the tools it actually needs.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "tools": {
+            "minItems": 1,
+            "maxItems": 64,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "description": "Registered tool names allowed in this session"
+          },
+          "ttlSeconds": {
+            "description": "Session lifetime in seconds (default 900, max 3600)",
+            "type": "integer",
+            "minimum": 30,
+            "maximum": 3600
+          },
+          "label": {
+            "description": "Optional human-readable task label",
+            "type": "string",
+            "maxLength": 120
+          }
+        },
+        "required": [
+          "tools"
+        ]
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "allowedTools": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string"
+          },
+          "remainingSeconds": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "sessionId",
+          "allowedTools",
+          "createdAt",
+          "expiresAt",
+          "remainingSeconds"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "sensitiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "appIntentEligible": true,
+      "ineligibleReason": null
+    },
+    {
       "name": "suggest_next_tools",
       "title": "Suggest Next Tools",
       "description": "Based on your usage patterns, suggest which tools typically follow a given tool. Learns from how you use AirMCP over time. Returns frequently-used tool sequences.",
@@ -13287,6 +13429,70 @@
       "annotations": {
         "readOnlyHint": false,
         "destructiveHint": true,
+        "sensitiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "appIntentEligible": true,
+      "ineligibleReason": null
+    },
+    {
+      "name": "tool_session_status",
+      "title": "Tool Session Status",
+      "description": "Inspect one active tool session by id without listing other clients' sessions.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "description": "Session id returned by start_tool_session"
+          }
+        },
+        "required": [
+          "sessionId"
+        ]
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "allowedTools": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string"
+          },
+          "remainingSeconds": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "sessionId",
+          "allowedTools",
+          "createdAt",
+          "expiresAt",
+          "remainingSeconds"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
         "sensitiveHint": false,
         "idempotentHint": true,
         "openWorldHint": false

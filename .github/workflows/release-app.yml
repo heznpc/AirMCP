@@ -30,27 +30,29 @@ on:
       tag:
         description: "Tag to release (e.g. v2.11.0)"
         required: true
+      require_signing:
+        description: "Fail instead of skipping when Apple signing secrets are missing"
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: release-app-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  release-app:
+  signing-preflight:
     runs-on: macos-latest
-    environment: release
-    permissions:
-      contents: write
-      id-token: write       # Sigstore signing for attest-build-provenance
-      attestations: write   # Upload attestation to the repo's attestation store
+    outputs:
+      ready: ${{ steps.secrets.outputs.ready }}
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-
-      # Fail fast and loud when secrets haven't been wired yet. Every
-      # required secret is checked up-front so an operator sees the
-      # full list in one CI log, not six sequential failures.
+      # Missing signing secrets are not an npm/.mcpb release blocker. On tag
+      # push, skip cleanly until Developer ID notarization is configured. Manual
+      # dispatch can set require_signing=true to make the absence a hard error.
       - name: Preflight — required secrets present
+        id: secrets
         env:
+          REQUIRE_SIGNING: ${{ github.event.inputs.require_signing == 'true' }}
           APPLE_DEVELOPER_ID: ${{ secrets.APPLE_DEVELOPER_ID }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
@@ -66,10 +68,29 @@ jobs:
           [ -n "$APPLE_CERT_P12_BASE64" ]   || missing+=("APPLE_CERT_P12_BASE64")
           [ -n "$APPLE_CERT_P12_PASSWORD" ] || missing+=("APPLE_CERT_P12_PASSWORD")
           if [ ${#missing[@]} -gt 0 ]; then
-            echo "::error::Missing required secrets: ${missing[*]}"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            if [ "$REQUIRE_SIGNING" = "true" ]; then
+              echo "::error::Missing required secrets: ${missing[*]}"
+              echo "See .github/workflows/release-app.yml header for the full list"
+              exit 1
+            fi
+            echo "::notice::Skipping signed app release; missing secrets: ${missing[*]}"
             echo "See .github/workflows/release-app.yml header for the full list"
-            exit 1
+            exit 0
           fi
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+
+  release-app:
+    needs: signing-preflight
+    if: needs.signing-preflight.outputs.ready == 'true'
+    runs-on: macos-latest
+    environment: release
+    permissions:
+      contents: write
+      id-token: write       # Sigstore signing for attest-build-provenance
+      attestations: write   # Upload attestation to the repo's attestation store
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Extract version
         id: version

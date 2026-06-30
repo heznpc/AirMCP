@@ -764,6 +764,7 @@ public struct MCPProfileStatusOutput: Codable, Sendable {
     public let modulesDisabled: [String]
     public let toolsExposed: Double
     public let toolsRegistered: Double
+    public let toolSessionsActive: Double
     public let frontDoorTools: [String]
 }
 
@@ -2224,11 +2225,15 @@ public struct DiscoverToolsIntent: AppIntent {
     @Parameter(title: "Max results (default 20)", inclusiveRange: (1, 50))
     public var limit: Double?
 
+    @Parameter(title: "Optional task-scoped tool session id; limits matches to the session allowlist")
+    public var sessionId: String?
+
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         var args: [String: any Sendable] = [:]
         args["query"] = query
         if let v = limit { args["limit"] = v }
+        if let v = sessionId { args["sessionId"] = v }
         let result = try await MCPIntentRouter.shared.call(
             tool: "discover_tools",
             args: args
@@ -9558,6 +9563,13 @@ public struct MCPProfileStatusSnippetView: View {
                 Text("Tools Registered")
                 Spacer()
                 Text(data.toolsRegistered.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Tool Sessions Active")
+                Spacer()
+                Text(data.toolSessionsActive.formatted())
                     .lineLimit(1)
                     .truncationMode(.tail)
             }

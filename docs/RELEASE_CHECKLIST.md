@@ -110,13 +110,16 @@ Breaking을 포함한 minor/patch는 **금지**. 직전 메이저에 묶어 둘 
 
 ### 3.4 npm publish + .mcpb → GitHub Release
 - [ ] CD workflow(`cd.yml`) 자동 트리거 확인, 또는 수동 `npm publish --provenance`
+- [ ] `NPM_TOKEN`을 쓰는 경우 `npm whoami`가 통과하고 해당 토큰이 `airmcp` publish 권한을 가진 automation/granular token인지 확인. 토큰이 비어 있으면 npm trusted publishing이 GitHub environment `npm` + 이 workflow에 설정되어 있어야 한다.
 - [ ] `npm view airmcp@X.Y.Z` 로 반영 검증
 - [ ] `npx -y airmcp@X.Y.Z --version` 스모크
 - [ ] Release에 `airmcp-X.Y.Z.mcpb`가 첨부되어 있는지 확인 (Claude Desktop 원클릭 설치용)
+- [ ] `npm run release:verify -- --version=X.Y.Z` 로 npm latest, fresh `npx`, GitHub Release `.mcpb` asset을 한 번에 검증
 
 ### 3.5 Signed .app → GitHub Release
 - [ ] `release-app.yml` 워크플로가 태그 푸시로 자동 실행됐는지 확인 (Actions 탭)
-- [ ] 실패 시 **Missing required secrets** 에러면 아래 6개를 Settings → Secrets and variables → Actions에 등록:
+- [ ] Apple signing secret이 없으면 태그 푸시에서는 signed app job이 **skip** 되는 것이 정상이다. 수동 dispatch에서 반드시 실패시키려면 `require_signing=true`로 실행한다.
+- [ ] signed app 릴리스가 필요하면 아래 6개를 Settings → Secrets and variables → Actions에 등록:
   - `APPLE_DEVELOPER_ID` — Developer ID Application certificate 공통명 (예: `Developer ID Application: Jane Doe (A1B2C3D4E5)`)
   - `APPLE_ID` — notarytool용 Apple ID 이메일
   - `APPLE_ID_PASSWORD` — [App-specific password](https://appleid.apple.com) (Sign-in and security → App-specific passwords)

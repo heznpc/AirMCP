@@ -119,7 +119,14 @@ const CHECK_ONLY = process.argv.includes("--check");
 // An explicit SKIP list remains for specific tools that would otherwise
 // generate but have known runtime issues we haven't addressed yet. Empty
 // at the moment — listed here so future skips are discoverable in one place.
-const SKIP_NAMES = new Set([]);
+const SKIP_NAMES = new Set([
+  // MCP harness controls are useful for agent runtimes but make poor Siri /
+  // Shortcuts actions: their value is in constraining an MCP task context,
+  // not in user-facing automation.
+  "start_tool_session",
+  "tool_session_status",
+  "end_tool_session",
+]);
 
 // A.4: opt-in for destructive tools. Accept common truthy strings so
 // `AIRMCP_APPINTENTS_DESTRUCTIVE=1` / `=true` / `=yes` / `=on` all

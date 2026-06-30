@@ -165,6 +165,8 @@ export interface AirMcpConfig {
   profile: ActiveProfileName;
   /** MCP tools/list exposure mode. Registered tools remain callable through run_tool. */
   toolExposure: ToolExposureMode;
+  /** Require task-scoped sessions before run_tool can dispatch hidden tools. Default: false */
+  requireToolSession: boolean;
   /** Tools exposed in progressive tools/list mode. */
   progressiveTools: Set<string>;
   /** Include shared notes/folders in results. Default: false */
@@ -188,6 +190,7 @@ export interface AirMcpConfig {
 interface FileConfig {
   profile?: string;
   toolExposure?: string;
+  requireToolSession?: boolean;
   includeShared?: boolean;
   allowSendMessages?: boolean;
   allowSendMail?: boolean;
@@ -236,6 +239,7 @@ function loadFileConfig(): LoadResult {
     const config: FileConfig = {};
     if (typeof obj.profile === "string") config.profile = obj.profile;
     if (typeof obj.toolExposure === "string") config.toolExposure = obj.toolExposure;
+    if (typeof obj.requireToolSession === "boolean") config.requireToolSession = obj.requireToolSession;
     if (typeof obj.includeShared === "boolean") config.includeShared = obj.includeShared;
     if (typeof obj.allowSendMessages === "boolean") config.allowSendMessages = obj.allowSendMessages;
     if (typeof obj.allowSendMail === "boolean") config.allowSendMail = obj.allowSendMail;
@@ -346,7 +350,13 @@ export function parseConfig(): AirMcpConfig {
 
   // Validate boolean fields: warn if non-boolean values are present in the raw config
   if (rawObj) {
-    const boolFields = ["includeShared", "allowSendMessages", "allowSendMail", "allowRunJavascript"] as const;
+    const boolFields = [
+      "includeShared",
+      "allowSendMessages",
+      "allowSendMail",
+      "allowRunJavascript",
+      "requireToolSession",
+    ] as const;
     for (const field of boolFields) {
       if (field in rawObj && typeof rawObj[field] !== "boolean") {
         log.warn("config field has wrong type — ignored", { field, expected: "boolean", got: typeof rawObj[field] });
@@ -396,6 +406,7 @@ export function parseConfig(): AirMcpConfig {
   const allowSendMessages = envBool("AIRMCP_ALLOW_SEND_MESSAGES", file.allowSendMessages, false);
   const allowSendMail = envBool("AIRMCP_ALLOW_SEND_MAIL", file.allowSendMail, false);
   const allowRunJavascript = envBool("AIRMCP_ALLOW_RUN_JAVASCRIPT", file.allowRunJavascript, false);
+  const requireToolSession = envBool("AIRMCP_REQUIRE_TOOL_SESSION", file.requireToolSession, false);
 
   // Performance config: write to env vars so constants.ts picks them up.
   // KNOWN LIMITATION: constants.ts evaluates envInt() at import time (before
@@ -447,6 +458,7 @@ export function parseConfig(): AirMcpConfig {
   return {
     profile: activeProfile,
     toolExposure,
+    requireToolSession,
     progressiveTools: getProgressiveToolAllowlist(),
     includeShared,
     disabledModules,

@@ -212,6 +212,7 @@ export async function createServer(
       outputSchema: {
         profile: z.string(),
         toolExposure: z.string(),
+        requireToolSession: z.boolean(),
         modulesEnabled: z.array(z.string()),
         modulesDisabled: z.array(z.string()),
         toolsExposed: z.number(),
@@ -225,6 +226,7 @@ export async function createServer(
       return okStructured({
         profile: config.profile,
         toolExposure: config.toolExposure,
+        requireToolSession: config.requireToolSession,
         modulesEnabled: enabled,
         modulesDisabled: disabled,
         toolsExposed: toolRegistry.getExposedToolCount(),
@@ -348,6 +350,12 @@ export async function createServer(
       const info = toolRegistry.getToolInfo(name);
       if (!info) {
         return errNotFound(`Unknown tool "${name}". Use discover_tools to find available tools.`);
+      }
+      const hiddenTool = !toolRegistry.getExposedToolNames().includes(name);
+      if (config.requireToolSession && hiddenTool && !sessionId) {
+        return errInvalidInput(
+          `Tool session required for hidden tool "${name}". Call start_tool_session with this tool, then pass sessionId to run_tool.`,
+        );
       }
       const sessionGate = toolSessions.assertAllowed(sessionId, name);
       if (!sessionGate.ok) return errInvalidInput(sessionGate.message);

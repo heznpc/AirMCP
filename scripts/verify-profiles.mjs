@@ -38,6 +38,24 @@ const CASES = [
     requiredModules: ["notes", "reminders", "calendar", "shortcuts", "system", "finder", "weather"],
   },
   {
+    name: "starter-progressive-require-session",
+    profile: "starter",
+    exposure: "progressive",
+    requireToolSession: true,
+    minTools: 10,
+    maxTools: 40,
+    requiredTools: [
+      "profile_status",
+      "list_profiles",
+      "start_tool_session",
+      "discover_tools",
+      "run_tool",
+      "list_notes",
+      "list_events",
+    ],
+    requiredModules: ["notes", "reminders", "calendar", "shortcuts", "system", "finder", "weather"],
+  },
+  {
     name: "communications-safe-progressive",
     profile: "communications-safe",
     exposure: "progressive",
@@ -80,6 +98,10 @@ function parseStructuredResult(callResp) {
   }
 }
 
+function firstText(callResp) {
+  return callResp.result?.content?.find?.((c) => c.type === "text")?.text ?? "";
+}
+
 function bootCase(testCase) {
   return new Promise((resolve) => {
     const env = {
@@ -87,6 +109,7 @@ function bootCase(testCase) {
       AIRMCP_PROFILE: testCase.profile,
       AIRMCP_TOOL_EXPOSURE: testCase.exposure,
       AIRMCP_FAKE_OS_VERSION: "0",
+      AIRMCP_REQUIRE_TOOL_SESSION: testCase.requireToolSession ? "true" : "false",
       AIRMCP_SEMANTIC_SEARCH: "false",
       AIRMCP_AUDIT_LOG: "false",
       AIRMCP_USAGE_TRACKING: "false",
@@ -162,7 +185,7 @@ function bootCase(testCase) {
         const status = parseStructuredResult(statusResp);
         if (!status) throw new Error(`profile_status was not parseable: ${JSON.stringify(statusResp)}`);
 
-        if (testCase.name === "starter-progressive") {
+        if (testCase.name === "starter-progressive" || testCase.name === "starter-progressive-require-session") {
           const sessionResp = await request(
             "tools/call",
             { name: "start_tool_session", arguments: { tools: ["profile_status"], label: "profile-check", ttlSeconds: 60 } },
@@ -185,6 +208,51 @@ function bootCase(testCase) {
           );
           if (!deniedResp.result?.isError) {
             throw new Error(`run_tool session denied call unexpectedly succeeded: ${JSON.stringify(deniedResp)}`);
+          }
+        }
+
+        if (testCase.requireToolSession) {
+          const discoverResp = await request(
+            "tools/call",
+            { name: "discover_tools", arguments: { query: "create note", limit: 10 } },
+            7,
+          );
+          if (discoverResp.error || discoverResp.result?.isError) {
+            throw new Error(`discover_tools hidden lookup failed: ${JSON.stringify(discoverResp)}`);
+          }
+          const discover = parseStructuredResult(discoverResp);
+          if (!discover?.matches?.some?.((match) => match.name === "create_note")) {
+            throw new Error(`discover_tools did not return hidden create_note: ${JSON.stringify(discoverResp)}`);
+          }
+
+          const noSessionResp = await request("tools/call", { name: "run_tool", arguments: { name: "create_note" } }, 8);
+          if (!noSessionResp.result?.isError || !firstText(noSessionResp).includes("Tool session required")) {
+            throw new Error(`run_tool hidden no-session call was not rejected: ${JSON.stringify(noSessionResp)}`);
+          }
+
+          const createSessionResp = await request(
+            "tools/call",
+            {
+              name: "start_tool_session",
+              arguments: { tools: ["create_note"], label: "hidden-create-check", ttlSeconds: 60 },
+            },
+            9,
+          );
+          const createSession = parseStructuredResult(createSessionResp);
+          if (!createSession?.sessionId) {
+            throw new Error(`start_tool_session for hidden create_note failed: ${JSON.stringify(createSessionResp)}`);
+          }
+
+          const missingArgsResp = await request(
+            "tools/call",
+            { name: "run_tool", arguments: { name: "create_note", args: {}, sessionId: createSession.sessionId } },
+            10,
+          );
+          if (
+            !missingArgsResp.result?.isError ||
+            !firstText(missingArgsResp).includes('Invalid arguments for tool "create_note"')
+          ) {
+            throw new Error(`run_tool hidden session call did not reach target validation: ${JSON.stringify(missingArgsResp)}`);
           }
         }
 
@@ -235,6 +303,9 @@ for (const testCase of CASES) {
   }
   if (result.status.profile !== testCase.profile) problems.push(`profile_status.profile=${result.status.profile}`);
   if (result.status.toolExposure !== testCase.exposure) problems.push(`profile_status.toolExposure=${result.status.toolExposure}`);
+  if (result.status.requireToolSession !== Boolean(testCase.requireToolSession)) {
+    problems.push(`profile_status.requireToolSession=${result.status.requireToolSession}`);
+  }
   if (missingTools.length) problems.push(`missing tools: ${missingTools.join(", ")}`);
   if (missingModules.length) problems.push(`missing enabled modules: ${missingModules.join(", ")}`);
 

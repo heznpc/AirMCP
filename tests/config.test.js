@@ -22,6 +22,7 @@ const ENV_KEYS = [
   'AIRMCP_ALLOW_SEND_MESSAGES',
   'AIRMCP_ALLOW_SEND_MAIL',
   'AIRMCP_ALLOW_RUN_JAVASCRIPT',
+  'AIRMCP_REQUIRE_TOOL_SESSION',
   'AIRMCP_SHARE_APPROVAL',
   'AIRMCP_HITL_LEVEL',
   'AIRMCP_AUDIT_LOG',
@@ -165,6 +166,11 @@ describe('parseConfig() — defaults with no config file', () => {
     expect(cfg.allowRunJavascript).toBe(false);
   });
 
+  test('requireToolSession defaults to false', () => {
+    const cfg = parseConfig();
+    expect(cfg.requireToolSession).toBe(false);
+  });
+
   test('features all default to true (except telemetry)', () => {
     const cfg = parseConfig();
     expect(cfg.features.auditLog).toBe(true);
@@ -258,6 +264,25 @@ describe('parseConfig() — environment variable overrides', () => {
     process.env.AIRMCP_ALLOW_RUN_JAVASCRIPT = 'true';
     const cfg = parseConfig();
     expect(cfg.allowRunJavascript).toBe(true);
+  });
+
+  test('AIRMCP_REQUIRE_TOOL_SESSION=true requires sessions for hidden run_tool dispatch', () => {
+    process.env.AIRMCP_REQUIRE_TOOL_SESSION = 'true';
+    const cfg = parseConfig();
+    expect(cfg.requireToolSession).toBe(true);
+  });
+
+  test('config requireToolSession=true enables hidden run_tool session enforcement', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'airmcp-config-'));
+    try {
+      PATHS.CONFIG = join(dir, 'config.json');
+      writeFileSync(PATHS.CONFIG, JSON.stringify({ requireToolSession: true }), 'utf8');
+
+      const cfg = parseConfig();
+      expect(cfg.requireToolSession).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

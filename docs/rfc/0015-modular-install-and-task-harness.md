@@ -16,6 +16,7 @@ The first shipped slice is the task harness:
 - `start_tool_session` creates a short-lived allowlist of registered tools,
 - `discover_tools({ sessionId })` searches only that allowlist,
 - `run_tool({ sessionId })` refuses calls outside that allowlist,
+- `AIRMCP_REQUIRE_TOOL_SESSION=true` can require sessions before `run_tool` dispatches hidden tools while keeping directly exposed tools callable,
 - `tool_session_status` and `end_tool_session` make the session inspectable and revocable,
 - profile matrix verification exercises the allow/deny path over the real MCP wire.
 

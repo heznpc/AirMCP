@@ -380,6 +380,7 @@ function buildConfigPayload(params: {
     ...(params.locale ? { locale: params.locale } : {}),
     profile: selectedProfile,
     toolExposure: selectedProfile === "custom" ? "profile" : DEFAULT_TOOL_EXPOSURE_BY_PROFILE[selectedProfile],
+    requireToolSession: true,
     disabledModules,
     includeShared: params.includeShared,
     allowSendMessages: params.allowSendMessages,

@@ -20,6 +20,9 @@ export function runHelp(): void {
   );
   console.log(`    ${GREEN}$${RESET} npx airmcp ${BOLD}doctor${RESET}          ${DIM}Diagnose installation${RESET}`);
   console.log(
+    `    ${GREEN}$${RESET} npx airmcp ${BOLD}modules${RESET}         ${DIM}Inspect or edit module add-on activation${RESET}`,
+  );
+  console.log(
     `    ${GREEN}$${RESET} npx airmcp ${BOLD}workflows${RESET}       ${DIM}Show high-value workflow examples${RESET}`,
   );
   console.log(
@@ -49,6 +52,7 @@ export function runHelp(): void {
   console.log("");
   console.log(`    ${CYAN}init${RESET}       ${DIM}Choose language, select modules, configure MCP clients${RESET}`);
   console.log(`    ${CYAN}doctor${RESET}     ${DIM}Check Node.js, macOS, permissions, clients, modules${RESET}`);
+  console.log(`    ${CYAN}modules${RESET}    ${DIM}List, enable, disable, or doctor DLC-like module add-ons${RESET}`);
   console.log(`    ${CYAN}connect${RESET}    ${DIM}Bridge stdio clients into the app-owned local runtime${RESET}`);
   console.log(
     `    ${CYAN}connect-clients${RESET} ${DIM}Configure installed clients to use that app-owned runtime${RESET}`,
@@ -65,6 +69,9 @@ export function runHelp(): void {
   );
   console.log(
     `    ${WHITE}AIRMCP_TOOL_EXPOSURE${RESET}=${DIM}progressive|profile|full${RESET} ${DIM}Control tools/list size${RESET}`,
+  );
+  console.log(
+    `    ${WHITE}AIRMCP_MODULE_PACKS${RESET}=${DIM}core,productivity${RESET} ${DIM}Activate selected module add-ons${RESET}`,
   );
   console.log(
     `    ${WHITE}AIRMCP_DISABLE_${RESET}${DIM}<MODULE>${RESET}=true  ${DIM}Disable a specific module${RESET}`,

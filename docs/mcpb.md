@@ -70,7 +70,7 @@ AirMCP's tool list is dynamic (skills + dynamic shortcuts generate tools at runt
 
 ### "I want a specific module off"
 
-For per-module disabling, or to opt into experimental modules such as `spatial_prep`, drop the `.mcpb` path and use `npx airmcp init` / environment variables instead (`~/.config/airmcp/config.json` has a module selection block).
+For per-module disabling, selected module-pack activation, or experimental modules such as `spatial_prep`, drop the `.mcpb` path and use `npx airmcp init`, `npx airmcp modules`, or environment variables instead (`~/.config/airmcp/config.json` has a module selection block).
 
 ### Bundle is large (>5 MB)
 

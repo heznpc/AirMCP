@@ -16,6 +16,7 @@ If a variable accepts a path, `~` expands to `$HOME`. Booleans are `"true"` / `"
 | Use only selected module packs | `AIRMCP_MODULE_PACKS=core,productivity` |
 | Send all 293 tools without compactDescription | `AIRMCP_COMPACT_TOOLS=false` + `AIRMCP_TOOL_EXPOSURE=full` |
 | Require sessions before hidden tools can run | `AIRMCP_REQUIRE_TOOL_SESSION=true` |
+| Inspect or edit module add-ons | `npx airmcp modules` |
 | Increase audit-log signing strength for cross-host integrity | `AIRMCP_AUDIT_HMAC_KEY=<32+ random bytes>` |
 | Block every destructive tool on a panic | `touch ~/.config/airmcp/emergency-stop` |
 
@@ -85,7 +86,7 @@ If a variable accepts a path, `~` expands to `$HOME`. Booleans are `"true"` / `"
 | `AIRMCP_PROFILE` | `starter` | Runtime profile: `starter`, `communications-safe`, `productivity`, or `full`. May also include opt-in modules such as `spatial_prep`. |
 | `AIRMCP_TOOL_EXPOSURE` | profile-dependent | `progressive` exposes the front door, `profile` exposes the selected profile, `full` exposes every loaded tool. |
 | `AIRMCP_MODULE_PACKS` | all packs | Comma-separated DLC-like pack allow-list. `core` is always kept. Examples: `core-only`, `core,communications`, `core,productivity,spatial`, or `all`. Modules whose profile is enabled but pack is unavailable are reported through `profile_status.modulesMissingPacks`. |
-| `AIRMCP_REQUIRE_TOOL_SESSION` | (off) | `true` makes `run_tool` require a valid `sessionId` before dispatching hidden tools. Directly exposed tools remain callable without a session. |
+| `AIRMCP_REQUIRE_TOOL_SESSION` | (off unless app/CLI config sets it) | `true` makes `run_tool` require a valid `sessionId` before dispatching hidden tools. Directly exposed tools remain callable without a session. New app/CLI-generated configs set `requireToolSession: true`; no-config direct stdio keeps the compatible default. |
 | `AIRMCP_ENABLE_SPATIAL_PREP` | (off) | `true` enables the experimental read-only spatial asset prep tools. |
 | `AIRMCP_DEBUG_MODULES` | (empty) | Comma-separated whitelist. When set, only listed modules load — easier debugging of import / boot issues. |
 | `AIRMCP_DEBUG_SEQUENTIAL` | (off) | `true` loads modules one-by-one instead of `Promise.all()`. Memory-safe debugging. |
@@ -201,7 +202,7 @@ It does not replace OS permissions, HITL approval, OAuth scopes, rate limits, or
 
 ## Module packs
 
-AirMCP module packs are the runtime contract for DLC-like installation. The current npm package still ships every built-in module, but `AIRMCP_MODULE_PACKS` lets operators activate only selected packs today and gives future add-on packages a tested boundary. Future add-on package names intentionally omit the word "pack": for example `@heznpc/airmcp-productivity`, `@heznpc/airmcp-communications`, and `@heznpc/airmcp-spatial`.
+AirMCP module packs are the runtime contract for DLC-like installation. The current npm package still ships every built-in module, but `npx airmcp modules` and `AIRMCP_MODULE_PACKS` let operators activate only selected packs today and give future add-on packages a tested boundary. Future add-on package names intentionally omit the word "pack": for example `@heznpc/airmcp-productivity`, `@heznpc/airmcp-communications`, and `@heznpc/airmcp-spatial`.
 
 Built-in packs:
 
@@ -217,7 +218,7 @@ Built-in packs:
 - `google-workspace`: Google Workspace
 - `spatial`: experimental spatial prep
 
-Use `list_module_packs` to inspect the active pack set and future add-on package names over MCP. `profile_status` also reports `modulePacksConfigured`, `modulePacksAvailable`, and `modulesMissingPacks` so a client can tell whether a module is disabled by profile/config or unavailable because its pack is not active.
+Use `npx airmcp modules list` locally or `list_module_packs` over MCP to inspect the active pack set and future add-on package names. Use `npx airmcp modules enable productivity,communications` to write a narrow `modulePacks` config. `profile_status` also reports `modulePacksConfigured`, `modulePacksAvailable`, and `modulesMissingPacks` so a client can tell whether a module is disabled by profile/config or unavailable because its pack is not active.
 
 ---
 

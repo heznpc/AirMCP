@@ -13,7 +13,7 @@
 
 **Part of:** Human-Controlled AI Systems · Research Program 1 (anchor — Apple-side agent governance).
 
-**Requires**: macOS for the server. The recommended desktop path is the AirMCP menubar app: it owns the loopback HTTP runtime, while Claude/Codex/Cursor attach to it as clients. The direct CLI server (`npx -y airmcp`) still works for development and boots the **starter** profile with progressive `tools/list` exposure: a small front door (`profile_status`, `list_profiles`, `list_module_packs`, `discover_tools`, `run_tool`, and core starter tools) instead of every loaded tool. Use `AIRMCP_PROFILE=communications-safe|productivity|full` to choose a module profile, `AIRMCP_TOOL_EXPOSURE=profile|full` to widen `tools/list`, `AIRMCP_MODULE_PACKS=core,productivity` to activate only selected DLC-like packs, or `--full` / `AIRMCP_FULL=true` to enable all 29 modules / 293 tools. Most tools are pure JXA and work on macOS 14+ with no extra setup. **Swift-backed tools** — HealthKit, on-device semantic search, recurring events/reminders, photo import/delete/classify, Vision, Speech, Location, Bluetooth, and Apple Intelligence previews — need the **optional Swift bridge** — build it from a source checkout with `npm run swift-build` (it ships in **none** of the distribution channels — the npm tarball, the `.mcpb` bundle, or the menubar `.app` — so build it from source as above); without it those tools return a clear "Swift bridge not found" error and everything else keeps working. FoundationModels-backed Apple Intelligence and `AskAirMCPIntent` additionally require macOS 26+ on Apple Silicon and an opt-in Swift build with `AIRMCP_ENABLE_FOUNDATION_MODELS`.
+**Requires**: macOS for the server. The recommended desktop path is the AirMCP menubar app: it owns the loopback HTTP runtime, while Claude/Codex/Cursor attach to it as clients. The direct CLI server (`npx -y airmcp`) still works for development and boots the **starter** profile with progressive `tools/list` exposure: a small front door (`profile_status`, `list_profiles`, `list_module_packs`, `discover_tools`, `run_tool`, and core starter tools) instead of every loaded tool. Use `AIRMCP_PROFILE=communications-safe|productivity|full` to choose a module profile, `AIRMCP_TOOL_EXPOSURE=profile|full` to widen `tools/list`, `npx airmcp modules enable productivity` or `AIRMCP_MODULE_PACKS=core,productivity` to activate only selected DLC-like packs, or `--full` / `AIRMCP_FULL=true` to enable all 29 modules / 293 tools. New app/CLI-created configs require task sessions for hidden `run_tool` dispatch; no-config direct stdio keeps the compatible path unless `AIRMCP_REQUIRE_TOOL_SESSION=true` is set. Most tools are pure JXA and work on macOS 14+ with no extra setup. **Swift-backed tools** — HealthKit, on-device semantic search, recurring events/reminders, photo import/delete/classify, Vision, Speech, Location, Bluetooth, and Apple Intelligence previews — need the **optional Swift bridge** — build it from a source checkout with `npm run swift-build` (it ships in **none** of the distribution channels — the npm tarball, the `.mcpb` bundle, or the menubar `.app` — so build it from source as above); without it those tools return a clear "Swift bridge not found" error and everything else keeps working. FoundationModels-backed Apple Intelligence and `AskAirMCPIntent` additionally require macOS 26+ on Apple Silicon and an opt-in Swift build with `AIRMCP_ENABLE_FOUNDATION_MODELS`.
 
 > Available in multiple languages at the [project landing page](https://heznpc.github.io/AirMCP/).
 
@@ -29,7 +29,7 @@
 
 - **293 tools** (29 modules) — Apple app CRUD + system control + Apple Intelligence + UI Automation + Screen Capture + Maps + Podcasts + Weather + iWork (Pages/Numbers/Keynote) + Google Workspace + dynamic shortcuts + context memory + audit introspection
 - **Profile-first runtime** — `starter`, `communications-safe`, `productivity`, and `full` module profiles, plus `progressive` / `profile` / `full` tool exposure so clients can start thin and expand intentionally
-- **DLC-like module packs** — `AIRMCP_MODULE_PACKS=core,productivity` activates only selected packs; `list_module_packs` and `profile_status.modulesMissingPacks` make missing-pack state visible over MCP
+- **DLC-like module packs** — `npx airmcp modules` or `AIRMCP_MODULE_PACKS=core,productivity` activates only selected packs; `list_module_packs` and `profile_status.modulesMissingPacks` make missing-pack state visible over MCP
 - **Task-scoped tool sessions** — `start_tool_session` lets a client give one task a short-lived tool allowlist; `discover_tools` and `run_tool` honor that `sessionId` so a broad runtime can still feel narrow in use
 - **231 Shortcuts / Siri AppIntents** — auto-generated from the tool manifest (82 Interactive Snippet views + 13 AppEnum pickers); workflow-first AppShortcuts ship by default, while `AskAirMCPIntent` is a FoundationModels preview gated behind `AIRMCP_ENABLE_FOUNDATION_MODELS`
 - **32 prompts + 14 YAML skill built-ins** — per-app workflows + cross-module + developer workflows + Skills DSL (`inputs` / `parallel` / `loop` / `on_error` / `retry` / 9 event triggers)
@@ -87,6 +87,16 @@ npx airmcp doctor
 ```
 
 Checks Node.js version, config files, MCP client setup, macOS permissions, and module status — all in one command.
+
+### Module add-ons
+
+```bash
+npx airmcp modules
+npx airmcp modules enable productivity,communications
+npx airmcp modules doctor
+```
+
+This edits the runtime `modulePacks` activation set. The current universal package still contains every built-in module; future physical add-on package names intentionally omit `pack-*` naming, for example `@heznpc/airmcp-productivity`.
 
 ### Workflow Catalog
 

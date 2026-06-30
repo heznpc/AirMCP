@@ -152,6 +152,9 @@ jobs:
       - name: Verify llms.txt + llms-full.txt drift
         run: npm run llms:check
 
+      - name: Verify tool description token budget
+        run: npm run tokens:check
+
       - name: Verify version sync
         run: node scripts/sync-version.mjs --check
 

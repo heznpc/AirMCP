@@ -4,6 +4,7 @@ import {
   MODULE_PACK_MANIFEST,
   getDefaultModulePacks,
   getModulePackNameForModule,
+  isModulePackAvailable,
 } from '../dist/shared/module-packs.js';
 
 /* ================================================================== */
@@ -71,6 +72,17 @@ describe('module pack manifest', () => {
         expect(pack.packageName).toBe('airmcp');
       } else {
         expect(pack.packageName).toMatch(/^@heznpc\/airmcp-/);
+      }
+    }
+  });
+
+  test('each pack forms an activation boundary for its modules', () => {
+    for (const pack of MODULE_PACK_MANIFEST) {
+      const selected = new Set(['core', pack.name]);
+      for (const candidate of MODULE_PACK_MANIFEST) {
+        for (const moduleName of candidate.modules) {
+          expect(isModulePackAvailable(moduleName, selected)).toBe(candidate.name === 'core' || candidate.name === pack.name);
+        }
       }
     }
   });

@@ -23,6 +23,8 @@ final class ConfigManager {
     struct Config: Codable, Sendable {
         var profile: String?
         var toolExposure: String?
+        var modulePacks: [String]?
+        var requireToolSession: Bool
         var includeShared: Bool
         var allowSendMessages: Bool
         var allowSendMail: Bool
@@ -33,6 +35,8 @@ final class ConfigManager {
         static let `default` = Config(
             profile: "starter",
             toolExposure: "progressive",
+            modulePacks: nil,
+            requireToolSession: true,
             includeShared: false,
             allowSendMessages: false,
             allowSendMail: false,
@@ -40,6 +44,44 @@ final class ConfigManager {
             shareApproval: nil,
             hitl: nil
         )
+
+        init(
+            profile: String?,
+            toolExposure: String?,
+            modulePacks: [String]?,
+            requireToolSession: Bool,
+            includeShared: Bool,
+            allowSendMessages: Bool,
+            allowSendMail: Bool,
+            disabledModules: [String],
+            shareApproval: [String]?,
+            hitl: HitlConfig?
+        ) {
+            self.profile = profile
+            self.toolExposure = toolExposure
+            self.modulePacks = modulePacks
+            self.requireToolSession = requireToolSession
+            self.includeShared = includeShared
+            self.allowSendMessages = allowSendMessages
+            self.allowSendMail = allowSendMail
+            self.disabledModules = disabledModules
+            self.shareApproval = shareApproval
+            self.hitl = hitl
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            profile = try container.decodeIfPresent(String.self, forKey: .profile)
+            toolExposure = try container.decodeIfPresent(String.self, forKey: .toolExposure)
+            modulePacks = try container.decodeIfPresent([String].self, forKey: .modulePacks)
+            requireToolSession = try container.decodeIfPresent(Bool.self, forKey: .requireToolSession) ?? true
+            includeShared = try container.decodeIfPresent(Bool.self, forKey: .includeShared) ?? false
+            allowSendMessages = try container.decodeIfPresent(Bool.self, forKey: .allowSendMessages) ?? false
+            allowSendMail = try container.decodeIfPresent(Bool.self, forKey: .allowSendMail) ?? false
+            disabledModules = try container.decodeIfPresent([String].self, forKey: .disabledModules) ?? []
+            shareApproval = try container.decodeIfPresent([String].self, forKey: .shareApproval)
+            hitl = try container.decodeIfPresent(HitlConfig.self, forKey: .hitl)
+        }
     }
 
     var config: Config = .default

@@ -22,6 +22,7 @@
 // Usage:
 //   node scripts/measure-tool-tokens.mjs              — pretty report
 //   node scripts/measure-tool-tokens.mjs --json       — machine-readable
+//   node scripts/measure-tool-tokens.mjs --check      — fail if budgets drift
 //   node scripts/measure-tool-tokens.mjs --top 20     — top-N heaviest
 //   AIRMCP_TOKEN_RATIO=3.3 node scripts/measure-tool-tokens.mjs
 
@@ -33,8 +34,30 @@ const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const MANIFEST = join(ROOT, "docs", "tool-manifest.json");
 const TOKEN_RATIO = Number(process.env.AIRMCP_TOKEN_RATIO ?? 4);
 const JSON_MODE = process.argv.includes("--json");
+const CHECK_MODE = process.argv.includes("--check");
 const TOP_FLAG = process.argv.indexOf("--top");
 const TOP_N = TOP_FLAG !== -1 ? Number(process.argv[TOP_FLAG + 1] ?? 10) : 10;
+const DEFAULT_MAX_AFTER_TOKENS = 6500;
+const DEFAULT_MIN_SAVED_PCT = 20;
+const DEFAULT_MAX_TOOL_AFTER_TOKENS = 45;
+
+function numericArg(flag, envKey, fallback) {
+  const idx = process.argv.indexOf(flag);
+  const raw = idx !== -1 ? process.argv[idx + 1] : process.env[envKey];
+  if (raw === undefined) return fallback;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+const CHECK_BUDGETS = {
+  maxAfterTokens: numericArg("--max-after-tokens", "AIRMCP_MAX_TOOL_DESC_TOKENS", DEFAULT_MAX_AFTER_TOKENS),
+  minSavedPct: numericArg("--min-saved-pct", "AIRMCP_MIN_TOOL_DESC_SAVED_PCT", DEFAULT_MIN_SAVED_PCT),
+  maxToolAfterTokens: numericArg(
+    "--max-tool-after-tokens",
+    "AIRMCP_MAX_SINGLE_TOOL_DESC_TOKENS",
+    DEFAULT_MAX_TOOL_AFTER_TOKENS,
+  ),
+};
 
 if (!existsSync(MANIFEST)) {
   console.error(`[measure-tokens] ${MANIFEST} not found — run \`node scripts/dump-tool-manifest.mjs\` first`);
@@ -134,8 +157,39 @@ const report = {
     })),
 };
 
+function checkBudgets() {
+  const failures = [];
+  if (totals.afterTokens > CHECK_BUDGETS.maxAfterTokens) {
+    failures.push(`after tokens ${totals.afterTokens} > budget ${CHECK_BUDGETS.maxAfterTokens}`);
+  }
+  if (reductionPct < CHECK_BUDGETS.minSavedPct) {
+    failures.push(`saved pct ${reductionPct}% < budget ${CHECK_BUDGETS.minSavedPct}%`);
+  }
+  const tooLarge = rows.filter((r) => r.afterTokens > CHECK_BUDGETS.maxToolAfterTokens);
+  if (tooLarge.length) {
+    failures.push(
+      `single tool descriptions over ${CHECK_BUDGETS.maxToolAfterTokens} tokens: ${tooLarge
+        .map((r) => `${r.name}=${r.afterTokens}`)
+        .join(", ")}`,
+    );
+  }
+  if (failures.length) {
+    console.error("[measure-tokens --check] FAIL");
+    for (const failure of failures) console.error(`  - ${failure}`);
+    process.exit(1);
+  }
+  console.log(
+    `[measure-tokens --check] OK — after ~${totals.afterTokens} tokens <= ${CHECK_BUDGETS.maxAfterTokens}, saved ${reductionPct}%`,
+  );
+}
+
 if (JSON_MODE) {
   process.stdout.write(JSON.stringify(report, null, 2) + "\n");
+  process.exit(0);
+}
+
+if (CHECK_MODE) {
+  checkBudgets();
   process.exit(0);
 }
 

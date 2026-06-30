@@ -11,6 +11,10 @@ The default config file location is `~/.config/airmcp/config.json`. You can over
 
 ```json
 {
+  "profile": "starter",
+  "toolExposure": "progressive",
+  "modulePacks": ["core", "productivity"],
+  "requireToolSession": true,
   "includeShared": false,
   "allowSendMessages": false,
   "allowSendMail": false,
@@ -34,6 +38,10 @@ The default config file location is `~/.config/airmcp/config.json`. You can over
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
+| `profile` | string | `"starter"` | Runtime profile: `starter`, `communications-safe`, `productivity`, or `full` |
+| `toolExposure` | string | profile-dependent | `progressive`, `profile`, or `full` tools/list exposure |
+| `modulePacks` | string[] | all packs | DLC-like activation packs. `core` is always kept |
+| `requireToolSession` | boolean | `false` unless app/CLI config sets it | Require task-scoped sessions before hidden `run_tool` dispatch |
 | `includeShared` | boolean | `false` | Include shared notes/folders in results |
 | `allowSendMessages` | boolean | `false` | Allow sending iMessages via the Messages module |
 | `allowSendMail` | boolean | `false` | Allow sending emails via the Mail module |
@@ -56,6 +64,8 @@ The default config file location is `~/.config/airmcp/config.json`. You can over
 | `AIRMCP_FULL=true` | Enable all standard 29 modules (profile-only modules stay opt-in) |
 | `AIRMCP_PROFILE=starter` | Select a module profile: `starter`, `communications-safe`, `productivity`, or `full` |
 | `AIRMCP_TOOL_EXPOSURE=progressive` | Keep `tools/list` thin; use `profile` or `full` to expose more tools |
+| `AIRMCP_MODULE_PACKS=core,productivity` | Activate selected DLC-like module packs |
+| `AIRMCP_REQUIRE_TOOL_SESSION=true` | Require task-scoped sessions before hidden `run_tool` dispatch |
 | `AIRMCP_PROFILE=spatial_prep` | Enable an experimental profile-only module in addition to the selected profile |
 | `AIRMCP_ENABLE_SPATIAL_PREP=true` | Enable the experimental read-only spatial asset prep tools |
 | `AIRMCP_DISABLE_<MODULE>=true` | Disable a specific module (e.g. `AIRMCP_DISABLE_TV=true`) |
@@ -126,6 +136,7 @@ npx airmcp --http --bind-all  # Bind to 0.0.0.0 (all interfaces)
 npx airmcp --full             # Enable all modules
 npx airmcp connect            # Proxy stdio clients to AirMCP.app
 npx airmcp init               # Interactive setup wizard
+npx airmcp modules            # Inspect or edit module add-on activation
 npx airmcp doctor             # Diagnose installation
 npx airmcp --help             # Show usage guide
 ```
@@ -169,6 +180,6 @@ When no `config.json` exists and `--full` is not used, AirMCP enables the curate
 - **Finder** -- file search, directory listing, file operations
 - **Weather** -- current conditions and forecasts
 
-All other standard modules are disabled by default. Use `npx airmcp init`, `AIRMCP_PROFILE=communications-safe|productivity|full`, or `--full` to customize. Use `AIRMCP_TOOL_EXPOSURE=profile|full` when a client should see more than the progressive front door.
+All other standard modules are disabled by default. Use `npx airmcp init`, `npx airmcp modules enable productivity`, `AIRMCP_PROFILE=communications-safe|productivity|full`, or `--full` to customize. Use `AIRMCP_TOOL_EXPOSURE=profile|full` when a client should see more than the progressive front door.
 
 Experimental profile-only modules, such as `spatial_prep`, stay disabled even with `--full`. Enable them explicitly with `AIRMCP_PROFILE=spatial_prep` or `AIRMCP_ENABLE_SPATIAL_PREP=true`.

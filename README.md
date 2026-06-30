@@ -13,13 +13,13 @@
 
 **Part of:** Human-Controlled AI Systems · Research Program 1 (anchor — Apple-side agent governance).
 
-**Requires**: macOS for the server. The recommended desktop path is the AirMCP menubar app: it owns the loopback HTTP runtime, while Claude/Codex/Cursor attach to it as clients. The direct CLI server (`npx -y airmcp`) still works for development and loads a curated **starter** module set (~111 tools); `--full` (or `AIRMCP_FULL=true`) enables all 29 modules / 286 tools. Most tools are pure JXA and work on macOS 14+ with no extra setup. **Swift-backed tools** — HealthKit, on-device semantic search, recurring events/reminders, photo import/delete/classify, Vision, Speech, Location, Bluetooth, and Apple Intelligence previews — need the **optional Swift bridge** — build it from a source checkout with `npm run swift-build` (it ships in **none** of the distribution channels — the npm tarball, the `.mcpb` bundle, or the menubar `.app` — so build it from source as above); without it those tools return a clear "Swift bridge not found" error and everything else keeps working. FoundationModels-backed Apple Intelligence and `AskAirMCPIntent` additionally require macOS 26+ on Apple Silicon and an opt-in Swift build with `AIRMCP_ENABLE_FOUNDATION_MODELS`.
+**Requires**: macOS for the server. The recommended desktop path is the AirMCP menubar app: it owns the loopback HTTP runtime, while Claude/Codex/Cursor attach to it as clients. The direct CLI server (`npx -y airmcp`) still works for development and boots the **starter** profile with progressive `tools/list` exposure: a small front door (`profile_status`, `list_profiles`, `discover_tools`, `run_tool`, and core starter tools) instead of every loaded tool. Use `AIRMCP_PROFILE=communications-safe|productivity|full` to choose a module profile, `AIRMCP_TOOL_EXPOSURE=profile|full` to widen `tools/list`, or `--full` / `AIRMCP_FULL=true` to enable all 29 modules / 289 tools. Most tools are pure JXA and work on macOS 14+ with no extra setup. **Swift-backed tools** — HealthKit, on-device semantic search, recurring events/reminders, photo import/delete/classify, Vision, Speech, Location, Bluetooth, and Apple Intelligence previews — need the **optional Swift bridge** — build it from a source checkout with `npm run swift-build` (it ships in **none** of the distribution channels — the npm tarball, the `.mcpb` bundle, or the menubar `.app` — so build it from source as above); without it those tools return a clear "Swift bridge not found" error and everything else keeps working. FoundationModels-backed Apple Intelligence and `AskAirMCPIntent` additionally require macOS 26+ on Apple Silicon and an opt-in Swift build with `AIRMCP_ENABLE_FOUNDATION_MODELS`.
 
 > Available in multiple languages at the [project landing page](https://heznpc.github.io/AirMCP/).
 
 ## What this is — at a glance
 
-- **Currently implemented** — 286 tools across 29 modules (a curated **starter** set loads by default; `--full` enables all; Swift-backed tools need the optional bridge, see Requires above); HMAC-chained audit log with tamper-detection test suite; default HITL approval per destructive/sensitive call; rate limit (60/min + 10 destructive/hr); `allowNetwork` inbound HTTP exposure policy (RFC 0002); OAuth 2.1 + Resource Indicators (RFC 0005 Steps 1+2 — RS256/ES256 JWT, scope gate, `.well-known/oauth-protected-resource` per RFC 9728); sessionless `.well-known/mcp.json` discovery; 228 Shortcuts/AppIntents auto-generated from the tool manifest; native SwiftUI menubar app (ad-hoc signed; Developer ID notarization pending); Claude Code plugin package (`.claude-plugin/plugin.json` + `.mcp.json` at repo root, with the `.mcp.json` invocation pinned to the same npm version as the manifest so the marketplace SHA-approval and the installed runtime always agree). On every CI run, `npm run mcp:validate` boots the built `dist/index.js` under a pinned [`@modelcontextprotocol/inspector`](https://github.com/modelcontextprotocol/inspector) `--cli` and checks the `tools/list` response for JSON-RPC envelope drift, embedded error envelopes, and zero-tool responses — this is a wire-shape gate, not a substitute for the HMAC / HITL / audit primitives, which have their own tests.
+- **Currently implemented** — 289 tools across 29 modules behind first-class profiles (`starter`, `communications-safe`, `productivity`, `full`) and progressive exposure (`discover_tools` + `run_tool` keep hidden tools callable without dumping the full catalog into every client context); HMAC-chained audit log with tamper-detection test suite; default HITL approval per destructive/sensitive call; rate limit (60/min + 10 destructive/hr); `allowNetwork` inbound HTTP exposure policy (RFC 0002); OAuth 2.1 + Resource Indicators (RFC 0005 Steps 1+2 — RS256/ES256 JWT, scope gate, `.well-known/oauth-protected-resource` per RFC 9728); sessionless `.well-known/mcp.json` discovery; 230 Shortcuts/AppIntents auto-generated from the full tool manifest; native SwiftUI menubar app (ad-hoc signed; Developer ID notarization pending); Claude Code plugin package (`.claude-plugin/plugin.json` + `.mcp.json` at repo root, with the `.mcp.json` invocation pinned to the same npm version as the manifest so the marketplace SHA-approval and the installed runtime always agree). On every CI run, `npm run mcp:validate` boots the built `dist/index.js` under a pinned [`@modelcontextprotocol/inspector`](https://github.com/modelcontextprotocol/inspector) `--cli` and checks the `tools/list` response for JSON-RPC envelope drift, embedded error envelopes, and zero-tool responses — this is a wire-shape gate, not a substitute for the HMAC / HITL / audit primitives, which have their own tests.
 - **Planned** — RFC 0005 Step 3 browser PKCE guide; stateless streamable HTTP for horizontal scale per MCP 2026 roadmap; iOS/visionOS exploration (v3.0+); consolidated registry re-publishing across Anthropic MCP Registry, Smithery, PulseMCP, Glama, MCP Market, Cline Marketplace, LobeHub (the `.well-known/mcp.json` endpoint is published, `mcpName` is set, and past ad-hoc registrations exist on some registries but their versions/metadata have drifted out of date — a single self-publishing PR will re-push the current manifest to each); Claude Code Plugin submission to `anthropics/claude-plugins-community` (community marketplace launched 2026-05-22; the plugin package itself — `.claude-plugin/plugin.json` + `.mcp.json` — lives at repo root and is validated by CI; the remaining step is the operator-side submission via `clau.de/plugin-directory-submission`); App Schemas codegen (WWDC 2026 introduced App Schemas — a new agentic layer over App Intents + App Entities, plus a View Annotations API for on-screen awareness and an App Intents Testing framework; the installed SDK exposes the non-deprecated `@AppIntent(schema:)` / `@AppEntity(schema:)` / `@AppEnum(schema:)` macro declarations, and full Xcode can typecheck those macros, but the default Command Line Tools still lack `AppIntentsMacros` / `AppIntentsTesting`; Calendar events, Reminders, and Contacts also lack matching public AssistantSchemas constants in the local SDK, so AirMCP keeps the generated default artifact on plain AppIntents/AppEntities until CI has a schema-capable toolchain and each mapping targets an official schema constant). iOS companion server (`ios/Sources/AirMCPServer`, ~1500 LOC) is **preview**, not GA — macOS is the shipping surface.
 - **Design intent** — Core infra (HITL · audit · rate-limit · HMAC chain · network policy · OAuth scope gate) is the differentiated layer; the tool surface is broad and JXA-thin **by design**. JXA is the bridge, not the product. The interesting code lives in `src/shared/` (audit, rate-limit, HITL, network policy, OAuth gate, structured-content validators) and the Swift bridges (`swift/Sources/AirMCPKit`) for EventKit / HealthKit / PhotoKit / Vision / FoundationModels. Blast-radius unit is one tool call. Adjacent to — not a replacement for — the canonical [Model Context Protocol reference servers](https://github.com/modelcontextprotocol/servers) (Everything, Filesystem, Fetch, Git, Memory, Sequential Thinking, Time); AirMCP fills the Apple-native domain those references leave open. Aligned with Anthropic's three-layer containment doctrine ([*How we contain Claude across products*](https://anthropic.com/engineering/how-we-contain-claude), 2026-05-27 engineering blog): the Environment layer (sandbox / VM / egress controls) and Model layer (system prompts / classifiers) are Anthropic's host-side responsibility; AirMCP implements the **External Content layer** — tool-permission gating + MCP server auditing — for the Apple-native domain, complementary to (not replacing) Claude Code's process-level Seatbelt/bubblewrap sandbox. The same production governance primitives (sensitive-action HITL, scope-gated permissions, real-time tamper-evident audit, rate-limited destructive ops, emergency stop file) that high-stakes vertical MCP servers — financial trading, crypto exchange, supply-chain attestation — build per-deployment are surfaced once here as OSS reference.
 - **Non-goals** — Per-session batched approval that covers "the next N calls" (failure mode this project is built around). Editable or skippable audit entries (the chain is load-bearing). Promising iOS parity on the public surface (preview only). Replacing native Apple apps — AirMCP automates them, it does not reimplement them. Headless / non-Apple platforms beyond what Google Workspace already provides.
@@ -27,15 +27,16 @@
 
 ## Features
 
-- **286 tools** (29 modules) — Apple app CRUD + system control + Apple Intelligence + UI Automation + Screen Capture + Maps + Podcasts + Weather + iWork (Pages/Numbers/Keynote) + Google Workspace + dynamic shortcuts + context memory + audit introspection
-- **228 Shortcuts / Siri AppIntents** — auto-generated from the tool manifest (79 Interactive Snippet views + 13 AppEnum pickers); workflow-first AppShortcuts ship by default, while `AskAirMCPIntent` is a FoundationModels preview gated behind `AIRMCP_ENABLE_FOUNDATION_MODELS`
+- **289 tools** (29 modules) — Apple app CRUD + system control + Apple Intelligence + UI Automation + Screen Capture + Maps + Podcasts + Weather + iWork (Pages/Numbers/Keynote) + Google Workspace + dynamic shortcuts + context memory + audit introspection
+- **Profile-first runtime** — `starter`, `communications-safe`, `productivity`, and `full` module profiles, plus `progressive` / `profile` / `full` tool exposure so clients can start thin and expand intentionally
+- **230 Shortcuts / Siri AppIntents** — auto-generated from the tool manifest (81 Interactive Snippet views + 13 AppEnum pickers); workflow-first AppShortcuts ship by default, while `AskAirMCPIntent` is a FoundationModels preview gated behind `AIRMCP_ENABLE_FOUNDATION_MODELS`
 - **32 prompts + 14 YAML skill built-ins** — per-app workflows + cross-module + developer workflows + Skills DSL (`inputs` / `parallel` / `loop` / `on_error` / `retry` / 9 event triggers)
 - **9 MCP resources** — Notes, Calendar, Reminders, Music, Mail, System, Context Memory + unified `context://snapshot/{depth}`
 - **3 interactive MCP Apps** — `calendar_week_view`, `music_player`, `timeline_today` (fuses events + reminders on one day-axis)
 - **9 event triggers** — calendar, reminders, pasteboard, mail unread, focus mode, now playing, file modified, screen locked/unlocked — skills bind to any of these for automation
 - **Safety first** — HITL approval + audit log + rate limit (60/min + 10 destructive/hr) + emergency stop file + `allowNetwork` inbound HTTP exposure policy (RFC 0002)
 - **OAuth 2.1 + Resource Indicators** — RFC 0005 Steps 1+2: `with-oauth*` inbound HTTP policy, JWT verification (RS256/ES256 only, 60s clock tolerance), scope gate (`mcp:read` / `mcp:write` / `mcp:destructive` / `mcp:admin`), `.well-known/oauth-protected-resource` per RFC 9728, zero-interaction local dev via `npm run dev:oauth`. Browser MCP clients: see **[docs/oauth-browser-pkce.md](docs/oauth-browser-pkce.md)** for the Authorization Code + PKCE setup
-- **Sessionless discovery** — `.well-known/mcp.json` publishes the full tool + module inventory, network policy, allowed origins, and authorization mode so registry crawlers (Anthropic MCP Registry, Smithery, PulseMCP, Glama) catalog AirMCP without opening a session
+- **Sessionless discovery** — `.well-known/mcp.json` publishes the active advertised tool surface, enabled module inventory, network policy, allowed origins, and authorization mode so registry crawlers (Anthropic MCP Registry, Smithery, PulseMCP, Glama) catalog AirMCP without opening a session
 - **JXA + Swift 6.2 bridge** — JXA for basic automation, Swift 6 strict concurrency with EventKit/PhotoKit/HealthKit/Vision, plus opt-in FoundationModels previews
 - **Apple Intelligence preview** — On-device summarize / rewrite / proofread / `ai_agent` / `ai_plan_metrics` (planner regression catcher) via Foundation Models. This path is macOS 26+ / Apple Silicon and compile-time opt-in (`AIRMCP_ENABLE_FOUNDATION_MODELS`). WWDC 2026 made the model layer officially pluggable: Foundation Models gained a `LanguageModel` protocol where on-device, Private Cloud Compute, and third-party cloud models back the same session API — Anthropic and Google publish Swift packages for their frontier models ([WWDC26 session 241](https://developer.apple.com/videos/play/wwdc2026/241/), first-party). Apple's own announcement names no Siri backbone vendor — the widely reported Gemini deal is press reporting, not Apple's wording — and AirMCP doesn't bet on one either way: the governance layer (sensitive-action HITL, HMAC-chained audit, scope gate, rate limits) is model-agnostic, and the brains stay in whatever MCP client you connect.
 - **Context memory** — `memory_put`/`query`/`forget`/`stats` + `memory://recent` resource for facts/entities/episodes, surviving restarts
@@ -66,6 +67,14 @@ npx airmcp init
 ```
 
 Picks the modules to enable, writes the MCP-client config, saves preferences to `~/.config/airmcp/config.json`.
+
+Non-interactive setup:
+
+```bash
+npx airmcp init --profile starter --yes
+npx airmcp init --profile communications-safe --yes
+npx airmcp init --profile productivity --yes
+```
 
 **3. Restart your MCP client.** Your AI can now read notes, manage reminders, check your calendar, and more.
 
@@ -146,19 +155,19 @@ These are the first-class use cases. The full tool catalog stays available when 
 
 **Is**: the governed action layer for AI on Apple. Siri can understand the request; AirMCP gives it hands, memory, workflows, and guardrails. External MCP agents use the same runtime through stdio or HTTP. When Apple ships more native action APIs, AirMCP can delegate lower-level app calls to the OS while keeping the orchestration and governance layer above.
 
-**Isn't**: a thin per-app wrapper. The distinctive thing is *integrated depth* — 286 tools + Swift bridge + Skills DSL + production-grade safety primitives + Google Workspace + iOS AppIntents in one auditable open-source codebase, with the governance layer (sensitive-action HITL, HMAC-chained audit, scope gate, rate limit) as the load-bearing part, not the tool count.
+**Isn't**: a thin per-app wrapper. The distinctive thing is *integrated depth* — 289 tools + Swift bridge + Skills DSL + production-grade safety primitives + Google Workspace + iOS AppIntents in one auditable open-source codebase, with the governance layer (sensitive-action HITL, HMAC-chained audit, scope gate, rate limit) as the load-bearing part, not the tool count.
 
 ### Integrated depth
 
 The point is the combination in one auditable codebase, not any single capability:
 
-- **286 tools across 29 modules** — Apple app CRUD + system control + Apple Intelligence + iWork + Google Workspace + dynamic Shortcuts.
+- **289 tools across 29 modules** — Apple app CRUD + system control + Apple Intelligence + iWork + Google Workspace + dynamic Shortcuts.
 - **Skills DSL workflow engine** — `parallel` / `loop` / `on_error` / `retry` / 9 event triggers.
 - **Semantic memory** — Gemini + on-device Swift embeddings, persistent across restarts.
 - **Production safety primitives** — HITL for destructive and other configured sensitive actions, HMAC-chained audit log (tamper-detection asserted in `tests/audit-tamper-detection.test.js`), rate limiting, emergency stop, OAuth 2.1 + Resource Indicators (RS256/ES256 JWT + RFC 8707 audience + RFC 9728 PRM + DPoP advertisement). DPoP is advertised in the `.well-known` card, not enforced — `dpop_bound_access_tokens_required: false`; tokens are not yet bound to a proof.
 - **Input validation** — Zod on every tool + outputSchema on reads + script↔schema contract tests.
 - **Native Swift API depth** — direct EventKit / HealthKit / PhotoKit / Vision, plus opt-in Foundation Models preview builds; not an `osascript` wrapper.
-- **iOS surface** — 228 auto-generated AppIntents + AppShortcutsProvider (RFC 0007); `AskAirMCPIntent` is present only in `AIRMCP_ENABLE_FOUNDATION_MODELS` builds on iOS 26+/macOS 26+.
+- **iOS surface** — 230 auto-generated AppIntents + AppShortcutsProvider (RFC 0007); `AskAirMCPIntent` is present only in `AIRMCP_ENABLE_FOUNDATION_MODELS` builds on iOS 26+/macOS 26+.
 - **9-language i18n**, **multi-client** (any MCP-capable AI), **open source** (every line auditable, modifiable, forkable).
 
 ### Why this position holds
@@ -214,7 +223,7 @@ User-authored skills land in `~/.config/airmcp/skills/*.yaml` and hot-reload.
 
 ## Safety & Operations
 
-AirMCP runs with access to 286 tools on your machine. A few layers keep a buggy agent plan from turning into an incident:
+AirMCP can register up to 289 tools on your machine. The default starter/progressive surface exposes only a small front door, and these layers keep a buggy agent plan from turning into an incident:
 
 - **HITL approval** — at the default level, every sensitive or destructive tool prompts before firing (via MCP Elicitation or a Unix socket fallback). Per-call, per-scope.
 - **Rate limit** — 60 tool calls/minute globally, 10 destructive/hour. Token-bucket so bursts are fine; sustained rate isn't.
@@ -227,12 +236,12 @@ AirMCP runs with access to 286 tools on your machine. A few layers keep a buggy 
 
 ## Siri · Shortcuts · Spotlight (iOS 17+ / macOS 14+)
 
-AirMCP's tools auto-register as Apple App Intents — **228 generated intents** across read + non-destructive write surfaces (RFC 0007 Phase A). Destructive intents are env-gated (`AIRMCP_APPINTENTS_DESTRUCTIVE=true` opt-in). Anything that speaks the Intents system — Siri, Shortcuts, Spotlight, the Action Button, Widgets — calls them directly without opening the app.
+AirMCP's tools auto-register as Apple App Intents — **230 generated intents** across read + non-destructive write surfaces (RFC 0007 Phase A). Destructive intents are env-gated (`AIRMCP_APPINTENTS_DESTRUCTIVE=true` opt-in). Anything that speaks the Intents system — Siri, Shortcuts, Spotlight, the Action Button, Widgets — calls them directly without opening the app.
 
 - **Workflow-first Siri phrases** ship out of the box via `AppShortcutsProvider` (codegen'd from the MCP tool manifest). The default provider uses nine workflow/read shortcuts; the optional `Ask AirMCP` natural-language shortcut is compiled separately when FoundationModels are enabled.
 - **Shortcuts app**: every AirMCP tool appears as an action with typed parameters.
 - **iOS 26 "Use Model"**: autonomously picks AirMCP tools as tool-call targets.
-- **Interactive Snippets** (iOS 26+): 82 typed tools render SwiftUI result views inline in Shortcuts/Siri/Spotlight.
+- **Interactive Snippets** (iOS 26+): 81 typed tools render SwiftUI result views inline in Shortcuts/Siri/Spotlight.
 - **"Ask AirMCP" preview** (iOS 26+/macOS 26+, opt-in build): natural-language agent routed to Apple's on-device Foundation Models with AirMCP tools registered. 100% on-device, but not part of the default Swift build.
 
 See [docs/shortcuts.md](docs/shortcuts.md) for the full guide + [RFC 0007](docs/rfc/0007-app-intent-bridge.md) for the architecture.
@@ -395,7 +404,7 @@ npx airmcp --http --bind-all --port 3847
 curl http://127.0.0.1:3847/.well-known/mcp.json
 ```
 
-The response includes `"network_policy": "with-token+origin"` so the client can confirm what it's connecting to before a single tool call. Registry crawlers (Anthropic MCP Registry, Smithery, PulseMCP, Glama) use the same endpoint to build their catalog without connecting live — it carries the full tool inventory (`tools.count`, `tools.names`), enabled modules, license, and homepage, so a crawler can surface "AirMCP: 286 tools across calendar, notes, mail, …" without opening a session. MCP spec version pinned via `schema_version: "2025-11-25"`. When the policy is `with-oauth*`, a sibling `/.well-known/oauth-protected-resource` endpoint (RFC 9728) advertises the authorization server + audience + supported scopes so conforming clients can negotiate OAuth before the first MCP call.
+The response includes `"network_policy": "with-token+origin"` so the client can confirm what it's connecting to before a single tool call. Registry crawlers (Anthropic MCP Registry, Smithery, PulseMCP, Glama) use the same endpoint to build their catalog without connecting live — it carries the full tool inventory (`tools.count`, `tools.names`), enabled modules, license, and homepage, so a crawler can surface "AirMCP: 289 tools across calendar, notes, mail, …" without opening a session. MCP spec version pinned via `schema_version: "2025-11-25"`. When the policy is `with-oauth*`, a sibling `/.well-known/oauth-protected-resource` endpoint (RFC 9728) advertises the authorization server + audience + supported scopes so conforming clients can negotiate OAuth before the first MCP call.
 
 Running AirMCP on a laptop that suspends? Put the menubar app on your Mac Mini / always-on host, point the browser at that hostname, and leave the token in Chrome's secure storage. Revoke by rotating `AIRMCP_HTTP_TOKEN` and restarting the server.
 
@@ -889,7 +898,8 @@ Or edit `~/.config/airmcp/config.json` directly:
 | `AIRMCP_ALLOW_SEND_MESSAGES` | `false`                      | Allow sending iMessages (opt-in)                             |
 | `AIRMCP_ALLOW_SEND_MAIL`     | `false`                      | Allow sending emails (opt-in)                                |
 | `AIRMCP_FULL`                | `false`                      | Enable all standard 29 modules (profile-only modules stay opt-in) |
-| `AIRMCP_PROFILE`             | —                            | Comma-separated experimental profiles/modules to opt into (e.g. `spatial_prep`) |
+| `AIRMCP_PROFILE`             | `starter`                    | Module profile: `starter`, `communications-safe`, `productivity`, `full`; can also include opt-in modules such as `spatial_prep` |
+| `AIRMCP_TOOL_EXPOSURE`       | profile-dependent            | `progressive` exposes a small front door, `profile` exposes the selected profile, `full` exposes every loaded tool |
 | `AIRMCP_ENABLE_SPATIAL_PREP` | `false`                      | Enable the experimental read-only spatial asset prep tools    |
 | `AIRMCP_DISABLE_{MODULE}`    | —                            | Disable a specific module (e.g. `AIRMCP_DISABLE_MUSIC=true`) |
 | `GEMINI_API_KEY`             | —                            | Google Gemini API key for cloud embeddings (optional)        |
@@ -984,7 +994,7 @@ Modules with OS requirements (e.g., Intelligence requires macOS 26+) are automat
 - **Input sanitization** — `open_url` and `add_to_reading_list` reject non-`http(s)` URL schemes and SSRF-style destinations (loopback, RFC1918, link-local / cloud-metadata) via `validateExternalHttpUrl`. `run_javascript` is off unless explicitly enabled (`AIRMCP_ALLOW_RUN_JAVASCRIPT`) and returns its output as untrusted content. `escJxaShell`/`escAS` strip control characters from shell/AppleScript arguments.
 - **Read data exposure** — At the default `sensitive-only` HITL level, destructive operations and privacy-sensitive reads (incl. mail/messages/contacts content, clipboard, health, precise location) require per-call HITL approval; only non-sensitive reads run without a prompt. When connected to cloud LLMs, returned data passes through the LLM provider. Mitigations: PII scrubbing in logs, pagination limits, sensitive modules (mail, messages) require explicit opt-in.
 - **IPC overhead** — Multi-process path (Client → Node.js → osascript/Swift CLI → macOS app). Each JXA call adds ~50ms overhead. Pagination prevents bulk data transfers. Swift bridge path bypasses JXA for EventKit/PhotoKit operations.
-- **Scope** — 286 tools across 29 modules follow 5 repeating patterns (JXA CRUD, Swift bridge, HTTP API, System Events, CLI wrapper), keeping maintenance proportional to pattern count, not tool count.
+- **Scope** — 289 tools across 29 modules follow 5 repeating patterns (JXA CRUD, Swift bridge, HTTP API, System Events, CLI wrapper), keeping maintenance proportional to pattern count, not tool count.
 
 ### Location & Bluetooth
 

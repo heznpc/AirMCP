@@ -1,13 +1,13 @@
 {
   "generatedAt": "STABLE_PLACEHOLDER",
   "protocolVersion": "2025-06-18",
-  "toolCount": 286,
-  "eligibleCount": 281,
-  "ineligibleCount": 5,
+  "toolCount": 289,
+  "eligibleCount": 283,
+  "ineligibleCount": 6,
   "ineligibleByReason": {
     "object-param:recurrence": 2,
     "object-param:schema": 1,
-    "object-param:args": 1,
+    "object-param:args": 2,
     "object-param:params": 1
   },
   "tools": [
@@ -6603,6 +6603,73 @@
       "ineligibleReason": null
     },
     {
+      "name": "list_profiles",
+      "title": "List Profiles",
+      "description": "List AirMCP runtime profiles. Profiles choose which modules load; toolExposure chooses how much of that surface appears in tools/list.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {}
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "profiles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "modules": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "defaultToolExposure": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "description",
+                "modules",
+                "defaultToolExposure"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "active": {
+            "type": "string"
+          },
+          "toolExposure": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "profiles",
+          "active",
+          "toolExposure"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "sensitiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "appIntentEligible": true,
+      "ineligibleReason": null
+    },
+    {
       "name": "list_reading_list",
       "title": "List Reading List",
       "description": "List all items in Safari's Reading List.",
@@ -9133,6 +9200,71 @@
       "ineligibleReason": null
     },
     {
+      "name": "profile_status",
+      "title": "Profile Status",
+      "description": "Show the active AirMCP profile, module set, tool exposure mode, exposed tool count, and total registered tool count.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {}
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "string"
+          },
+          "toolExposure": {
+            "type": "string"
+          },
+          "modulesEnabled": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "modulesDisabled": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "toolsExposed": {
+            "type": "number"
+          },
+          "toolsRegistered": {
+            "type": "number"
+          },
+          "frontDoorTools": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "profile",
+          "toolExposure",
+          "modulesEnabled",
+          "modulesDisabled",
+          "toolsExposed",
+          "toolsRegistered",
+          "frontDoorTools"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "sensitiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "appIntentEligible": true,
+      "ineligibleReason": null
+    },
+    {
       "name": "proofread_text",
       "title": "Proofread Text",
       "description": "Proofread and correct grammar/spelling using Apple Intelligence (on-device Foundation Models). Requires macOS 26+ with Apple Silicon.",
@@ -10442,6 +10574,44 @@
       },
       "appIntentEligible": true,
       "ineligibleReason": null
+    },
+    {
+      "name": "run_tool",
+      "title": "Run Tool",
+      "description": "Run an AirMCP tool by name with JSON arguments. Use discover_tools first when the tool is not visible in tools/list.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Registered tool name to run"
+          },
+          "args": {
+            "description": "Tool arguments as a JSON object",
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "outputSchema": null,
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "sensitiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "appIntentEligible": false,
+      "ineligibleReason": "object-param:args"
     },
     {
       "name": "scan_bluetooth",

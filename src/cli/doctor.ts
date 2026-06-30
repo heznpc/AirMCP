@@ -131,7 +131,7 @@ export async function runDoctor(): Promise<void> {
       meh("Config file", `${PATHS.CONFIG} (parse error)`);
     }
   } else {
-    meh("Config file", `Not found — using starter preset`);
+    meh("Config file", `Not found — using starter profile`);
   }
 
   // ── MCP Clients ────────────────────────────────────────────────────

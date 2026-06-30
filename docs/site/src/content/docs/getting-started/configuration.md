@@ -54,7 +54,9 @@ The default config file location is `~/.config/airmcp/config.json`. You can over
 | Variable | Description |
 |----------|-------------|
 | `AIRMCP_FULL=true` | Enable all standard 29 modules (profile-only modules stay opt-in) |
-| `AIRMCP_PROFILE=spatial_prep` | Enable an experimental profile-only module |
+| `AIRMCP_PROFILE=starter` | Select a module profile: `starter`, `communications-safe`, `productivity`, or `full` |
+| `AIRMCP_TOOL_EXPOSURE=progressive` | Keep `tools/list` thin; use `profile` or `full` to expose more tools |
+| `AIRMCP_PROFILE=spatial_prep` | Enable an experimental profile-only module in addition to the selected profile |
 | `AIRMCP_ENABLE_SPATIAL_PREP=true` | Enable the experimental read-only spatial asset prep tools |
 | `AIRMCP_DISABLE_<MODULE>=true` | Disable a specific module (e.g. `AIRMCP_DISABLE_TV=true`) |
 | `AIRMCP_CONFIG_PATH` | Override config file path (default: `~/.config/airmcp/config.json`) |
@@ -157,7 +159,7 @@ Using `--bind-all` without `AIRMCP_HTTP_TOKEN` is rejected at startup. Use `AIRM
 
 ## Starter Modules
 
-When no `config.json` exists and `--full` is not used, AirMCP enables a curated starter set:
+When no `config.json` exists and `--full` is not used, AirMCP enables the curated `starter` profile and progressive tool exposure:
 
 - **Notes** -- read, create, update, delete notes and folders
 - **Reminders** -- manage tasks and reminder lists
@@ -167,6 +169,6 @@ When no `config.json` exists and `--full` is not used, AirMCP enables a curated 
 - **Finder** -- file search, directory listing, file operations
 - **Weather** -- current conditions and forecasts
 
-All other standard modules are disabled by default. Use `npx airmcp init` to customize, or pass `--full` to enable the standard 29-module surface.
+All other standard modules are disabled by default. Use `npx airmcp init`, `AIRMCP_PROFILE=communications-safe|productivity|full`, or `--full` to customize. Use `AIRMCP_TOOL_EXPOSURE=profile|full` when a client should see more than the progressive front door.
 
 Experimental profile-only modules, such as `spatial_prep`, stay disabled even with `--full`. Enable them explicitly with `AIRMCP_PROFILE=spatial_prep` or `AIRMCP_ENABLE_SPATIAL_PREP=true`.

@@ -122,12 +122,17 @@ jest.unstable_mockModule('../dist/shared/hitl.js', () => ({
 const toolRegistryEvents = [];
 let toolRegistryInstalled = false;
 jest.unstable_mockModule('../dist/shared/tool-registry.js', () => ({
+  ToolInputValidationError: class ToolInputValidationError extends Error {},
   toolRegistry: {
     installOn: jest.fn((_server) => {
       toolRegistryInstalled = true;
       toolRegistryEvents.push({ kind: 'install', t: Date.now() });
     }),
+    configureExposure: jest.fn(),
+    pruneStaleRegistrations: jest.fn(),
     getToolCount: () => 0,
+    getExposedToolCount: () => 0,
+    getExposedToolNames: () => [],
     getPromptCount: () => 0,
     getToolNames: () => [],
     searchTools: () => [],
@@ -177,7 +182,24 @@ jest.unstable_mockModule('../dist/shared/share-guard.js', () => ({
 // config — return a benign default config (every module enabled).
 jest.unstable_mockModule('../dist/shared/config.js', () => ({
   NPM_PACKAGE_NAME: 'airmcp',
+  FRONT_DOOR_TOOLS: ['profile_status', 'list_profiles', 'discover_tools', 'run_tool', 'get_workflow'],
+  PROFILE_NAMES: ['starter', 'communications-safe', 'productivity', 'full'],
+  PROFILE_DESCRIPTIONS: {
+    starter: 'Starter',
+    'communications-safe': 'Communications Safe',
+    productivity: 'Productivity',
+    full: 'Full',
+  },
+  PROFILE_MODULES: {
+    starter: ['notes'],
+    'communications-safe': ['notes', 'mail', 'messages'],
+    productivity: ['notes', 'pages', 'numbers', 'keynote'],
+    full: ['notes', 'calendar', 'finder'],
+  },
   parseConfig: jest.fn(() => ({
+    profile: 'starter',
+    toolExposure: 'profile',
+    progressiveTools: new Set(['profile_status', 'list_profiles', 'discover_tools', 'run_tool']),
     hitl: { level: 'off' },
     allowSendMail: false,
     allowSendMessages: false,
@@ -206,6 +228,9 @@ function mkPkg() {
 }
 function mkConfig() {
   return {
+    profile: 'starter',
+    toolExposure: 'profile',
+    progressiveTools: new Set(['profile_status', 'list_profiles', 'discover_tools', 'run_tool']),
     hitl: { level: 'off' },
     allowSendMail: false,
     allowSendMessages: false,

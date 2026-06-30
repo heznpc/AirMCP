@@ -8,6 +8,7 @@ export interface AppRuntimeProbeOptions {
   clientVersion?: string;
   timeoutMs?: number;
   minTools?: number;
+  requiredTools?: string[];
 }
 
 export interface AppRuntimeProbeResult {
@@ -41,6 +42,11 @@ export async function probeAppRuntimeMcp(options: AppRuntimeProbeOptions): Promi
     const toolCount = tools.tools.length;
     if (toolCount < minTools) {
       throw new Error(`tools/list returned ${toolCount} tools; expected at least ${minTools}`);
+    }
+    const toolNames = new Set(tools.tools.map((tool) => tool.name));
+    const missing = (options.requiredTools ?? []).filter((name) => !toolNames.has(name));
+    if (missing.length > 0) {
+      throw new Error(`tools/list missing required tools: ${missing.join(", ")}`);
     }
     const serverVersion = client.getServerVersion();
     return {

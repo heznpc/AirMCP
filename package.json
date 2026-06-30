@@ -1,7 +1,7 @@
 {
   "name": "airmcp",
-  "version": "2.13.0",
-  "description": "MCP server for the entire Apple ecosystem — Notes, Reminders, Calendar, Contacts, Mail, Messages, Music, Finder, Safari, System, Photos, Shortcuts, Apple Intelligence, TV, Screen Capture, Maps, and Podcasts. Connect any AI to your Mac.",
+  "version": "2.14.0",
+  "description": "Approval-gated local action runtime for Apple workspaces, with profile-based modules, progressive MCP tool exposure, audit logs, HITL approval, and Mac app automation.",
   "keywords": [
     "mcp",
     "model-context-protocol",
@@ -83,6 +83,7 @@
     "smoke": "node scripts/smoke-mcp.mjs",
     "premcp:validate": "npm run build",
     "mcp:validate": "node scripts/mcp-validate.mjs",
+    "profiles:check": "node scripts/verify-profiles.mjs",
     "verify:package": "node scripts/verify-published-package.mjs",
     "release:preflight": "node scripts/release-preflight.mjs",
     "build:mcpb": "node scripts/build-mcpb.mjs",

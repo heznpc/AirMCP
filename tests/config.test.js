@@ -1,4 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   MODULE_NAMES,
   KNOWN_MODULE_NAMES,
@@ -27,6 +30,7 @@ const ENV_KEYS = [
   'AIRMCP_PROACTIVE_CONTEXT',
   'AIRMCP_TELEMETRY',
   'AIRMCP_PROFILE',
+  'AIRMCP_TOOL_EXPOSURE',
   ...KNOWN_MODULE_NAMES.map((m) => `AIRMCP_DISABLE_${m.toUpperCase()}`),
   ...OPT_IN_MODULE_NAMES.map((m) => `AIRMCP_ENABLE_${m.toUpperCase()}`),
 ];
@@ -125,6 +129,8 @@ describe('parseConfig() — defaults with no config file', () => {
 
   test('with no env vars and no config file, uses starter preset', () => {
     const cfg = parseConfig();
+    expect(cfg.profile).toBe('starter');
+    expect(cfg.toolExposure).toBe('progressive');
 
     // Starter modules should be enabled
     for (const mod of STARTER_MODULES) {
@@ -186,6 +192,8 @@ describe('parseConfig() — environment variable overrides', () => {
   test('with AIRMCP_FULL=true, all modules are enabled', () => {
     process.env.AIRMCP_FULL = 'true';
     const cfg = parseConfig();
+    expect(cfg.profile).toBe('full');
+    expect(cfg.toolExposure).toBe('full');
 
     for (const mod of MODULE_NAMES) {
       expect(cfg.disabledModules.has(mod)).toBe(false);
@@ -281,6 +289,7 @@ describe('parseConfig() — module enable/disable logic', () => {
   test('AIRMCP_FULL=true enables all modules regardless of starter status', () => {
     process.env.AIRMCP_FULL = 'true';
     const cfg = parseConfig();
+    expect(cfg.profile).toBe('full');
     for (const mod of MODULE_NAMES) {
       expect(cfg.disabledModules.has(mod)).toBe(false);
     }
@@ -305,7 +314,38 @@ describe('parseConfig() — module enable/disable logic', () => {
   test('AIRMCP_PROFILE=spatial_prep enables the spatial prep module', () => {
     process.env.AIRMCP_PROFILE = 'spatial_prep';
     const cfg = parseConfig();
+    expect(cfg.profile).toBe('starter');
     expect(isModuleEnabled(cfg, 'spatial_prep')).toBe(true);
+  });
+
+  test('AIRMCP_PROFILE=productivity enables productivity profile modules', () => {
+    process.env.AIRMCP_PROFILE = 'productivity';
+    const cfg = parseConfig();
+    expect(cfg.profile).toBe('productivity');
+    expect(cfg.toolExposure).toBe('profile');
+    expect(isModuleEnabled(cfg, 'mail')).toBe(true);
+    expect(isModuleEnabled(cfg, 'messages')).toBe(true);
+    expect(isModuleEnabled(cfg, 'pages')).toBe(true);
+    expect(isModuleEnabled(cfg, 'music')).toBe(false);
+  });
+
+  test('AIRMCP_PROFILE=communications_safe accepts underscore alias and keeps send defaults off', () => {
+    process.env.AIRMCP_PROFILE = 'communications_safe';
+    const cfg = parseConfig();
+    expect(cfg.profile).toBe('communications-safe');
+    expect(cfg.toolExposure).toBe('progressive');
+    expect(isModuleEnabled(cfg, 'mail')).toBe(true);
+    expect(isModuleEnabled(cfg, 'messages')).toBe(true);
+    expect(cfg.allowSendMail).toBe(false);
+    expect(cfg.allowSendMessages).toBe(false);
+  });
+
+  test('AIRMCP_TOOL_EXPOSURE overrides the profile default', () => {
+    process.env.AIRMCP_PROFILE = 'starter';
+    process.env.AIRMCP_TOOL_EXPOSURE = 'full';
+    const cfg = parseConfig();
+    expect(cfg.profile).toBe('starter');
+    expect(cfg.toolExposure).toBe('full');
   });
 
   test('AIRMCP_ENABLE_SPATIAL_PREP=true enables the spatial prep module', () => {
@@ -319,6 +359,21 @@ describe('parseConfig() — module enable/disable logic', () => {
     process.env.AIRMCP_DISABLE_SPATIAL_PREP = 'true';
     const cfg = parseConfig();
     expect(isModuleEnabled(cfg, 'spatial_prep')).toBe(false);
+  });
+
+  test('invalid profile in config falls back to starter instead of legacy custom', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'airmcp-config-'));
+    try {
+      PATHS.CONFIG = join(dir, 'config.json');
+      writeFileSync(PATHS.CONFIG, JSON.stringify({ profile: 'prodcutivity' }), 'utf8');
+
+      const cfg = parseConfig();
+      expect(cfg.profile).toBe('starter');
+      expect(isModuleEnabled(cfg, 'notes')).toBe(true);
+      expect(isModuleEnabled(cfg, 'mail')).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

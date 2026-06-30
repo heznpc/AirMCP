@@ -25,6 +25,7 @@ import { assertTestMode } from "./errors.js";
 import { checkRateLimit } from "./rate-limit.js";
 import { getOAuthClaims, getRequestContext, runWithRequestContext, getActor } from "./request-context.js";
 import { randomUUID } from "node:crypto";
+import { z } from "zod";
 import { evaluateScopeGate } from "./oauth-scope.js";
 
 /** Threshold in characters above which we auto-attach a result size hint. */
@@ -45,7 +46,10 @@ function autoSizeHint(result: unknown): unknown {
 
 interface RegisteredToolEntry {
   handler: AnyFn;
+  generation: number;
+  inputSchema?: unknown;
   enabled: boolean;
+  exposed: boolean;
   title?: string;
   description?: string;
   titleLower?: string;
@@ -66,22 +70,57 @@ export interface ToolInfo {
   description?: string;
 }
 
+export interface ToolExposurePolicy {
+  mode: "full" | "profile" | "progressive";
+  exposedToolNames?: Set<string>;
+}
+
 interface RegisteredPromptEntry {
   callback: AnyFn;
+  generation: number;
+}
+
+export class ToolInputValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ToolInputValidationError";
+  }
 }
 
 class ToolRegistry {
   private tools = new Map<string, RegisteredToolEntry>();
   private prompts = new Map<string, RegisteredPromptEntry>();
+  private exposurePolicy: ToolExposurePolicy = { mode: "full" };
+  private registrationGeneration = 0;
   // ── Tool accessors ──────────────────────────────────────────────
 
   getToolCount(): number {
     return this.tools.size;
   }
 
+  getExposedToolCount(): number {
+    return this.getExposedToolNames().length;
+  }
+
   /** Get all tool names. */
   getToolNames(): string[] {
     return [...this.tools.keys()];
+  }
+
+  /** Get tool names currently advertised through the MCP SDK tools/list surface. */
+  getExposedToolNames(): string[] {
+    return [...this.tools.entries()].filter(([, entry]) => entry.enabled && entry.exposed).map(([name]) => name);
+  }
+
+  getExposureMode(): ToolExposurePolicy["mode"] {
+    return this.exposurePolicy.mode;
+  }
+
+  configureExposure(policy: ToolExposurePolicy): void {
+    this.exposurePolicy = {
+      mode: policy.mode,
+      exposedToolNames: policy.exposedToolNames ? new Set(policy.exposedToolNames) : undefined,
+    };
   }
 
   /** Search tools by query string (substring match on name, title, description). */
@@ -137,7 +176,8 @@ class ToolRegistry {
     const tool = this.tools.get(name);
     if (!tool) throw new Error(`Tool "${name}" not found`);
     if (!tool.enabled) throw new Error(`Tool "${name}" is disabled`);
-    const raw = (await tool.handler(args, {})) as {
+    const validatedArgs = validateToolArgs(name, tool.inputSchema, args);
+    const raw = (await tool.handler(validatedArgs, {})) as {
       content?: Array<{ type: string; text: string }>;
       isError?: boolean;
       structuredContent?: unknown;
@@ -189,8 +229,26 @@ class ToolRegistry {
       this.tools.clear();
       this.prompts.clear();
     }
-    this.interceptToolRegistration(server);
-    this.interceptPromptRegistration(server);
+    this.registrationGeneration += 1;
+    const generation = this.registrationGeneration;
+    this.interceptToolRegistration(server, generation);
+    this.interceptPromptRegistration(server, generation);
+  }
+
+  /**
+   * Remove registrations from older server generations. HTTP warmup can
+   * construct a new server with a narrower profile while the singleton still
+   * contains the previous session's wider registry; pruning after all modules
+   * register keeps discovery/call_tool aligned with the active profile without
+   * creating an empty-registry race window during startup.
+   */
+  pruneStaleRegistrations(): void {
+    for (const [name, entry] of this.tools) {
+      if (entry.generation !== this.registrationGeneration) this.tools.delete(name);
+    }
+    for (const [name, entry] of this.prompts) {
+      if (entry.generation !== this.registrationGeneration) this.prompts.delete(name);
+    }
   }
 
   /**
@@ -202,6 +260,8 @@ class ToolRegistry {
     assertTestMode("ToolRegistry.reset()");
     this.tools.clear();
     this.prompts.clear();
+    this.exposurePolicy = { mode: "full" };
+    this.registrationGeneration = 0;
   }
 
   /**
@@ -229,9 +289,13 @@ class ToolRegistry {
     return lastArg as AnyFn;
   }
 
-  private interceptToolRegistration(server: McpServer): void {
+  private interceptToolRegistration(server: McpServer, generation: number): void {
     const origRegisterTool = server.registerTool.bind(server);
     const tools = this.tools;
+    const shouldExposeTool = (name: string): boolean => {
+      if (this.exposurePolicy.mode !== "progressive") return true;
+      return this.exposurePolicy.exposedToolNames?.has(name) === true;
+    };
 
     const wrapHandler = (name: string, handler: AnyFn): AnyFn => {
       return (async (...args: unknown[]) => {
@@ -364,17 +428,22 @@ class ToolRegistry {
       const config = hasConfig ? (rest[0] as Record<string, unknown>) : {};
       const title = config.title as string | undefined;
       const fullDescription = config.description as string | undefined;
+      const inputSchema = config.inputSchema;
+      const exposed = shouldExposeTool(name);
       // Compact mode: shorten descriptions sent to clients via SDK
-      if (fullDescription) {
+      if (exposed && fullDescription) {
         config.description = compactDescription(fullDescription);
       }
-      const result = (origRegisterTool as AnyFn)(name, ...rest);
+      const result = exposed ? (origRegisterTool as AnyFn)(name, ...rest) : undefined;
       // Store FULL description in registry for discover_tools / semantic search
       const annotations = (config as { annotations?: { destructiveHint?: boolean; readOnlyHint?: boolean } })
         .annotations;
       tools.set(name, {
         handler: wrapped,
+        generation,
+        inputSchema,
         enabled: true,
+        exposed,
         title,
         description: fullDescription,
         titleLower: title?.toLowerCase(),
@@ -393,15 +462,20 @@ class ToolRegistry {
       rest[rest.length - 1] = wrapped;
       // Legacy tool() — description is the 2nd arg if it's a string
       const fullDesc = typeof rest[0] === "string" ? rest[0] : undefined;
+      const inputSchema = typeof rest[0] === "string" ? rest[1] : rest[0];
+      const exposed = shouldExposeTool(name);
       // Compact mode: shorten description sent to clients via SDK
-      if (fullDesc) {
+      if (exposed && fullDesc) {
         rest[0] = compactDescription(fullDesc);
       }
-      const result = (origTool as AnyFn)(name, ...rest);
+      const result = exposed ? (origTool as AnyFn)(name, ...rest) : undefined;
       // Store FULL description in registry for discover_tools / semantic search
       tools.set(name, {
         handler: wrapped,
+        generation,
+        inputSchema,
         enabled: true,
+        exposed,
         description: fullDesc,
         descriptionLower: fullDesc?.toLowerCase(),
       });
@@ -409,14 +483,14 @@ class ToolRegistry {
     }) as typeof server.tool;
   }
 
-  private interceptPromptRegistration(server: McpServer): void {
+  private interceptPromptRegistration(server: McpServer, generation: number): void {
     const origRegisterPrompt = server.registerPrompt.bind(server);
     const prompts = this.prompts;
     server.registerPrompt = ((name: string, ...rest: unknown[]) => {
       const cb = this.validateCallback("registerPrompt", "Prompt", name, rest, origRegisterPrompt as AnyFn);
       if (!cb) return;
       const result = (origRegisterPrompt as AnyFn)(name, ...rest);
-      prompts.set(name, { callback: cb });
+      prompts.set(name, { callback: cb, generation });
       return result;
     }) as typeof server.registerPrompt;
 
@@ -425,10 +499,60 @@ class ToolRegistry {
       const cb = this.validateCallback("prompt", "Prompt", name, rest, origPrompt as AnyFn);
       if (!cb) return;
       const result = (origPrompt as AnyFn)(name, ...rest);
-      prompts.set(name, { callback: cb });
+      prompts.set(name, { callback: cb, generation });
       return result;
     }) as typeof server.prompt;
   }
+}
+
+interface SafeParseSchema {
+  safeParse(input: unknown): { success: true; data: unknown } | { success: false; error: unknown };
+}
+
+function isSafeParseSchema(value: unknown): value is SafeParseSchema {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    "safeParse" in value &&
+    typeof (value as { safeParse?: unknown }).safeParse === "function"
+  );
+}
+
+function isZodRawShape(value: unknown): value is z.ZodRawShape {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  return Object.values(value).every(isSafeParseSchema);
+}
+
+function formatValidationIssues(error: unknown): string {
+  const issues = (error as { issues?: Array<{ path?: Array<string | number>; message?: string }> }).issues;
+  if (!Array.isArray(issues) || issues.length === 0) return String(error);
+  return issues
+    .map((issue) => {
+      const path = issue.path && issue.path.length > 0 ? issue.path.join(".") : "arguments";
+      return `${path}: ${issue.message ?? "invalid value"}`;
+    })
+    .join("; ");
+}
+
+function coerceValidatedObject(value: unknown): Record<string, unknown> {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  return {};
+}
+
+function validateToolArgs(name: string, inputSchema: unknown, args: Record<string, unknown>): Record<string, unknown> {
+  if (isZodRawShape(inputSchema) && Object.keys(inputSchema).length === 0) return args;
+  const schema = isSafeParseSchema(inputSchema)
+    ? inputSchema
+    : isZodRawShape(inputSchema)
+      ? z.object(inputSchema)
+      : null;
+  if (!schema) return args;
+
+  const parsed = schema.safeParse(args);
+  if (parsed.success) return coerceValidatedObject(parsed.data);
+  throw new ToolInputValidationError(`Invalid arguments for tool "${name}": ${formatValidationIssues(parsed.error)}`);
 }
 
 /** Singleton registry instance — shared across the process. */

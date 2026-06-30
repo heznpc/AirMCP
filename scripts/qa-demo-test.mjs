@@ -243,7 +243,7 @@ async function runDemo() {
 
   await step("AI status", "ai_status", {}, { log: true });
   await step("Summarize text", "summarize_text", {
-    text: "AirMCP is an open-source MCP server that connects AI assistants to the entire Apple ecosystem on macOS. With 226 tools across 24 modules, it enables AI to read notes, manage calendars, send messages, control system settings, browse Safari, play music, and much more. It supports Claude Code, Cursor, Codex, and any MCP-compatible client.",
+    text: "AirMCP is an approval-gated local action runtime for Apple workspaces on macOS. With 289 tools across 29 modules, profile-based loading, progressive tool exposure, HITL approval, and audit logs, it supports Claude Code, Cursor, Codex, and any MCP-compatible client.",
   }, { log: true });
 
   // ── Cleanup ────────────────────────────────────────────────────────

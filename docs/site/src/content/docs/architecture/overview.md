@@ -145,7 +145,7 @@ ok(data)   // { content: [{ type: "text", text: JSON.stringify(data) }] }
 err(msg)   // { content: [{ type: "text", text: msg }], isError: true }
 ```
 
-This ensures consistent error handling across all 286 tools.
+This ensures consistent error handling across all 289 tools.
 
 ## Directory Structure
 

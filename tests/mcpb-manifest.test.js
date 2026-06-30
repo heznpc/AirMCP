@@ -84,6 +84,16 @@ describe("mcpb manifest template — user_config (MCPB-spec-aware)", () => {
     const m = render();
     expect(m.server.mcp_config.env.GEMINI_API_KEY).toBe("${user_config.gemini_api_key}");
     expect(m.server.mcp_config.env.AIRMCP_FULL).toBe("${user_config.load_all_modules}");
+    expect(m.server.mcp_config.env.AIRMCP_PROFILE).toBe("${user_config.profile}");
+    expect(m.server.mcp_config.env.AIRMCP_TOOL_EXPOSURE).toBe("${user_config.tool_exposure}");
+  });
+
+  test("profile and tool exposure default to the thin starter surface", () => {
+    const m = render();
+    expect(m.user_config.profile.type).toBe("string");
+    expect(m.user_config.profile.default).toBe("starter");
+    expect(m.user_config.tool_exposure.type).toBe("string");
+    expect(m.user_config.tool_exposure.default).toBe("progressive");
   });
 
   test("every referenced user_config key exists in user_config", () => {

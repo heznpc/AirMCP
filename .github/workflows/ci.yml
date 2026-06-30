@@ -106,6 +106,9 @@ jobs:
         timeout-minutes: 2
         run: npm run mcp:validate
 
+      - name: Profile exposure matrix
+        run: npm run profiles:check
+
       # Forcing function on the SHIPPED artifact (RFC 0014 root-cause). The
       # step above boots the repo's dist/; this packs the real tarball,
       # installs it into a CLEAN project (deps resolved fresh, no repo on

@@ -90,8 +90,8 @@ for (const line of resLines) {
   }
 }
 
-const configContent = readFileSync(join(SRC, "shared", "config.ts"), "utf-8");
-const moduleBlock = configContent.match(/export const MODULE_NAMES = \[([\s\S]*?)\] as const/);
+const profilesContent = readFileSync(join(SRC, "shared", "profiles.ts"), "utf-8");
+const moduleBlock = profilesContent.match(/export const MODULE_NAMES = \[([\s\S]*?)\] as const/);
 const modules = moduleBlock ? (moduleBlock[1].match(/"/g) || []).length / 2 : 0;
 
 const stats = { tools, prompts, resources, modules, mcpApps, appIntents };
@@ -180,7 +180,11 @@ const docsPages = [
   "docs/site/src/content/docs/contributing/testing.md",
 ];
 for (const page of docsPages) {
-  syncFile(page, [{ pattern: /(\d+) modules/g, value: modules }]);
+  syncFile(page, [
+    { pattern: /(\d+) modules/g, value: modules },
+    { pattern: /approximately (\d+) tools/g, value: tools },
+    { pattern: /all (\d+) tools/g, value: tools },
+  ]);
 }
 
 // MCPB manifest template — the long_description string lives in the user

@@ -4,7 +4,7 @@
   "display_name": "AirMCP",
   "version": "{{VERSION}}",
   "description": "{{DESCRIPTION}}",
-  "long_description": "AirMCP connects any MCP-compatible AI client to your Mac — Notes, Reminders, Calendar, Contacts, Mail, Messages, Music, Finder, Safari, Photos, System control, Apple Intelligence, and more. 286 tools across 29 modules. Most tools are pure JXA and work out of the box on macOS; Swift-bridge-backed tools (HealthKit, Vision, Foundation Models, on-device semantic search) are not included in this bundle and require building the optional Swift bridge. No cloud calls unless you set a Gemini API key.\n\nSafety first: HITL (human-in-the-loop) approval for sensitive actions, queryable audit log, rate limiter + emergency stop, declarative HTTP network policy.\n\niOS-ready: 228 auto-generated Apple App Intents expose AirMCP tools to Siri, Shortcuts, and Spotlight once the iOS companion ships.",
+  "long_description": "AirMCP connects any MCP-compatible AI client to your Mac — Notes, Reminders, Calendar, Contacts, Mail, Messages, Music, Finder, Safari, Photos, System control, Apple Intelligence, and more. 289 tools across 29 modules. Most tools are pure JXA and work out of the box on macOS; Swift-bridge-backed tools (HealthKit, Vision, Foundation Models, on-device semantic search) are not included in this bundle and require building the optional Swift bridge. No cloud calls unless you set a Gemini API key.\n\nSafety first: HITL (human-in-the-loop) approval for sensitive actions, queryable audit log, rate limiter + emergency stop, declarative HTTP network policy.\n\niOS-ready: 230 auto-generated Apple App Intents expose AirMCP tools to Siri, Shortcuts, and Spotlight once the iOS companion ships.",
   "author": {
     "name": "heznpc",
     "url": "https://github.com/heznpc"
@@ -46,7 +46,9 @@
       "args": ["${__dirname}/server/dist/index.js"],
       "env": {
         "GEMINI_API_KEY": "${user_config.gemini_api_key}",
-        "AIRMCP_FULL": "${user_config.load_all_modules}"
+        "AIRMCP_FULL": "${user_config.load_all_modules}",
+        "AIRMCP_PROFILE": "${user_config.profile}",
+        "AIRMCP_TOOL_EXPOSURE": "${user_config.tool_exposure}"
       }
     }
   },
@@ -65,6 +67,20 @@
       "description": "Off by default — only the 7 starter modules load (notes, reminders, calendar, shortcuts, system, finder, weather) to keep the surface small. Turn on to register all standard modules (contacts, mail, messages, music, safari, photos, apple intelligence, TV, maps, iWork, Google Workspace, health, bluetooth, etc.). Experimental profile-only modules such as spatial_prep remain disabled. Per-module disable can still be done via AIRMCP_DISABLE_<MODULE> env vars in advanced setups.",
       "required": false,
       "default": false
+    },
+    "profile": {
+      "type": "string",
+      "title": "Runtime profile",
+      "description": "Module profile to load when Load all modules is off: starter, communications-safe, productivity, or full.",
+      "required": false,
+      "default": "starter"
+    },
+    "tool_exposure": {
+      "type": "string",
+      "title": "Tool exposure",
+      "description": "How many registered tools appear in tools/list: progressive keeps a small front door, profile exposes the selected profile, full exposes everything loaded.",
+      "required": false,
+      "default": "progressive"
     }
   },
   "tools_generated": true,

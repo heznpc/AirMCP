@@ -48,9 +48,9 @@ if (!existsSync(entry)) {
 //   AIRMCP_FULL=true           load every module, not just STARTER_MODULES.
 //                              Without this, a fresh machine (no
 //                              ~/.airmcp/config.json) emits only the 7
-//                              starter modules (~111 tools), while a
-//                              developer laptop with a live config emits
-//                              ~120+. The bridge codegen needs the full
+//                              starter profile and progressive exposure,
+//                              while a developer laptop with a live config
+//                              emits a custom surface. The bridge codegen needs the full
 //                              inventory regardless of user preference.
 //   AIRMCP_COMPACT_TOOLS=false  Keep full tool descriptions. Compact mode
 //                              (src/shared/tool-filter.ts) truncates to
@@ -61,6 +61,9 @@ if (!existsSync(entry)) {
 //                              into e.g. "… Foundation Model and repo…".
 //                              The manifest-driven Swift codegen wants
 //                              the authored text verbatim.
+//   AIRMCP_TOOL_EXPOSURE=full  Export the full tools/list contract for docs,
+//                              AppIntent codegen, and count-stats. Runtime
+//                              defaults may use progressive exposure.
 //
 // Do not set AIRMCP_TEST_MODE — that flag disables a separate set of
 // paths (test helpers) unrelated to tool registration.
@@ -70,6 +73,7 @@ const server = spawn("node", [entry, "--full"], {
     ...process.env,
     AIRMCP_FAKE_OS_VERSION: "0",
     AIRMCP_FULL: "true",
+    AIRMCP_TOOL_EXPOSURE: "full",
     AIRMCP_COMPACT_TOOLS: "false",
     // Clear any per-module AIRMCP_DISABLE_* set in the developer shell
     // (belt-and-suspenders with --full).

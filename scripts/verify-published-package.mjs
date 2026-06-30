@@ -42,15 +42,23 @@ const INSPECTOR_PKG = `@modelcontextprotocol/inspector@${INSPECTOR_VERSION}`;
 const INSPECTOR_TIMEOUT_MS = 120_000;
 
 // Surface floor for the DEFAULT boot. A plain `npx -y airmcp` (no --full, no
-// config.json) applies the STARTER preset (config.ts:339) — a curated subset,
-// ~111 tools here — NOT all 272. The "272 tools" headline is the --full /
-// registered count (owned by count-stats + tool-count-drift). This gate tests
-// the *default user experience*, so the floor only needs to catch "booted to
-// near-empty" (a broken/incomplete package), robust to per-machine gating.
-const MIN_TOOLS = 100;
-// Tools that MUST be present in any environment (pure JXA, no bridge/hardware
-// gate). If any of these is missing, the package shipped broken.
-const REQUIRED_CORE_TOOLS = ["list_notes", "list_reminders", "list_events", "list_directory"];
+// config.json) applies the STARTER profile with progressive exposure: modules
+// still load, but tools/list advertises a small front door rather than every
+// registered tool. This gate tests the default user experience, so the floor
+// catches "booted to near-empty" without forcing the old token-heavy surface.
+const MIN_TOOLS = 10;
+// Tools that MUST be present in any environment. Front-door tools prove the
+// progressive runtime is usable; core JXA tools prove starter modules loaded.
+const REQUIRED_CORE_TOOLS = [
+  "profile_status",
+  "list_profiles",
+  "discover_tools",
+  "run_tool",
+  "list_notes",
+  "list_reminders",
+  "list_events",
+  "list_directory",
+];
 
 function sh(cmd, args, opts = {}) {
   const r = spawnSync(cmd, args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, ...opts });
@@ -65,10 +73,9 @@ function sh(cmd, args, opts = {}) {
 
 function bootAndList(entry, cwd) {
   return new Promise((done) => {
-    // Boot the installed tarball at its DEFAULT (STARTER) surface, independent
+    // Boot the installed tarball at its DEFAULT (STARTER/progressive) surface, independent
     // of host config / AIRMCP_* — see scripts/lib/clean-boot-env.mjs. This gate
-    // tests the *default user experience*, so the count must be the ~111-tool
-    // surface a fresh `npx -y airmcp` user gets, not whatever the host enables.
+    // tests the default user experience, not whatever the host enables.
     const env = cleanBootEnv();
     const proc = spawn(
       "npx",
@@ -165,7 +172,7 @@ try {
     process.exit(1);
   }
 
-  console.log(`✓ packaged tarball boots clean and serves ${tools.length} tools (core JXA tools present).`);
+  console.log(`✓ packaged tarball boots clean and serves ${tools.length} exposed tools (front door + core JXA present).`);
   console.log("  (This gate tests the SHIPPED artifact, closing the docs-ahead-of-distribution gap.)");
 } finally {
   if (tgz) rmSync(tgz, { force: true });

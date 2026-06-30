@@ -13,7 +13,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = join(ROOT, "src");
 
 /**
- * Canonical module list parsed from `src/shared/config.ts`'s
+ * Canonical module list parsed from `src/shared/profiles.ts`'s
  * `MODULE_NAMES` const. Read at script start so the module count stays
  * aligned with `count-stats.mjs` (which counts the same array). Without
  * this we used to show "32 modules" — `walkDir` happily groups every
@@ -24,8 +24,8 @@ const SRC = join(ROOT, "src");
  */
 const CANONICAL_MODULE_COUNT = (() => {
   try {
-    const config = readFileSync(join(SRC, "shared", "config.ts"), "utf-8");
-    const m = config.match(/export const MODULE_NAMES = \[([\s\S]*?)\] as const;/);
+    const profiles = readFileSync(join(SRC, "shared", "profiles.ts"), "utf-8");
+    const m = profiles.match(/export const MODULE_NAMES = \[([\s\S]*?)\] as const;/);
     if (!m) return null;
     return (m[1].match(/"([^"]+)"/g) || []).length;
   } catch {
@@ -35,8 +35,8 @@ const CANONICAL_MODULE_COUNT = (() => {
 
 const OPT_IN_MODULES = (() => {
   try {
-    const config = readFileSync(join(SRC, "shared", "config.ts"), "utf-8");
-    const m = config.match(/export const OPT_IN_MODULE_NAMES = \[([\s\S]*?)\] as const;/);
+    const profiles = readFileSync(join(SRC, "shared", "profiles.ts"), "utf-8");
+    const m = profiles.match(/export const OPT_IN_MODULE_NAMES = \[([\s\S]*?)\] as const;/);
     if (!m) return new Set();
     return new Set((m[1].match(/"([^"]+)"/g) || []).map((s) => JSON.parse(s)));
   } catch {
@@ -181,7 +181,7 @@ export function generateLlmsText() {
   const REPO = "https://github.com/heznpc/AirMCP";
   let llmsTxt = `# AirMCP
 
-> MCP server for the entire Apple ecosystem. ${headlineTools} tools across ${moduleCount} modules.
+> Approval-gated local action runtime for Apple workspaces. ${headlineTools} tools across ${moduleCount} modules.
 
 ## Links
 

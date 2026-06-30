@@ -1,0 +1,142 @@
+#!/usr/bin/env node
+/**
+ * Stage physical AirMCP add-on packages from the built dist tree.
+ *
+ * This is intentionally a build artifact, not checked-in package output:
+ * runtime code can prefer installed add-on packages today, while the universal
+ * `airmcp` package remains a compatibility fallback until the split is ready
+ * to publish as separate npm packages.
+ */
+
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+const ROOT = dirname(fileURLToPath(new URL("../package.json", import.meta.url)));
+const BUILD_DIR = join(ROOT, "build", "addons");
+const CHECK = process.argv.includes("--check");
+
+function fail(message) {
+  console.error(`addon-packages: ${message}`);
+  process.exit(1);
+}
+
+function readJson(path) {
+  return JSON.parse(readFileSync(path, "utf8"));
+}
+
+function ensureBuilt() {
+  if (!existsSync(join(ROOT, "dist", "index.js"))) {
+    fail("dist/index.js missing; run `npm run build` before staging add-on packages");
+  }
+  if (!existsSync(join(ROOT, "dist", "shared", "module-packs.js"))) {
+    fail("dist/shared/module-packs.js missing; run `npm run build` first");
+  }
+}
+
+function packageDirName(packageName) {
+  return packageName.replace(/^@/, "").replace("/", "__");
+}
+
+function copyRequiredDir(from, to, label) {
+  if (!existsSync(from)) fail(`${label} missing: ${from}`);
+  cpSync(from, to, { recursive: true });
+}
+
+function makePackageJson(rootPkg, pack) {
+  if (pack.packageName.includes("pack-") || pack.packageName.includes("-pack")) {
+    fail(`${pack.name} package name must not contain pack-* wording: ${pack.packageName}`);
+  }
+  return {
+    name: pack.packageName,
+    version: rootPkg.version,
+    description: `${pack.title} add-on modules for AirMCP.`,
+    keywords: ["airmcp", "mcp", "macos", "module-addon", pack.name],
+    homepage: rootPkg.homepage,
+    bugs: rootPkg.bugs,
+    repository: rootPkg.repository,
+    license: rootPkg.license,
+    author: rootPkg.author,
+    type: "module",
+    main: "dist/index.js",
+    files: ["dist"],
+    publishConfig: { access: "public" },
+    peerDependencies: {
+      airmcp: rootPkg.version,
+    },
+    dependencies: rootPkg.dependencies,
+    airmcp: {
+      modulePack: pack.name,
+      modules: pack.modules,
+    },
+    exports: {
+      ".": "./dist/index.js",
+      "./package.json": "./package.json",
+      "./dist/*": "./dist/*",
+    },
+    engines: rootPkg.engines,
+    os: rootPkg.os,
+  };
+}
+
+function writeAddonIndex(packageDir, pack) {
+  const contents = [
+    `export const modulePack = ${JSON.stringify(pack.name)};`,
+    `export const modules = ${JSON.stringify(pack.modules)};`,
+    `export const packageName = ${JSON.stringify(pack.packageName)};`,
+    "",
+  ].join("\n");
+  writeFileSync(join(packageDir, "dist", "index.js"), contents);
+}
+
+async function verifyAddonEntrypoints(packageRoot, pack) {
+  for (const moduleName of pack.modules) {
+    const file = join(packageRoot, "dist", moduleName, "tools.js");
+    try {
+      await import(pathToFileURL(file));
+    } catch (error) {
+      fail(`${pack.name}/${moduleName} staged tools entrypoint is not importable: ${error.message}`);
+    }
+  }
+}
+
+async function main() {
+  ensureBuilt();
+  const rootPkg = readJson(join(ROOT, "package.json"));
+  const { MODULE_PACK_MANIFEST } = await import(pathToFileURL(join(ROOT, "dist", "shared", "module-packs.js")));
+  const addonPacks = MODULE_PACK_MANIFEST.filter((pack) => pack.name !== "core");
+
+  rmSync(BUILD_DIR, { recursive: true, force: true });
+  mkdirSync(BUILD_DIR, { recursive: true });
+
+  const manifest = [];
+  for (const pack of addonPacks) {
+    const packageRoot = join(BUILD_DIR, packageDirName(pack.packageName), "package");
+    mkdirSync(join(packageRoot, "dist"), { recursive: true });
+    copyRequiredDir(join(ROOT, "dist", "shared"), join(packageRoot, "dist", "shared"), "shared runtime");
+
+    for (const moduleName of pack.modules) {
+      copyRequiredDir(join(ROOT, "dist", moduleName), join(packageRoot, "dist", moduleName), `${pack.name}/${moduleName}`);
+    }
+
+    writeAddonIndex(packageRoot, pack);
+    const packageJson = makePackageJson(rootPkg, pack);
+    writeFileSync(join(packageRoot, "package.json"), JSON.stringify(packageJson, null, 2) + "\n");
+    await verifyAddonEntrypoints(packageRoot, pack);
+
+    manifest.push({
+      name: pack.name,
+      packageName: pack.packageName,
+      modules: pack.modules,
+      packageDir: packageRoot.replace(`${ROOT}/`, ""),
+    });
+  }
+
+  writeFileSync(join(BUILD_DIR, "manifest.json"), JSON.stringify({ version: rootPkg.version, packages: manifest }, null, 2) + "\n");
+  console.log(`ok: staged ${manifest.length} add-on packages in ${BUILD_DIR}`);
+  if (CHECK) console.log("ok: add-on package boundary check passed");
+}
+
+main().catch((error) => {
+  fail(error instanceof Error ? error.message : String(error));
+});

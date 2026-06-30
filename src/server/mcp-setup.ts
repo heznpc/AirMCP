@@ -35,6 +35,7 @@ import { ToolInputValidationError, toolRegistry } from "../shared/tool-registry.
 import { TOOL_SESSION_CONTROL_TOOLS, toolSessions } from "../shared/tool-sessions.js";
 import { semanticToolSearch, isToolSearchIndexed, indexToolDescriptions } from "../shared/tool-search.js";
 import { isCompactMode } from "../shared/tool-filter.js";
+import { resolveHarnessAdapter } from "../shared/task-adapters.js";
 import { usageTracker } from "../shared/usage-tracker.js";
 import { generateProactiveContext } from "../shared/proactive.js";
 import { eventBus } from "../shared/event-bus.js";
@@ -55,6 +56,7 @@ export async function createServer(
   options: CreateServerOptions,
 ): Promise<{ server: SdkMcpServer; bannerInfo: BannerInfo; cleanupEventListeners: () => void }> {
   const { config, hitlClient, osVersion, pkg } = options;
+  const harness = resolveHarnessAdapter(config);
 
   const server = new SdkMcpServer({
     name: NPM_PACKAGE_NAME,
@@ -252,6 +254,7 @@ export async function createServer(
         modulePacksAvailable: z.array(z.string()),
         modulesMissingPacks: z.array(z.string()),
         requireToolSession: z.boolean(),
+        harnessAdapter: z.string(),
         modulesEnabled: z.array(z.string()),
         modulesDisabled: z.array(z.string()),
         toolsExposed: z.number(),
@@ -269,6 +272,7 @@ export async function createServer(
         modulePacksAvailable,
         modulesMissingPacks,
         requireToolSession: config.requireToolSession,
+        harnessAdapter: harness.name,
         modulesEnabled: enabled,
         modulesDisabled: disabled,
         toolsExposed: toolRegistry.getExposedToolCount(),
@@ -292,15 +296,17 @@ export async function createServer(
         tools: z
           .array(z.string().min(1).max(200))
           .min(1)
-          .max(64)
+          .max(harness.maxSessionTools)
           .describe("Registered tool names allowed in this session"),
         ttlSeconds: z
           .number()
           .int()
           .min(30)
-          .max(3600)
+          .max(harness.maxSessionTtlSeconds)
           .optional()
-          .describe("Session lifetime in seconds (default 900, max 3600)"),
+          .describe(
+            `Session lifetime in seconds (default ${harness.defaultSessionTtlSeconds}, max ${harness.maxSessionTtlSeconds})`,
+          ),
         label: z.string().max(120).optional().describe("Optional human-readable task label"),
       },
       outputSchema: {
@@ -321,7 +327,9 @@ export async function createServer(
       if (blocked.length) {
         return errInvalidInput(`Tool sessions cannot delegate session-control tools: ${blocked.join(", ")}`);
       }
-      return okStructured(toolSessions.start({ tools, ttlSeconds, label }));
+      return okStructured(
+        toolSessions.start({ tools, ttlSeconds: ttlSeconds ?? harness.defaultSessionTtlSeconds, label }),
+      );
     },
   );
 
@@ -373,6 +381,42 @@ export async function createServer(
   // registry and are invoked through the same wrapped handler path. A caller
   // may pass sessionId to constrain execution to a short-lived allowlist.
   lServer.registerTool(
+    "describe_tool",
+    {
+      title: "Describe Tool",
+      description:
+        "Fetch the full description for one registered AirMCP tool after discover_tools returns a compact match.",
+      inputSchema: {
+        name: z.string().min(1).max(200).describe("Registered tool name to describe"),
+        full: z.boolean().optional().describe("Return the full description instead of the compact summary"),
+        sessionId: z
+          .string()
+          .uuid()
+          .optional()
+          .describe("Optional task-scoped tool session id; requires the tool to be in the session allowlist"),
+      },
+      outputSchema: {
+        name: z.string(),
+        title: z.string().optional(),
+        description: z.string().optional(),
+        descriptionDetail: z.enum(["summary", "full"]),
+        exposed: z.boolean(),
+        readOnly: z.boolean().optional(),
+        destructive: z.boolean().optional(),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ name, full, sessionId }) => {
+      const sessionGate = toolSessions.assertAllowed(sessionId, name);
+      if (!sessionGate.ok) return errInvalidInput(sessionGate.message);
+      const descriptionMode = full === false ? "summary" : "full";
+      const details = toolRegistry.getToolDetails(name, { descriptionMode });
+      if (!details) return errNotFound(`Unknown tool "${name}". Use discover_tools to find available tools.`);
+      return okStructured({ ...details, descriptionDetail: descriptionMode });
+    },
+  );
+
+  lServer.registerTool(
     "run_tool",
     {
       title: "Run Tool",
@@ -394,7 +438,7 @@ export async function createServer(
         return errNotFound(`Unknown tool "${name}". Use discover_tools to find available tools.`);
       }
       const hiddenTool = !toolRegistry.getExposedToolNames().includes(name);
-      if (config.requireToolSession && hiddenTool && !sessionId) {
+      if (harness.requireSessionForHiddenTools && hiddenTool && !sessionId) {
         return errInvalidInput(
           `Tool session required for hidden tool "${name}". Call start_tool_session with this tool, then pass sessionId to run_tool.`,
         );
@@ -452,6 +496,7 @@ export async function createServer(
       }
       const substringResults = toolRegistry.searchTools(query, maxResults, {
         ...(allowedToolNames ? { allowedToolNames } : {}),
+        descriptionMode: harness.discoveryDescriptionMode,
       });
 
       // If substring search found enough, return immediately

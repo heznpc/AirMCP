@@ -6,7 +6,7 @@ Internal tracking doc for AirMCP's public-registry presence. Update the status c
 
 | Registry                       | Status                                           | Last action                               | Next step                                                                                                                                                                   |
 | ------------------------------ | ------------------------------------------------ | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Anthropic MCP Registry**     | Pending (submitted via Google Form, no response) | 2026-03-28                                | **Resubmit now** with the current description below — new differentiators: `.mcpb` one-click install, OAuth 2.1 + Resource Indicators, profiles, progressive tool exposure, 231 AppIntents |
+| **Anthropic MCP Registry**     | Pending (submitted via Google Form, no response) | 2026-03-28                                | **Resubmit now** with the current description below — new differentiators: `.mcpb` one-click install, OAuth 2.1 + Resource Indicators, profiles, progressive tool exposure, 232 AppIntents |
 | **Smithery.ai**                | Listed (`airmcp`)                                | Manifest auto-tracked via `smithery.yaml` | Request featured placement — current pitch should be workflow + governance depth, bounded to README-level Apple-native comparisons rather than an unqualified "only" claim     |
 | **Glama**                      | Listed (`AirMCP`)                                | `glama.json` present                      | Verify icon + category render on the live detail page; ask for category "Apple / macOS" pin                                                                                 |
 | **MCP Market (mcpmarket.com)** | Not submitted                                    | —                                         | **Submit this week** — see section below for the pitch (v2.11 headline)                                                                                                     |
@@ -54,7 +54,7 @@ When the counts or headline features change, walk this list before you touch any
 
 - [ ] `npm run stats:sync` shows **no** remaining diffs (zero "sync:" lines)
 - [ ] `server.json` `version` matches `package.json` version
-- [ ] `server.json` `description` reflects current headline features (`.mcpb` one-click, OAuth 2.1, profiles, progressive tool exposure, 231 AppIntents, skills, memory, audit, inbound HTTP `allowNetwork`)
+- [ ] `server.json` `description` reflects current headline features (`.mcpb` one-click, OAuth 2.1, profiles, progressive tool exposure, 232 AppIntents, skills, memory, audit, inbound HTTP `allowNetwork`)
 - [ ] `README.md` Features block mirrors the description — catches the case where one was updated without the other
 - [ ] `docs/index.html` hero + `tryit_footer` counts match the registry description
 - [ ] `CHANGELOG.md` `[Unreleased]` block names every user-visible change since the last registry ping
@@ -65,7 +65,7 @@ When the counts or headline features change, walk this list before you touch any
 
 The 2026-03-28 Google Form submission used the v2.7 pitch ("262 tools across 27 modules"). For the resubmission:
 
-- **Headline for current resubmission**: "Approval-gated local action runtime for Apple workspaces — 293 tools across 29 modules with profiles, progressive tool exposure, workflow skills, context memory, queryable audit log, sensitive-action HITL, OAuth 2.1, and inbound HTTP `allowNetwork` policy."
+- **Headline for current resubmission**: "Approval-gated local action runtime for Apple workspaces — 294 tools across 29 modules with profiles, progressive tool exposure, workflow skills, context memory, queryable audit log, sensitive-action HITL, OAuth 2.1, and inbound HTTP `allowNetwork` policy."
 - **Security story** (registry reviewers care): HITL approval, rate limit + emergency stop file, `allowNetwork` startup invariant (RFC 0002), PII-scrubbed audit log at `0600`.
 - **Differentiator vs. apple-mcp / shortcuts**: the Skills DSL (`parallel`/`loop`/`on_error`/`retry`/inputs/triggers) + event-bus triggers + governance primitives. Keep this claim bounded: based on README-level/public-surface comparison, not full source audits of every competitor.
 - **Demo asset**: point at `docs/demo.gif` (re-record with `./scripts/record-demo.sh` before the submission).
@@ -74,7 +74,7 @@ The 2026-03-28 Google Form submission used the v2.7 pitch ("262 tools across 27 
 
 Ask after the npm publish lands. Pitch the following concrete wins over the baseline `apple-mcp` listing:
 
-- Broad tool surface plus workflow-first entry points (293 tools, 29 modules, curated workflow catalog)
+- Broad tool surface plus workflow-first entry points (294 tools, 29 modules, curated workflow catalog)
 - README-level Apple-native comparison: AirMCP is the only tracked listing that publicly documents the full governance stack together — HMAC audit, sensitive-action HITL, rate limit, inbound HTTP `allowNetwork`, OAuth Resource Indicators
 - Queryable audit log and Skills DSL are concrete differentiators; avoid claiming competitors have zero governance without a fresh source audit
 - Documented inbound HTTP exposure policy (RFC 0002 in-tree)
@@ -85,7 +85,7 @@ The manifest is auto-synced; they shouldn't need any new asset from our side.
 
 One-paragraph pitch for the submission form:
 
-> AirMCP is an Apple-native MCP runtime for governed workflows across the local Apple workspace. It ships 293 tools across 29 modules (Notes, Calendar, Reminders, Contacts, Mail, Messages, Music, Finder, Safari, System, Photos, Shortcuts, Apple Intelligence previews, TV, Screen Capture, Maps, Podcasts, Weather, Pages/Numbers/Keynote, Location, Bluetooth, HealthKit, Context Memory, Audit), plus module profiles, progressive tool exposure, workflow skills, sensitive-action HITL approval, HMAC-chained audit logs, rate limiting, OAuth 2.1 + Resource Indicators, and an inbound HTTP `allowNetwork` policy (RFC 0002). In README-level Apple-native MCP comparisons, this is the full-stack governance surface to beat; re-check competitor READMEs/source before publishing any unqualified "only" claim. Open source (MIT), v2.14+ on npm. iOS sibling with auto-generated AppIntents and an opt-in Foundation Models on-device agent preview (RFC 0007) in active development.
+> AirMCP is an Apple-native MCP runtime for governed workflows across the local Apple workspace. It ships 294 tools across 29 modules (Notes, Calendar, Reminders, Contacts, Mail, Messages, Music, Finder, Safari, System, Photos, Shortcuts, Apple Intelligence previews, TV, Screen Capture, Maps, Podcasts, Weather, Pages/Numbers/Keynote, Location, Bluetooth, HealthKit, Context Memory, Audit), plus module profiles, progressive tool exposure, workflow skills, sensitive-action HITL approval, HMAC-chained audit logs, rate limiting, OAuth 2.1 + Resource Indicators, and an inbound HTTP `allowNetwork` policy (RFC 0002). In README-level Apple-native MCP comparisons, this is the full-stack governance surface to beat; re-check competitor READMEs/source before publishing any unqualified "only" claim. Open source (MIT), v2.14+ on npm. iOS sibling with auto-generated AppIntents and an opt-in Foundation Models on-device agent preview (RFC 0007) in active development.
 
 Screenshots to attach:
 

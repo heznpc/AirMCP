@@ -112,9 +112,10 @@ function printDoctor(payload: ReturnType<typeof statusPayload>): void {
   console.log(
     `    ${GREEN}ok${RESET} runtime contract: AIRMCP_MODULE_PACKS/config.json can activate selected packs today`,
   );
-  console.log(`    ${GREEN}ok${RESET} package names: future add-ons omit pack-* naming`);
+  console.log(`    ${GREEN}ok${RESET} package names: add-ons omit pack-* naming`);
+  console.log(`    ${GREEN}ok${RESET} package staging: npm run addons:build creates tarball-ready add-on directories`);
   console.log(
-    `    ${YELLOW}wait${RESET} package split: current npm package still ships every built-in module until signed app/bridge distribution is ready`,
+    `    ${YELLOW}wait${RESET} publish split: current npm package keeps bundled fallback until shipped-artifact checks cover add-ons`,
   );
   console.log("");
 }

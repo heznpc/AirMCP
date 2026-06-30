@@ -39,6 +39,7 @@ const CASES = [
       "list_profiles",
       "list_module_packs",
       "discover_tools",
+      "describe_tool",
       "run_tool",
       "list_notes",
       "list_events",
@@ -58,6 +59,7 @@ const CASES = [
       "list_module_packs",
       "start_tool_session",
       "discover_tools",
+      "describe_tool",
       "run_tool",
       "list_notes",
       "list_events",
@@ -70,7 +72,7 @@ const CASES = [
     exposure: "progressive",
     minTools: 10,
     maxTools: 45,
-    requiredTools: ["profile_status", "list_profiles", "list_module_packs", "discover_tools", "run_tool"],
+    requiredTools: ["profile_status", "list_profiles", "list_module_packs", "discover_tools", "describe_tool", "run_tool"],
     requiredModules: ["contacts", "mail", "messages"],
   },
   {
@@ -80,7 +82,7 @@ const CASES = [
     modulePacks: "core-only",
     minTools: 90,
     maxTools: 135,
-    requiredTools: ["profile_status", "list_profiles", "list_module_packs", "discover_tools", "run_tool"],
+    requiredTools: ["profile_status", "list_profiles", "list_module_packs", "discover_tools", "describe_tool", "run_tool"],
     requiredModules: ["notes", "reminders", "calendar", "shortcuts", "system", "finder", "weather"],
     forbiddenModules: ["contacts", "mail", "messages", "pages", "numbers", "keynote", "safari", "google"],
     requiredPacks: ["core"],
@@ -94,7 +96,7 @@ const CASES = [
     modulePacks: "core,communications",
     minTools: 100,
     maxTools: 170,
-    requiredTools: ["profile_status", "list_profiles", "list_module_packs", "discover_tools", "run_tool", "send_mail"],
+    requiredTools: ["profile_status", "list_profiles", "list_module_packs", "discover_tools", "describe_tool", "run_tool", "send_mail"],
     requiredModules: ["contacts", "mail", "messages"],
     forbiddenModules: ["pages", "numbers", "keynote", "safari", "google"],
     requiredPacks: ["core", "communications"],
@@ -107,7 +109,7 @@ const CASES = [
     exposure: "profile",
     modulePacks: "core,productivity",
     minTools: 70,
-    requiredTools: ["profile_status", "list_profiles", "list_module_packs", "discover_tools", "run_tool"],
+    requiredTools: ["profile_status", "list_profiles", "list_module_packs", "discover_tools", "describe_tool", "run_tool"],
     requiredModules: ["pages", "numbers", "keynote"],
     forbiddenModules: ["contacts", "mail", "messages"],
     requiredPacks: ["core", "productivity"],
@@ -124,6 +126,7 @@ const CASES = [
       "list_profiles",
       "list_module_packs",
       "discover_tools",
+      "describe_tool",
       "run_tool",
       "send_mail",
       "send_message",
@@ -140,6 +143,7 @@ const CASES = [
       "list_profiles",
       "list_module_packs",
       "discover_tools",
+      "describe_tool",
       "run_tool",
       "list_notes",
       "list_events",
@@ -302,6 +306,19 @@ function bootCase(testCase) {
           const discover = parseStructuredResult(discoverResp);
           if (!discover?.matches?.some?.((match) => match.name === "create_note")) {
             throw new Error(`discover_tools did not return hidden create_note: ${JSON.stringify(discoverResp)}`);
+          }
+
+          const describeResp = await request(
+            "tools/call",
+            { name: "describe_tool", arguments: { name: "create_note", full: true } },
+            12,
+          );
+          if (describeResp.error || describeResp.result?.isError) {
+            throw new Error(`describe_tool hidden detail failed: ${JSON.stringify(describeResp)}`);
+          }
+          const described = parseStructuredResult(describeResp);
+          if (described?.name !== "create_note" || described?.descriptionDetail !== "full") {
+            throw new Error(`describe_tool did not return full create_note detail: ${JSON.stringify(describeResp)}`);
           }
 
           const noSessionResp = await request("tools/call", { name: "run_tool", arguments: { name: "create_note" } }, 8);

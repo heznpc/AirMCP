@@ -63,6 +63,8 @@
   ],
   "scripts": {
     "build": "node scripts/build.mjs",
+    "addons:build": "node scripts/build-addon-packages.mjs",
+    "addons:check": "node scripts/build-addon-packages.mjs --check",
     "swift-build": "cd swift && swift build -c release",
     "app-build": "cd app && swift build -c release",
     "app:run": "./scripts/bundle-app.sh run",

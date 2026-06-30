@@ -2,8 +2,8 @@
 //
 // Source: docs/tool-manifest.json
 // Generator: scripts/gen-swift-intents.mjs
-// RFC 0007 Phase A.2b.2 + A.4.1 — 231 auto-selected read-only
-// tools (82 with typed drift-guards + Interactive Snippet
+// RFC 0007 Phase A.2b.2 + A.4.1 — 232 auto-selected read-only
+// tools (83 with typed drift-guards + Interactive Snippet
 // SwiftUI views) + 9 AppShortcutsProvider entries.
 // Run `npm run gen:intents` to refresh after tool metadata changes.
 // CI guards against drift via `npm run gen:intents:check`.
@@ -65,6 +65,17 @@ public struct MCPAuditSummaryOutput: Codable, Sendable {
     public let verified: Bool
     public let verifiedFirstBreak: Verifiedfirstbreak?
     public let auditDisabled: Bool
+}
+
+// Output type for: describe_tool
+public struct MCPDescribeToolOutput: Codable, Sendable {
+    public let name: String
+    public let title: String?
+    public let description: String?
+    public let descriptionDetail: String
+    public let exposed: Bool
+    public let readOnly: Bool?
+    public let destructive: Bool?
 }
 
 // Output type for: discover_tools
@@ -781,6 +792,7 @@ public struct MCPProfileStatusOutput: Codable, Sendable {
     public let modulePacksAvailable: [String]
     public let modulesMissingPacks: [String]
     public let requireToolSession: Bool
+    public let harnessAdapter: String
     public let modulesEnabled: [String]
     public let modulesDisabled: [String]
     public let toolsExposed: Double
@@ -2207,6 +2219,47 @@ public struct CreateShortcutIntent: AppIntent {
             tool: "create_shortcut",
             args: ["name": name]
         )
+        return .result(value: result)
+    }
+}
+
+// Tool: describe_tool
+public struct DescribeToolIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Describe Tool"
+    nonisolated(unsafe) public static var description = IntentDescription("Fetch the full description for one registered AirMCP tool after discover_tools returns a compact match.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Registered tool name to describe")
+    public var name: String
+
+    @Parameter(title: "Return the full description instead of the compact summary")
+    public var full: Bool?
+
+    @Parameter(title: "Optional task-scoped tool session id; requires the tool to be in the session all")
+    public var sessionId: String?
+
+    @MainActor
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        args["name"] = name
+        if let v = full { args["full"] = v }
+        if let v = sessionId { args["sessionId"] = v }
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "describe_tool",
+            args: args
+        )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "describe_tool", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPDescribeToolOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPDescribeToolSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -8113,6 +8166,67 @@ public struct MCPAuditSummarySnippetView: View {
     }
 }
 
+// Snippet view for: describe_tool  (shape: scalar)
+@available(macOS 26, iOS 26, *)
+public struct MCPDescribeToolSnippetView: View {
+    public let data: MCPDescribeToolOutput
+    public init(data: MCPDescribeToolOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text("Name")
+                Spacer()
+                Text(data.name)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Title")
+                Spacer()
+                Text((data.title ?? "—"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Description")
+                Spacer()
+                Text((data.description ?? "—"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Description Detail")
+                Spacer()
+                Text(data.descriptionDetail)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Exposed")
+                Spacer()
+                Text((data.exposed ? "Yes" : "No"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Read Only")
+                Spacer()
+                Text((data.readOnly.map { $0 ? "Yes" : "No" } ?? "—"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Destructive")
+                Spacer()
+                Text((data.destructive.map { $0 ? "Yes" : "No" } ?? "—"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+        }
+        .padding()
+    }
+}
+
 // Snippet view for: discover_tools  (shape: list-object)
 @available(macOS 26, iOS 26, *)
 public struct MCPDiscoverToolsSnippetView: View {
@@ -9645,6 +9759,13 @@ public struct MCPProfileStatusSnippetView: View {
                 Text("Require Tool Session")
                 Spacer()
                 Text((data.requireToolSession ? "Yes" : "No"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Harness Adapter")
+                Spacer()
+                Text(data.harnessAdapter)
                     .lineLimit(1)
                     .truncationMode(.tail)
             }

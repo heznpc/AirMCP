@@ -1,5 +1,5 @@
 name: airmcp
-description: Approval-gated local action runtime for Apple workspaces — 293 tools across 29 modules, profile-based loading, progressive tool exposure, HITL approval, audit logs, and Mac app automation.
+description: Approval-gated local action runtime for Apple workspaces — 294 tools across 29 modules, profile-based loading, progressive tool exposure, HITL approval, audit logs, and Mac app automation.
 homepage: https://github.com/heznpc/AirMCP
 icon: https://raw.githubusercontent.com/heznpc/AirMCP/main/icons/airmcp-icon-256.png
 license: MIT

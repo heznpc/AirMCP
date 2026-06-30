@@ -26,7 +26,7 @@ export async function indexToolDescriptions(): Promise<number> {
 
   const tools = toolRegistry
     .getToolNames()
-    .map((name) => toolRegistry.getToolInfo(name))
+    .map((name) => toolRegistry.getToolInfo(name, { descriptionMode: "full" }))
     .filter((t): t is ToolInfo => t !== undefined);
   const texts = tools.map((t) => `${t.name}: ${t.title ?? ""} ${t.description ?? ""}`);
 
@@ -58,7 +58,9 @@ export async function semanticToolSearch(
     const queryVector = await embedText(query, provider);
     const scored = toolVectors
       .map((tv) => ({
-        info: { name: tv.name, title: tv.title, description: tv.description } as ToolInfo,
+        info:
+          toolRegistry.getToolInfo(tv.name, { descriptionMode: "summary" }) ??
+          ({ name: tv.name, title: tv.title, description: tv.description } as ToolInfo),
         score: cosineSimilarity(queryVector, tv.vector),
       }))
       .filter((s) => s.score >= threshold)

@@ -2,14 +2,14 @@ import type { ModuleRegistration } from "./registry.js";
 import type { ModuleCompatibility } from "./compatibility.js";
 import type { AirMcpConfig } from "./config.js";
 import { isModuleEnabled } from "./config.js";
-import { log, errToCtx } from "./logger.js";
+import { log } from "./logger.js";
 import {
   getDefaultModulePacks,
-  getModulePackNameForModule,
   getModulePackStatuses,
   isModulePackAvailable,
   type ModulePackStatus,
 } from "./module-packs.js";
+import { importModuleRegistration } from "./module-loader.js";
 
 /**
  * Module manifest — the single source of truth for all AirMCP modules.
@@ -151,44 +151,12 @@ function getDebugWhitelist(): Set<string> | null {
   return whitelist.size > 0 ? whitelist : null;
 }
 
-/** Import a single module definition, returning null on failure. */
-async function importModule(def: ModuleManifestEntry): Promise<ModuleRegistration | null> {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const toolsMod: Record<string, any> = await import(`../${def.name}/tools.js`);
-    const toolsFn = findRegisterFn(toolsMod);
-    if (!toolsFn) {
-      log.warn("no register function found in tools.ts", { module: def.name });
-      return null;
-    }
-
-    let promptsFn: ModuleRegistration["prompts"] | undefined;
-    if (def.hasPrompts) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const promptsMod: Record<string, any> = await import(`../${def.name}/prompts.js`);
-      promptsFn = findRegisterFn(promptsMod);
-    }
-
-    return {
-      name: def.name,
-      tools: toolsFn,
-      prompts: promptsFn,
-      minMacosVersion: def.minMacosVersion,
-      compatibility: def.compatibility,
-      pack: getModulePackNameForModule(def.name) ?? undefined,
-    } as ModuleRegistration;
-  } catch (e) {
-    log.error("failed to load module", { module: def.name, err: errToCtx(e) });
-    return null;
-  }
-}
-
 const cacheByKey = new Map<string, ModuleRegistration[]>();
 
 export async function loadModuleRegistry(config?: AirMcpConfig): Promise<ModuleRegistration[]> {
   const whitelist = getDebugWhitelist();
   const targets = getTargetManifestEntries(config, whitelist);
-  const cacheKey = targets.map((m) => m.name).join(",");
+  const cacheKey = `${process.env.AIRMCP_ADDON_PACKAGE_MODE ?? "prefer-installed"}|${targets.map((m) => m.name).join(",")}`;
   if (cacheByKey.has(cacheKey)) return cacheByKey.get(cacheKey)!;
 
   const sequential = process.env.AIRMCP_DEBUG_SEQUENTIAL === "true";
@@ -209,7 +177,7 @@ export async function loadModuleRegistry(config?: AirMcpConfig): Promise<ModuleR
   if (sequential) {
     // Sequential: load one module at a time to minimize memory usage
     for (const def of targets) {
-      const result = await importModule(def);
+      const result = await importModuleRegistration(def);
       if (result) {
         registry.push(result);
       } else {
@@ -218,7 +186,7 @@ export async function loadModuleRegistry(config?: AirMcpConfig): Promise<ModuleR
     }
   } else {
     // Parallel: original Promise.all() behavior
-    const results = await Promise.all(targets.map(importModule));
+    const results = await Promise.all(targets.map(importModuleRegistration));
     for (let i = 0; i < results.length; i++) {
       if (results[i]) {
         registry.push(results[i]!);
@@ -267,24 +235,6 @@ export function getModulePackPlan(config?: AirMcpConfig): {
     packs: getModulePackStatuses(availablePacks),
     modulesMissingPacks,
   };
-}
-
-/** Find the first exported function whose name starts with "register". */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function findRegisterFn(mod: Record<string, any>): ((...args: any[]) => any) | undefined {
-  // Prefer registerXxxTools over registerDynamicXxx (dynamic tools are registered separately)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let fallback: ((...args: any[]) => any) | undefined;
-  for (const [key, val] of Object.entries(mod)) {
-    if (typeof val === "function" && key.startsWith("register")) {
-      if (key.includes("Dynamic")) {
-        fallback = fallback ?? val;
-        continue;
-      }
-      return val;
-    }
-  }
-  return fallback;
 }
 
 // Backward compat: synchronous MODULE_REGISTRY for code that reads it after init

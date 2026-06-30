@@ -3,6 +3,7 @@ import { getModuleNames, setModuleRegistry, MODULE_REGISTRY, MODULE_MANIFEST } f
 import {
   MODULE_PACK_MANIFEST,
   getDefaultModulePacks,
+  getModuleAddonImportSpec,
   getModulePackNameForModule,
   isModulePackAvailable,
 } from '../dist/shared/module-packs.js';
@@ -64,7 +65,7 @@ describe('module pack manifest', () => {
     expect([...getDefaultModulePacks()].sort()).toEqual(MODULE_PACK_MANIFEST.map((pack) => pack.name).sort());
   });
 
-  test('future add-on package names do not expose pack-* naming', () => {
+  test('add-on package names do not expose pack-* naming', () => {
     for (const pack of MODULE_PACK_MANIFEST) {
       expect(pack.packageName).not.toContain('pack-');
       expect(pack.packageName).not.toContain('-pack');
@@ -74,6 +75,12 @@ describe('module pack manifest', () => {
         expect(pack.packageName).toMatch(/^@heznpc\/airmcp-/);
       }
     }
+  });
+
+  test('add-on import specs target physical package entrypoints', () => {
+    expect(getModuleAddonImportSpec('pages', 'tools')).toBe('@heznpc/airmcp-productivity/dist/pages/tools.js');
+    expect(getModuleAddonImportSpec('mail', 'tools')).toBe('@heznpc/airmcp-communications/dist/mail/tools.js');
+    expect(getModuleAddonImportSpec('notes', 'tools')).toBeNull();
   });
 
   test('each pack forms an activation boundary for its modules', () => {
@@ -114,10 +121,12 @@ describe('setModuleRegistry()', () => {
 describe('loadModuleRegistry() — debug filtering', () => {
   let savedDebugModules;
   let savedDebugSequential;
+  let savedAddonPackageMode;
 
   beforeEach(() => {
     savedDebugModules = process.env.AIRMCP_DEBUG_MODULES;
     savedDebugSequential = process.env.AIRMCP_DEBUG_SEQUENTIAL;
+    savedAddonPackageMode = process.env.AIRMCP_ADDON_PACKAGE_MODE;
   });
 
   afterEach(() => {
@@ -125,6 +134,8 @@ describe('loadModuleRegistry() — debug filtering', () => {
     else process.env.AIRMCP_DEBUG_MODULES = savedDebugModules;
     if (savedDebugSequential === undefined) delete process.env.AIRMCP_DEBUG_SEQUENTIAL;
     else process.env.AIRMCP_DEBUG_SEQUENTIAL = savedDebugSequential;
+    if (savedAddonPackageMode === undefined) delete process.env.AIRMCP_ADDON_PACKAGE_MODE;
+    else process.env.AIRMCP_ADDON_PACKAGE_MODE = savedAddonPackageMode;
   });
 
   test('AIRMCP_DEBUG_MODULES filters to only specified modules', async () => {
@@ -215,6 +226,45 @@ describe('loadModuleRegistry() — debug filtering', () => {
     });
 
     expect(registry.some((mod) => mod.name === 'pages')).toBe(false);
+  });
+
+  test('loadModuleRegistry external-only mode refuses missing add-on packages', async () => {
+    process.env.AIRMCP_DEBUG_MODULES = 'pages';
+    process.env.AIRMCP_ADDON_PACKAGE_MODE = 'external-only';
+    delete process.env.AIRMCP_DEBUG_SEQUENTIAL;
+
+    const { loadModuleRegistry } = await import(
+      `../dist/shared/modules.js?t=${Date.now()}${Math.random()}`
+    );
+
+    const errors = [];
+    const origError = console.error;
+    console.error = (...args) => errors.push(args.join(' '));
+
+    try {
+      const registry = await loadModuleRegistry({
+        modulePacks: new Set(['core', 'productivity']),
+        disabledModules: new Set(),
+        shareApprovalModules: new Set(),
+        includeShared: false,
+        allowSendMessages: false,
+        allowSendMail: false,
+        allowRunJavascript: false,
+        hitl: { level: 'sensitive-only', whitelist: new Set(), timeout: 30, socketPath: '/tmp/hitl.sock' },
+        features: {
+          auditLog: true,
+          usageTracking: true,
+          semanticToolSearch: true,
+          proactiveContext: true,
+          telemetry: false,
+        },
+      });
+
+      expect(registry.some((mod) => mod.name === 'pages')).toBe(false);
+      expect(errors.some((line) => line.includes('required add-on package module failed to load'))).toBe(true);
+    } finally {
+      console.error = origError;
+    }
   });
 
   test('unknown module names in AIRMCP_DEBUG_MODULES are rejected with warning', async () => {

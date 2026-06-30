@@ -18,6 +18,12 @@ import {
   type AirMcpProfileName,
   type ToolExposureMode,
 } from "./profiles.js";
+import {
+  MODULE_PACK_NAMES,
+  getDefaultModulePacks,
+  resolveModulePackSelection,
+  type ModulePackName,
+} from "./module-packs.js";
 
 export {
   DEFAULT_TOOL_EXPOSURE_BY_PROFILE,
@@ -45,6 +51,17 @@ export {
   type ModuleName,
   type ToolExposureMode,
 } from "./profiles.js";
+export {
+  CORE_MODULE_PACK_NAME,
+  MODULE_PACK_MANIFEST,
+  MODULE_PACK_NAMES,
+  getModulePackNameForModule,
+  getModulePackStatuses,
+  isModulePackAvailable,
+  resolveModulePackSelection,
+  type ModulePackName,
+  type ModulePackStatus,
+} from "./module-packs.js";
 
 /**
  * Return the macOS major version number.
@@ -165,6 +182,10 @@ export interface AirMcpConfig {
   profile: ActiveProfileName;
   /** MCP tools/list exposure mode. Registered tools remain callable through run_tool. */
   toolExposure: ToolExposureMode;
+  /** Available DLC-like module packs. Defaults to every built-in pack. */
+  modulePacks: Set<ModulePackName>;
+  /** True when modulePacks came from config/env instead of the default all-pack set. */
+  modulePacksConfigured: boolean;
   /** Require task-scoped sessions before run_tool can dispatch hidden tools. Default: false */
   requireToolSession: boolean;
   /** Tools exposed in progressive tools/list mode. */
@@ -190,6 +211,7 @@ export interface AirMcpConfig {
 interface FileConfig {
   profile?: string;
   toolExposure?: string;
+  modulePacks?: string | string[];
   requireToolSession?: boolean;
   includeShared?: boolean;
   allowSendMessages?: boolean;
@@ -239,6 +261,10 @@ function loadFileConfig(): LoadResult {
     const config: FileConfig = {};
     if (typeof obj.profile === "string") config.profile = obj.profile;
     if (typeof obj.toolExposure === "string") config.toolExposure = obj.toolExposure;
+    if (typeof obj.modulePacks === "string") config.modulePacks = obj.modulePacks;
+    if (Array.isArray(obj.modulePacks)) {
+      config.modulePacks = obj.modulePacks.filter((m): m is string => typeof m === "string");
+    }
     if (typeof obj.requireToolSession === "boolean") config.requireToolSession = obj.requireToolSession;
     if (typeof obj.includeShared === "boolean") config.includeShared = obj.includeShared;
     if (typeof obj.allowSendMessages === "boolean") config.allowSendMessages = obj.allowSendMessages;
@@ -330,6 +356,13 @@ export function parseConfig(): AirMcpConfig {
     normalizeToolExposureMode(process.env.AIRMCP_TOOL_EXPOSURE) ??
     normalizeToolExposureMode(file.toolExposure) ??
     defaultExposure;
+  const modulePackSelection = resolveModulePackSelection(process.env.AIRMCP_MODULE_PACKS ?? file.modulePacks);
+  if (modulePackSelection.unknown.length > 0) {
+    log.warn("unknown module pack in modulePacks — ignored", {
+      packs: modulePackSelection.unknown,
+      expected: MODULE_PACK_NAMES,
+    });
+  }
 
   // Validate disabledModules: warn about unknown module names
   if (file.disabledModules) {
@@ -361,6 +394,13 @@ export function parseConfig(): AirMcpConfig {
       if (field in rawObj && typeof rawObj[field] !== "boolean") {
         log.warn("config field has wrong type — ignored", { field, expected: "boolean", got: typeof rawObj[field] });
       }
+    }
+    if ("modulePacks" in rawObj && typeof rawObj.modulePacks !== "string" && !Array.isArray(rawObj.modulePacks)) {
+      log.warn("config field has wrong type — ignored", {
+        field: "modulePacks",
+        expected: "string|string[]",
+        got: typeof rawObj.modulePacks,
+      });
     }
   }
 
@@ -458,6 +498,8 @@ export function parseConfig(): AirMcpConfig {
   return {
     profile: activeProfile,
     toolExposure,
+    modulePacks: modulePackSelection.packs.size > 0 ? modulePackSelection.packs : getDefaultModulePacks(),
+    modulePacksConfigured: modulePackSelection.configured,
     requireToolSession,
     progressiveTools: getProgressiveToolAllowlist(),
     includeShared,

@@ -13,7 +13,8 @@ If a variable accepts a path, `~` expands to `$HOME`. Booleans are `"true"` / `"
 | Bind HTTP server to all interfaces with token auth | `AIRMCP_ALLOW_NETWORK=with-token` + `AIRMCP_HTTP_TOKEN=…` |
 | Bind HTTP server with OAuth 2.1 | `AIRMCP_ALLOW_NETWORK=with-oauth` + `AIRMCP_OAUTH_ISSUER=…` + `AIRMCP_OAUTH_AUDIENCE=…` |
 | Disable a flaky module without removing config | `AIRMCP_DEBUG_MODULES=notes,calendar` (whitelist) |
-| Send all 289 tools without compactDescription | `AIRMCP_COMPACT_TOOLS=false` + `AIRMCP_TOOL_EXPOSURE=full` |
+| Use only selected module packs | `AIRMCP_MODULE_PACKS=core,productivity` |
+| Send all 293 tools without compactDescription | `AIRMCP_COMPACT_TOOLS=false` + `AIRMCP_TOOL_EXPOSURE=full` |
 | Require sessions before hidden tools can run | `AIRMCP_REQUIRE_TOOL_SESSION=true` |
 | Increase audit-log signing strength for cross-host integrity | `AIRMCP_AUDIT_HMAC_KEY=<32+ random bytes>` |
 | Block every destructive tool on a panic | `touch ~/.config/airmcp/emergency-stop` |
@@ -83,6 +84,7 @@ If a variable accepts a path, `~` expands to `$HOME`. Booleans are `"true"` / `"
 | `AIRMCP_FULL` | (off) | `true` enables every standard module ignoring the config's `disabledModules`. Profile-only modules stay opt-in. |
 | `AIRMCP_PROFILE` | `starter` | Runtime profile: `starter`, `communications-safe`, `productivity`, or `full`. May also include opt-in modules such as `spatial_prep`. |
 | `AIRMCP_TOOL_EXPOSURE` | profile-dependent | `progressive` exposes the front door, `profile` exposes the selected profile, `full` exposes every loaded tool. |
+| `AIRMCP_MODULE_PACKS` | all packs | Comma-separated DLC-like pack allow-list. `core` is always kept. Examples: `core-only`, `core,communications`, `core,productivity,spatial`, or `all`. Modules whose profile is enabled but pack is unavailable are reported through `profile_status.modulesMissingPacks`. |
 | `AIRMCP_REQUIRE_TOOL_SESSION` | (off) | `true` makes `run_tool` require a valid `sessionId` before dispatching hidden tools. Directly exposed tools remain callable without a session. |
 | `AIRMCP_ENABLE_SPATIAL_PREP` | (off) | `true` enables the experimental read-only spatial asset prep tools. |
 | `AIRMCP_DEBUG_MODULES` | (empty) | Comma-separated whitelist. When set, only listed modules load — easier debugging of import / boot issues. |
@@ -194,6 +196,28 @@ AirMCP's profile/exposure settings control what loads and what appears in `tools
 This is a cooperative harness contract for MCP clients and higher-level agent runners. By default it preserves the compatible no-session path for hidden tools. Set `AIRMCP_REQUIRE_TOOL_SESSION=true` when the client or harness is ready for strict task scoping: hidden tools still appear through `discover_tools`, but `run_tool` refuses to dispatch them unless the caller passes a valid `sessionId`. Directly exposed tools remain callable without a session.
 
 It does not replace OS permissions, HITL approval, OAuth scopes, rate limits, or the emergency stop; those gates still run inside the target tool call.
+
+---
+
+## Module packs
+
+AirMCP module packs are the runtime contract for DLC-like installation. The current npm package still ships every built-in module, but `AIRMCP_MODULE_PACKS` lets operators activate only selected packs today and gives future split packages a tested boundary.
+
+Built-in packs:
+
+- `core`: notes, reminders, calendar, shortcuts, system, Finder, weather, audit visibility
+- `communications`: contacts, mail, messages
+- `productivity`: Pages, Numbers, Keynote
+- `browser`: Safari
+- `media`: Music, TV, Podcasts, speech
+- `visual`: Photos, screen, UI automation
+- `location`: Maps, current location
+- `device`: Bluetooth, Health
+- `intelligence`: Apple Intelligence, memory
+- `google-workspace`: Google Workspace
+- `spatial`: experimental spatial prep
+
+Use `list_module_packs` to inspect the active pack set over MCP. `profile_status` also reports `modulePacksConfigured`, `modulePacksAvailable`, and `modulesMissingPacks` so a client can tell whether a module is disabled by profile/config or unavailable because its pack is not active.
 
 ---
 

@@ -2,7 +2,7 @@
  * Factory for valid AirMcpConfig objects used in tests.
  *
  * Shape mirrors src/shared/config.ts AirMcpConfig interface:
- *   profile, toolExposure, progressiveTools,
+ *   profile, toolExposure, progressiveTools, modulePacks,
  *   includeShared, disabledModules, shareApprovalModules,
  *   allowSendMessages, allowSendMail, allowRunJavascript, hitl
  */
@@ -16,7 +16,9 @@ export function createMockConfig(overrides = {}) {
   return {
     profile: 'starter',
     toolExposure: 'profile',
-    progressiveTools: new Set(['profile_status', 'list_profiles', 'discover_tools', 'run_tool']),
+    progressiveTools: new Set(['profile_status', 'list_profiles', 'list_module_packs', 'discover_tools', 'run_tool']),
+    modulePacks: new Set(['core', 'communications', 'productivity', 'browser', 'media', 'visual', 'location', 'device', 'intelligence', 'google-workspace', 'spatial']),
+    modulePacksConfigured: false,
     includeShared: false,
     disabledModules: new Set(disabledModules),
     shareApprovalModules: new Set(shareApprovalModules),

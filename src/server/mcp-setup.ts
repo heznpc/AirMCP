@@ -26,7 +26,7 @@ import {
   NPM_PACKAGE_NAME,
   type AirMcpConfig,
 } from "../shared/config.js";
-import { loadModuleRegistry, setModuleRegistry } from "../shared/modules.js";
+import { getModulePackPlan, loadModuleRegistry, setModuleRegistry } from "../shared/modules.js";
 import { resolveModuleCompatibility } from "../shared/compatibility.js";
 import { registerDynamicShortcutTools } from "../shortcuts/tools.js";
 import { HitlClient } from "../shared/hitl.js";
@@ -87,6 +87,9 @@ export async function createServer(
   // opt-in surfaces stay zero-cost at startup.
   const MODULE_REGISTRY = await loadModuleRegistry(config);
   setModuleRegistry(MODULE_REGISTRY);
+  const modulePackPlan = getModulePackPlan(config);
+  const modulePacksAvailable = modulePackPlan.packs.filter((pack) => pack.available).map((pack) => pack.name);
+  const modulesMissingPacks = modulePackPlan.modulesMissingPacks;
 
   // RFC 0004: route every module through the compatibility resolver. The
   // resolver folds in minMacosVersion (legacy gate), maxMacosVersion, brokenOn,
@@ -200,6 +203,38 @@ export async function createServer(
     },
   );
 
+  lServer.registerTool(
+    "list_module_packs",
+    {
+      title: "List Module Packs",
+      description:
+        "List DLC-like AirMCP module packs and whether each pack is available in the current runtime configuration.",
+      inputSchema: {},
+      outputSchema: {
+        configured: z.boolean(),
+        active: z.array(z.string()),
+        packs: z.array(
+          z.object({
+            name: z.string(),
+            title: z.string(),
+            description: z.string(),
+            modules: z.array(z.string()),
+            available: z.boolean(),
+            required: z.boolean(),
+          }),
+        ),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async () => {
+      return okStructured({
+        configured: config.modulePacksConfigured,
+        active: modulePacksAvailable,
+        packs: modulePackPlan.packs,
+      });
+    },
+  );
+
   // profile_status: report the active module/exposure contract without forcing
   // clients to inspect every tool in tools/list.
   lServer.registerTool(
@@ -212,6 +247,9 @@ export async function createServer(
       outputSchema: {
         profile: z.string(),
         toolExposure: z.string(),
+        modulePacksConfigured: z.boolean(),
+        modulePacksAvailable: z.array(z.string()),
+        modulesMissingPacks: z.array(z.string()),
         requireToolSession: z.boolean(),
         modulesEnabled: z.array(z.string()),
         modulesDisabled: z.array(z.string()),
@@ -226,6 +264,9 @@ export async function createServer(
       return okStructured({
         profile: config.profile,
         toolExposure: config.toolExposure,
+        modulePacksConfigured: config.modulePacksConfigured,
+        modulePacksAvailable,
+        modulesMissingPacks,
         requireToolSession: config.requireToolSession,
         modulesEnabled: enabled,
         modulesDisabled: disabled,

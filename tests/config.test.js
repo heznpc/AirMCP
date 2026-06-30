@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import {
   MODULE_NAMES,
   KNOWN_MODULE_NAMES,
+  MODULE_PACK_NAMES,
   OPT_IN_MODULE_NAMES,
   STARTER_MODULES,
   parseConfig,
@@ -23,6 +24,7 @@ const ENV_KEYS = [
   'AIRMCP_ALLOW_SEND_MAIL',
   'AIRMCP_ALLOW_RUN_JAVASCRIPT',
   'AIRMCP_REQUIRE_TOOL_SESSION',
+  'AIRMCP_MODULE_PACKS',
   'AIRMCP_SHARE_APPROVAL',
   'AIRMCP_HITL_LEVEL',
   'AIRMCP_AUDIT_LOG',
@@ -171,6 +173,12 @@ describe('parseConfig() — defaults with no config file', () => {
     expect(cfg.requireToolSession).toBe(false);
   });
 
+  test('modulePacks defaults to every built-in pack', () => {
+    const cfg = parseConfig();
+    expect(cfg.modulePacksConfigured).toBe(false);
+    expect([...cfg.modulePacks].sort()).toEqual([...MODULE_PACK_NAMES].sort());
+  });
+
   test('features all default to true (except telemetry)', () => {
     const cfg = parseConfig();
     expect(cfg.features.auditLog).toBe(true);
@@ -280,6 +288,44 @@ describe('parseConfig() — environment variable overrides', () => {
 
       const cfg = parseConfig();
       expect(cfg.requireToolSession).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('AIRMCP_MODULE_PACKS limits available DLC-like module packs and keeps core', () => {
+    process.env.AIRMCP_MODULE_PACKS = 'productivity';
+    const cfg = parseConfig();
+    expect(cfg.modulePacksConfigured).toBe(true);
+    expect(cfg.modulePacks.has('core')).toBe(true);
+    expect(cfg.modulePacks.has('productivity')).toBe(true);
+    expect(cfg.modulePacks.has('communications')).toBe(false);
+  });
+
+  test('AIRMCP_MODULE_PACKS=core-only keeps only the required core pack', () => {
+    process.env.AIRMCP_MODULE_PACKS = 'core-only';
+    const cfg = parseConfig();
+    expect([...cfg.modulePacks]).toEqual(['core']);
+  });
+
+  test('empty AIRMCP_MODULE_PACKS is treated as unset', () => {
+    process.env.AIRMCP_MODULE_PACKS = '';
+    const cfg = parseConfig();
+    expect(cfg.modulePacksConfigured).toBe(false);
+    expect([...cfg.modulePacks].sort()).toEqual([...MODULE_PACK_NAMES].sort());
+  });
+
+  test('config modulePacks accepts aliases', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'airmcp-config-'));
+    try {
+      PATHS.CONFIG = join(dir, 'config.json');
+      writeFileSync(PATHS.CONFIG, JSON.stringify({ modulePacks: ['iwork', 'comms'] }), 'utf8');
+
+      const cfg = parseConfig();
+      expect(cfg.modulePacks.has('core')).toBe(true);
+      expect(cfg.modulePacks.has('productivity')).toBe(true);
+      expect(cfg.modulePacks.has('communications')).toBe(true);
+      expect(cfg.modulePacks.has('media')).toBe(false);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

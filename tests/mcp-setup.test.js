@@ -76,6 +76,19 @@ jest.unstable_mockModule('@modelcontextprotocol/sdk/server/mcp.js', () => ({
 let fakeModuleRegistry = [];
 jest.unstable_mockModule('../dist/shared/modules.js', () => ({
   loadModuleRegistry: jest.fn(async () => fakeModuleRegistry),
+  getModulePackPlan: jest.fn(() => ({
+    packs: [
+      {
+        name: 'core',
+        title: 'Core Workspace',
+        description: 'Core',
+        modules: ['notes'],
+        available: true,
+        required: true,
+      },
+    ],
+    modulesMissingPacks: [],
+  })),
   setModuleRegistry: jest.fn(),
   MODULE_REGISTRY: [],
   getModuleNames: jest.fn(() => fakeModuleRegistry.map((m) => m.name)),
@@ -182,7 +195,7 @@ jest.unstable_mockModule('../dist/shared/share-guard.js', () => ({
 // config — return a benign default config (every module enabled).
 jest.unstable_mockModule('../dist/shared/config.js', () => ({
   NPM_PACKAGE_NAME: 'airmcp',
-  FRONT_DOOR_TOOLS: ['profile_status', 'list_profiles', 'discover_tools', 'run_tool', 'get_workflow'],
+  FRONT_DOOR_TOOLS: ['profile_status', 'list_profiles', 'list_module_packs', 'discover_tools', 'run_tool', 'get_workflow'],
   PROFILE_NAMES: ['starter', 'communications-safe', 'productivity', 'full'],
   PROFILE_DESCRIPTIONS: {
     starter: 'Starter',
@@ -199,7 +212,9 @@ jest.unstable_mockModule('../dist/shared/config.js', () => ({
   parseConfig: jest.fn(() => ({
     profile: 'starter',
     toolExposure: 'profile',
-    progressiveTools: new Set(['profile_status', 'list_profiles', 'discover_tools', 'run_tool']),
+    progressiveTools: new Set(['profile_status', 'list_profiles', 'list_module_packs', 'discover_tools', 'run_tool']),
+    modulePacks: new Set(['core']),
+    modulePacksConfigured: false,
     hitl: { level: 'off' },
     allowSendMail: false,
     allowSendMessages: false,
@@ -230,7 +245,9 @@ function mkConfig() {
   return {
     profile: 'starter',
     toolExposure: 'profile',
-    progressiveTools: new Set(['profile_status', 'list_profiles', 'discover_tools', 'run_tool']),
+    progressiveTools: new Set(['profile_status', 'list_profiles', 'list_module_packs', 'discover_tools', 'run_tool']),
+    modulePacks: new Set(['core']),
+    modulePacksConfigured: false,
     hitl: { level: 'off' },
     allowSendMail: false,
     allowSendMessages: false,

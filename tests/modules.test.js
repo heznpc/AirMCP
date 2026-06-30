@@ -1,5 +1,10 @@
 import { describe, test, expect, jest, beforeEach, afterEach } from '@jest/globals';
-import { getModuleNames, setModuleRegistry, MODULE_REGISTRY } from '../dist/shared/modules.js';
+import { getModuleNames, setModuleRegistry, MODULE_REGISTRY, MODULE_MANIFEST } from '../dist/shared/modules.js';
+import {
+  MODULE_PACK_MANIFEST,
+  getDefaultModulePacks,
+  getModulePackNameForModule,
+} from '../dist/shared/module-packs.js';
 
 /* ================================================================== */
 /*  Static exports (no mocking needed)                                */
@@ -41,6 +46,21 @@ describe('getModuleNames()', () => {
     const first = getModuleNames();
     const second = getModuleNames();
     expect(first).toEqual(second);
+  });
+});
+
+describe('module pack manifest', () => {
+  test('assigns every module manifest entry to exactly one pack', () => {
+    const packedModules = MODULE_PACK_MANIFEST.flatMap((pack) => pack.modules);
+    expect(new Set(packedModules).size).toBe(packedModules.length);
+    for (const mod of MODULE_MANIFEST) {
+      expect(getModulePackNameForModule(mod.name)).toBeTruthy();
+      expect(packedModules).toContain(mod.name);
+    }
+  });
+
+  test('default module packs include all declared packs', () => {
+    expect([...getDefaultModulePacks()].sort()).toEqual(MODULE_PACK_MANIFEST.map((pack) => pack.name).sort());
   });
 });
 
@@ -142,6 +162,35 @@ describe('loadModuleRegistry() — debug filtering', () => {
     });
 
     expect(registry.some((mod) => mod.name === 'spatial_prep')).toBe(false);
+  });
+
+  test('loadModuleRegistry skips modules whose pack is unavailable', async () => {
+    process.env.AIRMCP_DEBUG_MODULES = 'notes,pages';
+    delete process.env.AIRMCP_DEBUG_SEQUENTIAL;
+
+    const { loadModuleRegistry } = await import(
+      `../dist/shared/modules.js?t=${Date.now()}${Math.random()}`
+    );
+
+    const registry = await loadModuleRegistry({
+      modulePacks: new Set(['core']),
+      disabledModules: new Set(),
+      shareApprovalModules: new Set(),
+      includeShared: false,
+      allowSendMessages: false,
+      allowSendMail: false,
+      allowRunJavascript: false,
+      hitl: { level: 'sensitive-only', whitelist: new Set(), timeout: 30, socketPath: '/tmp/hitl.sock' },
+      features: {
+        auditLog: true,
+        usageTracking: true,
+        semanticToolSearch: true,
+        proactiveContext: true,
+        telemetry: false,
+      },
+    });
+
+    expect(registry.some((mod) => mod.name === 'pages')).toBe(false);
   });
 
   test('unknown module names in AIRMCP_DEBUG_MODULES are rejected with warning', async () => {

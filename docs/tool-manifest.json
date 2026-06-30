@@ -1,8 +1,8 @@
 {
   "generatedAt": "STABLE_PLACEHOLDER",
   "protocolVersion": "2025-06-18",
-  "toolCount": 292,
-  "eligibleCount": 286,
+  "toolCount": 293,
+  "eligibleCount": 287,
   "ineligibleCount": 6,
   "ineligibleByReason": {
     "object-param:recurrence": 2,
@@ -6237,6 +6237,84 @@
       "ineligibleReason": null
     },
     {
+      "name": "list_module_packs",
+      "title": "List Module Packs",
+      "description": "List DLC-like AirMCP module packs and whether each pack is available in the current runtime configuration.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {}
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "configured": {
+            "type": "boolean"
+          },
+          "active": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "packs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "modules": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "available": {
+                  "type": "boolean"
+                },
+                "required": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "name",
+                "title",
+                "description",
+                "modules",
+                "available",
+                "required"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "configured",
+          "active",
+          "packs"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "sensitiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "appIntentEligible": true,
+      "ineligibleReason": null
+    },
+    {
       "name": "list_notes",
       "title": "List Notes",
       "description": "List all notes with title, folder, and dates. Optionally filter by folder name. Supports pagination via limit/offset.",
@@ -9270,6 +9348,21 @@
           "toolExposure": {
             "type": "string"
           },
+          "modulePacksConfigured": {
+            "type": "boolean"
+          },
+          "modulePacksAvailable": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "modulesMissingPacks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "requireToolSession": {
             "type": "boolean"
           },
@@ -9304,6 +9397,9 @@
         "required": [
           "profile",
           "toolExposure",
+          "modulePacksConfigured",
+          "modulePacksAvailable",
+          "modulesMissingPacks",
           "requireToolSession",
           "modulesEnabled",
           "modulesDisabled",

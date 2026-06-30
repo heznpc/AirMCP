@@ -21,6 +21,8 @@ final class ConfigManager {
     }
 
     struct Config: Codable, Sendable {
+        var profile: String?
+        var toolExposure: String?
         var includeShared: Bool
         var allowSendMessages: Bool
         var allowSendMail: Bool
@@ -29,9 +31,11 @@ final class ConfigManager {
         var hitl: HitlConfig?
 
         static let `default` = Config(
+            profile: "starter",
+            toolExposure: "progressive",
             includeShared: false,
-            allowSendMessages: true,
-            allowSendMail: true,
+            allowSendMessages: false,
+            allowSendMail: false,
             disabledModules: [],
             shareApproval: nil,
             hitl: nil
@@ -98,7 +102,12 @@ final class ConfigManager {
 
     var disabledModules: [String] {
         get { config.disabledModules }
-        set { config.disabledModules = newValue; save() }
+        set {
+            config.profile = "custom"
+            config.toolExposure = config.toolExposure ?? "profile"
+            config.disabledModules = newValue
+            save()
+        }
     }
 
     var shareApprovalModules: [String] {

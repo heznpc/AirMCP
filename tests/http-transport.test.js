@@ -41,12 +41,12 @@ jest.unstable_mockModule('../dist/server/shutdown.js', () => ({
 }));
 // tool-registry's transitive deps (usage-tracker, audit) touch
 // PATHS + FS — not relevant to http-transport's surface tests, so
-// stub the only two methods the .well-known handler reads at request
+// stub the methods the .well-known handler reads at request
 // time.
 jest.unstable_mockModule('../dist/shared/tool-registry.js', () => ({
   toolRegistry: {
-    getToolCount: () => 0,
-    getToolNames: () => [],
+    getExposedToolCount: () => 0,
+    getExposedToolNames: () => [],
   },
 }));
 

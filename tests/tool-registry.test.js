@@ -12,7 +12,7 @@ jest.unstable_mockModule('../dist/shared/tool-filter.js', () => ({
   compactDescription: jest.fn((d) => d ? d.substring(0, 80) : d),
 }));
 
-const { toolRegistry } = await import('../dist/shared/tool-registry.js');
+const { toolRegistry, ToolInputValidationError } = await import('../dist/shared/tool-registry.js');
 const { McpServer } = await import('@modelcontextprotocol/sdk/server/mcp.js');
 
 // ─── Helper: mock server for unit-level tests ──────────────────────────────
@@ -138,6 +138,24 @@ describe('ToolRegistry (mock server)', () => {
     expect(result.content[0].text).toBe('result');
   });
 
+  test('callTool validates arguments against registerTool inputSchema', async () => {
+    server.registerTool('requires_name', {
+      title: 'Requires Name',
+      inputSchema: {
+        name: z.string().min(1),
+        limit: z.number().int().min(1).default(5),
+      },
+    }, async (args) => ({
+      content: [{ type: 'text', text: JSON.stringify(args) }],
+    }));
+
+    await expect(toolRegistry.callTool('requires_name', {}))
+      .rejects.toBeInstanceOf(ToolInputValidationError);
+
+    const result = await toolRegistry.callTool('requires_name', { name: 'Ada' });
+    expect(JSON.parse(result.content[0].text)).toEqual({ name: 'Ada', limit: 5 });
+  });
+
   test('callTool throws for unknown tool', async () => {
     await expect(toolRegistry.callTool('nonexistent', {}))
       .rejects.toThrow('Tool "nonexistent" not found');
@@ -172,11 +190,44 @@ describe('ToolRegistry (mock server)', () => {
     expect(toolRegistry.getToolCount()).toBe(1);
   });
 
+  test('pruneStaleRegistrations removes entries not registered by the latest server generation', () => {
+    server.registerTool('old_tool', { title: 'Old' }, async () => ({}));
+
+    const server2 = createMockServer();
+    toolRegistry.installOn(server2);
+    server2.registerTool('new_tool', { title: 'New' }, async () => ({}));
+    toolRegistry.pruneStaleRegistrations();
+
+    expect(toolRegistry.getToolNames()).toEqual(['new_tool']);
+    expect(toolRegistry.getToolInfo('old_tool')).toBeUndefined();
+  });
+
   test('reset() clears all registrations', () => {
     server.registerTool('old_tool', { title: 'Old' }, async () => ({}));
     expect(toolRegistry.getToolCount()).toBe(1);
     toolRegistry.reset();
     expect(toolRegistry.getToolCount()).toBe(0);
+  });
+
+  test('progressive exposure hides tools from SDK but keeps them searchable and callable', async () => {
+    toolRegistry.configureExposure({ mode: 'progressive', exposedToolNames: new Set(['visible_tool']) });
+
+    server.registerTool('visible_tool', { title: 'Visible', description: 'Shown to tools/list' }, async () => ({
+      content: [{ type: 'text', text: 'visible' }],
+    }));
+    server.registerTool('hidden_tool', { title: 'Hidden', description: 'Still discoverable' }, async () => ({
+      content: [{ type: 'text', text: 'hidden' }],
+    }));
+
+    expect(toolRegistry.getToolCount()).toBe(2);
+    expect(toolRegistry.getExposedToolNames()).toEqual(['visible_tool']);
+    expect(toolRegistry.getExposedToolCount()).toBe(1);
+    expect(server._tools.has('visible_tool')).toBe(true);
+    expect(server._tools.has('hidden_tool')).toBe(false);
+    expect(toolRegistry.searchTools('hidden').map((r) => r.name)).toContain('hidden_tool');
+
+    const result = await toolRegistry.callTool('hidden_tool', {});
+    expect(result.content[0].text).toBe('hidden');
   });
 });
 

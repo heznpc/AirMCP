@@ -2,8 +2,8 @@
 //
 // Source: docs/tool-manifest.json
 // Generator: scripts/gen-swift-intents.mjs
-// RFC 0007 Phase A.2b.2 + A.4.1 — 228 auto-selected read-only
-// tools (79 with typed drift-guards + Interactive Snippet
+// RFC 0007 Phase A.2b.2 + A.4.1 — 230 auto-selected read-only
+// tools (81 with typed drift-guards + Interactive Snippet
 // SwiftUI views) + 9 AppShortcutsProvider entries.
 // Run `npm run gen:intents` to refresh after tool metadata changes.
 // CI guards against drift via `npm run gen:intents:check`.
@@ -539,6 +539,20 @@ public struct MCPListPlaylistsOutput: Codable, Sendable {
     public let playlists: [PlaylistsItem]
 }
 
+// Output type for: list_profiles
+public struct MCPListProfilesOutput: Codable, Sendable {
+    public struct ProfilesItem: Codable, Sendable {
+        public let name: String
+        public let description: String
+        public let modules: [String]
+        public let defaultToolExposure: String
+    }
+
+    public let profiles: [ProfilesItem]
+    public let active: String
+    public let toolExposure: String
+}
+
 // Output type for: list_reading_list
 public struct MCPListReadingListOutput: Codable, Sendable {
     public struct ItemsItem: Codable, Sendable {
@@ -740,6 +754,17 @@ public struct MCPProactiveContextOutput: Codable, Sendable {
     public let timeContext: Timecontext
     public let suggestedTools: [SuggestedtoolsItem]
     public let suggestedWorkflows: [String]
+}
+
+// Output type for: profile_status
+public struct MCPProfileStatusOutput: Codable, Sendable {
+    public let profile: String
+    public let toolExposure: String
+    public let modulesEnabled: [String]
+    public let modulesDisabled: [String]
+    public let toolsExposed: Double
+    public let toolsRegistered: Double
+    public let frontDoorTools: [String]
 }
 
 // Output type for: read_chat
@@ -4398,6 +4423,34 @@ public struct ListPodcastShowsIntent: AppIntent {
     }
 }
 
+// Tool: list_profiles
+public struct ListProfilesIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "List Profiles"
+    nonisolated(unsafe) public static var description = IntentDescription("List AirMCP runtime profiles. Profiles choose which modules load; toolExposure chooses how much of that surface appears in tools/list.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @MainActor
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "list_profiles",
+            args: [String: any Sendable]()
+        )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "list_profiles", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPListProfilesOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPListProfilesSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
+        return .result(value: result)
+    }
+}
+
 // Tool: list_reading_list
 public struct ListReadingListIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "List Reading List"
@@ -5581,6 +5634,34 @@ public struct ProactiveContextIntent: AppIntent {
         #if canImport(SwiftUI) && compiler(>=6.3)
         if #available(macOS 26, iOS 26, *) {
             return .result(value: result, view: MCPProactiveContextSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
+        return .result(value: result)
+    }
+}
+
+// Tool: profile_status
+public struct ProfileStatusIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Profile Status"
+    nonisolated(unsafe) public static var description = IntentDescription("Show the active AirMCP profile, module set, tool exposure mode, exposed tool count, and total registered tool count.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @MainActor
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "profile_status",
+            args: [String: any Sendable]()
+        )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "profile_status", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPProfileStatusOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPProfileStatusSnippetView(data: decoded))
         }
         #endif
         _ = decoded
@@ -9092,6 +9173,23 @@ public struct MCPListPlaylistsSnippetView: View {
     }
 }
 
+// Snippet view for: list_profiles  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPListProfilesSnippetView: View {
+    public let data: MCPListProfilesOutput
+    public init(data: MCPListProfilesOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.profiles.enumerated()), id: \.offset) { _, row in
+                Text(row.name)
+                    .font(.body)
+                    .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
 // Snippet view for: list_reading_list  (shape: list-object)
 @available(macOS 26, iOS 26, *)
 public struct MCPListReadingListSnippetView: View {
@@ -9406,6 +9504,67 @@ public struct MCPProactiveContextSnippetView: View {
                 Text("Suggested Workflows")
                 Spacer()
                 Text(String(describing: data.suggestedWorkflows))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: profile_status  (shape: scalar)
+@available(macOS 26, iOS 26, *)
+public struct MCPProfileStatusSnippetView: View {
+    public let data: MCPProfileStatusOutput
+    public init(data: MCPProfileStatusOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text("Profile")
+                Spacer()
+                Text(data.profile)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Tool Exposure")
+                Spacer()
+                Text(data.toolExposure)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Modules Enabled")
+                Spacer()
+                Text(String(describing: data.modulesEnabled))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Modules Disabled")
+                Spacer()
+                Text(String(describing: data.modulesDisabled))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Tools Exposed")
+                Spacer()
+                Text(data.toolsExposed.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Tools Registered")
+                Spacer()
+                Text(data.toolsRegistered.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Front Door Tools")
+                Spacer()
+                Text(String(describing: data.frontDoorTools))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }

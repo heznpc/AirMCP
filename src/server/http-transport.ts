@@ -484,11 +484,12 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
       httpToken,
       allowNetwork,
       allowedOrigins: [...allowedOrigins],
-      // Read tool inventory at request time so a hot-reload or a
-      // later `listChanged` notification doesn't leave the card stale.
+      // Read the advertised tools/list inventory at request time so a
+      // hot-reload, profile change, or later `listChanged` notification
+      // doesn't leave the discovery card stale or wider than active exposure.
       tools: {
-        count: toolRegistry.getToolCount(),
-        names: toolRegistry.getToolNames(),
+        count: toolRegistry.getExposedToolCount(),
+        names: toolRegistry.getExposedToolNames(),
       },
       modules: enabledModuleNames,
       oauth: oauth ?? undefined,

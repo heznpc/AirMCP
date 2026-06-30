@@ -1,6 +1,6 @@
 # AirMCP
 
-> MCP server for the entire Apple ecosystem. 286 tools across 29 modules.
+> Approval-gated local action runtime for Apple workspaces. 289 tools across 29 modules.
 
 ## Links
 

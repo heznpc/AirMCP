@@ -6,7 +6,7 @@
 import { McpServer as SdkMcpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { McpServer as LightMcpServer } from "../shared/mcp.js";
 import { z } from "zod";
-import { ok, okStructured, errSwift, errNotFound, errUpstream, toolError } from "../shared/result.js";
+import { ok, okStructured, errSwift, errInvalidInput, errNotFound, errUpstream, toolError } from "../shared/result.js";
 import { registerCrossPrompts } from "../cross/prompts.js";
 import { registerCrossTools } from "../cross/tools.js";
 import { registerSemanticTools } from "../semantic/tools.js";
@@ -16,13 +16,22 @@ import { registerSkillEngine } from "../skills/index.js";
 import { log, errToCtx } from "../shared/logger.js";
 import { getRegisteredTriggers } from "../skills/triggers.js";
 import { registerApps } from "../apps/tools.js";
-import { getCompatibilityEnv, isModuleEnabled, NPM_PACKAGE_NAME, type AirMcpConfig } from "../shared/config.js";
+import {
+  FRONT_DOOR_TOOLS,
+  PROFILE_DESCRIPTIONS,
+  PROFILE_MODULES,
+  PROFILE_NAMES,
+  getCompatibilityEnv,
+  isModuleEnabled,
+  NPM_PACKAGE_NAME,
+  type AirMcpConfig,
+} from "../shared/config.js";
 import { loadModuleRegistry, setModuleRegistry } from "../shared/modules.js";
 import { resolveModuleCompatibility } from "../shared/compatibility.js";
 import { registerDynamicShortcutTools } from "../shortcuts/tools.js";
 import { HitlClient } from "../shared/hitl.js";
 import { installHitlGuard } from "../shared/hitl-guard.js";
-import { toolRegistry } from "../shared/tool-registry.js";
+import { ToolInputValidationError, toolRegistry } from "../shared/tool-registry.js";
 import { semanticToolSearch, isToolSearchIndexed, indexToolDescriptions } from "../shared/tool-search.js";
 import { isCompactMode } from "../shared/tool-filter.js";
 import { usageTracker } from "../shared/usage-tracker.js";
@@ -63,6 +72,10 @@ export async function createServer(
   // handler with audit/usage tracking and stores it in its map. This makes
   // the stored handler `audit(HITL(callback))` so that skill execution via
   // toolRegistry.callTool() also goes through HITL approval.
+  toolRegistry.configureExposure({
+    mode: config.toolExposure,
+    exposedToolNames: config.toolExposure === "progressive" ? config.progressiveTools : undefined,
+  });
   toolRegistry.installOn(lServer);
 
   if (hitlClient && config.hitl.level !== "off") {
@@ -152,6 +165,105 @@ export async function createServer(
     // we only register it when both modules are enabled.
     timeline: enabled.includes("calendar") && enabled.includes("reminders"),
   });
+
+  // list_profiles: small front door for profile-first setup
+  lServer.registerTool(
+    "list_profiles",
+    {
+      title: "List Profiles",
+      description:
+        "List AirMCP runtime profiles. Profiles choose which modules load; toolExposure chooses how much of that surface appears in tools/list.",
+      inputSchema: {},
+      outputSchema: {
+        profiles: z.array(
+          z.object({
+            name: z.string(),
+            description: z.string(),
+            modules: z.array(z.string()),
+            defaultToolExposure: z.string(),
+          }),
+        ),
+        active: z.string(),
+        toolExposure: z.string(),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async () => {
+      const profiles = PROFILE_NAMES.map((name) => ({
+        name,
+        description: PROFILE_DESCRIPTIONS[name],
+        modules: [...PROFILE_MODULES[name]],
+        defaultToolExposure: name === "full" ? "full" : name === "productivity" ? "profile" : "progressive",
+      }));
+      return okStructured({ profiles, active: config.profile, toolExposure: config.toolExposure });
+    },
+  );
+
+  // profile_status: report the active module/exposure contract without forcing
+  // clients to inspect every tool in tools/list.
+  lServer.registerTool(
+    "profile_status",
+    {
+      title: "Profile Status",
+      description:
+        "Show the active AirMCP profile, module set, tool exposure mode, exposed tool count, and total registered tool count.",
+      inputSchema: {},
+      outputSchema: {
+        profile: z.string(),
+        toolExposure: z.string(),
+        modulesEnabled: z.array(z.string()),
+        modulesDisabled: z.array(z.string()),
+        toolsExposed: z.number(),
+        toolsRegistered: z.number(),
+        frontDoorTools: z.array(z.string()),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async () => {
+      return okStructured({
+        profile: config.profile,
+        toolExposure: config.toolExposure,
+        modulesEnabled: enabled,
+        modulesDisabled: disabled,
+        toolsExposed: toolRegistry.getExposedToolCount(),
+        toolsRegistered: toolRegistry.getToolCount(),
+        frontDoorTools: [...FRONT_DOOR_TOOLS],
+      });
+    },
+  );
+
+  // run_tool: dispatcher for progressive exposure. Hidden tools remain in the
+  // registry and are invoked through the same wrapped handler path.
+  lServer.registerTool(
+    "run_tool",
+    {
+      title: "Run Tool",
+      description:
+        "Run an AirMCP tool by name with JSON arguments. Use discover_tools first when the tool is not visible in tools/list.",
+      inputSchema: {
+        name: z.string().min(1).max(200).describe("Registered tool name to run"),
+        args: z.record(z.string(), z.unknown()).optional().describe("Tool arguments as a JSON object"),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async ({ name, args }) => {
+      if (name === "run_tool") {
+        return errInvalidInput("run_tool cannot call itself");
+      }
+      const info = toolRegistry.getToolInfo(name);
+      if (!info) {
+        return errNotFound(`Unknown tool "${name}". Use discover_tools to find available tools.`);
+      }
+      try {
+        return await toolRegistry.callTool(name, args ?? {});
+      } catch (e) {
+        if (e instanceof ToolInputValidationError) {
+          return errInvalidInput(e.message);
+        }
+        return errUpstream(`Failed to run tool "${name}": ${e instanceof Error ? e.message : String(e)}`);
+      }
+    },
+  );
 
   // discover_tools: SEP-1821-inspired dynamic tool discovery
   lServer.registerTool(
@@ -471,6 +583,8 @@ export async function createServer(
     },
   );
 
+  toolRegistry.pruneStaleRegistrations();
+
   // Index tool descriptions for semantic search (non-blocking, if enabled)
   if (config.features.semanticToolSearch) {
     indexToolDescriptions().catch((e) => {
@@ -479,7 +593,7 @@ export async function createServer(
   }
 
   // Collect banner info for startup display
-  const toolCount = toolRegistry.getToolCount();
+  const toolCount = toolRegistry.getExposedToolCount();
   const promptCount = toolRegistry.getPromptCount();
 
   const bannerInfo: BannerInfo = {

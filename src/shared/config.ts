@@ -5,6 +5,46 @@ import { release } from "node:os";
 import { HOME, PATHS } from "./constants.js";
 import { HEALTHKIT_MIN_MACOS, type CompatibilityEnv } from "./compatibility.js";
 import { log, errToCtx } from "./logger.js";
+import {
+  DEFAULT_TOOL_EXPOSURE_BY_PROFILE,
+  KNOWN_MODULE_NAMES,
+  OPT_IN_MODULE_NAMES,
+  PROFILE_NAMES,
+  getProfileModules,
+  getProgressiveToolAllowlist,
+  normalizeProfileName,
+  normalizeToolExposureMode,
+  type ActiveProfileName,
+  type AirMcpProfileName,
+  type ToolExposureMode,
+} from "./profiles.js";
+
+export {
+  DEFAULT_TOOL_EXPOSURE_BY_PROFILE,
+  FRONT_DOOR_TOOLS,
+  KNOWN_MODULE_NAMES,
+  MODULE_NAMES,
+  OPT_IN_MODULE_NAMES,
+  PROFILE_DESCRIPTIONS,
+  PROFILE_MODULES,
+  PROFILE_NAMES,
+  PROGRESSIVE_EXPOSED_TOOLS,
+  STARTER_MODULE_NAMES,
+  STARTER_MODULES,
+  TOOL_EXPOSURE_MODES,
+  getProfileDisabledModules,
+  getProfileModules,
+  getProgressiveToolAllowlist,
+  isProfileName,
+  isToolExposureMode,
+  normalizeProfileName,
+  normalizeToolExposureMode,
+  type ActiveProfileName,
+  type AirMcpProfileName,
+  type KnownModuleName,
+  type ModuleName,
+  type ToolExposureMode,
+} from "./profiles.js";
 
 /**
  * Return the macOS major version number.
@@ -77,7 +117,7 @@ export function getCompatibilityEnv(): CompatibilityEnv {
 /** npm package name — single source of truth for npx/install references */
 export const NPM_PACKAGE_NAME = "airmcp";
 /** Version-pinned npm package specifier for app-owned proxy/runtime commands. */
-export const NPM_PACKAGE_SPECIFIER = process.env.AIRMCP_NPM_PACKAGE_SPECIFIER || "airmcp@2.13.0";
+export const NPM_PACKAGE_SPECIFIER = process.env.AIRMCP_NPM_PACKAGE_SPECIFIER || "airmcp@2.14.0";
 
 export type HitlLevel = "off" | "destructive-only" | "sensitive-only" | "all-writes" | "all";
 
@@ -89,55 +129,6 @@ export interface HitlConfig {
 }
 
 const HITL_LEVELS: readonly string[] = ["off", "destructive-only", "sensitive-only", "all-writes", "all"];
-
-export const MODULE_NAMES = [
-  "notes",
-  "reminders",
-  "calendar",
-  "contacts",
-  "mail",
-  "messages",
-  "music",
-  "finder",
-  "safari",
-  "system",
-  "photos",
-  "shortcuts",
-  "intelligence",
-  "tv",
-  "ui",
-  "screen",
-  "maps",
-  "podcasts",
-  "weather",
-  "pages",
-  "numbers",
-  "keynote",
-  "location",
-  "bluetooth",
-  "google",
-  "speech",
-  "health",
-  "memory",
-  "audit",
-] as const;
-
-export const OPT_IN_MODULE_NAMES = ["spatial_prep"] as const;
-export const KNOWN_MODULE_NAMES = [...MODULE_NAMES, ...OPT_IN_MODULE_NAMES] as const;
-
-/** Core modules enabled by default when no config.json exists */
-export const STARTER_MODULES: ReadonlySet<string> = new Set([
-  "notes",
-  "reminders",
-  "calendar",
-  "shortcuts",
-  "system",
-  "finder",
-  "weather",
-]);
-
-export type ModuleName = (typeof MODULE_NAMES)[number];
-export type KnownModuleName = (typeof KNOWN_MODULE_NAMES)[number];
 
 export interface McpClient {
   name: string;
@@ -170,6 +161,12 @@ export interface FeaturesConfig {
 }
 
 export interface AirMcpConfig {
+  /** Active module profile. "custom" means legacy disabledModules controls the surface. */
+  profile: ActiveProfileName;
+  /** MCP tools/list exposure mode. Registered tools remain callable through run_tool. */
+  toolExposure: ToolExposureMode;
+  /** Tools exposed in progressive tools/list mode. */
+  progressiveTools: Set<string>;
   /** Include shared notes/folders in results. Default: false */
   includeShared: boolean;
   /** Set of disabled module names */
@@ -189,6 +186,8 @@ export interface AirMcpConfig {
 }
 
 interface FileConfig {
+  profile?: string;
+  toolExposure?: string;
   includeShared?: boolean;
   allowSendMessages?: boolean;
   allowSendMail?: boolean;
@@ -235,6 +234,8 @@ function loadFileConfig(): LoadResult {
     }
     const obj = raw as Record<string, unknown>;
     const config: FileConfig = {};
+    if (typeof obj.profile === "string") config.profile = obj.profile;
+    if (typeof obj.toolExposure === "string") config.toolExposure = obj.toolExposure;
     if (typeof obj.includeShared === "boolean") config.includeShared = obj.includeShared;
     if (typeof obj.allowSendMessages === "boolean") config.allowSendMessages = obj.allowSendMessages;
     if (typeof obj.allowSendMail === "boolean") config.allowSendMail = obj.allowSendMail;
@@ -304,6 +305,27 @@ function envBool(envKey: string, fileValue: boolean | undefined, defaultValue: b
 export function parseConfig(): AirMcpConfig {
   const { config: file, fileExists, rawObj } = loadFileConfig();
   const fullMode = process.env.AIRMCP_FULL === "true" || process.argv.includes("--full");
+  const profileEnv = parseProfileEnv(process.env.AIRMCP_PROFILE);
+  const fileProfile = normalizeProfileName(file.profile);
+  const fileProfileWasProvided = file.profile !== undefined;
+  const envProfile = profileEnv.profile;
+  if (fileProfileWasProvided && !fileProfile) {
+    log.warn("invalid profile — using safe starter profile", {
+      provided: file.profile,
+      expected: PROFILE_NAMES,
+    });
+  }
+  const activeProfile: ActiveProfileName = fullMode
+    ? "full"
+    : (envProfile ?? fileProfile ?? (fileProfileWasProvided ? "starter" : !fileExists ? "starter" : "custom"));
+  const profileModules =
+    activeProfile !== "custom" ? new Set<string>(getProfileModules(activeProfile as AirMcpProfileName)) : null;
+  const defaultExposure =
+    activeProfile !== "custom" ? DEFAULT_TOOL_EXPOSURE_BY_PROFILE[activeProfile as AirMcpProfileName] : "profile";
+  const toolExposure =
+    normalizeToolExposureMode(process.env.AIRMCP_TOOL_EXPOSURE) ??
+    normalizeToolExposureMode(file.toolExposure) ??
+    defaultExposure;
 
   // Validate disabledModules: warn about unknown module names
   if (file.disabledModules) {
@@ -332,23 +354,21 @@ export function parseConfig(): AirMcpConfig {
     }
   }
 
-  // Disabled modules: env vars override, then JSON fallback, then starter preset
+  // Disabled modules: env vars override, then profile, then JSON fallback.
   const disabledModules = new Set<string>();
   const fileDisabled = new Set(file.disabledModules ?? []);
-  const enabledProfiles = parseProfileEnv(process.env.AIRMCP_PROFILE);
   for (const mod of KNOWN_MODULE_NAMES) {
     const envKey = `AIRMCP_DISABLE_${mod.toUpperCase()}`;
     const enableEnvKey = `AIRMCP_ENABLE_${mod.toUpperCase()}`;
     const envVal = process.env[envKey];
-    const optInEnabled = process.env[enableEnvKey] === "true" || enabledProfiles.has(mod);
+    const optInEnabled = process.env[enableEnvKey] === "true" || profileEnv.optIns.has(mod);
     if (envVal === "true") {
       disabledModules.add(mod);
     } else if ((OPT_IN_MODULE_NAMES as readonly string[]).includes(mod) && !optInEnabled) {
       disabledModules.add(mod);
-    } else if (envVal === undefined && !fullMode && fileDisabled.has(mod)) {
+    } else if (envVal === undefined && !fullMode && profileModules && !profileModules.has(mod) && !optInEnabled) {
       disabledModules.add(mod);
-    } else if (envVal === undefined && !fileExists && !fullMode && !STARTER_MODULES.has(mod) && !optInEnabled) {
-      // No config.json & not --full: apply starter preset
+    } else if (envVal === undefined && !fullMode && fileDisabled.has(mod)) {
       disabledModules.add(mod);
     }
   }
@@ -425,6 +445,9 @@ export function parseConfig(): AirMcpConfig {
   };
 
   return {
+    profile: activeProfile,
+    toolExposure,
+    progressiveTools: getProgressiveToolAllowlist(),
     includeShared,
     disabledModules,
     shareApprovalModules,
@@ -440,14 +463,21 @@ export function isModuleEnabled(config: AirMcpConfig, moduleName: string): boole
   return !config.disabledModules.has(moduleName);
 }
 
-function parseProfileEnv(raw: string | undefined): Set<string> {
-  const profiles = new Set<string>();
-  if (!raw) return profiles;
+function parseProfileEnv(raw: string | undefined): { profile: AirMcpProfileName | null; optIns: Set<string> } {
+  let profile: AirMcpProfileName | null = null;
+  const optIns = new Set<string>();
+  if (!raw) return { profile, optIns };
   for (const part of raw.split(",")) {
-    const profile = part.trim().toLowerCase();
-    if (profile) profiles.add(profile);
+    const token = part.trim().toLowerCase();
+    if (!token) continue;
+    const normalizedProfile = normalizeProfileName(token);
+    if (normalizedProfile && !profile) {
+      profile = normalizedProfile;
+    } else if ((KNOWN_MODULE_NAMES as readonly string[]).includes(token)) {
+      optIns.add(token);
+    }
   }
-  return profiles;
+  return { profile, optIns };
 }
 
 export function needsShareApproval(config: AirMcpConfig, moduleName: string): boolean {

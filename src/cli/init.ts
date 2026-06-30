@@ -7,7 +7,14 @@
  */
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
-import { MODULE_NAMES, STARTER_MODULES } from "../shared/config.js";
+import {
+  DEFAULT_TOOL_EXPOSURE_BY_PROFILE,
+  MODULE_NAMES,
+  PROFILE_MODULES,
+  STARTER_MODULES,
+  normalizeProfileName,
+  type AirMcpProfileName,
+} from "../shared/config.js";
 import { PATHS } from "../shared/constants.js";
 import { codexManualSetupCommand, stdioProxyEntry } from "./codex-mcp.js";
 import { configureMcpClients } from "./client-config.js";
@@ -289,20 +296,13 @@ const PRESETS: Record<string, { desc: string; modules: string[] }> = {
     desc: "Core essentials (7 modules) \u2014 Notes, Calendar, Reminders, System, Shortcuts, Finder, Weather",
     modules: [...STARTER_MODULES],
   },
+  "communications-safe": {
+    desc: "Starter plus Contacts, Mail, Messages (send actions remain OFF)",
+    modules: [...PROFILE_MODULES["communications-safe"]],
+  },
   productivity: {
-    desc: "All productivity apps (10 modules)",
-    modules: [
-      "notes",
-      "reminders",
-      "calendar",
-      "contacts",
-      "mail",
-      "messages",
-      "pages",
-      "numbers",
-      "keynote",
-      "shortcuts",
-    ],
+    desc: "All productivity apps (11 modules)",
+    modules: [...PROFILE_MODULES.productivity],
   },
   all: {
     desc: `Everything (${MODULE_NAMES.length} modules)`,
@@ -314,17 +314,129 @@ const PRESETS: Record<string, { desc: string; modules: string[] }> = {
 
 import { DIM, RESET, BOLD, WHITE, GREEN, YELLOW } from "./style.js";
 
+function parseInitArgs(): { yes: boolean; profile: AirMcpProfileName | null; noClients: boolean } {
+  const args = process.argv.slice(3);
+  let profile: AirMcpProfileName | null = null;
+  let yes = false;
+  let noClients = false;
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === "--yes" || arg === "-y") {
+      yes = true;
+    } else if (arg === "--no-clients") {
+      noClients = true;
+    } else if (arg === "--profile") {
+      profile = normalizeProfileName(args[i + 1]) ?? null;
+      i++;
+    } else if (arg?.startsWith("--profile=")) {
+      profile = normalizeProfileName(arg.slice("--profile=".length));
+    }
+  }
+  return { yes, profile, noClients };
+}
+
+function inferProfile(enabled: Set<string>): AirMcpProfileName | "custom" {
+  for (const profile of Object.keys(PROFILE_MODULES) as AirMcpProfileName[]) {
+    const modules = PROFILE_MODULES[profile];
+    if (modules.length !== enabled.size) continue;
+    if (modules.every((moduleName) => enabled.has(moduleName))) return profile;
+  }
+  return "custom";
+}
+
+function readExistingConfig(): Record<string, unknown> {
+  if (!existsSync(PATHS.CONFIG)) return {};
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(PATHS.CONFIG, "utf-8"));
+    return isPlainObject(parsed) ? parsed : {};
+  } catch {
+    console.warn(`\n  ${YELLOW}\u26A0${RESET} Existing config.json is corrupt JSON — overwriting`);
+    return {};
+  }
+}
+
+function writeConfigPayload(payload: Record<string, unknown>): void {
+  mkdirSync(PATHS.CONFIG_DIR, { recursive: true });
+  writeFileSync(PATHS.CONFIG, JSON.stringify(payload, null, 2) + "\n");
+}
+
+function buildConfigPayload(params: {
+  existingConfig: Record<string, unknown>;
+  locale?: string;
+  enabled: Set<string>;
+  includeShared: boolean;
+  allowSendMessages: boolean;
+  allowSendMail: boolean;
+  allowRunJavascript: boolean;
+  hitlLevel: string;
+  features: Record<string, boolean>;
+}): Record<string, unknown> {
+  const selectedProfile = inferProfile(params.enabled);
+  const disabledModules = MODULE_NAMES.filter((m) => !params.enabled.has(m));
+  const existingHitl = isPlainObject(params.existingConfig.hitl) ? params.existingConfig.hitl : {};
+  const existingFeatures = isPlainObject(params.existingConfig.features) ? params.existingConfig.features : {};
+  return {
+    ...params.existingConfig,
+    ...(params.locale ? { locale: params.locale } : {}),
+    profile: selectedProfile,
+    toolExposure: selectedProfile === "custom" ? "profile" : DEFAULT_TOOL_EXPOSURE_BY_PROFILE[selectedProfile],
+    disabledModules,
+    includeShared: params.includeShared,
+    allowSendMessages: params.allowSendMessages,
+    allowSendMail: params.allowSendMail,
+    allowRunJavascript: params.allowRunJavascript,
+    hitl: { ...existingHitl, level: params.hitlLevel },
+    features: {
+      ...existingFeatures,
+      ...params.features,
+    },
+  };
+}
+
 export async function runInit(): Promise<void> {
+  const initArgs = parseInitArgs();
+  if (initArgs.yes && initArgs.profile) {
+    const enabled = new Set<string>(PROFILE_MODULES[initArgs.profile]);
+    const configPayload = buildConfigPayload({
+      existingConfig: readExistingConfig(),
+      enabled,
+      includeShared: false,
+      allowSendMessages: false,
+      allowSendMail: false,
+      allowRunJavascript: false,
+      hitlLevel: "sensitive-only",
+      features: {
+        usageTracking: true,
+        auditLog: true,
+        semanticToolSearch: true,
+        proactiveContext: true,
+      },
+    });
+    try {
+      writeConfigPayload(configPayload);
+    } catch (err) {
+      console.error(`[AirMCP] Failed to write config: ${formatError(err)}`);
+      process.exit(1);
+    }
+    const clientResults = initArgs.noClients ? [] : configureMcpClients({ includeSkipped: false });
+    const patchedClients = clientResults.filter((result) => result.status !== "failed").length;
+    console.log(
+      `[AirMCP] profile=${initArgs.profile}, toolExposure=${configPayload.toolExposure}, modules=${enabled.size}, clients=${patchedClients}`,
+    );
+    console.log(`[AirMCP] wrote ${PATHS.CONFIG}`);
+    return;
+  }
+
   // Guard: interactive prompts require a TTY
   if (!process.stdin.isTTY) {
     console.error(
       "[AirMCP] init requires an interactive terminal.\n" +
-        "  For non-interactive setup, create the config manually:\n" +
-        `    mkdir -p ${PATHS.CONFIG_DIR}\n` +
-        `    echo '{}' > ${PATHS.CONFIG}\n` +
-        "  Or run the default starter modules (no config needed):\n" +
-        "    npx airmcp\n" +
-        "  (set AIRMCP_FULL=true to load all modules instead)",
+        "  For non-interactive setup, choose a profile explicitly:\n" +
+        "    npx airmcp init --profile starter --yes\n" +
+        "    npx airmcp init --profile communications-safe --yes\n" +
+        "    npx airmcp init --profile productivity --yes\n" +
+        "    npx airmcp init --profile full --yes\n" +
+        "  Add --no-clients to write config.json without patching MCP clients.",
     );
     process.exit(1);
   }
@@ -366,6 +478,7 @@ export async function runInit(): Promise<void> {
   const presetMap = {
     all: [...MODULE_NAMES],
     starter: [...STARTER_MODULES],
+    comms: PRESETS["communications-safe"]!.modules,
     productivity: PRESETS.productivity!.modules,
   };
 
@@ -407,48 +520,26 @@ export async function runInit(): Promise<void> {
   );
 
   // --- Step 4: Write config.json ---
-  const disabledModules = MODULE_NAMES.filter((m) => !enabled.has(m));
-
   console.log("");
   process.stdout.write(`  ${t("writing_config", lang)}`);
-
-  mkdirSync(PATHS.CONFIG_DIR, { recursive: true });
-
-  // Preserve unknown fields from any existing config so a re-run of init
-  // doesn't wipe out hand-edited keys (e.g. hitl.whitelist, future flags).
-  let existingConfig: Record<string, unknown> = {};
-  if (existsSync(PATHS.CONFIG)) {
-    try {
-      const parsed: unknown = JSON.parse(readFileSync(PATHS.CONFIG, "utf-8"));
-      if (isPlainObject(parsed)) {
-        existingConfig = parsed;
-      }
-    } catch {
-      console.warn(`\n  ${YELLOW}\u26A0${RESET} Existing config.json is corrupt JSON — overwriting`);
-    }
-  }
-  const existingHitl = isPlainObject(existingConfig.hitl) ? existingConfig.hitl : {};
-  const existingFeatures = isPlainObject(existingConfig.features) ? existingConfig.features : {};
-
-  const configPayload = {
-    ...existingConfig,
+  const configPayload = buildConfigPayload({
+    existingConfig: readExistingConfig(),
     locale: lang,
-    disabledModules,
+    enabled,
     includeShared: permSelected.has("includeShared"),
     allowSendMessages: permSelected.has("sendMessages"),
     allowSendMail: permSelected.has("sendMail"),
     allowRunJavascript: permSelected.has("runJavascript"),
-    hitl: { ...existingHitl, level: hitlLevel },
+    hitlLevel,
     features: {
-      ...existingFeatures,
       usageTracking: featureSelected.has("usageTracking"),
       auditLog: featureSelected.has("auditLog"),
       semanticToolSearch: featureSelected.has("semanticToolSearch"),
       proactiveContext: featureSelected.has("proactiveContext"),
     },
-  };
+  });
   try {
-    writeFileSync(PATHS.CONFIG, JSON.stringify(configPayload, null, 2) + "\n");
+    writeConfigPayload(configPayload);
   } catch (err) {
     console.error(`\n  ${YELLOW}\u2716${RESET} Failed to write config: ${formatError(err)}`);
     process.exit(1);
@@ -486,7 +577,7 @@ export async function runInit(): Promise<void> {
   // --- Done ---
   console.log("");
   console.log(
-    `  ${GREEN}\u2713${RESET} ${t("setup_complete", lang)} ${BOLD}${enabled.size} modules${RESET}, safety: ${BOLD}${hitlLevel}${RESET}, ${patchedClients} client(s) configured.`,
+    `  ${GREEN}\u2713${RESET} ${t("setup_complete", lang)} ${BOLD}${enabled.size} modules${RESET}, profile: ${BOLD}${String(configPayload.profile)}${RESET}, safety: ${BOLD}${hitlLevel}${RESET}, ${patchedClients} client(s) configured.`,
   );
   if (detectedClients.length > 0) {
     console.log(`  ${DIM}Start AirMCP.app, then restart ${detectedClients.join(", ")} to connect.${RESET}`);

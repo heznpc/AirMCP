@@ -166,11 +166,12 @@ describe("airmcp connect", () => {
       token,
       clientName: "airmcp-runtime-probe-test",
       timeoutMs: 10_000,
-      minTools: 100,
+      minTools: 10,
+      requiredTools: ["profile_status", "list_profiles", "discover_tools", "run_tool", "list_notes"],
     });
 
     expect(probe.serverName).toBe("airmcp");
-    expect(probe.toolCount).toBeGreaterThan(100);
+    expect(probe.toolCount).toBeGreaterThanOrEqual(10);
     expect(probe.sampleTools.length).toBeGreaterThan(0);
   }, 60_000);
 
@@ -267,6 +268,9 @@ describe("airmcp connect", () => {
 
     expect(tools.error).toBeUndefined();
     expect(Array.isArray(tools.result.tools)).toBe(true);
-    expect(tools.result.tools.length).toBeGreaterThan(100);
+    expect(tools.result.tools.length).toBeGreaterThanOrEqual(10);
+    expect(tools.result.tools.map((tool) => tool.name)).toEqual(
+      expect.arrayContaining(["profile_status", "list_profiles", "discover_tools", "run_tool", "list_notes"]),
+    );
   }, 60_000);
 });

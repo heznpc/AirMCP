@@ -8,11 +8,16 @@ export function runHelp(): void {
   console.log("");
   for (const line of LOGO_LINES) console.log(line);
   console.log("");
-  console.log(`  ${BOLD}${WHITE}AirMCP${RESET}  ${DIM}MCP server for the entire Apple ecosystem${RESET}`);
+  console.log(
+    `  ${BOLD}${WHITE}AirMCP${RESET}  ${DIM}Approval-gated local action runtime for Apple workspaces${RESET}`,
+  );
   console.log("");
   console.log(`  ${BOLD}Usage${RESET}`);
   console.log("");
   console.log(`    ${GREEN}$${RESET} npx airmcp ${BOLD}init${RESET}            ${DIM}Interactive setup wizard${RESET}`);
+  console.log(
+    `    ${GREEN}$${RESET} npx airmcp ${BOLD}init --profile starter --yes${RESET} ${DIM}Non-interactive profile setup${RESET}`,
+  );
   console.log(`    ${GREEN}$${RESET} npx airmcp ${BOLD}doctor${RESET}          ${DIM}Diagnose installation${RESET}`);
   console.log(
     `    ${GREEN}$${RESET} npx airmcp ${BOLD}workflows${RESET}       ${DIM}Show high-value workflow examples${RESET}`,
@@ -55,6 +60,12 @@ export function runHelp(): void {
   console.log(`  ${BOLD}Environment Variables${RESET}`);
   console.log("");
   console.log(`    ${WHITE}AIRMCP_FULL${RESET}=true              ${DIM}Enable all modules (ignores config)${RESET}`);
+  console.log(
+    `    ${WHITE}AIRMCP_PROFILE${RESET}=${DIM}starter|communications-safe|productivity|full${RESET} ${DIM}Choose module profile${RESET}`,
+  );
+  console.log(
+    `    ${WHITE}AIRMCP_TOOL_EXPOSURE${RESET}=${DIM}progressive|profile|full${RESET} ${DIM}Control tools/list size${RESET}`,
+  );
   console.log(
     `    ${WHITE}AIRMCP_DISABLE_${RESET}${DIM}<MODULE>${RESET}=true  ${DIM}Disable a specific module${RESET}`,
   );

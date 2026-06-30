@@ -10,23 +10,22 @@
 // tool handler that needs TCC permissions; the handshake + tools/list
 // round-trip is the contract it guards.
 //
-// Boots at the DEFAULT (STARTER) surface via cleanBootEnv (see
+// Boots at the DEFAULT (STARTER/progressive) surface via cleanBootEnv (see
 // scripts/lib/clean-boot-env.mjs): the host's config.json and AIRMCP_* are
-// stripped, so the registered count is the deterministic ~111-tool starter set
-// on any runner (local or CI), not whatever the host has enabled — the smaller
-// surface vs the static `count-stats` total is by design. SMOKE_MIN_TOOLS
-// defaults to 100 — headroom under the ~111 starter floor to catch a
-// broken-boot regression (top-level throw, dead registration path).
+// stripped, so tools/list is the deterministic small front-door set on any
+// runner (local or CI), not whatever the host has enabled. SMOKE_MIN_TOOLS
+// defaults to 10 — enough to catch a near-empty boot while allowing the
+// progressive exposure surface to stay token-light.
 //
 // Env knobs:
-//   SMOKE_MIN_TOOLS  — minimum tools/list length to pass (default: 100)
+//   SMOKE_MIN_TOOLS  — minimum tools/list length to pass (default: 10)
 //   SMOKE_TIMEOUT_MS — ms to wait for a full response set (default: 20_000)
 
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { cleanBootEnv } from "./lib/clean-boot-env.mjs";
 
-const MIN_TOOLS = Number(process.env.SMOKE_MIN_TOOLS ?? 100);
+const MIN_TOOLS = Number(process.env.SMOKE_MIN_TOOLS ?? 10);
 const TIMEOUT_MS = Number(process.env.SMOKE_TIMEOUT_MS ?? 20_000);
 
 const server = spawn("node", ["dist/index.js"], {

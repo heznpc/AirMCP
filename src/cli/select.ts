@@ -131,7 +131,7 @@ export function selectMulti(
     render(true);
     let confirmed = false;
     const hintText = presets
-      ? `↑↓←→ move · Enter/Space toggle · a=all · s=starter · p=prod · d=done`
+      ? `↑↓←→ move · Enter/Space toggle · a=all · s=starter · c=comms · p=prod · d=done`
       : `↑↓←→ move · Enter/Space toggle · d=done`;
     out.write(`\n${CLEAR_LINE}  ${DIM}${hintText}${RESET}`);
 
@@ -189,6 +189,10 @@ export function selectMulti(
         needRender = true;
       } else if (key.name === "s" && presets?.starter) {
         const set = new Set(presets.starter);
+        for (const o of options) o.checked = set.has(o.value);
+        needRender = true;
+      } else if (key.name === "c" && presets?.comms) {
+        const set = new Set(presets.comms);
         for (const o of options) o.checked = set.has(o.value);
         needRender = true;
       } else if (key.name === "p" && presets?.productivity) {

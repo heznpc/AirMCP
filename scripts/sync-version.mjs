@@ -14,6 +14,7 @@
  *   9. mcp.json                            (MCP Registry submission manifest)
  *   10. .claude-plugin/plugin.json         (Claude Code plugin manifest)
  *   11. .mcp.json                          (Claude Code project/plugin MCP config — pinned npm version)
+ *   12. docs/index.html                    (structured data softwareVersion)
  *
  * Usage:
  *   node scripts/sync-version.mjs           # sync all files
@@ -207,6 +208,15 @@ syncFile(".mcp.json", [
     pattern: /"airmcp@[\d.]+"/,
     replacement: `"airmcp@${VERSION}"`,
     label: ".mcp.json airmcp version pin",
+  },
+]);
+
+// 12. docs/index.html — Schema.org SoftwareApplication softwareVersion.
+syncFile("docs/index.html", [
+  {
+    pattern: /"softwareVersion": "[^"]+"/,
+    replacement: `"softwareVersion": "${VERSION}"`,
+    label: "structured data softwareVersion",
   },
 ]);
 

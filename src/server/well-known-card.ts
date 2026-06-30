@@ -9,8 +9,8 @@
  * Glama) hit this endpoint to build their catalog. Beyond the MCP
  * spec minimum (2025-11-25: name, version, transport, capabilities),
  * AirMCP adds:
- *   - `tools: { count, names[] }` — full tool inventory so crawlers
- *     can surface the surface area without opening a session
+ *   - `tools: { count, names[] }` — advertised tools/list inventory so
+ *     crawlers see the active profile/exposure surface without opening a session
  *   - `modules[]` — the enabled module list for this host (depends
  *     on config + OS compatibility gates)
  *   - `license` / `homepage` — standard registry metadata

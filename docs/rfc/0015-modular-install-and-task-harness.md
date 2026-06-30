@@ -25,6 +25,7 @@ This is a cooperative MCP-client contract. It is not a security boundary by itse
 The second shipped slice is the module-pack contract:
 
 - `src/shared/module-packs.ts` defines DLC-like packs (`core`, `communications`, `productivity`, `browser`, `media`, `visual`, `location`, `device`, `intelligence`, `google-workspace`, `spatial`),
+- each pack declares its future package name without a `pack-` prefix (`airmcp`, `@heznpc/airmcp-productivity`, `@heznpc/airmcp-spatial`, ...),
 - `AIRMCP_MODULE_PACKS` and `config.json -> modulePacks` can restrict the available pack set while preserving `core`,
 - module loading skips enabled-profile modules whose pack is unavailable before dynamic import,
 - `list_module_packs` reports the active pack set over MCP,
@@ -39,7 +40,7 @@ Keep the npm package as the reliable universal runtime until demand proves a sma
 |---|---|---|
 | Runtime core | `airmcp` | Owns config, transports, audit, HITL, OAuth, rate limits, profiles, and task sessions. |
 | Optional bridges | source-built Swift bridge / future signed app component | Heavy native capability already differs from npm/MCPB distribution. |
-| Module packs | future `@airmcp/<module-pack>` packages or signed app downloadable components | Only after pack-boundary tests prove install size/startup gain beats release complexity. |
+| Module add-ons | future `@heznpc/airmcp-productivity` / `@heznpc/airmcp-spatial` packages or signed app downloadable components | Only after pack-boundary tests prove install size/startup gain beats release complexity. |
 
 ## Acceptance gates before physical module-pack packages
 

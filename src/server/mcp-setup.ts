@@ -216,6 +216,7 @@ export async function createServer(
         packs: z.array(
           z.object({
             name: z.string(),
+            packageName: z.string(),
             title: z.string(),
             description: z.string(),
             modules: z.array(z.string()),

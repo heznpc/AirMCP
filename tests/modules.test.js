@@ -62,6 +62,18 @@ describe('module pack manifest', () => {
   test('default module packs include all declared packs', () => {
     expect([...getDefaultModulePacks()].sort()).toEqual(MODULE_PACK_MANIFEST.map((pack) => pack.name).sort());
   });
+
+  test('future add-on package names do not expose pack-* naming', () => {
+    for (const pack of MODULE_PACK_MANIFEST) {
+      expect(pack.packageName).not.toContain('pack-');
+      expect(pack.packageName).not.toContain('-pack');
+      if (pack.name === 'core') {
+        expect(pack.packageName).toBe('airmcp');
+      } else {
+        expect(pack.packageName).toMatch(/^@heznpc\/airmcp-/);
+      }
+    }
+  });
 });
 
 describe('setModuleRegistry()', () => {

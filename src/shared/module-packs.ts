@@ -12,6 +12,7 @@ export const CORE_MODULE_PACK_NAME = "core";
 export const MODULE_PACK_MANIFEST = [
   {
     name: "core",
+    packageName: "airmcp",
     title: "Core Workspace",
     description:
       "Base local workspace pack: notes, reminders, calendar, shortcuts, system, Finder, weather, and audit visibility.",
@@ -20,6 +21,7 @@ export const MODULE_PACK_MANIFEST = [
   },
   {
     name: "communications",
+    packageName: "@heznpc/airmcp-communications",
     title: "Communications",
     description:
       "Contacts, Mail, and Messages modules. Send actions still require their existing explicit safety opt-ins.",
@@ -27,42 +29,49 @@ export const MODULE_PACK_MANIFEST = [
   },
   {
     name: "productivity",
+    packageName: "@heznpc/airmcp-productivity",
     title: "Productivity",
     description: "Apple iWork modules for Pages, Numbers, and Keynote.",
     modules: ["pages", "numbers", "keynote"],
   },
   {
     name: "browser",
+    packageName: "@heznpc/airmcp-browser",
     title: "Browser",
     description: "Safari tabs, page capture, bookmarks, and reading-list automation.",
     modules: ["safari"],
   },
   {
     name: "media",
+    packageName: "@heznpc/airmcp-media",
     title: "Media",
     description: "Music, TV, Podcasts, and speech automation surfaces.",
     modules: ["music", "tv", "podcasts", "speech"],
   },
   {
     name: "visual",
+    packageName: "@heznpc/airmcp-visual",
     title: "Visual",
     description: "Photos, screen capture, and UI automation modules.",
     modules: ["photos", "screen", "ui"],
   },
   {
     name: "location",
+    packageName: "@heznpc/airmcp-location",
     title: "Location",
     description: "Maps and current-location modules. Weather stays in core because starter workflows use it.",
     modules: ["maps", "location"],
   },
   {
     name: "device",
+    packageName: "@heznpc/airmcp-device",
     title: "Device",
     description: "Bluetooth and HealthKit-oriented device modules.",
     modules: ["bluetooth", "health"],
   },
   {
     name: "intelligence",
+    packageName: "@heznpc/airmcp-intelligence",
     title: "Intelligence",
     description:
       "Apple Intelligence and local memory modules. Embedding search remains separately gated by feature flags.",
@@ -70,12 +79,14 @@ export const MODULE_PACK_MANIFEST = [
   },
   {
     name: "google-workspace",
+    packageName: "@heznpc/airmcp-google",
     title: "Google Workspace",
     description: "Google Workspace integration modules.",
     modules: ["google"],
   },
   {
     name: "spatial",
+    packageName: "@heznpc/airmcp-spatial",
     title: "Spatial",
     description: "Experimental spatial asset/context preparation modules.",
     modules: ["spatial_prep"],
@@ -86,6 +97,7 @@ export type ModulePackName = (typeof MODULE_PACK_MANIFEST)[number]["name"];
 
 export interface ModulePackStatus {
   name: ModulePackName;
+  packageName: string;
   title: string;
   description: string;
   modules: string[];
@@ -145,6 +157,7 @@ export function getModulePackNameForModule(moduleName: string): ModulePackName |
 export function getModulePackStatuses(availablePacks: ReadonlySet<string>): ModulePackStatus[] {
   return MODULE_PACK_MANIFEST.map((pack) => ({
     name: pack.name,
+    packageName: pack.packageName,
     title: pack.title,
     description: pack.description,
     modules: [...pack.modules],

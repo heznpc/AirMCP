@@ -6266,6 +6266,9 @@
                 "name": {
                   "type": "string"
                 },
+                "packageName": {
+                  "type": "string"
+                },
                 "title": {
                   "type": "string"
                 },
@@ -6287,6 +6290,7 @@
               },
               "required": [
                 "name",
+                "packageName",
                 "title",
                 "description",
                 "modules",

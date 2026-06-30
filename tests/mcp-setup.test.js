@@ -80,6 +80,7 @@ jest.unstable_mockModule('../dist/shared/modules.js', () => ({
     packs: [
       {
         name: 'core',
+        packageName: 'airmcp',
         title: 'Core Workspace',
         description: 'Core',
         modules: ['notes'],

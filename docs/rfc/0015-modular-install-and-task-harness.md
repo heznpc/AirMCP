@@ -1,6 +1,6 @@
 # RFC 0015 — Modular install and task-scoped harness
 
-Status: Pack Contract Implemented
+Status: Runtime Contract Implemented
 
 ## Problem
 
@@ -17,6 +17,7 @@ The first shipped slice is the task harness:
 - `discover_tools({ sessionId })` searches only that allowlist,
 - `run_tool({ sessionId })` refuses calls outside that allowlist,
 - `AIRMCP_REQUIRE_TOOL_SESSION=true` can require sessions before `run_tool` dispatches hidden tools while keeping directly exposed tools callable,
+- new app/CLI-generated configs set `requireToolSession: true`; direct no-config stdio remains compatible,
 - `tool_session_status` and `end_tool_session` make the session inspectable and revocable,
 - profile matrix verification exercises the allow/deny path over the real MCP wire.
 
@@ -27,6 +28,7 @@ The second shipped slice is the module-pack contract:
 - `src/shared/module-packs.ts` defines DLC-like packs (`core`, `communications`, `productivity`, `browser`, `media`, `visual`, `location`, `device`, `intelligence`, `google-workspace`, `spatial`),
 - each pack declares its future package name without a `pack-` prefix (`airmcp`, `@heznpc/airmcp-productivity`, `@heznpc/airmcp-spatial`, ...),
 - `AIRMCP_MODULE_PACKS` and `config.json -> modulePacks` can restrict the available pack set while preserving `core`,
+- `npx airmcp modules` lists, enables, disables, and doctors the active pack set before physical package splitting,
 - module loading skips enabled-profile modules whose pack is unavailable before dynamic import,
 - `list_module_packs` reports the active pack set over MCP,
 - `profile_status` reports `modulePacksConfigured`, `modulePacksAvailable`, and `modulesMissingPacks`,
@@ -42,9 +44,12 @@ Keep the npm package as the reliable universal runtime until demand proves a sma
 | Optional bridges | source-built Swift bridge / future signed app component | Heavy native capability already differs from npm/MCPB distribution. |
 | Module add-ons | future `@heznpc/airmcp-productivity` / `@heznpc/airmcp-spatial` packages or signed app downloadable components | Only after pack-boundary tests prove install size/startup gain beats release complexity. |
 
+`npx airmcp doctor` treats the Swift bridge as an optional bridge, not a module add-on package. That keeps the first physical split focused on the heaviest native binary/signing boundary before multiplying npm package surfaces.
+
 ## Acceptance gates before physical module-pack packages
 
-- `profiles:check` reports startup/list timings for starter/progressive vs full/full and at least one restricted-pack profile.
+- `profiles:check` reports startup/list timings for starter/progressive vs full/full, multiple restricted-pack profiles, strict task-session behavior, and discovery golden queries.
+- `npm run tokens:check` keeps the eager tool-description budget bounded as modules grow.
 - `npm pack --dry-run --json` shows package size regressions per release.
 - `list_module_packs` and `profile_status.modulesMissingPacks` remain stable public truth surfaces.
 - At least one real user/workflow needs a smaller install, not only a smaller context window.

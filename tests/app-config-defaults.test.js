@@ -18,6 +18,16 @@ describe("AirMCP.app ConfigManager defaults", () => {
     expect(source).toMatch(/allowSendMail:\s*false/);
   });
 
+  test("requires task sessions by default in the app-owned runtime config", () => {
+    expect(source).toMatch(/requireToolSession:\s*true/);
+    expect(source).toMatch(/decodeIfPresent\(Bool\.self,\s*forKey:\s*\.requireToolSession\)\s*\?\?\s*true/);
+  });
+
+  test("preserves module pack activation written by the CLI", () => {
+    expect(source).toMatch(/var modulePacks:\s*\[String\]\?/);
+    expect(source).toMatch(/decodeIfPresent\(\[String\]\.self,\s*forKey:\s*\.modulePacks\)/);
+  });
+
   test("module toggles switch the JSON config to custom profile", () => {
     expect(source).toMatch(/var disabledModules:[\s\S]*config\.profile\s*=\s*"custom"/);
   });

@@ -16,6 +16,7 @@ import { clientRuntimeShape } from "./client-config.js";
 import { LOGO_LINES, typeLine } from "../shared/banner.js";
 import { esc } from "../shared/esc.js";
 import { MODULE_MANIFEST } from "../shared/modules.js";
+import { getModulePackStatuses, resolveModulePackSelection } from "../shared/module-packs.js";
 import { summarizeCompatibility } from "../shared/compatibility.js";
 import { RESET, BOLD, DIM, WHITE, GREEN, SYM, heading, line, divider, spinner, sleep } from "./style.js";
 import { APP_RUNTIME_TOKEN_PATH } from "../shared/app-runtime-token.js";
@@ -28,6 +29,8 @@ const APP_OWNED_HEALTH_URL = CODEX_APP_OWNED_URL.replace(/\/mcp$/, "/health");
 
 interface FileConfig {
   locale?: string;
+  modulePacks?: string | string[];
+  requireToolSession?: boolean;
   disabledModules?: string[];
   includeShared?: boolean;
   allowSendMessages?: boolean;
@@ -311,6 +314,25 @@ export async function runDoctor(): Promise<void> {
     console.log(parts.join(""));
   }
 
+  console.log(heading("Module add-ons"));
+  const packSelection = resolveModulePackSelection(process.env.AIRMCP_MODULE_PACKS ?? fileConfig?.modulePacks);
+  const packStatuses = getModulePackStatuses(packSelection.packs);
+  const activePacks = packStatuses.filter((pack) => pack.available);
+  ok("Active packs", activePacks.map((pack) => pack.name).join(", "));
+  if (packSelection.configured)
+    ok("Pack source", process.env.AIRMCP_MODULE_PACKS ? "AIRMCP_MODULE_PACKS" : "config.json");
+  else meh("Pack source", "default all built-in packs");
+  for (const pack of packStatuses) {
+    const detail = `${pack.packageName} · ${pack.modules.join(", ")}`;
+    if (pack.available) ok(`pack:${pack.name}`, detail);
+    else meh(`pack:${pack.name}`, detail);
+  }
+
+  console.log(heading("Task harness"));
+  const strictHarness = process.env.AIRMCP_REQUIRE_TOOL_SESSION === "true" || fileConfig?.requireToolSession === true;
+  if (strictHarness) ok("Hidden tool sessions", "required before run_tool dispatches hidden tools");
+  else meh("Hidden tool sessions", "compatible mode — set requireToolSession=true for strict task scoping");
+
   // ── Compatibility (RFC 0004) ───────────────────────────────────────
   //
   // Run the pure resolver against the current host env so users can see
@@ -440,7 +462,7 @@ export async function runDoctor(): Promise<void> {
   if (existsSync(swiftBridgePath)) {
     ok("Swift bridge", "built");
   } else {
-    meh("Swift bridge", `not built — run: npm run swift-build`);
+    meh("Swift bridge", `not built — run: npm run swift-build (optional bridge, not a module add-on package)`);
   }
 
   // GWS CLI

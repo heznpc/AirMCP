@@ -19,6 +19,7 @@ if (_sub === "--version" || _sub === "-v" || _sub === "-V") {
 if (
   _sub === "init" ||
   _sub === "doctor" ||
+  _sub === "modules" ||
   _sub === "workflows" ||
   _sub === "connect" ||
   _sub === "connect-clients" ||
@@ -32,6 +33,9 @@ if (
   } else if (_sub === "doctor") {
     const mod = await import("./cli/doctor.js");
     await mod.runDoctor();
+  } else if (_sub === "modules") {
+    const mod = await import("./cli/modules.js");
+    await mod.runModules();
   } else if (_sub === "workflows") {
     const mod = await import("./cli/workflows.js");
     await mod.runWorkflows();

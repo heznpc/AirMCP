@@ -74,6 +74,34 @@ const CASES = [
     requiredModules: ["contacts", "mail", "messages"],
   },
   {
+    name: "core-only-pack-boundary",
+    profile: "full",
+    exposure: "profile",
+    modulePacks: "core-only",
+    minTools: 90,
+    maxTools: 135,
+    requiredTools: ["profile_status", "list_profiles", "list_module_packs", "discover_tools", "run_tool"],
+    requiredModules: ["notes", "reminders", "calendar", "shortcuts", "system", "finder", "weather"],
+    forbiddenModules: ["contacts", "mail", "messages", "pages", "numbers", "keynote", "safari", "google"],
+    requiredPacks: ["core"],
+    unavailablePacks: ["communications", "productivity", "browser", "google-workspace"],
+    missingPackModules: ["contacts", "mail", "messages", "pages", "numbers", "keynote", "safari", "google"],
+  },
+  {
+    name: "communications-pack-boundary",
+    profile: "full",
+    exposure: "profile",
+    modulePacks: "core,communications",
+    minTools: 100,
+    maxTools: 170,
+    requiredTools: ["profile_status", "list_profiles", "list_module_packs", "discover_tools", "run_tool", "send_mail"],
+    requiredModules: ["contacts", "mail", "messages"],
+    forbiddenModules: ["pages", "numbers", "keynote", "safari", "google"],
+    requiredPacks: ["core", "communications"],
+    unavailablePacks: ["productivity", "browser", "google-workspace"],
+    missingPackModules: ["pages", "numbers", "keynote", "safari", "google"],
+  },
+  {
     name: "productivity-pack-boundary",
     profile: "productivity",
     exposure: "profile",
@@ -117,6 +145,12 @@ const CASES = [
       "list_events",
     ],
     requiredModules: ["notes", "calendar", "finder", "safari", "system", "photos", "google"],
+    discoveryExpectations: [
+      { query: "spreadsheet cell", expected: "numbers_set_cell" },
+      { query: "screenshot", expected: "capture_screenshot" },
+      { query: "send email", expected: "send_mail" },
+      { query: "weather", expected: "get_current_weather" },
+    ],
   },
 ];
 
@@ -301,12 +335,32 @@ function bootCase(testCase) {
           }
         }
 
+        const discoveryResults = [];
+        for (const [idx, expectation] of (testCase.discoveryExpectations ?? []).entries()) {
+          const discoverResp = await request(
+            "tools/call",
+            { name: "discover_tools", arguments: { query: expectation.query, limit: 10 } },
+            20 + idx,
+          );
+          if (discoverResp.error || discoverResp.result?.isError) {
+            throw new Error(`discover_tools "${expectation.query}" failed: ${JSON.stringify(discoverResp)}`);
+          }
+          const discover = parseStructuredResult(discoverResp);
+          if (!discover?.matches?.some?.((match) => match.name === expectation.expected)) {
+            throw new Error(
+              `discover_tools "${expectation.query}" did not return ${expectation.expected}: ${JSON.stringify(discoverResp)}`,
+            );
+          }
+          discoveryResults.push({ query: expectation.query, expected: expectation.expected });
+        }
+
         resolve({
           ok: true,
           testCase,
           tools,
           status,
           packs,
+          discoveryResults,
           stderr,
           timings: {
             initMs: Number((initializedAt - bootStarted) / 1_000_000n),

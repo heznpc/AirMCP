@@ -143,6 +143,7 @@ mkdirSync(OUT_DIR, { recursive: true });
 
 console.log(`release-preflight: AirMCP v${version}`);
 run("npm", ["run", "build"]);
+run("npm", ["run", "tokens:check"]);
 run("npm", ["run", "profiles:check"]);
 run("npm", ["run", "verify:package"]);
 verifyNpmDryRun();

@@ -5,7 +5,7 @@ description: All 25 AirMCP modules with tool counts and capabilities.
 
 AirMCP ships 29 modules that cover the Apple workspace. Each module registers a set of MCP tools that AI assistants can call. The full manifest contains 293 tools, while the default starter/progressive runtime exposes a smaller front door.
 
-Module packs are the DLC-like activation boundary above modules. `AIRMCP_MODULE_PACKS=core,productivity` keeps core workspace tools and iWork active while reporting unavailable profile modules through `profile_status.modulesMissingPacks`.
+Module packs are the DLC-like activation boundary above modules. `npx airmcp modules enable productivity` or `AIRMCP_MODULE_PACKS=core,productivity` keeps core workspace tools and iWork active while reporting unavailable profile modules through `profile_status.modulesMissingPacks`. The current universal package still ships every built-in module; future physical add-on names omit `pack-*` naming, for example `@heznpc/airmcp-productivity`.
 
 ## Module Table
 
@@ -68,4 +68,5 @@ Modules marked with prompts support also register MCP prompt templates. These ar
 - **Semantic search** requires either `GEMINI_API_KEY` for cloud embeddings or the Swift bridge for on-device embeddings.
 - **UI automation** requires Accessibility permissions for the host terminal/MCP client.
 - **Location** requires Location Services permission.
+- **Spatial** is an experimental opt-in add-on candidate, not part of the default profile.
 - All JXA-based modules (Notes, Reminders, Calendar, Contacts, Mail, Messages, Music, Safari, Photos, etc.) require Automation permissions.

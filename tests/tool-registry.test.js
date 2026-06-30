@@ -128,6 +128,21 @@ describe('ToolRegistry (mock server)', () => {
     expect(toolRegistry.searchTools('zzzznonexistent')).toEqual([]);
   });
 
+  test('searchTools returns compact descriptions while getToolDetails can fetch full text', () => {
+    const fullDescription = `${'A'.repeat(90)} needle`;
+    server.registerTool('long_description_tool', {
+      title: 'Long Description Tool',
+      description: fullDescription,
+    }, async () => ({}));
+
+    const [match] = toolRegistry.searchTools('needle');
+    expect(match.name).toBe('long_description_tool');
+    expect(match.description).toBe(fullDescription.substring(0, 80));
+
+    const details = toolRegistry.getToolDetails('long_description_tool', { descriptionMode: 'full' });
+    expect(details.description).toBe(fullDescription);
+  });
+
   test('callTool invokes registered handler', async () => {
     const handler = jest.fn().mockResolvedValue({
       content: [{ type: 'text', text: 'result' }],

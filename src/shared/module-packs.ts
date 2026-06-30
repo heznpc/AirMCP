@@ -3,8 +3,8 @@
  *
  * Packs are AirMCP's DLC-like install/activation boundary. The current npm
  * package still ships every module, but this manifest is the runtime contract
- * that lets operators activate only selected packs and lets future packages
- * prove their boundaries before physical package splitting.
+ * that lets operators activate only selected packs and lets staged add-on
+ * packages prove their boundaries before bundled fallback can be removed.
  */
 
 export const CORE_MODULE_PACK_NAME = "core";
@@ -152,6 +152,17 @@ export function getDefaultModulePacks(): Set<ModulePackName> {
 
 export function getModulePackNameForModule(moduleName: string): ModulePackName | null {
   return PACK_BY_MODULE.get(moduleName) ?? null;
+}
+
+export function getModulePackPackageName(packName: string): string | null {
+  return MODULE_PACK_MANIFEST.find((pack) => pack.name === packName)?.packageName ?? null;
+}
+
+export function getModuleAddonImportSpec(moduleName: string, kind: "tools" | "prompts"): string | null {
+  const packName = getModulePackNameForModule(moduleName);
+  if (!packName || packName === CORE_MODULE_PACK_NAME) return null;
+  const packageName = getModulePackPackageName(packName);
+  return packageName ? `${packageName}/dist/${moduleName}/${kind}.js` : null;
 }
 
 export function getModulePackStatuses(availablePacks: ReadonlySet<string>): ModulePackStatus[] {

@@ -322,6 +322,7 @@ export async function runDoctor(): Promise<void> {
   if (packSelection.configured)
     ok("Pack source", process.env.AIRMCP_MODULE_PACKS ? "AIRMCP_MODULE_PACKS" : "config.json");
   else meh("Pack source", "default all built-in packs");
+  ok("Add-on import mode", process.env.AIRMCP_ADDON_PACKAGE_MODE ?? "prefer-installed");
   for (const pack of packStatuses) {
     const detail = `${pack.packageName} · ${pack.modules.join(", ")}`;
     if (pack.available) ok(`pack:${pack.name}`, detail);
@@ -330,6 +331,10 @@ export async function runDoctor(): Promise<void> {
 
   console.log(heading("Task harness"));
   const strictHarness = process.env.AIRMCP_REQUIRE_TOOL_SESSION === "true" || fileConfig?.requireToolSession === true;
+  const harnessAdapter =
+    process.env.AIRMCP_HARNESS_ADAPTER ??
+    (process.env.AIRMCP_APP_OWNED_RUNTIME ? "app-runtime" : strictHarness ? "strict" : "compatible");
+  ok("Harness adapter", harnessAdapter);
   if (strictHarness) ok("Hidden tool sessions", "required before run_tool dispatches hidden tools");
   else meh("Hidden tool sessions", "compatible mode — set requireToolSession=true for strict task scoping");
 

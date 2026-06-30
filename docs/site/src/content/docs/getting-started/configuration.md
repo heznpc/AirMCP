@@ -65,7 +65,9 @@ The default config file location is `~/.config/airmcp/config.json`. You can over
 | `AIRMCP_PROFILE=starter` | Select a module profile: `starter`, `communications-safe`, `productivity`, or `full` |
 | `AIRMCP_TOOL_EXPOSURE=progressive` | Keep `tools/list` thin; use `profile` or `full` to expose more tools |
 | `AIRMCP_MODULE_PACKS=core,productivity` | Activate selected DLC-like module packs |
+| `AIRMCP_ADDON_PACKAGE_MODE=prefer-installed` | Try installed physical add-on packages before bundled fallback |
 | `AIRMCP_REQUIRE_TOOL_SESSION=true` | Require task-scoped sessions before hidden `run_tool` dispatch |
+| `AIRMCP_HARNESS_ADAPTER=strict` | Select a task harness policy explicitly |
 | `AIRMCP_PROFILE=spatial_prep` | Enable an experimental profile-only module in addition to the selected profile |
 | `AIRMCP_ENABLE_SPATIAL_PREP=true` | Enable the experimental read-only spatial asset prep tools |
 | `AIRMCP_DISABLE_<MODULE>=true` | Disable a specific module (e.g. `AIRMCP_DISABLE_TV=true`) |

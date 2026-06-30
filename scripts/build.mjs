@@ -14,6 +14,8 @@ const entryPoints = globSync("src/**/*.ts", {
   ignore: ["**/*.test.ts", "**/*.spec.ts"],
 });
 
+rmSync("dist", { recursive: true, force: true });
+
 buildSync({
   entryPoints,
   outdir: "dist",

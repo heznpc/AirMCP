@@ -74,6 +74,12 @@ export function runHelp(): void {
     `    ${WHITE}AIRMCP_MODULE_PACKS${RESET}=${DIM}core,productivity${RESET} ${DIM}Activate selected module add-ons${RESET}`,
   );
   console.log(
+    `    ${WHITE}AIRMCP_ADDON_PACKAGE_MODE${RESET}=${DIM}prefer-installed|bundled|external-only${RESET} ${DIM}Choose module import mode${RESET}`,
+  );
+  console.log(
+    `    ${WHITE}AIRMCP_HARNESS_ADAPTER${RESET}=${DIM}compatible|strict|app-runtime|agent${RESET} ${DIM}Choose task harness policy${RESET}`,
+  );
+  console.log(
     `    ${WHITE}AIRMCP_DISABLE_${RESET}${DIM}<MODULE>${RESET}=true  ${DIM}Disable a specific module${RESET}`,
   );
   console.log(`    ${WHITE}GEMINI_API_KEY${RESET}=${DIM}<key>${RESET}          ${DIM}Enable Gemini embeddings${RESET}`);

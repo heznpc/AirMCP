@@ -51,7 +51,8 @@ interface RegisteredToolEntry {
   enabled: boolean;
   exposed: boolean;
   title?: string;
-  description?: string;
+  fullDescription?: string;
+  summaryDescription?: string;
   titleLower?: string;
   descriptionLower?: string;
   /** Captured from `annotations.destructiveHint` at registration time —
@@ -68,6 +69,14 @@ export interface ToolInfo {
   name: string;
   title?: string;
   description?: string;
+}
+
+export type ToolDescriptionMode = "summary" | "full" | "none";
+
+export interface ToolDetails extends ToolInfo {
+  exposed: boolean;
+  destructive?: boolean;
+  readOnly?: boolean;
 }
 
 export interface ToolExposurePolicy {
@@ -124,7 +133,11 @@ class ToolRegistry {
   }
 
   /** Search tools by query string (substring match on name, title, description). */
-  searchTools(query: string, limit = 20, options: { allowedToolNames?: Set<string> } = {}): ToolInfo[] {
+  searchTools(
+    query: string,
+    limit = 20,
+    options: { allowedToolNames?: Set<string>; descriptionMode?: ToolDescriptionMode } = {},
+  ): ToolInfo[] {
     const q = query.toLowerCase();
     const words = q.split(/\s+/).filter(Boolean);
     const scored: Array<{ info: ToolInfo; score: number }> = [];
@@ -136,10 +149,10 @@ class ToolRegistry {
       for (const w of words) {
         if (name.includes(w)) score += 3;
         else if (entry.titleLower?.includes(w)) score += 2;
-        else if (entry.descriptionLower?.includes(w)) score += 1;
+        else if (this.getDescriptionLower(entry)?.includes(w)) score += 1;
       }
       if (score > 0) {
-        scored.push({ info: { name, title: entry.title, description: entry.description }, score });
+        scored.push({ info: this.toToolInfo(name, entry, options.descriptionMode ?? "summary"), score });
       }
     }
 
@@ -148,10 +161,47 @@ class ToolRegistry {
   }
 
   /** Get tool info by name. */
-  getToolInfo(name: string): ToolInfo | undefined {
+  getToolInfo(name: string, options: { descriptionMode?: ToolDescriptionMode } = {}): ToolInfo | undefined {
     const entry = this.tools.get(name);
     if (!entry) return undefined;
-    return { name, title: entry.title, description: entry.description };
+    return this.toToolInfo(name, entry, options.descriptionMode ?? "full");
+  }
+
+  getToolDetails(name: string, options: { descriptionMode?: ToolDescriptionMode } = {}): ToolDetails | undefined {
+    const entry = this.tools.get(name);
+    if (!entry) return undefined;
+    return {
+      ...this.toToolInfo(name, entry, options.descriptionMode ?? "full"),
+      exposed: entry.exposed,
+      ...(entry.destructive !== undefined ? { destructive: entry.destructive } : {}),
+      ...(entry.readOnly !== undefined ? { readOnly: entry.readOnly } : {}),
+    };
+  }
+
+  private getDescriptionLower(entry: RegisteredToolEntry): string | undefined {
+    if (entry.descriptionLower !== undefined) return entry.descriptionLower;
+    entry.descriptionLower = entry.fullDescription?.toLowerCase();
+    return entry.descriptionLower;
+  }
+
+  private getSummaryDescription(entry: RegisteredToolEntry): string | undefined {
+    if (!entry.fullDescription) return undefined;
+    entry.summaryDescription ??= compactDescription(entry.fullDescription);
+    return entry.summaryDescription;
+  }
+
+  private toToolInfo(name: string, entry: RegisteredToolEntry, descriptionMode: ToolDescriptionMode): ToolInfo {
+    const description =
+      descriptionMode === "none"
+        ? undefined
+        : descriptionMode === "summary"
+          ? this.getSummaryDescription(entry)
+          : entry.fullDescription;
+    return {
+      name,
+      ...(entry.title !== undefined ? { title: entry.title } : {}),
+      ...(description !== undefined ? { description } : {}),
+    };
   }
 
   /**
@@ -436,7 +486,7 @@ class ToolRegistry {
         config.description = compactDescription(fullDescription);
       }
       const result = exposed ? (origRegisterTool as AnyFn)(name, ...rest) : undefined;
-      // Store FULL description in registry for discover_tools / semantic search
+      // Store the full description lazily for describe_tool / search scoring.
       const annotations = (config as { annotations?: { destructiveHint?: boolean; readOnlyHint?: boolean } })
         .annotations;
       tools.set(name, {
@@ -446,9 +496,9 @@ class ToolRegistry {
         enabled: true,
         exposed,
         title,
-        description: fullDescription,
+        fullDescription,
+        summaryDescription: exposed ? (config.description as string | undefined) : undefined,
         titleLower: title?.toLowerCase(),
-        descriptionLower: fullDescription?.toLowerCase(),
         destructive: annotations?.destructiveHint === true,
         readOnly: annotations?.readOnlyHint === true,
       });
@@ -470,15 +520,15 @@ class ToolRegistry {
         rest[0] = compactDescription(fullDesc);
       }
       const result = exposed ? (origTool as AnyFn)(name, ...rest) : undefined;
-      // Store FULL description in registry for discover_tools / semantic search
+      // Store the full description lazily for describe_tool / search scoring.
       tools.set(name, {
         handler: wrapped,
         generation,
         inputSchema,
         enabled: true,
         exposed,
-        description: fullDesc,
-        descriptionLower: fullDesc?.toLowerCase(),
+        fullDescription: fullDesc,
+        summaryDescription: exposed ? (rest[0] as string | undefined) : undefined,
       });
       return result;
     }) as typeof server.tool;

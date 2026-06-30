@@ -14,7 +14,8 @@ If a variable accepts a path, `~` expands to `$HOME`. Booleans are `"true"` / `"
 | Bind HTTP server with OAuth 2.1 | `AIRMCP_ALLOW_NETWORK=with-oauth` + `AIRMCP_OAUTH_ISSUER=…` + `AIRMCP_OAUTH_AUDIENCE=…` |
 | Disable a flaky module without removing config | `AIRMCP_DEBUG_MODULES=notes,calendar` (whitelist) |
 | Use only selected module packs | `AIRMCP_MODULE_PACKS=core,productivity` |
-| Send all 293 tools without compactDescription | `AIRMCP_COMPACT_TOOLS=false` + `AIRMCP_TOOL_EXPOSURE=full` |
+| Stage physical add-on package artifacts | `npm run addons:build` |
+| Send all 294 tools without compactDescription | `AIRMCP_COMPACT_TOOLS=false` + `AIRMCP_TOOL_EXPOSURE=full` |
 | Require sessions before hidden tools can run | `AIRMCP_REQUIRE_TOOL_SESSION=true` |
 | Inspect or edit module add-ons | `npx airmcp modules` |
 | Increase audit-log signing strength for cross-host integrity | `AIRMCP_AUDIT_HMAC_KEY=<32+ random bytes>` |
@@ -86,7 +87,12 @@ If a variable accepts a path, `~` expands to `$HOME`. Booleans are `"true"` / `"
 | `AIRMCP_PROFILE` | `starter` | Runtime profile: `starter`, `communications-safe`, `productivity`, or `full`. May also include opt-in modules such as `spatial_prep`. |
 | `AIRMCP_TOOL_EXPOSURE` | profile-dependent | `progressive` exposes the front door, `profile` exposes the selected profile, `full` exposes every loaded tool. |
 | `AIRMCP_MODULE_PACKS` | all packs | Comma-separated DLC-like pack allow-list. `core` is always kept. Examples: `core-only`, `core,communications`, `core,productivity,spatial`, or `all`. Modules whose profile is enabled but pack is unavailable are reported through `profile_status.modulesMissingPacks`. |
+| `AIRMCP_ADDON_PACKAGE_MODE` | `prefer-installed` | Module import mode. `prefer-installed` tries installed physical add-on packages such as `@heznpc/airmcp-productivity` before bundled fallback; `bundled` skips external packages; `external-only` refuses missing add-ons outside `core`. |
 | `AIRMCP_REQUIRE_TOOL_SESSION` | (off unless app/CLI config sets it) | `true` makes `run_tool` require a valid `sessionId` before dispatching hidden tools. Directly exposed tools remain callable without a session. New app/CLI-generated configs set `requireToolSession: true`; no-config direct stdio keeps the compatible default. |
+| `AIRMCP_HARNESS_ADAPTER` | inferred | Task harness policy: `compatible`, `strict`, `app-runtime`, or `agent`. App-owned HTTP runtime is inferred from `AIRMCP_APP_OWNED_RUNTIME`; config-driven strict sessions infer `strict`. |
+| `AIRMCP_TOOL_SESSION_MAX_TOOLS` | `64` | Maximum tools allowed in one task-scoped session. Capped at 64. |
+| `AIRMCP_TOOL_SESSION_DEFAULT_TTL_SECONDS` | `900` | Default task session lifetime. |
+| `AIRMCP_TOOL_SESSION_MAX_TTL_SECONDS` | `3600` | Maximum task session lifetime. Capped at 3600. |
 | `AIRMCP_ENABLE_SPATIAL_PREP` | (off) | `true` enables the experimental read-only spatial asset prep tools. |
 | `AIRMCP_DEBUG_MODULES` | (empty) | Comma-separated whitelist. When set, only listed modules load — easier debugging of import / boot issues. |
 | `AIRMCP_DEBUG_SEQUENTIAL` | (off) | `true` loads modules one-by-one instead of `Promise.all()`. Memory-safe debugging. |
@@ -188,13 +194,13 @@ These are documented for completeness; you should rarely set them in production.
 
 ## Task-scoped tool sessions
 
-AirMCP's profile/exposure settings control what loads and what appears in `tools/list`. For a single agent task, clients can narrow further with the MCP tools `start_tool_session`, `discover_tools`, `run_tool`, `tool_session_status`, and `end_tool_session`:
+AirMCP's profile/exposure settings control what loads and what appears in `tools/list`. For a single agent task, clients can narrow further with the MCP tools `start_tool_session`, `discover_tools`, `describe_tool`, `run_tool`, `tool_session_status`, and `end_tool_session`:
 
 1. `start_tool_session({ tools: ["search_notes", "read_note"], ttlSeconds: 900 })`
 2. `discover_tools({ query: "notes", sessionId })` only searches that allowlist.
 3. `run_tool({ name: "read_note", args: {...}, sessionId })` refuses tools outside the allowlist.
 
-This is a cooperative harness contract for MCP clients and higher-level agent runners. By default it preserves the compatible no-session path for hidden tools. Set `AIRMCP_REQUIRE_TOOL_SESSION=true` when the client or harness is ready for strict task scoping: hidden tools still appear through `discover_tools`, but `run_tool` refuses to dispatch them unless the caller passes a valid `sessionId`. Directly exposed tools remain callable without a session.
+This is a cooperative harness contract for MCP clients and higher-level agent runners. By default it preserves the compatible no-session path for hidden tools. Set `AIRMCP_REQUIRE_TOOL_SESSION=true` or `AIRMCP_HARNESS_ADAPTER=strict` when the client or harness is ready for strict task scoping: hidden tools still appear through compact `discover_tools` results, `describe_tool` fetches the full description for one selected tool, and `run_tool` refuses to dispatch hidden tools unless the caller passes a valid `sessionId`. Directly exposed tools remain callable without a session.
 
 It does not replace OS permissions, HITL approval, OAuth scopes, rate limits, or the emergency stop; those gates still run inside the target tool call.
 
@@ -202,7 +208,7 @@ It does not replace OS permissions, HITL approval, OAuth scopes, rate limits, or
 
 ## Module packs
 
-AirMCP module packs are the runtime contract for DLC-like installation. The current npm package still ships every built-in module, but `npx airmcp modules` and `AIRMCP_MODULE_PACKS` let operators activate only selected packs today and give future add-on packages a tested boundary. Future add-on package names intentionally omit the word "pack": for example `@heznpc/airmcp-productivity`, `@heznpc/airmcp-communications`, and `@heznpc/airmcp-spatial`.
+AirMCP module packs are the runtime contract for DLC-like installation. `npx airmcp modules` and `AIRMCP_MODULE_PACKS` let operators activate only selected packs today. `npm run addons:build` stages physical npm package directories under `build/addons`, and the runtime tries installed add-on packages first in `prefer-installed` mode before falling back to bundled modules. Add-on package names intentionally omit the word "pack": for example `@heznpc/airmcp-productivity`, `@heznpc/airmcp-communications`, and `@heznpc/airmcp-spatial`.
 
 Built-in packs:
 
@@ -218,7 +224,7 @@ Built-in packs:
 - `google-workspace`: Google Workspace
 - `spatial`: experimental spatial prep
 
-Use `npx airmcp modules list` locally or `list_module_packs` over MCP to inspect the active pack set and future add-on package names. Use `npx airmcp modules enable productivity,communications` to write a narrow `modulePacks` config. `profile_status` also reports `modulePacksConfigured`, `modulePacksAvailable`, and `modulesMissingPacks` so a client can tell whether a module is disabled by profile/config or unavailable because its pack is not active.
+Use `npx airmcp modules list` locally or `list_module_packs` over MCP to inspect the active pack set and add-on package names. Use `npx airmcp modules enable productivity,communications` to write a narrow `modulePacks` config. `profile_status` also reports `modulePacksConfigured`, `modulePacksAvailable`, and `modulesMissingPacks` so a client can tell whether a module is disabled by profile/config or unavailable because its pack is not active.
 
 ---
 

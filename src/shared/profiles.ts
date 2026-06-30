@@ -114,6 +114,7 @@ export const FRONT_DOOR_TOOLS = [
   "tool_session_status",
   "end_tool_session",
   "discover_tools",
+  "describe_tool",
   "run_tool",
   "get_workflow",
 ] as const;

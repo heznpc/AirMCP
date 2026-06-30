@@ -1,8 +1,8 @@
 {
   "generatedAt": "STABLE_PLACEHOLDER",
   "protocolVersion": "2025-06-18",
-  "toolCount": 293,
-  "eligibleCount": 287,
+  "toolCount": 294,
+  "eligibleCount": 288,
   "ineligibleCount": 6,
   "ineligibleByReason": {
     "object-param:recurrence": 2,
@@ -1890,6 +1890,82 @@
         "destructiveHint": true,
         "sensitiveHint": false,
         "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "appIntentEligible": true,
+      "ineligibleReason": null
+    },
+    {
+      "name": "describe_tool",
+      "title": "Describe Tool",
+      "description": "Fetch the full description for one registered AirMCP tool after discover_tools returns a compact match.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Registered tool name to describe"
+          },
+          "full": {
+            "description": "Return the full description instead of the compact summary",
+            "type": "boolean"
+          },
+          "sessionId": {
+            "description": "Optional task-scoped tool session id; requires the tool to be in the session allowlist",
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "descriptionDetail": {
+            "type": "string",
+            "enum": [
+              "summary",
+              "full"
+            ]
+          },
+          "exposed": {
+            "type": "boolean"
+          },
+          "readOnly": {
+            "type": "boolean"
+          },
+          "destructive": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "descriptionDetail",
+          "exposed"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "sensitiveHint": false,
+        "idempotentHint": true,
         "openWorldHint": false
       },
       "appIntentEligible": true,
@@ -9370,6 +9446,9 @@
           "requireToolSession": {
             "type": "boolean"
           },
+          "harnessAdapter": {
+            "type": "string"
+          },
           "modulesEnabled": {
             "type": "array",
             "items": {
@@ -9405,6 +9484,7 @@
           "modulePacksAvailable",
           "modulesMissingPacks",
           "requireToolSession",
+          "harnessAdapter",
           "modulesEnabled",
           "modulesDisabled",
           "toolsExposed",

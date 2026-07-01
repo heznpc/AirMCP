@@ -8,6 +8,7 @@ AirMCP's job is to collect local Apple-workspace context and produce auditable, 
 
 - Read local asset context from Finder, Photos, Keynote, screen captures, and user-selected files.
 - Produce manifests that describe assets, provenance, dimensions, permissions, labels, and suggested scene placement.
+- Provide a first workflow through `prepare_spatial_handoff_manifest`: selected local assets in, read-only metadata and bounded nearby context out.
 - Export handoff folders that a separate renderer, design tool, or headset workflow can consume.
 - Keep writes explicit and auditable. Generated manifests or export folders must be user-directed outputs, not background sync.
 - Surface missing dependency or package state through `list_module_packs`, `profile_status`, and `install_module_pack`.

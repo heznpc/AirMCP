@@ -69,6 +69,8 @@ Release artifacts now use a slim root by default while the source checkout keeps
 - `npm run addons:check` stages every non-core package and fails on missing module/shared files or `pack-*` naming drift.
 - `npm run addons:verify-install -- --all` packs the slim root package plus every staged add-on, first proves a root-only install cannot silently use bundled fallback in `AIRMCP_ADDON_PACKAGE_MODE=external-only`, then installs the add-on artifacts and proves the selected packs register over MCP stdio.
 - `npm run addons:measure-split` packs the universal local build with lifecycle scripts disabled, compares it with slim-root plus selected add-ons, and records packed/unpacked/install-size plus startup/list timing deltas.
+- `npm run addons:first-user-drill` rehearses a registry-free first-user path: slim root only, missing-pack prompt, local add-on install into the persistent prefix, config activation, and external-only boot.
+- `npm run addons:kill-test` combines split measurement with the first-user drill and fails the publish lane when size evidence is weak, install prompts are missing, confirmation gating is absent, or installed add-ons are not load-bearing.
 - `npm pack --dry-run --json` must include `dist/.airmcp-slim-root.json` and must not include non-core module `tools.js` / `prompts.js` entrypoints.
 - `.mcpb` release artifacts must include the same slim-root marker and must not leak non-core module entrypoints.
 - `list_module_packs`, `install_module_pack`, `profile_status.modulesMissingPacks`, `profile_status.modulesMissingAddonPackages`, `profile_status.modulePackInstallIssues`, and `profile_status.missingPackInstallHints` remain stable public truth surfaces, including a human-readable install prompt message for missing add-ons.
@@ -81,7 +83,7 @@ This matrix is the decision surface after an add-on modular-distribution kill-te
 
 Validation evidence must include:
 
-- `npm run release:preflight` or the equivalent explicit sequence: `build`, `tokens:check`, `profiles:check`, `harness:check`, `addons:check`, `addons:verify-install -- --all`, `addons:measure-split -- --require-size-win`, `verify:package`, `npm pack --dry-run --json`, and `build:mcpb`.
+- `npm run release:preflight` or the equivalent explicit sequence: `build`, `tokens:check`, `profiles:check`, `harness:check`, `addons:check`, `addons:verify-install -- --all`, `addons:measure-split -- --require-size-win`, `addons:first-user-drill -- --no-build`, `addons:kill-test -- --no-build`, `verify:package`, `npm pack --dry-run --json`, and `build:mcpb`.
 - Add-on package install smoke test in `AIRMCP_ADDON_PACKAGE_MODE=external-only` for at least one non-core pack and one restricted-pack profile, with both root-only negative provenance and installed-add-on positive registration checks.
 - Wire test coverage for explicit `compatible`, `strict`, `app-runtime`, and `agent` harness adapter policies plus app-owned runtime inference.
 - Size and startup/list timing measurements for universal bundled install vs slim-root add-on install. Thresholds are owner-ratified release gates, not inferred by the implementation session.

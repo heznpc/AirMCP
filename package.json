@@ -72,6 +72,7 @@
     "addons:check": "node scripts/build-addon-packages.mjs --check",
     "addons:verify-install": "node scripts/verify-addon-install.mjs",
     "addons:measure-split": "node scripts/measure-addon-split.mjs",
+    "addons:publish": "node scripts/publish-addon-packages.mjs",
     "swift-build": "cd swift && swift build -c release",
     "app-build": "cd app && swift build -c release",
     "app:run": "./scripts/bundle-app.sh run",

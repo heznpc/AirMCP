@@ -172,10 +172,17 @@
 
 /* Module Add-ons */
 "addons.active" = "Active";
+"addons.refresh" = "Refresh Add-on Status";
 "addons.install" = "Install and Activate";
 "addons.uninstall" = "Uninstall";
 "addons.copyInstallCommand" = "Copy Install Command";
 "addons.installing" = "Installing %@...";
+"addons.refreshing" = "Refreshing add-on status...";
+"addons.statusUpdated" = "Add-on status refreshed.";
+"addons.statusUnknown" = "Install status not checked";
+"addons.installed" = "Installed";
+"addons.notInstalled" = "Not installed";
+"addons.activeButMissing" = "Active but not installed";
 "addons.doneRestart" = "Add-on updated. Restart server to apply.";
 "addons.failed" = "Add-on failed: %@";
 "addon.core" = "Core Workspace";

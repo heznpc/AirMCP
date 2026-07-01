@@ -111,6 +111,12 @@ function makePackageJson(rootPkg, pack) {
   if (pack.packageName.includes("pack-") || pack.packageName.includes("-pack")) {
     fail(`${pack.name} package name must not contain pack-* wording: ${pack.packageName}`);
   }
+  const repository =
+    rootPkg.repository?.type === "git" &&
+    typeof rootPkg.repository.url === "string" &&
+    rootPkg.repository.url.startsWith("https://")
+      ? { ...rootPkg.repository, url: `git+${rootPkg.repository.url}` }
+      : rootPkg.repository;
   return {
     name: pack.packageName,
     version: rootPkg.version,
@@ -118,7 +124,7 @@ function makePackageJson(rootPkg, pack) {
     keywords: ["airmcp", "mcp", "macos", "module-addon", pack.name],
     homepage: rootPkg.homepage,
     bugs: rootPkg.bugs,
-    repository: rootPkg.repository,
+    repository,
     license: rootPkg.license,
     author: rootPkg.author,
     type: "module",

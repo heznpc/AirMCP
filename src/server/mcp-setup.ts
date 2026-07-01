@@ -68,13 +68,18 @@ function buildMissingPackInstallHints(
     missingByPack.set(packName, current);
   }
 
-  return MODULE_PACK_MANIFEST.filter((pack) => missingByPack.has(pack.name)).map((pack) => ({
-    pack: pack.name,
-    packageName: pack.packageName,
-    installSpec: `${pack.packageName}@${version}`,
-    modules: missingByPack.get(pack.name) ?? [],
-    command: `npx airmcp modules enable ${pack.name} --install`,
-  }));
+  return MODULE_PACK_MANIFEST.filter((pack) => missingByPack.has(pack.name)).map((pack) => {
+    const modules = missingByPack.get(pack.name) ?? [];
+    const command = `npx airmcp modules enable ${pack.name} --install`;
+    return {
+      pack: pack.name,
+      packageName: pack.packageName,
+      installSpec: `${pack.packageName}@${version}`,
+      modules,
+      command,
+      message: `Install and activate the ${pack.name} add-on to use ${modules.join(", ")}: ${command}. Restart AirMCP after installation.`,
+    };
+  });
 }
 
 export async function createServer(
@@ -301,6 +306,7 @@ export async function createServer(
             installSpec: z.string(),
             modules: z.array(z.string()),
             command: z.string(),
+            message: z.string(),
           }),
         ),
         requireToolSession: z.boolean(),

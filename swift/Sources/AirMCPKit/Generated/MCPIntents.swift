@@ -795,6 +795,7 @@ public struct MCPProfileStatusOutput: Codable, Sendable {
         public let installSpec: String
         public let modules: [String]
         public let command: String
+        public let message: String
     }
 
     public let profile: String

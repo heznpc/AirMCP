@@ -108,9 +108,10 @@ Breaking을 포함한 minor/patch는 **금지**. 직전 메이저에 묶어 둘 
 - [ ] `ci.yml` 전 단계 green
 - [ ] CodeQL·Scorecard 경고 신규 없음
 
-### 3.4 npm publish + .mcpb → GitHub Release
-- [ ] CD workflow(`cd.yml`) 자동 트리거 확인, 또는 수동 `npm publish --provenance`
+### 3.4 add-on publish + root npm publish + .mcpb → GitHub Release
+- [ ] CD workflow(`cd.yml`) 자동 트리거 확인. 수동 실행 시 `npm run release:preflight` 이후 `npm run addons:publish -- --publish --all --no-build --skip-verify`를 먼저 실행하고, 그 다음 root `npm publish --provenance --access public`을 실행한다.
 - [ ] `NPM_TOKEN`을 쓰는 경우 `npm whoami`가 통과하고 해당 토큰이 `airmcp` publish 권한을 가진 automation/granular token인지 확인. 토큰이 비어 있으면 npm trusted publishing이 GitHub environment `npm` + 이 workflow에 설정되어 있어야 한다.
+- [ ] `npm view @heznpc/airmcp-productivity@X.Y.Z` 등 add-on package가 같은 버전으로 반영됐는지 확인
 - [ ] `npm view airmcp@X.Y.Z` 로 반영 검증
 - [ ] `npx -y airmcp@X.Y.Z --version` 스모크
 - [ ] Release에 `airmcp-X.Y.Z.mcpb`가 첨부되어 있는지 확인 (Claude Desktop 원클릭 설치용)

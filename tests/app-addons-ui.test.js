@@ -18,9 +18,12 @@ describe("AirMCP.app module add-on management", () => {
 
   test("module menu exposes pack-level add-on controls", () => {
     expect(menuContent).toContain('Menu(L("addons.menu"))');
+    expect(menuContent).toContain('Button(L("addons.refresh"))');
     expect(menuContent).toContain('Button(L("addons.install"))');
     expect(menuContent).toContain('Button(L("addons.uninstall"))');
     expect(menuContent).toContain('Button(L("addons.copyInstallCommand"))');
+    expect(menuContent).toContain("addonManager.isInstalled(pack: pack.id)");
+    expect(menuContent).toContain('"addons.activeButMissing"');
     expect(menuContent).toContain("@heznpc/airmcp-productivity");
     expect(menuContent).toContain("@heznpc/airmcp-spatial");
   });
@@ -29,10 +32,15 @@ describe("AirMCP.app module add-on management", () => {
     expect(addonManager).toContain("AirMcpConstants.npmPackageSpecifier");
     expect(addonManager).toContain('"modules"');
     expect(addonManager).toContain('"--install"');
+    expect(addonManager).toContain('"list"');
+    expect(addonManager).toContain('"--json"');
+    expect(addonManager).toContain("installedPacks");
   });
 
   test("localized strings cover the add-on controls", () => {
     expect(enStrings).toContain('"addons.menu" = "Module Add-ons"');
+    expect(enStrings).toContain('"addons.refresh" = "Refresh Add-on Status"');
+    expect(enStrings).toContain('"addons.activeButMissing" = "Active but not installed"');
     expect(enStrings).toContain('"addon.spatial" = "Spatial"');
   });
 });

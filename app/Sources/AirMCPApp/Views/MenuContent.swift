@@ -602,6 +602,13 @@ struct MenuContent: View {
                 Divider()
             }
 
+            Button(L("addons.refresh")) {
+                addonManager.refresh()
+            }
+            .disabled(addonManager.isRunning)
+
+            Divider()
+
             ForEach(allModulePacks) { pack in
                 addOnMenu(for: pack)
             }
@@ -617,6 +624,8 @@ struct MenuContent: View {
     @ViewBuilder
     private func addOnMenu(for pack: ModulePackInfo) -> some View {
         let isActive = configManager.modulePacks.contains(pack.id)
+        let isInstalled = addonManager.isInstalled(pack: pack.id)
+        let isActiveButMissing = isActive && !isInstalled
 
         Menu {
             Text(pack.localizedDescription)
@@ -626,6 +635,11 @@ struct MenuContent: View {
             Text(pack.packageName)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+
+            Label(
+                addonInstallStatusText(isInstalled: isInstalled, isActiveButMissing: isActiveButMissing),
+                systemImage: addonInstallStatusIcon(isInstalled: isInstalled, isActiveButMissing: isActiveButMissing)
+            )
 
             Divider()
 
@@ -646,15 +660,45 @@ struct MenuContent: View {
                 Button(L("addons.uninstall")) {
                     addonManager.uninstall(pack: pack.id, configManager: configManager)
                 }
-                .disabled(addonManager.isRunning)
+                .disabled(addonManager.isRunning || !isInstalled)
 
                 Button(L("addons.copyInstallCommand")) {
                     AirMcpConstants.copyToClipboard(pack.installCommand)
                 }
             }
         } label: {
-            Label(pack.localizedTitle, systemImage: isActive ? "checkmark.circle" : pack.icon)
+            Label(pack.localizedTitle, systemImage: addOnMenuIcon(pack: pack, isActive: isActive, isInstalled: isInstalled))
         }
+    }
+
+    private func addOnMenuIcon(pack: ModulePackInfo, isActive: Bool, isInstalled: Bool) -> String {
+        if isActive && !isInstalled {
+            return "exclamationmark.triangle"
+        }
+        if isActive {
+            return "checkmark.circle"
+        }
+        return pack.icon
+    }
+
+    private func addonInstallStatusText(isInstalled: Bool, isActiveButMissing: Bool) -> String {
+        if !addonManager.hasLoadedInstallStatus {
+            return L("addons.statusUnknown")
+        }
+        if isActiveButMissing {
+            return L("addons.activeButMissing")
+        }
+        return L(isInstalled ? "addons.installed" : "addons.notInstalled")
+    }
+
+    private func addonInstallStatusIcon(isInstalled: Bool, isActiveButMissing: Bool) -> String {
+        if !addonManager.hasLoadedInstallStatus {
+            return "questionmark.circle"
+        }
+        if isActiveButMissing {
+            return "exclamationmark.triangle"
+        }
+        return isInstalled ? "checkmark.seal" : "icloud.and.arrow.down"
     }
 
     private var addonStatusIcon: String {

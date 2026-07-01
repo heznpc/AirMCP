@@ -59,22 +59,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build
-        run: npm run build
+      - name: Release preflight
+        run: npm run release:preflight
 
-      - name: Verify package contents
-        run: |
-          PACK_OUT=$(npm pack --dry-run 2>&1)
-          echo "$PACK_OUT"
-          if echo "$PACK_OUT" | grep -Ev '\.d\.ts$' | grep -qE '\.(map|ts|env|token)$'; then
-            echo "::error::Unexpected files detected in package (source maps, .ts, .env, or token files)!"
-            exit 1
-          fi
+      - name: Publish add-ons with provenance
+        run: npm run addons:publish -- --publish --all --no-build --skip-verify
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Build .mcpb Desktop Extension
-        run: npm run build:mcpb
-
-      - name: Publish with provenance
+      - name: Publish root with provenance
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -85,7 +78,7 @@ jobs:
           tag_name: v${{ steps.pkg.outputs.version }}
           name: v${{ steps.pkg.outputs.version }}
           generate_release_notes: true
-          files: build/mcpb/airmcp-${{ steps.pkg.outputs.version }}.mcpb
+          files: build/release-preflight/airmcp-${{ steps.pkg.outputs.version }}.mcpb
           fail_on_unmatched_files: true
 
       - name: Verify public release state

@@ -9,7 +9,16 @@ import { readFileSync, existsSync, statSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
-import { MODULE_NAMES, STARTER_MODULES, NPM_PACKAGE_NAME, MCP_CLIENTS, getCompatibilityEnv } from "../shared/config.js";
+import {
+  MODULE_NAMES,
+  NPM_PACKAGE_NAME,
+  MCP_CLIENTS,
+  getCompatibilityEnv,
+  isModuleEnabled,
+  normalizeProfileName,
+  parseConfig,
+  type AirMcpConfig,
+} from "../shared/config.js";
 import { HOME, PATHS } from "../shared/constants.js";
 import { CODEX_APP_OWNED_URL, codexAirmcpRuntimeShape, isCodexCliAvailable } from "./codex-mcp.js";
 import { clientRuntimeShape } from "./client-config.js";
@@ -29,6 +38,8 @@ const APP_OWNED_HEALTH_URL = CODEX_APP_OWNED_URL.replace(/\/mcp$/, "/health");
 
 interface FileConfig {
   locale?: string;
+  profile?: string;
+  toolExposure?: string;
   modulePacks?: string | string[];
   requireToolSession?: boolean;
   disabledModules?: string[];
@@ -125,6 +136,7 @@ export async function runDoctor(): Promise<void> {
   console.log(heading("Configuration"));
 
   let fileConfig: FileConfig | null = null;
+  let runtimeConfig: AirMcpConfig | null = null;
   if (existsSync(PATHS.CONFIG)) {
     try {
       fileConfig = JSON.parse(readFileSync(PATHS.CONFIG, "utf-8")) as FileConfig;
@@ -135,6 +147,20 @@ export async function runDoctor(): Promise<void> {
     }
   } else {
     meh("Config file", `Not found — using starter profile`);
+  }
+  try {
+    runtimeConfig = parseConfig();
+    const enabledCount = MODULE_NAMES.filter((moduleName) => isModuleEnabled(runtimeConfig!, moduleName)).length;
+    ok(
+      "Runtime profile",
+      `${runtimeConfig.profile} (${runtimeConfig.toolExposure} exposure, ${enabledCount}/${MODULE_NAMES.length} modules enabled)`,
+    );
+    const requestedProfile = normalizeProfileName(fileConfig?.profile);
+    if (fileConfig?.profile && requestedProfile !== runtimeConfig.profile) {
+      meh("Config profile", `requested "${fileConfig.profile}", effective "${runtimeConfig.profile}"`);
+    }
+  } catch (e) {
+    meh("Runtime profile", `could not parse effective config: ${e instanceof Error ? e.message : String(e)}`);
   }
 
   // ── MCP Clients ────────────────────────────────────────────────────
@@ -167,6 +193,21 @@ export async function runDoctor(): Promise<void> {
         meh(client.name, `config parse error`);
       }
     }
+  }
+  try {
+    const output = execFileSync("claude", ["mcp", "list"], {
+      encoding: "utf8",
+      timeout: 3_000,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    anyClientFound = true;
+    if (/\bairmcp\b/i.test(output)) {
+      ok("Claude Code user scope", `${GREEN}connected${RESET} ${DIM}(claude mcp list)${RESET}`);
+    } else {
+      meh("Claude Code user scope", "CLI available but no airmcp entry found");
+    }
+  } catch {
+    /* CLI absent or not configured; file-config checks above remain authoritative. */
   }
   if (isCodexCliAvailable()) {
     anyClientFound = true;
@@ -281,18 +322,12 @@ export async function runDoctor(): Promise<void> {
   // ── Modules ────────────────────────────────────────────────────────
   console.log(heading("Modules"));
 
-  const disabledSet = new Set(fileConfig?.disabledModules ?? []);
   const enabledMods: string[] = [];
   const disabledMods: string[] = [];
 
   for (const mod of MODULE_NAMES) {
-    if (fileConfig) {
-      if (disabledSet.has(mod)) disabledMods.push(mod);
-      else enabledMods.push(mod);
-    } else {
-      if (STARTER_MODULES.has(mod)) enabledMods.push(mod);
-      else disabledMods.push(mod);
-    }
+    if (runtimeConfig ? isModuleEnabled(runtimeConfig, mod) : false) enabledMods.push(mod);
+    else disabledMods.push(mod);
   }
 
   console.log(`  ${BOLD}${enabledMods.length}${RESET} enabled  ${DIM}${disabledMods.length} disabled${RESET}\n`);
@@ -316,10 +351,10 @@ export async function runDoctor(): Promise<void> {
 
   console.log(heading("Module add-ons"));
   const packSelection = resolveModulePackSelection(process.env.AIRMCP_MODULE_PACKS ?? fileConfig?.modulePacks);
-  const packStatuses = getModulePackStatuses(packSelection.packs);
+  const packStatuses = getModulePackStatuses(runtimeConfig?.modulePacks ?? packSelection.packs);
   const activePacks = packStatuses.filter((pack) => pack.available);
   ok("Active packs", activePacks.map((pack) => pack.name).join(", "));
-  if (packSelection.configured)
+  if (runtimeConfig?.modulePacksConfigured ?? packSelection.configured)
     ok("Pack source", process.env.AIRMCP_MODULE_PACKS ? "AIRMCP_MODULE_PACKS" : "config.json");
   else meh("Pack source", "default all built-in packs");
   ok("Add-on import mode", process.env.AIRMCP_ADDON_PACKAGE_MODE ?? "prefer-installed");
@@ -330,7 +365,7 @@ export async function runDoctor(): Promise<void> {
   }
 
   console.log(heading("Task harness"));
-  const strictHarness = process.env.AIRMCP_REQUIRE_TOOL_SESSION === "true" || fileConfig?.requireToolSession === true;
+  const strictHarness = runtimeConfig?.requireToolSession ?? false;
   const harnessAdapter =
     process.env.AIRMCP_HARNESS_ADAPTER ??
     (process.env.AIRMCP_APP_OWNED_RUNTIME ? "app-runtime" : strictHarness ? "strict" : "compatible");

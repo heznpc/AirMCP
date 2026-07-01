@@ -169,6 +169,7 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
       },
       outputSchema: {
         total: z.number(),
+        totalMatched: z.number(),
         returned: z.number(),
         offset: z.number(),
         notes: z.array(
@@ -179,6 +180,7 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
             preview: z.string(),
             creationDate: z.string(),
             modificationDate: z.string(),
+            shared: z.boolean(),
           }),
         ),
       },

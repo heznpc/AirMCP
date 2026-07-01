@@ -10,14 +10,20 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import {
   DEFAULT_TOOL_EXPOSURE_BY_PROFILE,
   MODULE_NAMES,
+  PRESET_PROFILE_NAMES,
   PROFILE_MODULES,
   STARTER_MODULES,
   normalizeProfileName,
   type AirMcpProfileName,
 } from "../shared/config.js";
 import { PATHS } from "../shared/constants.js";
-import { codexManualSetupCommand, stdioProxyEntry } from "./codex-mcp.js";
-import { configureMcpClients } from "./client-config.js";
+import {
+  codexDirectManualSetupCommand,
+  codexManualSetupCommand,
+  directStdioEntry,
+  stdioProxyEntry,
+} from "./codex-mcp.js";
+import { configureMcpClients, type ClientRuntimeMode } from "./client-config.js";
 import { LOGO_LINES, typeLine, sleep, writeOut } from "../shared/banner.js";
 import { isPlainObject } from "../shared/validate.js";
 import { formatError } from "../shared/errors.js";
@@ -314,11 +320,33 @@ const PRESETS: Record<string, { desc: string; modules: string[] }> = {
 
 import { DIM, RESET, BOLD, WHITE, GREEN, YELLOW } from "./style.js";
 
-function parseInitArgs(): { yes: boolean; profile: AirMcpProfileName | null; noClients: boolean } {
+function normalizeClientRuntimeMode(raw: string | undefined): ClientRuntimeMode | null {
+  const value = raw?.trim().toLowerCase();
+  if (value === "app" || value === "app-owned" || value === "airmcp-app") return "app";
+  if (value === "direct" || value === "stdio" || value === "direct-stdio") return "direct";
+  return null;
+}
+
+function parseClientRuntimeMode(raw: string | undefined): ClientRuntimeMode {
+  const mode = normalizeClientRuntimeMode(raw);
+  if (!mode) {
+    console.error(`[AirMCP] Invalid --client-runtime value: ${raw ?? ""}. Expected "app" or "direct".`);
+    process.exit(1);
+  }
+  return mode;
+}
+
+function parseInitArgs(): {
+  yes: boolean;
+  profile: AirMcpProfileName | null;
+  noClients: boolean;
+  clientRuntime: ClientRuntimeMode;
+} {
   const args = process.argv.slice(3);
   let profile: AirMcpProfileName | null = null;
   let yes = false;
   let noClients = false;
+  let clientRuntime: ClientRuntimeMode = "app";
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg === "--yes" || arg === "-y") {
@@ -330,13 +358,20 @@ function parseInitArgs(): { yes: boolean; profile: AirMcpProfileName | null; noC
       i++;
     } else if (arg?.startsWith("--profile=")) {
       profile = normalizeProfileName(arg.slice("--profile=".length));
+    } else if (arg === "--client-runtime") {
+      clientRuntime = parseClientRuntimeMode(args[i + 1]);
+      i++;
+    } else if (arg?.startsWith("--client-runtime=")) {
+      clientRuntime = parseClientRuntimeMode(arg.slice("--client-runtime=".length));
+    } else if (arg === "--direct-stdio") {
+      clientRuntime = "direct";
     }
   }
-  return { yes, profile, noClients };
+  return { yes, profile, noClients, clientRuntime };
 }
 
 function inferProfile(enabled: Set<string>): AirMcpProfileName | "custom" {
-  for (const profile of Object.keys(PROFILE_MODULES) as AirMcpProfileName[]) {
+  for (const profile of PRESET_PROFILE_NAMES) {
     const modules = PROFILE_MODULES[profile];
     if (modules.length !== enabled.size) continue;
     if (modules.every((moduleName) => enabled.has(moduleName))) return profile;
@@ -419,10 +454,12 @@ export async function runInit(): Promise<void> {
       console.error(`[AirMCP] Failed to write config: ${formatError(err)}`);
       process.exit(1);
     }
-    const clientResults = initArgs.noClients ? [] : configureMcpClients({ includeSkipped: false });
+    const clientResults = initArgs.noClients
+      ? []
+      : configureMcpClients({ includeSkipped: false, runtimeMode: initArgs.clientRuntime });
     const patchedClients = clientResults.filter((result) => result.status !== "failed").length;
     console.log(
-      `[AirMCP] profile=${initArgs.profile}, toolExposure=${configPayload.toolExposure}, modules=${enabled.size}, clients=${patchedClients}`,
+      `[AirMCP] profile=${String(configPayload.profile)}, toolExposure=${configPayload.toolExposure}, modules=${enabled.size}, clients=${patchedClients}`,
     );
     console.log(`[AirMCP] wrote ${PATHS.CONFIG}`);
     return;
@@ -437,6 +474,7 @@ export async function runInit(): Promise<void> {
         "    npx airmcp init --profile communications-safe --yes\n" +
         "    npx airmcp init --profile productivity --yes\n" +
         "    npx airmcp init --profile full --yes\n" +
+        "  Add --client-runtime direct to write direct stdio client entries.\n" +
         "  Add --no-clients to write config.json without patching MCP clients.",
     );
     process.exit(1);
@@ -548,8 +586,8 @@ export async function runInit(): Promise<void> {
   console.log(` ${GREEN}\u2713${RESET} ${PATHS.CONFIG}`);
 
   // --- Step 3: Auto-detect and patch MCP client configs ---
-  const airmcpEntry = stdioProxyEntry();
-  const clientResults = configureMcpClients({ includeSkipped: false });
+  const airmcpEntry = initArgs.clientRuntime === "direct" ? directStdioEntry() : stdioProxyEntry();
+  const clientResults = configureMcpClients({ includeSkipped: false, runtimeMode: initArgs.clientRuntime });
   const detectedClients = clientResults.map((result) => result.name);
   let patchedClients = 0;
 
@@ -572,7 +610,9 @@ export async function runInit(): Promise<void> {
     console.log(`  ${DIM}${JSON.stringify({ mcpServers: { airmcp: airmcpEntry } }, null, 2)}${RESET}`);
     console.log("");
     console.log("  Codex CLI:");
-    console.log(`  ${DIM}${codexManualSetupCommand()}${RESET}`);
+    console.log(
+      `  ${DIM}${initArgs.clientRuntime === "direct" ? codexDirectManualSetupCommand() : codexManualSetupCommand()}${RESET}`,
+    );
   }
 
   // --- Done ---
@@ -581,7 +621,11 @@ export async function runInit(): Promise<void> {
     `  ${GREEN}\u2713${RESET} ${t("setup_complete", lang)} ${BOLD}${enabled.size} modules${RESET}, profile: ${BOLD}${String(configPayload.profile)}${RESET}, safety: ${BOLD}${hitlLevel}${RESET}, ${patchedClients} client(s) configured.`,
   );
   if (detectedClients.length > 0) {
-    console.log(`  ${DIM}Start AirMCP.app, then restart ${detectedClients.join(", ")} to connect.${RESET}`);
+    if (initArgs.clientRuntime === "direct") {
+      console.log(`  ${DIM}Restart ${detectedClients.join(", ")} to connect via direct stdio.${RESET}`);
+    } else {
+      console.log(`  ${DIM}Start AirMCP.app, then restart ${detectedClients.join(", ")} to connect.${RESET}`);
+    }
   }
   console.log("");
   console.log(`  ${DIM}${t("next_steps", lang)}:${RESET}`);

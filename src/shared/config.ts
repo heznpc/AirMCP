@@ -31,6 +31,7 @@ export {
   KNOWN_MODULE_NAMES,
   MODULE_NAMES,
   OPT_IN_MODULE_NAMES,
+  PRESET_PROFILE_NAMES,
   PROFILE_DESCRIPTIONS,
   PROFILE_MODULES,
   PROFILE_NAMES,
@@ -49,6 +50,7 @@ export {
   type AirMcpProfileName,
   type KnownModuleName,
   type ModuleName,
+  type PresetProfileName,
   type ToolExposureMode,
 } from "./profiles.js";
 export {

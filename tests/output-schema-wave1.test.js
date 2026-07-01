@@ -7,7 +7,7 @@
  * Over time the two drift: a new field in the JXA script that isn't
  * added to the Zod object, a field renamed on the Swift side but not the
  * schema, etc. This file closes that gap for the three highest-traffic
- * read tools — list_notes, list_reminders, list_events — by calling each
+ * read tools — list/search notes, list/search reminders, and list_events — by calling each
  * tool against mocked runtimes and running the captured structuredContent
  * through the tool's own outputSchema via z.object(...).strict().safeParse().
  *
@@ -69,6 +69,44 @@ describe('outputSchema Wave 1 — list_notes', () => {
   });
 });
 
+describe('outputSchema Wave 1 — search_notes', () => {
+  beforeEach(() => {
+    mockRunJxa.mockReset();
+  });
+
+  test('runtime response conforms to declared outputSchema', async () => {
+    const server = createMockServer();
+    registerNoteTools(server, createMockConfig());
+
+    mockRunJxa.mockResolvedValue({
+      total: 2,
+      totalMatched: 1,
+      offset: 0,
+      returned: 1,
+      notes: [
+        {
+          id: 'a',
+          name: 'A',
+          folder: 'Notes',
+          preview: 'needle preview',
+          creationDate: '2024-01-01',
+          modificationDate: '2024-01-02',
+          shared: false,
+        },
+      ],
+    });
+
+    const result = await server.callTool('search_notes', { query: 'needle' });
+    expect(result.structuredContent).toBeDefined();
+
+    const schema = schemaFor(server, 'search_notes');
+    const parsed = schema.safeParse(result.structuredContent);
+    if (!parsed.success) {
+      throw new Error(`search_notes drift: ${JSON.stringify(parsed.error.issues, null, 2)}`);
+    }
+  });
+});
+
 describe('outputSchema Wave 1 — list_reminders', () => {
   beforeEach(() => {
     if (mockRunAutomation) mockRunAutomation.mockReset();
@@ -109,6 +147,47 @@ describe('outputSchema Wave 1 — list_reminders', () => {
     const parsed = schema.safeParse(result.structuredContent);
     if (!parsed.success) {
       throw new Error(`list_reminders drift: ${JSON.stringify(parsed.error.issues, null, 2)}`);
+    }
+  });
+});
+
+describe('outputSchema Wave 1 — search_reminders', () => {
+  beforeEach(() => {
+    if (mockRunAutomation) mockRunAutomation.mockReset();
+    mockRunJxa.mockReset();
+  });
+
+  test('runtime response conforms to declared outputSchema', async () => {
+    const server = createMockServer();
+    registerReminderTools(server, createMockConfig());
+
+    const payload = {
+      returned: 1,
+      reminders: [
+        {
+          id: 'r1',
+          name: 'Buy milk',
+          completed: false,
+          dueDate: null,
+          priority: 0,
+          flagged: false,
+          list: 'Reminders',
+        },
+      ],
+    };
+
+    if (mockRunAutomation) {
+      mockRunAutomation.mockResolvedValue(payload);
+    }
+    mockRunJxa.mockResolvedValue(payload);
+
+    const result = await server.callTool('search_reminders', { query: 'milk' });
+    expect(result.structuredContent).toBeDefined();
+
+    const schema = schemaFor(server, 'search_reminders');
+    const parsed = schema.safeParse(result.structuredContent);
+    if (!parsed.success) {
+      throw new Error(`search_reminders drift: ${JSON.stringify(parsed.error.issues, null, 2)}`);
     }
   });
 });

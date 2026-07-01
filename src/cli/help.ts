@@ -37,6 +37,9 @@ export function runHelp(): void {
   console.log(
     `    ${GREEN}$${RESET} npx airmcp ${BOLD}connect-clients${RESET} ${DIM}Repair client configs for AirMCP.app runtime${RESET}`,
   );
+  console.log(
+    `    ${GREEN}$${RESET} npx airmcp ${BOLD}connect-clients --client-runtime direct${RESET} ${DIM}Use direct stdio configs${RESET}`,
+  );
   console.log(`    ${GREEN}$${RESET} npx airmcp                  ${DIM}Start MCP server (stdio)${RESET}`);
   console.log(`    ${GREEN}$${RESET} npx airmcp ${BOLD}--http${RESET}          ${DIM}Start as HTTP server${RESET}`);
   console.log(
@@ -57,7 +60,7 @@ export function runHelp(): void {
   console.log(`    ${CYAN}modules${RESET}    ${DIM}List, install, enable, disable, or doctor module add-ons${RESET}`);
   console.log(`    ${CYAN}connect${RESET}    ${DIM}Bridge stdio clients into the app-owned local runtime${RESET}`);
   console.log(
-    `    ${CYAN}connect-clients${RESET} ${DIM}Configure installed clients to use that app-owned runtime${RESET}`,
+    `    ${CYAN}connect-clients${RESET} ${DIM}Configure installed clients for app-owned or direct stdio runtime${RESET}`,
   );
   console.log(
     `    ${CYAN}workflows${RESET}  ${DIM}Show target workflows, prompts, modules, Siri phrases, safety notes${RESET}`,
@@ -67,7 +70,7 @@ export function runHelp(): void {
   console.log("");
   console.log(`    ${WHITE}AIRMCP_FULL${RESET}=true              ${DIM}Request all installed modules${RESET}`);
   console.log(
-    `    ${WHITE}AIRMCP_PROFILE${RESET}=${DIM}starter|communications-safe|productivity|full${RESET} ${DIM}Choose module profile${RESET}`,
+    `    ${WHITE}AIRMCP_PROFILE${RESET}=${DIM}starter|communications-safe|productivity|full|custom${RESET} ${DIM}Choose module profile${RESET}`,
   );
   console.log(
     `    ${WHITE}AIRMCP_TOOL_EXPOSURE${RESET}=${DIM}progressive|profile|full${RESET} ${DIM}Control tools/list size${RESET}`,

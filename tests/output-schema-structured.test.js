@@ -50,7 +50,7 @@ const TOOL_FIXTURES = {
   },
   search_notes: {
     args: { query: 'test', limit: 10, offset: 0 },
-    mock: { total: 0, returned: 0, offset: 0, notes: [] },
+    mock: { total: 0, totalMatched: 0, returned: 0, offset: 0, notes: [] },
   },
   // reminders
   list_reminders: {

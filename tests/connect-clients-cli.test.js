@@ -47,6 +47,27 @@ describe("airmcp connect-clients", () => {
     expect(readFileSync(configPath, "utf8")).toContain('"airmcp"');
   });
 
+  test("dry-run JSON accepts the direct runtime mode", () => {
+    const home = mkdtempSync(join(tmpdir(), "airmcp-connect-clients-"));
+    homes.push(home);
+    const configPath = join(home, "Library", "Application Support", "Claude", "claude_desktop_config.json");
+    mkdirSync(dirname(configPath), { recursive: true });
+    writeFileSync(configPath, JSON.stringify({ mcpServers: { airmcp: { command: "npx", args: ["-y", "airmcp"] } } }));
+
+    const result = runCli(home, ["connect-clients", "--dry-run", "--json", "--client-runtime", "direct"]);
+
+    expect(result.status).toBe(0);
+    const payload = JSON.parse(result.stdout);
+    expect(payload.clientRuntime).toBe("direct");
+    expect(payload.results).toEqual([
+      expect.objectContaining({
+        name: "Claude Desktop",
+        status: "already-configured",
+        configPath,
+      }),
+    ]);
+  });
+
   test("rejects unknown flags with a non-zero exit code", () => {
     const home = mkdtempSync(join(tmpdir(), "airmcp-connect-clients-"));
     homes.push(home);

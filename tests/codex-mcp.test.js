@@ -26,7 +26,10 @@ const {
   CODEX_APP_OWNED_URL,
   codexAirmcpRuntimeShape,
   codexConfigTomlRuntimeShape,
+  codexDirectManualSetupCommand,
   configureCodexAirmcp,
+  configureCodexAirmcpDirect,
+  directStdioEntry,
   isCodexAirmcpConfigured,
   stdioProxyEntry,
 } = await import("../dist/cli/codex-mcp.js");
@@ -209,5 +212,28 @@ describe("codex MCP setup", () => {
       args: ["-y", packageSpecifier, "connect", "--url", CODEX_APP_OWNED_URL],
       env: { AIRMCP_HTTP_TOKEN: "test-token" },
     });
+  });
+
+  test("direct stdio entries intentionally launch the version-pinned server", () => {
+    expect(directStdioEntry()).toEqual({
+      command: "npx",
+      args: ["-y", packageSpecifier],
+    });
+    expect(codexDirectManualSetupCommand()).toBe(`codex mcp add airmcp -- npx -y ${packageSpecifier}`);
+  });
+
+  test("can configure Codex for direct stdio runtime", () => {
+    codexGetOutput = "airmcp\ntransport: http\ncommand: node";
+    expect(configureCodexAirmcpDirect()).toBe("configured");
+    expect(execFileSync).toHaveBeenCalledWith(
+      "codex",
+      ["mcp", "remove", "airmcp"],
+      expect.objectContaining({ encoding: "utf8" }),
+    );
+    expect(execFileSync).toHaveBeenCalledWith(
+      "codex",
+      ["mcp", "add", "airmcp", "--", "npx", "-y", packageSpecifier],
+      expect.objectContaining({ encoding: "utf8" }),
+    );
   });
 });

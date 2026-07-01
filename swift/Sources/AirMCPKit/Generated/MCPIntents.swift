@@ -1076,9 +1076,11 @@ public struct MCPSearchNotesOutput: Codable, Sendable {
         public let preview: String
         public let creationDate: String
         public let modificationDate: String
+        public let shared: Bool
     }
 
     public let total: Double
+    public let totalMatched: Double
     public let returned: Double
     public let offset: Double
     public let notes: [NotesItem]

@@ -116,8 +116,8 @@ jobs:
         run: npm run addons:check
 
       - name: Verify installed add-on package smoke
-        timeout-minutes: 5
-        run: npm run addons:verify-install
+        timeout-minutes: 10
+        run: npm run addons:verify-install -- --all
 
       # Forcing function on the SHIPPED artifact (RFC 0014 root-cause). The
       # step above boots the repo's dist/; this packs the real tarball,

@@ -107,7 +107,23 @@ if (!existsSync(join(ROOT, "dist", "index.js"))) {
   console.error(`[mcpb] dist/index.js not found — run \`npm run build\` first`);
   process.exit(1);
 }
-cpSync(join(ROOT, "dist"), join(serverDir, "dist"), { recursive: true });
+const slimApply = spawnSync(process.execPath, ["scripts/slim-root-package.mjs", "--apply"], { cwd: ROOT, stdio: "inherit" });
+if (slimApply.status !== 0) {
+  console.error(`[mcpb] slim root apply failed with status ${slimApply.status}`);
+  process.exit(1);
+}
+try {
+  cpSync(join(ROOT, "dist"), join(serverDir, "dist"), { recursive: true });
+} finally {
+  const slimRestore = spawnSync(process.execPath, ["scripts/slim-root-package.mjs", "--restore"], {
+    cwd: ROOT,
+    stdio: "inherit",
+  });
+  if (slimRestore.status !== 0) {
+    console.error(`[mcpb] slim root restore failed with status ${slimRestore.status}`);
+    process.exit(1);
+  }
+}
 
 // ── Install production deps into the bundle ──────────────────────────
 console.error("[mcpb] installing production dependencies into bundle…");

@@ -71,7 +71,10 @@ function verifyNpmDryRun() {
   const output = run("npm", ["pack", "--dry-run", "--json"], { capture: true });
   let pack;
   try {
-    [pack] = JSON.parse(output);
+    const arrayStart = output.indexOf("[");
+    const arrayEnd = output.lastIndexOf("]");
+    const jsonText = arrayStart >= 0 && arrayEnd > arrayStart ? output.slice(arrayStart, arrayEnd + 1) : output;
+    [pack] = JSON.parse(jsonText);
   } catch (error) {
     fail(`npm pack --dry-run --json did not return parseable JSON: ${error.message}`);
   }
@@ -93,13 +96,35 @@ function verifyNpmDryRun() {
   if (!filePaths.includes("dist/index.js")) {
     fail("npm dry-run is missing dist/index.js");
   }
-  console.log(`ok: npm dry-run: ${pack.filename}, ${filePaths.length} files, dist-only publish surface`);
+  if (!filePaths.includes("dist/.airmcp-slim-root.json")) {
+    fail("npm dry-run is missing dist/.airmcp-slim-root.json; root package is not the slim publish surface");
+  }
+  const stagedManifest = JSON.parse(readFileSync(join(ROOT, "build", "addons", "manifest.json"), "utf8"));
+  const leakedEntrypoints = [];
+  for (const addonPack of stagedManifest.packages ?? []) {
+    for (const moduleName of addonPack.modules ?? []) {
+      for (const fileName of ["tools.js", "prompts.js"]) {
+        const entry = `dist/${moduleName}/${fileName}`;
+        if (filePaths.includes(entry)) leakedEntrypoints.push(entry);
+      }
+    }
+  }
+  if (leakedEntrypoints.length) {
+    fail(`npm dry-run includes non-core module entrypoints that belong in add-ons: ${leakedEntrypoints.join(", ")}`);
+  }
+  console.log(`ok: npm dry-run: ${pack.filename}, ${filePaths.length} files, slim root publish surface`);
 }
 
 function verifyMcpb(path) {
   const size = assertFile(path, ".mcpb");
   const entries = listZip(path);
-  const required = ["manifest.json", "icon.png", "server/package.json", "server/dist/index.js"];
+  const required = [
+    "manifest.json",
+    "icon.png",
+    "server/package.json",
+    "server/dist/index.js",
+    "server/dist/.airmcp-slim-root.json",
+  ];
   const missing = required.filter((entry) => !entries.includes(entry));
   if (missing.length) fail(`.mcpb is missing required entries: ${missing.join(", ")}`);
   if (!entries.some((entry) => entry.startsWith("server/node_modules/"))) {
@@ -115,6 +140,19 @@ function verifyMcpb(path) {
       entry.endsWith("/.npmrc"),
   );
   if (forbidden.length) fail(`.mcpb includes forbidden paths: ${forbidden.join(", ")}`);
+  const stagedManifest = JSON.parse(readFileSync(join(ROOT, "build", "addons", "manifest.json"), "utf8"));
+  const leakedEntrypoints = [];
+  for (const addonPack of stagedManifest.packages ?? []) {
+    for (const moduleName of addonPack.modules ?? []) {
+      for (const fileName of ["tools.js", "prompts.js"]) {
+        const entry = `server/dist/${moduleName}/${fileName}`;
+        if (entries.includes(entry)) leakedEntrypoints.push(entry);
+      }
+    }
+  }
+  if (leakedEntrypoints.length) {
+    fail(`.mcpb includes non-core module entrypoints that belong in add-ons: ${leakedEntrypoints.join(", ")}`);
+  }
 
   const manifest = readZipJson(path, "manifest.json");
   if (manifest.version !== version) {
@@ -147,15 +185,14 @@ run("npm", ["run", "tokens:check"]);
 run("npm", ["run", "profiles:check"]);
 run("npm", ["run", "harness:check"]);
 run("npm", ["run", "addons:check"]);
-run("npm", ["run", "addons:verify-install"]);
-run("npm", ["run", "addons:measure-split", "--", "--no-build"]);
-run("npm", ["run", "verify:package"]);
-verifyNpmDryRun();
-run("npm", ["run", "build:mcpb"]);
-
+run("npm", ["run", "addons:verify-install", "--", "--all"]);
+run("npm", ["run", "addons:measure-split", "--", "--no-build", "--require-size-win"]);
 const splitMeasurementPath = join(ROOT, "build", "addons", "split-measurement.json");
 assertFile(splitMeasurementPath, "add-on split measurement");
 copyFileSync(splitMeasurementPath, join(OUT_DIR, "addon-split-measurement.json"));
+run("npm", ["run", "verify:package"]);
+verifyNpmDryRun();
+run("npm", ["run", "build:mcpb"]);
 
 const mcpbPath = join(ROOT, "build", "mcpb", `airmcp-${version}.mcpb`);
 verifyMcpb(mcpbPath);

@@ -591,7 +591,9 @@ export async function runInit(): Promise<void> {
   );
   console.log(`    ${DIM}\u2022${RESET} Run ${BOLD}npx airmcp workflows${RESET} to see target workflows and prompts`);
   console.log(`    ${DIM}\u2022${RESET} Re-run ${BOLD}npx airmcp init${RESET} anytime to change modules`);
-  console.log(`    ${DIM}\u2022${RESET} Use ${BOLD}npx airmcp --full${RESET} to enable all modules temporarily`);
+  console.log(
+    `    ${DIM}\u2022${RESET} Use ${BOLD}npx airmcp --full${RESET} to request every installed module temporarily`,
+  );
   console.log("");
   console.log(`  ${DIM}${t("try_asking", lang)}${RESET}`);
   console.log(`    ${DIM}\u201c${RESET}${t("prompt_calendar_today", lang)}${DIM}\u201d${RESET}`);

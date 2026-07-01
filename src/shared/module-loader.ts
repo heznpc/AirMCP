@@ -1,9 +1,13 @@
 import type { ModuleRegistration } from "./registry.js";
 import type { ModuleManifestEntry } from "./modules.js";
+import { pathToFileURL } from "node:url";
+import { resolveAddonPackageImport } from "./addon-packages.js";
 import { getModuleAddonImportSpec, getModulePackNameForModule } from "./module-packs.js";
 import { log, errToCtx } from "./logger.js";
 
 type AddonPackageMode = "prefer-installed" | "bundled" | "external-only";
+
+const missingAddonPackageModules = new Set<string>();
 
 function getAddonPackageMode(): AddonPackageMode {
   const raw = (process.env.AIRMCP_ADDON_PACKAGE_MODE ?? "prefer-installed").trim().toLowerCase();
@@ -16,6 +20,18 @@ function isOptionalPackageMiss(error: unknown): boolean {
   if (code === "ERR_MODULE_NOT_FOUND" || code === "MODULE_NOT_FOUND") return true;
   const message = error instanceof Error ? error.message : String(error);
   return message.includes("Cannot find package '@heznpc/airmcp-");
+}
+
+export function clearMissingAddonPackageModules(): void {
+  missingAddonPackageModules.clear();
+}
+
+export function getMissingAddonPackageModules(): string[] {
+  return [...missingAddonPackageModules].sort();
+}
+
+function rememberMissingAddonPackageModule(moduleName: string): void {
+  missingAddonPackageModules.add(moduleName);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -42,12 +58,38 @@ async function importModuleFile(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<Record<string, any> | null> {
   const externalSpec = getModuleAddonImportSpec(def.name, kind);
+  let externalPackageMissing = false;
 
   if (externalSpec && mode !== "bundled") {
     try {
       return (await import(externalSpec)) as Record<string, unknown>;
     } catch (error) {
+      const resolvedFromPrefix = resolveAddonPackageImport(externalSpec);
+      if (resolvedFromPrefix) {
+        try {
+          return (await import(pathToFileURL(resolvedFromPrefix).href)) as Record<string, unknown>;
+        } catch (prefixError) {
+          if (mode === "external-only") {
+            log.error("required add-on package module failed to load", {
+              module: def.name,
+              kind,
+              spec: externalSpec,
+              resolved: resolvedFromPrefix,
+              err: errToCtx(prefixError),
+            });
+            return null;
+          }
+          log.warn("installed add-on package failed from configured prefix; falling back to bundled module", {
+            module: def.name,
+            kind,
+            spec: externalSpec,
+            resolved: resolvedFromPrefix,
+            err: errToCtx(prefixError),
+          });
+        }
+      }
       if (mode === "external-only") {
+        if (isOptionalPackageMiss(error)) rememberMissingAddonPackageModule(def.name);
         log.error("required add-on package module failed to load", {
           module: def.name,
           kind,
@@ -63,11 +105,18 @@ async function importModuleFile(
           spec: externalSpec,
           err: errToCtx(error),
         });
+      } else {
+        externalPackageMissing = true;
       }
     }
   }
 
-  return (await import(`../${def.name}/${kind}.js`)) as Record<string, unknown>;
+  try {
+    return (await import(`../${def.name}/${kind}.js`)) as Record<string, unknown>;
+  } catch (error) {
+    if (externalSpec && externalPackageMissing) rememberMissingAddonPackageModule(def.name);
+    throw error;
+  }
 }
 
 /** Import a single module definition, returning null on failure. */

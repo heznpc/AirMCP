@@ -14,6 +14,7 @@ If a variable accepts a path, `~` expands to `$HOME`. Booleans are `"true"` / `"
 | Bind HTTP server with OAuth 2.1 | `AIRMCP_ALLOW_NETWORK=with-oauth` + `AIRMCP_OAUTH_ISSUER=…` + `AIRMCP_OAUTH_AUDIENCE=…` |
 | Disable a flaky module without removing config | `AIRMCP_DEBUG_MODULES=notes,calendar` (whitelist) |
 | Use only selected module packs | `AIRMCP_MODULE_PACKS=core,productivity` |
+| Install and activate a module add-on | `npx airmcp modules enable productivity --install` |
 | Stage physical add-on package artifacts | `npm run addons:build` |
 | Send all 294 tools without compactDescription | `AIRMCP_COMPACT_TOOLS=false` + `AIRMCP_TOOL_EXPOSURE=full` |
 | Require sessions before hidden tools can run | `AIRMCP_REQUIRE_TOOL_SESSION=true` |
@@ -83,11 +84,12 @@ If a variable accepts a path, `~` expands to `$HOME`. Booleans are `"true"` / `"
 
 | Variable | Default | Notes |
 |---|---|---|
-| `AIRMCP_FULL` | (off) | `true` enables every standard module ignoring the config's `disabledModules`. Profile-only modules stay opt-in. |
+| `AIRMCP_FULL` | (off) | `true` requests every standard module ignoring the config's `disabledModules`. In slim-root release artifacts, non-core tools still require the matching add-on package; missing packages surface through `profile_status.missingPackInstallHints`. Profile-only modules stay opt-in. |
 | `AIRMCP_PROFILE` | `starter` | Runtime profile: `starter`, `communications-safe`, `productivity`, or `full`. May also include opt-in modules such as `spatial_prep`. |
 | `AIRMCP_TOOL_EXPOSURE` | profile-dependent | `progressive` exposes the front door, `profile` exposes the selected profile, `full` exposes every loaded tool. |
 | `AIRMCP_MODULE_PACKS` | all packs | Comma-separated DLC-like pack allow-list. `core` is always kept. Examples: `core-only`, `core,communications`, `core,productivity,spatial`, or `all`. Modules whose profile is enabled but pack is unavailable are reported through `profile_status.modulesMissingPacks`. |
 | `AIRMCP_ADDON_PACKAGE_MODE` | `prefer-installed` | Module import mode. `prefer-installed` tries installed physical add-on packages such as `@heznpc/airmcp-productivity` before bundled fallback; `bundled` skips external packages; `external-only` refuses missing add-ons outside `core`. |
+| `AIRMCP_ADDON_INSTALL_PREFIX` | `~/.airmcp/addons` | Override where `npx airmcp modules enable <pack> --install` installs companion add-on packages. The runtime resolver checks this user-level prefix after normal package resolution, so `npx` and AirMCP.app installs stay persistent instead of landing in a temporary npx cache. |
 | `AIRMCP_REQUIRE_TOOL_SESSION` | (off unless app/CLI config sets it) | `true` makes `run_tool` require a valid `sessionId` before dispatching hidden tools. Directly exposed tools remain callable without a session. New app/CLI-generated configs set `requireToolSession: true`; no-config direct stdio keeps the compatible default. |
 | `AIRMCP_HARNESS_ADAPTER` | inferred | Task harness policy: `compatible`, `strict`, `app-runtime`, or `agent`. App-owned HTTP runtime is inferred from `AIRMCP_APP_OWNED_RUNTIME`; config-driven strict sessions infer `strict`. |
 | `AIRMCP_TOOL_SESSION_MAX_TOOLS` | `64` | Maximum tools allowed in one task-scoped session. Capped at 64. |
@@ -208,7 +210,7 @@ It does not replace OS permissions, HITL approval, OAuth scopes, rate limits, or
 
 ## Module packs
 
-AirMCP module packs are the runtime contract for DLC-like installation. `npx airmcp modules` and `AIRMCP_MODULE_PACKS` let operators activate only selected packs today. `npm run addons:build` stages physical npm package directories under `build/addons`, and the runtime tries installed add-on packages first in `prefer-installed` mode before falling back to bundled modules. Add-on package names intentionally omit the word "pack": for example `@heznpc/airmcp-productivity`, `@heznpc/airmcp-communications`, and `@heznpc/airmcp-spatial`.
+AirMCP module packs are the runtime contract for DLC-like installation. `npx airmcp modules` and `AIRMCP_MODULE_PACKS` let operators activate only selected packs, while `npx airmcp modules enable productivity --install` installs the matching companion npm package and then activates it. npm and MCPB release artifacts ship as a slim root; non-core entrypoints live in the physical add-on packages staged by `npm run addons:build`. In local source builds, the runtime still tries installed add-on packages first in `prefer-installed` mode before falling back to the universal `dist` tree. Add-on package names intentionally omit the word "pack": for example `@heznpc/airmcp-productivity`, `@heznpc/airmcp-communications`, and `@heznpc/airmcp-spatial`.
 
 Built-in packs:
 
@@ -224,7 +226,7 @@ Built-in packs:
 - `google-workspace`: Google Workspace
 - `spatial`: experimental spatial prep
 
-Use `npx airmcp modules list` locally or `list_module_packs` over MCP to inspect the active pack set and add-on package names. Use `npx airmcp modules enable productivity,communications` to write a narrow `modulePacks` config. `profile_status` also reports `modulePacksConfigured`, `modulePacksAvailable`, and `modulesMissingPacks` so a client can tell whether a module is disabled by profile/config or unavailable because its pack is not active.
+Use `npx airmcp modules list` locally or `list_module_packs` over MCP to inspect the active pack set, package names, and install commands. Use `npx airmcp modules enable productivity,communications` to write a narrow `modulePacks` config, or add `--install` when the physical companion package should be installed on demand. `profile_status` also reports `modulePacksConfigured`, `modulePacksAvailable`, `modulesMissingPacks`, `modulesMissingAddonPackages`, and `missingPackInstallHints` so a client can prompt for the exact add-on install command when a requested profile is missing a pack or a slim-root runtime cannot find the package.
 
 ---
 

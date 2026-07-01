@@ -501,6 +501,9 @@ public struct MCPListModulePacksOutput: Codable, Sendable {
         public let modules: [String]
         public let available: Bool
         public let required: Bool
+        public let installSpec: String?
+        public let installCommand: String?
+        public let uninstallCommand: String?
     }
 
     public let configured: Bool
@@ -786,11 +789,21 @@ public struct MCPProactiveContextOutput: Codable, Sendable {
 
 // Output type for: profile_status
 public struct MCPProfileStatusOutput: Codable, Sendable {
+    public struct MissingpackinstallhintsItem: Codable, Sendable {
+        public let pack: String
+        public let packageName: String
+        public let installSpec: String
+        public let modules: [String]
+        public let command: String
+    }
+
     public let profile: String
     public let toolExposure: String
     public let modulePacksConfigured: Bool
     public let modulePacksAvailable: [String]
     public let modulesMissingPacks: [String]
+    public let modulesMissingAddonPackages: [String]
+    public let missingPackInstallHints: [MissingpackinstallhintsItem]
     public let requireToolSession: Bool
     public let harnessAdapter: String
     public let modulesEnabled: [String]
@@ -9752,6 +9765,20 @@ public struct MCPProfileStatusSnippetView: View {
                 Text("Modules Missing Packs")
                 Spacer()
                 Text(String(describing: data.modulesMissingPacks))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Modules Missing Addon Packages")
+                Spacer()
+                Text(String(describing: data.modulesMissingAddonPackages))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Missing Pack Install Hints")
+                Spacer()
+                Text(String(describing: data.missingPackInstallHints))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }

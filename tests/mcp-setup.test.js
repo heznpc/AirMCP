@@ -74,25 +74,30 @@ jest.unstable_mockModule('@modelcontextprotocol/sdk/server/mcp.js', () => ({
 
 // loadModuleRegistry → fixture set per-test via this Jest mock.
 let fakeModuleRegistry = [];
+let fakeModulePackPlan = {
+  packs: [
+    {
+      name: 'core',
+      packageName: 'airmcp',
+      title: 'Core Workspace',
+      description: 'Core',
+      modules: ['notes'],
+      available: true,
+      required: true,
+    },
+  ],
+  modulesMissingPacks: [],
+};
+let fakeMissingAddonPackageModules = [];
 jest.unstable_mockModule('../dist/shared/modules.js', () => ({
   loadModuleRegistry: jest.fn(async () => fakeModuleRegistry),
-  getModulePackPlan: jest.fn(() => ({
-    packs: [
-      {
-        name: 'core',
-        packageName: 'airmcp',
-        title: 'Core Workspace',
-        description: 'Core',
-        modules: ['notes'],
-        available: true,
-        required: true,
-      },
-    ],
-    modulesMissingPacks: [],
-  })),
+  getModulePackPlan: jest.fn(() => fakeModulePackPlan),
   setModuleRegistry: jest.fn(),
   MODULE_REGISTRY: [],
   getModuleNames: jest.fn(() => fakeModuleRegistry.map((m) => m.name)),
+}));
+jest.unstable_mockModule('../dist/shared/module-loader.js', () => ({
+  getMissingAddonPackageModules: jest.fn(() => fakeMissingAddonPackageModules),
 }));
 
 // Compatibility resolver — drives the enabled / osBlocked / broken / deprecated
@@ -274,6 +279,21 @@ beforeEach(() => {
   hitlInstallCalls.length = 0;
   toolRegistryInstalled = false;
   fakeModuleRegistry = [];
+  fakeModulePackPlan = {
+    packs: [
+      {
+        name: 'core',
+        packageName: 'airmcp',
+        title: 'Core Workspace',
+        description: 'Core',
+        modules: ['notes'],
+        available: true,
+        required: true,
+      },
+    ],
+    modulesMissingPacks: [],
+  };
+  fakeMissingAddonPackageModules = [];
   resolveCompatImpl = () => ({ decision: 'register-clean', reason: '' });
 });
 
@@ -495,5 +515,114 @@ describe('createServer — installation order invariant', () => {
     }
     expect(hitlInstallCalls).toHaveLength(1);
     expect(hitlInstallCalls[0].serverPresent).toBe(true);
+  });
+});
+
+describe('createServer — module add-on install hints', () => {
+  test('profile_status and list_module_packs expose on-demand install commands for missing packs', async () => {
+    fakeModuleRegistry = [{ name: 'notes', tools: () => {} }];
+    fakeModulePackPlan = {
+      packs: [
+        {
+          name: 'core',
+          packageName: 'airmcp',
+          title: 'Core Workspace',
+          description: 'Core',
+          modules: ['notes'],
+          available: true,
+          required: true,
+        },
+        {
+          name: 'productivity',
+          packageName: '@heznpc/airmcp-productivity',
+          title: 'Productivity',
+          description: 'iWork',
+          modules: ['pages', 'numbers', 'keynote'],
+          available: false,
+          required: false,
+        },
+      ],
+      modulesMissingPacks: ['pages', 'numbers'],
+    };
+
+    const origError = console.error;
+    console.error = () => {};
+    try {
+      await createServer(mkOptions({ pkg: { ...mkPkg(), version: '2.15.0' } }));
+    } finally {
+      console.error = origError;
+    }
+
+    const statusTool = sdkRegisterToolCalls.find((call) => call.name === 'profile_status');
+    const packsTool = sdkRegisterToolCalls.find((call) => call.name === 'list_module_packs');
+    const status = await statusTool.cb();
+    const packs = await packsTool.cb();
+
+    expect(status.structuredContent.missingPackInstallHints).toEqual([
+      {
+        pack: 'productivity',
+        packageName: '@heznpc/airmcp-productivity',
+        installSpec: '@heznpc/airmcp-productivity@2.15.0',
+        modules: ['pages', 'numbers'],
+        command: 'npx airmcp modules enable productivity --install',
+      },
+    ]);
+    expect(status.structuredContent.modulesMissingAddonPackages).toEqual([]);
+    expect(packs.structuredContent.packs.find((pack) => pack.name === 'productivity')).toMatchObject({
+      installSpec: '@heznpc/airmcp-productivity@2.15.0',
+      installCommand: 'npx airmcp modules enable productivity --install',
+      uninstallCommand: 'npx airmcp modules uninstall productivity',
+    });
+  });
+
+  test('profile_status folds physically missing add-on packages into install hints', async () => {
+    fakeModuleRegistry = [{ name: 'notes', tools: () => {} }];
+    fakeModulePackPlan = {
+      packs: [
+        {
+          name: 'core',
+          packageName: 'airmcp',
+          title: 'Core Workspace',
+          description: 'Core',
+          modules: ['notes'],
+          available: true,
+          required: true,
+        },
+        {
+          name: 'productivity',
+          packageName: '@heznpc/airmcp-productivity',
+          title: 'Productivity',
+          description: 'iWork',
+          modules: ['pages', 'numbers', 'keynote'],
+          available: true,
+          required: false,
+        },
+      ],
+      modulesMissingPacks: [],
+    };
+    fakeMissingAddonPackageModules = ['pages'];
+
+    const origError = console.error;
+    console.error = () => {};
+    try {
+      await createServer(mkOptions({ pkg: { ...mkPkg(), version: '2.15.0' } }));
+    } finally {
+      console.error = origError;
+    }
+
+    const statusTool = sdkRegisterToolCalls.find((call) => call.name === 'profile_status');
+    const status = await statusTool.cb();
+
+    expect(status.structuredContent.modulesMissingPacks).toEqual([]);
+    expect(status.structuredContent.modulesMissingAddonPackages).toEqual(['pages']);
+    expect(status.structuredContent.missingPackInstallHints).toEqual([
+      {
+        pack: 'productivity',
+        packageName: '@heznpc/airmcp-productivity',
+        installSpec: '@heznpc/airmcp-productivity@2.15.0',
+        modules: ['pages'],
+        command: 'npx airmcp modules enable productivity --install',
+      },
+    ]);
   });
 });

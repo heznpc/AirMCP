@@ -6362,6 +6362,36 @@
                 },
                 "required": {
                   "type": "boolean"
+                },
+                "installSpec": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "installCommand": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "uninstallCommand": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 }
               },
               "required": [
@@ -6371,7 +6401,10 @@
                 "description",
                 "modules",
                 "available",
-                "required"
+                "required",
+                "installSpec",
+                "installCommand",
+                "uninstallCommand"
               ],
               "additionalProperties": false
             }
@@ -9443,6 +9476,46 @@
               "type": "string"
             }
           },
+          "modulesMissingAddonPackages": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "missingPackInstallHints": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "pack": {
+                  "type": "string"
+                },
+                "packageName": {
+                  "type": "string"
+                },
+                "installSpec": {
+                  "type": "string"
+                },
+                "modules": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "command": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "pack",
+                "packageName",
+                "installSpec",
+                "modules",
+                "command"
+              ],
+              "additionalProperties": false
+            }
+          },
           "requireToolSession": {
             "type": "boolean"
           },
@@ -9483,6 +9556,8 @@
           "modulePacksConfigured",
           "modulePacksAvailable",
           "modulesMissingPacks",
+          "modulesMissingAddonPackages",
+          "missingPackInstallHints",
           "requireToolSession",
           "harnessAdapter",
           "modulesEnabled",

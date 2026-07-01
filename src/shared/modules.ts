@@ -9,7 +9,7 @@ import {
   isModulePackAvailable,
   type ModulePackStatus,
 } from "./module-packs.js";
-import { importModuleRegistration } from "./module-loader.js";
+import { clearMissingAddonPackageModules, importModuleRegistration } from "./module-loader.js";
 
 /**
  * Module manifest — the single source of truth for all AirMCP modules.
@@ -158,6 +158,7 @@ export async function loadModuleRegistry(config?: AirMcpConfig): Promise<ModuleR
   const targets = getTargetManifestEntries(config, whitelist);
   const cacheKey = `${process.env.AIRMCP_ADDON_PACKAGE_MODE ?? "prefer-installed"}|${targets.map((m) => m.name).join(",")}`;
   if (cacheByKey.has(cacheKey)) return cacheByKey.get(cacheKey)!;
+  clearMissingAddonPackageModules();
 
   const sequential = process.env.AIRMCP_DEBUG_SEQUENTIAL === "true";
 

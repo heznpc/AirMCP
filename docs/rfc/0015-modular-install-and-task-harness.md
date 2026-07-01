@@ -1,6 +1,6 @@
 # RFC 0015 — Modular install and task-scoped harness
 
-Status: Add-on Staging Implemented
+Status: Slim Root Default Implemented
 
 ## Problem
 
@@ -30,29 +30,31 @@ The second shipped slice is the module-pack contract:
 - `src/shared/module-packs.ts` defines DLC-like packs (`core`, `communications`, `productivity`, `browser`, `media`, `visual`, `location`, `device`, `intelligence`, `google-workspace`, `spatial`),
 - each pack declares its add-on package name without a `pack-` prefix (`airmcp`, `@heznpc/airmcp-productivity`, `@heznpc/airmcp-spatial`, ...),
 - `AIRMCP_MODULE_PACKS` and `config.json -> modulePacks` can restrict the available pack set while preserving `core`,
-- `npx airmcp modules` lists, enables, disables, and doctors the active pack set,
+- `npx airmcp modules` lists, enables, disables, installs, uninstalls, and doctors the active pack set,
+- `npx airmcp modules enable <pack> --install` installs companion npm packages into the user-level add-on prefix before activating `modulePacks`,
 - module loading skips enabled-profile modules whose pack is unavailable before dynamic import,
 - `list_module_packs` reports the active pack set over MCP,
-- `profile_status` reports `modulePacksConfigured`, `modulePacksAvailable`, and `modulesMissingPacks`,
+- `profile_status` reports `modulePacksConfigured`, `modulePacksAvailable`, `modulesMissingPacks`, `modulesMissingAddonPackages`, and install hints,
 - `profiles:check` includes a real MCP wire case proving `productivity` remains available while `communications` modules become missing-pack modules when only `core,productivity` are active.
 
-The third shipped slice is physical package staging:
+The third shipped slice is physical package split:
 
 - `scripts/build-addon-packages.mjs` stages tarball-ready package directories under `build/addons`,
 - each staged package includes only its pack modules; shared runtime imports are rewritten to the peer root `airmcp` package instead of copied into every add-on,
-- `AIRMCP_ADDON_PACKAGE_MODE=prefer-installed` tries an installed add-on package before bundled fallback,
+- `AIRMCP_ADDON_PACKAGE_MODE=prefer-installed` tries an installed add-on package from normal package resolution and `AIRMCP_ADDON_INSTALL_PREFIX` before bundled fallback,
 - `AIRMCP_ADDON_PACKAGE_MODE=external-only` turns missing add-ons into module-load failures outside `core`,
+- `npm pack` / `npm publish` prepack builds a slim root artifact and postpack restores the universal local `dist`,
 - `npm run addons:check` is wired into CI and `release:preflight`.
 
-## Proposed install split
+## Implemented install split
 
-Keep the npm package as the reliable universal fallback while add-on packages prove install-size and startup wins. Split module packs in this order:
+Release artifacts now use a slim root by default while the source checkout keeps a universal local `dist` for development and measurement. Split module packs in this order:
 
 | Layer            | Package shape                                                                                                  | Why first                                                                                                                          |
 | ---------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | Runtime core     | `airmcp`                                                                                                       | Owns config, transports, audit, HITL, OAuth, rate limits, profiles, and task sessions.                                             |
 | Optional bridges | source-built Swift bridge / future signed app component                                                        | Heavy native capability already differs from npm/MCPB distribution.                                                                |
-| Module add-ons   | staged `@heznpc/airmcp-productivity` / `@heznpc/airmcp-spatial` packages or signed app downloadable components | Runtime can already import installed add-ons first; publishing waits until package-size/startup evidence beats release complexity. |
+| Module add-ons   | staged `@heznpc/airmcp-productivity` / `@heznpc/airmcp-spatial` packages or signed app downloadable components | Runtime imports installed add-ons first; missing slim-root packages surface install hints instead of silently pretending the module exists. |
 
 `npx airmcp doctor` treats the Swift bridge as an optional bridge, not a module add-on package. That keeps the first physical split focused on the heaviest native binary/signing boundary before multiplying npm package surfaces.
 
@@ -62,29 +64,31 @@ Keep the npm package as the reliable universal fallback while add-on packages pr
 - `npm run harness:check` proves `compatible`, `strict`, `app-runtime`, and `agent` adapter policy over the real MCP stdio wire, including the app-owned runtime inference path.
 - `npm run tokens:check` keeps the eager tool-description budget bounded as modules grow.
 - `npm run addons:check` stages every non-core package and fails on missing module/shared files or `pack-*` naming drift.
-- `npm run addons:verify-install` packs the root package plus at least one staged add-on, first proves a root-only install cannot silently use bundled fallback in `AIRMCP_ADDON_PACKAGE_MODE=external-only`, then installs the add-on artifact and proves the selected pack registers over MCP stdio.
-- `npm run addons:measure-split` builds a temporary slim root artifact, installs it with selected add-ons, and records packed/unpacked/install-size plus startup/list timing deltas against the universal bundled package.
-- `npm pack --dry-run --json` shows package size regressions per release.
-- `list_module_packs` and `profile_status.modulesMissingPacks` remain stable public truth surfaces.
+- `npm run addons:verify-install -- --all` packs the slim root package plus every staged add-on, first proves a root-only install cannot silently use bundled fallback in `AIRMCP_ADDON_PACKAGE_MODE=external-only`, then installs the add-on artifacts and proves the selected packs register over MCP stdio.
+- `npm run addons:measure-split` packs the universal local build with lifecycle scripts disabled, compares it with slim-root plus selected add-ons, and records packed/unpacked/install-size plus startup/list timing deltas.
+- `npm pack --dry-run --json` must include `dist/.airmcp-slim-root.json` and must not include non-core module `tools.js` / `prompts.js` entrypoints.
+- `.mcpb` release artifacts must include the same slim-root marker and must not leak non-core module entrypoints.
+- `list_module_packs`, `profile_status.modulesMissingPacks`, `profile_status.modulesMissingAddonPackages`, and `profile_status.missingPackInstallHints` remain stable public truth surfaces.
 - At least one real user/workflow needs a smaller install, not only a smaller context window.
 - Pack boundaries have tests proving no profile loads a missing optional module by accident.
 
 ## Post-validation decision matrix
 
-This matrix is the decision surface after an add-on modular-distribution kill-test. It decides whether the staged package split graduates, stalls, or rolls back to runtime-only module packs. It does not change the current safety model: bundled fallback remains the default user-safe path until install evidence is clean across npm, MCPB, app runtime, and no-config stdio.
+This matrix is the decision surface after an add-on modular-distribution kill-test. It decides whether the slim-root/add-on split stays the default, stalls, or rolls back to runtime-only module packs. It does not change the safety model: `core` keeps the front door, and missing non-core packages surface install hints instead of widening permissions.
 
 Validation evidence must include:
 
-- `npm run release:preflight` or the equivalent explicit sequence: `build`, `tokens:check`, `profiles:check`, `harness:check`, `addons:check`, `addons:verify-install`, `addons:measure-split`, `verify:package`, `npm pack --dry-run --json`, and `build:mcpb`.
+- `npm run release:preflight` or the equivalent explicit sequence: `build`, `tokens:check`, `profiles:check`, `harness:check`, `addons:check`, `addons:verify-install -- --all`, `addons:measure-split -- --require-size-win`, `verify:package`, `npm pack --dry-run --json`, and `build:mcpb`.
 - Add-on package install smoke test in `AIRMCP_ADDON_PACKAGE_MODE=external-only` for at least one non-core pack and one restricted-pack profile, with both root-only negative provenance and installed-add-on positive registration checks.
 - Wire test coverage for explicit `compatible`, `strict`, `app-runtime`, and `agent` harness adapter policies plus app-owned runtime inference.
 - Size and startup/list timing measurements for universal bundled install vs slim-root add-on install. Thresholds are owner-ratified release gates, not inferred by the implementation session.
+- Shipped-artifact checks proving npm and MCPB artifacts are slim root artifacts, not merely measured temporary artifacts.
 
 | Validation result       | Decision                                                                                                            | Immediate action                                                                                                                                                                                            | Follow-up goal                                                                                                             | Public status                                                                 |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| Validation passes       | Graduate add-ons to opt-in prerelease distribution, still with bundled fallback.                                    | Prepare npm prerelease/canary add-on package plan and document install path; keep `airmcp` universal package as the default.                                                                                | Add shipped-artifact CI coverage for installed add-ons before any stable publish or fallback removal.                      | "Add-on packages are opt-in prerelease; universal package remains supported." |
-| Size win is weak        | Do not publish physical add-ons yet. Runtime module packs remain useful; physical split stays staged.               | Record the measured size/startup deltas and keep `addons:check` in CI/release preflight.                                                                                                                    | Re-evaluate heavier boundaries first: Swift bridge/app component, shared dependency pruning, or pack granularity changes.  | "Staging validated technically, but release value is not proven."             |
-| Install fails           | Block add-on distribution. Keep bundled fallback and runtime pack activation only.                                  | Preserve failing artifact, install log, package manifest, and import mode; fix package layout, dependency, export, or peer-version issue before another kill-test.                                          | Add a regression test for the exact install failure if it is reproducible locally or in CI.                                | "No add-on package publish; use bundled `airmcp`."                            |
+| Validation passes       | Keep slim root as the default release shape.                                                                       | Publish root and add-on artifacts only when shipped-artifact checks pass; keep the install prompt path documented.                                                                                           | Expand clean-install coverage from the default productivity pack to every publish-target add-on.                           | "Slim root is the default; install add-ons on demand."                        |
+| Size win is weak        | Do not widen add-on publishing. Keep the slim gate, but re-check whether the split is worth the product complexity. | Record measured size/startup deltas and require owner ratification before adding more physical packages.                                                                                                     | Re-evaluate heavier boundaries first: Swift bridge/app component, shared dependency pruning, or pack granularity changes.  | "Slim root works technically, but value needs tighter evidence."              |
+| Install fails           | Block add-on distribution and block stable release.                                                                | Preserve failing artifact, install log, package manifest, and import mode; fix package layout, dependency, export, or peer-version issue before another release attempt.                                    | Add a regression test for the exact install failure if it is reproducible locally or in CI.                                | "No add-on package publish until install is fixed."                           |
 | Adapter wire tests fail | Block graduation of the task-harness contract for affected adapters; do not use add-on split to widen distribution. | Keep compatible/no-session stdio behavior available; fix `start_tool_session`, `discover_tools`, `describe_tool`, `run_tool`, `tool_session_status`, or `end_tool_session` wire behavior before publishing. | Add or tighten wire cases for the failing adapter policy, especially hidden-tool rejection and session allowlist behavior. | "Task harness remains staged for the failing adapter."                        |
 
 If multiple rows apply, choose the most conservative result in this order: install failure, adapter wire failure, weak size win, pass.
@@ -92,5 +96,4 @@ If multiple rows apply, choose the most conservative result in this order: insta
 ## Non-goals
 
 - Do not split safety primitives out of core.
-- Do not remove bundled fallback until installed add-ons have passed shipped-artifact checks across npm, MCPB, app runtime, and no-config stdio.
 - Do not use AppIntents/Shortcuts as the module-pack mechanism; they are user-facing automation surfaces, not runtime dependency management.

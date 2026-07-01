@@ -12,6 +12,7 @@ struct AirMCPApp: App {
     @State private var hitlManager = HitlManager()
     @State private var logManager = LogManager()
     @State private var updateManager = UpdateManager()
+    @State private var addonManager = AddonManager()
     @State private var hitlInitialized = false
     @State private var appInitialized = false
 
@@ -65,7 +66,8 @@ struct AirMCPApp: App {
                 setupManager: setupManager,
                 hitlManager: hitlManager,
                 logManager: logManager,
-                updateManager: updateManager
+                updateManager: updateManager,
+                addonManager: addonManager
             )
             .onAppear {
                 initializeRuntimeIfNeeded()

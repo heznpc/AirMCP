@@ -125,8 +125,10 @@ function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
 }
 
-function npmPack(cwd) {
-  const output = sh("npm", ["pack", "--json"], { cwd });
+function npmPack(cwd, options = {}) {
+  const args = ["pack", "--json"];
+  if (options.ignoreScripts) args.push("--ignore-scripts");
+  const output = sh("npm", args, { cwd });
   let parsed;
   try {
     const arrayStart = output.indexOf("[");
@@ -564,12 +566,12 @@ try {
   const forbiddenModules = assertion.forbiddenModules ?? [];
 
   console.log(`[2/6] npm pack universal root and selected add-ons (${selectedPacks.join(", ")})`);
-  const universalRootPack = npmPack(ROOT);
+  const universalRootPack = npmPack(ROOT, { ignoreScripts: true });
   tarballs.push(universalRootPack.tgz);
   const addonPacks = selectedPacks.map((packName) => {
     const pack = stagedManifest.packages.find((candidate) => candidate.name === packName);
     const packageRoot = join(ROOT, pack.packageDir);
-    const artifact = npmPack(packageRoot);
+    const artifact = npmPack(packageRoot, { ignoreScripts: true });
     tarballs.push(artifact.tgz);
     return { ...artifact, packName, packageName: pack.packageName };
   });
@@ -577,7 +579,7 @@ try {
   console.log("[3/6] create temporary slim root package");
   const slim = makeSlimRootPackageSource(stagedManifest.packages);
   slimSourceDir = slim.sourceDir;
-  const slimRootPack = npmPack(slimSourceDir);
+  const slimRootPack = npmPack(slimSourceDir, { ignoreScripts: true });
   tarballs.push(slimRootPack.tgz);
 
   console.log("[4/6] install and boot universal bundled package");

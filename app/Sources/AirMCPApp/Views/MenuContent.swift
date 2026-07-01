@@ -41,6 +41,19 @@ private struct ModuleInfo: Identifiable {
     private static let currentMacOSVersion = ProcessInfo.processInfo.operatingSystemVersion.majorVersion
 }
 
+private struct ModulePackInfo: Identifiable {
+    let id: String
+    let titleKey: String
+    let descKey: String
+    let packageName: String
+    let icon: String
+    let required: Bool
+
+    var localizedTitle: String { L(titleKey) }
+    var localizedDescription: String { L(descKey) }
+    var installCommand: String { "npx airmcp modules enable \(id) --install" }
+}
+
 private struct WorkflowInfo: Identifiable {
     let id: String
     let titleKey: String
@@ -89,6 +102,100 @@ private let allModules: [ModuleInfo] = [
     ModuleInfo(id: "google", icon: "globe", toolCount: 16),
     ModuleInfo(id: "speech", icon: "waveform", toolCount: 3),
     ModuleInfo(id: "health", icon: "heart", toolCount: 5),
+    ModuleInfo(id: "memory", icon: "brain.head.profile", toolCount: 4),
+    ModuleInfo(id: "audit", icon: "doc.text.magnifyingglass", toolCount: 2),
+    ModuleInfo(id: "spatial_prep", icon: "visionpro", toolCount: 2),
+]
+
+private let allModulePacks: [ModulePackInfo] = [
+    ModulePackInfo(
+        id: "core",
+        titleKey: "addon.core",
+        descKey: "addon.core.desc",
+        packageName: "airmcp",
+        icon: "square.stack.3d.up",
+        required: true
+    ),
+    ModulePackInfo(
+        id: "communications",
+        titleKey: "addon.communications",
+        descKey: "addon.communications.desc",
+        packageName: "@heznpc/airmcp-communications",
+        icon: "bubble.left.and.bubble.right",
+        required: false
+    ),
+    ModulePackInfo(
+        id: "productivity",
+        titleKey: "addon.productivity",
+        descKey: "addon.productivity.desc",
+        packageName: "@heznpc/airmcp-productivity",
+        icon: "doc.on.doc",
+        required: false
+    ),
+    ModulePackInfo(
+        id: "browser",
+        titleKey: "addon.browser",
+        descKey: "addon.browser.desc",
+        packageName: "@heznpc/airmcp-browser",
+        icon: "safari",
+        required: false
+    ),
+    ModulePackInfo(
+        id: "media",
+        titleKey: "addon.media",
+        descKey: "addon.media.desc",
+        packageName: "@heznpc/airmcp-media",
+        icon: "play.rectangle",
+        required: false
+    ),
+    ModulePackInfo(
+        id: "visual",
+        titleKey: "addon.visual",
+        descKey: "addon.visual.desc",
+        packageName: "@heznpc/airmcp-visual",
+        icon: "photo.on.rectangle",
+        required: false
+    ),
+    ModulePackInfo(
+        id: "location",
+        titleKey: "addon.location",
+        descKey: "addon.location.desc",
+        packageName: "@heznpc/airmcp-location",
+        icon: "map",
+        required: false
+    ),
+    ModulePackInfo(
+        id: "device",
+        titleKey: "addon.device",
+        descKey: "addon.device.desc",
+        packageName: "@heznpc/airmcp-device",
+        icon: "dot.radiowaves.left.and.right",
+        required: false
+    ),
+    ModulePackInfo(
+        id: "intelligence",
+        titleKey: "addon.intelligence",
+        descKey: "addon.intelligence.desc",
+        packageName: "@heznpc/airmcp-intelligence",
+        icon: "brain",
+        required: false
+    ),
+    ModulePackInfo(
+        id: "google-workspace",
+        titleKey: "addon.google",
+        descKey: "addon.google.desc",
+        packageName: "@heznpc/airmcp-google",
+        icon: "globe",
+        required: false
+    ),
+    ModulePackInfo(
+        id: "spatial",
+        titleKey: "addon.spatial",
+        descKey: "addon.spatial.desc",
+        packageName: "@heznpc/airmcp-spatial",
+        icon: "visionpro",
+        required: false
+    ),
 ]
 
 private let featuredWorkflows: [WorkflowInfo] = [
@@ -242,6 +349,7 @@ struct MenuContent: View {
     let hitlManager: HitlManager
     let logManager: LogManager
     let updateManager: UpdateManager
+    let addonManager: AddonManager
 
     var body: some View {
         // ── 1. Server Status ────────────────────────────────
@@ -477,9 +585,99 @@ struct MenuContent: View {
     @ViewBuilder
     private var modulesSection: some View {
         Menu(L("menu.modules")) {
+            addOnsMenu
+            Divider()
             ForEach(allModules) { module in
                 moduleToggle(for: module)
             }
+        }
+    }
+
+    @ViewBuilder
+    private var addOnsMenu: some View {
+        Menu(L("addons.menu")) {
+            if let status = addonManager.statusLabel {
+                Label(status, systemImage: addonStatusIcon)
+                    .foregroundStyle(addonStatusColor)
+                Divider()
+            }
+
+            ForEach(allModulePacks) { pack in
+                addOnMenu(for: pack)
+            }
+
+            Divider()
+
+            Text(L("settings.restartHint"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder
+    private func addOnMenu(for pack: ModulePackInfo) -> some View {
+        let isActive = configManager.modulePacks.contains(pack.id)
+
+        Menu {
+            Text(pack.localizedDescription)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Text(pack.packageName)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Divider()
+
+            Toggle(L("addons.active"), isOn: Binding(
+                get: { isActive },
+                set: { enabled in
+                    configManager.setModulePack(pack.id, enabled: enabled)
+                }
+            ))
+            .disabled(pack.required)
+
+            if !pack.required {
+                Button(L("addons.install")) {
+                    addonManager.install(pack: pack.id, configManager: configManager)
+                }
+                .disabled(addonManager.isRunning)
+
+                Button(L("addons.uninstall")) {
+                    addonManager.uninstall(pack: pack.id, configManager: configManager)
+                }
+                .disabled(addonManager.isRunning)
+
+                Button(L("addons.copyInstallCommand")) {
+                    AirMcpConstants.copyToClipboard(pack.installCommand)
+                }
+            }
+        } label: {
+            Label(pack.localizedTitle, systemImage: isActive ? "checkmark.circle" : pack.icon)
+        }
+    }
+
+    private var addonStatusIcon: String {
+        switch addonManager.state {
+        case .idle:
+            "circle"
+        case .running:
+            "progress.indicator"
+        case .done:
+            "checkmark.circle.fill"
+        case .failed:
+            "exclamationmark.triangle"
+        }
+    }
+
+    private var addonStatusColor: Color {
+        switch addonManager.state {
+        case .done:
+            .green
+        case .failed:
+            .red
+        default:
+            .secondary
         }
     }
 

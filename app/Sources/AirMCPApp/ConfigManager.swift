@@ -11,6 +11,19 @@ enum HitlLevel: String, Codable, Sendable, CaseIterable {
 @MainActor
 @Observable
 final class ConfigManager {
+    private static let allModulePacks = [
+        "core",
+        "communications",
+        "productivity",
+        "browser",
+        "media",
+        "visual",
+        "location",
+        "device",
+        "intelligence",
+        "google-workspace",
+        "spatial",
+    ]
 
     struct HitlConfig: Codable, Sendable {
         var level: HitlLevel
@@ -150,6 +163,35 @@ final class ConfigManager {
             config.disabledModules = newValue
             save()
         }
+    }
+
+    var modulePacks: [String] {
+        get { config.modulePacks ?? Self.allModulePacks }
+        set {
+            var seen = Set<String>()
+            var next = newValue.filter { pack in
+                guard Self.allModulePacks.contains(pack), !seen.contains(pack) else { return false }
+                seen.insert(pack)
+                return true
+            }
+            if !next.contains("core") {
+                next.insert("core", at: 0)
+            }
+            config.modulePacks = next
+            save()
+        }
+    }
+
+    func setModulePack(_ pack: String, enabled: Bool) {
+        var packs = modulePacks
+        if enabled {
+            if !packs.contains(pack) {
+                packs.append(pack)
+            }
+        } else if pack != "core" {
+            packs.removeAll { $0 == pack }
+        }
+        modulePacks = packs
     }
 
     var shareApprovalModules: [String] {

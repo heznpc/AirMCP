@@ -26,6 +26,8 @@ describe("AirMCP.app ConfigManager defaults", () => {
   test("preserves module pack activation written by the CLI", () => {
     expect(source).toMatch(/var modulePacks:\s*\[String\]\?/);
     expect(source).toMatch(/decodeIfPresent\(\[String\]\.self,\s*forKey:\s*\.modulePacks\)/);
+    expect(source).toContain('func setModulePack(_ pack: String, enabled: Bool)');
+    expect(source).toContain('"core"');
   });
 
   test("module toggles switch the JSON config to custom profile", () => {

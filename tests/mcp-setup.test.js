@@ -565,6 +565,8 @@ describe('createServer — module add-on install hints', () => {
         installSpec: '@heznpc/airmcp-productivity@2.15.0',
         modules: ['pages', 'numbers'],
         command: 'npx airmcp modules enable productivity --install',
+        message:
+          'Install and activate the productivity add-on to use pages, numbers: npx airmcp modules enable productivity --install. Restart AirMCP after installation.',
       },
     ]);
     expect(status.structuredContent.modulesMissingAddonPackages).toEqual([]);
@@ -622,6 +624,8 @@ describe('createServer — module add-on install hints', () => {
         installSpec: '@heznpc/airmcp-productivity@2.15.0',
         modules: ['pages'],
         command: 'npx airmcp modules enable productivity --install',
+        message:
+          'Install and activate the productivity add-on to use pages: npx airmcp modules enable productivity --install. Restart AirMCP after installation.',
       },
     ]);
   });

@@ -15,7 +15,18 @@ final class AddonManager {
         case failure(String)
     }
 
+    private struct ModulesListPayload: Decodable {
+        let packs: [PackStatus]
+    }
+
+    private struct PackStatus: Decodable {
+        let name: String
+        let installed: Bool
+    }
+
     var state: State = .idle
+    var installedPacks: Set<String> = ["core"]
+    var hasLoadedInstallStatus = false
 
     var isRunning: Bool {
         if case .running = state { return true }
@@ -26,8 +37,8 @@ final class AddonManager {
         switch state {
         case .idle:
             return nil
-        case .running(let pack):
-            return L("addons.installing", pack)
+        case .running(let message):
+            return message
         case .done(let message):
             return message
         case .failed(let message):
@@ -43,13 +54,30 @@ final class AddonManager {
         run(action: "uninstall", pack: pack, flag: nil, configManager: configManager)
     }
 
+    func refresh() {
+        guard !isRunning else { return }
+        state = .running(L("addons.refreshing"))
+
+        Task {
+            if let message = await loadInstalledPacks() {
+                state = .failed(message)
+            } else {
+                state = .done(L("addons.statusUpdated"))
+            }
+        }
+    }
+
+    func isInstalled(pack: String) -> Bool {
+        pack == "core" || installedPacks.contains(pack)
+    }
+
     func reset() {
         state = .idle
     }
 
     private func run(action: String, pack: String, flag: String?, configManager: ConfigManager) {
         guard !isRunning else { return }
-        state = .running(pack)
+        state = .running(L("addons.installing", pack))
 
         var args = ["modules", action, pack]
         if let flag {
@@ -61,10 +89,30 @@ final class AddonManager {
             switch result {
             case .success:
                 configManager.load()
+                _ = await loadInstalledPacks()
                 state = .done(L("addons.doneRestart"))
             case .failure(let message):
                 state = .failed(message)
             }
+        }
+    }
+
+    private func loadInstalledPacks() async -> String? {
+        let result = await Self.runAirMcp(["modules", "list", "--json"])
+        switch result {
+        case .success(let output):
+            do {
+                let payload = try JSONDecoder().decode(ModulesListPayload.self, from: Data(output.utf8))
+                var next = Set(payload.packs.filter(\.installed).map(\.name))
+                next.insert("core")
+                installedPacks = next
+                hasLoadedInstallStatus = true
+                return nil
+            } catch {
+                return error.localizedDescription
+            }
+        case .failure(let message):
+            return message
         }
     }
 

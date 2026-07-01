@@ -226,7 +226,7 @@ Built-in packs:
 - `google-workspace`: Google Workspace
 - `spatial`: experimental spatial prep
 
-Use `npx airmcp modules list` locally or `list_module_packs` over MCP to inspect the active pack set, package names, and install commands. Use `npx airmcp modules enable productivity,communications` to write a narrow `modulePacks` config, or add `--install` when the physical companion package should be installed on demand. `profile_status` also reports `modulePacksConfigured`, `modulePacksAvailable`, `modulesMissingPacks`, `modulesMissingAddonPackages`, and `missingPackInstallHints` so a client can prompt for the exact add-on install command when a requested profile is missing a pack or a slim-root runtime cannot find the package.
+Use `npx airmcp modules list` locally or `list_module_packs` over MCP to inspect the active pack set, package names, and install commands. Use `npx airmcp modules enable productivity,communications` to write a narrow `modulePacks` config, or add `--install` when the physical companion package should be installed on demand. `profile_status` also reports `modulePacksConfigured`, `modulePacksAvailable`, `modulesMissingPacks`, `modulesMissingAddonPackages`, and `missingPackInstallHints` so a client can prompt for the exact add-on install command when a requested profile is missing a pack or a slim-root runtime cannot find the package. Each install hint includes a human-readable `message` field for clients that want to show a direct install prompt instead of constructing copy from the raw command fields.
 
 ---
 

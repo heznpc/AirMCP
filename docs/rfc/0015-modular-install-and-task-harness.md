@@ -44,7 +44,8 @@ The third shipped slice is physical package split:
 - `AIRMCP_ADDON_PACKAGE_MODE=prefer-installed` tries an installed add-on package from normal package resolution and `AIRMCP_ADDON_INSTALL_PREFIX` before bundled fallback,
 - `AIRMCP_ADDON_PACKAGE_MODE=external-only` turns missing add-ons into module-load failures outside `core`,
 - `npm pack` / `npm publish` prepack builds a slim root artifact and postpack restores the universal local `dist`,
-- `npm run addons:check` is wired into CI and `release:preflight`.
+- `npm run addons:check` is wired into CI and `release:preflight`,
+- `npm run addons:publish` dry-runs by default and only publishes staged add-ons when `--publish` is explicit.
 
 ## Implemented install split
 
@@ -68,7 +69,7 @@ Release artifacts now use a slim root by default while the source checkout keeps
 - `npm run addons:measure-split` packs the universal local build with lifecycle scripts disabled, compares it with slim-root plus selected add-ons, and records packed/unpacked/install-size plus startup/list timing deltas.
 - `npm pack --dry-run --json` must include `dist/.airmcp-slim-root.json` and must not include non-core module `tools.js` / `prompts.js` entrypoints.
 - `.mcpb` release artifacts must include the same slim-root marker and must not leak non-core module entrypoints.
-- `list_module_packs`, `profile_status.modulesMissingPacks`, `profile_status.modulesMissingAddonPackages`, and `profile_status.missingPackInstallHints` remain stable public truth surfaces.
+- `list_module_packs`, `profile_status.modulesMissingPacks`, `profile_status.modulesMissingAddonPackages`, and `profile_status.missingPackInstallHints` remain stable public truth surfaces, including a human-readable install prompt message for missing add-ons.
 - At least one real user/workflow needs a smaller install, not only a smaller context window.
 - Pack boundaries have tests proving no profile loads a missing optional module by accident.
 

@@ -9504,6 +9504,9 @@
                 },
                 "command": {
                   "type": "string"
+                },
+                "message": {
+                  "type": "string"
                 }
               },
               "required": [
@@ -9511,7 +9514,8 @@
                 "packageName",
                 "installSpec",
                 "modules",
-                "command"
+                "command",
+                "message"
               ],
               "additionalProperties": false
             }

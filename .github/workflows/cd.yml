@@ -34,7 +34,7 @@ jobs:
 
       - name: Version guard
         run: |
-          if git rev-parse "v${{ steps.pkg.outputs.version }}" >/dev/null 2>&1; then
+          if git show-ref --tags --verify --quiet "refs/tags/v${{ steps.pkg.outputs.version }}"; then
             echo "::error::Tag v${{ steps.pkg.outputs.version }} already exists. Bump the version first."
             exit 1
           fi
@@ -62,13 +62,18 @@ jobs:
       - name: Release preflight
         run: npm run release:preflight
 
-      - name: Publish add-ons with provenance
-        run: npm run addons:publish -- --publish --all --no-build --skip-verify
+      - name: Publish root with provenance
+        run: |
+          if npm view "${{ steps.pkg.outputs.name }}@${{ steps.pkg.outputs.version }}" version >/dev/null 2>&1; then
+            echo "${{ steps.pkg.outputs.name }}@${{ steps.pkg.outputs.version }} is already published; skipping root publish."
+          else
+            npm publish --provenance --access public
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Publish root with provenance
-        run: npm publish --provenance --access public
+      - name: Publish add-ons with provenance
+        run: npm run addons:publish -- --publish --all --no-build --skip-verify
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 

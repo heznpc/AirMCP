@@ -38,6 +38,16 @@ function run(cmd, args, options = {}) {
   }
 }
 
+function runCaptured(cmd, args, options = {}) {
+  return spawnSync(cmd, args, {
+    cwd: ROOT,
+    env: process.env,
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+    ...options,
+  });
+}
+
 function parseList(value) {
   return value
     .split(",")
@@ -155,13 +165,37 @@ function verifyPackageDirFallback(pack) {
   return join(ROOT, "build", "addons", packageDirName(pack.packageName), "package");
 }
 
-function publishPackage({ packageRoot, pack, args }) {
+function isVersionPublished(packageName, version) {
+  const result = runCaptured("npm", ["view", `${packageName}@${version}`, "version"]);
+  return result.status === 0 && result.stdout.trim() === version;
+}
+
+function publishPackage({ packageRoot, pack, args, version }) {
   const npmArgs = ["publish", "--access", args.access, "--tag", args.tag];
   if (!args.publish) npmArgs.push("--dry-run");
   if (args.publish && args.provenance) npmArgs.push("--provenance");
 
+  if (isVersionPublished(pack.packageName, version)) {
+    console.log(`[addons:publish] skip ${pack.packageName}@${version} — already published`);
+    return;
+  }
+
   console.log(`[addons:publish] ${args.publish ? "publish" : "dry-run"} ${pack.packageName}`);
-  run("npm", npmArgs, { cwd: packageRoot });
+  const result = runCaptured("npm", npmArgs, { cwd: packageRoot });
+  if (result.status === 0) {
+    if (result.stdout) process.stdout.write(result.stdout);
+    if (result.stderr) process.stderr.write(result.stderr);
+    return;
+  }
+
+  const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
+  if (output.includes(`previously published versions: ${version}`)) {
+    console.log(`[addons:publish] skip ${pack.packageName}@${version} — already published`);
+    return;
+  }
+  if (result.stdout) process.stdout.write(result.stdout);
+  if (result.stderr) process.stderr.write(result.stderr);
+  fail(`command failed (${result.status ?? "signal"}): npm ${npmArgs.join(" ")}`);
 }
 
 function main() {
@@ -193,7 +227,7 @@ function main() {
   for (const pack of selected) {
     let packageRoot = verifyStagedPackage(manifest, pack);
     if (!existsSync(packageRoot)) packageRoot = verifyPackageDirFallback(pack);
-    publishPackage({ packageRoot, pack, args });
+    publishPackage({ packageRoot, pack, args, version: manifest.version });
   }
 
   console.log(`ok: ${args.publish ? "published" : "dry-run checked"} ${selected.length} add-on package(s)`);

@@ -22,13 +22,22 @@ describe("add-on publish release lane", () => {
     expect(script).toContain('"--provenance"');
   });
 
-  test("CD publishes add-ons before the slim root and releases the preflight mcpb", () => {
+  test("publish command can resume when an add-on version already exists", () => {
+    expect(script).toContain("function isVersionPublished(packageName, version)");
+    expect(script).toContain('["view", `${packageName}@${version}`, "version"]');
+    expect(script).toContain("already published");
+    expect(script).toContain("previously published versions");
+  });
+
+  test("CD publishes the slim root before add-ons and releases the preflight mcpb", () => {
     expect(cdWorkflow).toContain("npm run release:preflight");
-    expect(cdWorkflow).toContain("npm run addons:publish -- --publish --all --no-build --skip-verify");
-    expect(cdWorkflow.indexOf("Publish add-ons with provenance")).toBeLessThan(
-      cdWorkflow.indexOf("Publish root with provenance"),
+    expect(cdWorkflow).toContain('git show-ref --tags --verify --quiet "refs/tags/v${{ steps.pkg.outputs.version }}"');
+    expect(cdWorkflow.indexOf("Publish root with provenance")).toBeLessThan(
+      cdWorkflow.indexOf("Publish add-ons with provenance"),
     );
     expect(cdWorkflow).toContain("npm publish --provenance --access public");
+    expect(cdWorkflow).toContain("is already published; skipping root publish");
+    expect(cdWorkflow).toContain("npm run addons:publish -- --publish --all --no-build --skip-verify");
     expect(cdWorkflow).toContain("build/release-preflight/airmcp-${{ steps.pkg.outputs.version }}.mcpb");
   });
 });

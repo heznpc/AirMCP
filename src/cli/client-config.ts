@@ -7,12 +7,15 @@ import {
   CODEX_APP_OWNED_URL,
   type CodexAirmcpRuntimeShape,
   configureCodexAirmcp,
+  configureCodexAirmcpDirect,
   codexAirmcpRuntimeShape,
+  directStdioEntry,
   isCodexCliAvailable,
   stdioProxyEntry,
 } from "./codex-mcp.js";
 
 export type ClientRuntimeShape = "app-owned" | "direct" | "unknown";
+export type ClientRuntimeMode = "app" | "direct";
 export type ClientConfigStatus = "configured" | "already-configured" | "would-configure" | "skipped" | "failed";
 
 export interface ClientConfigResult {
@@ -28,11 +31,13 @@ export interface ClientConfigOptions {
   includeSkipped?: boolean;
   token?: string;
   now?: () => number;
+  runtimeMode?: ClientRuntimeMode;
   configureCodex?: boolean;
   codex?: {
     isAvailable: () => boolean;
     shape: () => CodexAirmcpRuntimeShape;
     configure: () => "already-configured" | "configured";
+    configureDirect?: () => "already-configured" | "configured";
   };
 }
 
@@ -53,9 +58,18 @@ function deepEqual(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
+function runtimeDetail(runtimeMode: ClientRuntimeMode): string {
+  return runtimeMode === "direct" ? "direct stdio runtime" : "token-gated AirMCP.app runtime";
+}
+
+function targetRuntimeShape(runtimeMode: ClientRuntimeMode): ClientRuntimeShape {
+  return runtimeMode === "direct" ? "direct" : "app-owned";
+}
+
 function configureFileClient(
   client: McpClient,
   options: Required<Pick<ClientConfigOptions, "dryRun" | "now">> & {
+    runtimeMode: ClientRuntimeMode;
     token?: string;
   },
 ): ClientConfigResult {
@@ -70,7 +84,12 @@ function configureFileClient(
     };
   }
 
-  const targetEntry = stdioProxyEntry(options.dryRun ? "<app-runtime-token>" : options.token);
+  const targetEntry =
+    options.runtimeMode === "direct"
+      ? directStdioEntry()
+      : stdioProxyEntry(options.dryRun ? "<app-runtime-token>" : options.token);
+  const detail = runtimeDetail(options.runtimeMode);
+  const targetShape = targetRuntimeShape(options.runtimeMode);
 
   try {
     let existing: Record<string, unknown> = {};
@@ -87,15 +106,15 @@ function configureFileClient(
       return {
         name: client.name,
         status: "already-configured",
-        detail: "token-gated AirMCP.app runtime",
+        detail,
         configPath: client.configPath,
       };
     }
-    if (options.dryRun && clientRuntimeShape(currentEntry) === "app-owned") {
+    if (options.dryRun && clientRuntimeShape(currentEntry) === targetShape) {
       return {
         name: client.name,
         status: "already-configured",
-        detail: "token-gated AirMCP.app runtime",
+        detail,
         configPath: client.configPath,
       };
     }
@@ -104,7 +123,7 @@ function configureFileClient(
       return {
         name: client.name,
         status: "would-configure",
-        detail: configExists ? "would replace airmcp with the app-owned runtime proxy" : "would create config file",
+        detail: configExists ? `would replace airmcp with the ${detail}` : "would create config file",
         configPath: client.configPath,
       };
     }
@@ -119,7 +138,7 @@ function configureFileClient(
     return {
       name: client.name,
       status: "configured",
-      detail: "token-gated AirMCP.app runtime",
+      detail,
       configPath: client.configPath,
     };
   } catch (error) {
@@ -134,6 +153,7 @@ function configureFileClient(
 
 function configureCodexClient(
   options: Required<Pick<ClientConfigOptions, "dryRun">> & {
+    runtimeMode: ClientRuntimeMode;
     codex: NonNullable<ClientConfigOptions["codex"]>;
   },
 ): ClientConfigResult {
@@ -143,6 +163,23 @@ function configureCodexClient(
 
   try {
     const shape = options.codex.shape();
+    if (options.runtimeMode === "direct") {
+      if (shape === "direct") {
+        return { name: "Codex", status: "already-configured", detail: "direct stdio runtime" };
+      }
+      if (options.dryRun) {
+        return {
+          name: "Codex",
+          status: "would-configure",
+          detail: shape === "missing" ? "would add airmcp MCP server" : "would replace existing airmcp MCP server",
+        };
+      }
+      if (!options.codex.configureDirect) {
+        throw new Error("direct Codex configuration is unavailable");
+      }
+      options.codex.configureDirect();
+      return { name: "Codex", status: "configured", detail: "direct stdio runtime" };
+    }
     if (shape === "app-owned" || shape === "app-owned-pending-restart") {
       return { name: "Codex", status: "already-configured", detail: "AirMCP.app runtime" };
     }
@@ -165,15 +202,19 @@ export function configureMcpClients(options: ClientConfigOptions = {}): ClientCo
   const includeSkipped = options.includeSkipped ?? true;
   const clients = options.clients ?? MCP_CLIENTS;
   const now = options.now ?? Date.now;
+  const runtimeMode = options.runtimeMode ?? "app";
   const codex = options.codex ?? {
     isAvailable: isCodexCliAvailable,
     shape: codexAirmcpRuntimeShape,
     configure: configureCodexAirmcp,
+    configureDirect: configureCodexAirmcpDirect,
   };
 
-  const results = clients.map((client) => configureFileClient(client, { dryRun, now, token: options.token }));
+  const results = clients.map((client) =>
+    configureFileClient(client, { dryRun, now, runtimeMode, token: options.token }),
+  );
   if (options.configureCodex ?? true) {
-    results.push(configureCodexClient({ dryRun, codex }));
+    results.push(configureCodexClient({ dryRun, runtimeMode, codex }));
   }
   return includeSkipped ? results : results.filter((result) => result.status !== "skipped");
 }

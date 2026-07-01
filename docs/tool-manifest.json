@@ -11955,6 +11955,9 @@
           "total": {
             "type": "number"
           },
+          "totalMatched": {
+            "type": "number"
+          },
           "returned": {
             "type": "number"
           },
@@ -11983,6 +11986,9 @@
                 },
                 "modificationDate": {
                   "type": "string"
+                },
+                "shared": {
+                  "type": "boolean"
                 }
               },
               "required": [
@@ -11991,7 +11997,8 @@
                 "folder",
                 "preview",
                 "creationDate",
-                "modificationDate"
+                "modificationDate",
+                "shared"
               ],
               "additionalProperties": false
             }
@@ -11999,6 +12006,7 @@
         },
         "required": [
           "total",
+          "totalMatched",
           "returned",
           "offset",
           "notes"

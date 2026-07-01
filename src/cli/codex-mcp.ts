@@ -149,6 +149,18 @@ export function configureCodexAirmcp(): "already-configured" | "configured" {
   return "configured";
 }
 
+export function configureCodexAirmcpDirect(): "already-configured" | "configured" {
+  const shape = codexAirmcpRuntimeShape();
+  if (shape === "direct") {
+    return "already-configured";
+  }
+  if (isCodexAirmcpConfigured()) {
+    runCodex(["mcp", "remove", "airmcp"]);
+  }
+  runCodex(["mcp", "add", "airmcp", "--", "npx", "-y", NPM_PACKAGE_SPECIFIER]);
+  return "configured";
+}
+
 export function codexManualSetupCommand(): string {
   return (
     "codex mcp add --env AIRMCP_HTTP_TOKEN=<token> airmcp -- npx -y " +
@@ -156,6 +168,20 @@ export function codexManualSetupCommand(): string {
     " connect --url " +
     CODEX_APP_OWNED_URL
   );
+}
+
+export function codexDirectManualSetupCommand(): string {
+  return "codex mcp add airmcp -- npx -y " + NPM_PACKAGE_SPECIFIER;
+}
+
+export function directStdioEntry(): {
+  command: string;
+  args: string[];
+} {
+  return {
+    command: "npx",
+    args: ["-y", NPM_PACKAGE_SPECIFIER],
+  };
 }
 
 export function stdioProxyEntry(token = ensureAppRuntimeToken()): {

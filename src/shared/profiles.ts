@@ -56,9 +56,11 @@ export const STARTER_MODULE_NAMES = [
 /** Core modules enabled by default when no config.json exists. */
 export const STARTER_MODULES: ReadonlySet<string> = new Set(STARTER_MODULE_NAMES);
 
-export const PROFILE_NAMES = ["starter", "communications-safe", "productivity", "full"] as const;
+export const PRESET_PROFILE_NAMES = ["starter", "communications-safe", "productivity", "full"] as const;
+export const PROFILE_NAMES = [...PRESET_PROFILE_NAMES, "custom"] as const;
+export type PresetProfileName = (typeof PRESET_PROFILE_NAMES)[number];
 export type AirMcpProfileName = (typeof PROFILE_NAMES)[number];
-export type ActiveProfileName = AirMcpProfileName | "custom";
+export type ActiveProfileName = AirMcpProfileName;
 
 export const TOOL_EXPOSURE_MODES = ["progressive", "profile", "full"] as const;
 export type ToolExposureMode = (typeof TOOL_EXPOSURE_MODES)[number];
@@ -89,6 +91,7 @@ export const PROFILE_MODULES: Record<AirMcpProfileName, readonly ModuleName[]> =
   "communications-safe": COMMUNICATIONS_SAFE_MODULES,
   productivity: PRODUCTIVITY_MODULES,
   full: MODULE_NAMES,
+  custom: MODULE_NAMES,
 };
 
 export const PROFILE_DESCRIPTIONS: Record<AirMcpProfileName, string> = {
@@ -97,6 +100,7 @@ export const PROFILE_DESCRIPTIONS: Record<AirMcpProfileName, string> = {
     "Starter plus contacts, mail, and messages. Read/manage tools load, but send actions remain disabled unless explicitly opted in.",
   productivity: "Productivity workspace: starter, communications, Finder, and iWork modules.",
   full: "All standard modules. Experimental opt-in modules remain disabled unless explicitly enabled.",
+  custom: "Custom module selection controlled by disabledModules.",
 };
 
 export const DEFAULT_TOOL_EXPOSURE_BY_PROFILE: Record<AirMcpProfileName, ToolExposureMode> = {
@@ -104,6 +108,7 @@ export const DEFAULT_TOOL_EXPOSURE_BY_PROFILE: Record<AirMcpProfileName, ToolExp
   "communications-safe": "progressive",
   productivity: "profile",
   full: "full",
+  custom: "profile",
 };
 
 export const FRONT_DOOR_TOOLS = [

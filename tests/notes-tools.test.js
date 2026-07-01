@@ -205,8 +205,10 @@ describe('search_notes', () => {
 
   test('returns search results with previews', async () => {
     const { server } = setup();
-    mockRunJxa.mockResolvedValue({
+    const payload = {
       total: 1,
+      totalMatched: 1,
+      offset: 0,
       returned: 1,
       notes: [
         {
@@ -215,7 +217,8 @@ describe('search_notes', () => {
           preview: 'Discussion about Q4 planning...',
         },
       ],
-    });
+    };
+    mockRunJxa.mockResolvedValue(payload);
 
     const result = await server.callTool('search_notes', { query: 'meeting', limit: 50 });
 
@@ -223,12 +226,15 @@ describe('search_notes', () => {
     // search_notes uses okUntrusted, so the text includes the UNTRUSTED wrapper
     expect(result.content[0].text).toContain('UNTRUSTED');
     expect(result.content[0].text).toContain('Meeting Notes');
+    expect(result.structuredContent).toEqual(payload);
   });
 
   test('filters shared notes from search results', async () => {
     const { server } = setup({ includeShared: false });
     mockRunJxa.mockResolvedValue({
       total: 2,
+      totalMatched: 2,
+      offset: 0,
       returned: 2,
       notes: [
         { id: 'id-1', name: 'My Note', folder: 'Notes', shared: false, preview: 'abc', creationDate: '2024-01-01', modificationDate: '2024-01-02' },

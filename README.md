@@ -13,7 +13,7 @@
 
 **Part of:** Human-Controlled AI Systems · Research Program 1 (anchor — Apple-side agent governance).
 
-**Requires**: macOS for the server. The recommended desktop path is the AirMCP menubar app: it owns the loopback HTTP runtime, while Claude/Codex/Cursor attach to it as clients. The direct CLI server (`npx -y airmcp`) still works for development and boots the **starter** profile with progressive `tools/list` exposure: a small front door (`profile_status`, `list_profiles`, `list_module_packs`, `discover_tools`, `describe_tool`, `run_tool`, and core starter tools) instead of every loaded tool. Use `AIRMCP_PROFILE=communications-safe|productivity|full` to choose a module profile, `AIRMCP_TOOL_EXPOSURE=profile|full` to widen `tools/list`, `npx airmcp modules enable productivity` or `AIRMCP_MODULE_PACKS=core,productivity` to activate only selected DLC-like packs, or `--full` / `AIRMCP_FULL=true` to request all 29 modules / 295 tools when the matching add-ons are installed. New app/CLI-created configs require task sessions for hidden `run_tool` dispatch; no-config direct stdio keeps the compatible path unless `AIRMCP_REQUIRE_TOOL_SESSION=true` is set. Most tools are pure JXA and work on macOS 14+ with no extra setup. **Swift-backed tools** — HealthKit, on-device semantic search, recurring events/reminders, photo import/delete/classify, Vision, Speech, Location, Bluetooth, and Apple Intelligence previews — need the **optional Swift bridge** — build it from a source checkout with `npm run swift-build` (it ships in **none** of the distribution channels — the npm tarball, the `.mcpb` bundle, or the menubar `.app` — so build it from source as above); without it those tools return a clear "Swift bridge not found" error and everything else keeps working. FoundationModels-backed Apple Intelligence and `AskAirMCPIntent` additionally require macOS 26+ on Apple Silicon and an opt-in Swift build with `AIRMCP_ENABLE_FOUNDATION_MODELS`.
+**Requires**: macOS for the server. The recommended desktop path is the AirMCP menubar app: it owns the loopback HTTP runtime, while Claude/Codex/Cursor attach to it as clients. The direct CLI server (`npx -y airmcp`) still works for development and boots the **starter** profile with progressive `tools/list` exposure: a small front door (`profile_status`, `list_profiles`, `list_module_packs`, `discover_tools`, `describe_tool`, `run_tool`, and core starter tools) instead of every loaded tool. Use `AIRMCP_PROFILE=communications-safe|productivity|full|custom` to choose a module profile, `AIRMCP_TOOL_EXPOSURE=profile|full` to widen `tools/list`, `npx airmcp modules enable productivity` or `AIRMCP_MODULE_PACKS=core,productivity` to activate only selected DLC-like packs, or `--full` / `AIRMCP_FULL=true` to request all 29 modules / 295 tools when the matching add-ons are installed. New app/CLI-created configs require task sessions for hidden `run_tool` dispatch; no-config direct stdio keeps the compatible path unless `AIRMCP_REQUIRE_TOOL_SESSION=true` is set. Most tools are pure JXA and work on macOS 14+ with no extra setup. **Swift-backed tools** — HealthKit, on-device semantic search, recurring events/reminders, photo import/delete/classify, Vision, Speech, Location, Bluetooth, and Apple Intelligence previews — need the **optional Swift bridge** — build it from a source checkout with `npm run swift-build` (it ships in **none** of the distribution channels — the npm tarball, the `.mcpb` bundle, or the menubar `.app` — so build it from source as above); without it those tools return a clear "Swift bridge not found" error and everything else keeps working. FoundationModels-backed Apple Intelligence and `AskAirMCPIntent` additionally require macOS 26+ on Apple Silicon and an opt-in Swift build with `AIRMCP_ENABLE_FOUNDATION_MODELS`.
 
 > Available in multiple languages at the [project landing page](https://heznpc.github.io/AirMCP/).
 
@@ -76,6 +76,7 @@ Non-interactive setup:
 npx airmcp init --profile starter --yes
 npx airmcp init --profile communications-safe --yes
 npx airmcp init --profile productivity --yes
+npx airmcp init --profile productivity --yes --client-runtime direct
 ```
 
 **3. Restart your MCP client.** Your AI can now read notes, manage reminders, check your calendar, and more.
@@ -334,7 +335,7 @@ Add to `~/.codeium/windsurf/mcp_config.json`:
 
 ### Other MCP Clients
 
-Any client that supports the MCP stdio transport can use AirMCP. Use `npx -y airmcp connect --url http://127.0.0.1:3847/mcp` with `AIRMCP_HTTP_TOKEN` set when AirMCP.app owns the runtime. Direct HTTP clients must send `Authorization: Bearer <token>`. Use direct `npx -y airmcp` only when you intentionally want that client process to own a separate server instance.
+Any client that supports the MCP stdio transport can use AirMCP. Use `npx -y airmcp connect --url http://127.0.0.1:3847/mcp` with `AIRMCP_HTTP_TOKEN` set when AirMCP.app owns the runtime. Direct HTTP clients must send `Authorization: Bearer <token>`. Use direct `npx -y airmcp` only when you intentionally want that client process to own a separate server instance; `npx airmcp init --client-runtime direct` and `npx airmcp connect-clients --client-runtime direct` write that shape explicitly.
 
 ### Local Development
 
@@ -902,6 +903,7 @@ Or edit `~/.config/airmcp/config.json` directly:
 | `npx airmcp --http`    | Start as HTTP server (port 3847)  |
 | `npx airmcp connect`   | Proxy stdio clients to AirMCP.app |
 | `npx airmcp connect-clients` | Repair installed client configs for AirMCP.app |
+| `npx airmcp connect-clients --client-runtime direct` | Switch installed client configs to direct stdio |
 
 ## Configuration
 
@@ -913,7 +915,7 @@ Or edit `~/.config/airmcp/config.json` directly:
 | `AIRMCP_ALLOW_SEND_MESSAGES` | `false`                      | Allow sending iMessages (opt-in)                             |
 | `AIRMCP_ALLOW_SEND_MAIL`     | `false`                      | Allow sending emails (opt-in)                                |
 | `AIRMCP_FULL`                | `false`                      | Enable all standard 29 modules (profile-only modules stay opt-in) |
-| `AIRMCP_PROFILE`             | `starter`                    | Module profile: `starter`, `communications-safe`, `productivity`, `full`; can also include opt-in modules such as `spatial_prep` |
+| `AIRMCP_PROFILE`             | `starter`                    | Module profile: `starter`, `communications-safe`, `productivity`, `full`, `custom`; can also include opt-in modules such as `spatial_prep` |
 | `AIRMCP_TOOL_EXPOSURE`       | profile-dependent            | `progressive` exposes a small front door, `profile` exposes the selected profile, `full` exposes every loaded tool |
 | `AIRMCP_MODULE_PACKS`        | all packs                    | Activate selected module add-ons, e.g. `core,productivity` |
 | `AIRMCP_ADDON_PACKAGE_MODE`  | `prefer-installed`           | Module import mode: `prefer-installed`, `bundled`, or `external-only` |

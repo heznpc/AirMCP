@@ -62,7 +62,7 @@ The default config file location is `~/.config/airmcp/config.json`. You can over
 | Variable | Description |
 |----------|-------------|
 | `AIRMCP_FULL=true` | Enable all standard 29 modules (profile-only modules stay opt-in) |
-| `AIRMCP_PROFILE=starter` | Select a module profile: `starter`, `communications-safe`, `productivity`, or `full` |
+| `AIRMCP_PROFILE=starter` | Select a module profile: `starter`, `communications-safe`, `productivity`, `full`, or `custom` |
 | `AIRMCP_TOOL_EXPOSURE=progressive` | Keep `tools/list` thin; use `profile` or `full` to expose more tools |
 | `AIRMCP_MODULE_PACKS=core,productivity` | Activate selected DLC-like module packs |
 | `AIRMCP_ADDON_PACKAGE_MODE=prefer-installed` | Try installed physical add-on packages before bundled fallback |
@@ -183,6 +183,6 @@ When no `config.json` exists and `--full` is not used, AirMCP enables the curate
 - **Finder** -- file search, directory listing, file operations
 - **Weather** -- current conditions and forecasts
 
-All other standard modules are disabled by default. Use `npx airmcp init`, `npx airmcp modules enable productivity`, `AIRMCP_PROFILE=communications-safe|productivity|full`, or `--full` to customize. Use `AIRMCP_TOOL_EXPOSURE=profile|full` when a client should see more than the progressive front door.
+All other standard modules are disabled by default. Use `npx airmcp init`, `npx airmcp modules enable productivity`, `AIRMCP_PROFILE=communications-safe|productivity|full|custom`, or `--full` to customize. `custom` means the `disabledModules` list is the source of truth. Use `AIRMCP_TOOL_EXPOSURE=profile|full` when a client should see more than the progressive front door.
 
 Experimental profile-only modules, such as `spatial_prep`, stay disabled even with `--full`. Enable them explicitly with `AIRMCP_PROFILE=spatial_prep` or `AIRMCP_ENABLE_SPATIAL_PREP=true`.

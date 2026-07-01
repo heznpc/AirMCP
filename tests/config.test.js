@@ -7,6 +7,9 @@ import {
   KNOWN_MODULE_NAMES,
   MODULE_PACK_NAMES,
   OPT_IN_MODULE_NAMES,
+  PROFILE_NAMES,
+  PROFILE_MODULES,
+  DEFAULT_TOOL_EXPOSURE_BY_PROFILE,
   STARTER_MODULES,
   parseConfig,
   isModuleEnabled,
@@ -115,6 +118,16 @@ describe('STARTER_MODULES', () => {
     for (const mod of nonStarter) {
       expect(STARTER_MODULES.has(mod)).toBe(false);
     }
+  });
+});
+
+/* ================================================================== */
+
+describe('PROFILE_NAMES', () => {
+  test('custom is a first-class profile for config/app-created module selections', () => {
+    expect(PROFILE_NAMES).toContain('custom');
+    expect(PROFILE_MODULES.custom).toEqual(MODULE_NAMES);
+    expect(DEFAULT_TOOL_EXPOSURE_BY_PROFILE.custom).toBe('profile');
   });
 });
 
@@ -442,6 +455,28 @@ describe('parseConfig() — module enable/disable logic', () => {
       expect(cfg.profile).toBe('starter');
       expect(isModuleEnabled(cfg, 'notes')).toBe(true);
       expect(isModuleEnabled(cfg, 'mail')).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('profile=custom in config preserves the explicit disabledModules surface', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'airmcp-config-'));
+    try {
+      PATHS.CONFIG = join(dir, 'config.json');
+      writeFileSync(
+        PATHS.CONFIG,
+        JSON.stringify({ profile: 'custom', disabledModules: ['mail', 'messages'] }),
+        'utf8',
+      );
+
+      const cfg = parseConfig();
+      expect(cfg.profile).toBe('custom');
+      expect(cfg.toolExposure).toBe('profile');
+      expect(isModuleEnabled(cfg, 'notes')).toBe(true);
+      expect(isModuleEnabled(cfg, 'pages')).toBe(true);
+      expect(isModuleEnabled(cfg, 'mail')).toBe(false);
+      expect(isModuleEnabled(cfg, 'messages')).toBe(false);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

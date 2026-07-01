@@ -85,7 +85,7 @@ If a variable accepts a path, `~` expands to `$HOME`. Booleans are `"true"` / `"
 | Variable | Default | Notes |
 |---|---|---|
 | `AIRMCP_FULL` | (off) | `true` requests every standard module ignoring the config's `disabledModules`. In slim-root release artifacts, non-core tools still require the matching add-on package; missing packages surface through `profile_status.missingPackInstallHints`. Profile-only modules stay opt-in. |
-| `AIRMCP_PROFILE` | `starter` | Runtime profile: `starter`, `communications-safe`, `productivity`, or `full`. May also include opt-in modules such as `spatial_prep`. |
+| `AIRMCP_PROFILE` | `starter` | Runtime profile: `starter`, `communications-safe`, `productivity`, `full`, or `custom`. `custom` preserves the config's `disabledModules` surface. May also include opt-in modules such as `spatial_prep`. |
 | `AIRMCP_TOOL_EXPOSURE` | profile-dependent | `progressive` exposes the front door, `profile` exposes the selected profile, `full` exposes every loaded tool. |
 | `AIRMCP_MODULE_PACKS` | all packs | Comma-separated DLC-like pack allow-list. `core` is always kept. Examples: `core-only`, `core,communications`, `core,productivity,spatial`, or `all`. Modules whose profile is enabled but pack is unavailable are reported through `profile_status.modulesMissingPacks`. |
 | `AIRMCP_ADDON_PACKAGE_MODE` | `prefer-installed` | Module import mode. `prefer-installed` tries installed physical add-on packages such as `@heznpc/airmcp-productivity` before bundled fallback; `bundled` skips external packages; `external-only` refuses missing add-ons outside `core`. |

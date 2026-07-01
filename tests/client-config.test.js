@@ -120,6 +120,39 @@ describe("client config repair", () => {
     expect(readJson(configPath)).toEqual(existing);
   });
 
+  test("can intentionally write a direct stdio client entry instead of the app-owned proxy", async () => {
+    const home = mkdtempSync(join(tmpdir(), "airmcp-client-config-"));
+    tempHomes.push(home);
+    const { configureMcpClients } = await loadClientConfig(home);
+    const configPath = join(home, "Client", "mcp.json");
+    mkdirSync(dirname(configPath), { recursive: true });
+    writeFileSync(
+      configPath,
+      JSON.stringify({ mcpServers: { airmcp: { command: "npx", args: ["-y", "airmcp@2.12.0"] } } }, null, 2) + "\n",
+    );
+
+    const results = configureMcpClients({
+      clients: [{ name: "Test Client", configPath, serversKey: "mcpServers" }],
+      configureCodex: false,
+      runtimeMode: "direct",
+      now: () => 456,
+    });
+
+    expect(results).toEqual([
+      {
+        name: "Test Client",
+        status: "configured",
+        detail: "direct stdio runtime",
+        configPath,
+      },
+    ]);
+    expect(readFileSync(`${configPath}.bak.456`, "utf8")).toContain("airmcp@2.12.0");
+    expect(readJson(configPath).mcpServers.airmcp).toEqual({
+      command: "npx",
+      args: ["-y", packageSpecifier],
+    });
+  });
+
   test("surfaces parse errors without clobbering the existing client config", async () => {
     const home = mkdtempSync(join(tmpdir(), "airmcp-client-config-"));
     tempHomes.push(home);
@@ -158,6 +191,32 @@ describe("client config repair", () => {
       { name: "Codex", status: "would-configure", detail: "would replace existing airmcp MCP server" },
     ]);
     expect(configure).not.toHaveBeenCalled();
+  });
+
+  test("supports dry-run Codex direct runtime repair without shelling out", async () => {
+    const home = mkdtempSync(join(tmpdir(), "airmcp-client-config-"));
+    tempHomes.push(home);
+    const { configureMcpClients } = await loadClientConfig(home);
+    const configure = jest.fn();
+    const configureDirect = jest.fn();
+
+    const results = configureMcpClients({
+      clients: [],
+      dryRun: true,
+      runtimeMode: "direct",
+      codex: {
+        isAvailable: () => true,
+        shape: () => "app-owned",
+        configure,
+        configureDirect,
+      },
+    });
+
+    expect(results).toEqual([
+      { name: "Codex", status: "would-configure", detail: "would replace existing airmcp MCP server" },
+    ]);
+    expect(configure).not.toHaveBeenCalled();
+    expect(configureDirect).not.toHaveBeenCalled();
   });
 
   test("honors AIRMCP_NPM_PACKAGE_SPECIFIER for local development client wiring", async () => {

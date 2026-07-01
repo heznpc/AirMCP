@@ -18,4 +18,11 @@ describe("release:verify add-on registry coverage", () => {
     expect(script).toContain("await import(name)");
     expect(script).toContain("packageName export mismatch");
   });
+
+  test("runs npx smoke from a fresh directory instead of the repo root", () => {
+    expect(script).toContain("function verifyNpxSmoke()");
+    expect(script).toContain('mkdtempSync(join(tmpdir(), "airmcp-release-npx-"))');
+    expect(script).toContain("cwd: work");
+    expect(script).toContain("verifyNpxSmoke()");
+  });
 });

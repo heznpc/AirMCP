@@ -8,7 +8,17 @@
  * to publish as separate npm packages.
  */
 
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -43,6 +53,60 @@ function copyRequiredDir(from, to, label) {
   cpSync(from, to, { recursive: true });
 }
 
+function rewriteSharedRuntimeImports(file) {
+  const before = readFileSync(file, "utf8");
+  const after = before
+    .replaceAll('from "../shared/', 'from "airmcp/dist/shared/')
+    .replaceAll("from '../shared/", "from 'airmcp/dist/shared/")
+    .replaceAll('import("../shared/', 'import("airmcp/dist/shared/')
+    .replaceAll("import('../shared/", "import('airmcp/dist/shared/");
+  if (after !== before) writeFileSync(file, after);
+}
+
+function rewriteSharedRuntimeImportsInDir(dir) {
+  for (const entry of readdirSync(dir)) {
+    const path = join(dir, entry);
+    const stat = lstatSync(path);
+    if (stat.isDirectory()) {
+      rewriteSharedRuntimeImportsInDir(path);
+    } else if (entry.endsWith(".js")) {
+      rewriteSharedRuntimeImports(path);
+    }
+  }
+}
+
+function assertNoBundledSharedRuntime(packageRoot, pack) {
+  const sharedDir = join(packageRoot, "dist", "shared");
+  if (existsSync(sharedDir)) fail(`${pack.name} add-on must not bundle dist/shared`);
+}
+
+function assertNoRelativeSharedImports(packageRoot, pack) {
+  const offenders = [];
+  function scan(dir) {
+    for (const entry of readdirSync(dir)) {
+      const path = join(dir, entry);
+      const stat = lstatSync(path);
+      if (stat.isDirectory()) {
+        scan(path);
+      } else if (entry.endsWith(".js") && readFileSync(path, "utf8").includes("../shared/")) {
+        offenders.push(path.replace(`${packageRoot}/`, ""));
+      }
+    }
+  }
+  scan(join(packageRoot, "dist"));
+  if (offenders.length) {
+    fail(`${pack.name} add-on still has relative shared imports: ${offenders.join(", ")}`);
+  }
+}
+
+function installRootPackageSymlinkForVerification(packageRoot) {
+  const nodeModules = join(packageRoot, "node_modules");
+  const link = join(nodeModules, "airmcp");
+  mkdirSync(nodeModules, { recursive: true });
+  rmSync(link, { recursive: true, force: true });
+  symlinkSync(ROOT, link, "dir");
+}
+
 function makePackageJson(rootPkg, pack) {
   if (pack.packageName.includes("pack-") || pack.packageName.includes("-pack")) {
     fail(`${pack.name} package name must not contain pack-* wording: ${pack.packageName}`);
@@ -68,6 +132,7 @@ function makePackageJson(rootPkg, pack) {
     airmcp: {
       modulePack: pack.name,
       modules: pack.modules,
+      sharedRuntime: "peer-root",
     },
     exports: {
       ".": "./dist/index.js",
@@ -90,6 +155,9 @@ function writeAddonIndex(packageDir, pack) {
 }
 
 async function verifyAddonEntrypoints(packageRoot, pack) {
+  installRootPackageSymlinkForVerification(packageRoot);
+  assertNoBundledSharedRuntime(packageRoot, pack);
+  assertNoRelativeSharedImports(packageRoot, pack);
   for (const moduleName of pack.modules) {
     const file = join(packageRoot, "dist", moduleName, "tools.js");
     try {
@@ -113,10 +181,14 @@ async function main() {
   for (const pack of addonPacks) {
     const packageRoot = join(BUILD_DIR, packageDirName(pack.packageName), "package");
     mkdirSync(join(packageRoot, "dist"), { recursive: true });
-    copyRequiredDir(join(ROOT, "dist", "shared"), join(packageRoot, "dist", "shared"), "shared runtime");
 
     for (const moduleName of pack.modules) {
-      copyRequiredDir(join(ROOT, "dist", moduleName), join(packageRoot, "dist", moduleName), `${pack.name}/${moduleName}`);
+      copyRequiredDir(
+        join(ROOT, "dist", moduleName),
+        join(packageRoot, "dist", moduleName),
+        `${pack.name}/${moduleName}`,
+      );
+      rewriteSharedRuntimeImportsInDir(join(packageRoot, "dist", moduleName));
     }
 
     writeAddonIndex(packageRoot, pack);
@@ -129,10 +201,14 @@ async function main() {
       packageName: pack.packageName,
       modules: pack.modules,
       packageDir: packageRoot.replace(`${ROOT}/`, ""),
+      sharedRuntime: "peer-root",
     });
   }
 
-  writeFileSync(join(BUILD_DIR, "manifest.json"), JSON.stringify({ version: rootPkg.version, packages: manifest }, null, 2) + "\n");
+  writeFileSync(
+    join(BUILD_DIR, "manifest.json"),
+    JSON.stringify({ version: rootPkg.version, packages: manifest }, null, 2) + "\n",
+  );
   console.log(`ok: staged ${manifest.length} add-on packages in ${BUILD_DIR}`);
   if (CHECK) console.log("ok: add-on package boundary check passed");
 }

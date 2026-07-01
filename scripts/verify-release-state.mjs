@@ -107,15 +107,27 @@ function verifyAddonRegistryInstall(addonPacks) {
   }
 }
 
+function verifyNpxSmoke() {
+  const work = mkdtempSync(join(tmpdir(), "airmcp-release-npx-"));
+  try {
+    const npx = run("npx", ["-y", `${pkg.name}@${version}`, "--version"], {
+      cwd: work,
+      timeout: 120_000,
+    });
+    if (npx.status !== 0) fail(`npx smoke failed for ${pkg.name}@${version}`, npx.stderr || npx.stdout);
+    if (npx.stdout !== version) fail(`npx --version mismatch: expected ${version}, got ${npx.stdout}`);
+    console.log(`ok: npx -y ${pkg.name}@${version} --version`);
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+}
+
 console.log(`release-verify: ${pkg.name}@${version}`);
 
 verifyPublishedPackage(pkg.name, version, "npm root");
 
 if (!skipNpx) {
-  const npx = run("npx", ["-y", `${pkg.name}@${version}`, "--version"], { timeout: 120_000 });
-  if (npx.status !== 0) fail(`npx smoke failed for ${pkg.name}@${version}`, npx.stderr || npx.stdout);
-  if (npx.stdout !== version) fail(`npx --version mismatch: expected ${version}, got ${npx.stdout}`);
-  console.log(`ok: npx -y ${pkg.name}@${version} --version`);
+  verifyNpxSmoke();
 }
 
 if (!skipGithub) {

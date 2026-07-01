@@ -1,6 +1,6 @@
 import { describe, test, expect } from "@jest/globals";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -89,6 +89,30 @@ describe("airmcp modules CLI", () => {
         expect.arrayContaining(["npm", "install", "--no-save", `@heznpc/airmcp-productivity@${pkg.version}`]),
       );
       expect(existsSync(join(home, ".config", "airmcp", "config.json"))).toBe(false);
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  test("list reports stale installed add-on versions and repair commands", () => {
+    const home = mkdtempSync(join(tmpdir(), "airmcp-modules-"));
+    try {
+      const packageDir = join(home, ".airmcp", "addons", "node_modules", "@heznpc", "airmcp-productivity");
+      mkdirSync(packageDir, { recursive: true });
+      writeFileSync(
+        join(packageDir, "package.json"),
+        JSON.stringify({ name: "@heznpc/airmcp-productivity", version: "0.0.1" }, null, 2),
+      );
+
+      const payload = JSON.parse(runModules(home, ["list", "--json"]));
+      const productivity = payload.packs.find((pack) => pack.name === "productivity");
+      expect(productivity.installed).toBe(true);
+      expect(productivity.installedVersion).toBe("0.0.1");
+      expect(productivity.expectedVersion).toBe(pkg.version);
+      expect(productivity.installStatus).toBe("version-mismatch");
+      expect(productivity.updateAvailable).toBe(true);
+      expect(productivity.repairCommand).toBe("npx airmcp modules enable productivity --install");
+      expect(typeof productivity.installedSizeBytes).toBe("number");
     } finally {
       rmSync(home, { recursive: true, force: true });
     }

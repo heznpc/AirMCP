@@ -1,8 +1,8 @@
 {
   "generatedAt": "STABLE_PLACEHOLDER",
   "protocolVersion": "2025-06-18",
-  "toolCount": 294,
-  "eligibleCount": 288,
+  "toolCount": 295,
+  "eligibleCount": 289,
   "ineligibleCount": 6,
   "ineligibleByReason": {
     "object-param:recurrence": 2,
@@ -4665,6 +4665,115 @@
       "ineligibleReason": null
     },
     {
+      "name": "install_module_pack",
+      "title": "Install Module Pack",
+      "description": "Install, repair, update, or uninstall one AirMCP add-on package after explicit user confirmation. Use dryRun first to preview the npm command.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "pack": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "description": "Non-core module pack name, for example productivity, communications, media, or spatial"
+          },
+          "action": {
+            "description": "install repairs or updates the exact matching add-on version; uninstall removes it",
+            "type": "string",
+            "enum": [
+              "install",
+              "uninstall"
+            ]
+          },
+          "dryRun": {
+            "description": "Preview the npm command and config change without writing anything",
+            "type": "boolean"
+          },
+          "confirm": {
+            "description": "Required true for real install/uninstall because this runs npm and edits AirMCP config",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "pack"
+        ]
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "pack": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "install",
+              "uninstall"
+            ]
+          },
+          "packageName": {
+            "type": "string"
+          },
+          "installSpec": {
+            "type": "string"
+          },
+          "command": {
+            "type": "string"
+          },
+          "dryRun": {
+            "type": "boolean"
+          },
+          "skipped": {
+            "type": "boolean"
+          },
+          "confirmed": {
+            "type": "boolean"
+          },
+          "configPath": {
+            "type": "string"
+          },
+          "activePacks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "restartRequired": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "pack",
+          "action",
+          "packageName",
+          "installSpec",
+          "command",
+          "dryRun",
+          "skipped",
+          "confirmed",
+          "configPath",
+          "activePacks",
+          "restartRequired",
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "sensitiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "appIntentEligible": true,
+      "ineligibleReason": null
+    },
+    {
       "name": "is_app_running",
       "title": "Is App Running",
       "description": "Check whether an application is currently running. Returns process details if found.",
@@ -6363,6 +6472,44 @@
                 "required": {
                   "type": "boolean"
                 },
+                "installed": {
+                  "type": "boolean"
+                },
+                "installedVersion": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "expectedVersion": {
+                  "type": "string"
+                },
+                "installedSizeBytes": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "installStatus": {
+                  "type": "string",
+                  "enum": [
+                    "required",
+                    "not-installed",
+                    "installed",
+                    "version-mismatch"
+                  ]
+                },
+                "updateAvailable": {
+                  "type": "boolean"
+                },
                 "installSpec": {
                   "anyOf": [
                     {
@@ -6374,6 +6521,26 @@
                   ]
                 },
                 "installCommand": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "updateCommand": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "repairCommand": {
                   "anyOf": [
                     {
                       "type": "string"
@@ -6402,8 +6569,16 @@
                 "modules",
                 "available",
                 "required",
+                "installed",
+                "installedVersion",
+                "expectedVersion",
+                "installedSizeBytes",
+                "installStatus",
+                "updateAvailable",
                 "installSpec",
                 "installCommand",
+                "updateCommand",
+                "repairCommand",
                 "uninstallCommand"
               ],
               "additionalProperties": false
@@ -9482,6 +9657,59 @@
               "type": "string"
             }
           },
+          "modulePackInstallIssues": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "pack": {
+                  "type": "string"
+                },
+                "packageName": {
+                  "type": "string"
+                },
+                "installStatus": {
+                  "type": "string"
+                },
+                "installedVersion": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "expectedVersion": {
+                  "type": "string"
+                },
+                "command": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "pack",
+                "packageName",
+                "installStatus",
+                "installedVersion",
+                "expectedVersion",
+                "command",
+                "message"
+              ],
+              "additionalProperties": false
+            }
+          },
           "missingPackInstallHints": {
             "type": "array",
             "items": {
@@ -9561,6 +9789,7 @@
           "modulePacksAvailable",
           "modulesMissingPacks",
           "modulesMissingAddonPackages",
+          "modulePackInstallIssues",
           "missingPackInstallHints",
           "requireToolSession",
           "harnessAdapter",

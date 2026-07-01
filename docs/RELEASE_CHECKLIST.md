@@ -115,7 +115,7 @@ Breaking을 포함한 minor/patch는 **금지**. 직전 메이저에 묶어 둘 
 - [ ] `npm view airmcp@X.Y.Z` 로 반영 검증
 - [ ] `npx -y airmcp@X.Y.Z --version` 스모크
 - [ ] Release에 `airmcp-X.Y.Z.mcpb`가 첨부되어 있는지 확인 (Claude Desktop 원클릭 설치용)
-- [ ] `npm run release:verify -- --version=X.Y.Z` 로 npm latest, fresh `npx`, GitHub Release `.mcpb` asset을 한 번에 검증
+- [ ] `npm run release:verify -- --version=X.Y.Z` 로 root npm latest, 모든 `@heznpc/airmcp-*` add-on 버전, fresh registry install/import, fresh `npx`, GitHub Release `.mcpb` asset을 한 번에 검증
 
 ### 3.5 Signed .app → GitHub Release
 - [ ] `release-app.yml` 워크플로가 태그 푸시로 자동 실행됐는지 확인 (Actions 탭)

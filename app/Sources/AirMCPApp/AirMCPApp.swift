@@ -98,6 +98,7 @@ struct AirMCPApp: App {
         }
         if !appInitialized {
             appInitialized = true
+            addonManager.refreshIfNeeded()
             updateManager.startPeriodicChecks()
             if ProcessInfo.processInfo.environment[AirMcpConstants.envForceAppRuntime] == "1" {
                 serverManager.startServer()

@@ -6,9 +6,10 @@
  * This gate goes one step closer to a user install:
  *   1. build the root package and staged add-ons,
  *   2. npm-pack the root package plus selected add-on packages,
- *   3. install those tarballs into a clean throwaway project,
- *   4. boot the installed root package with AIRMCP_ADDON_PACKAGE_MODE=external-only,
- *   5. prove selected pack modules register over the real MCP stdio wire.
+ *   3. install only the root tarball and prove external-only refuses bundled fallback,
+ *   4. install root plus add-ons into a clean throwaway project,
+ *   5. boot the installed root package with AIRMCP_ADDON_PACKAGE_MODE=external-only,
+ *   6. prove selected pack modules register over the real MCP stdio wire.
  *
  * The default intentionally checks one coherent workflow pack (`productivity`).
  * Use `--all` when you want a broader artifact smoke without changing the
@@ -20,11 +21,12 @@ import { createInterface } from "node:readline";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { cleanBootEnv } from "./lib/clean-boot-env.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const TIMEOUT_MS = Number(process.env.ADDON_INSTALL_VERIFY_TIMEOUT_MS ?? 45_000);
+const COMPATIBILITY_OPTIONAL_MODULES = new Set(["health", "intelligence"]);
 
 const PACK_ASSERTIONS = {
   productivity: {
@@ -36,6 +38,8 @@ const PACK_ASSERTIONS = {
     validationTool: "numbers_set_cell",
   },
 };
+
+let profileModulesByName = null;
 
 function fail(message) {
   console.error(`[addons:verify-install] FAIL — ${message}`);
@@ -115,6 +119,57 @@ function parseStructuredResult(callResp) {
 
 function firstText(callResp) {
   return callResp.result?.content?.find?.((c) => c.type === "text")?.text ?? "";
+}
+
+async function getProfileModuleSet(profile) {
+  if (!profileModulesByName) {
+    const profilesUrl = pathToFileURL(join(ROOT, "dist", "shared", "profiles.js")).href;
+    const { PROFILE_MODULES } = await import(profilesUrl);
+    profileModulesByName = PROFILE_MODULES;
+  }
+  return new Set(profileModulesByName[profile] ?? profileModulesByName.full ?? []);
+}
+
+async function getExpectedPackModules(packNames, packManifest, profile) {
+  const profileModules = await getProfileModuleSet(profile);
+  return [
+    ...new Set(
+      packNames.flatMap((packName) => {
+        const pack = packManifest.find((candidate) => candidate.name === packName);
+        return (pack?.modules ?? []).filter((moduleName) => profileModules.has(moduleName));
+      }),
+    ),
+  ];
+}
+
+function getPackPackageName(packManifest, packName) {
+  return packManifest.find((candidate) => candidate.name === packName)?.packageName ?? null;
+}
+
+function getAddonLoadFailureLines(stderr) {
+  return stderr
+    .split(/\r?\n/)
+    .filter(
+      (line) =>
+        line.includes("required add-on package module failed to load") ||
+        line.includes("Cannot find package '@heznpc/airmcp-"),
+    );
+}
+
+function hasAddonLoadFailureForModule(stderr, moduleName) {
+  return getAddonLoadFailureLines(stderr).some(
+    (line) =>
+      line.includes(`"module":"${moduleName}"`) ||
+      line.includes(`"module": "${moduleName}"`) ||
+      line.includes(`/${moduleName}/tools.js`) ||
+      line.includes(`/${moduleName}/prompts.js`),
+  );
+}
+
+function throwWithStderr(message, stderr) {
+  const failures = getAddonLoadFailureLines(stderr);
+  const suffix = failures.length ? `\n--- add-on load failures ---\n${failures.slice(-20).join("\n")}` : "";
+  throw new Error(`${message}${suffix}`);
 }
 
 function startMcp(entry, cwd, env) {
@@ -253,16 +308,20 @@ async function verifyInstalledRuntime({ work, entry, packNames, packManifest }) 
       if (!activePacks.has(packName)) throw new Error(`active packs missing ${packName}: ${JSON.stringify(packs)}`);
     }
 
-    const requiredModules = [
-      ...new Set(
-        packNames.flatMap((packName) => {
-          const pack = packManifest.find((candidate) => candidate.name === packName);
-          return pack?.modules ?? [];
-        }),
-      ),
-    ];
+    const stderr = client.stderr();
+    const hardLoadFailures = getAddonLoadFailureLines(stderr);
+    if (hardLoadFailures.length) {
+      throwWithStderr("installed add-on mode emitted required package load failures", stderr);
+    }
+
+    const requiredModules = await getExpectedPackModules(packNames, packManifest, profile);
+    const compatibilitySkipped = [];
     for (const moduleName of requiredModules) {
       if (!status.modulesEnabled?.includes?.(moduleName)) {
+        if (COMPATIBILITY_OPTIONAL_MODULES.has(moduleName) && !hasAddonLoadFailureForModule(stderr, moduleName)) {
+          compatibilitySkipped.push(moduleName);
+          continue;
+        }
         throw new Error(`module ${moduleName} was not enabled from installed add-on: ${JSON.stringify(status)}`);
       }
     }
@@ -317,6 +376,96 @@ async function verifyInstalledRuntime({ work, entry, packNames, packManifest }) 
       }
     }
 
+    return {
+      tools: tools.length,
+      registered: status.toolsRegistered,
+      modulesEnabled: status.modulesEnabled,
+      compatibilitySkipped,
+    };
+  } catch (error) {
+    const stderr = client.stderr();
+    if (/required add-on package module failed to load|Cannot find package '@heznpc\/airmcp-/.test(stderr)) {
+      throw new Error(
+        `${error instanceof Error ? error.message : String(error)}\n--- stderr ---\n${stderr.slice(-4000)}`,
+      );
+    }
+    throw error;
+  } finally {
+    clearTimeout(watchdog);
+    await client.stop();
+  }
+}
+
+async function verifyBundledFallbackRefused({ work, entry, packNames, packManifest }) {
+  const primaryPack = packNames[0] ?? "productivity";
+  const assertion = PACK_ASSERTIONS[primaryPack] ?? {};
+  const profile = assertion.profile ?? "full";
+  const env = {
+    ...cleanBootEnv(),
+    AIRMCP_PROFILE: profile,
+    AIRMCP_TOOL_EXPOSURE: "profile",
+    AIRMCP_MODULE_PACKS: ["core", ...packNames].join(","),
+    AIRMCP_ADDON_PACKAGE_MODE: "external-only",
+    AIRMCP_FAKE_OS_VERSION: "0",
+    AIRMCP_SEMANTIC_SEARCH: "false",
+    AIRMCP_AUDIT_LOG: "false",
+    AIRMCP_USAGE_TRACKING: "false",
+    AIRMCP_PROACTIVE_CONTEXT: "false",
+  };
+
+  const client = startMcp(entry, work, env);
+  const watchdog = setTimeout(() => {
+    client.stop().finally(() => fail(`root-only fallback verification timed out after ${TIMEOUT_MS}ms`));
+  }, TIMEOUT_MS);
+
+  try {
+    const initResp = await client.request(
+      "initialize",
+      {
+        protocolVersion: "2025-06-18",
+        capabilities: {},
+        clientInfo: { name: "airmcp-addon-negative-verify", version: "0.0.0" },
+      },
+      1,
+    );
+    if (!initResp.result) throw new Error(`initialize failed: ${JSON.stringify(initResp)}`);
+    client.notify("notifications/initialized");
+
+    const listResp = await client.request("tools/list", {}, 2);
+    const tools = listResp.result?.tools;
+    if (!Array.isArray(tools) || tools.length < 10) {
+      throw new Error(`tools/list malformed or too small: ${JSON.stringify(listResp)}`);
+    }
+
+    const statusResp = await client.request("tools/call", { name: "profile_status", arguments: {} }, 3);
+    expectNoWireError(statusResp, "profile_status");
+    const status = parseStructuredResult(statusResp);
+    if (!status) throw new Error(`profile_status was not parseable: ${JSON.stringify(statusResp)}`);
+
+    const stderr = client.stderr();
+    const expectedModules = await getExpectedPackModules(packNames, packManifest, profile);
+    const leakedModules = expectedModules.filter((moduleName) => status.modulesEnabled?.includes?.(moduleName));
+    if (leakedModules.length) {
+      throwWithStderr(
+        `root-only install loaded selected add-on module(s) despite external-only mode: ${leakedModules.join(", ")}`,
+        stderr,
+      );
+    }
+
+    const expectedPackages = [];
+    for (const packName of packNames) {
+      const modules = await getExpectedPackModules([packName], packManifest, profile);
+      const packageName = getPackPackageName(packManifest, packName);
+      if (modules.length && packageName) expectedPackages.push(packageName);
+    }
+    const missingFailurePackages = expectedPackages.filter((packageName) => !stderr.includes(packageName));
+    if (missingFailurePackages.length) {
+      throwWithStderr(
+        `root-only install did not prove missing package failure(s): ${missingFailurePackages.join(", ")}`,
+        stderr,
+      );
+    }
+
     return { tools: tools.length, registered: status.toolsRegistered, modulesEnabled: status.modulesEnabled };
   } catch (error) {
     const stderr = client.stderr();
@@ -334,10 +483,11 @@ async function verifyInstalledRuntime({ work, entry, packNames, packManifest }) 
 
 const { all, packs } = parsePackArgs();
 let work = null;
+let rootOnlyWork = null;
 const tarballs = [];
 
 try {
-  console.log("[1/5] build root dist and stage add-on packages");
+  console.log("[1/6] build root dist and stage add-on packages");
   sh("npm", ["run", "build"], { cwd: ROOT });
   sh(process.execPath, ["scripts/build-addon-packages.mjs", "--check"], { cwd: ROOT });
 
@@ -347,7 +497,7 @@ try {
   const missing = selectedPacks.filter((packName) => !stagedManifest.packages.some((pack) => pack.name === packName));
   if (missing.length) fail(`unknown staged add-on pack(s): ${missing.join(", ")}`);
 
-  console.log(`[2/5] npm pack root and add-on artifacts (${selectedPacks.join(", ")})`);
+  console.log(`[2/6] npm pack root and add-on artifacts (${selectedPacks.join(", ")})`);
   const rootPack = npmPack(ROOT);
   tarballs.push(rootPack.tgz);
   const addonPacks = selectedPacks.map((packName) => {
@@ -358,8 +508,21 @@ try {
     return { ...artifact, packName, packageName: pack.packageName };
   });
 
+  rootOnlyWork = mkdtempSync(join(tmpdir(), "airmcp-addon-root-only-"));
+  console.log(`[3/6] prove root-only install refuses bundled fallback ${rootOnlyWork}`);
+  sh("npm", ["init", "-y"], { cwd: rootOnlyWork });
+  sh("npm", ["install", "--no-audit", "--no-fund", "--no-save", rootPack.tgz], { cwd: rootOnlyWork });
+  const rootOnlyEntry = join(rootOnlyWork, "node_modules", "airmcp", "dist", "index.js");
+  if (!existsSync(rootOnlyEntry)) fail(`installed root-only package is missing ${rootOnlyEntry}`);
+  await verifyBundledFallbackRefused({
+    work: rootOnlyWork,
+    entry: rootOnlyEntry,
+    packNames: selectedPacks,
+    packManifest: stagedManifest.packages,
+  });
+
   work = mkdtempSync(join(tmpdir(), "airmcp-addon-install-"));
-  console.log(`[3/5] install tarballs into clean project ${work}`);
+  console.log(`[4/6] install tarballs into clean project ${work}`);
   sh("npm", ["init", "-y"], { cwd: work });
   sh("npm", ["install", "--no-audit", "--no-fund", "--no-save", rootPack.tgz, ...addonPacks.map((pack) => pack.tgz)], {
     cwd: work,
@@ -368,7 +531,7 @@ try {
   const entry = join(work, "node_modules", "airmcp", "dist", "index.js");
   if (!existsSync(entry)) fail(`installed root package is missing ${entry}`);
 
-  console.log("[4/5] boot installed root with AIRMCP_ADDON_PACKAGE_MODE=external-only");
+  console.log("[5/6] boot installed root with AIRMCP_ADDON_PACKAGE_MODE=external-only");
   const result = await verifyInstalledRuntime({
     work,
     entry,
@@ -376,7 +539,7 @@ try {
     packManifest: stagedManifest.packages,
   });
 
-  console.log("[5/5] artifact summary");
+  console.log("[6/6] artifact summary");
   const rows = [
     { name: "airmcp", filename: rootPack.filename, packed: rootPack.packageSize, unpacked: rootPack.unpackedSize },
     ...addonPacks.map((pack) => ({
@@ -392,9 +555,13 @@ try {
   console.log(
     `ok: installed add-on pack(s) ${selectedPacks.join(", ")} registered ${result.registered} tools; tools/list exposed ${result.tools}`,
   );
+  if (result.compatibilitySkipped.length) {
+    console.log(`ok: compatibility-gated module(s) skipped on this host: ${result.compatibilitySkipped.join(", ")}`);
+  }
 } catch (error) {
   fail(error instanceof Error ? error.message : String(error));
 } finally {
   for (const tgz of tarballs) rmSync(tgz, { force: true });
   if (work) rmSync(work, { recursive: true, force: true });
+  if (rootOnlyWork) rmSync(rootOnlyWork, { recursive: true, force: true });
 }

@@ -82,7 +82,8 @@ function startMcp(adapter) {
       return;
     }
     if (msg.id !== undefined && pending.has(msg.id)) {
-      const { resolve: resolvePending } = pending.get(msg.id);
+      const { resolve: resolvePending, timer } = pending.get(msg.id);
+      clearTimeout(timer);
       pending.delete(msg.id);
       resolvePending(msg);
     }
@@ -91,13 +92,13 @@ function startMcp(adapter) {
   function request(method, params, id) {
     proc.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id, method, ...(params ? { params } : {}) })}\n`);
     return new Promise((resolveReq, rejectReq) => {
-      pending.set(id, { resolve: resolveReq });
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         if (pending.has(id)) {
           pending.delete(id);
           rejectReq(new Error(`timeout waiting for id=${id} (${method})`));
         }
       }, TIMEOUT_MS);
+      pending.set(id, { resolve: resolveReq, timer });
     });
   }
 
@@ -115,6 +116,8 @@ function startMcp(adapter) {
       } catch {
         /* child may already be gone */
       }
+      for (const { timer } of pending.values()) clearTimeout(timer);
+      pending.clear();
       const timer = setTimeout(() => {
         if (!closed) proc.kill("SIGKILL");
         resolveStop();

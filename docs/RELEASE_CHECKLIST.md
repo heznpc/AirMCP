@@ -93,7 +93,7 @@ Breaking을 포함한 minor/patch는 **금지**. 직전 메이저에 묶어 둘 
 ## 3. 릴리스 실행
 
 ### 3.1 Dry release preflight (publish 금지)
-- [ ] `npm run release:preflight` 로 npm tarball dry-run + packaged server boot + `.mcpb` 구조 검증
+- [ ] `npm run release:preflight` 로 add-on verify/install, split size kill-test, first-user add-on drill, npm tarball dry-run, packaged server boot, `.mcpb` 구조 검증
 - [ ] app 산출물까지 확인할 때는 `npm run release:preflight -- --app`
 - [ ] GitHub Actions **Release Preflight** workflow green 확인
 - [ ] workflow artifact에 `airmcp-X.Y.Z.mcpb`와 `AirMCP-X.Y.Z-adhoc.zip`이 생성되는지 확인
@@ -198,6 +198,10 @@ npm run stats:check && npm run i18n:check
 
 # dry release artifact
 npm run release:preflight
+
+# add-on modular distribution probes
+npm run addons:first-user-drill
+npm run addons:kill-test
 
 # 취약점
 npm audit --audit-level=moderate

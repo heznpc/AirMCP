@@ -190,6 +190,14 @@ run("npm", ["run", "addons:measure-split", "--", "--no-build", "--require-size-w
 const splitMeasurementPath = join(ROOT, "build", "addons", "split-measurement.json");
 assertFile(splitMeasurementPath, "add-on split measurement");
 copyFileSync(splitMeasurementPath, join(OUT_DIR, "addon-split-measurement.json"));
+run("npm", ["run", "addons:first-user-drill", "--", "--no-build"]);
+const firstUserDrillPath = join(ROOT, "build", "addons", "first-user-addon-drill.json");
+assertFile(firstUserDrillPath, "first-user add-on drill");
+copyFileSync(firstUserDrillPath, join(OUT_DIR, "first-user-addon-drill.json"));
+run("npm", ["run", "addons:kill-test", "--", "--no-build"]);
+const modularKillTestPath = join(ROOT, "build", "addons", "modular-distribution-kill-test.json");
+assertFile(modularKillTestPath, "modular distribution kill-test");
+copyFileSync(modularKillTestPath, join(OUT_DIR, "modular-distribution-kill-test.json"));
 run("npm", ["run", "verify:package"]);
 verifyNpmDryRun();
 run("npm", ["run", "build:mcpb"]);

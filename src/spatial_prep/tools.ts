@@ -25,8 +25,10 @@ const NEARBY_CONTEXT_EXTENSIONS = new Set([
 ]);
 
 const MAX_TEXT_FILE_BYTES = 64_000;
+const MAX_HANDOFF_ASSETS = 25;
 
 const assetExtensionSchema = z.enum(ASSET_EXTENSIONS);
+const handoffAssetRoleSchema = z.enum(["primary", "reference", "texture", "material", "environment", "unknown"]);
 
 interface SpatialAsset {
   path: string;
@@ -39,6 +41,12 @@ interface SpatialAsset {
 
 interface NearbyFile extends SpatialAsset {
   kind: "asset" | "material" | "texture" | "metadata" | "context";
+}
+
+interface HandoffAssetInput {
+  path: string;
+  label?: string;
+  role?: "primary" | "reference" | "texture" | "material" | "environment" | "unknown";
 }
 
 export function registerSpatialPrepTools(server: McpServer, _config: AirMcpConfig): void {
@@ -186,6 +194,112 @@ export function registerSpatialPrepTools(server: McpServer, _config: AirMcpConfi
       }
     },
   );
+
+  server.registerTool(
+    "prepare_spatial_handoff_manifest",
+    {
+      title: "Prepare Spatial Handoff Manifest",
+      description:
+        "Create a read-only handoff manifest for downstream VR/spatial tools from selected local assets and bounded nearby context.",
+      inputSchema: {
+        assets: z
+          .array(
+            z.object({
+              path: zFilePath.describe("Absolute path to a local spatial/VR asset or reference file"),
+              label: z.string().min(1).max(120).optional().describe("Optional user-visible asset label"),
+              role: handoffAssetRoleSchema.optional().default("reference").describe("Asset role in the handoff"),
+            }),
+          )
+          .min(1)
+          .max(MAX_HANDOFF_ASSETS)
+          .describe("Assets to include in the handoff manifest"),
+        projectName: z.string().min(1).max(120).optional().describe("Optional project or scene name"),
+        root: zFilePath.optional().describe("Optional project root; existing assets must resolve inside it"),
+        includeNearby: z
+          .boolean()
+          .optional()
+          .default(true)
+          .describe("Include nearby texture/material/context metadata"),
+        nearbyLimit: z.number().int().min(0).max(20).optional().default(10).describe("Max nearby files per asset"),
+        maxTextChars: z
+          .number()
+          .int()
+          .min(0)
+          .max(2_000)
+          .optional()
+          .default(500)
+          .describe("Max characters per adjacent text context file"),
+        includeHidden: z.boolean().optional().default(false).describe("Include dotfiles in nearby context"),
+      },
+      outputSchema: {
+        manifestVersion: z.string(),
+        projectName: z.string().nullable(),
+        createdAt: z.string(),
+        root: z.string().nullable(),
+        assetCount: z.number().int(),
+        existingAssetCount: z.number().int(),
+        supportedAssetCount: z.number().int(),
+        assets: z.array(
+          z.object({
+            path: z.string(),
+            label: z.string().nullable(),
+            role: z.enum(["primary", "reference", "texture", "material", "environment", "unknown"]),
+            name: z.string(),
+            extension: z.string(),
+            relativePath: z.string().nullable(),
+            exists: z.boolean(),
+            supportedSpatialAsset: z.boolean(),
+            size: z.number().int().nullable(),
+            modifiedAt: z.string().nullable(),
+            error: z.string().nullable(),
+            nearby: z.object({
+              total: z.number().int(),
+              returned: z.number().int(),
+              files: z.array(
+                z.object({
+                  path: z.string(),
+                  relativePath: z.string(),
+                  name: z.string(),
+                  extension: z.string(),
+                  kind: z.enum(["asset", "material", "texture", "metadata", "context"]),
+                  size: z.number().int(),
+                  modifiedAt: z.string(),
+                }),
+              ),
+            }),
+            textContext: z.array(
+              z.object({
+                path: z.string(),
+                name: z.string(),
+                extension: z.string(),
+                size: z.number().int(),
+                excerpt: z.string(),
+                truncated: z.boolean(),
+              }),
+            ),
+          }),
+        ),
+        notes: z.array(z.string()),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ assets, projectName, root, includeNearby, nearbyLimit, maxTextChars, includeHidden }) => {
+      try {
+        const result = await buildSpatialHandoffManifest({
+          assets,
+          projectName,
+          root,
+          includeNearby,
+          nearbyLimit,
+          maxTextChars,
+          includeHidden,
+        });
+        return okUntrustedStructured(result);
+      } catch (e) {
+        return formatFsError("prepare spatial handoff manifest", e);
+      }
+    },
+  );
 }
 
 function normalizeAssetExtensions(
@@ -327,6 +441,136 @@ async function buildAssetContext(options: {
       "Binary asset contents are not read.",
       "Adjacent text is returned as untrusted context and is bounded by maxTextChars.",
     ],
+  };
+}
+
+async function buildSpatialHandoffManifest(options: {
+  assets: HandoffAssetInput[];
+  projectName?: string;
+  root?: string;
+  includeNearby: boolean;
+  nearbyLimit: number;
+  maxTextChars: number;
+  includeHidden: boolean;
+}) {
+  const root = options.root ? await realpath(options.root) : null;
+  if (root) {
+    const rootStat = await stat(root);
+    if (!rootStat.isDirectory()) throw new Error(`not a directory: ${options.root}`);
+  }
+
+  const assets = [];
+  for (const asset of options.assets) {
+    assets.push(
+      await buildHandoffAsset({
+        input: asset,
+        root,
+        includeNearby: options.includeNearby,
+        nearbyLimit: options.nearbyLimit,
+        maxTextChars: options.maxTextChars,
+        includeHidden: options.includeHidden,
+      }),
+    );
+  }
+
+  return {
+    manifestVersion: "airmcp.spatial.handoff.v1",
+    projectName: options.projectName ?? null,
+    createdAt: new Date().toISOString(),
+    root,
+    assetCount: assets.length,
+    existingAssetCount: assets.filter((asset) => asset.exists).length,
+    supportedAssetCount: assets.filter((asset) => asset.supportedSpatialAsset).length,
+    assets,
+    notes: [
+      "Binary asset contents are not read.",
+      "Adjacent text is returned as untrusted context and is bounded by maxTextChars.",
+      "This manifest is a handoff contract for downstream spatial tools; AirMCP does not render the scene.",
+    ],
+  };
+}
+
+async function buildHandoffAsset(options: {
+  input: HandoffAssetInput;
+  root: string | null;
+  includeNearby: boolean;
+  nearbyLimit: number;
+  maxTextChars: number;
+  includeHidden: boolean;
+}) {
+  const { input, root } = options;
+  const rawPath = input.path;
+  const fallbackExtension = extname(rawPath).toLowerCase();
+  const fallback = {
+    path: rawPath,
+    label: input.label ?? null,
+    role: input.role ?? "reference",
+    name: basename(rawPath),
+    extension: fallbackExtension,
+    relativePath: root ? relative(root, rawPath) : null,
+    exists: false,
+    supportedSpatialAsset: ASSET_EXTENSION_SET.has(fallbackExtension),
+    size: null,
+    modifiedAt: null,
+    error: null as string | null,
+    nearby: { total: 0, returned: 0, files: [] as NearbyFile[] },
+    textContext: [] as Awaited<ReturnType<typeof readTextContext>>,
+  };
+
+  let assetPath;
+  try {
+    assetPath = await realpath(rawPath);
+  } catch (error) {
+    return {
+      ...fallback,
+      error: `not found: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+
+  if (root && !isInside(root, assetPath)) {
+    throw new Error(`asset is outside root: ${rawPath}`);
+  }
+
+  const fileStat = await stat(assetPath);
+  if (!fileStat.isFile()) {
+    return {
+      ...fallback,
+      path: assetPath,
+      name: basename(assetPath),
+      extension: extname(assetPath).toLowerCase(),
+      relativePath: root ? relative(root, assetPath) : null,
+      error: `not a file: ${rawPath}`,
+    };
+  }
+
+  const extension = extname(assetPath).toLowerCase();
+  const supportedSpatialAsset = ASSET_EXTENSION_SET.has(extension);
+  const nearby =
+    options.includeNearby && options.nearbyLimit > 0
+      ? await listNearbyFiles(
+          dirname(assetPath),
+          root ?? dirname(assetPath),
+          assetPath,
+          options.nearbyLimit,
+          options.includeHidden,
+        )
+      : { total: 0, returned: 0, files: [] };
+  const textContext = await readTextContext(nearby.files, options.maxTextChars);
+
+  return {
+    path: assetPath,
+    label: input.label ?? null,
+    role: input.role ?? "reference",
+    name: basename(assetPath),
+    extension,
+    relativePath: root ? relative(root, assetPath) : null,
+    exists: true,
+    supportedSpatialAsset,
+    size: fileStat.size,
+    modifiedAt: fileStat.mtime.toISOString(),
+    error: supportedSpatialAsset ? null : `unsupported VR asset extension: ${extension || "(none)"}`,
+    nearby,
+    textContext,
   };
 }
 

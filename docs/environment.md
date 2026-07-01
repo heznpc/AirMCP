@@ -16,7 +16,7 @@ If a variable accepts a path, `~` expands to `$HOME`. Booleans are `"true"` / `"
 | Use only selected module packs | `AIRMCP_MODULE_PACKS=core,productivity` |
 | Install and activate a module add-on | `npx airmcp modules enable productivity --install` |
 | Stage physical add-on package artifacts | `npm run addons:build` |
-| Send all 294 tools without compactDescription | `AIRMCP_COMPACT_TOOLS=false` + `AIRMCP_TOOL_EXPOSURE=full` |
+| Send all 295 tools without compactDescription | `AIRMCP_COMPACT_TOOLS=false` + `AIRMCP_TOOL_EXPOSURE=full` |
 | Require sessions before hidden tools can run | `AIRMCP_REQUIRE_TOOL_SESSION=true` |
 | Inspect or edit module add-ons | `npx airmcp modules` |
 | Increase audit-log signing strength for cross-host integrity | `AIRMCP_AUDIT_HMAC_KEY=<32+ random bytes>` |
@@ -229,6 +229,8 @@ Built-in packs:
 Use `npx airmcp modules list` locally or `list_module_packs` over MCP to inspect the active pack set, package names, install commands, installed version, expected version, update status, and installed size. Use `npx airmcp modules enable productivity,communications` to write a narrow `modulePacks` config, or add `--install` when the physical companion package should be installed on demand. `profile_status` also reports `modulePacksConfigured`, `modulePacksAvailable`, `modulesMissingPacks`, `modulesMissingAddonPackages`, `modulePackInstallIssues`, and `missingPackInstallHints` so a client can prompt for the exact add-on install command when a requested profile is missing a pack or a slim-root runtime cannot find the package. Each install hint includes a human-readable `message` field for clients that want to show a direct install prompt instead of constructing copy from the raw command fields.
 
 MCP clients may call `install_module_pack` for semi-automatic add-on management. The safe flow is `install_module_pack({ pack: "productivity", dryRun: true })`, show the returned npm command to the user, then call again with `confirm: true` only after explicit approval. Real install/uninstall calls edit `~/.config/airmcp/config.json`, run npm in the persistent add-on prefix, and require an AirMCP restart before the newly installed package is loaded.
+
+Release preflight now keeps this user journey as a gate, not only a CLI claim. `npm run addons:first-user-drill` installs a temporary slim root into a clean project, verifies the missing-pack install prompt, installs the local staged add-on into a persistent prefix, activates the pack, and boots in `external-only` mode. `npm run addons:kill-test` combines that drill with `addons:measure-split` so weak install-size evidence or a broken first-user path blocks the physical add-on publish lane.
 
 The `spatial` pack is the extension point for VR/spatial context bridges. Its contract is read-only asset/context preparation: gather local Apple workspace context, file metadata, screenshots, Photos/Keynote/Finder references, and exportable manifests for a downstream spatial renderer or headset workflow. It must not become a generic 3D render pipeline inside the core package. See [`spatial-addon-contract.md`](spatial-addon-contract.md).
 

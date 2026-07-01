@@ -23,7 +23,8 @@ describe('Spatial prep tools', () => {
   test('registers the read-only spatial prep tools', () => {
     expect(server._tools.has('list_vr_assets')).toBe(true);
     expect(server._tools.has('get_vr_asset_context')).toBe(true);
-    for (const name of ['list_vr_assets', 'get_vr_asset_context']) {
+    expect(server._tools.has('prepare_spatial_handoff_manifest')).toBe(true);
+    for (const name of ['list_vr_assets', 'get_vr_asset_context', 'prepare_spatial_handoff_manifest']) {
       const tool = server._tools.get(name);
       expect(tool.opts.annotations.readOnlyHint).toBe(true);
       expect(tool.opts.annotations.destructiveHint).toBe(false);
@@ -99,5 +100,38 @@ describe('Spatial prep tools', () => {
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('[invalid_input]');
+  });
+
+  test('prepare_spatial_handoff_manifest creates a bounded downstream handoff', async () => {
+    const project = join(tempDir, 'project');
+    await mkdir(project, { recursive: true });
+    const assetPath = join(project, 'room.usdz');
+    await writeFile(assetPath, 'fake binary');
+    await writeFile(join(project, 'room-basecolor.png'), 'image bytes');
+    await writeFile(join(project, 'scene-notes.md'), 'Renderer-facing context should stay bounded and untrusted.');
+
+    const result = await server.callTool('prepare_spatial_handoff_manifest', {
+      projectName: 'Room Review',
+      root: project,
+      assets: [{ path: assetPath, label: 'Main room', role: 'primary' }],
+      includeNearby: true,
+      nearbyLimit: 10,
+      maxTextChars: 18,
+      includeHidden: false,
+    });
+
+    expect(result.structuredContent.manifestVersion).toBe('airmcp.spatial.handoff.v1');
+    expect(result.structuredContent.projectName).toBe('Room Review');
+    expect(result.structuredContent.assetCount).toBe(1);
+    expect(result.structuredContent.existingAssetCount).toBe(1);
+    expect(result.structuredContent.supportedAssetCount).toBe(1);
+    const asset = result.structuredContent.assets[0];
+    expect(asset.path).toBe(await realpath(assetPath));
+    expect(asset.label).toBe('Main room');
+    expect(asset.role).toBe('primary');
+    expect(asset.supportedSpatialAsset).toBe(true);
+    expect(asset.nearby.files.map((file) => file.kind).sort()).toEqual(['metadata', 'texture']);
+    expect(asset.textContext[0].excerpt.length).toBeLessThanOrEqual(18);
+    expect(result.structuredContent.notes.join(' ')).toContain('does not render');
   });
 });

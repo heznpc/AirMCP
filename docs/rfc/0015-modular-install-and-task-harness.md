@@ -39,7 +39,7 @@ The second shipped slice is the module-pack contract:
 The third shipped slice is physical package staging:
 
 - `scripts/build-addon-packages.mjs` stages tarball-ready package directories under `build/addons`,
-- each staged package includes only its pack modules plus the shared runtime files those modules import,
+- each staged package includes only its pack modules; shared runtime imports are rewritten to the peer root `airmcp` package instead of copied into every add-on,
 - `AIRMCP_ADDON_PACKAGE_MODE=prefer-installed` tries an installed add-on package before bundled fallback,
 - `AIRMCP_ADDON_PACKAGE_MODE=external-only` turns missing add-ons into module-load failures outside `core`,
 - `npm run addons:check` is wired into CI and `release:preflight`.

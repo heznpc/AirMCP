@@ -58,6 +58,11 @@
   "bin": {
     "airmcp": "dist/index.js"
   },
+  "exports": {
+    ".": "./dist/index.js",
+    "./package.json": "./package.json",
+    "./dist/*": "./dist/*"
+  },
   "files": [
     "dist"
   ],

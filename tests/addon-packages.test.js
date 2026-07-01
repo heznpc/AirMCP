@@ -22,7 +22,13 @@ describe("add-on package staging", () => {
     expect(packageJson.name).toBe("@heznpc/airmcp-productivity");
     expect(packageJson.name).not.toContain("pack-");
     expect(packageJson.airmcp.modules).toEqual(["pages", "numbers", "keynote"]);
+    expect(packageJson.airmcp.sharedRuntime).toBe("peer-root");
+    expect(productivity.sharedRuntime).toBe("peer-root");
     expect(existsSync(join(packageRoot, "dist", "pages", "tools.js"))).toBe(true);
-    expect(existsSync(join(packageRoot, "dist", "shared", "mcp.js"))).toBe(true);
+    expect(existsSync(join(packageRoot, "dist", "shared", "mcp.js"))).toBe(false);
+
+    const pagesTools = readFileSync(join(packageRoot, "dist", "pages", "tools.js"), "utf8");
+    expect(pagesTools).toContain('from "airmcp/dist/shared/');
+    expect(pagesTools).not.toContain("../shared/");
   });
 });

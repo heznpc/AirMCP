@@ -86,6 +86,8 @@
     "format": "prettier --write src/",
     "format:check": "prettier --check src/",
     "prepublishOnly": "npm run clean && npm run build",
+    "prepack": "npm run build && npm run addons:check && node scripts/slim-root-package.mjs --apply",
+    "postpack": "node scripts/slim-root-package.mjs --restore",
     "pretest": "npm run build",
     "start": "node dist/index.js",
     "test": "node --experimental-vm-modules node_modules/.bin/jest",

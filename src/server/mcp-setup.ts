@@ -27,6 +27,8 @@ import {
   type AirMcpConfig,
 } from "../shared/config.js";
 import { getModulePackPlan, loadModuleRegistry, setModuleRegistry } from "../shared/modules.js";
+import { CORE_MODULE_PACK_NAME, MODULE_PACK_MANIFEST, getModulePackNameForModule } from "../shared/module-packs.js";
+import { getMissingAddonPackageModules } from "../shared/module-loader.js";
 import { resolveModuleCompatibility } from "../shared/compatibility.js";
 import { registerDynamicShortcutTools } from "../shortcuts/tools.js";
 import { HitlClient } from "../shared/hitl.js";
@@ -50,6 +52,29 @@ export interface CreateServerOptions {
   hitlClient: HitlClient | null;
   osVersion: number;
   pkg: { version: string; description?: string; license?: string; homepage?: string };
+}
+
+function buildMissingPackInstallHints(
+  modulesMissingPacks: string[],
+  missingAddonPackageModules: string[],
+  version: string,
+) {
+  const missingByPack = new Map<string, string[]>();
+  for (const moduleName of [...modulesMissingPacks, ...missingAddonPackageModules]) {
+    const packName = getModulePackNameForModule(moduleName);
+    if (!packName || packName === CORE_MODULE_PACK_NAME) continue;
+    const current = missingByPack.get(packName) ?? [];
+    if (!current.includes(moduleName)) current.push(moduleName);
+    missingByPack.set(packName, current);
+  }
+
+  return MODULE_PACK_MANIFEST.filter((pack) => missingByPack.has(pack.name)).map((pack) => ({
+    pack: pack.name,
+    packageName: pack.packageName,
+    installSpec: `${pack.packageName}@${version}`,
+    modules: missingByPack.get(pack.name) ?? [],
+    command: `npx airmcp modules enable ${pack.name} --install`,
+  }));
 }
 
 export async function createServer(
@@ -92,6 +117,12 @@ export async function createServer(
   const modulePackPlan = getModulePackPlan(config);
   const modulePacksAvailable = modulePackPlan.packs.filter((pack) => pack.available).map((pack) => pack.name);
   const modulesMissingPacks = modulePackPlan.modulesMissingPacks;
+  const missingAddonPackageModules = getMissingAddonPackageModules();
+  const missingPackInstallHints = buildMissingPackInstallHints(
+    modulesMissingPacks,
+    missingAddonPackageModules,
+    pkg.version,
+  );
 
   // RFC 0004: route every module through the compatibility resolver. The
   // resolver folds in minMacosVersion (legacy gate), maxMacosVersion, brokenOn,
@@ -224,6 +255,9 @@ export async function createServer(
             modules: z.array(z.string()),
             available: z.boolean(),
             required: z.boolean(),
+            installSpec: z.string().nullable(),
+            installCommand: z.string().nullable(),
+            uninstallCommand: z.string().nullable(),
           }),
         ),
       },
@@ -233,7 +267,13 @@ export async function createServer(
       return okStructured({
         configured: config.modulePacksConfigured,
         active: modulePacksAvailable,
-        packs: modulePackPlan.packs,
+        packs: modulePackPlan.packs.map((pack) => ({
+          ...pack,
+          installSpec: pack.name === CORE_MODULE_PACK_NAME ? null : `${pack.packageName}@${pkg.version}`,
+          installCommand:
+            pack.name === CORE_MODULE_PACK_NAME ? null : `npx airmcp modules enable ${pack.name} --install`,
+          uninstallCommand: pack.name === CORE_MODULE_PACK_NAME ? null : `npx airmcp modules uninstall ${pack.name}`,
+        })),
       });
     },
   );
@@ -253,6 +293,16 @@ export async function createServer(
         modulePacksConfigured: z.boolean(),
         modulePacksAvailable: z.array(z.string()),
         modulesMissingPacks: z.array(z.string()),
+        modulesMissingAddonPackages: z.array(z.string()),
+        missingPackInstallHints: z.array(
+          z.object({
+            pack: z.string(),
+            packageName: z.string(),
+            installSpec: z.string(),
+            modules: z.array(z.string()),
+            command: z.string(),
+          }),
+        ),
         requireToolSession: z.boolean(),
         harnessAdapter: z.string(),
         modulesEnabled: z.array(z.string()),
@@ -271,6 +321,8 @@ export async function createServer(
         modulePacksConfigured: config.modulePacksConfigured,
         modulePacksAvailable,
         modulesMissingPacks,
+        modulesMissingAddonPackages: missingAddonPackageModules,
+        missingPackInstallHints,
         requireToolSession: config.requireToolSession,
         harnessAdapter: harness.name,
         modulesEnabled: enabled,

@@ -122,11 +122,13 @@ describe('loadModuleRegistry() — debug filtering', () => {
   let savedDebugModules;
   let savedDebugSequential;
   let savedAddonPackageMode;
+  let savedAddonInstallPrefix;
 
   beforeEach(() => {
     savedDebugModules = process.env.AIRMCP_DEBUG_MODULES;
     savedDebugSequential = process.env.AIRMCP_DEBUG_SEQUENTIAL;
     savedAddonPackageMode = process.env.AIRMCP_ADDON_PACKAGE_MODE;
+    savedAddonInstallPrefix = process.env.AIRMCP_ADDON_INSTALL_PREFIX;
   });
 
   afterEach(() => {
@@ -136,6 +138,8 @@ describe('loadModuleRegistry() — debug filtering', () => {
     else process.env.AIRMCP_DEBUG_SEQUENTIAL = savedDebugSequential;
     if (savedAddonPackageMode === undefined) delete process.env.AIRMCP_ADDON_PACKAGE_MODE;
     else process.env.AIRMCP_ADDON_PACKAGE_MODE = savedAddonPackageMode;
+    if (savedAddonInstallPrefix === undefined) delete process.env.AIRMCP_ADDON_INSTALL_PREFIX;
+    else process.env.AIRMCP_ADDON_INSTALL_PREFIX = savedAddonInstallPrefix;
   });
 
   test('AIRMCP_DEBUG_MODULES filters to only specified modules', async () => {
@@ -231,11 +235,13 @@ describe('loadModuleRegistry() — debug filtering', () => {
   test('loadModuleRegistry external-only mode refuses missing add-on packages', async () => {
     process.env.AIRMCP_DEBUG_MODULES = 'pages';
     process.env.AIRMCP_ADDON_PACKAGE_MODE = 'external-only';
+    process.env.AIRMCP_ADDON_INSTALL_PREFIX = '/tmp/airmcp-missing-addon-prefix';
     delete process.env.AIRMCP_DEBUG_SEQUENTIAL;
 
     const { loadModuleRegistry } = await import(
       `../dist/shared/modules.js?t=${Date.now()}${Math.random()}`
     );
+    const { getMissingAddonPackageModules } = await import('../dist/shared/module-loader.js');
 
     const errors = [];
     const origError = console.error;
@@ -262,6 +268,7 @@ describe('loadModuleRegistry() — debug filtering', () => {
 
       expect(registry.some((mod) => mod.name === 'pages')).toBe(false);
       expect(errors.some((line) => line.includes('required add-on package module failed to load'))).toBe(true);
+      expect(getMissingAddonPackageModules()).toContain('pages');
     } finally {
       console.error = origError;
     }

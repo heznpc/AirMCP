@@ -8,6 +8,7 @@
 
 /* Menu - Sections */
 "menu.modules" = "Modules";
+"addons.menu" = "Module Add-ons";
 "menu.workflows" = "Workflows";
 "menu.settings" = "Settings";
 "menu.viewLogs" = "View Logs (%d)";
@@ -165,7 +166,40 @@
 "module.memory.desc" = "Durable facts, entities, episodes — ai_agent's recall";
 "module.audit" = "Audit";
 "module.audit.desc" = "Query the on-device log of every tool call";
+"module.spatial_prep" = "Spatial Prep";
+"module.spatial_prep.desc" = "Read-only VR/spatial asset context";
 "module.requiresMacOS" = "requires macOS %d+";
+
+/* Module Add-ons */
+"addons.active" = "Active";
+"addons.install" = "Install and Activate";
+"addons.uninstall" = "Uninstall";
+"addons.copyInstallCommand" = "Copy Install Command";
+"addons.installing" = "Installing %@...";
+"addons.doneRestart" = "Add-on updated. Restart server to apply.";
+"addons.failed" = "Add-on failed: %@";
+"addon.core" = "Core Workspace";
+"addon.core.desc" = "Starter workspace tools and audit visibility.";
+"addon.communications" = "Communications";
+"addon.communications.desc" = "Contacts, Mail, and Messages.";
+"addon.productivity" = "Productivity";
+"addon.productivity.desc" = "Pages, Numbers, and Keynote.";
+"addon.browser" = "Browser";
+"addon.browser.desc" = "Safari tabs, bookmarks, and page capture.";
+"addon.media" = "Media";
+"addon.media.desc" = "Music, TV, Podcasts, and Speech.";
+"addon.visual" = "Visual";
+"addon.visual.desc" = "Photos, Screen, and UI Automation.";
+"addon.location" = "Location";
+"addon.location.desc" = "Maps and current location.";
+"addon.device" = "Device";
+"addon.device.desc" = "Bluetooth and HealthKit-oriented device tools.";
+"addon.intelligence" = "Intelligence";
+"addon.intelligence.desc" = "Apple Intelligence and context memory.";
+"addon.google" = "Google Workspace";
+"addon.google.desc" = "Google Workspace integration.";
+"addon.spatial" = "Spatial";
+"addon.spatial.desc" = "VR/spatial asset and project context preparation.";
 
 /* Onboarding */
 "onboarding.back" = "Back";

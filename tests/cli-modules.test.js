@@ -1,8 +1,10 @@
 import { describe, test, expect } from "@jest/globals";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
+const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
 
 function runModules(home, args) {
   return execFileSync(process.execPath, ["dist/index.js", "modules", ...args], {
@@ -53,6 +55,7 @@ describe("airmcp modules CLI", () => {
     try {
       const payload = JSON.parse(runModules(home, ["list", "--json"]));
       expect(payload.active).toContain("core");
+      expect(payload.installPrefix).toBe(join(home, ".airmcp", "addons"));
       expect(payload.packs.some((pack) => pack.packageName.includes("pack-"))).toBe(false);
       expect(payload.packs.find((pack) => pack.name === "productivity").packageName).toBe(
         "@heznpc/airmcp-productivity",
@@ -67,6 +70,42 @@ describe("airmcp modules CLI", () => {
     try {
       const payload = JSON.parse(runModules(home, ["enable", "productivity", "--json"]));
       expect(payload.active).toEqual(["core", "productivity"]);
+
+      const config = JSON.parse(readFileSync(join(home, ".config", "airmcp", "config.json"), "utf8"));
+      expect(config.modulePacks).toEqual(["core", "productivity"]);
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  test("enable --install dry-run plans companion package install before activation", () => {
+    const home = mkdtempSync(join(tmpdir(), "airmcp-modules-"));
+    try {
+      const payload = JSON.parse(runModules(home, ["enable", "productivity", "--install", "--dry-run", "--json"]));
+      expect(payload.plannedActive).toEqual(["core", "productivity"]);
+      expect(payload.operation.action).toBe("install");
+      expect(payload.operation.packages).toEqual([`@heznpc/airmcp-productivity@${pkg.version}`]);
+      expect(payload.operation.command).toEqual(
+        expect.arrayContaining(["npm", "install", "--no-save", `@heznpc/airmcp-productivity@${pkg.version}`]),
+      );
+      expect(existsSync(join(home, ".config", "airmcp", "config.json"))).toBe(false);
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  test("uninstall dry-run plans companion package removal without disabling the pack", () => {
+    const home = mkdtempSync(join(tmpdir(), "airmcp-modules-"));
+    try {
+      runModules(home, ["enable", "productivity", "--json"]);
+      const payload = JSON.parse(runModules(home, ["uninstall", "productivity", "--dry-run", "--json"]));
+      expect(payload.active).toEqual(["core", "productivity"]);
+      expect(payload.plannedActive).toEqual(["core"]);
+      expect(payload.operation.action).toBe("uninstall");
+      expect(payload.operation.packages).toEqual(["@heznpc/airmcp-productivity"]);
+      expect(payload.operation.command).toEqual(
+        expect.arrayContaining(["npm", "uninstall", "@heznpc/airmcp-productivity"]),
+      );
 
       const config = JSON.parse(readFileSync(join(home, ".config", "airmcp", "config.json"), "utf8"));
       expect(config.modulePacks).toEqual(["core", "productivity"]);

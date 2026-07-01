@@ -136,6 +136,11 @@ try {
     console.error(`✗ installed package is missing the entrypoint: ${entry}`);
     process.exit(1);
   }
+  const slimMarker = join(work, "node_modules", "airmcp", "dist", ".airmcp-slim-root.json");
+  if (!existsSync(slimMarker)) {
+    console.error("✗ installed package is missing dist/.airmcp-slim-root.json; npm artifact is not slim-root.");
+    process.exit(1);
+  }
 
   console.log("[3/3] boot the INSTALLED server under MCP Inspector …");
   // eslint-disable-next-line no-undef -- top-level await is fine in an ESM script

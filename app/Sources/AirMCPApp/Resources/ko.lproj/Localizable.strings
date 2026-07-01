@@ -8,6 +8,7 @@
 
 /* Menu - Sections */
 "menu.modules" = "모듈";
+"addons.menu" = "모듈 애드온";
 "menu.workflows" = "워크플로우";
 "menu.settings" = "설정";
 "menu.viewLogs" = "로그 보기 (%d)";
@@ -165,7 +166,40 @@
 "module.memory.desc" = "사실·엔티티·에피소드를 저장해 ai_agent가 기억하도록";
 "module.audit" = "감사 로그";
 "module.audit.desc" = "AirMCP가 실행한 모든 툴 호출을 조회";
+"module.spatial_prep" = "Spatial 준비";
+"module.spatial_prep.desc" = "VR/spatial asset 맥락을 읽기 전용으로 준비";
 "module.requiresMacOS" = "macOS %d 이상 필요";
+
+/* Module Add-ons */
+"addons.active" = "활성화";
+"addons.install" = "설치 및 활성화";
+"addons.uninstall" = "제거";
+"addons.copyInstallCommand" = "설치 명령 복사";
+"addons.installing" = "%@ 설치 중...";
+"addons.doneRestart" = "애드온이 업데이트되었습니다. 서버를 재시작하면 반영됩니다.";
+"addons.failed" = "애드온 실패: %@";
+"addon.core" = "Core Workspace";
+"addon.core.desc" = "starter workspace 도구와 감사 로그.";
+"addon.communications" = "Communications";
+"addon.communications.desc" = "연락처, 메일, 메시지.";
+"addon.productivity" = "Productivity";
+"addon.productivity.desc" = "Pages, Numbers, Keynote.";
+"addon.browser" = "Browser";
+"addon.browser.desc" = "Safari 탭, 북마크, 페이지 캡처.";
+"addon.media" = "Media";
+"addon.media.desc" = "음악, TV, 팟캐스트, 음성.";
+"addon.visual" = "Visual";
+"addon.visual.desc" = "사진, 화면, UI 자동화.";
+"addon.location" = "Location";
+"addon.location.desc" = "지도와 현재 위치.";
+"addon.device" = "Device";
+"addon.device.desc" = "Bluetooth와 HealthKit 계열 기기 도구.";
+"addon.intelligence" = "Intelligence";
+"addon.intelligence.desc" = "Apple Intelligence와 맥락 기억.";
+"addon.google" = "Google Workspace";
+"addon.google.desc" = "Google Workspace 연동.";
+"addon.spatial" = "Spatial";
+"addon.spatial.desc" = "VR/spatial asset과 프로젝트 맥락 준비.";
 
 /* Onboarding */
 "onboarding.back" = "이전";

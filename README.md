@@ -13,7 +13,7 @@
 
 **Part of:** Human-Controlled AI Systems · Research Program 1 (anchor — Apple-side agent governance).
 
-**Requires**: macOS for the server. The recommended desktop path is the AirMCP menubar app: it owns the loopback HTTP runtime, while Claude/Codex/Cursor attach to it as clients. The direct CLI server (`npx -y airmcp`) still works for development and boots the **starter** profile with progressive `tools/list` exposure: a small front door (`profile_status`, `list_profiles`, `list_module_packs`, `discover_tools`, `describe_tool`, `run_tool`, and core starter tools) instead of every loaded tool. Use `AIRMCP_PROFILE=communications-safe|productivity|full` to choose a module profile, `AIRMCP_TOOL_EXPOSURE=profile|full` to widen `tools/list`, `npx airmcp modules enable productivity` or `AIRMCP_MODULE_PACKS=core,productivity` to activate only selected DLC-like packs, or `--full` / `AIRMCP_FULL=true` to enable all 29 modules / 294 tools. New app/CLI-created configs require task sessions for hidden `run_tool` dispatch; no-config direct stdio keeps the compatible path unless `AIRMCP_REQUIRE_TOOL_SESSION=true` is set. Most tools are pure JXA and work on macOS 14+ with no extra setup. **Swift-backed tools** — HealthKit, on-device semantic search, recurring events/reminders, photo import/delete/classify, Vision, Speech, Location, Bluetooth, and Apple Intelligence previews — need the **optional Swift bridge** — build it from a source checkout with `npm run swift-build` (it ships in **none** of the distribution channels — the npm tarball, the `.mcpb` bundle, or the menubar `.app` — so build it from source as above); without it those tools return a clear "Swift bridge not found" error and everything else keeps working. FoundationModels-backed Apple Intelligence and `AskAirMCPIntent` additionally require macOS 26+ on Apple Silicon and an opt-in Swift build with `AIRMCP_ENABLE_FOUNDATION_MODELS`.
+**Requires**: macOS for the server. The recommended desktop path is the AirMCP menubar app: it owns the loopback HTTP runtime, while Claude/Codex/Cursor attach to it as clients. The direct CLI server (`npx -y airmcp`) still works for development and boots the **starter** profile with progressive `tools/list` exposure: a small front door (`profile_status`, `list_profiles`, `list_module_packs`, `discover_tools`, `describe_tool`, `run_tool`, and core starter tools) instead of every loaded tool. Use `AIRMCP_PROFILE=communications-safe|productivity|full` to choose a module profile, `AIRMCP_TOOL_EXPOSURE=profile|full` to widen `tools/list`, `npx airmcp modules enable productivity` or `AIRMCP_MODULE_PACKS=core,productivity` to activate only selected DLC-like packs, or `--full` / `AIRMCP_FULL=true` to request all 29 modules / 294 tools when the matching add-ons are installed. New app/CLI-created configs require task sessions for hidden `run_tool` dispatch; no-config direct stdio keeps the compatible path unless `AIRMCP_REQUIRE_TOOL_SESSION=true` is set. Most tools are pure JXA and work on macOS 14+ with no extra setup. **Swift-backed tools** — HealthKit, on-device semantic search, recurring events/reminders, photo import/delete/classify, Vision, Speech, Location, Bluetooth, and Apple Intelligence previews — need the **optional Swift bridge** — build it from a source checkout with `npm run swift-build` (it ships in **none** of the distribution channels — the npm tarball, the `.mcpb` bundle, or the menubar `.app` — so build it from source as above); without it those tools return a clear "Swift bridge not found" error and everything else keeps working. FoundationModels-backed Apple Intelligence and `AskAirMCPIntent` additionally require macOS 26+ on Apple Silicon and an opt-in Swift build with `AIRMCP_ENABLE_FOUNDATION_MODELS`.
 
 > Available in multiple languages at the [project landing page](https://heznpc.github.io/AirMCP/).
 
@@ -93,10 +93,12 @@ Checks Node.js version, config files, MCP client setup, macOS permissions, and m
 ```bash
 npx airmcp modules
 npx airmcp modules enable productivity,communications
+npx airmcp modules enable productivity --install
+npx airmcp modules uninstall media
 npx airmcp modules doctor
 ```
 
-This edits the runtime `modulePacks` activation set. `npm run addons:build` stages tarball-ready physical add-on packages from `dist`, `npm run addons:verify-install` proves installed add-ons are load-bearing in `external-only` mode, and `npm run addons:measure-split` records the slim-root size/startup delta before any add-on publish decision. Add-on package names intentionally omit `pack-*` naming, for example `@heznpc/airmcp-productivity`.
+This edits the runtime `modulePacks` activation set. `--install` installs the matching companion npm add-on into `~/.airmcp/addons` (override with `AIRMCP_ADDON_INSTALL_PREFIX`) and then activates the pack; `uninstall` disables the pack and removes that companion package. The npm and MCPB release artifacts ship as a slim root, while `npm run addons:build` stages tarball-ready physical add-on packages from `dist`, `npm run addons:verify-install` proves installed add-ons are load-bearing in `external-only` mode, and `npm run addons:measure-split` records the slim-root size/startup delta against the universal local build. Add-on package names intentionally omit `pack-*` naming, for example `@heznpc/airmcp-productivity`.
 
 ### Workflow Catalog
 
@@ -875,7 +877,7 @@ By default, new installations start with 7 starter modules (Notes, Reminders, Ca
 # Re-run the setup wizard to change modules
 npx airmcp init
 
-# Or enable all modules at once
+# Or request every installed module at once
 npx airmcp --full
 ```
 
@@ -896,7 +898,7 @@ Or edit `~/.config/airmcp/config.json` directly:
 | `npx airmcp modules`   | Inspect or edit module add-ons    |
 | `npx airmcp`           | Start MCP server (stdio, default) |
 | `npx airmcp --version` | Print version and exit            |
-| `npx airmcp --full`    | Start with all 29 modules enabled |
+| `npx airmcp --full`    | Request every installed module |
 | `npx airmcp --http`    | Start as HTTP server (port 3847)  |
 | `npx airmcp connect`   | Proxy stdio clients to AirMCP.app |
 | `npx airmcp connect-clients` | Repair installed client configs for AirMCP.app |
@@ -915,6 +917,7 @@ Or edit `~/.config/airmcp/config.json` directly:
 | `AIRMCP_TOOL_EXPOSURE`       | profile-dependent            | `progressive` exposes a small front door, `profile` exposes the selected profile, `full` exposes every loaded tool |
 | `AIRMCP_MODULE_PACKS`        | all packs                    | Activate selected module add-ons, e.g. `core,productivity` |
 | `AIRMCP_ADDON_PACKAGE_MODE`  | `prefer-installed`           | Module import mode: `prefer-installed`, `bundled`, or `external-only` |
+| `AIRMCP_ADDON_INSTALL_PREFIX` | `~/.airmcp/addons`          | Override where `airmcp modules --install` places companion add-on packages |
 | `AIRMCP_HARNESS_ADAPTER`     | inferred                     | Task harness adapter: `compatible`, `strict`, `app-runtime`, or `agent` |
 | `AIRMCP_REQUIRE_TOOL_SESSION` | config-dependent            | Require task sessions before hidden `run_tool` dispatch |
 | `AIRMCP_ENABLE_SPATIAL_PREP` | `false`                      | Enable the experimental read-only spatial asset prep tools    |

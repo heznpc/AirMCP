@@ -96,7 +96,7 @@ npx airmcp modules enable productivity,communications
 npx airmcp modules doctor
 ```
 
-This edits the runtime `modulePacks` activation set. `npm run addons:build` stages tarball-ready physical add-on packages from `dist`, and the runtime can prefer installed add-ons before falling back to bundled modules. Add-on package names intentionally omit `pack-*` naming, for example `@heznpc/airmcp-productivity`.
+This edits the runtime `modulePacks` activation set. `npm run addons:build` stages tarball-ready physical add-on packages from `dist`, `npm run addons:verify-install` proves installed add-ons are load-bearing in `external-only` mode, and `npm run addons:measure-split` records the slim-root size/startup delta before any add-on publish decision. Add-on package names intentionally omit `pack-*` naming, for example `@heznpc/airmcp-productivity`.
 
 ### Workflow Catalog
 

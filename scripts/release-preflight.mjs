@@ -148,9 +148,14 @@ run("npm", ["run", "profiles:check"]);
 run("npm", ["run", "harness:check"]);
 run("npm", ["run", "addons:check"]);
 run("npm", ["run", "addons:verify-install"]);
+run("npm", ["run", "addons:measure-split", "--", "--no-build"]);
 run("npm", ["run", "verify:package"]);
 verifyNpmDryRun();
 run("npm", ["run", "build:mcpb"]);
+
+const splitMeasurementPath = join(ROOT, "build", "addons", "split-measurement.json");
+assertFile(splitMeasurementPath, "add-on split measurement");
+copyFileSync(splitMeasurementPath, join(OUT_DIR, "addon-split-measurement.json"));
 
 const mcpbPath = join(ROOT, "build", "mcpb", `airmcp-${version}.mcpb`);
 verifyMcpb(mcpbPath);

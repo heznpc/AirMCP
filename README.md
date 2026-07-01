@@ -27,7 +27,7 @@
 
 ## Features
 
-- **294 tools** (29 modules) — Apple app CRUD + system control + Apple Intelligence + UI Automation + Screen Capture + Maps + Podcasts + Weather + iWork (Pages/Numbers/Keynote) + Google Workspace + dynamic shortcuts + context memory + audit introspection
+- **295 tools** (29 modules) — Apple app CRUD + system control + Apple Intelligence + UI Automation + Screen Capture + Maps + Podcasts + Weather + iWork (Pages/Numbers/Keynote) + Google Workspace + dynamic shortcuts + context memory + audit introspection
 - **Profile-first runtime** — `starter`, `communications-safe`, `productivity`, and `full` module profiles, plus `progressive` / `profile` / `full` tool exposure so clients can start thin and expand intentionally
 - **DLC-like module packs** — `npx airmcp modules` or `AIRMCP_MODULE_PACKS=core,productivity` activates only selected packs; `list_module_packs` and `profile_status.modulesMissingPacks` make missing-pack state visible over MCP
 - **Task-scoped tool sessions** — `start_tool_session` lets a client give one task a short-lived tool allowlist; `discover_tools` and `run_tool` honor that `sessionId` so a broad runtime can still feel narrow in use

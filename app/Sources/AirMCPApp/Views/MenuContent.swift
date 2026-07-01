@@ -352,41 +352,46 @@ struct MenuContent: View {
     let addonManager: AddonManager
 
     var body: some View {
-        // ── 1. Server Status ────────────────────────────────
-        serverStatusSection
+        Group {
+            // ── 1. Server Status ────────────────────────────────
+            serverStatusSection
 
-        Divider()
+            Divider()
 
-        // ── 2. Update & Quick Setup ────────────────────────
-        updateSection
-        quickSetupSection
+            // ── 2. Update & Quick Setup ────────────────────────
+            updateSection
+            quickSetupSection
 
-        // ── 3. Workflows ───────────────────────────────────
-        workflowsSection
+            // ── 3. Workflows ───────────────────────────────────
+            workflowsSection
 
-        // ── 4. Modules ─────────────────────────────────────
-        modulesSection
+            // ── 4. Modules ─────────────────────────────────────
+            modulesSection
 
-        // ── 5. Swift Bridge ────────────────────────────────
-        swiftBridgeStatus
+            // ── 5. Swift Bridge ────────────────────────────────
+            swiftBridgeStatus
 
-        Divider()
+            Divider()
 
-        // ── 6. Settings ────────────────────────────────────
-        settingsMenu
+            // ── 6. Settings ────────────────────────────────────
+            settingsMenu
 
-        Divider()
+            Divider()
 
-        // ── 7. Logs ────────────────────────────────────────
-        logsMenu
+            // ── 7. Logs ────────────────────────────────────────
+            logsMenu
 
-        // ── 8. Configuration & Help ────────────────────────
-        configSection
+            // ── 8. Configuration & Help ────────────────────────
+            configSection
 
-        Divider()
+            Divider()
 
-        // ── 9. Footer ──────────────────────────────────────
-        footerSection
+            // ── 9. Footer ──────────────────────────────────────
+            footerSection
+        }
+        .onAppear {
+            addonManager.refreshIfNeeded()
+        }
     }
 
     // MARK: 1 - Server Status
@@ -626,6 +631,7 @@ struct MenuContent: View {
         let isActive = configManager.modulePacks.contains(pack.id)
         let isInstalled = addonManager.isInstalled(pack: pack.id)
         let isActiveButMissing = isActive && !isInstalled
+        let needsRepair = addonManager.isUpdateAvailable(pack: pack.id)
 
         Menu {
             Text(pack.localizedDescription)
@@ -637,9 +643,31 @@ struct MenuContent: View {
                 .foregroundStyle(.secondary)
 
             Label(
-                addonInstallStatusText(isInstalled: isInstalled, isActiveButMissing: isActiveButMissing),
-                systemImage: addonInstallStatusIcon(isInstalled: isInstalled, isActiveButMissing: isActiveButMissing)
+                addonInstallStatusText(pack: pack, isInstalled: isInstalled, isActiveButMissing: isActiveButMissing),
+                systemImage: addonInstallStatusIcon(
+                    pack: pack,
+                    isInstalled: isInstalled,
+                    isActiveButMissing: isActiveButMissing
+                )
             )
+
+            if let version = addonManager.versionSummary(pack: pack.id) {
+                Text(version)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            if let size = addonManager.sizeSummary(pack: pack.id) {
+                Text(L("addons.installedSize", size))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            if let modules = addonManager.moduleSummary(pack: pack.id) {
+                Text(L("addons.modules", modules))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
 
             Divider()
 
@@ -652,10 +680,17 @@ struct MenuContent: View {
             .disabled(pack.required)
 
             if !pack.required {
+                if needsRepair {
+                    Button(L("addons.repair")) {
+                        addonManager.repair(pack: pack.id, configManager: configManager)
+                    }
+                    .disabled(addonManager.isRunning)
+                }
+
                 Button(L("addons.install")) {
                     addonManager.install(pack: pack.id, configManager: configManager)
                 }
-                .disabled(addonManager.isRunning)
+                .disabled(addonManager.isRunning || (isInstalled && !needsRepair))
 
                 Button(L("addons.uninstall")) {
                     addonManager.uninstall(pack: pack.id, configManager: configManager)
@@ -672,6 +707,9 @@ struct MenuContent: View {
     }
 
     private func addOnMenuIcon(pack: ModulePackInfo, isActive: Bool, isInstalled: Bool) -> String {
+        if addonManager.isUpdateAvailable(pack: pack.id) {
+            return "arrow.triangle.2.circlepath.circle"
+        }
         if isActive && !isInstalled {
             return "exclamationmark.triangle"
         }
@@ -681,9 +719,12 @@ struct MenuContent: View {
         return pack.icon
     }
 
-    private func addonInstallStatusText(isInstalled: Bool, isActiveButMissing: Bool) -> String {
+    private func addonInstallStatusText(pack: ModulePackInfo, isInstalled: Bool, isActiveButMissing: Bool) -> String {
         if !addonManager.hasLoadedInstallStatus {
             return L("addons.statusUnknown")
+        }
+        if addonManager.isUpdateAvailable(pack: pack.id) {
+            return L("addons.updateAvailable")
         }
         if isActiveButMissing {
             return L("addons.activeButMissing")
@@ -691,9 +732,12 @@ struct MenuContent: View {
         return L(isInstalled ? "addons.installed" : "addons.notInstalled")
     }
 
-    private func addonInstallStatusIcon(isInstalled: Bool, isActiveButMissing: Bool) -> String {
+    private func addonInstallStatusIcon(pack: ModulePackInfo, isInstalled: Bool, isActiveButMissing: Bool) -> String {
         if !addonManager.hasLoadedInstallStatus {
             return "questionmark.circle"
+        }
+        if addonManager.isUpdateAvailable(pack: pack.id) {
+            return "arrow.triangle.2.circlepath.circle"
         }
         if isActiveButMissing {
             return "exclamationmark.triangle"

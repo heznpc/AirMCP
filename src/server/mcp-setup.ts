@@ -3,6 +3,7 @@
  * and banner metadata collection.
  */
 
+import { existsSync, readFileSync } from "node:fs";
 import { McpServer as SdkMcpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { McpServer as LightMcpServer } from "../shared/mcp.js";
 import { z } from "zod";
@@ -27,7 +28,13 @@ import {
   type AirMcpConfig,
 } from "../shared/config.js";
 import { getModulePackPlan, loadModuleRegistry, setModuleRegistry } from "../shared/modules.js";
-import { CORE_MODULE_PACK_NAME, MODULE_PACK_MANIFEST, getModulePackNameForModule } from "../shared/module-packs.js";
+import {
+  CORE_MODULE_PACK_NAME,
+  MODULE_PACK_MANIFEST,
+  getModulePackNameForModule,
+  resolveModulePackSelection,
+  type ModulePackName,
+} from "../shared/module-packs.js";
 import { getMissingAddonPackageModules } from "../shared/module-loader.js";
 import { resolveModuleCompatibility } from "../shared/compatibility.js";
 import { registerDynamicShortcutTools } from "../shortcuts/tools.js";
@@ -46,6 +53,15 @@ import { resourceCache } from "../shared/cache.js";
 import { checkSwiftBridge, runSwift } from "../shared/swift.js";
 import type { BannerInfo } from "../shared/banner.js";
 import { SERVER_ICON, WEBSITE_URL } from "../shared/icons.js";
+import { PATHS } from "../shared/constants.js";
+import {
+  createAddonPackageOperation,
+  executeAddonPackageOperation,
+  formatShellCommand,
+  withAddonInstallStatus,
+  writeModulePackConfig,
+} from "../shared/addon-operations.js";
+import { isPlainObject } from "../shared/validate.js";
 
 export interface CreateServerOptions {
   config: AirMcpConfig;
@@ -80,6 +96,37 @@ function buildMissingPackInstallHints(
       message: `Install and activate the ${pack.name} add-on to use ${modules.join(", ")}: ${command}. Restart AirMCP after installation.`,
     };
   });
+}
+
+function readConfigFile(): Record<string, unknown> {
+  if (!existsSync(PATHS.CONFIG)) return {};
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(PATHS.CONFIG, "utf-8"));
+    return isPlainObject(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function sortedPackList(packs: ReadonlySet<ModulePackName>): ModulePackName[] {
+  return MODULE_PACK_MANIFEST.map((pack) => pack.name).filter((name) => packs.has(name));
+}
+
+function findEditableModulePack(packName: string) {
+  const pack = MODULE_PACK_MANIFEST.find((candidate) => candidate.name === packName);
+  if (!pack || pack.name === CORE_MODULE_PACK_NAME) return null;
+  return pack;
+}
+
+function planModulePackConfig(packName: ModulePackName, enabled: boolean) {
+  const config = readConfigFile();
+  const selection = resolveModulePackSelection(config.modulePacks as string | string[] | undefined);
+  const next =
+    config.modulePacks === undefined ? new Set<ModulePackName>([CORE_MODULE_PACK_NAME]) : new Set(selection.packs);
+  if (enabled) next.add(packName);
+  else next.delete(packName);
+  next.add(CORE_MODULE_PACK_NAME);
+  return { config, activePacks: sortedPackList(next) };
 }
 
 export async function createServer(
@@ -121,6 +168,18 @@ export async function createServer(
   setModuleRegistry(MODULE_REGISTRY);
   const modulePackPlan = getModulePackPlan(config);
   const modulePacksAvailable = modulePackPlan.packs.filter((pack) => pack.available).map((pack) => pack.name);
+  const modulePackInstallStatuses = modulePackPlan.packs.map((pack) => withAddonInstallStatus(pack, pkg.version));
+  const modulePackInstallIssues = modulePackInstallStatuses
+    .filter((pack) => pack.updateAvailable)
+    .map((pack) => ({
+      pack: pack.name,
+      packageName: pack.packageName,
+      installStatus: pack.installStatus,
+      installedVersion: pack.installedVersion,
+      expectedVersion: pack.expectedVersion,
+      command: pack.repairCommand,
+      message: `${pack.name} add-on is installed at ${pack.installedVersion ?? "unknown"}, but AirMCP expects ${pack.expectedVersion}. Run ${pack.repairCommand} and restart AirMCP.`,
+    }));
   const modulesMissingPacks = modulePackPlan.modulesMissingPacks;
   const missingAddonPackageModules = getMissingAddonPackageModules();
   const missingPackInstallHints = buildMissingPackInstallHints(
@@ -260,8 +319,16 @@ export async function createServer(
             modules: z.array(z.string()),
             available: z.boolean(),
             required: z.boolean(),
+            installed: z.boolean(),
+            installedVersion: z.string().nullable(),
+            expectedVersion: z.string(),
+            installedSizeBytes: z.number().nullable(),
+            installStatus: z.enum(["required", "not-installed", "installed", "version-mismatch"]),
+            updateAvailable: z.boolean(),
             installSpec: z.string().nullable(),
             installCommand: z.string().nullable(),
+            updateCommand: z.string().nullable(),
+            repairCommand: z.string().nullable(),
             uninstallCommand: z.string().nullable(),
           }),
         ),
@@ -272,13 +339,94 @@ export async function createServer(
       return okStructured({
         configured: config.modulePacksConfigured,
         active: modulePacksAvailable,
-        packs: modulePackPlan.packs.map((pack) => ({
-          ...pack,
-          installSpec: pack.name === CORE_MODULE_PACK_NAME ? null : `${pack.packageName}@${pkg.version}`,
-          installCommand:
-            pack.name === CORE_MODULE_PACK_NAME ? null : `npx airmcp modules enable ${pack.name} --install`,
-          uninstallCommand: pack.name === CORE_MODULE_PACK_NAME ? null : `npx airmcp modules uninstall ${pack.name}`,
-        })),
+        packs: modulePackInstallStatuses,
+      });
+    },
+  );
+
+  lServer.registerTool(
+    "install_module_pack",
+    {
+      title: "Install Module Pack",
+      description:
+        "Install, repair, update, or uninstall one AirMCP add-on package after explicit user confirmation. Use dryRun first to preview the npm command.",
+      inputSchema: {
+        pack: z
+          .string()
+          .min(1)
+          .max(80)
+          .describe("Non-core module pack name, for example productivity, communications, media, or spatial"),
+        action: z
+          .enum(["install", "uninstall"])
+          .optional()
+          .describe("install repairs or updates the exact matching add-on version; uninstall removes it"),
+        dryRun: z.boolean().optional().describe("Preview the npm command and config change without writing anything"),
+        confirm: z
+          .boolean()
+          .optional()
+          .describe("Required true for real install/uninstall because this runs npm and edits AirMCP config"),
+      },
+      outputSchema: {
+        pack: z.string(),
+        action: z.enum(["install", "uninstall"]),
+        packageName: z.string(),
+        installSpec: z.string(),
+        command: z.string(),
+        dryRun: z.boolean(),
+        skipped: z.boolean(),
+        confirmed: z.boolean(),
+        configPath: z.string(),
+        activePacks: z.array(z.string()),
+        restartRequired: z.boolean(),
+        message: z.string(),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+    },
+    async ({ pack, action, dryRun, confirm }) => {
+      const selectedPack = findEditableModulePack(pack);
+      if (!selectedPack) {
+        return errInvalidInput(`Unknown or non-editable module add-on "${pack}". Use list_module_packs first.`);
+      }
+      const requested = new Set<ModulePackName>([selectedPack.name]);
+      const effectiveAction = action ?? "install";
+      const previewOnly = dryRun === true;
+      if (!previewOnly && confirm !== true) {
+        return errInvalidInput("Set confirm:true to install or uninstall a module add-on. Run with dryRun:true first.");
+      }
+
+      const operation = createAddonPackageOperation(effectiveAction, requested, pkg.version, { dryRun: previewOnly });
+      const { config: currentConfig, activePacks } = planModulePackConfig(
+        selectedPack.name,
+        effectiveAction === "install",
+      );
+
+      if (!previewOnly) {
+        try {
+          executeAddonPackageOperation(operation);
+          writeModulePackConfig(currentConfig, activePacks, PATHS.CONFIG);
+        } catch (error) {
+          return errUpstream(
+            `Failed to ${effectiveAction} ${selectedPack.packageName}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      }
+
+      const command = formatShellCommand(operation.command);
+      return okStructured({
+        pack: selectedPack.name,
+        action: effectiveAction,
+        packageName: selectedPack.packageName,
+        installSpec: `${selectedPack.packageName}@${pkg.version}`,
+        command,
+        dryRun: previewOnly,
+        skipped: operation.skipped,
+        confirmed: confirm === true,
+        configPath: PATHS.CONFIG,
+        activePacks,
+        restartRequired: !previewOnly,
+        message: previewOnly
+          ? `Dry run only. To apply, call install_module_pack with pack:${selectedPack.name}, action:${effectiveAction}, confirm:true.`
+          : `${selectedPack.name} add-on ${effectiveAction === "install" ? "installed/activated" : "uninstalled/disabled"}. Restart AirMCP to apply.`,
       });
     },
   );
@@ -299,6 +447,17 @@ export async function createServer(
         modulePacksAvailable: z.array(z.string()),
         modulesMissingPacks: z.array(z.string()),
         modulesMissingAddonPackages: z.array(z.string()),
+        modulePackInstallIssues: z.array(
+          z.object({
+            pack: z.string(),
+            packageName: z.string(),
+            installStatus: z.string(),
+            installedVersion: z.string().nullable(),
+            expectedVersion: z.string(),
+            command: z.string().nullable(),
+            message: z.string(),
+          }),
+        ),
         missingPackInstallHints: z.array(
           z.object({
             pack: z.string(),
@@ -328,6 +487,7 @@ export async function createServer(
         modulePacksAvailable,
         modulesMissingPacks,
         modulesMissingAddonPackages: missingAddonPackageModules,
+        modulePackInstallIssues,
         missingPackInstallHints,
         requireToolSession: config.requireToolSession,
         harnessAdapter: harness.name,

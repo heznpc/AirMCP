@@ -183,6 +183,13 @@
 "addons.installed" = "Installed";
 "addons.notInstalled" = "Not installed";
 "addons.activeButMissing" = "Active but not installed";
+"addons.updateAvailable" = "Update or repair needed";
+"addons.repair" = "Update or Repair";
+"addons.versionMismatch" = "Installed %@, expected %@";
+"addons.versionInstalled" = "Version %@";
+"addons.versionExpected" = "Expected %@";
+"addons.installedSize" = "Installed size: %@";
+"addons.modules" = "Modules: %@";
 "addons.doneRestart" = "Add-on updated. Restart server to apply.";
 "addons.failed" = "Add-on failed: %@";
 "addon.core" = "Core Workspace";

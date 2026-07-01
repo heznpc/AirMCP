@@ -22,10 +22,17 @@ final class AddonManager {
     private struct PackStatus: Decodable {
         let name: String
         let installed: Bool
+        let installedVersion: String?
+        let expectedVersion: String?
+        let installStatus: String?
+        let updateAvailable: Bool?
+        let installedSizeBytes: Int?
+        let modules: [String]?
     }
 
     var state: State = .idle
     var installedPacks: Set<String> = ["core"]
+    private var packStatuses: [String: PackStatus] = [:]
     var hasLoadedInstallStatus = false
 
     var isRunning: Bool {
@@ -54,6 +61,10 @@ final class AddonManager {
         run(action: "uninstall", pack: pack, flag: nil, configManager: configManager)
     }
 
+    func repair(pack: String, configManager: ConfigManager) {
+        install(pack: pack, configManager: configManager)
+    }
+
     func refresh() {
         guard !isRunning else { return }
         state = .running(L("addons.refreshing"))
@@ -67,8 +78,46 @@ final class AddonManager {
         }
     }
 
+    func refreshIfNeeded() {
+        if !hasLoadedInstallStatus {
+            refresh()
+        }
+    }
+
     func isInstalled(pack: String) -> Bool {
         pack == "core" || installedPacks.contains(pack)
+    }
+
+    func isUpdateAvailable(pack: String) -> Bool {
+        packStatuses[pack]?.updateAvailable == true
+    }
+
+    func installStatus(pack: String) -> String? {
+        packStatuses[pack]?.installStatus
+    }
+
+    func versionSummary(pack: String) -> String? {
+        guard let status = packStatuses[pack] else { return nil }
+        if status.installStatus == "version-mismatch" {
+            return L("addons.versionMismatch", status.installedVersion ?? "unknown", status.expectedVersion ?? "unknown")
+        }
+        if let version = status.installedVersion, status.installed {
+            return L("addons.versionInstalled", version)
+        }
+        if let expected = status.expectedVersion, status.installed == false {
+            return L("addons.versionExpected", expected)
+        }
+        return nil
+    }
+
+    func sizeSummary(pack: String) -> String? {
+        guard let bytes = packStatuses[pack]?.installedSizeBytes else { return nil }
+        return ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
+    }
+
+    func moduleSummary(pack: String) -> String? {
+        guard let modules = packStatuses[pack]?.modules, !modules.isEmpty else { return nil }
+        return modules.joined(separator: ", ")
     }
 
     func reset() {
@@ -106,6 +155,7 @@ final class AddonManager {
                 var next = Set(payload.packs.filter(\.installed).map(\.name))
                 next.insert("core")
                 installedPacks = next
+                packStatuses = Dictionary(uniqueKeysWithValues: payload.packs.map { ($0.name, $0) })
                 hasLoadedInstallStatus = true
                 return nil
             } catch {

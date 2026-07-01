@@ -201,7 +201,15 @@ jest.unstable_mockModule('../dist/shared/share-guard.js', () => ({
 // config — return a benign default config (every module enabled).
 jest.unstable_mockModule('../dist/shared/config.js', () => ({
   NPM_PACKAGE_NAME: 'airmcp',
-  FRONT_DOOR_TOOLS: ['profile_status', 'list_profiles', 'list_module_packs', 'discover_tools', 'run_tool', 'get_workflow'],
+  FRONT_DOOR_TOOLS: [
+    'profile_status',
+    'list_profiles',
+    'list_module_packs',
+    'install_module_pack',
+    'discover_tools',
+    'run_tool',
+    'get_workflow',
+  ],
   PROFILE_NAMES: ['starter', 'communications-safe', 'productivity', 'full'],
   PROFILE_DESCRIPTIONS: {
     starter: 'Starter',
@@ -218,7 +226,14 @@ jest.unstable_mockModule('../dist/shared/config.js', () => ({
   parseConfig: jest.fn(() => ({
     profile: 'starter',
     toolExposure: 'profile',
-    progressiveTools: new Set(['profile_status', 'list_profiles', 'list_module_packs', 'discover_tools', 'run_tool']),
+    progressiveTools: new Set([
+      'profile_status',
+      'list_profiles',
+      'list_module_packs',
+      'install_module_pack',
+      'discover_tools',
+      'run_tool',
+    ]),
     modulePacks: new Set(['core']),
     modulePacksConfigured: false,
     hitl: { level: 'off' },
@@ -251,7 +266,14 @@ function mkConfig() {
   return {
     profile: 'starter',
     toolExposure: 'profile',
-    progressiveTools: new Set(['profile_status', 'list_profiles', 'list_module_packs', 'discover_tools', 'run_tool']),
+    progressiveTools: new Set([
+      'profile_status',
+      'list_profiles',
+      'list_module_packs',
+      'install_module_pack',
+      'discover_tools',
+      'run_tool',
+    ]),
     modulePacks: new Set(['core']),
     modulePacksConfigured: false,
     hitl: { level: 'off' },
@@ -628,5 +650,52 @@ describe('createServer — module add-on install hints', () => {
           'Install and activate the productivity add-on to use pages: npx airmcp modules enable productivity --install. Restart AirMCP after installation.',
       },
     ]);
+  });
+
+  test('install_module_pack requires confirmation for real npm operations and supports dry-run previews', async () => {
+    fakeModuleRegistry = [{ name: 'notes', tools: () => {} }];
+    fakeModulePackPlan = {
+      packs: [
+        {
+          name: 'core',
+          packageName: 'airmcp',
+          title: 'Core Workspace',
+          description: 'Core',
+          modules: ['notes'],
+          available: true,
+          required: true,
+        },
+        {
+          name: 'productivity',
+          packageName: '@heznpc/airmcp-productivity',
+          title: 'Productivity',
+          description: 'iWork',
+          modules: ['pages', 'numbers', 'keynote'],
+          available: false,
+          required: false,
+        },
+      ],
+      modulesMissingPacks: [],
+    };
+
+    await createServer(mkOptions({ pkg: { ...mkPkg(), version: '2.15.0' } }));
+
+    const installTool = sdkRegisterToolCalls.find((call) => call.name === 'install_module_pack');
+    const refused = await installTool.cb({ pack: 'productivity' });
+    expect(refused.isError).toBe(true);
+    expect(refused.structuredContent.error.message).toContain('confirm:true');
+
+    const dryRun = await installTool.cb({ pack: 'productivity', dryRun: true });
+    expect(dryRun.structuredContent).toMatchObject({
+      pack: 'productivity',
+      action: 'install',
+      packageName: '@heznpc/airmcp-productivity',
+      installSpec: '@heznpc/airmcp-productivity@2.15.0',
+      dryRun: true,
+      skipped: true,
+      restartRequired: false,
+    });
+    expect(dryRun.structuredContent.command).toContain('npm install');
+    expect(dryRun.structuredContent.activePacks).toEqual(expect.arrayContaining(['core', 'productivity']));
   });
 });

@@ -501,8 +501,16 @@ public struct MCPListModulePacksOutput: Codable, Sendable {
         public let modules: [String]
         public let available: Bool
         public let required: Bool
+        public let installed: Bool
+        public let installedVersion: String?
+        public let expectedVersion: String
+        public let installedSizeBytes: Double?
+        public let installStatus: String
+        public let updateAvailable: Bool
         public let installSpec: String?
         public let installCommand: String?
+        public let updateCommand: String?
+        public let repairCommand: String?
         public let uninstallCommand: String?
     }
 
@@ -789,6 +797,15 @@ public struct MCPProactiveContextOutput: Codable, Sendable {
 
 // Output type for: profile_status
 public struct MCPProfileStatusOutput: Codable, Sendable {
+    public struct ModulepackinstallissuesItem: Codable, Sendable {
+        public let pack: String
+        public let packageName: String
+        public let installStatus: String
+        public let installedVersion: String?
+        public let expectedVersion: String
+        public let command: String?
+        public let message: String
+    }
     public struct MissingpackinstallhintsItem: Codable, Sendable {
         public let pack: String
         public let packageName: String
@@ -804,6 +821,7 @@ public struct MCPProfileStatusOutput: Codable, Sendable {
     public let modulePacksAvailable: [String]
     public let modulesMissingPacks: [String]
     public let modulesMissingAddonPackages: [String]
+    public let modulePackInstallIssues: [ModulepackinstallissuesItem]
     public let missingPackInstallHints: [MissingpackinstallhintsItem]
     public let requireToolSession: Bool
     public let harnessAdapter: String
@@ -9773,6 +9791,13 @@ public struct MCPProfileStatusSnippetView: View {
                 Text("Modules Missing Addon Packages")
                 Spacer()
                 Text(String(describing: data.modulesMissingAddonPackages))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Module Pack Install Issues")
+                Spacer()
+                Text(String(describing: data.modulePackInstallIssues))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }

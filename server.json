@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.heznpc/airmcp",
-  "description": "Approval-gated local action runtime for Apple workspaces - 294 tools across 29 modules, profiles, progressive exposure, HITL, audit log, rate limits. macOS only.",
+  "description": "Approval-gated local action runtime for Apple workspaces - 295 tools across 29 modules, profiles, progressive exposure, HITL, audit log, rate limits. macOS only.",
   "version": "2.15.0",
   "websiteUrl": "https://github.com/heznpc/AirMCP",
   "repository": {

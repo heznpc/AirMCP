@@ -6,15 +6,17 @@
  * matching physical npm companion packages in the same install prefix as AirMCP.
  */
 
-import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  getAddonInstallPackageJsonPath,
-  getAddonInstallPrefix,
-  getAddonPackageInstallPath,
-} from "../shared/addon-packages.js";
+  createAddonPackageOperation,
+  executeAddonPackageOperation,
+  formatShellCommand,
+  withAddonInstallStatus,
+  type AddonOperation,
+} from "../shared/addon-operations.js";
+import { getAddonInstallPrefix } from "../shared/addon-packages.js";
 import { PATHS } from "../shared/constants.js";
 import {
   CORE_MODULE_PACK_NAME,
@@ -36,14 +38,6 @@ interface ParsedArgs {
   uninstall: boolean;
   dryRun: boolean;
   prefix?: string;
-}
-
-interface AddonOperation {
-  action: "install" | "uninstall";
-  prefix: string;
-  packages: string[];
-  command: string[];
-  skipped: boolean;
 }
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -127,85 +121,28 @@ function packNamesFor(tokens: string[]): Set<ModulePackName> {
   return selection.packs;
 }
 
-function addonPackageSpecs(packs: ReadonlySet<ModulePackName>): string[] {
-  return MODULE_PACK_MANIFEST.filter((pack) => pack.name !== CORE_MODULE_PACK_NAME && packs.has(pack.name)).map(
-    (pack) => `${pack.packageName}@${ROOT_VERSION}`,
-  );
-}
-
-function addonPackageNames(packs: ReadonlySet<ModulePackName>): string[] {
-  return MODULE_PACK_MANIFEST.filter((pack) => pack.name !== CORE_MODULE_PACK_NAME && packs.has(pack.name)).map(
-    (pack) => pack.packageName,
-  );
-}
-
-function installedAddonPackages(prefix: string): Set<string> {
-  const installed = new Set<string>();
-  for (const pack of MODULE_PACK_MANIFEST) {
-    if (pack.name === CORE_MODULE_PACK_NAME) {
-      installed.add(pack.name);
-      continue;
-    }
-    if (existsSync(join(getAddonPackageInstallPath(prefix, pack.packageName), "package.json")))
-      installed.add(pack.name);
-  }
-  return installed;
-}
-
-function ensureAddonInstallProject(prefix: string): void {
-  mkdirSync(prefix, { recursive: true });
-  const packageJsonPath = getAddonInstallPackageJsonPath(prefix);
-  if (!existsSync(packageJsonPath)) {
-    writeFileSync(packageJsonPath, JSON.stringify({ private: true, name: "airmcp-addons" }, null, 2) + "\n");
-  }
-}
-
-function formatShellCommand(command: string[]): string {
-  return command.map((part) => (/^[a-zA-Z0-9_./:@=-]+$/.test(part) ? part : JSON.stringify(part))).join(" ");
-}
-
 function runAddonPackageOperation(
   action: "install" | "uninstall",
   packs: ReadonlySet<ModulePackName>,
   args: ParsedArgs,
 ): AddonOperation {
-  const prefix = getAddonInstallPrefix(args.prefix);
-  const packages = action === "install" ? addonPackageSpecs(packs) : addonPackageNames(packs);
-  const npmArgs =
-    action === "install"
-      ? ["install", "--prefix", prefix, "--no-save", "--no-audit", "--no-fund", "--ignore-scripts", ...packages]
-      : ["uninstall", "--prefix", prefix, "--no-audit", "--no-fund", "--ignore-scripts", ...packages];
-  const operation: AddonOperation = {
-    action,
-    prefix,
-    packages,
-    command: ["npm", ...npmArgs],
-    skipped: packages.length === 0 || args.dryRun,
-  };
-
-  if (!operation.skipped) {
-    ensureAddonInstallProject(prefix);
-    execFileSync("npm", npmArgs, { stdio: args.json ? "pipe" : "inherit" });
-  }
+  const operation = createAddonPackageOperation(action, packs, ROOT_VERSION, {
+    prefix: args.prefix,
+    dryRun: args.dryRun,
+  });
+  executeAddonPackageOperation(operation, { inheritStdio: !args.json });
   return operation;
 }
 
 function statusPayload(config: Record<string, unknown>, prefix = getAddonInstallPrefix()) {
   const configured = process.env.AIRMCP_MODULE_PACKS !== undefined || config.modulePacks !== undefined;
   const packs = getModulePackStatuses(currentPackSet(config));
-  const installed = installedAddonPackages(prefix);
   return {
     configPath: PATHS.CONFIG,
     configured,
     installPrefix: prefix,
     active: packs.filter((pack) => pack.available).map((pack) => pack.name),
-    packs: packs.map((pack) => ({
-      ...pack,
-      installed: installed.has(pack.name),
-      installSpec: pack.name === CORE_MODULE_PACK_NAME ? "airmcp" : `${pack.packageName}@${ROOT_VERSION}`,
-      installCommand: pack.name === CORE_MODULE_PACK_NAME ? null : `npx airmcp modules enable ${pack.name} --install`,
-      uninstallCommand: pack.name === CORE_MODULE_PACK_NAME ? null : `npx airmcp modules uninstall ${pack.name}`,
-    })),
+    packs: packs.map((pack) => withAddonInstallStatus(pack, ROOT_VERSION, prefix)),
   };
 }
 
@@ -216,7 +153,12 @@ function printList(payload: ReturnType<typeof statusPayload>): void {
   console.log("");
   for (const pack of payload.packs) {
     const state = pack.available ? `${GREEN}enabled${RESET}` : `${DIM}disabled${RESET}`;
-    const installState = pack.installed ? `${GREEN}installed${RESET}` : `${YELLOW}not installed${RESET}`;
+    const installState =
+      pack.installStatus === "version-mismatch"
+        ? `${YELLOW}stale ${pack.installedVersion ?? "unknown"} → ${pack.expectedVersion}${RESET}`
+        : pack.installed
+          ? `${GREEN}installed${RESET}`
+          : `${YELLOW}not installed${RESET}`;
     const required = pack.required ? ` ${DIM}(required)${RESET}` : "";
     console.log(`  ${state.padEnd(18)} ${CYAN}${pack.name}${RESET}${required}`);
     console.log(`    ${DIM}${pack.packageName} · ${installState} · ${pack.modules.join(", ")}${RESET}`);

@@ -183,6 +183,13 @@
 "addons.installed" = "설치됨";
 "addons.notInstalled" = "미설치";
 "addons.activeButMissing" = "활성화되었지만 미설치";
+"addons.updateAvailable" = "업데이트 또는 복구 필요";
+"addons.repair" = "업데이트 또는 복구";
+"addons.versionMismatch" = "설치 %@, 필요 %@";
+"addons.versionInstalled" = "버전 %@";
+"addons.versionExpected" = "필요 %@";
+"addons.installedSize" = "설치 크기: %@";
+"addons.modules" = "모듈: %@";
 "addons.doneRestart" = "애드온이 업데이트되었습니다. 서버를 재시작하면 반영됩니다.";
 "addons.failed" = "애드온 실패: %@";
 "addon.core" = "Core Workspace";

@@ -35,6 +35,8 @@ The second shipped slice is the module-pack contract:
 - module loading skips enabled-profile modules whose pack is unavailable before dynamic import,
 - `list_module_packs` reports the active pack set over MCP,
 - `profile_status` reports `modulePacksConfigured`, `modulePacksAvailable`, `modulesMissingPacks`, `modulesMissingAddonPackages`, and install hints,
+- `list_module_packs` reports installed add-on version, expected version, update status, and installed size,
+- `install_module_pack` gives MCP clients a dry-run-first, `confirm:true`-gated path for semi-automatic add-on install/repair/uninstall,
 - `profiles:check` includes a real MCP wire case proving `productivity` remains available while `communications` modules become missing-pack modules when only `core,productivity` are active.
 
 The third shipped slice is physical package split:
@@ -69,7 +71,7 @@ Release artifacts now use a slim root by default while the source checkout keeps
 - `npm run addons:measure-split` packs the universal local build with lifecycle scripts disabled, compares it with slim-root plus selected add-ons, and records packed/unpacked/install-size plus startup/list timing deltas.
 - `npm pack --dry-run --json` must include `dist/.airmcp-slim-root.json` and must not include non-core module `tools.js` / `prompts.js` entrypoints.
 - `.mcpb` release artifacts must include the same slim-root marker and must not leak non-core module entrypoints.
-- `list_module_packs`, `profile_status.modulesMissingPacks`, `profile_status.modulesMissingAddonPackages`, and `profile_status.missingPackInstallHints` remain stable public truth surfaces, including a human-readable install prompt message for missing add-ons.
+- `list_module_packs`, `install_module_pack`, `profile_status.modulesMissingPacks`, `profile_status.modulesMissingAddonPackages`, `profile_status.modulePackInstallIssues`, and `profile_status.missingPackInstallHints` remain stable public truth surfaces, including a human-readable install prompt message for missing add-ons.
 - At least one real user/workflow needs a smaller install, not only a smaller context window.
 - Pack boundaries have tests proving no profile loads a missing optional module by accident.
 
@@ -84,6 +86,7 @@ Validation evidence must include:
 - Wire test coverage for explicit `compatible`, `strict`, `app-runtime`, and `agent` harness adapter policies plus app-owned runtime inference.
 - Size and startup/list timing measurements for universal bundled install vs slim-root add-on install. Thresholds are owner-ratified release gates, not inferred by the implementation session.
 - Shipped-artifact checks proving npm and MCPB artifacts are slim root artifacts, not merely measured temporary artifacts.
+- Post-publish `release:verify` checks every add-on package in the public npm registry and fresh-installs root plus add-ons from the registry before a release is called complete.
 
 | Validation result       | Decision                                                                                                            | Immediate action                                                                                                                                                                                            | Follow-up goal                                                                                                             | Public status                                                                 |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |

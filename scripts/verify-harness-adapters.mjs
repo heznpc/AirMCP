@@ -22,10 +22,17 @@ const ENTRY = join(ROOT, "dist", "index.js");
 const TIMEOUT_MS = Number(process.env.HARNESS_VERIFY_TIMEOUT_MS ?? 30_000);
 
 const CASES = [
-  { adapter: "compatible", hiddenRunRequiresSession: false },
-  { adapter: "strict", hiddenRunRequiresSession: true },
-  { adapter: "app-runtime", hiddenRunRequiresSession: true },
-  { adapter: "agent", hiddenRunRequiresSession: true },
+  { name: "compatible", adapter: "compatible", expectedAdapter: "compatible", hiddenRunRequiresSession: false },
+  { name: "strict", adapter: "strict", expectedAdapter: "strict", hiddenRunRequiresSession: true },
+  { name: "app-runtime", adapter: "app-runtime", expectedAdapter: "app-runtime", hiddenRunRequiresSession: true },
+  {
+    name: "app-runtime-inferred",
+    adapter: null,
+    expectedAdapter: "app-runtime",
+    hiddenRunRequiresSession: true,
+    env: { AIRMCP_APP_OWNED_RUNTIME: "true" },
+  },
+  { name: "agent", adapter: "agent", expectedAdapter: "agent", hiddenRunRequiresSession: true },
 ];
 
 if (!existsSync(ENTRY)) {
@@ -49,19 +56,20 @@ function firstText(callResp) {
   return callResp.result?.content?.find?.((c) => c.type === "text")?.text ?? "";
 }
 
-function startMcp(adapter) {
+function startMcp(testCase) {
   const env = {
     ...cleanBootEnv(),
     AIRMCP_PROFILE: "starter",
     AIRMCP_TOOL_EXPOSURE: "progressive",
     AIRMCP_REQUIRE_TOOL_SESSION: "false",
-    AIRMCP_HARNESS_ADAPTER: adapter,
     AIRMCP_FAKE_OS_VERSION: "0",
     AIRMCP_SEMANTIC_SEARCH: "false",
     AIRMCP_AUDIT_LOG: "false",
     AIRMCP_USAGE_TRACKING: "false",
     AIRMCP_PROACTIVE_CONTEXT: "false",
+    ...(testCase.env ?? {}),
   };
+  if (testCase.adapter) env.AIRMCP_HARNESS_ADAPTER = testCase.adapter;
   const proc = spawn("node", [ENTRY], { cwd: ROOT, env, stdio: ["pipe", "pipe", "pipe"] });
   const rl = createInterface({ input: proc.stdout });
   const pending = new Map();
@@ -142,10 +150,10 @@ function expectNoWireError(resp, label) {
 }
 
 async function verifyCase(testCase) {
-  const client = startMcp(testCase.adapter);
+  const client = startMcp(testCase);
   const watchdog = setTimeout(() => {
     client.stop().finally(() => {
-      console.error(`[harness-adapters] FAIL ${testCase.adapter}: timeout after ${TIMEOUT_MS}ms`);
+      console.error(`[harness-adapters] FAIL ${testCase.name}: timeout after ${TIMEOUT_MS}ms`);
       process.exit(1);
     });
   }, TIMEOUT_MS);
@@ -172,8 +180,8 @@ async function verifyCase(testCase) {
     const statusResp = await client.request("tools/call", { name: "profile_status", arguments: {} }, 3);
     expectNoWireError(statusResp, "profile_status");
     const status = parseStructuredResult(statusResp);
-    if (status?.harnessAdapter !== testCase.adapter) {
-      throw new Error(`profile_status.harnessAdapter=${status?.harnessAdapter}, expected ${testCase.adapter}`);
+    if (status?.harnessAdapter !== testCase.expectedAdapter) {
+      throw new Error(`profile_status.harnessAdapter=${status?.harnessAdapter}, expected ${testCase.expectedAdapter}`);
     }
 
     const discoverResp = await client.request(
@@ -219,7 +227,7 @@ async function verifyCase(testCase) {
 
     const sessionResp = await client.request(
       "tools/call",
-      { name: "start_tool_session", arguments: { tools: ["create_note"], label: testCase.adapter, ttlSeconds: 60 } },
+      { name: "start_tool_session", arguments: { tools: ["create_note"], label: testCase.name, ttlSeconds: 60 } },
       7,
     );
     expectNoWireError(sessionResp, "start_tool_session");
@@ -283,12 +291,12 @@ for (const testCase of CASES) {
   try {
     const result = await verifyCase(testCase);
     console.error(
-      `[harness-adapters] OK ${testCase.adapter}: ${result.tools} exposed / ${result.registered} registered / hiddenRequiresSession=${testCase.hiddenRunRequiresSession}`,
+      `[harness-adapters] OK ${testCase.name}: ${result.tools} exposed / ${result.registered} registered / adapter=${testCase.expectedAdapter} / hiddenRequiresSession=${testCase.hiddenRunRequiresSession}`,
     );
   } catch (error) {
     failed = true;
     console.error(
-      `[harness-adapters] FAIL ${testCase.adapter}: ${error instanceof Error ? error.message : String(error)}`,
+      `[harness-adapters] FAIL ${testCase.name}: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
 }

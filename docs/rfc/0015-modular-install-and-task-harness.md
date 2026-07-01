@@ -59,10 +59,10 @@ Keep the npm package as the reliable universal fallback while add-on packages pr
 ## Acceptance gates before publishing physical module-pack packages
 
 - `profiles:check` reports startup/list timings for starter/progressive vs full/full, multiple restricted-pack profiles, strict task-session behavior, and discovery golden queries.
-- `npm run harness:check` proves `compatible`, `strict`, `app-runtime`, and `agent` adapter policy over the real MCP stdio wire.
+- `npm run harness:check` proves `compatible`, `strict`, `app-runtime`, and `agent` adapter policy over the real MCP stdio wire, including the app-owned runtime inference path.
 - `npm run tokens:check` keeps the eager tool-description budget bounded as modules grow.
 - `npm run addons:check` stages every non-core package and fails on missing module/shared files or `pack-*` naming drift.
-- `npm run addons:verify-install` packs the root package plus at least one staged add-on, installs both into a clean project, and boots with `AIRMCP_ADDON_PACKAGE_MODE=external-only`.
+- `npm run addons:verify-install` packs the root package plus at least one staged add-on, first proves a root-only install cannot silently use bundled fallback in `AIRMCP_ADDON_PACKAGE_MODE=external-only`, then installs the add-on artifact and proves the selected pack registers over MCP stdio.
 - `npm pack --dry-run --json` shows package size regressions per release.
 - `list_module_packs` and `profile_status.modulesMissingPacks` remain stable public truth surfaces.
 - At least one real user/workflow needs a smaller install, not only a smaller context window.
@@ -75,8 +75,8 @@ This matrix is the decision surface after an add-on modular-distribution kill-te
 Validation evidence must include:
 
 - `npm run release:preflight` or the equivalent explicit sequence: `build`, `tokens:check`, `profiles:check`, `harness:check`, `addons:check`, `addons:verify-install`, `verify:package`, `npm pack --dry-run --json`, and `build:mcpb`.
-- Add-on package install smoke test in `AIRMCP_ADDON_PACKAGE_MODE=external-only` for at least one non-core pack and one restricted-pack profile.
-- Wire test coverage for `compatible`, `strict`, `app-runtime`, and `agent` harness adapter policies.
+- Add-on package install smoke test in `AIRMCP_ADDON_PACKAGE_MODE=external-only` for at least one non-core pack and one restricted-pack profile, with both root-only negative provenance and installed-add-on positive registration checks.
+- Wire test coverage for explicit `compatible`, `strict`, `app-runtime`, and `agent` harness adapter policies plus app-owned runtime inference.
 - Size and startup/list timing measurements for universal bundled install vs add-on install. Thresholds are owner-ratified release gates, not inferred by the implementation session.
 
 | Validation result       | Decision                                                                                                            | Immediate action                                                                                                                                                                                            | Follow-up goal                                                                                                             | Public status                                                                 |

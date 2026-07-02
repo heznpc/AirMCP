@@ -277,6 +277,21 @@ describe('sanitizeArgs()', () => {
     expect(result.args.note).toBe('ok');
   });
 
+  test('redacts secret keys nested inside array-of-object args', () => {
+    // Regression: sanitizeArgs must recurse into arrays, else a credential
+    // inside an array element (e.g. headers: [{ authorization }]) leaks raw.
+    const result = sanitizeArgs({
+      headers: [{ authorization: 'Bearer LEAK', 'x-id': 'ok' }],
+      records: [{ access_token: 'ya29.LEAK' }, { note: 'fine' }],
+      name: 'a',
+    });
+    expect(result.headers[0].authorization).toBe('[REDACTED]');
+    expect(result.headers[0]['x-id']).toBe('ok');
+    expect(result.records[0].access_token).toBe('[REDACTED]');
+    expect(result.records[1].note).toBe('fine');
+    expect(result.name).toBe('a');
+  });
+
   test('truncates string arguments longer than 500 chars', () => {
     const longStr = 'a'.repeat(600);
     const result = sanitizeArgs({ query: longStr });

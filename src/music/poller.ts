@@ -1,5 +1,6 @@
 import { eventBus } from "../shared/event-bus.js";
 import { runJxa } from "../shared/jxa.js";
+import { parseIntEnv } from "../shared/env.js";
 import { createPollerLogger, registerPoller } from "../shared/pollers.js";
 import { nowPlayingScript } from "./scripts.js";
 
@@ -11,11 +12,9 @@ import { nowPlayingScript } from "./scripts.js";
  * once the Swift side is wired up.
  */
 
-// A non-numeric AIRMCP_MUSIC_POLL_MS makes parseInt return NaN, and Math.max(5000, NaN)
-// is NaN — which setInterval coerces to 0, turning this into a runaway osascript hot
-// loop. Fall back to the default when the value is not a finite number.
-const MUSIC_POLL_PARSED = parseInt(process.env.AIRMCP_MUSIC_POLL_MS ?? "30000", 10);
-const MUSIC_INTERVAL_MS = Number.isFinite(MUSIC_POLL_PARSED) ? Math.max(5_000, MUSIC_POLL_PARSED) : 30_000;
+// parseIntEnv guards against a non-numeric AIRMCP_MUSIC_POLL_MS producing NaN
+// (which setInterval coerces to 0 → runaway osascript hot loop).
+const MUSIC_INTERVAL_MS = parseIntEnv(process.env.AIRMCP_MUSIC_POLL_MS, { floor: 5_000, fallback: 30_000 });
 
 interface NowPlayingPayload {
   playerState: string;

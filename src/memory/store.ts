@@ -244,14 +244,15 @@ export class MemoryStore {
       data.entries[id] = entry;
 
       // Bound total growth: if over the cap, evict the oldest entries by
-      // createdAt. The entry just written is newest (or an in-place update),
-      // so it is retained.
-      const entries = Object.entries(data.entries);
-      if (entries.length > MAX_ENTRIES) {
-        const oldestFirst = entries.sort(([, a], [, b]) =>
-          a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0,
-        );
-        for (const [staleId] of oldestFirst.slice(0, entries.length - MAX_ENTRIES)) {
+      // createdAt. The just-written entry (`id`) is excluded from eviction so an
+      // in-place update of the oldest entry — which keeps its old createdAt — is
+      // never dropped, even if the store arrived already over-cap (legacy /
+      // externally-edited file).
+      const evictable = Object.entries(data.entries).filter(([k]) => k !== id);
+      const overflow = evictable.length + 1 - MAX_ENTRIES;
+      if (overflow > 0) {
+        evictable.sort(([, a], [, b]) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0));
+        for (const [staleId] of evictable.slice(0, overflow)) {
           delete data.entries[staleId];
         }
       }

@@ -1,5 +1,6 @@
 import { eventBus } from "../shared/event-bus.js";
 import { runJxa } from "../shared/jxa.js";
+import { parseIntEnv } from "../shared/env.js";
 import { createPollerLogger, registerPoller } from "../shared/pollers.js";
 import { getUnreadCountScript } from "./scripts.js";
 
@@ -10,11 +11,9 @@ import { getUnreadCountScript } from "./scripts.js";
  * last observed value.
  */
 
-// A non-numeric AIRMCP_MAIL_POLL_MS makes parseInt return NaN, and Math.max(10000, NaN)
-// is NaN — which setInterval coerces to 0, turning this into a runaway osascript hot
-// loop. Fall back to the default when the value is not a finite number.
-const MAIL_POLL_PARSED = parseInt(process.env.AIRMCP_MAIL_POLL_MS ?? "60000", 10);
-const MAIL_INTERVAL_MS = Number.isFinite(MAIL_POLL_PARSED) ? Math.max(10_000, MAIL_POLL_PARSED) : 60_000;
+// parseIntEnv guards against a non-numeric AIRMCP_MAIL_POLL_MS producing NaN
+// (which setInterval coerces to 0 → runaway osascript hot loop).
+const MAIL_INTERVAL_MS = parseIntEnv(process.env.AIRMCP_MAIL_POLL_MS, { floor: 10_000, fallback: 60_000 });
 
 interface UnreadPayload {
   totalUnread: number;

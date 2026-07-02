@@ -60,17 +60,18 @@ final class HitlManager {
     func startListening() {
         guard listener == nil else { return }
 
-        // Ensure config directory exists, owner-only (0700). The HITL socket has
-        // no peer authentication (NWListener over a Unix socket can't cheaply read
-        // the peer's uid), so restrict the directory to the owner to stop OTHER
-        // local users on a shared Mac from connecting and forging approval prompts.
+        // Ensure config directory exists, then restrict ONLY the airmcp leaf to
+        // owner-only (0700). The HITL socket has no peer authentication (NWListener
+        // over a Unix socket can't cheaply read the peer's uid), so 0700 stops
+        // OTHER local users on a shared Mac from connecting and forging approval
+        // prompts. Note: the 0700 is applied via setAttributes on the leaf only —
+        // NOT passed to createDirectory, which would also tighten intermediates
+        // like the shared ~/.config that other tools expect at 0755.
         let configDir = (socketPath as NSString).deletingLastPathComponent
         try? FileManager.default.createDirectory(
             atPath: configDir,
-            withIntermediateDirectories: true,
-            attributes: [.posixPermissions: 0o700]
+            withIntermediateDirectories: true
         )
-        // createDirectory won't tighten an already-existing dir — enforce 0700.
         try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: configDir)
 
         // Remove stale socket file

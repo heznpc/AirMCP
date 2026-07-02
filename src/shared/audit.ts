@@ -442,15 +442,29 @@ export function sanitizeArgs(args: Record<string, unknown>, depth = 0): Record<s
       result[key] = "[REDACTED]";
       continue;
     }
-    if (typeof value === "string" && value.length > AUDIT.MAX_ARG_LENGTH) {
-      result[key] = value.slice(0, AUDIT.MAX_ARG_LENGTH) + `... (${value.length} chars)`;
-    } else if (value !== null && typeof value === "object" && !Array.isArray(value)) {
-      result[key] = sanitizeArgs(value as Record<string, unknown>, depth + 1);
-    } else {
-      result[key] = value;
-    }
+    result[key] = sanitizeValue(value, depth);
   }
   return result;
+}
+
+/**
+ * Recursively sanitize a single value: truncate long strings, recurse into
+ * plain objects (so nested secret-named keys are redacted), and recurse into
+ * arrays element-by-element — an array of objects (e.g. `headers: [{ authorization }]`)
+ * would otherwise be written verbatim and leak the embedded credential.
+ */
+function sanitizeValue(value: unknown, depth: number): unknown {
+  if (typeof value === "string" && value.length > AUDIT.MAX_ARG_LENGTH) {
+    return value.slice(0, AUDIT.MAX_ARG_LENGTH) + `... (${value.length} chars)`;
+  }
+  if (Array.isArray(value)) {
+    if (depth > 3) return "[truncated]";
+    return value.map((el) => sanitizeValue(el, depth + 1));
+  }
+  if (value !== null && typeof value === "object") {
+    return sanitizeArgs(value as Record<string, unknown>, depth + 1);
+  }
+  return value;
 }
 
 /**

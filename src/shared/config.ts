@@ -366,10 +366,14 @@ export function parseConfig(): AirMcpConfig {
     });
   }
 
-  // Validate disabledModules: warn about unknown module names
+  // Validate disabledModules: warn about unknown module names. Normalize the
+  // same way the disable logic does (trim + lowercase) so a mis-cased-but-valid
+  // entry like "Mail" — which IS honored below — does not trigger a spurious
+  // "unknown module" warning.
   if (file.disabledModules) {
     for (const mod of file.disabledModules) {
-      if (!(KNOWN_MODULE_NAMES as readonly string[]).includes(mod)) {
+      const normalized = String(mod).trim().toLowerCase();
+      if (!(KNOWN_MODULE_NAMES as readonly string[]).includes(normalized)) {
         log.warn("unknown module in disabledModules — ignored", { module: mod });
       }
     }

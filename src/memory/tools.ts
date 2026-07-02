@@ -12,7 +12,7 @@
 import type { McpServer } from "../shared/mcp.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import { z } from "zod";
-import { okStructured, errInvalidInput, toolError } from "../shared/result.js";
+import { okStructured, okUntrustedStructured, errInvalidInput, toolError } from "../shared/result.js";
 import { type MemoryKind } from "./store.js";
 import { getMemoryStore } from "./instance.js";
 
@@ -47,11 +47,11 @@ export function registerMemoryTools(server: McpServer, _config: AirMcpConfig): v
         "key upserts). `ttl_ms` makes the entry self-expiring.",
       inputSchema: {
         kind: kindSchema.describe("Entry category: fact | entity | episode"),
-        key: z.string().min(1).describe("Stable label (e.g. 'favorite_editor', 'person:Ada')"),
-        value: z.string().describe("Payload. JSON-stringify structured data upstream."),
-        id: z.string().optional().describe("Override the default `${kind}:${key}` id"),
-        tags: z.array(z.string()).optional().describe("Optional tags for later filtering"),
-        source: z.string().optional().describe("Originator — tool name, skill id, 'user' …"),
+        key: z.string().min(1).max(500).describe("Stable label (e.g. 'favorite_editor', 'person:Ada')"),
+        value: z.string().max(10_000).describe("Payload. JSON-stringify structured data upstream."),
+        id: z.string().max(500).optional().describe("Override the default `${kind}:${key}` id"),
+        tags: z.array(z.string().max(200)).max(64).optional().describe("Optional tags for later filtering"),
+        source: z.string().max(500).optional().describe("Originator — tool name, skill id, 'user' …"),
         ttl_ms: z.number().int().positive().optional().describe("Self-expire after N milliseconds"),
       },
       outputSchema: {
@@ -119,7 +119,11 @@ export function registerMemoryTools(server: McpServer, _config: AirMcpConfig): v
           limit,
           order,
         });
-        return okStructured({ total: entries.length, entries });
+        // Recalled entries hold free-form, third-party-influenceable text (an
+        // agent may store an email/note body as an episode). Return them wrapped
+        // as untrusted content — consistent with semantic_search and the read
+        // tools — so embedded instructions are framed as data, not commands.
+        return okUntrustedStructured({ total: entries.length, entries });
       } catch (e) {
         return toolError("query memory entries", e);
       }

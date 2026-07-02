@@ -79,16 +79,22 @@ public actor MCPHTTPServer {
 
         // MCP endpoint — bearer token auth
         router.post("/mcp") { request, _ in
-            // Auth check
-            if !authToken.isEmpty {
-                let authHeader = request.headers[.authorization]
-                guard authHeader == "Bearer \(authToken)" else {
-                    return Response(
-                        status: .unauthorized,
-                        headers: [.contentType: "application/json"],
-                        body: .init(byteBuffer: .init(string: "{\"error\":\"Unauthorized\"}"))
-                    )
-                }
+            // Auth check. An empty token is treated as DENY-ALL, never allow-all:
+            // a server with no configured token must not expose tools unauthenticated.
+            guard !authToken.isEmpty else {
+                return Response(
+                    status: .serviceUnavailable,
+                    headers: [.contentType: "application/json"],
+                    body: .init(byteBuffer: .init(string: "{\"error\":\"Server not configured (no auth token)\"}"))
+                )
+            }
+            let authHeader = request.headers[.authorization]
+            guard authHeader == "Bearer \(authToken)" else {
+                return Response(
+                    status: .unauthorized,
+                    headers: [.contentType: "application/json"],
+                    body: .init(byteBuffer: .init(string: "{\"error\":\"Unauthorized\"}"))
+                )
             }
 
             // Parse JSON-RPC request
@@ -131,7 +137,10 @@ public actor MCPHTTPServer {
 
         print("[AirMCP-iOS] MCP server listening on http://\(host):\(port)")
         if !token.isEmpty {
-            print("[AirMCP-iOS] Auth token: \(token)")
+            // Never log the full token — it is the sole credential and stdout is
+            // captured by the unified logging system / sysdiagnose. Print only a
+            // short prefix, matching the UI (App.swift shows token.prefix(8)).
+            print("[AirMCP-iOS] Auth token: \(token.prefix(8))… (\(token.count) chars)")
         }
 
         try await app.run()

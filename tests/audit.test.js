@@ -234,6 +234,64 @@ describe('sanitizeArgs()', () => {
     expect(result.Token).toBe('[REDACTED]');
   });
 
+  test('redacts compound OAuth/secret key names (access_token, refreshToken, clientSecret, api-key)', () => {
+    // Regression: the old /\b...\b/ regex failed to match these standard names because
+    // there is no word boundary before an embedded "token"/"secret", leaking their values.
+    const result = sanitizeArgs({
+      access_token: 'ya29.LEAK',
+      accessToken: 'ya29.LEAK',
+      refresh_token: 'rt_LEAK',
+      refreshToken: 'rt_LEAK',
+      sessionToken: 'st_LEAK',
+      clientSecret: 'cs_LEAK',
+      client_secret: 'cs_LEAK',
+      'api-key': 'ak_LEAK',
+      authorization: 'Bearer LEAK',
+      username: 'alice',
+    });
+    for (const k of [
+      'access_token',
+      'accessToken',
+      'refresh_token',
+      'refreshToken',
+      'sessionToken',
+      'clientSecret',
+      'client_secret',
+      'api-key',
+      'authorization',
+    ]) {
+      expect(result[k]).toBe('[REDACTED]');
+    }
+    expect(result.username).toBe('alice');
+  });
+
+  test('does not over-redact benign lookalike keys (author, content)', () => {
+    const result = sanitizeArgs({ author: 'alice', content: 'hello' });
+    expect(result.author).toBe('alice');
+    expect(result.content).toBe('hello');
+  });
+
+  test('redacts compound secret key nested inside object args', () => {
+    const result = sanitizeArgs({ args: { access_token: 'ya29.LEAK', note: 'ok' } });
+    expect(result.args.access_token).toBe('[REDACTED]');
+    expect(result.args.note).toBe('ok');
+  });
+
+  test('redacts secret keys nested inside array-of-object args', () => {
+    // Regression: sanitizeArgs must recurse into arrays, else a credential
+    // inside an array element (e.g. headers: [{ authorization }]) leaks raw.
+    const result = sanitizeArgs({
+      headers: [{ authorization: 'Bearer LEAK', 'x-id': 'ok' }],
+      records: [{ access_token: 'ya29.LEAK' }, { note: 'fine' }],
+      name: 'a',
+    });
+    expect(result.headers[0].authorization).toBe('[REDACTED]');
+    expect(result.headers[0]['x-id']).toBe('ok');
+    expect(result.records[0].access_token).toBe('[REDACTED]');
+    expect(result.records[1].note).toBe('fine');
+    expect(result.name).toBe('a');
+  });
+
   test('truncates string arguments longer than 500 chars', () => {
     const longStr = 'a'.repeat(600);
     const result = sanitizeArgs({ query: longStr });

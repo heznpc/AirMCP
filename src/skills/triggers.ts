@@ -4,6 +4,7 @@ import { executeSkill } from "./executor.js";
 import { eventBus, type AirMCPEvent } from "../shared/event-bus.js";
 import { runWithRequestContext, getRequestContext } from "../shared/request-context.js";
 import { randomUUID } from "node:crypto";
+import { parseIntEnv } from "../shared/env.js";
 import { log, errToCtx } from "../shared/logger.js";
 
 interface TriggerBinding {
@@ -17,13 +18,15 @@ const bindings = new Map<string, TriggerBinding[]>();
 // Retry policy for failed trigger dispatches. Exponential backoff (2s → 4s
 // → 8s …) with jitter avoids thundering-herd retries when many triggers fire
 // on the same event (e.g. a burst of `calendar_changed`). Override via env
-// for tests / aggressive polling setups.
-const TRIGGER_MAX_RETRIES = Math.max(0, parseInt(process.env.AIRMCP_TRIGGER_MAX_RETRIES ?? "2", 10));
-const TRIGGER_BASE_BACKOFF_MS = Math.max(100, parseInt(process.env.AIRMCP_TRIGGER_BASE_BACKOFF_MS ?? "2000", 10));
-const TRIGGER_MAX_BACKOFF_MS = Math.max(
-  TRIGGER_BASE_BACKOFF_MS,
-  parseInt(process.env.AIRMCP_TRIGGER_MAX_BACKOFF_MS ?? "60000", 10),
-);
+// for tests / aggressive polling setups. parseIntEnv guards against a
+// non-numeric override producing NaN — a NaN retry cap makes `attempt >= NaN`
+// always false (infinite retries) and a NaN backoff coerces to a 0ms hot loop.
+const TRIGGER_MAX_RETRIES = parseIntEnv(process.env.AIRMCP_TRIGGER_MAX_RETRIES, { floor: 0, fallback: 2 });
+const TRIGGER_BASE_BACKOFF_MS = parseIntEnv(process.env.AIRMCP_TRIGGER_BASE_BACKOFF_MS, { floor: 100, fallback: 2000 });
+const TRIGGER_MAX_BACKOFF_MS = parseIntEnv(process.env.AIRMCP_TRIGGER_MAX_BACKOFF_MS, {
+  floor: TRIGGER_BASE_BACKOFF_MS,
+  fallback: 60_000,
+});
 
 function computeBackoff(attempt: number): number {
   // attempt is 1-indexed: the 1st retry waits BASE, the 2nd waits 2×BASE, …

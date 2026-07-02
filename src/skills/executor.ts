@@ -313,18 +313,40 @@ const DEFAULT_RETRY_BACKOFF_MS = 1000;
 const MAX_RETRY_BACKOFF_MS = 60_000;
 
 /**
+ * Whether a non-thrown `{ isError: true }` tool response should be retried.
+ * Only errors whose `structuredContent.error.retryable` flag is true (e.g.
+ * `upstream_timeout`) are retryable. Terminal errors — HITL denials
+ * (`permission_denied`) and `invalid_input` — carry `retryable: false`, so
+ * they are NOT retried: retrying a HITL denial re-fires the approval dialog
+ * for an action the user already rejected (approval fatigue), and retrying a
+ * hard input error is pointless.
+ */
+function isRetryableErrorResponse(response: { structuredContent?: unknown }): boolean {
+  const sc = response.structuredContent;
+  if (sc && typeof sc === "object" && "error" in sc) {
+    const err = (sc as { error?: unknown }).error;
+    if (err && typeof err === "object" && "retryable" in err) {
+      return (err as { retryable?: unknown }).retryable === true;
+    }
+  }
+  return false;
+}
+
+/**
  * Invoke a tool with step-level retry semantics. The step is attempted up
  * to `1 + step.retry` times; each retry waits `base * 2^(attempt-1)` ms
  * with ±25% jitter, capped at MAX_RETRY_BACKOFF_MS.
  *
- * `isError` responses are treated as failures (same as thrown errors),
- * so a tool that returns `{ isError: true }` gets the same retry treatment
- * as one that throws. `parseToolResponse` still throws on isError, so the
- * retry decision lives here and the post-parse path stays as-is.
+ * A non-thrown `{ isError: true }` response is retried ONLY when it is
+ * retryable (see `isRetryableErrorResponse`); terminal errors (HITL denials,
+ * invalid input) are returned immediately so a denied step is never
+ * re-prompted. `parseToolResponse` still throws on the returned isError, so
+ * the post-parse path stays as-is.
  *
  * Rate-limit denials (the tool-registry gate throws with "[rate_limited]")
  * are retryable because the rate limiter surfaces a retry-after hint and
- * the skill may legitimately outlive the window.
+ * the skill may legitimately outlive the window; those arrive via the throw
+ * path below.
  */
 async function callToolWithRetry(
   server: McpServer,
@@ -343,12 +365,14 @@ async function callToolWithRetry(
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       const response = await callTool(server, toolName, args);
-      if (response.isError && attempt < maxRetries) {
-        // Tool reported an error as a non-thrown response. Retry with
-        // backoff; if we're out of retries, fall through and return the
+      if (response.isError && attempt < maxRetries && isRetryableErrorResponse(response)) {
+        // Tool reported a *retryable* error as a non-thrown response. Retry
+        // with backoff; if we're out of retries, fall through and return the
         // isError response so the caller's existing error path fires.
         lastError = new Error(response.content[0]?.text ?? "Tool returned an error");
       } else {
+        // Success, or a terminal (non-retryable) error such as a HITL denial /
+        // invalid input — return immediately without re-invoking the tool.
         return response;
       }
     } catch (e) {

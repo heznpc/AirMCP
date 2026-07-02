@@ -84,18 +84,12 @@ func readStdin() -> Data {
 /// Serializes every stdout write so that concurrently produced messages — the
 /// serial request loop's JSON-RPC responses and the async `start-observer`
 /// events (which fire from DispatchSource / EventKit / main-queue contexts) —
-/// can never interleave. Each line is written as ONE contiguous buffer
-/// (payload + "\n") while holding the lock, so a message can never be split
-/// across two `write` calls (which previously let an event's bytes land between
-/// a response's payload and its newline, corrupting the line for the Node reader).
-let stdoutLock = NSLock()
+/// can never interleave. See `AirMCPKit.LineWriter` for the invariant and the
+/// race it closes; it is unit-tested in AirMCPKitTests.
+let stdoutWriter = LineWriter(FileHandle.standardOutput)
 
 func emitLine(_ payload: Data) {
-    var line = payload
-    line.append(0x0A) // "\n"
-    stdoutLock.lock()
-    FileHandle.standardOutput.write(line)
-    stdoutLock.unlock()
+    stdoutWriter.writeLine(payload)
 }
 
 func writeJSON<T: Encodable>(_ value: T) throws {

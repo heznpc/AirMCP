@@ -47,11 +47,11 @@ export function registerMemoryTools(server: McpServer, _config: AirMcpConfig): v
         "key upserts). `ttl_ms` makes the entry self-expiring.",
       inputSchema: {
         kind: kindSchema.describe("Entry category: fact | entity | episode"),
-        key: z.string().min(1).describe("Stable label (e.g. 'favorite_editor', 'person:Ada')"),
-        value: z.string().describe("Payload. JSON-stringify structured data upstream."),
-        id: z.string().optional().describe("Override the default `${kind}:${key}` id"),
-        tags: z.array(z.string()).optional().describe("Optional tags for later filtering"),
-        source: z.string().optional().describe("Originator — tool name, skill id, 'user' …"),
+        key: z.string().min(1).max(500).describe("Stable label (e.g. 'favorite_editor', 'person:Ada')"),
+        value: z.string().max(10_000).describe("Payload. JSON-stringify structured data upstream."),
+        id: z.string().max(500).optional().describe("Override the default `${kind}:${key}` id"),
+        tags: z.array(z.string().max(200)).max(64).optional().describe("Optional tags for later filtering"),
+        source: z.string().max(500).optional().describe("Originator — tool name, skill id, 'user' …"),
         ttl_ms: z.number().int().positive().optional().describe("Self-expire after N milliseconds"),
       },
       outputSchema: {

@@ -47,3 +47,16 @@ describe('memory_query untrusted framing', () => {
     }
   });
 });
+
+describe('memory_put input bounds', () => {
+  test('caps value / key / tags to prevent unbounded on-disk growth', () => {
+    const server = createMockServer();
+    registerMemoryTools(server, {});
+    const schema = server._tools.get('memory_put').opts.inputSchema;
+
+    expect(schema.value.safeParse('x'.repeat(10_001)).success).toBe(false);
+    expect(schema.value.safeParse('x'.repeat(10_000)).success).toBe(true);
+    expect(schema.key.safeParse('k'.repeat(501)).success).toBe(false);
+    expect(schema.tags.safeParse(Array.from({ length: 65 }, () => 't')).success).toBe(false);
+  });
+});

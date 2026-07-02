@@ -73,6 +73,11 @@ export interface MemoryStats {
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 500;
+/** Hard cap on total stored entries. Bounds on-disk growth (each write
+ *  re-serializes the whole store) — beyond this the oldest entries by
+ *  createdAt are evicted so a runaway/prompt-injected loop cannot exhaust
+ *  disk. */
+const MAX_ENTRIES = 10_000;
 
 /** Deterministic id derivation. */
 export function deriveId(kind: MemoryKind, key: string): string {
@@ -237,6 +242,20 @@ export class MemoryStore {
       };
 
       data.entries[id] = entry;
+
+      // Bound total growth: if over the cap, evict the oldest entries by
+      // createdAt. The entry just written is newest (or an in-place update),
+      // so it is retained.
+      const entries = Object.entries(data.entries);
+      if (entries.length > MAX_ENTRIES) {
+        const oldestFirst = entries.sort(([, a], [, b]) =>
+          a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0,
+        );
+        for (const [staleId] of oldestFirst.slice(0, entries.length - MAX_ENTRIES)) {
+          delete data.entries[staleId];
+        }
+      }
+
       await this.save(data);
       return entry;
     });

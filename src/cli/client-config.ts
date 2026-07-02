@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type { McpClient } from "../shared/config.js";
 import { MCP_CLIENTS } from "../shared/config.js";
@@ -131,9 +131,21 @@ function configureFileClient(
     servers.airmcp = targetEntry;
     existing[client.serversKey] = servers;
 
-    if (configExists) copyFileSync(client.configPath, `${client.configPath}.bak.${options.now()}`);
+    // App-runtime mode embeds the AIRMCP_HTTP_TOKEN — the sole credential gating
+    // the local HTTP tool surface — into the client config. Write it owner-only
+    // (0600), matching the token file's own protection, so it is not left
+    // world-readable (0644) in a shared-home scenario. writeFileSync's `mode`
+    // only applies when creating a new file, so chmod explicitly to also cover an
+    // existing config and the backup copy.
+    const tokenMode = options.runtimeMode !== "direct";
+    if (configExists) {
+      const backupPath = `${client.configPath}.bak.${options.now()}`;
+      copyFileSync(client.configPath, backupPath);
+      if (tokenMode) chmodSync(backupPath, 0o600);
+    }
     mkdirSync(dirname(client.configPath), { recursive: true });
-    writeFileSync(client.configPath, JSON.stringify(existing, null, 2) + "\n");
+    writeFileSync(client.configPath, JSON.stringify(existing, null, 2) + "\n", tokenMode ? { mode: 0o600 } : undefined);
+    if (tokenMode) chmodSync(client.configPath, 0o600);
 
     return {
       name: client.name,

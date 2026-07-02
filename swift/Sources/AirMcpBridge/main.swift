@@ -81,6 +81,23 @@ func readStdin() -> Data {
     return data
 }
 
+/// Serializes every stdout write so that concurrently produced messages — the
+/// serial request loop's JSON-RPC responses and the async `start-observer`
+/// events (which fire from DispatchSource / EventKit / main-queue contexts) —
+/// can never interleave. Each line is written as ONE contiguous buffer
+/// (payload + "\n") while holding the lock, so a message can never be split
+/// across two `write` calls (which previously let an event's bytes land between
+/// a response's payload and its newline, corrupting the line for the Node reader).
+let stdoutLock = NSLock()
+
+func emitLine(_ payload: Data) {
+    var line = payload
+    line.append(0x0A) // "\n"
+    stdoutLock.lock()
+    FileHandle.standardOutput.write(line)
+    stdoutLock.unlock()
+}
+
 func writeJSON<T: Encodable>(_ value: T) throws {
     let data = try JSONEncoder().encode(value)
     if persistentMode, let id = currentRequestId {
@@ -90,11 +107,10 @@ func writeJSON<T: Encodable>(_ value: T) throws {
         }
         let wrapper: [String: Any] = ["id": id, "result": resultObj]
         let wrappedData = try JSONSerialization.data(withJSONObject: wrapper, options: [.sortedKeys])
-        FileHandle.standardOutput.write(wrappedData)
+        emitLine(wrappedData)
     } else {
-        FileHandle.standardOutput.write(data)
+        emitLine(data)
     }
-    FileHandle.standardOutput.write(Data("\n".utf8))
 }
 
 func writeOutput(_ output: Output) throws {
@@ -107,29 +123,25 @@ func writeRawJSON(_ data: Data) {
         if let resultObj = try? JSONSerialization.jsonObject(with: data) {
             let wrapper: [String: Any] = ["id": id, "result": resultObj]
             if let wrappedData = try? JSONSerialization.data(withJSONObject: wrapper, options: [.sortedKeys]) {
-                FileHandle.standardOutput.write(wrappedData)
-                FileHandle.standardOutput.write(Data("\n".utf8))
+                emitLine(wrappedData)
                 return
             }
         }
     }
-    FileHandle.standardOutput.write(data)
-    FileHandle.standardOutput.write(Data("\n".utf8))
+    emitLine(data)
 }
 
 func writeError(_ message: String) {
     if persistentMode {
         let resp: [String: Any] = ["id": currentRequestId ?? "", "error": message]
         if let data = try? JSONSerialization.data(withJSONObject: resp, options: [.sortedKeys]) {
-            FileHandle.standardOutput.write(data)
-            FileHandle.standardOutput.write(Data("\n".utf8))
+            emitLine(data)
         }
         return // Don't exit in persistent mode
     }
     let error = ["error": message]
     if let data = try? JSONSerialization.data(withJSONObject: error) {
-        FileHandle.standardOutput.write(data)
-        FileHandle.standardOutput.write(Data("\n".utf8))
+        emitLine(data)
     }
     exit(1)
 }
@@ -1477,8 +1489,7 @@ case "start-observer":
             "timestamp": ISO8601DateFormatter().string(from: Date()),
         ]
         if let jsonData = try? JSONSerialization.data(withJSONObject: notification, options: [.sortedKeys]) {
-            FileHandle.standardOutput.write(jsonData)
-            FileHandle.standardOutput.write(Data("\n".utf8))
+            emitLine(jsonData)
         }
     }
     // Don't return — keep observer running in persistent mode
@@ -1542,8 +1553,7 @@ if persistentMode {
     // Signal readiness
     let ready: [String: Any] = ["id": "__ready__", "result": ["status": "ok"]]
     if let data = try? JSONSerialization.data(withJSONObject: ready, options: [.sortedKeys]) {
-        FileHandle.standardOutput.write(data)
-        FileHandle.standardOutput.write(Data("\n".utf8))
+        emitLine(data)
     }
 
     while let line = readLine() {
@@ -1556,8 +1566,7 @@ if persistentMode {
               let command = json["command"] as? String else {
             let errResp: [String: Any] = ["id": "", "error": "Invalid request format. Expected {\"id\":\"...\",\"command\":\"...\",\"input\":{...}}"]
             if let data = try? JSONSerialization.data(withJSONObject: errResp, options: [.sortedKeys]) {
-                FileHandle.standardOutput.write(data)
-                FileHandle.standardOutput.write(Data("\n".utf8))
+                emitLine(data)
             }
             continue
         }

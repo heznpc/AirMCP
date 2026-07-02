@@ -12,7 +12,7 @@
 import type { McpServer } from "../shared/mcp.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import { z } from "zod";
-import { okStructured, errInvalidInput, toolError } from "../shared/result.js";
+import { okStructured, okUntrustedStructured, errInvalidInput, toolError } from "../shared/result.js";
 import { type MemoryKind } from "./store.js";
 import { getMemoryStore } from "./instance.js";
 
@@ -119,7 +119,11 @@ export function registerMemoryTools(server: McpServer, _config: AirMcpConfig): v
           limit,
           order,
         });
-        return okStructured({ total: entries.length, entries });
+        // Recalled entries hold free-form, third-party-influenceable text (an
+        // agent may store an email/note body as an episode). Return them wrapped
+        // as untrusted content — consistent with semantic_search and the read
+        // tools — so embedded instructions are framed as data, not commands.
+        return okUntrustedStructured({ total: entries.length, entries });
       } catch (e) {
         return toolError("query memory entries", e);
       }

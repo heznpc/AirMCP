@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, jest, test } from "@jest/globals";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -77,6 +77,50 @@ describe("client config repair", () => {
       args: ["-y", packageSpecifier, "connect", "--url", CODEX_APP_OWNED_URL],
       env: { AIRMCP_HTTP_TOKEN: "test-token" },
     });
+  });
+
+  test("writes the token-bearing client config and its backup owner-only (0600)", async () => {
+    const home = mkdtempSync(join(tmpdir(), "airmcp-client-config-"));
+    tempHomes.push(home);
+    const { configureMcpClients } = await loadClientConfig(home);
+    const configPath = join(home, "Client", "mcp.json");
+    mkdirSync(dirname(configPath), { recursive: true });
+    writeFileSync(
+      configPath,
+      JSON.stringify({ mcpServers: { airmcp: { command: "npx", args: ["-y", "airmcp@2.12.0"] } } }, null, 2) + "\n",
+    );
+    chmodSync(configPath, 0o644); // start world-readable to prove the fix tightens it
+
+    configureMcpClients({
+      clients: [{ name: "Test Client", configPath, serversKey: "mcpServers" }],
+      configureCodex: false,
+      now: () => 123,
+      token: "test-token",
+    });
+
+    // The embedded AIRMCP_HTTP_TOKEN must not be left world-readable.
+    expect(statSync(configPath).mode & 0o777).toBe(0o600);
+    expect(statSync(`${configPath}.bak.123`).mode & 0o777).toBe(0o600);
+    expect(readJson(configPath).mcpServers.airmcp.env.AIRMCP_HTTP_TOKEN).toBe("test-token");
+  });
+
+  test("direct runtime (no embedded token) does not force 0600 on the client config", async () => {
+    const home = mkdtempSync(join(tmpdir(), "airmcp-client-config-"));
+    tempHomes.push(home);
+    const { configureMcpClients } = await loadClientConfig(home);
+    const configPath = join(home, "Client", "mcp.json");
+    mkdirSync(dirname(configPath), { recursive: true });
+    writeFileSync(configPath, JSON.stringify({ mcpServers: {} }, null, 2) + "\n");
+    chmodSync(configPath, 0o644);
+
+    configureMcpClients({
+      clients: [{ name: "Test Client", configPath, serversKey: "mcpServers" }],
+      configureCodex: false,
+      now: () => 123,
+      runtimeMode: "direct",
+    });
+
+    expect(statSync(configPath).mode & 0o777).toBe(0o644);
   });
 
   test("dry-run reports changes without writing a token, backup, or config mutation", async () => {

@@ -23,6 +23,22 @@ function textResponse(text) {
 function errorResponse(msg) {
   return { content: [{ type: 'text', text: msg }], isError: true };
 }
+// A non-thrown isError that is explicitly retryable (e.g. upstream_timeout).
+function retryableErrorResponse(msg) {
+  return {
+    content: [{ type: 'text', text: msg }],
+    isError: true,
+    structuredContent: { error: { message: msg, retryable: true } },
+  };
+}
+// A terminal isError — HITL denial / invalid input — that must NOT be retried.
+function permissionDeniedResponse(msg) {
+  return {
+    content: [{ type: 'text', text: msg }],
+    isError: true,
+    structuredContent: { error: { message: msg, category: 'permission_denied', retryable: false } },
+  };
+}
 function untrustedStructuredResponse(data) {
   return {
     content: [{ type: 'text', text: JSON.stringify(data) }],
@@ -1179,9 +1195,9 @@ describe('executeSkill – retry', () => {
     expect(mockCallTool).toHaveBeenNthCalledWith(4, 'post', { reason: 'boom 3' });
   });
 
-  test('isError response is retried like a thrown error', async () => {
+  test('retryable isError response is retried', async () => {
     mockCallTool
-      .mockResolvedValueOnce(errorResponse('still starting'))
+      .mockResolvedValueOnce(retryableErrorResponse('still starting'))
       .mockResolvedValueOnce(okResponse({ ready: true }));
 
     const skill = {
@@ -1192,6 +1208,25 @@ describe('executeSkill – retry', () => {
 
     expect(result.success).toBe(true);
     expect(mockCallTool).toHaveBeenCalledTimes(2);
+  });
+
+  test('non-retryable isError (HITL denial) is NOT retried — no re-prompt', async () => {
+    // Regression: a HITL denial (permission_denied, retryable:false) must be
+    // returned immediately, not re-invoked, so the approval dialog is not
+    // re-fired for an action the user already rejected.
+    mockCallTool
+      .mockResolvedValueOnce(permissionDeniedResponse('denied by user'))
+      .mockResolvedValueOnce(okResponse({ ready: true }));
+
+    const skill = {
+      name: 'retry-denied',
+      steps: [{ id: 'send', tool: 'messages_send', args: {}, retry: 5, retry_backoff_ms: 0 }],
+    };
+    const result = await executeSkill(fakeServer, skill);
+
+    expect(result.success).toBe(false);
+    // Called exactly once despite retry:5 — the denial is terminal.
+    expect(mockCallTool).toHaveBeenCalledTimes(1);
   });
 
   test('retry=0 is a no-op and fails on the first error (default behaviour unchanged)', async () => {

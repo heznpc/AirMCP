@@ -407,8 +407,14 @@ export function parseConfig(): AirMcpConfig {
   }
 
   // Disabled modules: env vars override, then profile, then JSON fallback.
+  // AIRMCP_DISABLE_<MOD> is a disable-only opt-in (mirrored by AIRMCP_ENABLE_<MOD>);
+  // ONLY the literal value "true" force-disables. Any other value (e.g. "false"/"0")
+  // must be inert — it must NOT re-enable a module the profile/config excludes, which
+  // is why the profile/file branches are gated on the *absence of an explicit disable*
+  // rather than on `envVal === undefined` (setting the var to "false" previously
+  // fell open and silently re-enabled a profile-excluded module).
   const disabledModules = new Set<string>();
-  const fileDisabled = new Set(file.disabledModules ?? []);
+  const fileDisabled = new Set((file.disabledModules ?? []).map((m) => String(m).trim().toLowerCase()));
   for (const mod of KNOWN_MODULE_NAMES) {
     const envKey = `AIRMCP_DISABLE_${mod.toUpperCase()}`;
     const enableEnvKey = `AIRMCP_ENABLE_${mod.toUpperCase()}`;
@@ -418,9 +424,9 @@ export function parseConfig(): AirMcpConfig {
       disabledModules.add(mod);
     } else if ((OPT_IN_MODULE_NAMES as readonly string[]).includes(mod) && !optInEnabled) {
       disabledModules.add(mod);
-    } else if (envVal === undefined && !fullMode && profileModules && !profileModules.has(mod) && !optInEnabled) {
+    } else if (!fullMode && profileModules && !profileModules.has(mod) && !optInEnabled) {
       disabledModules.add(mod);
-    } else if (envVal === undefined && !fullMode && fileDisabled.has(mod)) {
+    } else if (!fullMode && fileDisabled.has(mod)) {
       disabledModules.add(mod);
     }
   }

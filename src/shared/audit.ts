@@ -428,7 +428,17 @@ export function sanitizeArgs(args: Record<string, unknown>, depth = 0): Record<s
   if (depth > 3) return { _truncated: true };
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(args)) {
-    if (/\b(password|secret|token|api_?key|auth_?token|credential)\b/i.test(key)) {
+    // Normalize the key (strip separators, lowercase) before matching. A `\b` word
+    // boundary never fires before an embedded "token"/"secret" in compound names, so
+    // the old regex FAILED to redact access_token / refreshToken / sessionToken /
+    // clientSecret / api-key and wrote their raw VALUES into the audit log. Matching
+    // fragments against the separator-stripped key catches those standard names.
+    const normalizedKey = key.replace(/[_\-\s]/g, "").toLowerCase();
+    if (
+      /token|secret|password|passphrase|passwd|apikey|credential|bearer|privatekey|sessionid|accesskey|oauth|authorization/.test(
+        normalizedKey,
+      )
+    ) {
       result[key] = "[REDACTED]";
       continue;
     }

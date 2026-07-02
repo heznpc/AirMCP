@@ -161,6 +161,20 @@ describe("gws_raw security whitelist", () => {
       expect(result.content[0].text).not.toContain("Destructive method");
     }
   });
+
+  test("blocks compound and case-variant destructive methods when allowSendMail is false", async () => {
+    // Regression: an exact, case-sensitive {delete,trash,remove,purge} blocklist let
+    // real irreversible methods (batchDelete, emptyTrash, clear) and case variants
+    // (Delete/DELETE) bypass the allowSendMail gate.
+    for (const method of ["batchDelete", "emptyTrash", "clear", "Delete", "DELETE"]) {
+      const result = await server.callTool("gws_raw", {
+        service: "gmail",
+        resource: "users.messages",
+        method,
+      });
+      expect(result.content[0].text).toContain("Destructive method");
+    }
+  });
 });
 
 describe("gws_raw CWE-88 argument-injection guard (inputSchema regex)", () => {

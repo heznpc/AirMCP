@@ -91,6 +91,22 @@ export const MODULE_PACK_MANIFEST = [
     description: "Experimental spatial asset/context preparation modules.",
     modules: ["spatial_prep"],
   },
+  {
+    name: "webhooks",
+    packageName: "@heznpc/airmcp-webhooks",
+    title: "Webhooks",
+    description:
+      "Inbound webhook listener: turns external HTTP callbacks into webhook_received events skills can bind to. Opt-in (AIRMCP_ENABLE_WEBHOOKS=true).",
+    modules: ["webhooks"],
+  },
+  {
+    name: "powerautomate",
+    packageName: "@heznpc/airmcp-powerautomate",
+    title: "Power Automate",
+    description:
+      "Outbound Microsoft Power Automate Cloud Flow trigger (HTTP request URLs, SAS or OAuth). Opt-in (AIRMCP_ENABLE_POWERAUTOMATE=true).",
+    modules: ["powerautomate"],
+  },
 ] as const;
 
 export type ModulePackName = (typeof MODULE_PACK_MANIFEST)[number]["name"];

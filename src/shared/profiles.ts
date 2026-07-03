@@ -37,7 +37,7 @@ export const MODULE_NAMES = [
   "audit",
 ] as const;
 
-export const OPT_IN_MODULE_NAMES = ["spatial_prep"] as const;
+export const OPT_IN_MODULE_NAMES = ["spatial_prep", "webhooks", "powerautomate"] as const;
 export const KNOWN_MODULE_NAMES = [...MODULE_NAMES, ...OPT_IN_MODULE_NAMES] as const;
 
 export type ModuleName = (typeof MODULE_NAMES)[number];

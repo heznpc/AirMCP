@@ -125,9 +125,11 @@ async function readBodyCapped(
   cap: number,
 ): Promise<{ text: string; truncated: boolean; totalBytes: number }> {
   if (!res.body) {
-    // No stream (e.g. a stubbed Response in tests) — fall back to text().
-    const text = await res.text().catch(() => "");
-    return { text, truncated: false, totalBytes: Buffer.byteLength(text) };
+    // No readable stream to cap. Production Node fetch always populates
+    // res.body; this branch only hits an empty/absent-body response. Match
+    // newtria and return empty rather than an uncapped res.text() — text()
+    // would buffer the whole body and defeat the maxResponseBytes OOM guard.
+    return { text: "", truncated: false, totalBytes: 0 };
   }
   const reader = res.body.getReader();
   const chunks: Uint8Array[] = [];

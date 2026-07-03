@@ -68,6 +68,20 @@ describe('triggerCloudFlow (api)', () => {
     expect(result.body.length).toBe(1000);
   });
 
+  test('a null-body response reads as empty (no uncapped text() OOM path)', async () => {
+    mockFetch.mockResolvedValue(new Response(null, { status: 204, statusText: 'No Content' }));
+    const result = await triggerCloudFlow({
+      url: 'https://example.logic.azure.com/flow',
+      auth: { type: 'sas' },
+      timeoutMs: 1000,
+      maxResponseBytes: 1024,
+    });
+    expect(result.status).toBe(204);
+    expect(result.truncated).toBe(false);
+    expect(result.totalBytes).toBe(0);
+    expect(result.body).toBeNull();
+  });
+
   test('non-2xx status is returned, not thrown', async () => {
     mockFetch.mockResolvedValue(
       new Response(JSON.stringify({ error: 'bad' }), { status: 400, statusText: 'Bad Request' }),

@@ -75,12 +75,12 @@ export function registerPowerAutomateTools(server: McpServer, _config: AirMcpCon
           ...(result.truncated ? { truncated: true, bytesRead: result.totalBytes, cap: maxResponseBytes } : {}),
         };
         // A non-2xx from the flow is an upstream failure the agent should see
-        // as an error; the (untrusted) response body still rides along in the
-        // message so the caller can inspect what the flow returned.
+        // as an error. Surface only the status line — the response body is
+        // untrusted third-party content, so we do NOT inline it unmarked into
+        // an error string (the 2xx path routes it through okUntrusted instead,
+        // which adds the data-vs-instructions markers).
         if (!result.ok) {
-          return errUpstream(
-            `Cloud Flow returned ${result.status} ${result.statusText}: ${JSON.stringify(result.body)}`,
-          );
+          return errUpstream(`Cloud Flow returned ${result.status} ${result.statusText}`);
         }
         // The response is third-party content — mark it untrusted so the model
         // treats it as data, not instructions.

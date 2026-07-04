@@ -116,6 +116,8 @@ export const MODULE_MANIFEST: ReadonlyArray<ModuleManifestEntry> = [
   { name: "memory" },
   { name: "audit" },
   { name: "spatial_prep" },
+  { name: "webhooks" },
+  { name: "powerautomate" },
 ];
 
 /**

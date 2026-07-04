@@ -90,9 +90,12 @@ for (const line of resLines) {
   }
 }
 
-const profilesContent = readFileSync(join(SRC, "shared", "profiles.ts"), "utf-8");
-const moduleBlock = profilesContent.match(/export const MODULE_NAMES = \[([\s\S]*?)\] as const/);
-const modules = moduleBlock ? (moduleBlock[1].match(/"/g) || []).length / 2 : 0;
+// Count the whole module catalog from MODULE_MANIFEST (modules.ts) — including
+// opt-in modules (spatial_prep, webhooks, powerautomate) that are absent from
+// the standard-profile MODULE_NAMES. Uses the SAME pattern as the
+// tool-count-drift test so the doc count and that guard can never diverge.
+const modulesContent = readFileSync(join(SRC, "shared", "modules.ts"), "utf-8");
+const modules = (modulesContent.match(/\bname:\s*"[a-z0-9-]+"/g) ?? []).length;
 
 const stats = { tools, prompts, resources, modules, mcpApps, appIntents };
 

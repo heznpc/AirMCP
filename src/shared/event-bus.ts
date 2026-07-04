@@ -10,7 +10,8 @@ export type AirMCPEventType =
   | "now_playing_changed"
   | "file_modified"
   | "screen_locked"
-  | "screen_unlocked";
+  | "screen_unlocked"
+  | "webhook_received";
 
 export interface AirMCPEvent {
   type: AirMCPEventType;
@@ -28,6 +29,7 @@ const VALID_EVENT_TYPES = new Set<AirMCPEventType>([
   "file_modified",
   "screen_locked",
   "screen_unlocked",
+  "webhook_received",
 ]);
 
 function isValidEventType(value: unknown): value is AirMCPEventType {

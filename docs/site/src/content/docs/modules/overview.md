@@ -3,7 +3,7 @@ title: Module Overview
 description: All 25 AirMCP modules with tool counts and capabilities.
 ---
 
-AirMCP ships 29 modules that cover the Apple workspace. Each module registers a set of MCP tools that AI assistants can call. The full manifest contains 295 tools, while the default starter/progressive runtime exposes a smaller front door.
+AirMCP ships 31 modules that cover the Apple workspace. Each module registers a set of MCP tools that AI assistants can call. The full manifest contains 295 tools, while the default starter/progressive runtime exposes a smaller front door.
 
 Module packs are the DLC-like activation boundary above modules. `npx airmcp modules enable productivity` or `AIRMCP_MODULE_PACKS=core,productivity` keeps core workspace tools and iWork active while reporting unavailable profile modules through `profile_status.modulesMissingPacks`. Add `--install` to install the matching companion npm add-on into the user-level add-on prefix before activating it. npm and MCPB releases ship as a slim root; non-core module entrypoints live in physical add-on packages staged by `npm run addons:build`. Add-on names omit `pack-*` naming, for example `@heznpc/airmcp-productivity`.
 

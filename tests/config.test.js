@@ -445,6 +445,35 @@ describe('parseConfig() — module enable/disable logic', () => {
     expect(isModuleEnabled(cfg, 'spatial_prep')).toBe(false);
   });
 
+  test('AIRMCP_DISABLE_<MOD>=false does not re-enable a profile-excluded module (fail-closed)', () => {
+    // Regression: only the literal "true" disables. A non-"true" value must stay inert
+    // and NOT fall open — previously `AIRMCP_DISABLE_MUSIC=false` re-enabled music under
+    // the productivity profile, which excludes it.
+    process.env.AIRMCP_PROFILE = 'productivity';
+    process.env.AIRMCP_DISABLE_MUSIC = 'false';
+    const cfg = parseConfig();
+    expect(isModuleEnabled(cfg, 'music')).toBe(false);
+  });
+
+  test('mis-cased / whitespace config disabledModules entries still disable the module', () => {
+    // Regression: disabledModules was matched case-sensitively against lowercase module
+    // names, so "Mail" / " messages " silently failed to disable and the module stayed on.
+    const dir = mkdtempSync(join(tmpdir(), 'airmcp-config-'));
+    try {
+      PATHS.CONFIG = join(dir, 'config.json');
+      writeFileSync(
+        PATHS.CONFIG,
+        JSON.stringify({ profile: 'custom', disabledModules: ['Mail', ' Messages '] }),
+        'utf8',
+      );
+      const cfg = parseConfig();
+      expect(isModuleEnabled(cfg, 'mail')).toBe(false);
+      expect(isModuleEnabled(cfg, 'messages')).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test('invalid profile in config falls back to starter instead of legacy custom', () => {
     const dir = mkdtempSync(join(tmpdir(), 'airmcp-config-'));
     try {

@@ -107,7 +107,10 @@ export function registerSemanticTools(server: McpServer, config: AirMcpConfig): 
     async ({ id, limit, threshold }) => {
       try {
         const result = await service.findRelated(id, { limit, threshold });
-        return ok(result);
+        // Item/related titles come from note names, mail subjects, and calendar
+        // summaries — attacker-influenceable — so frame them as untrusted, matching
+        // the sibling semantic_search.
+        return okUntrusted(result);
       } catch (e) {
         return toolError("semantic search", e);
       }

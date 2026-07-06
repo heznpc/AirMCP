@@ -25,7 +25,14 @@ const GWS_ALLOWED_SERVICES = new Set([
   "people",
 ]);
 
-const GWS_DESTRUCTIVE_METHODS = new Set(["delete", "trash", "remove", "purge"]);
+// Destructive-method detection. Matched case-insensitively as a substring so that
+// compound Google API method names (e.g. gmail `batchDelete`, drive `emptyTrash`,
+// sheets `clear`) and case variants (`Delete`/`DELETE`) cannot slip past the
+// allowSendMail gate. This is a fail-closed guard: any method whose name contains a
+// destructive verb requires the AIRMCP_ALLOW_SEND_MAIL opt-in. Previously this was an
+// exact, case-sensitive blocklist of {delete,trash,remove,purge}, which let real
+// irreversible methods like `batchDelete` execute with the opt-in disabled.
+const GWS_DESTRUCTIVE_PATTERN = /delete|trash|remove|purge|clear|empty|destroy|erase|wipe/i;
 const GWS_ALLOWED_LIST = [...GWS_ALLOWED_SERVICES].join(", ");
 
 export function registerGoogleTools(server: McpServer, config: AirMcpConfig): void {
@@ -500,7 +507,7 @@ export function registerGoogleTools(server: McpServer, config: AirMcpConfig): vo
       }
 
       // Block destructive methods unless explicitly allowed
-      if (GWS_DESTRUCTIVE_METHODS.has(method)) {
+      if (GWS_DESTRUCTIVE_PATTERN.test(method)) {
         if (!allowSendMail) {
           return errPermission(
             `Destructive method "${method}" is disabled. Set AIRMCP_ALLOW_SEND_MAIL=true to enable delete/trash operations.`,

@@ -1,5 +1,6 @@
 import { eventBus } from "../shared/event-bus.js";
 import { runJxa } from "../shared/jxa.js";
+import { parseIntEnv } from "../shared/env.js";
 import { createPollerLogger, registerPoller } from "../shared/pollers.js";
 import { getUnreadCountScript } from "./scripts.js";
 
@@ -10,7 +11,9 @@ import { getUnreadCountScript } from "./scripts.js";
  * last observed value.
  */
 
-const MAIL_INTERVAL_MS = Math.max(10_000, parseInt(process.env.AIRMCP_MAIL_POLL_MS ?? "60000", 10));
+// parseIntEnv guards against a non-numeric AIRMCP_MAIL_POLL_MS producing NaN
+// (which setInterval coerces to 0 → runaway osascript hot loop).
+const MAIL_INTERVAL_MS = parseIntEnv(process.env.AIRMCP_MAIL_POLL_MS, { floor: 10_000, fallback: 60_000 });
 
 interface UnreadPayload {
   totalUnread: number;

@@ -428,19 +428,43 @@ export function sanitizeArgs(args: Record<string, unknown>, depth = 0): Record<s
   if (depth > 3) return { _truncated: true };
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(args)) {
-    if (/\b(password|secret|token|api_?key|auth_?token|credential)\b/i.test(key)) {
+    // Normalize the key (strip separators, lowercase) before matching. A `\b` word
+    // boundary never fires before an embedded "token"/"secret" in compound names, so
+    // the old regex FAILED to redact access_token / refreshToken / sessionToken /
+    // clientSecret / api-key and wrote their raw VALUES into the audit log. Matching
+    // fragments against the separator-stripped key catches those standard names.
+    const normalizedKey = key.replace(/[_\-\s]/g, "").toLowerCase();
+    if (
+      /token|secret|password|passphrase|passwd|apikey|credential|bearer|privatekey|sessionid|accesskey|oauth|authorization/.test(
+        normalizedKey,
+      )
+    ) {
       result[key] = "[REDACTED]";
       continue;
     }
-    if (typeof value === "string" && value.length > AUDIT.MAX_ARG_LENGTH) {
-      result[key] = value.slice(0, AUDIT.MAX_ARG_LENGTH) + `... (${value.length} chars)`;
-    } else if (value !== null && typeof value === "object" && !Array.isArray(value)) {
-      result[key] = sanitizeArgs(value as Record<string, unknown>, depth + 1);
-    } else {
-      result[key] = value;
-    }
+    result[key] = sanitizeValue(value, depth);
   }
   return result;
+}
+
+/**
+ * Recursively sanitize a single value: truncate long strings, recurse into
+ * plain objects (so nested secret-named keys are redacted), and recurse into
+ * arrays element-by-element — an array of objects (e.g. `headers: [{ authorization }]`)
+ * would otherwise be written verbatim and leak the embedded credential.
+ */
+function sanitizeValue(value: unknown, depth: number): unknown {
+  if (typeof value === "string" && value.length > AUDIT.MAX_ARG_LENGTH) {
+    return value.slice(0, AUDIT.MAX_ARG_LENGTH) + `... (${value.length} chars)`;
+  }
+  if (Array.isArray(value)) {
+    if (depth > 3) return "[truncated]";
+    return value.map((el) => sanitizeValue(el, depth + 1));
+  }
+  if (value !== null && typeof value === "object") {
+    return sanitizeArgs(value as Record<string, unknown>, depth + 1);
+  }
+  return value;
 }
 
 /**

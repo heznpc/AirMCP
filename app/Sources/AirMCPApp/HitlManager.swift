@@ -45,6 +45,9 @@ final class HitlManager {
     private var pendingConnections: [String: NWConnection] = [:]
     private(set) var pendingTools: [String: String] = [:]  // id -> tool name
     private var receiveBuffers: [ObjectIdentifier: Data] = [:]
+    /// Max un-terminated bytes buffered per connection before the peer is
+    /// dropped — prevents a newline-less stream from exhausting the app's memory.
+    private static let maxReceiveBufferBytes = 64 * 1024
 
     private let socketPath: String = {
         NSHomeDirectory() + "/.config/airmcp/hitl.sock"
@@ -57,12 +60,19 @@ final class HitlManager {
     func startListening() {
         guard listener == nil else { return }
 
-        // Ensure config directory exists
+        // Ensure config directory exists, then restrict ONLY the airmcp leaf to
+        // owner-only (0700). The HITL socket has no peer authentication (NWListener
+        // over a Unix socket can't cheaply read the peer's uid), so 0700 stops
+        // OTHER local users on a shared Mac from connecting and forging approval
+        // prompts. Note: the 0700 is applied via setAttributes on the leaf only —
+        // NOT passed to createDirectory, which would also tighten intermediates
+        // like the shared ~/.config that other tools expect at 0755.
         let configDir = (socketPath as NSString).deletingLastPathComponent
         try? FileManager.default.createDirectory(
             atPath: configDir,
             withIntermediateDirectories: true
         )
+        try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: configDir)
 
         // Remove stale socket file
         removeSocketFile()
@@ -119,6 +129,9 @@ final class HitlManager {
     private func handleListenerState(_ newState: NWListener.State) {
         switch newState {
         case .ready:
+            // Tighten the socket file to owner-only (defense in depth alongside
+            // the 0700 dir); NWListener creates it at default perms when it binds.
+            try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: socketPath)
             state = connections.isEmpty ? .listening : .connected
         case .failed, .cancelled:
             stopListening()
@@ -198,6 +211,14 @@ final class HitlManager {
         }
 
         receiveBuffers[connId] = Data(buffer)
+
+        // Guard against an unbounded line: if a peer streams bytes without ever
+        // sending a newline, the un-terminated remainder grows without limit.
+        // Drop the connection once it exceeds the cap.
+        if buffer.count > Self.maxReceiveBufferBytes {
+            removeConnection(connection)
+            connection.cancel()
+        }
     }
 
     static func parseApprovalRequest(

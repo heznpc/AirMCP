@@ -7815,26 +7815,32 @@
           "key": {
             "type": "string",
             "minLength": 1,
+            "maxLength": 500,
             "description": "Stable label (e.g. 'favorite_editor', 'person:Ada')"
           },
           "value": {
             "type": "string",
+            "maxLength": 10000,
             "description": "Payload. JSON-stringify structured data upstream."
           },
           "id": {
             "description": "Override the default `${kind}:${key}` id",
-            "type": "string"
+            "type": "string",
+            "maxLength": 500
           },
           "tags": {
             "description": "Optional tags for later filtering",
+            "maxItems": 64,
             "type": "array",
             "items": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 200
             }
           },
           "source": {
             "description": "Originator — tool name, skill id, 'user' …",
-            "type": "string"
+            "type": "string",
+            "maxLength": 500
           },
           "ttl_ms": {
             "description": "Self-expire after N milliseconds",

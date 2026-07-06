@@ -105,6 +105,7 @@ export const SkillDefinitionSchema = z.object({
         "file_modified",
         "screen_locked",
         "screen_unlocked",
+        "webhook_received",
       ]),
       debounce_ms: z.number().optional(),
     })

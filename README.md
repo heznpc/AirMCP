@@ -9,68 +9,59 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/heznpc/AirMCP)](https://github.com/heznpc/AirMCP/stargazers)
 
-**Safe action layer for your Apple workspace.** AirMCP lets Siri, Shortcuts, Claude, Codex, Cursor, Raycast, opencode, Gemini CLI, Xcode agents, and any MCP-capable AI read, organize, and act across your Mac apps with approval gates for sensitive actions, HMAC-chained audit logs, rate limits, OAuth scopes, and local-first controls. The broad Apple + Google Workspace tool catalog is the surface; the workflow engine, semantic memory, Swift bridges, and governance layer are the runtime underneath.
+**Apple-native action runtime for MCP clients.** AirMCP lets Claude, Codex,
+Cursor, Raycast, Siri, Shortcuts, Xcode agents, and other MCP-capable AI clients
+read, organize, and act across your Mac apps through one governed local runtime.
 
-**Part of:** Human-Controlled AI Systems · Research Program 1 (anchor — Apple-side agent governance).
+The catalog is broad: 295 tools across 31 modules. The important part is the
+layer underneath: profile-based exposure, task-scoped tool sessions, per-call
+human approval, HMAC-chained audit logs, rate limits, OAuth scopes, and local
+controls for sensitive Apple workspace actions.
 
-**Requires**: macOS for the server. The recommended desktop path is the AirMCP menubar app: it owns the loopback HTTP runtime, while Claude/Codex/Cursor attach to it as clients. The direct CLI server (`npx -y airmcp`) still works for development and boots the **starter** profile with progressive `tools/list` exposure: a small front door (`profile_status`, `list_profiles`, `list_module_packs`, `discover_tools`, `describe_tool`, `run_tool`, and core starter tools) instead of every loaded tool. Use `AIRMCP_PROFILE=communications-safe|productivity|full|custom` to choose a module profile, `AIRMCP_TOOL_EXPOSURE=profile|full` to widen `tools/list`, `npx airmcp modules enable productivity` or `AIRMCP_MODULE_PACKS=core,productivity` to activate only selected DLC-like packs, or `--full` / `AIRMCP_FULL=true` to request all 29 standard modules / 295 tools when the matching add-ons are installed (the 2 opt-in network modules — webhooks, powerautomate — stay off unless explicitly enabled). New app/CLI-created configs require task sessions for hidden `run_tool` dispatch; no-config direct stdio keeps the compatible path unless `AIRMCP_REQUIRE_TOOL_SESSION=true` is set. Most tools are pure JXA and work on macOS 14+ with no extra setup. **Swift-backed tools** — HealthKit, on-device semantic search, recurring events/reminders, photo import/delete/classify, Vision, Speech, Location, Bluetooth, and Apple Intelligence previews — need the **optional Swift bridge** — build it from a source checkout with `npm run swift-build` (it ships in **none** of the distribution channels — the npm tarball, the `.mcpb` bundle, or the menubar `.app` — so build it from source as above); without it those tools return a clear "Swift bridge not found" error and everything else keeps working. FoundationModels-backed Apple Intelligence and `AskAirMCPIntent` additionally require macOS 26+ on Apple Silicon and an opt-in Swift build with `AIRMCP_ENABLE_FOUNDATION_MODELS`.
+> Multi-language project page: [heznpc.github.io/AirMCP](https://heznpc.github.io/AirMCP/)
 
-> Available in multiple languages at the [project landing page](https://heznpc.github.io/AirMCP/).
+## What You Get
 
-## What this is — at a glance
+- **Apple workspace tools** for Notes, Reminders, Calendar, Contacts, Mail,
+  Messages, Music, Finder, Safari, Photos, Shortcuts, system control, screen
+  capture, Weather, Maps, Location, Bluetooth, and more.
+- **Google Workspace tools** for Gmail, Drive, Sheets, Calendar, Docs, Tasks,
+  People, and raw `gws` CLI access.
+- **Profiles and progressive exposure** so clients start with a small front
+  door instead of every loaded tool.
+- **Skills DSL workflows** with `parallel`, `loop`, `retry`, `on_error`, runtime
+  inputs, and event triggers.
+- **Siri and Shortcuts bridge** generated from the MCP manifest through
+  AppIntents, with destructive intents gated separately.
+- **Native Swift bridge, optional** for EventKit, PhotoKit, HealthKit, Vision,
+  on-device semantic search, and FoundationModels preview builds.
+- **Dual transport**: stdio for standard MCP clients, HTTP/SSE for shared
+  local runtimes, browser clients, registries, and always-on hosts.
 
-- **Currently implemented** — 295 tools across 31 modules (2 opt-in: webhooks, powerautomate) behind first-class profiles (`starter`, `communications-safe`, `productivity`, `full`) and progressive exposure (`discover_tools` + `run_tool` keep hidden tools callable without dumping the full catalog into every client context); HMAC-chained audit log with tamper-detection test suite; default HITL approval per destructive/sensitive call; rate limit (60/min + 10 destructive/hr); `allowNetwork` inbound HTTP exposure policy (RFC 0002); OAuth 2.1 + Resource Indicators (RFC 0005 Steps 1+2 — RS256/ES256 JWT, scope gate, `.well-known/oauth-protected-resource` per RFC 9728); sessionless `.well-known/mcp.json` discovery; 232 Shortcuts/AppIntents auto-generated from the full tool manifest; native SwiftUI menubar app (ad-hoc signed; Developer ID notarization pending); Claude Code plugin package (`.claude-plugin/plugin.json` + `.mcp.json` at repo root, with the `.mcp.json` invocation pinned to the same npm version as the manifest so the marketplace SHA-approval and the installed runtime always agree). On every CI run, `npm run mcp:validate` boots the built `dist/index.js` under a pinned [`@modelcontextprotocol/inspector`](https://github.com/modelcontextprotocol/inspector) `--cli` and checks the `tools/list` response for JSON-RPC envelope drift, embedded error envelopes, and zero-tool responses — this is a wire-shape gate, not a substitute for the HMAC / HITL / audit primitives, which have their own tests.
-- **Planned** — RFC 0005 Step 3 browser PKCE guide; stateless streamable HTTP for horizontal scale per MCP 2026 roadmap; iOS/visionOS exploration (v3.0+); consolidated registry re-publishing across Anthropic MCP Registry, Smithery, PulseMCP, Glama, MCP Market, Cline Marketplace, LobeHub (the `.well-known/mcp.json` endpoint is published, `mcpName` is set, and past ad-hoc registrations exist on some registries but their versions/metadata have drifted out of date — a single self-publishing PR will re-push the current manifest to each); Claude Code Plugin submission to `anthropics/claude-plugins-community` (community marketplace launched 2026-05-22; the plugin package itself — `.claude-plugin/plugin.json` + `.mcp.json` — lives at repo root and is validated by CI; the remaining step is the operator-side submission via `clau.de/plugin-directory-submission`); App Schemas codegen (WWDC 2026 introduced App Schemas — a new agentic layer over App Intents + App Entities, plus a View Annotations API for on-screen awareness and an App Intents Testing framework; the installed SDK exposes the non-deprecated `@AppIntent(schema:)` / `@AppEntity(schema:)` / `@AppEnum(schema:)` macro declarations, and full Xcode can typecheck those macros, but the default Command Line Tools still lack `AppIntentsMacros` / `AppIntentsTesting`; Calendar events, Reminders, and Contacts also lack matching public AssistantSchemas constants in the local SDK, so AirMCP keeps the generated default artifact on plain AppIntents/AppEntities until CI has a schema-capable toolchain and each mapping targets an official schema constant). iOS companion server (`ios/Sources/AirMCPServer`, ~1500 LOC) is **preview**, not GA — macOS is the shipping surface.
-- **Design intent** — Core infra (HITL · audit · rate-limit · HMAC chain · network policy · OAuth scope gate) is the differentiated layer; the tool surface is broad and JXA-thin **by design**. JXA is the bridge, not the product. The interesting code lives in `src/shared/` (audit, rate-limit, HITL, network policy, OAuth gate, structured-content validators) and the Swift bridges (`swift/Sources/AirMCPKit`) for EventKit / HealthKit / PhotoKit / Vision / FoundationModels. Blast-radius unit is one tool call. Adjacent to — not a replacement for — the canonical [Model Context Protocol reference servers](https://github.com/modelcontextprotocol/servers) (Everything, Filesystem, Fetch, Git, Memory, Sequential Thinking, Time); AirMCP fills the Apple-native domain those references leave open. Aligned with Anthropic's three-layer containment doctrine ([*How we contain Claude across products*](https://anthropic.com/engineering/how-we-contain-claude), 2026-05-27 engineering blog): the Environment layer (sandbox / VM / egress controls) and Model layer (system prompts / classifiers) are Anthropic's host-side responsibility; AirMCP implements the **External Content layer** — tool-permission gating + MCP server auditing — for the Apple-native domain, complementary to (not replacing) Claude Code's process-level Seatbelt/bubblewrap sandbox. The same production governance primitives (sensitive-action HITL, scope-gated permissions, real-time tamper-evident audit, rate-limited destructive ops, emergency stop file) that high-stakes vertical MCP servers — financial trading, crypto exchange, supply-chain attestation — build per-deployment are surfaced once here as OSS reference.
-- **Non-goals** — Per-session batched approval that covers "the next N calls" (failure mode this project is built around). Editable or skippable audit entries (the chain is load-bearing). Promising iOS parity on the public surface (preview only). Replacing native Apple apps — AirMCP automates them, it does not reimplement them. Headless / non-Apple platforms beyond what Google Workspace already provides.
-- **Redacted** — External persons, accounts, and any internal-case identifiers are deliberately omitted. Self-critical metrics ("wrapper percentage", coverage-as-quality) are not surfaced as positioning.
+## Quick Start
 
-## Features
+### Claude Desktop one-click
 
-- **295 tools** (31 modules) — Apple app CRUD + system control + Apple Intelligence + UI Automation + Screen Capture + Maps + Podcasts + Weather + iWork (Pages/Numbers/Keynote) + Google Workspace + dynamic shortcuts + context memory + audit introspection
-- **Profile-first runtime** — `starter`, `communications-safe`, `productivity`, and `full` module profiles, plus `progressive` / `profile` / `full` tool exposure so clients can start thin and expand intentionally
-- **DLC-like module packs** — `npx airmcp modules` or `AIRMCP_MODULE_PACKS=core,productivity` activates only selected packs; `list_module_packs` and `profile_status.modulesMissingPacks` make missing-pack state visible over MCP
-- **Task-scoped tool sessions** — `start_tool_session` lets a client give one task a short-lived tool allowlist; `discover_tools` and `run_tool` honor that `sessionId` so a broad runtime can still feel narrow in use
-- **232 Shortcuts / Siri AppIntents** — auto-generated from the tool manifest (83 Interactive Snippet views + 13 AppEnum pickers); workflow-first AppShortcuts ship by default, while `AskAirMCPIntent` is a FoundationModels preview gated behind `AIRMCP_ENABLE_FOUNDATION_MODELS`
-- **32 prompts + 14 YAML skill built-ins** — per-app workflows + cross-module + developer workflows + Skills DSL (`inputs` / `parallel` / `loop` / `on_error` / `retry` / 9 event triggers)
-- **9 MCP resources** — Notes, Calendar, Reminders, Music, Mail, System, Context Memory + unified `context://snapshot/{depth}`
-- **3 interactive MCP Apps** — `calendar_week_view`, `music_player`, `timeline_today` (fuses events + reminders on one day-axis)
-- **9 event triggers** — calendar, reminders, pasteboard, mail unread, focus mode, now playing, file modified, screen locked/unlocked — skills bind to any of these for automation
-- **Safety first** — HITL approval + audit log + rate limit (60/min + 10 destructive/hr) + emergency stop file + `allowNetwork` inbound HTTP exposure policy (RFC 0002)
-- **OAuth 2.1 + Resource Indicators** — RFC 0005 Steps 1+2: `with-oauth*` inbound HTTP policy, JWT verification (RS256/ES256 only, 60s clock tolerance), scope gate (`mcp:read` / `mcp:write` / `mcp:destructive` / `mcp:admin`), `.well-known/oauth-protected-resource` per RFC 9728, zero-interaction local dev via `npm run dev:oauth`. Browser MCP clients: see **[docs/oauth-browser-pkce.md](docs/oauth-browser-pkce.md)** for the Authorization Code + PKCE setup
-- **Sessionless discovery** — `.well-known/mcp.json` publishes the active advertised tool surface, enabled module inventory, network policy, allowed origins, and authorization mode so registry crawlers (Anthropic MCP Registry, Smithery, PulseMCP, Glama) catalog AirMCP without opening a session
-- **JXA + Swift 6.2 bridge** — JXA for basic automation, Swift 6 strict concurrency with EventKit/PhotoKit/HealthKit/Vision, plus opt-in FoundationModels previews
-- **Apple Intelligence preview** — On-device summarize / rewrite / proofread / `ai_agent` / `ai_plan_metrics` (planner regression catcher) via Foundation Models. This path is macOS 26+ / Apple Silicon and compile-time opt-in (`AIRMCP_ENABLE_FOUNDATION_MODELS`). WWDC 2026 made the model layer officially pluggable: Foundation Models gained a `LanguageModel` protocol where on-device, Private Cloud Compute, and third-party cloud models back the same session API — Anthropic and Google publish Swift packages for their frontier models ([WWDC26 session 241](https://developer.apple.com/videos/play/wwdc2026/241/), first-party). Apple's own announcement names no Siri backbone vendor — the widely reported Gemini deal is press reporting, not Apple's wording — and AirMCP doesn't bet on one either way: the governance layer (sensitive-action HITL, HMAC-chained audit, scope gate, rate limits) is model-agnostic, and the brains stay in whatever MCP client you connect.
-- **Context memory** — `memory_put`/`query`/`forget`/`stats` + `memory://recent` resource for facts/entities/episodes, surviving restarts
-- **Native menubar app** — SwiftUI companion with onboarding wizard, auto-start, log viewer, update notifications, permission setup, server crash auto-restart, and app-owned loopback HTTP runtime for clients that should not each launch their own AirMCP server. Current release builds are ad-hoc signed; Developer ID codesigning + notarization (Gatekeeper-green) are wired in `.github/workflows/release-app.yml` but gated on Apple signing secrets, so they have not shipped yet.
-- **One-click setup** — `setup_permissions` tool or menubar app to request all macOS permissions at once
-- **Dual transport** — stdio (default) + HTTP/SSE (`--http`) with token auth, origin allow-list, and startup invariants that refuse to boot misconfigured servers
+1. Download `airmcp-<version>.mcpb` from
+   [Releases](https://github.com/heznpc/AirMCP/releases).
+2. Drag it onto Claude Desktop, or use **Settings -> Extensions -> Install from
+   file...**.
+3. Choose modules in the install form and finish setup.
 
-## Get Started
+Full guide: [docs/mcpb.md](docs/mcpb.md).
 
-Two paths. The menubar app is the recommended local runtime: start AirMCP.app once, then point Claude, Codex, Cursor, Windsurf, or other clients at that same loopback server. Claude Desktop users can also get one-click install via `.mcpb`, which is convenient but launches under Claude Desktop rather than the AirMCP.app-owned runtime.
+### CLI wizard
 
-### Option A — Claude Desktop one-click install (recommended for non-devs)
-
-1. Download `airmcp-<version>.mcpb` from [Releases](https://github.com/heznpc/AirMCP/releases).
-2. Drag it onto Claude Desktop, or **Settings → Extensions → Install from file…**.
-3. Fill in the config form (Gemini API key optional; modules toggle). Click Install.
-
-Full walkthrough: **[docs/mcpb.md](docs/mcpb.md)**.
-
-### Option B — CLI wizard (2 minutes)
-
-**1. Install Node.js** — `brew install node` or [nodejs.org](https://nodejs.org).
-
-**2. Run the Setup Wizard**:
+Install Node.js 20+, then run:
 
 ```bash
 npx airmcp init
 ```
 
-Picks the modules to enable, writes the MCP-client config, saves preferences to `~/.config/airmcp/config.json`.
+The wizard selects a profile, writes MCP client config, and stores preferences
+in `~/.config/airmcp/config.json`.
 
-Non-interactive setup:
+Non-interactive examples:
 
 ```bash
 npx airmcp init --profile starter --yes
@@ -79,276 +70,124 @@ npx airmcp init --profile productivity --yes
 npx airmcp init --profile productivity --yes --client-runtime direct
 ```
 
-**3. Restart your MCP client.** Your AI can now read notes, manage reminders, check your calendar, and more.
-
-### Troubleshooting
+Check the install:
 
 ```bash
 npx airmcp doctor
 ```
 
-Checks Node.js version, config files, MCP client setup, macOS permissions, and module status — all in one command.
+## Common Workflows
 
-### Module add-ons
+Once connected, ask your MCP client in natural language:
+
+- "Brief me on today's calendar, overdue reminders, unread mail, and recent
+  notes."
+- "Turn today's meetings into a prep checklist."
+- "Draft replies for urgent mail, but ask before sending anything."
+- "For my next meeting, find related notes, contacts, files, and reminders."
+- "Search my Safari tabs for that article and save the summary to Notes."
+- "Run my Morning Routine shortcut."
+- "Take a screenshot and save it to my Desktop."
+
+More workflow examples live in [docs/workflows.md](docs/workflows.md).
+
+## Runtime Model
+
+AirMCP is designed to keep a large local capability surface usable without
+dumping the full catalog into every client context.
+
+- **Profiles**: `starter`, `communications-safe`, `productivity`, `full`, or
+  `custom`.
+- **Tool exposure**: `progressive`, `profile`, or `full`.
+- **Module packs**: enable only the packs you want with `npx airmcp modules` or
+  `AIRMCP_MODULE_PACKS=core,productivity`.
+- **Task sessions**: `start_tool_session`, `discover_tools`, and `run_tool`
+  allow a broad runtime to behave like a narrow task-specific toolbelt.
+- **Opt-in network modules**: `webhooks` and `powerautomate` stay off in every
+  profile until explicitly enabled.
+
+Useful commands:
 
 ```bash
 npx airmcp modules
-npx airmcp modules enable productivity,communications
 npx airmcp modules enable productivity --install
-npx airmcp modules uninstall media
-npx airmcp modules doctor
-```
-
-This edits the runtime `modulePacks` activation set. `--install` installs the matching companion npm add-on into `~/.airmcp/addons` (override with `AIRMCP_ADDON_INSTALL_PREFIX`) and then activates the pack; `uninstall` disables the pack and removes that companion package. The npm and MCPB release artifacts ship as a slim root, while `npm run addons:build` stages tarball-ready physical add-on packages from `dist`, `npm run addons:verify-install` proves installed add-ons are load-bearing in `external-only` mode, and `npm run addons:measure-split` records the slim-root size/startup delta against the universal local build. Add-on package names intentionally omit `pack-*` naming, for example `@heznpc/airmcp-productivity`.
-
-### Inbound webhooks & Power Automate (opt-in)
-
-Two network-facing modules stay **off in every profile — including `full`** — until you enable them explicitly. They give AirMCP a bridge to the Windows/cloud side without a Mac-as-server backend, and they are gated this way because they are the only surfaces that accept inbound traffic or trigger external flows.
-
-- **`webhooks`** (`AIRMCP_ENABLE_WEBHOOKS=true`) — AirMCP's other nine event sources all observe the *local* Mac (calendar, clipboard, focus, files…). This one lets the outside world push an event to a skill. `webhook_listen_start` opens a loopback HTTP listener; each verified `POST` becomes a `webhook_received` event, and a skill with `trigger.event: webhook_received` acts on it. `webhook_listen_stop` / `webhook_listen_status` manage it. Safety defaults: binds `127.0.0.1` only, optional HMAC-SHA256 over `x-airmcp-signature`, a 1 MiB body cap (413 on overflow), and any non-loopback bind **requires** a ≥32-char secret. The listener replies `202` on a verified request; the skill runs asynchronously.
-- **`powerautomate`** (`AIRMCP_ENABLE_POWERAUTOMATE=true`) — `cloudflow_trigger` POSTs to a Power Automate Cloud Flow HTTP trigger URL (SAS `sig` param or OAuth Bearer), with a hard 120 s timeout (the Cloud Flow Response action cap) and a streamed response-size cap so a misconfigured flow can't OOM an agent loop.
-
-Together they close the round trip: a skill fires a Cloud Flow with `cloudflow_trigger`, the flow does Windows-side work, then `POST`s back to the webhook listener, which emits `webhook_received` for a follow-up skill. Both remain governed by the same HITL approval, HMAC-chained audit log, rate limits, and network policy as every other AirMCP tool.
-
-> **OAuth footgun** — a Cloud Flow HTTP trigger's OAuth `scope` must use a **double** slash before `.default`: `https://service.flow.microsoft.com//.default`. A single slash returns `MisMatchingOAuthClaims`, because the audience URL itself ends with `/`.
-
-### Workflow Catalog
-
-```bash
 npx airmcp workflows
 npx airmcp workflows daily-briefing --prompt
 ```
 
-Shows the target workflows AirMCP is built around — prompts, Siri phrases, core tools, and safety notes. See [docs/workflows.md](docs/workflows.md) for the target users, workflow catalog, and product direction behind this list.
+The complete generated tool manifest is in
+[docs/tool-manifest.json](docs/tool-manifest.json).
 
-The macOS menubar app exposes the same workflow catalog under **Workflows**, so non-CLI users can copy the right prompt or Siri phrase without reading the docs.
+## Safety Model
 
-## Try It — Apple Workspace Workflows
+AirMCP treats local app access as a governed action layer, not a blind shell for
+agents.
 
-Once connected, just ask your AI in natural language. Here are some things you can try:
+- **Per-call human approval** for destructive and sensitive actions at the
+  default `sensitive-only` HITL level.
+- **HMAC-chained audit log** at `~/.airmcp/audit.jsonl`, with tamper detection
+  covered by tests.
+- **Rate limits**: 60 calls/minute globally and 10 destructive calls/hour.
+- **Emergency stop**: `touch ~/.config/airmcp/emergency-stop` blocks destructive
+  tools without restarting the server.
+- **Inbound HTTP policy** through `AIRMCP_ALLOW_NETWORK`: loopback-only by
+  default, with token, origin, or OAuth modes available for wider exposure.
+- **OAuth 2.1 + Resource Indicators** for HTTP runtimes that need scoped access
+  control.
 
-**Daily Command Briefing**
-
-- "Brief me on today's calendar, overdue reminders, unread mail, and recent notes"
-- "Turn today's meetings into a prep checklist"
-- "Summarize what changed since yesterday and save it as a note"
-
-**Inbox → Tasks**
-
-- "Find emails from Alex about the project and create reminders for action items"
-- "Draft replies for urgent mail, but ask before sending anything"
-- "Move newsletters out of the inbox and keep only messages that need action"
-
-**Meeting Prep**
-
-- "For my next meeting, find related notes, contacts, files, and reminders"
-- "Create a meeting agenda in Notes from recent mail and project notes"
-- "After this meeting, turn the notes into follow-up reminders"
-
-**Research → Output**
-
-- "Open the Apple developer docs in Safari and summarize the page"
-- "Search my Safari tabs for that article I was reading about Swift"
-- "Find the Q1 report, read it, and draft a summary email to the team"
-
-**Siri and Shortcuts**
-
-- "Hey Siri, Daily Briefing in AirMCP"
-- "Hey Siri, triage my inbox with AirMCP"
-- "Hey Siri, Ask AirMCP about my day" *(FoundationModels opt-in build only)*
-
-**Power User**
-
-- "Turn on dark mode, set volume to 50%, and lower brightness"
-- "Take a screenshot and save it to my Desktop"
-- "Run my 'Morning Routine' shortcut"
-
-These are the first-class use cases. The full tool catalog stays available when you need to compose something more specific.
-
----
-
-## Why AirMCP?
-
-**AirMCP is a shared action layer, not a tool collection.** Siri and Shortcuts give Apple-native entry points; Claude, Codex, Cursor, Raycast, and other MCP clients bring external agents; AirMCP gives all of them the same governed runtime for Apple workspace actions. The value lives below the tool surface:
-
-- **Workflow engine** — declare multi-step automations in YAML with `parallel` / `loop` / `on_error` / `retry` / 9 event triggers. Not one-shot tool calls — a runtime that *orchestrates*.
-- **Semantic memory** — facts / entities / episodes with Gemini or on-device Swift embeddings. Persistent across restarts. This is agent context, not an OS feature.
-- **Safety primitives** — HITL approval, HMAC-chained audit log with tamper-detection asserted as a tested contract (`tests/audit-tamper-detection.test.js`), rate limiting, emergency stop, OAuth 2.1 + Resource Indicators (production-grade JWT verifier with RS256/ES256 + RFC 8707 audience + RFC 9728 protected-resource metadata + DPoP advertisement).
-- **Native Swift bridge** *(optional — build from source with `npm run swift-build`; not shipped in the npm tarball or the `.mcpb` bundle)* — direct access to EventKit / HealthKit / PhotoKit / Vision, with Foundation Models behind the explicit `AIRMCP_ENABLE_FOUNDATION_MODELS` preview flag. Not an `osascript` wrapper.
-- **Multi-client by design** — the same workflows can be reached from Siri/Shortcuts via AppIntents and from Claude, Codex, opencode, Gemini CLI, Antigravity, Cursor, Zed, Cline, JetBrains Air, OpenClaw, ChatGPT MCP Apps, and any future MCP-capable AI. No per-client porting.
-
-### What AirMCP is — and isn't
-
-**Is**: the governed action layer for AI on Apple. Siri can understand the request; AirMCP gives it hands, memory, workflows, and guardrails. External MCP agents use the same runtime through stdio or HTTP. When Apple ships more native action APIs, AirMCP can delegate lower-level app calls to the OS while keeping the orchestration and governance layer above.
-
-**Isn't**: a thin per-app wrapper. The distinctive thing is *integrated depth* — 295 tools + Swift bridge + Skills DSL + production-grade safety primitives + Google Workspace + iOS AppIntents in one auditable open-source codebase, with the governance layer (sensitive-action HITL, HMAC-chained audit, scope gate, rate limit) as the load-bearing part, not the tool count.
-
-### Integrated depth
-
-The point is the combination in one auditable codebase, not any single capability:
-
-- **295 tools across 31 modules** — Apple app CRUD + system control + Apple Intelligence + iWork + Google Workspace + dynamic Shortcuts.
-- **Skills DSL workflow engine** — `parallel` / `loop` / `on_error` / `retry` / 9 event triggers.
-- **Semantic memory** — Gemini + on-device Swift embeddings, persistent across restarts.
-- **Production safety primitives** — HITL for destructive and other configured sensitive actions, HMAC-chained audit log (tamper-detection asserted in `tests/audit-tamper-detection.test.js`), rate limiting, emergency stop, OAuth 2.1 + Resource Indicators (RS256/ES256 JWT + RFC 8707 audience + RFC 9728 PRM + DPoP advertisement). DPoP is advertised in the `.well-known` card, not enforced — `dpop_bound_access_tokens_required: false`; tokens are not yet bound to a proof.
-- **Input validation** — Zod on every tool + outputSchema on reads + script↔schema contract tests.
-- **Native Swift API depth** — direct EventKit / HealthKit / PhotoKit / Vision, plus opt-in Foundation Models preview builds; not an `osascript` wrapper.
-- **iOS surface** — 232 auto-generated AppIntents + AppShortcutsProvider (RFC 0007); `AskAirMCPIntent` is present only in `AIRMCP_ENABLE_FOUNDATION_MODELS` builds on iOS 26+/macOS 26+.
-- **9-language i18n**, **multi-client** (any MCP-capable AI), **open source** (every line auditable, modifiable, forkable).
-
-### Why this position holds
-
-- **Tool surface is leverage, not the moat.** Apple's eventual system MCP will replace many AppleScript wrappers; AirMCP's *workflow engine + safety + memory + multi-client + Google Workspace* layer survives as the integration above the OS.
-- **Open source**: every line auditable, modifiable, forkable. Apple's closed alternative won't have this.
-- **Sustained development on integrated depth**: actively maintained at v2.12+ with a CI-gated release pipeline, 1900+ test assertions, and the governance layer kept under tamper-detection contracts — depth that compounds over time rather than a one-shot tool dump.
-- **WWDC 2026 validated the category** ([keynote 2026-06-08](https://www.macrumors.com/2026/06/08/wwdc-2026-live-coverage/); App Schemas [session 240](https://developer.apple.com/videos/play/wwdc2026/240/) + agentic-security [session 347](https://developer.apple.com/videos/play/wwdc2026/347/), both first-party; full analysis in [`docs/rfc/0011-post-wwdc-2026.md`](docs/rfc/0011-post-wwdc-2026.md)). Apple deprecated SiriKit and made **App Intents the mandatory — and only — way a third-party app reaches Siri**, then layered **App Schemas** on top for agentic, cross-app, onscreen-aware actions. AirMCP already auto-generates App Intents (RFC 0007), so it was on the one blessed path before Apple made it mandatory. Apple's own agentic-security session now tells developers to add **user confirmation for sensitive actions, authentication, and prompt-injection containment** — the exact governance AirMCP has shipped from day one. And Apple drew a **two-layer line**: the *consumer/Siri* path is App Intents (Apple-proprietary, Siri-only) — no consumer MCP — while at the *developer/agent* layer Apple **ratified MCP** (Xcode 27 takes "skills, MCP tools and any agent via the Agent Client Protocol"; Xcode is itself an MCP server via `xcrun mcpbridge`). So MCP is now Apple's blessed agent-tool interface, and every *non-Siri* agent — Claude, Codex, opencode, Gemini CLI, Cursor, Zed, Cline, ChatGPT MCP Apps, and Apple's own Xcode — acts through MCP. Apple owns the default assistant; **AirMCP is the open action runtime for every other AI client** — one governed catalog feeding both the App Intents (Siri) surface and the MCP surface.
-
-
----
-
-## Skills DSL
-
-Declare a multi-step workflow in YAML and expose it as an MCP prompt **or** tool. The executor handles error policy, retries, parallel fan-out, loops, runtime arguments, and event triggers.
-
-```yaml
-name: sender-to-tasks
-title: Sender → Tasks
-expose_as: tool
-
-inputs:
-  query: { type: string, default: newsletter }
-  mailbox: { type: string, default: INBOX }
-  limit: { type: number, default: 10 }
-
-steps:
-  - id: hits
-    tool: search_messages
-    args: { query: "{{query}}", mailbox: "{{mailbox}}", limit: "{{limit}}" }
-    retry: 2
-    retry_backoff_ms: 1000
-
-  - id: queue
-    tool: create_reminder
-    only_if: "{{hits}} != null"
-    loop: "{{hits}}"
-    on_error:
-      continue # per-iteration: a HITL denial on one item
-      # doesn't abort the rest of the batch
-    args:
-      title: "Follow up: {{_item.subject}}"
-      body: "From {{_item.sender}} (query: {{query}})"
-```
-
-**Built-in skills** (14): `morning-briefing`, `calendar-alert`, `inbox-triage`, `meeting-action-items`, `focus-guardian`, `skills-weekly-review`, `project-digest`, `weekly-digest-note`, `focus-block-planner`, `clipboard-url-to-reading`, `favorites-digest`, `sender-to-tasks`, `evening-winddown`, `daily-journal`.
-
-**Event triggers**: `calendar_changed`, `reminders_changed`, `pasteboard_changed`, `mail_unread_changed`, `focus_mode_changed`, `now_playing_changed`, `file_modified`, `screen_locked`, `screen_unlocked`.
-
-User-authored skills land in `~/.config/airmcp/skills/*.yaml` and hot-reload.
-
----
-
-## Safety & Operations
-
-AirMCP can register up to 295 tools on your machine. The default starter/progressive surface exposes only a small front door, and these layers keep a buggy agent plan from turning into an incident:
-
-- **HITL approval** — at the default level, every sensitive or destructive tool prompts before firing (via MCP Elicitation or a Unix socket fallback). Per-call, per-scope.
-- **Rate limit** — 60 tool calls/minute globally, 10 destructive/hour. Token-bucket so bursts are fine; sustained rate isn't.
-- **Emergency stop** — `touch ~/.config/airmcp/emergency-stop` blocks every destructive tool immediately with a 1-second probe cache. No restart needed. `rm` the file to resume.
-- **Audit log** — every tool call lands in `~/.airmcp/audit.jsonl` with PII-scrubbed args, 0600 perms, 10MB rotation. Query it via `audit_log` / `audit_summary` tools. Each entry carries an HMAC chain (single-line tamper detection — `AIRMCP_AUDIT_HMAC_KEY` for cross-machine integrity) and a **correlation ID** that threads the entry, any thrown error, and the OpenTelemetry span (when enabled) for the same call — so a failing tool can be traced across log lines with one `grep`. **Every env knob lives in [docs/environment.md](docs/environment.md)** (77 vars indexed by category).
-- **Inbound HTTP exposure policy** (RFC 0002) — `AIRMCP_ALLOW_NETWORK` = `loopback-only` (default) / `with-token` / `with-token+origin` / `with-oauth` / `with-oauth+origin` / `unauthenticated`. This controls who can reach AirMCP's HTTP server; it is not a general outbound egress allow-list (the only outbound-side filtering is the Safari URL guard on `open_url`/`add_to_reading_list`, which rejects non-`http(s)` schemes and loopback/RFC1918/link-local destinations). Startup invariant refuses to boot a misconfigured server. Reverse-proxy header detection warns when a `loopback-only` server sees `X-Forwarded-*` so silently-public deploys get caught.
-- **`npx airmcp doctor`** — runs all the above policy + macOS compatibility + permission checks in one command.
-
----
-
-## Siri · Shortcuts · Spotlight (iOS 17+ / macOS 14+)
-
-AirMCP's tools auto-register as Apple App Intents — **231 generated intents** across read + non-destructive write surfaces (RFC 0007 Phase A). Destructive intents are env-gated (`AIRMCP_APPINTENTS_DESTRUCTIVE=true` opt-in). Anything that speaks the Intents system — Siri, Shortcuts, Spotlight, the Action Button, Widgets — calls them directly without opening the app.
-
-- **Workflow-first Siri phrases** ship out of the box via `AppShortcutsProvider` (codegen'd from the MCP tool manifest). The default provider uses nine workflow/read shortcuts; the optional `Ask AirMCP` natural-language shortcut is compiled separately when FoundationModels are enabled.
-- **Shortcuts app**: every AirMCP tool appears as an action with typed parameters.
-- **iOS 26 "Use Model"**: autonomously picks AirMCP tools as tool-call targets.
-- **Interactive Snippets** (iOS 26+): 83 typed tools render SwiftUI result views inline in Shortcuts/Siri/Spotlight.
-- **"Ask AirMCP" preview** (iOS 26+/macOS 26+, opt-in build): natural-language agent routed to Apple's on-device Foundation Models with AirMCP tools registered. 100% on-device, but not part of the default Swift build.
-
-See [docs/shortcuts.md](docs/shortcuts.md) for the full guide + [RFC 0007](docs/rfc/0007-app-intent-bridge.md) for the architecture.
-
----
+Environment variables are indexed in [docs/environment.md](docs/environment.md).
+HTTP policy details are in
+[RFC 0002](docs/rfc/0002-http-allow-network.md), and OAuth details are in
+[RFC 0005](docs/rfc/0005-oauth-resource-indicators.md).
 
 ## Client Setup
 
-Works with any MCP-compatible client. Start AirMCP.app first; it owns the local Apple permissions and starts a token-gated HTTP runtime on `http://127.0.0.1:3847/mcp`. Stdio-only clients use `npx -y airmcp connect` as a proxy into that runtime with `AIRMCP_HTTP_TOKEN` set. The app and setup wizard generate the per-install token at `~/Library/Application Support/AirMCP/http-token`.
+The recommended desktop pattern is one local AirMCP runtime, with clients
+connecting to it. The app or setup wizard generates a per-install token at:
 
-### Claude Desktop
-
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "airmcp": {
-      "command": "npx",
-      "args": ["-y", "airmcp", "connect", "--url", "http://127.0.0.1:3847/mcp"],
-      "env": {
-        "AIRMCP_HTTP_TOKEN": "<token>"
-      }
-    }
-  }
-}
+```text
+~/Library/Application Support/AirMCP/http-token
 ```
 
-### Claude Code
+Stdio clients can proxy into the app-owned HTTP runtime:
+
+```bash
+npx -y airmcp connect --url http://127.0.0.1:3847/mcp
+```
+
+Set `AIRMCP_HTTP_TOKEN` to the token value when using that proxy.
+
+Examples:
 
 ```bash
 claude mcp add --env AIRMCP_HTTP_TOKEN=<token> airmcp -- npx -y airmcp connect --url http://127.0.0.1:3847/mcp
-```
-
-### Codex
-
-```bash
 codex mcp add --env AIRMCP_HTTP_TOKEN=<token> airmcp -- npx -y airmcp connect --url http://127.0.0.1:3847/mcp
 ```
 
-### Cursor
+Direct stdio mode still works for development or isolated client-owned runtimes:
 
-Add to `.cursor/mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "airmcp": {
-      "command": "npx",
-      "args": ["-y", "airmcp", "connect", "--url", "http://127.0.0.1:3847/mcp"],
-      "env": {
-        "AIRMCP_HTTP_TOKEN": "<token>"
-      }
-    }
-  }
-}
+```bash
+npx -y airmcp
 ```
 
-### Windsurf
+Browser-based MCP clients should use HTTP mode with token and origin checks. See
+[docs/oauth-browser-pkce.md](docs/oauth-browser-pkce.md) for the browser/OAuth
+path.
 
-Add to `~/.codeium/windsurf/mcp_config.json`:
+## Siri and Shortcuts
 
-```json
-{
-  "mcpServers": {
-    "airmcp": {
-      "command": "npx",
-      "args": ["-y", "airmcp", "connect", "--url", "http://127.0.0.1:3847/mcp"],
-      "env": {
-        "AIRMCP_HTTP_TOKEN": "<token>"
-      }
-    }
-  }
-}
-```
+AirMCP can generate AppIntents and AppShortcuts from the same MCP tool manifest.
+That gives Siri, Shortcuts, Spotlight, widgets, and the Action Button typed
+access to the same governed runtime.
 
-### Other MCP Clients
+Destructive intents are opt-in with `AIRMCP_APPINTENTS_DESTRUCTIVE=true`.
+`AskAirMCPIntent` and FoundationModels-backed Apple Intelligence paths are
+preview-only and require explicit Swift builds.
 
-Any client that supports the MCP stdio transport can use AirMCP. Use `npx -y airmcp connect --url http://127.0.0.1:3847/mcp` with `AIRMCP_HTTP_TOKEN` set when AirMCP.app owns the runtime. Direct HTTP clients must send `Authorization: Bearer <token>`. Use direct `npx -y airmcp` only when you intentionally want that client process to own a separate server instance; `npx airmcp init --client-runtime direct` and `npx airmcp connect-clients --client-runtime direct` write that shape explicitly.
+Guide: [docs/shortcuts.md](docs/shortcuts.md). Architecture:
+[RFC 0007](docs/rfc/0007-app-intent-bridge.md).
 
-### Local Development
+## Local Development
 
 ```bash
 git clone https://github.com/heznpc/AirMCP.git
@@ -358,782 +197,80 @@ npm run build
 node dist/index.js
 ```
 
-### Developer Testing
+Useful checks:
 
 ```bash
-npm run dev:test -- notes             # test one module (fast, in-process)
-npm run dev:test:changed              # test only git-changed modules
-npm run dev:test:watch -- notes       # watch mode: auto re-test on save
-npm run dev:test -- --tool list_notes # test a single tool
+npm test
+npm run mcp:validate
+npm run dev:test -- notes
+npm run dev:test:changed
 ```
 
-See [Testing & Debugging Guide](docs/testing.md) for the full testing workflow.
-
-### Menubar App (Optional)
-
-A native SwiftUI companion app for server status monitoring and permission setup.
-
-```bash
-cd app && swift build -c release
-# Binary: app/.build/release/AirMCPApp
-```
-
-Features: onboarding wizard, auto-start on login, log viewer, update notifications, server status, one-click permission setup, MCP client config clipboard copy.
-
-### HTTP Mode
-
-HTTP server mode for remote agents, registries, and multi-client setups:
-
-```bash
-npx airmcp --http --port 3847
-```
-
-- Endpoint: `POST/GET/DELETE /mcp`
-- Transport: Streamable HTTP + SSE (MCP spec 2025-11-25)
-- Session management via `Mcp-Session-Id` header
-- Default port: 3847
-- Startup policy invariant (RFC 0002): refuses to bind public interfaces without a token — see [Safety & Operations](#safety--operations) above.
-
-Useful for running a Mac Mini as an "always-on AI hub."
-
-### Claude in Chrome & other browser-based MCP clients
-
-Browser extensions — including Anthropic's **Claude in Chrome** — can't spawn stdio subprocesses, so they consume MCP over HTTP. AirMCP's HTTP transport is designed for exactly this case.
-
-**1 · Start AirMCP with a token + origin allow-list:**
-
-```bash
-# Generate a token and keep it — you'll paste it into the Chrome extension.
-export AIRMCP_HTTP_TOKEN=$(openssl rand -hex 32)
-
-# Only accept requests whose Origin matches Claude's web UI:
-export AIRMCP_ALLOWED_ORIGINS="https://claude.ai"
-
-# Declarative policy: external binding, token required, Origin allow-list enforced.
-export AIRMCP_ALLOW_NETWORK="with-token+origin"
-
-npx airmcp --http --bind-all --port 3847
-```
-
-**2 · In the browser extension's MCP settings, add:**
-
-| Field       | Value                                                                        |
-| ----------- | ---------------------------------------------------------------------------- |
-| Server URL  | `http://<your-mac>:3847/mcp` (or `https://…` behind a TLS-terminating proxy) |
-| Auth header | `Authorization: Bearer <AIRMCP_HTTP_TOKEN>`                                  |
-| Transport   | Streamable HTTP (SSE)                                                        |
-
-**3 · Verify wiring:**
-
-```bash
-# From the same machine — should return the server card JSON:
-curl http://127.0.0.1:3847/.well-known/mcp.json
-```
-
-The response includes `"network_policy": "with-token+origin"` so the client can confirm what it's connecting to before a single tool call. Registry crawlers (Anthropic MCP Registry, Smithery, PulseMCP, Glama) use the same endpoint to build their catalog without connecting live — it carries the full tool inventory (`tools.count`, `tools.names`), enabled modules, license, and homepage, so a crawler can surface "AirMCP: 295 tools across calendar, notes, mail, …" without opening a session. MCP spec version pinned via `schema_version: "2025-11-25"`. When the policy is `with-oauth*`, a sibling `/.well-known/oauth-protected-resource` endpoint (RFC 9728) advertises the authorization server + audience + supported scopes so conforming clients can negotiate OAuth before the first MCP call.
-
-Running AirMCP on a laptop that suspends? Put the menubar app on your Mac Mini / always-on host, point the browser at that hostname, and leave the token in Chrome's secure storage. Revoke by rotating `AIRMCP_HTTP_TOKEN` and restarting the server.
-
-**Security gotchas** — in order of "most likely to bite":
-
-- Don't put AirMCP behind a proxy that strips `X-Forwarded-*` without also switching to `AIRMCP_ALLOW_NETWORK=with-token`. AirMCP detects proxy headers and warns, but only when it's in `loopback-only` mode — flip the policy first.
-- Don't hand-edit origin lists into `"*"` — the Origin check is your last line of defence if a token leaks from the extension's storage.
-- `touch ~/.config/airmcp/emergency-stop` on the server blocks every destructive call within 1s, no restart needed. Remember this path.
-
-## Tools
-
-### Notes (12 tools)
-
-| Tool              | Description                              | Type        |
-| ----------------- | ---------------------------------------- | ----------- |
-| `list_notes`      | List all notes with title, folder, dates | read        |
-| `search_notes`    | Search by keyword in title and body      | read        |
-| `read_note`       | Read full content by ID                  | read        |
-| `create_note`     | Create a note with HTML body             | write       |
-| `update_note`     | Replace entire body                      | destructive |
-| `delete_note`     | Delete (moved to Recently Deleted)       | destructive |
-| `move_note`       | Move to another folder                   | destructive |
-| `list_folders`    | List folders with note counts            | read        |
-| `create_folder`   | Create a new folder                      | write       |
-| `scan_notes`      | Bulk scan with metadata and preview      | read        |
-| `compare_notes`   | Compare 2-5 notes side by side           | read        |
-| `bulk_move_notes` | Move multiple notes at once              | destructive |
-
-### Reminders (11 tools)
-
-| Tool                        | Description                                  | Type        |
-| --------------------------- | -------------------------------------------- | ----------- |
-| `list_reminder_lists`       | List all lists with counts                   | read        |
-| `list_reminders`            | Filter by list/completed                     | read        |
-| `read_reminder`             | Full details by ID                           | read        |
-| `create_reminder`           | Create with due date/priority                | write       |
-| `update_reminder`           | Update properties                            | destructive |
-| `complete_reminder`         | Mark complete/incomplete                     | write       |
-| `delete_reminder`           | Delete permanently                           | destructive |
-| `search_reminders`          | Search by keyword in name/body               | read        |
-| `create_reminder_list`      | Create a new reminder list                   | write       |
-| `delete_reminder_list`      | Delete a reminder list                       | destructive |
-| `create_recurring_reminder` | Create with recurrence rule (Swift/EventKit) | write       |
-
-### Calendar (10 tools)
-
-| Tool                     | Description                                  | Type        |
-| ------------------------ | -------------------------------------------- | ----------- |
-| `list_calendars`         | List calendars with name/color               | read        |
-| `list_events`            | Events in date range with pagination         | read        |
-| `read_event`             | Full details with attendees                  | read        |
-| `create_event`           | Create with location/description             | write       |
-| `update_event`           | Update properties                            | destructive |
-| `delete_event`           | Delete permanently                           | destructive |
-| `search_events`          | Keyword search in date range                 | read        |
-| `get_upcoming_events`    | Next N events from now                       | read        |
-| `today_events`           | All events for today                         | read        |
-| `create_recurring_event` | Create with recurrence rule (Swift/EventKit) | write       |
-
-### Contacts (10 tools)
-
-| Tool                 | Description                              | Type        |
-| -------------------- | ---------------------------------------- | ----------- |
-| `list_contacts`      | List with email/phone, pagination        | read        |
-| `search_contacts`    | Search by name, email, phone, or org     | read        |
-| `read_contact`       | Full details (emails, phones, addresses) | read        |
-| `create_contact`     | Create with email/phone/org              | write       |
-| `update_contact`     | Update properties                        | destructive |
-| `delete_contact`     | Delete permanently                       | destructive |
-| `list_groups`        | List contact groups                      | read        |
-| `add_contact_email`  | Add email to existing contact            | write       |
-| `add_contact_phone`  | Add phone to existing contact            | write       |
-| `list_group_members` | List contacts in a group                 | read        |
-
-### Mail (11 tools)
-
-| Tool                | Description                       | Type        |
-| ------------------- | --------------------------------- | ----------- |
-| `list_mailboxes`    | List mailboxes with unread counts | read        |
-| `list_messages`     | Recent messages in a mailbox      | read        |
-| `read_message`      | Full message content              | read        |
-| `search_messages`   | Search by subject/sender          | read        |
-| `mark_message_read` | Mark read/unread                  | write       |
-| `flag_message`      | Flag/unflag a message             | write       |
-| `get_unread_count`  | Total unread across all mailboxes | read        |
-| `move_message`      | Move message to another mailbox   | destructive |
-| `list_accounts`     | List all mail accounts            | read        |
-| `send_mail`         | Compose and send an email         | write       |
-| `reply_mail`        | Reply to an email message         | write       |
-
-### Music (17 tools)
-
-| Tool                   | Description                                | Type        |
-| ---------------------- | ------------------------------------------ | ----------- |
-| `list_playlists`       | List playlists with track counts           | read        |
-| `list_tracks`          | Tracks in a playlist                       | read        |
-| `now_playing`          | Current track and playback state           | read        |
-| `playback_control`     | Play, pause, next, previous                | write       |
-| `search_tracks`        | Search by name/artist/album                | read        |
-| `play_track`           | Play a specific track by name              | write       |
-| `play_playlist`        | Start playing a playlist                   | write       |
-| `get_track_info`       | Detailed track metadata                    | read        |
-| `set_shuffle`          | Set shuffle and repeat mode                | write       |
-| `create_playlist`      | Create a new playlist                      | write       |
-| `add_to_playlist`      | Add a track to a playlist                  | write       |
-| `remove_from_playlist` | Remove a track from a playlist             | destructive |
-| `delete_playlist`      | Delete an existing playlist                | destructive |
-| `get_rating`           | Get rating, favorited, and disliked status | read        |
-| `set_rating`           | Set star rating (0-100) for a track        | write       |
-| `set_favorited`        | Mark or unmark a track as favorited        | write       |
-| `set_disliked`         | Mark or unmark a track as disliked         | write       |
-
-### Finder (8 tools)
-
-| Tool               | Description                   | Type        |
-| ------------------ | ----------------------------- | ----------- |
-| `search_files`     | Spotlight file search         | read        |
-| `get_file_info`    | File info (size, dates, tags) | read        |
-| `set_file_tags`    | Set Finder tags               | destructive |
-| `recent_files`     | Recently modified files       | read        |
-| `list_directory`   | List files in directory       | read        |
-| `move_file`        | Move/rename file              | destructive |
-| `trash_file`       | Move to Trash                 | destructive |
-| `create_directory` | Create new directory          | write       |
-
-### Safari (12 tools)
-
-| Tool                  | Description                       | Type        |
-| --------------------- | --------------------------------- | ----------- |
-| `list_tabs`           | List tabs across all windows      | read        |
-| `read_page_content`   | Read page text content            | read        |
-| `get_current_tab`     | Current active tab URL/title      | read        |
-| `open_url`            | Open URL in Safari                | write       |
-| `close_tab`           | Close a specific tab              | destructive |
-| `activate_tab`        | Switch to a specific tab          | write       |
-| `run_javascript`      | Execute JavaScript in tab         | write       |
-| `search_tabs`         | Search tabs by title/URL          | read        |
-| `list_bookmarks`      | List all bookmarks across folders | read        |
-| `add_bookmark`        | Add a bookmark to Safari          | write       |
-| `list_reading_list`   | List Reading List items           | read        |
-| `add_to_reading_list` | Add URL to Reading List           | write       |
-
-### System (27 tools)
-
-| Tool                     | Description                                  | Type        |
-| ------------------------ | -------------------------------------------- | ----------- |
-| `get_clipboard`          | Read clipboard content                       | read        |
-| `set_clipboard`          | Write to clipboard                           | write       |
-| `get_volume`             | Get system volume                            | read        |
-| `set_volume`             | Set system volume                            | write       |
-| `toggle_dark_mode`       | Toggle dark/light mode                       | write       |
-| `get_frontmost_app`      | Get frontmost application                    | read        |
-| `list_running_apps`      | List running applications                    | read        |
-| `get_screen_info`        | Display information                          | read        |
-| `show_notification`      | Show system notification                     | write       |
-| `capture_screenshot`     | Capture screenshot (full/window/selection)   | write       |
-| `get_wifi_status`        | WiFi connection status and signal            | read        |
-| `toggle_wifi`            | Turn WiFi on or off                          | write       |
-| `list_bluetooth_devices` | List paired Bluetooth devices                | read        |
-| `get_battery_status`     | Battery percentage, charging, time remaining | read        |
-| `get_brightness`         | Get display brightness level                 | read        |
-| `set_brightness`         | Set display brightness level                 | write       |
-| `toggle_focus_mode`      | Toggle Do Not Disturb on or off              | write       |
-| `system_sleep`           | Put system to sleep                          | write       |
-| `prevent_sleep`          | Keep system awake for N seconds              | write       |
-| `system_power`           | Shutdown or restart the system               | destructive |
-| `launch_app`             | Launch/activate an application               | write       |
-| `quit_app`               | Quit a running application                   | destructive |
-| `is_app_running`         | Check if an application is running           | read        |
-| `list_all_windows`       | List all windows across all apps             | read        |
-| `move_window`            | Move a window to specific coordinates        | write       |
-| `resize_window`          | Resize a window                              | write       |
-| `minimize_window`        | Minimize or restore a window                 | write       |
-
-### Photos (9 tools)
-
-| Tool             | Description                             | Type        |
-| ---------------- | --------------------------------------- | ----------- |
-| `list_albums`    | List albums                             | read        |
-| `list_photos`    | List photos in album                    | read        |
-| `search_photos`  | Search photos by keyword                | read        |
-| `get_photo_info` | Photo metadata details                  | read        |
-| `list_favorites` | List favorite photos                    | read        |
-| `create_album`   | Create new album                        | write       |
-| `add_to_album`   | Add photo to album                      | write       |
-| `import_photo`   | Import photo from file (Swift/PhotoKit) | write       |
-| `delete_photos`  | Delete photos by ID (Swift/PhotoKit)    | destructive |
-
-### Messages (6 tools)
-
-| Tool                | Description                              | Type  |
-| ------------------- | ---------------------------------------- | ----- |
-| `list_chats`        | Recent conversations with participants   | read  |
-| `read_chat`         | Chat details (participants, last update) | read  |
-| `search_chats`      | Search by name/participant/handle        | read  |
-| `send_message`      | Send iMessage/SMS text                   | write |
-| `send_file`         | Send file via iMessage/SMS               | write |
-| `list_participants` | List chat participants                   | read  |
-
-### Shortcuts (11 tools)
-
-| Tool                  | Description                                | Type        |
-| --------------------- | ------------------------------------------ | ----------- |
-| `list_shortcuts`      | List available shortcuts                   | read        |
-| `run_shortcut`        | Run shortcut by name                       | write       |
-| `search_shortcuts`    | Search shortcuts by name                   | read        |
-| `get_shortcut_detail` | Shortcut details/actions                   | read        |
-| `create_shortcut`     | Create a new shortcut via UI automation    | write       |
-| `delete_shortcut`     | Delete shortcut by name (macOS 13+)        | destructive |
-| `export_shortcut`     | Export shortcut to .shortcut file          | write       |
-| `import_shortcut`     | Import shortcut from .shortcut file        | write       |
-| `edit_shortcut`       | Open shortcut in Shortcuts app for editing | write       |
-| `duplicate_shortcut`  | Duplicate an existing shortcut             | write       |
-
-### UI Automation (10 tools)
-
-| Tool                     | Description                                      | Type  |
-| ------------------------ | ------------------------------------------------ | ----- |
-| `ui_open_app`            | Open app and read accessibility summary          | read  |
-| `ui_click`               | Click element by coordinates or text             | write |
-| `ui_type`                | Type text into focused field                     | write |
-| `ui_press_key`           | Send key combinations                            | write |
-| `ui_scroll`              | Scroll in direction                              | write |
-| `ui_read`                | Read app accessibility tree                      | read  |
-| `ui_accessibility_query` | Query UI elements by role/title/value/identifier | read  |
-| `ui_perform_action`      | Find element by locator + perform AX action      | write |
-| `ui_traverse`            | BFS traverse with PID targeting + visible filter | read  |
-| `ui_diff`                | Compare UI state before/after an action          | read  |
-
-### Apple Intelligence (13 tools)
-
-Requires macOS 26+ with Apple Silicon and a Swift bridge built with `AIRMCP_ENABLE_FOUNDATION_MODELS`.
-
-| Tool                  | Description                                                 | Type  |
-| --------------------- | ----------------------------------------------------------- | ----- |
-| `summarize_text`      | On-device text summarization                                | read  |
-| `rewrite_text`        | Rewrite with specified tone                                 | read  |
-| `proofread_text`      | Grammar/spelling correction                                 | read  |
-| `generate_text`       | Generate text with custom instructions via on-device AI     | read  |
-| `generate_structured` | Generate structured JSON output with schema                 | read  |
-| `tag_content`         | Content classification/tagging with confidence              | read  |
-| `ai_chat`             | Named multi-turn on-device AI session                       | read  |
-| `generate_image`      | Generate an image on disk via Image Playground              | write |
-| `scan_document`       | Detect text / tables / forms in an image                    | read  |
-| `generate_plan`       | Ask the on-device model for a JSON tool-call plan           | read  |
-| `ai_plan_metrics`     | Run a sampled GOLDEN_PLANS batch and report planner quality | read  |
-| `ai_status`           | Check Foundation Model availability                         | read  |
-| `ai_agent`            | On-device autonomous tool-calling agent                     | read  |
-
-### Context Memory (4 tools)
-
-Durable on-disk store for facts, named entities, and time-anchored episodes. Backed by `~/.cache/airmcp/memory.json`; also exposed as the `memory://recent` MCP resource.
-
-| Tool            | Description                                                                  | Type        |
-| --------------- | ---------------------------------------------------------------------------- | ----------- |
-| `memory_put`    | Insert or update a fact / entity / episode (idempotent upsert, optional TTL) | write       |
-| `memory_query`  | Filter by kind / tags / substring, newest-first                              | read        |
-| `memory_forget` | Delete by id / key / tag                                                     | destructive |
-| `memory_stats`  | Counts by kind + oldest/newest timestamps (sweeps expired as a side-effect)  | read        |
-
-### Audit (2 tools)
-
-Consumable view of the on-device audit log (populated for every tool call).
-
-| Tool            | Description                                                       | Type |
-| --------------- | ----------------------------------------------------------------- | ---- |
-| `audit_log`     | Paginated recent calls, filterable by tool / status / time window | read |
-| `audit_summary` | Total count, error rate, top-N busiest tools over a window        | read |
-
-### TV (6 tools)
-
-| Tool                  | Description                       | Type  |
-| --------------------- | --------------------------------- | ----- |
-| `tv_list_playlists`   | List Apple TV playlists (library) | read  |
-| `tv_list_tracks`      | List movies/episodes in playlist  | read  |
-| `tv_now_playing`      | Currently playing content         | read  |
-| `tv_playback_control` | Play/pause/next/previous control  | write |
-| `tv_search`           | Search movies/TV shows            | read  |
-| `tv_play`             | Play movie/episode by name        | write |
-
-### Screen Capture (5 tools)
-
-| Tool             | Description                                        | Type  |
-| ---------------- | -------------------------------------------------- | ----- |
-| `capture_screen` | Capture full screen screenshot (returns PNG image) | read  |
-| `capture_window` | Capture a specific app window                      | read  |
-| `capture_area`   | Capture a screen region by coordinates             | read  |
-| `list_windows`   | List all visible windows with position/size        | read  |
-| `record_screen`  | Record screen for 1-60 seconds (.mov)              | write |
-
-### Maps (8 tools)
-
-| Tool              | Description                               | Type  |
-| ----------------- | ----------------------------------------- | ----- |
-| `search_location` | Search for a place in Apple Maps          | write |
-| `get_directions`  | Get directions between two locations      | write |
-| `drop_pin`        | Drop a pin at specific coordinates        | write |
-| `open_address`    | Open a specific address in Apple Maps     | write |
-| `search_nearby`   | Search for places near a location         | write |
-| `share_location`  | Generate a shareable Apple Maps link      | read  |
-| `geocode`         | Convert place name/address to coordinates | read  |
-| `reverse_geocode` | Convert coordinates to place name/address | read  |
-
-### Podcasts (6 tools)
-
-> ⚠️ **Deprecated on macOS 26+** — Apple removed the entire Podcasts JXA scripting dictionary in Tahoe. The module is skipped at registration on macOS 26+ (manifest `brokenOn: [26]`); still available on macOS ≤ 25. Scheduled for removal at v3.0.0.
-
-| Tool                       | Description                       | Type  |
-| -------------------------- | --------------------------------- | ----- |
-| `list_podcast_shows`       | List subscribed podcast shows     | read  |
-| `list_podcast_episodes`    | List episodes for a show          | read  |
-| `podcast_now_playing`      | Currently playing podcast episode | read  |
-| `podcast_playback_control` | Play, pause, next, previous       | write |
-| `play_podcast_episode`     | Play a specific episode by name   | write |
-| `search_podcast_episodes`  | Search episodes by keyword        | read  |
-
-### Weather (3 tools)
-
-| Tool                  | Description                           | Type |
-| --------------------- | ------------------------------------- | ---- |
-| `get_current_weather` | Get current weather by coordinates    | read |
-| `get_daily_forecast`  | Get multi-day forecast by coordinates | read |
-| `get_hourly_forecast` | Get hourly forecast by coordinates    | read |
-
-### Location (2 tools)
-
-| Tool                      | Description                                  | Type |
-| ------------------------- | -------------------------------------------- | ---- |
-| `get_current_location`    | Get device's current GPS coordinates         | read |
-| `get_location_permission` | Check Location Services authorization status | read |
-
-### Bluetooth (4 tools)
-
-| Tool                   | Description                     | Type  |
-| ---------------------- | ------------------------------- | ----- |
-| `get_bluetooth_state`  | Check Bluetooth power state     | read  |
-| `scan_bluetooth`       | Scan for nearby BLE devices     | read  |
-| `connect_bluetooth`    | Connect to a BLE device by UUID | write |
-| `disconnect_bluetooth` | Disconnect a BLE device         | write |
-
-### Google Workspace (16 tools)
-
-Requires: `npm install -g @googleworkspace/cli && gws auth setup`
-
-| Tool                  | Description                    | Type  |
-| --------------------- | ------------------------------ | ----- |
-| `gws_status`          | Check GWS CLI availability     | read  |
-| `gws_gmail_list`      | List Gmail messages with query | read  |
-| `gws_gmail_read`      | Read Gmail message by ID       | read  |
-| `gws_gmail_send`      | Send email via Gmail           | write |
-| `gws_drive_list`      | List Google Drive files        | read  |
-| `gws_drive_read`      | Get Drive file metadata        | read  |
-| `gws_drive_search`    | Full-text search across Drive  | read  |
-| `gws_sheets_read`     | Read Google Sheet values       | read  |
-| `gws_sheets_write`    | Write to Google Sheet          | write |
-| `gws_calendar_list`   | List Google Calendar events    | read  |
-| `gws_calendar_create` | Create Google Calendar event   | write |
-| `gws_docs_read`       | Read Google Doc content        | read  |
-| `gws_tasks_list`      | List Google Tasks              | read  |
-| `gws_tasks_create`    | Create Google Task             | write |
-| `gws_people_search`   | Search Google Contacts         | read  |
-| `gws_raw`             | Execute any GWS CLI command    | write |
-
-## Resources
-
-MCP resources provide live data from Apple apps via URI.
-
-| URI                          | Description                                      |
-| ---------------------------- | ------------------------------------------------ |
-| `notes://recent`             | 10 most recent notes                             |
-| `notes://recent/{count}`     | Recent notes (custom count, max 50)              |
-| `calendar://today`           | Today's calendar events                          |
-| `calendar://upcoming`        | Next 7 days of calendar events                   |
-| `reminders://due`            | Overdue reminders                                |
-| `reminders://today`          | Today's due reminders (incomplete only)          |
-| `music://now-playing`        | Currently playing Apple Music track              |
-| `system://clipboard`         | macOS clipboard content                          |
-| `mail://unread`              | Unread mail count across all mailboxes           |
-| `context://snapshot`         | Unified context from all active apps             |
-| `context://snapshot/{depth}` | Configurable depth context (brief/standard/full) |
-
-## Prompts
-
-### Per-App
-
-- **organize-notes** — Classify notes by topic, create folders, move
-- **find-duplicates** — Find similar notes, compare, suggest cleanup
-- **weekly-review** — Summarize past week's notes
-- **organize-reminders** — Scan, identify overdue/completed, cleanup
-- **daily-review** — Today's due reminders with priorities
-- **schedule-review** — Upcoming events, conflicts, optimizations
-- **meeting-prep** — Event details + related notes for meeting prep
-
-### Cross-Module
-
-- **daily-briefing** — Today's events + due reminders + recent notes
-- **weekly-digest** — Past N days: events + notes + reminders combined
-- **meeting-notes-to-reminders** — Extract action items from meeting notes, create reminders
-- **event-follow-up** — Create follow-up note and reminders after a meeting
-- **research-with-safari** — Safari research + save results to Notes
-- **focus-session** — Calendar + Reminders + Music focus session
-- **file-organizer** — Finder file organization + Notes logging
-
-### Developer Workflows
-
-- **dev-session** — Scan project, check specs, research docs, create session notes
-- **debug-loop** — Capture errors from Safari/clipboard, locate code, log bugs, create fix tasks
-- **screen-capture-flow** — Screenshot → Photos import → annotation notes
-- **app-release-prep** — Calendar schedule + Notes changelog + Reminders checklist
-- **idea-to-task** — Break idea into tasks → Reminders + Calendar time blocks
-- **build-log** — Analyze build output, log errors or celebrate success
-
-### Shortcuts
-
-- **shortcut-automation** — Discover and chain Siri Shortcuts for automation
-- **shortcut-discovery** — Find relevant shortcuts for a task
-- **shortcut-troubleshooting** — Debug and fix broken shortcuts
-
-## Developer Agent Pipeline
-
-AirMCP's developer prompts connect Apple apps into autonomous agent workflows. Each prompt orchestrates tools across multiple modules — AI reads the actual filesystem, Notes, Calendar, and Reminders for context, then records structured results.
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     dev-session                                 │
-│  Finder (scan) → Notes (specs) → Safari (docs) → Notes (log)   │
-└─────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────┐
-│                     debug-loop                                  │
-│  Safari (JS errors) → Clipboard → Finder (locate) →            │
-│  Notes (bug log) → Reminders (fix tasks)                        │
-└─────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────┐
-│                     idea-to-task                                 │
-│  Notes (idea) → AI (decompose) → Reminders (tasks) →           │
-│  Calendar (time blocks)                                         │
-└─────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────┐
-│                     build-log                                   │
-│  Finder (output) → Clipboard (log) →                            │
-│  ┌ Fail → Notes (error log) → Reminders (fix tasks)             │
-│  └ Pass → Notification → Music (celebrate) → Notes (success)    │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-Designed for AI coding agents (Claude Code, Cursor, Copilot, etc.) to invoke via MCP prompts, turning your Mac into a context-aware development environment.
-
-## Module Presets
-
-By default, new installations start with 7 starter modules (Notes, Reminders, Calendar, Shortcuts, System, Finder, Weather) to keep things simple. You can enable more anytime:
-
-```bash
-# Re-run the setup wizard to change modules
-npx airmcp init
-
-# Or request every installed module at once
-npx airmcp --full
-```
-
-Or edit `~/.config/airmcp/config.json` directly:
-
-```json
-{
-  "disabledModules": ["messages", "intelligence"]
-}
-```
-
-## CLI Commands
-
-| Command                | Description                       |
-| ---------------------- | --------------------------------- |
-| `npx airmcp init`      | Interactive setup wizard          |
-| `npx airmcp doctor`    | Diagnose installation issues      |
-| `npx airmcp modules`   | Inspect or edit module add-ons    |
-| `npx airmcp`           | Start MCP server (stdio, default) |
-| `npx airmcp --version` | Print version and exit            |
-| `npx airmcp --full`    | Request every installed module |
-| `npx airmcp --http`    | Start as HTTP server (port 3847)  |
-| `npx airmcp connect`   | Proxy stdio clients to AirMCP.app |
-| `npx airmcp connect-clients` | Repair installed client configs for AirMCP.app |
-| `npx airmcp connect-clients --client-runtime direct` | Switch installed client configs to direct stdio |
-
-## Configuration
-
-### Environment Variables
-
-| Variable                     | Default                      | Description                                                  |
-| ---------------------------- | ---------------------------- | ------------------------------------------------------------ |
-| `AIRMCP_INCLUDE_SHARED`      | `false`                      | Include items shared/owned by others (off by default: shared items are filtered from reads and mutating them is denied, or routed through share-approval HITL when configured)                                 |
-| `AIRMCP_ALLOW_SEND_MESSAGES` | `false`                      | Allow sending iMessages (opt-in)                             |
-| `AIRMCP_ALLOW_SEND_MAIL`     | `false`                      | Allow sending emails (opt-in)                                |
-| `AIRMCP_FULL`                | `false`                      | Enable all 29 standard modules (profile-only + opt-in modules stay off) |
-| `AIRMCP_PROFILE`             | `starter`                    | Module profile: `starter`, `communications-safe`, `productivity`, `full`, `custom`; can also include opt-in modules such as `spatial_prep` |
-| `AIRMCP_TOOL_EXPOSURE`       | profile-dependent            | `progressive` exposes a small front door, `profile` exposes the selected profile, `full` exposes every loaded tool |
-| `AIRMCP_MODULE_PACKS`        | all packs                    | Activate selected module add-ons, e.g. `core,productivity` |
-| `AIRMCP_ADDON_PACKAGE_MODE`  | `prefer-installed`           | Module import mode: `prefer-installed`, `bundled`, or `external-only` |
-| `AIRMCP_ADDON_INSTALL_PREFIX` | `~/.airmcp/addons`          | Override where `airmcp modules --install` places companion add-on packages |
-| `AIRMCP_HARNESS_ADAPTER`     | inferred                     | Task harness adapter: `compatible`, `strict`, `app-runtime`, or `agent` |
-| `AIRMCP_REQUIRE_TOOL_SESSION` | config-dependent            | Require task sessions before hidden `run_tool` dispatch |
-| `AIRMCP_ENABLE_SPATIAL_PREP` | `false`                      | Enable the experimental read-only spatial asset prep tools    |
-| `AIRMCP_DISABLE_{MODULE}`    | —                            | Disable a specific module (e.g. `AIRMCP_DISABLE_MUSIC=true`) |
-| `GEMINI_API_KEY`             | —                            | Google Gemini API key for cloud embeddings (optional)        |
-| `AIRMCP_EMBEDDING_MODEL`     | `gemini-embedding-2-preview` | Gemini embedding model name                                  |
-| `AIRMCP_EMBEDDING_DIM`       | `3072`                       | Embedding dimension (256/512/1024/2048/3072)                 |
-| `AIRMCP_EMBEDDING_PROVIDER`  | auto                         | Force provider: `gemini`, `swift`, `hybrid`, `none`          |
-| `AIRMCP_HTTP_TOKEN`          | —                            | Bearer token for HTTP mode authentication                    |
-| `AIRMCP_NPM_PACKAGE_SPECIFIER` | `airmcp@<current>`          | Override app-owned proxy/runtime package for local testing   |
-
-Experimental profile-only modules are not enabled by `--full` / `AIRMCP_FULL`.
-Enable them explicitly with `AIRMCP_PROFILE=<module>` or their dedicated
-`AIRMCP_ENABLE_<MODULE>` flag.
-
-### Config File
-
-`~/.config/airmcp/config.json`:
-
-```json
-{
-  "disabledModules": ["messages", "intelligence"],
-  "includeShared": false,
-  "allowSendMessages": false,
-  "allowSendMail": false,
-  "hitl": {
-    "level": "sensitive-only",
-    "timeout": 30
-  }
-}
-```
-
-### Human-in-the-Loop (HITL)
-
-Require manual approval before sensitive or destructive operations:
-
-```json
-{
-  "hitl": {
-    "level": "sensitive-only",
-    "timeout": 30
-  }
-}
-```
-
-Levels: `off`, `destructive-only`, `sensitive-only`, `all-writes`, `all`
-
-### Semantic Search (Optional)
-
-On-device cross-app semantic search powered by Apple's NLContextualEmbedding. Find related notes, events, reminders, and emails by meaning — not just keywords.
-
-```bash
-npm run swift-build  # Build the Swift bridge first
-```
-
-Then use the tools:
-
-1. `semantic_index` — Index data from enabled Apple apps into a local vector store
-2. `semantic_search` — Search by meaning across all indexed data
-3. `find_related` — Find items related to a specific note/event/reminder
-4. `semantic_status` — Check index status
-
-Supports Korean, English, Japanese, Chinese with automatic language detection. Optionally set `GEMINI_API_KEY` for higher-quality Google Gemini embeddings.
-
-### Swift Bridge (Optional)
-
-For semantic search, recurring events/reminders (EventKit), and photo import/delete (PhotoKit):
+Swift bridge:
 
 ```bash
 npm run swift-build
 ```
 
-FoundationModels-backed Apple Intelligence is a preview path. Build it explicitly with a macOS 26 SDK and the opt-in compile flag:
+FoundationModels preview builds require macOS 26+, Apple Silicon, a compatible
+SDK, and the explicit compile flag:
 
 ```bash
 cd swift
 swift build -c release -Xswiftc -DAIRMCP_ENABLE_FOUNDATION_MODELS
 ```
 
+Local build artifacts can grow after Swift or app builds. To inspect or reclaim
+ignored artifacts:
+
+```bash
+npm run clean:local
+npm run clean:local:apply
+npm run size:check
+```
+
+Testing guide: [docs/testing.md](docs/testing.md).
+
 ## Requirements
 
-- macOS
-- Node.js >= 20
-- Per-app automation permissions (prompted on first run) — use `setup_permissions` tool to request all at once
-- Apple Intelligence preview: macOS 26+ with Apple Silicon and `AIRMCP_ENABLE_FOUNDATION_MODELS`
+- macOS for the server runtime.
+- Node.js 20 or newer.
+- macOS Automation, Accessibility, Full Disk Access, Location, Bluetooth, or
+  Photos permissions as required by the modules you enable.
+- Optional Swift bridge built from source for Swift-backed tools. It is not
+  bundled into the npm package, `.mcpb`, or menubar app distribution.
+- FoundationModels-backed Apple Intelligence preview requires macOS 26+, Apple
+  Silicon, and `AIRMCP_ENABLE_FOUNDATION_MODELS`.
 
-## Limitations
+The iOS server is preview, not the shipping surface. macOS is the supported
+runtime.
 
-Modules with OS requirements (e.g., Intelligence requires macOS 26+) are automatically disabled at startup on older systems via runtime OS detection.
+## Documentation
 
-### Architecture & Security
-
-- **JXA/AppleScript dependency** — Core automation relies on Apple's scripting dictionaries. While these have been stable for 10+ years, macOS updates can theoretically break individual modules. Circuit breaker (3 failures → 60s auto-disable) isolates failures. UI Automation tools (6 tools) are inherently more brittle and separated into their own module.
-- **Input sanitization** — `open_url` and `add_to_reading_list` reject non-`http(s)` URL schemes and SSRF-style destinations (loopback, RFC1918, link-local / cloud-metadata) via `validateExternalHttpUrl`. `run_javascript` is off unless explicitly enabled (`AIRMCP_ALLOW_RUN_JAVASCRIPT`) and returns its output as untrusted content. `escJxaShell`/`escAS` strip control characters from shell/AppleScript arguments.
-- **Read data exposure** — At the default `sensitive-only` HITL level, destructive operations and privacy-sensitive reads (incl. mail/messages/contacts content, clipboard, health, precise location) require per-call HITL approval; only non-sensitive reads run without a prompt. When connected to cloud LLMs, returned data passes through the LLM provider. Mitigations: PII scrubbing in logs, pagination limits, sensitive modules (mail, messages) require explicit opt-in.
-- **IPC overhead** — Multi-process path (Client → Node.js → osascript/Swift CLI → macOS app). Each JXA call adds ~50ms overhead. Pagination prevents bulk data transfers. Swift bridge path bypasses JXA for EventKit/PhotoKit operations.
-- **Scope** — 295 tools across 31 modules follow 5 repeating patterns (JXA CRUD, Swift bridge, HTTP API, System Events, CLI wrapper), keeping maintenance proportional to pattern count, not tool count.
-
-### Location & Bluetooth
-
-- Location requires macOS Location Services permission (first use triggers system dialog).
-- Bluetooth scanning discovers BLE (Low Energy) devices only. Classic Bluetooth devices are listed via `list_bluetooth_devices` in the System module.
-- Bluetooth connect/disconnect operates within the server process lifecycle.
-
-### Notes
-
-- Move copies and deletes (new ID, reset dates, lost attachments). Update replaces entire body — read first to preserve content.
-- Password-protected notes cannot be read.
-
-### Reminders / Calendar
-
-- JXA recurrence is read-only — use `create_recurring_event`/`create_recurring_reminder` (Swift/EventKit).
-- Calendar attendees are read-only.
-
-### Contacts
-
-- Custom fields not accessible.
-
-### Mail
-
-- Content truncated to 5000 chars by default (`maxLength` parameter adjustable).
-
-### Messages
-
-- Individual message content (chat history) not accessible via JXA.
-- Send requires recipient to be a registered buddy in Messages.
-
-### Music
-
-- Smart playlists are read-only.
-- Queue manipulation not available.
-
-### Finder
-
-- Tags use Spotlight (mdfind), performance varies with index state.
-
-### Safari
-
-- Reading page content requires "Allow JavaScript from Apple Events" in Safari Developer menu.
-- `run_javascript` is disabled unless `AIRMCP_ALLOW_RUN_JAVASCRIPT=true` (or `allowRunJavascript` in config); its output is returned as untrusted content. URL-scheme and SSRF rejection (non-`http(s)`, loopback/RFC1918/link-local) applies to `open_url` and `add_to_reading_list`, not to `run_javascript`.
-- **macOS 26+:** Bookmark and Reading List tools (`list_bookmarks`, `list_reading_list`, `add_bookmark`) use `Bookmarks.plist` instead of JXA (Apple removed bookmark scripting). Requires **Full Disk Access** for your terminal in System Settings > Privacy & Security. `add_bookmark` is not supported on macOS 26+.
-
-### Podcasts
-
-- **macOS 26+:** Apple removed the entire Podcasts JXA scripting dictionary in Tahoe. The module is skipped at registration time via `compatibility.brokenOn: [26]` in `src/shared/modules.ts` — `tools/list` won't surface any `*_podcast_*` tools on Tahoe hosts, so models can't pick a tool that can never succeed. Surfaced through `airmcp doctor` and `print-compat-report`. Scheduled for removal at v3.0.0; replacement under investigation (Shortcuts bridge / Media framework).
-
-### Photos
-
-- JXA: album creation and photo addition only, no import/delete.
-- Swift bridge (macOS 26+): full import/delete via PhotoKit.
-
-### Pages / Numbers / Keynote
-
-- **macOS 26+:** Apple renamed iWork apps (e.g. "Pages" → "Pages Creator Studio"). AirMCP uses bundle IDs internally so this is handled transparently.
-- Requires the corresponding iWork app to be open for document operations.
-
-### Apple Intelligence
-
-- Requires macOS 26 (Tahoe) + Apple Silicon.
-- Build the bridge with `cd swift && swift build -c release -Xswiftc -DAIRMCP_ENABLE_FOUNDATION_MODELS`.
-
-## Roadmap
-
-### v2.1 (Current)
-
-- **Gemini Embedding 2** — `gemini-embedding-2-preview`로 업그레이드. 네이티브 멀티모달(텍스트/이미지/오디오/비디오) 3072차원 임베딩. on-device Swift bridge + cloud Gemini 하이브리드 provider 지원. (WWDC26부터 Apple Foundation Models도 `LanguageModel` 프로토콜로 서드파티 클라우드 모델 — Anthropic·Google Swift 패키지 — 을 공식 지원, 하이브리드 구성이 플랫폼 표준 패턴이 됨)
-- **Google Workspace** — Gmail, Drive, Sheets, Calendar, Docs, Tasks, People via `@googleworkspace/cli`
-- **Dynamic module loading** — New modules = 1 line in MANIFEST (no import boilerplate)
-- **Centralized constants** — All API URLs, timeouts, buffer sizes in `src/shared/constants.ts` with env var overrides
-
-### v2.0
-
-- **CoreLocation** — Native GPS coordinates via Swift/CLLocationManager
-- **CoreBluetooth** — BLE device scanning, state, connect/disconnect via Swift/CBCentralManager
-- **App Management** — Launch, quit, check app status
-- **Window Management** — List, move, resize, minimize windows across all apps
-- **Geocoding** — Forward/reverse geocoding via Open-Meteo and Nominatim APIs
-- **Security hardening** — Sensitive modules (mail, messages) opt-in by default, architecture limitations documented
-
-### Platform Constraints (macOS 26+)
-
-- **Safari bookmarks/reading list** — Apple removed JXA bookmark scripting classes in macOS 26. The plist fallback (`~/Library/Safari/Bookmarks.plist`) requires Full Disk Access, which TCC blocks for headless/direct MCP server processes. The app-owned runtime is the intended permission boundary, but signed-app runtime verification is still required for this surface. Investigating Shortcuts-based or WebExtension bridge approaches.
-- **Safari `add_bookmark`** — Legacy JXA `make new bookmark` no longer supported in macOS 26. No programmatic alternative available yet.
-- **Podcasts** — Apple removed the Podcasts JXA scripting dictionary entirely in macOS 26. All 6 Podcasts tools return errors. Investigating Shortcuts bridge or Media framework alternatives.
-
-### Future
-
-- **OAuth 2.1 browser PKCE flow guide** — RFC 0005 Step 3: docs for Managed Agents / Claude in Chrome clients (Steps 1+2 shipped in v2.11.0)
-- **Stateless streamable HTTP** — horizontal scale per MCP 2026 roadmap (session state externalized)
-- **iOS / visionOS exploration** (v3.0+)
-- **Consolidated registry re-publishing** — single self-publishing PR that re-pushes the current `.well-known/mcp.json` manifest + `mcpName` to Anthropic MCP Registry, Smithery, PulseMCP, Glama, MCP Market, Cline Marketplace, LobeHub. Past ad-hoc registrations exist on some of these but versions and metadata have drifted out of date; until the re-push lands, only the discovery endpoint itself (published on this server) reflects current state.
+- [Tool manifest](docs/tool-manifest.json): generated list of registered tools.
+- [Workflows](docs/workflows.md): target workflows and prompt catalog.
+- [Skills DSL](docs/skills.md): YAML workflow syntax and built-ins.
+- [Shortcuts](docs/shortcuts.md): Siri, Shortcuts, Spotlight, and AppIntents.
+- [Environment variables](docs/environment.md): all runtime knobs.
+- [MCPB install](docs/mcpb.md): Claude Desktop extension package.
+- [OAuth browser PKCE](docs/oauth-browser-pkce.md): browser client setup.
+- [RFC index](docs/rfc/README.md): design records and architecture notes.
+- [Testing](docs/testing.md): development test workflow.
+- [Project direction](docs/direction.md): product direction and positioning.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, code style, and PR guidelines.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, code style, and PR
+guidelines.
 
-First-time contributors: look for issues labeled [`good first issue`](https://github.com/heznpc/AirMCP/labels/good%20first%20issue).
+First-time contributors can look for
+[`good first issue`](https://github.com/heznpc/AirMCP/labels/good%20first%20issue).
 
 ## Community
 
-- [GitHub Discussions](https://github.com/heznpc/AirMCP/discussions) — Questions, ideas, show & tell
-- [Issues](https://github.com/heznpc/AirMCP/issues) — Bug reports and feature requests
-- [Changelog](CHANGELOG.md) — Release history
+- [GitHub Discussions](https://github.com/heznpc/AirMCP/discussions)
+- [Issues](https://github.com/heznpc/AirMCP/issues)
+- [Changelog](CHANGELOG.md)
 
 ## License
 

@@ -14,8 +14,7 @@
  * size evidence to block.
  */
 
-import { spawn, spawnSync } from "node:child_process";
-import { createInterface } from "node:readline";
+import { spawnSync } from "node:child_process";
 import {
   cpSync,
   existsSync,
@@ -33,6 +32,7 @@ import { dirname, join, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { cleanBootEnv } from "./lib/clean-boot-env.mjs";
+import { expectNoWireError, parseStructuredResult, startMcp } from "./lib/mcp-stdio-client.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const BUILD_DIR = join(ROOT, "build", "addons");
@@ -173,18 +173,6 @@ function dirSizeBytes(path) {
   return total;
 }
 
-function parseStructuredResult(callResp) {
-  const result = callResp.result;
-  if (result?.structuredContent) return result.structuredContent;
-  const text = result?.content?.find?.((c) => c.type === "text")?.text;
-  if (!text) return null;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
-}
-
 async function getProfileModuleSet(profile) {
   if (!profileModulesByName) {
     const profilesUrl = pathToFileURL(join(ROOT, "dist", "shared", "profiles.js")).href;
@@ -216,86 +204,6 @@ function getAddonLoadFailureLines(stderr) {
     );
 }
 
-function startMcp(entry, cwd, env) {
-  const proc = spawn("node", [entry], { cwd, env, stdio: ["pipe", "pipe", "pipe"] });
-  const rl = createInterface({ input: proc.stdout });
-  const pending = new Map();
-  let stderr = "";
-  let closed = false;
-  let stopping = null;
-
-  proc.stderr.on("data", (chunk) => (stderr += chunk.toString()));
-  proc.on("close", () => {
-    closed = true;
-  });
-  rl.on("line", (line) => {
-    if (!line.trim()) return;
-    let msg;
-    try {
-      msg = JSON.parse(line);
-    } catch {
-      return;
-    }
-    if (msg.id !== undefined && pending.has(msg.id)) {
-      const { resolve: resolvePending, timer } = pending.get(msg.id);
-      clearTimeout(timer);
-      pending.delete(msg.id);
-      resolvePending(msg);
-    }
-  });
-
-  function request(method, params, id) {
-    proc.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id, method, ...(params ? { params } : {}) })}\n`);
-    return new Promise((resolveReq, rejectReq) => {
-      const timer = setTimeout(() => {
-        if (pending.has(id)) {
-          pending.delete(id);
-          rejectReq(new Error(`timeout waiting for id=${id} (${method})`));
-        }
-      }, TIMEOUT_MS);
-      pending.set(id, { resolve: resolveReq, timer });
-    });
-  }
-
-  function notify(method) {
-    proc.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", method })}\n`);
-  }
-
-  function stop() {
-    if (closed) return Promise.resolve();
-    if (stopping) return stopping;
-    stopping = new Promise((resolveStop) => {
-      rl.close();
-      try {
-        proc.stdin.end();
-      } catch {
-        /* child may already be gone */
-      }
-      for (const { timer } of pending.values()) clearTimeout(timer);
-      pending.clear();
-      const timer = setTimeout(() => {
-        if (!closed) proc.kill("SIGKILL");
-        resolveStop();
-      }, 1000);
-      timer.unref();
-      proc.once("close", () => {
-        clearTimeout(timer);
-        resolveStop();
-      });
-      proc.kill("SIGTERM");
-    });
-    return stopping;
-  }
-
-  return { request, notify, stop, stderr: () => stderr };
-}
-
-function expectNoWireError(resp, label) {
-  if (resp.error || resp.result?.isError) {
-    throw new Error(`${label} failed: ${JSON.stringify(resp)}`);
-  }
-}
-
 async function bootAndMeasure({ entry, work, profile, packNames, addonMode, expectedModules, forbiddenModules }) {
   const env = {
     ...cleanBootEnv(),
@@ -311,7 +219,7 @@ async function bootAndMeasure({ entry, work, profile, packNames, addonMode, expe
   };
 
   const started = performance.now();
-  const client = startMcp(entry, work, env);
+  const client = startMcp({ entry, cwd: work, env, timeoutMs: TIMEOUT_MS });
   const watchdog = setTimeout(() => {
     client.stop().finally(() => fail(`MCP boot measurement timed out after ${TIMEOUT_MS}ms`));
   }, TIMEOUT_MS);

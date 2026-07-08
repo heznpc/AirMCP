@@ -10,12 +10,16 @@
  *     allowlist rejection still behave the same way through stdio.
  */
 
-import { spawn } from "node:child_process";
-import { createInterface } from "node:readline";
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { cleanBootEnv } from "./lib/clean-boot-env.mjs";
+import {
+  expectNoWireError,
+  firstText,
+  parseStructuredResult,
+  startMcp as startMcpClient,
+} from "./lib/mcp-stdio-client.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const ENTRY = join(ROOT, "dist", "index.js");
@@ -40,22 +44,6 @@ if (!existsSync(ENTRY)) {
   process.exit(2);
 }
 
-function parseStructuredResult(callResp) {
-  const result = callResp.result;
-  if (result?.structuredContent) return result.structuredContent;
-  const text = result?.content?.find?.((c) => c.type === "text")?.text;
-  if (!text) return null;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
-}
-
-function firstText(callResp) {
-  return callResp.result?.content?.find?.((c) => c.type === "text")?.text ?? "";
-}
-
 function startMcp(testCase) {
   const env = {
     ...cleanBootEnv(),
@@ -70,83 +58,7 @@ function startMcp(testCase) {
     ...(testCase.env ?? {}),
   };
   if (testCase.adapter) env.AIRMCP_HARNESS_ADAPTER = testCase.adapter;
-  const proc = spawn("node", [ENTRY], { cwd: ROOT, env, stdio: ["pipe", "pipe", "pipe"] });
-  const rl = createInterface({ input: proc.stdout });
-  const pending = new Map();
-  let stderr = "";
-  let closed = false;
-  let stopping = null;
-
-  proc.stderr.on("data", (chunk) => (stderr += chunk.toString()));
-  proc.on("close", () => {
-    closed = true;
-  });
-  rl.on("line", (line) => {
-    if (!line.trim()) return;
-    let msg;
-    try {
-      msg = JSON.parse(line);
-    } catch {
-      return;
-    }
-    if (msg.id !== undefined && pending.has(msg.id)) {
-      const { resolve: resolvePending, timer } = pending.get(msg.id);
-      clearTimeout(timer);
-      pending.delete(msg.id);
-      resolvePending(msg);
-    }
-  });
-
-  function request(method, params, id) {
-    proc.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id, method, ...(params ? { params } : {}) })}\n`);
-    return new Promise((resolveReq, rejectReq) => {
-      const timer = setTimeout(() => {
-        if (pending.has(id)) {
-          pending.delete(id);
-          rejectReq(new Error(`timeout waiting for id=${id} (${method})`));
-        }
-      }, TIMEOUT_MS);
-      pending.set(id, { resolve: resolveReq, timer });
-    });
-  }
-
-  function notify(method) {
-    proc.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", method })}\n`);
-  }
-
-  function stop() {
-    if (closed) return Promise.resolve();
-    if (stopping) return stopping;
-    stopping = new Promise((resolveStop) => {
-      rl.close();
-      try {
-        proc.stdin.end();
-      } catch {
-        /* child may already be gone */
-      }
-      for (const { timer } of pending.values()) clearTimeout(timer);
-      pending.clear();
-      const timer = setTimeout(() => {
-        if (!closed) proc.kill("SIGKILL");
-        resolveStop();
-      }, 1000);
-      timer.unref();
-      proc.once("close", () => {
-        clearTimeout(timer);
-        resolveStop();
-      });
-      proc.kill("SIGTERM");
-    });
-    return stopping;
-  }
-
-  return { request, notify, stop, stderr: () => stderr };
-}
-
-function expectNoWireError(resp, label) {
-  if (resp.error || resp.result?.isError) {
-    throw new Error(`${label} failed: ${JSON.stringify(resp)}`);
-  }
+  return startMcpClient({ entry: ENTRY, cwd: ROOT, env, timeoutMs: TIMEOUT_MS });
 }
 
 async function verifyCase(testCase) {

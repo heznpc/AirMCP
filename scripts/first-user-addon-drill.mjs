@@ -8,20 +8,12 @@
  * then boots the installed root in external-only mode.
  */
 
-import { spawn, spawnSync } from "node:child_process";
-import { createInterface } from "node:readline";
-import {
-  cpSync,
-  existsSync,
-  mkdtempSync,
-  mkdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { spawnSync } from "node:child_process";
+import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { expectNoWireError, parseStructuredResult, startMcp } from "./lib/mcp-stdio-client.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const BUILD_DIR = join(ROOT, "build", "addons");
@@ -191,100 +183,8 @@ function runCliJson(entry, args, env) {
   }
 }
 
-function parseStructuredResult(callResp) {
-  const result = callResp.result;
-  if (result?.structuredContent) return result.structuredContent;
-  const text = result?.content?.find?.((c) => c.type === "text")?.text;
-  if (!text) return null;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
-}
-
-function startMcp(entry, cwd, env) {
-  const proc = spawn("node", [entry], { cwd, env, stdio: ["pipe", "pipe", "pipe"] });
-  const rl = createInterface({ input: proc.stdout });
-  const pending = new Map();
-  let stderr = "";
-  let closed = false;
-  let stopping = null;
-
-  proc.stderr.on("data", (chunk) => (stderr += chunk.toString()));
-  proc.on("close", () => {
-    closed = true;
-  });
-  rl.on("line", (line) => {
-    if (!line.trim()) return;
-    let msg;
-    try {
-      msg = JSON.parse(line);
-    } catch {
-      return;
-    }
-    if (msg.id !== undefined && pending.has(msg.id)) {
-      const { resolve: resolvePending, timer } = pending.get(msg.id);
-      clearTimeout(timer);
-      pending.delete(msg.id);
-      resolvePending(msg);
-    }
-  });
-
-  function request(method, params, id) {
-    proc.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id, method, ...(params ? { params } : {}) })}\n`);
-    return new Promise((resolveReq, rejectReq) => {
-      const timer = setTimeout(() => {
-        if (pending.has(id)) {
-          pending.delete(id);
-          rejectReq(new Error(`timeout waiting for id=${id} (${method})`));
-        }
-      }, TIMEOUT_MS);
-      pending.set(id, { resolve: resolveReq, timer });
-    });
-  }
-
-  function notify(method) {
-    proc.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", method })}\n`);
-  }
-
-  function stop() {
-    if (closed) return Promise.resolve();
-    if (stopping) return stopping;
-    stopping = new Promise((resolveStop) => {
-      rl.close();
-      try {
-        proc.stdin.end();
-      } catch {
-        /* child may already be gone */
-      }
-      for (const { timer } of pending.values()) clearTimeout(timer);
-      pending.clear();
-      const timer = setTimeout(() => {
-        if (!closed) proc.kill("SIGKILL");
-        resolveStop();
-      }, 1000);
-      timer.unref();
-      proc.once("close", () => {
-        clearTimeout(timer);
-        resolveStop();
-      });
-      proc.kill("SIGTERM");
-    });
-    return stopping;
-  }
-
-  return { request, notify, stop, stderr: () => stderr };
-}
-
-function expectNoWireError(resp, label) {
-  if (resp.error || resp.result?.isError) {
-    throw new Error(`${label} failed: ${JSON.stringify(resp)}`);
-  }
-}
-
 async function bootForStatus({ entry, work, env, packName, expectInstalled }) {
-  const client = startMcp(entry, work, env);
+  const client = startMcp({ entry, cwd: work, env, timeoutMs: TIMEOUT_MS });
   const watchdog = setTimeout(() => {
     client.stop().finally(() => fail(`MCP first-user drill timed out after ${TIMEOUT_MS}ms`));
   }, TIMEOUT_MS);
@@ -366,7 +266,9 @@ async function bootForStatus({ entry, work, env, packName, expectInstalled }) {
     };
   } catch (error) {
     const stderr = client.stderr();
-    throw new Error(`${error instanceof Error ? error.message : String(error)}\n--- stderr ---\n${stderr.slice(-4000)}`);
+    throw new Error(
+      `${error instanceof Error ? error.message : String(error)}\n--- stderr ---\n${stderr.slice(-4000)}`,
+    );
   } finally {
     clearTimeout(watchdog);
     await client.stop();
@@ -432,16 +334,24 @@ try {
   });
 
   const cliDryRun = runCliJson(entry, ["enable", pack.name, "--install", "--dry-run"], env);
-  if (!cliDryRun.operation?.packages?.some?.((spec) => spec === pack.packageName || spec.startsWith(`${pack.packageName}@`))) {
+  if (
+    !cliDryRun.operation?.packages?.some?.(
+      (spec) => spec === pack.packageName || spec.startsWith(`${pack.packageName}@`),
+    )
+  ) {
     fail(`CLI dry-run did not include ${pack.packageName}: ${JSON.stringify(cliDryRun.operation)}`);
   }
 
   console.log(`[5/7] install local add-on tarball into persistent prefix ${prefix}`);
   mkdirSync(prefix, { recursive: true });
   writeFileSync(join(prefix, "package.json"), JSON.stringify({ private: true, name: "airmcp-addons" }, null, 2) + "\n");
-  sh("npm", ["install", "--prefix", prefix, "--no-save", "--no-audit", "--no-fund", "--ignore-scripts", addonPack.tgz], {
-    cwd: work,
-  });
+  sh(
+    "npm",
+    ["install", "--prefix", prefix, "--no-save", "--no-audit", "--no-fund", "--ignore-scripts", addonPack.tgz],
+    {
+      cwd: work,
+    },
+  );
 
   console.log("[6/7] activate the pack in user config");
   const activated = runCliJson(entry, ["enable", pack.name], env);
@@ -524,6 +434,8 @@ try {
 } finally {
   for (const tgz of tarballs) rmSync(tgz, { force: true });
   if (slimSourceDir) rmSync(slimSourceDir, { recursive: true, force: true });
-  if (work && process.env.AIRMCP_KEEP_FIRST_USER_DRILL_WORKDIR !== "true") rmSync(work, { recursive: true, force: true });
-  if (home && process.env.AIRMCP_KEEP_FIRST_USER_DRILL_WORKDIR !== "true") rmSync(home, { recursive: true, force: true });
+  if (work && process.env.AIRMCP_KEEP_FIRST_USER_DRILL_WORKDIR !== "true")
+    rmSync(work, { recursive: true, force: true });
+  if (home && process.env.AIRMCP_KEEP_FIRST_USER_DRILL_WORKDIR !== "true")
+    rmSync(home, { recursive: true, force: true });
 }

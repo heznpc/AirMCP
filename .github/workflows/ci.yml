@@ -115,6 +115,9 @@ jobs:
       - name: Verify add-on package boundaries
         run: npm run addons:check
 
+      - name: Verify public source and npm package size
+        run: npm run size:check
+
       - name: Verify installed add-on package smoke
         timeout-minutes: 10
         run: npm run addons:verify-install -- --all

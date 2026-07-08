@@ -185,6 +185,7 @@ run("npm", ["run", "tokens:check"]);
 run("npm", ["run", "profiles:check"]);
 run("npm", ["run", "harness:check"]);
 run("npm", ["run", "addons:check"]);
+run("npm", ["run", "size:check"]);
 run("npm", ["run", "addons:verify-install", "--", "--all"]);
 run("npm", ["run", "addons:measure-split", "--", "--no-build", "--require-size-win"]);
 const splitMeasurementPath = join(ROOT, "build", "addons", "split-measurement.json");

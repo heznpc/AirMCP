@@ -113,7 +113,21 @@ function verifyTrackedPaths() {
 }
 
 function verifyNpmPack() {
-  const result = run("npm", ["pack", "--dry-run", "--json"], { encoding: "utf8" });
+  const result = spawnSync("npm", ["pack", "--dry-run", "--json"], {
+    cwd: ROOT,
+    encoding: "utf8",
+    maxBuffer: 128 * 1024 * 1024,
+  });
+  const restore = spawnSync(process.execPath, ["scripts/slim-root-package.mjs", "--restore"], {
+    cwd: ROOT,
+    encoding: "utf8",
+  });
+  if (restore.status !== 0) {
+    fail("failed to restore universal dist after npm pack dry-run", restore.stderr || restore.stdout);
+  }
+  if (result.status !== 0) {
+    fail("command failed: npm pack --dry-run --json", result.stderr || result.stdout);
+  }
   const pack = parseNpmPackJson(result.stdout);
   if (pack.name !== pkg.name || pack.version !== pkg.version) {
     fail(`npm pack metadata mismatch: expected ${pkg.name}@${pkg.version}, got ${pack.name}@${pack.version}`);

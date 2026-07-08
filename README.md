@@ -111,12 +111,17 @@ Useful commands:
 ```bash
 npx airmcp modules
 npx airmcp modules enable productivity --install
+npx airmcp --full
 npx airmcp workflows
 npx airmcp workflows daily-briefing --prompt
 ```
 
 The complete generated tool manifest is in
 [docs/tool-manifest.json](docs/tool-manifest.json).
+
+Current generated surfaces: 232 Shortcuts / Siri AppIntents, 83 Interactive Snippet views,
+and 13 AppEnum pickers. The sessionless discovery card uses MCP schema version
+2025-11-25.
 
 ## Safety Model
 
@@ -127,13 +132,13 @@ agents.
   default `sensitive-only` HITL level.
 - **HMAC-chained audit log** at `~/.airmcp/audit.jsonl`, with tamper detection
   covered by tests.
-- **Rate limits**: 60 calls/minute globally and 10 destructive calls/hour.
+- **Rate limits**: 60/min globally and 10 destructive/hr.
 - **Emergency stop**: `touch ~/.config/airmcp/emergency-stop` blocks destructive
   tools without restarting the server.
 - **Inbound HTTP policy** through `AIRMCP_ALLOW_NETWORK`: loopback-only by
   default, with token, origin, or OAuth modes available for wider exposure.
 - **OAuth 2.1 + Resource Indicators** for HTTP runtimes that need scoped access
-  control.
+  control, with RS256/ES256 JWT verification.
 
 Environment variables are indexed in [docs/environment.md](docs/environment.md).
 HTTP policy details are in

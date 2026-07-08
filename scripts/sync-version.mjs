@@ -24,6 +24,7 @@
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
+import { syncFile as syncAnchoredFile } from "./lib/sync-file.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
@@ -34,40 +35,13 @@ const MAJOR_MINOR = VERSION.split(".").slice(0, 2).join(".");
 
 const checkMode = process.argv.includes("--check");
 let dirty = false;
+let fatal = false;
 
 function syncFile(relPath, replacements) {
-  const absPath = resolve(root, relPath);
-  if (!existsSync(absPath)) {
-    console.warn(`  skip: ${relPath} (not found)`);
-    return;
-  }
-  let content = readFileSync(absPath, "utf8");
-  let changed = false;
-
-  for (const { pattern, replacement, label } of replacements) {
-    const updated = content.replace(pattern, replacement);
-    if (updated !== content) {
-      changed = true;
-      content = updated;
-    } else if (!pattern.test(content.replace(pattern, replacement) === content ? "" : content)) {
-      // Check if the current value already matches
-      if (!pattern.test(content)) {
-        console.warn(`  warn: ${relPath} — pattern not found for "${label}"`);
-      }
-    }
-  }
-
-  if (changed) {
-    if (checkMode) {
-      console.error(`  STALE: ${relPath}`);
-      dirty = true;
-    } else {
-      writeFileSync(absPath, content);
-      console.log(`  sync: ${relPath}`);
-    }
-  } else {
-    console.log(`  ok:   ${relPath}`);
-  }
+  const requiredReplacements = replacements.map((replacement) => ({ required: true, ...replacement }));
+  const result = syncAnchoredFile(root, relPath, requiredReplacements, { mode: checkMode ? "check" : "sync" });
+  dirty ||= result.dirty;
+  fatal ||= result.fatal;
 }
 
 console.log(`\nVersion sync: ${VERSION}\n`);
@@ -222,7 +196,11 @@ syncFile("docs/index.html", [
 
 console.log("");
 
-if (checkMode && dirty) {
-  console.error("Version mismatch detected. Run: node scripts/sync-version.mjs");
+if (dirty) {
+  if (fatal) {
+    console.error("Version sync anchors missing. Restore the anchors or update scripts/sync-version.mjs.");
+  } else {
+    console.error("Version mismatch detected. Run: node scripts/sync-version.mjs");
+  }
   process.exit(1);
 }

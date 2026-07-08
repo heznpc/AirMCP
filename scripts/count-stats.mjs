@@ -10,9 +10,10 @@
  *   node scripts/count-stats.mjs --sync   # update all docs to match source
  */
 
-import { readFileSync, writeFileSync, readdirSync, existsSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { syncFile as syncAnchoredFile } from "./lib/sync-file.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = join(ROOT, "src");
@@ -109,42 +110,18 @@ if (mode === "print") {
 // ── Shared helpers for check & sync ────────────────────────────────
 
 let dirty = false;
+let changedAny = false;
+let fatal = false;
 
 /**
  * Apply numeric replacements to a file.
  * Each replacement: { pattern: RegExp with (\d+) capture group, value: number }
  */
 function syncFile(relPath, replacements) {
-  const absPath = join(ROOT, relPath);
-  if (!existsSync(absPath)) return;
-
-  let content = readFileSync(absPath, "utf-8");
-  let changed = false;
-
-  for (const { pattern, value } of replacements) {
-    content = content.replace(pattern, (...args) => {
-      const match = args[0];
-      const num = args[1];
-      const current = parseInt(num);
-      if (current !== value) {
-        changed = true;
-        return match.replace(num, String(value));
-      }
-      return match;
-    });
-  }
-
-  if (changed) {
-    if (mode === "check") {
-      console.error(`  STALE: ${relPath}`);
-      dirty = true;
-    } else {
-      writeFileSync(absPath, content);
-      console.log(`  sync: ${relPath}`);
-    }
-  } else {
-    console.log(`  ok:   ${relPath}`);
-  }
+  const result = syncAnchoredFile(ROOT, relPath, replacements, { mode });
+  dirty ||= result.dirty;
+  changedAny ||= result.changed;
+  fatal ||= result.fatal;
 }
 
 // ── Run ────────────────────────────────────────────────────────────
@@ -222,8 +199,8 @@ syncFile("docs/index.html", [
 
 // Registry metadata
 const registryPattern = [
-  { pattern: /(\d+) tools across/g, value: tools },
-  { pattern: /across (\d+) modules/g, value: modules },
+  { pattern: /(\d+) tools across/g, value: tools, required: true, label: "tool count" },
+  { pattern: /across (\d+) modules/g, value: modules, required: true, label: "module count" },
 ];
 syncFile("mcp.json", registryPattern);
 syncFile("glama.json", registryPattern);
@@ -234,8 +211,8 @@ syncFile(".claude-plugin/plugin.json", registryPattern);
 // Anthropic MCP Registry manifest — only the description carries
 // the counts (version/package fields live outside the pattern scope).
 syncFile("server.json", [
-  { pattern: /(\d+) tools across/g, value: tools },
-  { pattern: /across (\d+) modules/g, value: modules },
+  { pattern: /(\d+) tools across/g, value: tools, required: true, label: "tool count" },
+  { pattern: /across (\d+) modules/g, value: modules, required: true, label: "module count" },
 ]);
 
 // Locale files — each uses different words for "modules"
@@ -249,11 +226,15 @@ if (existsSync(localeDir)) {
 
 console.log("");
 
-if (mode === "check" && dirty) {
-  console.error("Stats mismatch detected. Run: node scripts/count-stats.mjs --sync");
+if (dirty) {
+  if (fatal) {
+    console.error("Stats sync anchors missing. Restore the anchors or update scripts/count-stats.mjs.");
+  } else {
+    console.error("Stats mismatch detected. Run: node scripts/count-stats.mjs --sync");
+  }
   process.exit(1);
 }
 
-if (mode === "sync" && !dirty) {
+if (mode === "sync" && !changedAny) {
   console.log("All files already in sync.");
 }

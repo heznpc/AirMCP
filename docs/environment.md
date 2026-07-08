@@ -16,7 +16,7 @@ If a variable accepts a path, `~` expands to `$HOME`. Booleans are `"true"` / `"
 | Use only selected module packs | `AIRMCP_MODULE_PACKS=core,productivity` |
 | Install and activate a module add-on | `npx airmcp modules enable productivity --install` |
 | Stage physical add-on package artifacts | `npm run addons:build` |
-| Send all 295 tools without compactDescription | `AIRMCP_COMPACT_TOOLS=false` + `AIRMCP_TOOL_EXPOSURE=full` |
+| Send all 296 tools without compactDescription | `AIRMCP_COMPACT_TOOLS=false` + `AIRMCP_TOOL_EXPOSURE=full` |
 | Require sessions before hidden tools can run | `AIRMCP_REQUIRE_TOOL_SESSION=true` |
 | Inspect or edit module add-ons | `npx airmcp modules` |
 | Increase audit-log signing strength for cross-host integrity | `AIRMCP_AUDIT_HMAC_KEY=<32+ random bytes>` |

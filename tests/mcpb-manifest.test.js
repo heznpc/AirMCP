@@ -75,7 +75,7 @@ describe("mcpb manifest template — user_config (MCPB-spec-aware)", () => {
     const la = m.user_config.load_all_modules;
     expect(la.type).toBe("boolean");
     expect(la.default).toBe(false);
-    // If the default flips, the bundle starts loading 29 modules by
+    // If the default flips, the bundle starts loading the full module catalog by
     // default — a footprint change that warrants re-audit + CHANGELOG
     // entry. Lock it here.
   });

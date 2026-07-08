@@ -81,6 +81,30 @@ describe("cli workflows command", () => {
     expect(logSpy.mock.calls[0][0]).toBe("calendar, notes, contacts, finder, reminders");
   });
 
+  test("prints workflow readiness from the same catalog", async () => {
+    await runWorkflows(["daily-briefing", "--readiness"]);
+
+    const output = logSpy.mock.calls.map((call) => call.join(" ")).join("\n");
+    expect(output).toContain("Workflow config readiness");
+    expect(output).toContain("MCP workflow_readiness");
+    expect(output).toContain("Daily Briefing");
+    expect(output).toContain("daily-briefing");
+    expect(output).toMatch(/ready|partial|blocked/);
+  });
+
+  test("emits machine-readable workflow readiness JSON", async () => {
+    await runWorkflows(["daily-briefing", "--readiness", "--json"]);
+
+    expect(logSpy).toHaveBeenCalledTimes(1);
+    const parsed = JSON.parse(logSpy.mock.calls[0][0]);
+    expect(parsed).toMatchObject({
+      scope: "config",
+      summary: { total: 1 },
+    });
+    expect(parsed.note).toContain("workflow_readiness");
+    expect(parsed.workflows[0].id).toBe("daily-briefing");
+  });
+
   test("runs a real read-only daily briefing preview path", async () => {
     mockBuildSnapshot.mockResolvedValue('{"timestamp":"2026-06-17T00:00:00.000Z","depth":"brief","calendar":{}}');
 

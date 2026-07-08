@@ -13,21 +13,15 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = join(ROOT, "src");
 
 /**
- * Canonical module list parsed from `src/shared/profiles.ts`'s
- * `MODULE_NAMES` const. Read at script start so the module count stays
- * aligned with `count-stats.mjs` (which counts the same array). Without
- * this we used to show "32 modules" — `walkDir` happily groups every
- * dir under src/ that has a `registerTool` call, including
- * cross/semantic/audit/server which aren't user-visible "modules" in
- * the config sense. The strict module list is what registry submissions
- * + README counts already use.
+ * Canonical module list parsed from `src/shared/modules.ts`.
+ * `count-stats.mjs` uses this same manifest so opt-in modules such as
+ * webhooks/powerautomate stay visible in public headline counts while
+ * non-module source dirs such as semantic/shared/apps stay out.
  */
 const CANONICAL_MODULE_COUNT = (() => {
   try {
-    const profiles = readFileSync(join(SRC, "shared", "profiles.ts"), "utf-8");
-    const m = profiles.match(/export const MODULE_NAMES = \[([\s\S]*?)\] as const;/);
-    if (!m) return null;
-    return (m[1].match(/"([^"]+)"/g) || []).length;
+    const modules = readFileSync(join(SRC, "shared", "modules.ts"), "utf-8");
+    return (modules.match(/\bname:\s*"[a-z0-9_-]+"/g) || []).length;
   } catch {
     return null;
   }

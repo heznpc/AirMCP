@@ -1,6 +1,6 @@
 {
   "meta_title": "AirMCP — More than Siri",
-  "meta_description": "지난주 회의 메모에서 실행항목을 뽑아 리마인더로 옮기고, 완료되면 알려줍니다. AirMCP는 Apple 생태계를 어떤 AI 클라이언트에든 잇는 오픈소스 도구 — 31개 모듈, 293개 툴.",
+  "meta_description": "지난주 회의 메모에서 실행항목을 뽑아 리마인더로 옮기고, 완료되면 알려줍니다. AirMCP는 Apple 생태계를 어떤 AI 클라이언트에든 잇는 오픈소스 도구 — 32개 모듈, 296개 툴.",
   "nav_modules": "모듈",
   "nav_beyond": "Siri 너머",
   "nav_workflows": "워크플로",
@@ -137,7 +137,7 @@
   "why_label": "왜 AirMCP인가?",
   "why_title": "가장 완전한 Apple MCP 서버.",
   "why_sub": "AirMCP가 다른 대안과 어떻게 다른지 확인하세요.",
-  "why_1_title": "31개 모듈, 293개 도구",
+  "why_1_title": "32개 모듈, 296개 도구",
   "why_1_desc": "다른 프로젝트는 10-15개 도구만 제공하고 업데이트를 멈춥니다. AirMCP는 모든 주요 Apple 앱을 지원하며 계속 성장합니다.",
   "why_2_title": "기본 내장 보안",
   "why_2_desc": "사용자 확인(HITL), 감사 로깅, 입력 검증. 무단 쓰기 작업이 없습니다.",
@@ -188,6 +188,6 @@
   "tryit_5": "\"지금 내 위치 알려주고 여기 날씨도 보여줘\"",
   "tryit_6_cat": "크로스 앱",
   "tryit_6": "\"오늘 회의 확인하고, 관련 메모 찾아서, 미리 알림에 준비 체크리스트 만들어줘\"",
-  "tryit_footer": "293개 도구. 무한한 조합.",
+  "tryit_footer": "296개 도구. 무한한 조합.",
   "footer_tagline": "Claude Code, Codex, 모든 MCP 클라이언트를 위해."
 }

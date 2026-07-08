@@ -1,6 +1,6 @@
 {
   "meta_title": "AirMCP — More than Siri",
-  "meta_description": "Extrayez les tâches des notes de la réunion de la semaine dernière, transférez-les dans Rappels et recevez une alerte à leur achèvement. AirMCP est l'outil open source qui connecte votre écosystème Apple à n'importe quel client IA — 31 modules, 295 outils.",
+  "meta_description": "Extrayez les tâches des notes de la réunion de la semaine dernière, transférez-les dans Rappels et recevez une alerte à leur achèvement. AirMCP est l'outil open source qui connecte votre écosystème Apple à n'importe quel client IA — 32 modules, 296 outils.",
   "nav_modules": "Modules",
   "nav_beyond": "Beyond Siri",
   "nav_workflows": "Workflows",
@@ -137,7 +137,7 @@
   "why_label": "Pourquoi AirMCP ?",
   "why_title": "Le serveur Apple MCP le plus complet.",
   "why_sub": "Decouvrez comment AirMCP se distingue des alternatives.",
-  "why_1_title": "295 outils dans 31 modules",
+  "why_1_title": "296 outils dans 32 modules",
   "why_1_desc": "Les autres offrent 10-15 outils puis cessent les mises a jour. AirMCP couvre toutes les apps Apple principales et continue de croitre.",
   "why_2_title": "Securite par defaut",
   "why_2_desc": "Confirmation humaine, journalisation d'audit et validation des entrees. Aucune ecriture silencieuse.",
@@ -188,6 +188,6 @@
   "tryit_5": "\"Donne-moi ma position actuelle et montre la météo ici\"",
   "tryit_6_cat": "Multi-app",
   "tryit_6": "\"Vérifie les réunions d'aujourd'hui, trouve les notes associées et crée une checklist de préparation dans Rappels\"",
-  "tryit_footer": "295 outils. Des combinaisons infinies.",
+  "tryit_footer": "296 outils. Des combinaisons infinies.",
   "footer_tagline": "Conçu pour Claude Code, Codex et chaque client MCP."
 }

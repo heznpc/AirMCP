@@ -123,7 +123,7 @@ describe("doc drift: README prose vs manifest", () => {
     // Module entries are `{ name: "<id>", ... }`, often single-line, so the
     // name: token is not anchored to line start. (Verified: all `name:` keys
     // in this file are module ids — no other use.)
-    const modCount = (modulesSrc.match(/\bname:\s*"[a-z0-9-]+"/g) ?? []).length;
+    const modCount = (modulesSrc.match(/\bname:\s*"[a-z0-9_-]+"/g) ?? []).length;
     expect(modCount).toBeGreaterThan(0);
     expect(readmeNum(/(\d+)\s+modules\b/)).toBe(modCount);
   });

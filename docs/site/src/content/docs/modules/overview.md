@@ -1,9 +1,9 @@
 ---
 title: Module Overview
-description: All 25 AirMCP modules with tool counts and capabilities.
+description: All 32 AirMCP modules with tool counts and capabilities.
 ---
 
-AirMCP ships 31 modules that cover the Apple workspace. Each module registers a set of MCP tools that AI assistants can call. The full manifest contains 295 tools, while the default starter/progressive runtime exposes a smaller front door.
+AirMCP ships 32 modules that cover the Apple workspace. Each module registers a set of MCP tools that AI assistants can call. The full manifest contains 296 tools, while the default starter/progressive runtime exposes a smaller front door.
 
 Module packs are the DLC-like activation boundary above modules. `npx airmcp modules enable productivity` or `AIRMCP_MODULE_PACKS=core,productivity` keeps core workspace tools and iWork active while reporting unavailable profile modules through `profile_status.modulesMissingPacks`. Add `--install` to install the matching companion npm add-on into the user-level add-on prefix before activating it. npm and MCPB releases ship as a slim root; non-core module entrypoints live in physical add-on packages staged by `npm run addons:build`. Add-on names omit `pack-*` naming, for example `@heznpc/airmcp-productivity`.
 
@@ -24,8 +24,8 @@ The release gate treats this as a user journey, not just packaging metadata: `ad
 | **Safari** | 12 | Tab management, bookmarks, reading list. Open/close tabs, get page content, execute JavaScript. |
 | **System** | 27 | Clipboard, volume, brightness, dark mode, Wi-Fi, Bluetooth, battery, running apps, windows, notifications. |
 | **Photos** | 11 | Albums, search, favorites, photo info. Create albums, export photos. |
-| **Shortcuts** | 10 | List, search, run, create, delete, export, import, duplicate Siri Shortcuts. Plus dynamic per-shortcut tools. |
-| **Intelligence** | 11 | Apple Intelligence features (macOS 26+ only). Writing tools, image generation, summarization. |
+| **Shortcuts** | 11 | List, search, run, create, delete, export, import, duplicate Siri Shortcuts. Plus dynamic per-shortcut tools. |
+| **Intelligence** | 13 | Apple Intelligence features (macOS 26+ only). Writing tools, image generation, summarization. |
 | **TV** | 6 | Apple TV app control. Playlists, playback, search. |
 | **UI** | 10 | UI automation via Accessibility APIs. Read UI trees, click elements, type text, inspect menus. |
 | **Screen** | 5 | Screen capture. List windows, capture screen/window/area. |
@@ -33,11 +33,18 @@ The release gate treats this as a user journey, not just packaging metadata: `ad
 | **Podcasts** | 6 | Podcast shows, episodes, playback control. |
 | **Weather** | 3 | Current weather, daily forecast, hourly forecast via Open-Meteo API. |
 | **Pages** | 7 | Apple Pages automation. List, create, read/write body text, close documents. |
-| **Numbers** | 9 | Apple Numbers automation. Spreadsheets, sheets, cell read/write. |
+| **Numbers** | 12 | Apple Numbers automation. Spreadsheets, sheets, cell read/write. |
 | **Keynote** | 9 | Apple Keynote automation. Slides, presenter notes, add/delete slides. |
 | **Location** | 2 | Location permission status, current location (via CoreLocation). |
 | **Bluetooth** | 4 | Bluetooth state, device discovery, connect/disconnect. |
 | **Google** | 16 | Google Workspace integration. Gmail, Google Calendar, Drive, Contacts, Tasks via GWS CLI. |
+| **Speech** | 3 | Speech recognition and text-to-speech helpers for local audio workflows. |
+| **Health** | 5 | HealthKit-backed summaries and samples through the optional Swift bridge. |
+| **Memory** | 4 | Local context memory for storing, querying, and summarizing reusable facts. |
+| **Audit** | 2 | Queryable audit summaries and raw audit log access. |
+| **Spatial Prep** | 3 | Experimental opt-in spatial preparation tools. |
+| **Webhooks** | 3 | Opt-in inbound webhook tools gated by the network policy. |
+| **Power Automate** | 1 | Opt-in inbound Power Automate bridge. |
 
 ## Additional Tools
 
@@ -47,8 +54,8 @@ Beyond the module tools, AirMCP registers several cross-cutting tools:
 |----------|------:|-------------|
 | **Cross-module** | 1 | `summarize_context` -- collects context from all enabled apps and produces a briefing via MCP Sampling. |
 | **Semantic** | 7 | Vector-based semantic search. Build, search, and manage on-device embedding indexes for notes and reminders. |
-| **Setup** | 1 | `airmcp_doctor` -- runtime diagnostics tool that checks permissions, modules, and system state. |
-| **Workflow** | 1 | `get_workflow` -- retrieve prompt handlers as text for autonomous agent environments. |
+| **Front door** | 12 | `profile_status`, `workflow_readiness`, module-pack tools, task sessions, dynamic discovery, and `run_tool`. |
+| **Workflow** | 1 | `get_workflow` -- retrieve prompt handlers as text for autonomous agent environments. Curated workflow readiness is exposed through `workflow_readiness`. |
 | **Skills** | - | Personal Skills Engine -- user-defined YAML-based workflows (not counted as tools). |
 
 ## Prompts

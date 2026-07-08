@@ -63,6 +63,8 @@ const prompts = countInDir(SRC, /server\.prompt\(/g);
 // which is the correct loud signal.
 const INTENTS_PATH = join(ROOT, "swift", "Sources", "AirMCPKit", "Generated", "MCPIntents.swift");
 let appIntents = 0;
+let snippetViews = 0;
+let appEnums = 0;
 if (existsSync(INTENTS_PATH)) {
   const intentsContent = readFileSync(INTENTS_PATH, "utf-8");
   // `: AppIntent {` matches the protocol conformance opening. `: AppIntent,`
@@ -71,6 +73,10 @@ if (existsSync(INTENTS_PATH)) {
   // start under-counting.
   const matches = intentsContent.match(/:\s*AppIntent\s*[\{,]/g);
   appIntents = matches ? matches.length : 0;
+  const snippetMatches = intentsContent.match(/public struct MCP\w+SnippetView:\s*View/g);
+  snippetViews = snippetMatches ? snippetMatches.length : 0;
+  const enumMatches = intentsContent.match(/public enum \w+:\s*String,\s*AppEnum/g);
+  appEnums = enumMatches ? enumMatches.length : 0;
 }
 
 // MCP Apps (interactive UI views via @modelcontextprotocol/ext-apps).
@@ -96,9 +102,9 @@ for (const line of resLines) {
 // the standard-profile MODULE_NAMES. Uses the SAME pattern as the
 // tool-count-drift test so the doc count and that guard can never diverge.
 const modulesContent = readFileSync(join(SRC, "shared", "modules.ts"), "utf-8");
-const modules = (modulesContent.match(/\bname:\s*"[a-z0-9-]+"/g) ?? []).length;
+const modules = (modulesContent.match(/\bname:\s*"[a-z0-9_-]+"/g) ?? []).length;
 
-const stats = { tools, prompts, resources, modules, mcpApps, appIntents };
+const stats = { tools, prompts, resources, modules, mcpApps, appIntents, snippetViews, appEnums };
 
 // ── Print mode ─────────────────────────────────────────────────────
 
@@ -127,18 +133,23 @@ function syncFile(relPath, replacements) {
 // ── Run ────────────────────────────────────────────────────────────
 
 console.log(
-  `\nStats ${mode}: ${tools} tools, ${prompts} prompts, ${resources} resources, ${modules} modules, ${mcpApps} MCP Apps, ${appIntents} AppIntents\n`,
+  `\nStats ${mode}: ${tools} tools, ${prompts} prompts, ${resources} resources, ${modules} modules, ${mcpApps} MCP Apps, ${appIntents} AppIntents, ${snippetViews} snippets, ${appEnums} AppEnums\n`,
 );
 
 // README.md — also picks up the two lines audits keep flagging:
 //   "**229 Shortcuts / Siri AppIntents**" → reconciled with generated file
 //   "**34 prompts + 14 YAML skill built-ins**" → reconciled with src count
 syncFile("README.md", [
+  { pattern: /The catalog is broad: (\d+) tools across/g, value: tools },
+  { pattern: /tools across (\d+) modules/g, value: modules },
   { pattern: /\*\*(\d+) tools\*\*/, value: tools },
   { pattern: /(\d+) modules\)/g, value: modules },
   { pattern: /(\d+) Apple apps/g, value: modules },
   { pattern: /(\d+) Shortcuts\/AppIntents/g, value: appIntents },
   { pattern: /\*\*(\d+) Shortcuts \/ Siri AppIntents\*\*/, value: appIntents },
+  { pattern: /Current generated surfaces: (\d+) Shortcuts \/ Siri AppIntents/g, value: appIntents },
+  { pattern: /(\d+) Interactive Snippet views/g, value: snippetViews },
+  { pattern: /and (\d+) AppEnum pickers/g, value: appEnums },
   { pattern: /(\d+) auto-generated AppIntents/g, value: appIntents },
   { pattern: /\*\*(\d+) prompts \+ /, value: prompts },
 ]);
@@ -162,10 +173,19 @@ const docsPages = [
 for (const page of docsPages) {
   syncFile(page, [
     { pattern: /(\d+) modules/g, value: modules },
+    { pattern: /All (\d+) AirMCP modules/g, value: modules },
     { pattern: /approximately (\d+) tools/g, value: tools },
     { pattern: /all (\d+) tools/g, value: tools },
+    { pattern: /contains (\d+) tools/g, value: tools },
   ]);
 }
+
+syncFile("docs/site/src/content/docs/index.mdx", [
+  { pattern: /— (\d+) modules, \d+ tools/g, value: modules },
+  { pattern: /— \d+ modules, (\d+) tools/g, value: tools },
+  { pattern: /<Card title="(\d+) Modules"/, value: modules },
+  { pattern: /<Card title="(\d+) Tools"/, value: tools },
+]);
 
 // MCPB manifest template — the long_description string lives in the user
 // install dialog, so a stale count is highly visible. Guard the tool /
@@ -175,6 +195,7 @@ syncFile("mcpb/manifest.template.json", [
   { pattern: /(\d+) tools across/g, value: tools },
   { pattern: /across (\d+) modules/g, value: modules },
   { pattern: /(\d+) auto-generated Apple App Intents/g, value: appIntents },
+  { pattern: /Load all (\d+) modules on startup/g, value: modules },
 ]);
 
 // Other docs
@@ -184,17 +205,45 @@ syncFile("docs/skills.md", [
 ]);
 syncFile("docs/shortcuts.md", [{ pattern: /(\d+) tools are auto-registered/g, value: tools }]);
 syncFile("docs/REGISTRY_SUBMISSIONS.md", [{ pattern: /(\d+) AppIntents/g, value: appIntents }]);
+syncFile("docs/REGISTRY_SUBMISSIONS.md", [
+  { pattern: /(\d+) tools across/g, value: tools },
+  { pattern: /across (\d+) modules/g, value: modules },
+  { pattern: /\((\d+) tools, \d+ modules/g, value: tools },
+  { pattern: /, (\d+) modules, curated workflow catalog/g, value: modules },
+]);
 syncFile("docs/TERMS_OF_SERVICE.md", [
   { pattern: /(\d+) tools/g, value: tools },
   { pattern: /(\d+) modules/g, value: modules },
 ]);
+syncFile("docs/environment.md", [{ pattern: /Send all (\d+) tools/g, value: tools }]);
+syncFile("docs/mcpb.md", [{ pattern: /Load all (\d+) modules on startup/g, value: modules }]);
 
 // Landing page — only match aggregate counts, not per-module badges.
 syncFile("docs/index.html", [
+  { pattern: /— (\d+) modules, \d+ tools/g, value: modules },
+  { pattern: /— \d+ modules, (\d+) tools/g, value: tools },
+  { pattern: /(\d+) Apple modules, \d+ tools/g, value: modules },
+  { pattern: /\d+ Apple modules, (\d+) tools/g, value: tools },
+  {
+    pattern:
+      /text-2xl font-bold tracking-tight">(\d+)<\/div>\s*<div class="text-xs opacity-35 mt-1" data-i18n="stat_modules"/,
+    value: modules,
+  },
+  {
+    pattern:
+      /text-2xl font-bold tracking-tight">(\d+)<\/div>\s*<div class="text-xs opacity-35 mt-1" data-i18n="stat_tools"/,
+    value: tools,
+  },
+  {
+    pattern:
+      /text-2xl font-bold tracking-tight">(\d+)<\/div>\s*<div class="text-xs opacity-35 mt-1" data-i18n="stat_prompts"/,
+    value: prompts,
+  },
   { pattern: /with (\d+) tools across/g, value: tools },
   { pattern: /across (\d+) modules/g, value: modules },
   { pattern: /hero_sub">(\d+) tools/g, value: tools },
   { pattern: /tryit_footer">(\d+) tools/g, value: tools },
+  { pattern: /why_1_title">(\d+) tools/g, value: tools },
 ]);
 
 // Registry metadata
@@ -218,9 +267,19 @@ syncFile("server.json", [
 // Locale files — each uses different words for "modules"
 const localeDir = join(ROOT, "docs", "locales");
 if (existsSync(localeDir)) {
-  const moduleWords = /(\d+)([\s\u00a0]*(?:modules?|개 모듈|モジュール|个模块|個模組|Modulen|módulos))/g;
+  const moduleWords = /(\d+)([\s\u00a0]*(?:modules?|개 모듈|モジュール|个模块|個模組|Module|Modulen|m[oó]dulos))/g;
+  const moduleKeyWords = /(\d+)([\s\u00a0]*(?:modules?|개 모듈|モジュール|个模块|個模組|Module|Modulen|m[oó]dulos))/;
+  const toolKeyWords =
+    /(\d+)([\s\u00a0]*(?:tools?|Tools|개 툴|개 도구|ツール|个工具|個工具|Werkzeuge|herramientas|outils|ferramentas))/;
   for (const f of readdirSync(localeDir).filter((f) => f.endsWith(".json"))) {
-    syncFile(`docs/locales/${f}`, [{ pattern: moduleWords, value: modules }]);
+    syncFile(`docs/locales/${f}`, [
+      { pattern: moduleWords, value: modules },
+      { pattern: new RegExp(`"meta_description": "[^"]*?${moduleKeyWords.source}`), value: modules },
+      { pattern: new RegExp(`"meta_description": "[^"]*?${toolKeyWords.source}`), value: tools },
+      { pattern: new RegExp(`"why_1_title": "[^"]*?${moduleKeyWords.source}`), value: modules },
+      { pattern: new RegExp(`"why_1_title": "[^"]*?${toolKeyWords.source}`), value: tools },
+      { pattern: new RegExp(`"tryit_footer": "${toolKeyWords.source}`), value: tools },
+    ]);
   }
 }
 

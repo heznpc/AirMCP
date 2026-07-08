@@ -13,7 +13,7 @@
 Cursor, Raycast, Siri, Shortcuts, Xcode agents, and other MCP-capable AI clients
 read, organize, and act across your Mac apps through one governed local runtime.
 
-The catalog is broad: 295 tools across 31 modules. The important part is the
+The catalog is broad: 296 tools across 32 modules. The important part is the
 layer underneath: profile-based exposure, task-scoped tool sessions, per-call
 human approval, HMAC-chained audit logs, rate limits, OAuth scopes, and local
 controls for sensitive Apple workspace actions.
@@ -113,13 +113,14 @@ npx airmcp modules
 npx airmcp modules enable productivity --install
 npx airmcp --full
 npx airmcp workflows
+npx airmcp workflows --readiness
 npx airmcp workflows daily-briefing --prompt
 ```
 
 The complete generated tool manifest is in
 [docs/tool-manifest.json](docs/tool-manifest.json).
 
-Current generated surfaces: 232 Shortcuts / Siri AppIntents, 83 Interactive Snippet views,
+Current generated surfaces: 233 Shortcuts / Siri AppIntents, 84 Interactive Snippet views,
 and 13 AppEnum pickers. The sessionless discovery card uses MCP schema version
 2025-11-25.
 

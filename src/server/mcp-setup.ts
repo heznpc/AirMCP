@@ -45,6 +45,13 @@ import { TOOL_SESSION_CONTROL_TOOLS, toolSessions } from "../shared/tool-session
 import { semanticToolSearch, isToolSearchIndexed, indexToolDescriptions } from "../shared/tool-search.js";
 import { isCompactMode } from "../shared/tool-filter.js";
 import { resolveHarnessAdapter } from "../shared/task-adapters.js";
+import {
+  WORKFLOWS,
+  assessWorkflowReadiness,
+  assessWorkflowsReadiness,
+  findWorkflow,
+  summarizeWorkflowsReadiness,
+} from "../shared/workflows.js";
 import { usageTracker } from "../shared/usage-tracker.js";
 import { generateProactiveContext } from "../shared/proactive.js";
 import { eventBus } from "../shared/event-bus.js";
@@ -267,6 +274,37 @@ export async function createServer(
     timeline: enabled.includes("calendar") && enabled.includes("reminders"),
   });
 
+  const buildWorkflowReadiness = () =>
+    assessWorkflowsReadiness({
+      enabledModules: enabled,
+      modulesMissingPacks,
+      modulesMissingAddonPackages: missingAddonPackageModules,
+      registeredTools: toolRegistry.getToolNames(),
+      allowSendMail: config.allowSendMail,
+      allowSendMessages: config.allowSendMessages,
+    });
+
+  const workflowReadinessIssueSchema = z.object({
+    code: z.string(),
+    severity: z.enum(["info", "warning", "blocker"]),
+    message: z.string(),
+    module: z.string().optional(),
+    pack: z.string().optional(),
+    tool: z.string().optional(),
+    command: z.string().optional(),
+  });
+  const workflowReadinessSchema = z.object({
+    id: z.string(),
+    title: z.string(),
+    prompt: z.string(),
+    requiredModules: z.array(z.string()),
+    tools: z.array(z.string()),
+    status: z.enum(["ready", "partial", "blocked"]),
+    ready: z.boolean(),
+    summary: z.string(),
+    issues: z.array(workflowReadinessIssueSchema),
+  });
+
   // list_profiles: small front door for profile-first setup
   lServer.registerTool(
     "list_profiles",
@@ -476,10 +514,17 @@ export async function createServer(
         toolsRegistered: z.number(),
         toolSessionsActive: z.number(),
         frontDoorTools: z.array(z.string()),
+        workflowReadiness: z.object({
+          total: z.number(),
+          ready: z.number(),
+          partial: z.number(),
+          blocked: z.number(),
+        }),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async () => {
+      const workflowReadiness = buildWorkflowReadiness();
       return okStructured({
         profile: config.profile,
         toolExposure: config.toolExposure,
@@ -497,6 +542,66 @@ export async function createServer(
         toolsRegistered: toolRegistry.getToolCount(),
         toolSessionsActive: toolSessions.activeCount(),
         frontDoorTools: [...FRONT_DOOR_TOOLS],
+        workflowReadiness: summarizeWorkflowsReadiness(workflowReadiness),
+      });
+    },
+  );
+
+  lServer.registerTool(
+    "workflow_readiness",
+    {
+      title: "Workflow Readiness",
+      description:
+        "Explain whether curated AirMCP workflows are ready in the active runtime, including missing modules, add-ons, tools, and write opt-ins.",
+      inputSchema: {
+        id: z
+          .string()
+          .min(1)
+          .max(120)
+          .optional()
+          .describe("Optional workflow id, for example daily-briefing or meeting-prep"),
+      },
+      outputSchema: {
+        activeProfile: z.string(),
+        toolExposure: z.string(),
+        workflows: z.array(workflowReadinessSchema),
+        summary: z.object({
+          total: z.number(),
+          ready: z.number(),
+          partial: z.number(),
+          blocked: z.number(),
+        }),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ id }) => {
+      if (id) {
+        const workflow = findWorkflow(id);
+        if (!workflow) {
+          return errNotFound(`Unknown workflow "${id}". Known workflows: ${WORKFLOWS.map((w) => w.id).join(", ")}`);
+        }
+        const readiness = assessWorkflowReadiness(workflow, {
+          enabledModules: enabled,
+          modulesMissingPacks,
+          modulesMissingAddonPackages: missingAddonPackageModules,
+          registeredTools: toolRegistry.getToolNames(),
+          allowSendMail: config.allowSendMail,
+          allowSendMessages: config.allowSendMessages,
+        });
+        return okStructured({
+          activeProfile: config.profile,
+          toolExposure: config.toolExposure,
+          workflows: [readiness],
+          summary: summarizeWorkflowsReadiness([readiness]),
+        });
+      }
+
+      const workflows = buildWorkflowReadiness();
+      return okStructured({
+        activeProfile: config.profile,
+        toolExposure: config.toolExposure,
+        workflows,
+        summary: summarizeWorkflowsReadiness(workflows),
       });
     },
   );
@@ -681,7 +786,7 @@ export async function createServer(
       title: "Discover Tools",
       description:
         "Search available tools by keyword. Returns matching tools with descriptions. " +
-        "Use this instead of scanning all 250+ tools — describe what you need and get relevant tools.",
+        "Use this instead of scanning the full tool catalog — describe what you need and get relevant tools.",
       inputSchema: {
         query: z.string().min(1).max(500).describe("Search query — e.g. 'calendar', 'send email', 'music playback'"),
         limit: z.number().min(1).max(50).optional().describe("Max results (default 20)"),

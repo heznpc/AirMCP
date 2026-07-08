@@ -2,8 +2,8 @@
 //
 // Source: docs/tool-manifest.json
 // Generator: scripts/gen-swift-intents.mjs
-// RFC 0007 Phase A.2b.2 + A.4.1 — 232 auto-selected read-only
-// tools (83 with typed drift-guards + Interactive Snippet
+// RFC 0007 Phase A.2b.2 + A.4.1 — 233 auto-selected read-only
+// tools (84 with typed drift-guards + Interactive Snippet
 // SwiftUI views) + 9 AppShortcutsProvider entries.
 // Run `npm run gen:intents` to refresh after tool metadata changes.
 // CI guards against drift via `npm run gen:intents:check`.
@@ -814,6 +814,12 @@ public struct MCPProfileStatusOutput: Codable, Sendable {
         public let command: String
         public let message: String
     }
+    public struct Workflowreadiness: Codable, Sendable {
+        public let total: Double
+        public let ready: Double
+        public let partial: Double
+        public let blocked: Double
+    }
 
     public let profile: String
     public let toolExposure: String
@@ -831,6 +837,7 @@ public struct MCPProfileStatusOutput: Codable, Sendable {
     public let toolsRegistered: Double
     public let toolSessionsActive: Double
     public let frontDoorTools: [String]
+    public let workflowReadiness: Workflowreadiness
 }
 
 // Output type for: read_chat
@@ -1195,6 +1202,42 @@ public struct MCPTodayEventsOutput: Codable, Sendable {
 // Output type for: toggle_dark_mode
 public struct MCPToggleDarkModeOutput: Codable, Sendable {
     public let darkMode: Bool
+}
+
+// Output type for: workflow_readiness
+public struct MCPWorkflowReadinessOutput: Codable, Sendable {
+    public struct WorkflowsItem: Codable, Sendable {
+        public struct IssuesItem: Codable, Sendable {
+            public let code: String
+            public let severity: String
+            public let message: String
+            public let module: String?
+            public let pack: String?
+            public let tool: String?
+            public let command: String?
+        }
+
+        public let id: String
+        public let title: String
+        public let prompt: String
+        public let requiredModules: [String]
+        public let tools: [String]
+        public let status: String
+        public let ready: Bool
+        public let summary: String
+        public let issues: [IssuesItem]
+    }
+    public struct Summary: Codable, Sendable {
+        public let total: Double
+        public let ready: Double
+        public let partial: Double
+        public let blocked: Double
+    }
+
+    public let activeProfile: String
+    public let toolExposure: String
+    public let workflows: [WorkflowsItem]
+    public let summary: Summary
 }
 
 // MARK: - AppEnum types
@@ -2322,7 +2365,7 @@ public struct DisconnectBluetoothIntent: AppIntent {
 // Tool: discover_tools
 public struct DiscoverToolsIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Discover Tools"
-    nonisolated(unsafe) public static var description = IntentDescription("Search available tools by keyword. Returns matching tools with descriptions. Use this instead of scanning all 250+ tools — describe what you need and get relevant tools.")
+    nonisolated(unsafe) public static var description = IntentDescription("Search available tools by keyword. Returns matching tools with descriptions. Use this instead of scanning the full tool catalog — describe what you need and get relevant tools.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -8012,6 +8055,39 @@ public struct UiTraverseIntent: AppIntent {
     }
 }
 
+// Tool: workflow_readiness
+public struct WorkflowReadinessIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Workflow Readiness"
+    nonisolated(unsafe) public static var description = IntentDescription("Explain whether curated AirMCP workflows are ready in the active runtime, including missing modules, add-ons, tools, and write opt-ins.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @Parameter(title: "Optional workflow id, for example daily-briefing or meeting-prep")
+    public var id: String?
+
+    @MainActor
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        if let v = id { args["id"] = v }
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "workflow_readiness",
+            args: args
+        )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "workflow_readiness", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPWorkflowReadinessOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPWorkflowReadinessSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
+        return .result(value: result)
+    }
+}
+
 // MARK: - AppShortcutsProvider
 
 #if AIRMCP_ENABLE_FOUNDATION_MODELS && canImport(FoundationModels) && compiler(>=6.3)
@@ -9866,6 +9942,13 @@ public struct MCPProfileStatusSnippetView: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
+            HStack {
+                Text("Workflow Readiness")
+                Spacer()
+                Text(String(describing: data.workflowReadiness))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
         }
         .padding()
     }
@@ -10632,6 +10715,23 @@ public struct MCPToggleDarkModeSnippetView: View {
                 Text((data.darkMode ? "Yes" : "No"))
                     .lineLimit(1)
                     .truncationMode(.tail)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: workflow_readiness  (shape: list-object)
+@available(macOS 26, iOS 26, *)
+public struct MCPWorkflowReadinessSnippetView: View {
+    public let data: MCPWorkflowReadinessOutput
+    public init(data: MCPWorkflowReadinessOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(data.workflows.enumerated()), id: \.offset) { _, row in
+                Text(row.title)
+                    .font(.body)
+                    .lineLimit(1)
             }
         }
         .padding()

@@ -52,12 +52,14 @@ npx airmcp workflows daily-briefing --prompt
 npx airmcp workflows daily-briefing --preview
 npx airmcp workflows meeting-prep --modules
 npx airmcp workflows inbox-triage --tools
+npx airmcp workflows --readiness
+npx airmcp workflows --readiness --json
 npx airmcp workflows project-digest --json
 ```
 
 The CLI prints the same curated workflow catalog that the macOS menubar app exposes under **Workflows**. Each workflow includes a copyable prompt, core tools, optional Siri phrase, and safety note.
 
-Use a workflow id with `--prompt`, `--siri`, `--tools`, `--modules`, `--safety`, or `--json` when you want only one field for a shell script, launcher, onboarding screen, or agent prompt. `daily-briefing --preview` performs a real read-only snapshot of Calendar, Reminders, Mail, and Notes; it does not write data.
+Use a workflow id with `--prompt`, `--siri`, `--tools`, `--modules`, `--safety`, or `--json` when you want only one field for a shell script, launcher, onboarding screen, or agent prompt. `--readiness` checks profile, module-pack, add-on package, and write opt-in readiness without launching the live server; the MCP `workflow_readiness` tool checks live tool registration inside the active runtime. `daily-briefing --preview` performs a real read-only snapshot of Calendar, Reminders, Mail, and Notes; it does not write data.
 
 For Codex:
 
@@ -75,7 +77,7 @@ For Siri and Shortcuts, see [shortcuts.md](shortcuts.md). The default AppShortcu
 
 ## What Exists Today
 
-- CLI workflow catalog SSOT: `src/cli/workflows-catalog.json`
+- Shared workflow catalog SSOT: `src/shared/workflows-catalog.json`
 - CLI workflow renderer and preview runner: `src/cli/workflows.ts`
 - Menubar Workflows menu: `app/Sources/AirMCPApp/Views/MenuContent.swift`
 - Built-in workflow skills: `src/skills/builtins/*.yaml`

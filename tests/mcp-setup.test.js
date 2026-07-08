@@ -206,6 +206,7 @@ jest.unstable_mockModule('../dist/shared/config.js', () => ({
     'list_profiles',
     'list_module_packs',
     'install_module_pack',
+    'workflow_readiness',
     'discover_tools',
     'run_tool',
     'get_workflow',
@@ -231,6 +232,7 @@ jest.unstable_mockModule('../dist/shared/config.js', () => ({
       'list_profiles',
       'list_module_packs',
       'install_module_pack',
+      'workflow_readiness',
       'discover_tools',
       'run_tool',
     ]),
@@ -271,6 +273,7 @@ function mkConfig() {
       'list_profiles',
       'list_module_packs',
       'install_module_pack',
+      'workflow_readiness',
       'discover_tools',
       'run_tool',
     ]),
@@ -541,6 +544,40 @@ describe('createServer — installation order invariant', () => {
 });
 
 describe('createServer — module add-on install hints', () => {
+  test('workflow_readiness explains workflow blockers from the active runtime', async () => {
+    fakeModuleRegistry = [{ name: 'notes', tools: () => {} }];
+
+    const origError = console.error;
+    console.error = () => {};
+    try {
+      await createServer(mkOptions({ pkg: { ...mkPkg(), version: '2.15.0' } }));
+    } finally {
+      console.error = origError;
+    }
+
+    const readinessTool = sdkRegisterToolCalls.find((call) => call.name === 'workflow_readiness');
+    const statusTool = sdkRegisterToolCalls.find((call) => call.name === 'profile_status');
+    const readiness = await readinessTool.cb({ id: 'daily-briefing' });
+    const status = await statusTool.cb();
+
+    expect(readiness.structuredContent).toMatchObject({
+      activeProfile: 'starter',
+      toolExposure: 'profile',
+      summary: { total: 1, ready: 0, partial: 0, blocked: 1 },
+    });
+    expect(readiness.structuredContent.workflows[0]).toMatchObject({
+      id: 'daily-briefing',
+      status: 'blocked',
+    });
+    expect(readiness.structuredContent.workflows[0].issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'module_disabled', module: 'calendar' }),
+        expect.objectContaining({ code: 'tool_not_registered', tool: 'today_events' }),
+      ]),
+    );
+    expect(status.structuredContent.workflowReadiness).toMatchObject({ total: 6, blocked: 6 });
+  });
+
   test('profile_status and list_module_packs expose on-demand install commands for missing packs', async () => {
     fakeModuleRegistry = [{ name: 'notes', tools: () => {} }];
     fakeModulePackPlan = {

@@ -2,7 +2,7 @@
 /**
  * review-route.mjs — make /code-review stratified by construction (RFC 0013).
  *
- * A flat diff-scan over 29 modules / 272 tools dilutes attention and misses the
+ * A flat diff-scan over the full module/tool catalog dilutes attention and misses the
  * silent-systemic defects (audit-seal / HITL-bypass / OAuth / rate-limit) that
  * actually matter. This script is the EXECUTABLE form of RFC 0013: it takes a
  * diff, classifies every changed file into a risk tier, and emits the exact

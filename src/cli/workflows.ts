@@ -1,26 +1,18 @@
 /**
  * `npx airmcp workflows` — curated high-value workflow catalog.
  */
-import { readFileSync } from "node:fs";
 import { BOLD, CYAN, DIM, GREEN, RESET, WHITE } from "./style.js";
+import { parseConfig, isModuleEnabled } from "../shared/config.js";
+import { getModulePackPlan } from "../shared/modules.js";
+import { getMissingAddonPackageModules } from "../shared/module-loader.js";
+import {
+  WORKFLOWS,
+  assessWorkflowsReadiness,
+  summarizeWorkflowsReadiness,
+  type Workflow,
+} from "../shared/workflows.js";
 
-type Workflow = {
-  id: string;
-  title: string;
-  bestFor: string;
-  prompt: string;
-  siri?: string;
-  tools: string[];
-  requiredModules: string[];
-  implementation: "prompt-recipe" | "built-in-skill";
-  safety: string;
-};
-
-const workflowCatalog = JSON.parse(
-  readFileSync(new URL("./workflows-catalog.json", import.meta.url), "utf8"),
-) as Workflow[];
-
-export const WORKFLOWS: Workflow[] = workflowCatalog;
+export { WORKFLOWS };
 
 const DAILY_BRIEFING_PREVIEW_MODULES = new Set(["calendar", "reminders", "mail", "notes"]);
 const KNOWN_FLAGS = new Set([
@@ -31,6 +23,7 @@ const KNOWN_FLAGS = new Set([
   "--modules",
   "--safety",
   "--preview",
+  "--readiness",
   "--help",
   "-h",
 ]);
@@ -94,6 +87,57 @@ async function printReadOnlyPreview(workflow: Workflow): Promise<void> {
   console.log(snapshot);
 }
 
+async function printReadiness(workflow: Workflow | undefined, json = false): Promise<void> {
+  const config = parseConfig();
+  const enabledModules = Array.from(new Set(WORKFLOWS.flatMap((w) => w.requiredModules))).filter((moduleName) =>
+    isModuleEnabled(config, moduleName),
+  );
+  const packPlan = getModulePackPlan(config);
+  const readiness = assessWorkflowsReadiness({
+    enabledModules,
+    modulesMissingPacks: packPlan.modulesMissingPacks,
+    modulesMissingAddonPackages: getMissingAddonPackageModules(),
+    allowSendMail: config.allowSendMail,
+    allowSendMessages: config.allowSendMessages,
+  });
+  const rows = workflow ? readiness.filter((row) => row.id === workflow.id) : readiness;
+
+  if (json) {
+    console.log(
+      JSON.stringify(
+        {
+          scope: "config",
+          note: "Checks profile, module packs, add-on packages, and write opt-ins. Live tool registration is checked by the MCP workflow_readiness tool.",
+          summary: summarizeWorkflowsReadiness(rows),
+          workflows: rows,
+        },
+        null,
+        2,
+      ),
+    );
+    return;
+  }
+
+  console.log(`${BOLD}${WHITE}Workflow config readiness${RESET}`);
+  console.log(
+    `${DIM}Checks profile, module packs, add-on packages, and write opt-ins. Use MCP workflow_readiness for live tool registration.${RESET}`,
+  );
+  console.log("");
+
+  for (const row of rows) {
+    const color = row.status === "ready" ? GREEN : row.status === "partial" ? CYAN : WHITE;
+    console.log(`${color}${row.title}${RESET} (${row.id}) — ${row.status}`);
+    console.log(`  ${DIM}${row.summary}${RESET}`);
+    if (row.issues.length > 0) {
+      for (const issue of row.issues) {
+        const target = issue.module ?? issue.tool ?? issue.pack ?? issue.code;
+        console.log(`  ${issue.severity}: ${target} — ${issue.message}`);
+        if (issue.command) console.log(`    ${DIM}${issue.command}${RESET}`);
+      }
+    }
+  }
+}
+
 export async function runWorkflows(args = process.argv.slice(3)): Promise<void> {
   const invalidFlags = unknownFlags(args);
   if (invalidFlags.length > 0) {
@@ -118,6 +162,11 @@ export async function runWorkflows(args = process.argv.slice(3)): Promise<void> 
       return;
     }
     await printReadOnlyPreview(workflow);
+    return;
+  }
+
+  if (hasFlag(args, "--readiness")) {
+    await printReadiness(workflow, hasFlag(args, "--json"));
     return;
   }
 
@@ -156,6 +205,9 @@ export async function runWorkflows(args = process.argv.slice(3)): Promise<void> 
   );
   console.log(
     `  ${DIM}Tip: run ${BOLD}npx airmcp workflows daily-briefing --prompt${RESET}${DIM} to print one copyable prompt.${RESET}`,
+  );
+  console.log(
+    `  ${DIM}Tip: run ${BOLD}npx airmcp workflows --readiness${RESET}${DIM} to check profile/add-on readiness before launching a workflow.${RESET}`,
   );
   console.log("");
 }

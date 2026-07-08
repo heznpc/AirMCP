@@ -1,6 +1,6 @@
 {
   "meta_title": "AirMCP — More than Siri",
-  "meta_description": "Aktionspunkte aus den Meeting-Notizen der letzten Woche extrahieren, in Erinnerungen übernehmen und benachrichtigt werden, sobald sie erledigt sind. AirMCP ist das Open-Source-Tool, das dein Apple-Ökosystem mit jedem KI-Client verbindet — 27 Module, 262 Tools.",
+  "meta_description": "Aktionspunkte aus den Meeting-Notizen der letzten Woche extrahieren, in Erinnerungen übernehmen und benachrichtigt werden, sobald sie erledigt sind. AirMCP ist das Open-Source-Tool, das dein Apple-Ökosystem mit jedem KI-Client verbindet — 32 Module, 296 Tools.",
   "nav_modules": "Module",
   "nav_beyond": "Beyond Siri",
   "nav_workflows": "Workflows",
@@ -137,7 +137,7 @@
   "why_label": "Warum AirMCP?",
   "why_title": "Der vollstaendigste Apple MCP-Server.",
   "why_sub": "Erfahren Sie, wie AirMCP sich von Alternativen unterscheidet.",
-  "why_1_title": "295 Werkzeuge in 31 Modulen",
+  "why_1_title": "296 Werkzeuge in 32 Modulen",
   "why_1_desc": "Andere bieten 10-15 Werkzeuge und stellen Updates ein. AirMCP deckt alle wichtigen Apple-Apps ab und waechst weiter.",
   "why_2_title": "Sicherheit standardmaessig",
   "why_2_desc": "Human-in-the-Loop-Bestaetigung, Audit-Logging und Eingabevalidierung. Keine stillen Schreibvorgaenge.",
@@ -188,6 +188,6 @@
   "tryit_5": "\"Zeig mir meinen aktuellen Standort und das Wetter hier\"",
   "tryit_6_cat": "App-übergreifend",
   "tryit_6": "\"Prüfe die heutigen Meetings, finde zugehörige Notizen und erstelle eine Vorbereitungs-Checkliste in Erinnerungen\"",
-  "tryit_footer": "262 Tools. Endlose Kombinationen.",
+  "tryit_footer": "296 Tools. Endlose Kombinationen.",
   "footer_tagline": "Gebaut für Claude Code, Codex und jeden MCP-Client."
 }

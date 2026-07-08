@@ -116,6 +116,7 @@ export const FRONT_DOOR_TOOLS = [
   "list_profiles",
   "list_module_packs",
   "install_module_pack",
+  "workflow_readiness",
   "start_tool_session",
   "tool_session_status",
   "end_tool_session",

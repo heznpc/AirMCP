@@ -16,7 +16,14 @@ export function createMockConfig(overrides = {}) {
   return {
     profile: 'starter',
     toolExposure: 'profile',
-    progressiveTools: new Set(['profile_status', 'list_profiles', 'list_module_packs', 'discover_tools', 'run_tool']),
+    progressiveTools: new Set([
+      'profile_status',
+      'list_profiles',
+      'list_module_packs',
+      'workflow_readiness',
+      'discover_tools',
+      'run_tool',
+    ]),
     modulePacks: new Set(['core', 'communications', 'productivity', 'browser', 'media', 'visual', 'location', 'device', 'intelligence', 'google-workspace', 'spatial']),
     modulePacksConfigured: false,
     includeShared: false,

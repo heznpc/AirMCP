@@ -1,6 +1,6 @@
 # AirMCP
 
-> Approval-gated local action runtime for Apple workspaces. 295 tools across 29 modules.
+> Approval-gated local action runtime for Apple workspaces. 296 tools across 32 modules.
 
 ## Links
 

@@ -2,7 +2,7 @@
 /**
  * AirMCP Debug Pipeline — memory-safe module-by-module debugging
  *
- * Problem: loading 262 tools simultaneously exhausts memory during debugging.
+ * Problem: loading the full tool catalog simultaneously exhausts memory during debugging.
  * Solution: spawn a server per module, test it, kill it, then move on.
  *
  * Usage:

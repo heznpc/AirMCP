@@ -1,7 +1,7 @@
 {
   "$schema": "https://glama.ai/mcp/schemas/server.json",
   "name": "AirMCP",
-  "description": "Approval-gated local action runtime for Apple workspaces — 295 tools across 31 modules, profile-based loading, progressive tool exposure, HITL approval, audit logs, and Mac app automation.",
+  "description": "Approval-gated local action runtime for Apple workspaces — 296 tools across 32 modules, profile-based loading, progressive tool exposure, HITL approval, audit logs, and Mac app automation.",
   "icon": "https://raw.githubusercontent.com/heznpc/AirMCP/main/icons/airmcp-icon-256.png",
   "category": "automation",
   "maintainers": [

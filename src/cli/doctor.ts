@@ -24,9 +24,11 @@ import { CODEX_APP_OWNED_URL, codexAirmcpRuntimeShape, isCodexCliAvailable } fro
 import { clientRuntimeShape } from "./client-config.js";
 import { LOGO_LINES, typeLine } from "../shared/banner.js";
 import { esc } from "../shared/esc.js";
-import { MODULE_MANIFEST } from "../shared/modules.js";
+import { MODULE_MANIFEST, getModulePackPlan } from "../shared/modules.js";
 import { getModulePackStatuses, resolveModulePackSelection } from "../shared/module-packs.js";
+import { getMissingAddonPackageModules } from "../shared/module-loader.js";
 import { summarizeCompatibility } from "../shared/compatibility.js";
+import { assessWorkflowsReadiness, summarizeWorkflowsReadiness } from "../shared/workflows.js";
 import { RESET, BOLD, DIM, WHITE, GREEN, SYM, heading, line, divider, spinner, sleep } from "./style.js";
 import { APP_RUNTIME_TOKEN_PATH } from "../shared/app-runtime-token.js";
 import { probeAppRuntimeMcp } from "./app-runtime-probe.js";
@@ -372,6 +374,39 @@ export async function runDoctor(): Promise<void> {
   ok("Harness adapter", harnessAdapter);
   if (strictHarness) ok("Hidden tool sessions", "required before run_tool dispatches hidden tools");
   else meh("Hidden tool sessions", "compatible mode — set requireToolSession=true for strict task scoping");
+
+  console.log(heading("Workflow config readiness"));
+  meh("Scope", "profile/module packs/add-on packages/write opt-ins; MCP workflow_readiness checks live tools");
+  if (runtimeConfig) {
+    const workflowPackPlan = getModulePackPlan(runtimeConfig);
+    const workflows = assessWorkflowsReadiness({
+      enabledModules: enabledMods,
+      modulesMissingPacks: workflowPackPlan.modulesMissingPacks,
+      modulesMissingAddonPackages: getMissingAddonPackageModules(),
+      allowSendMail: runtimeConfig.allowSendMail,
+      allowSendMessages: runtimeConfig.allowSendMessages,
+    });
+    const { ready, partial, blocked } = summarizeWorkflowsReadiness(workflows);
+    if (blocked === 0 && partial === 0) {
+      ok("Curated workflows", `${ready}/${workflows.length} ready`);
+    } else {
+      meh("Curated workflows", `${ready} ready, ${partial} partial, ${blocked} blocked`);
+    }
+    for (const workflow of workflows) {
+      const label = `workflow:${workflow.id}`;
+      if (workflow.status === "ready") {
+        ok(label, workflow.summary);
+      } else {
+        const firstIssue = workflow.issues[0];
+        const detail = firstIssue
+          ? `${workflow.summary} ${firstIssue.message}${firstIssue.command ? ` Run: ${firstIssue.command}` : ""}`
+          : workflow.summary;
+        meh(label, detail);
+      }
+    }
+  } else {
+    meh("Curated workflows", "runtime config unavailable");
+  }
 
   // ── Compatibility (RFC 0004) ───────────────────────────────────────
   //

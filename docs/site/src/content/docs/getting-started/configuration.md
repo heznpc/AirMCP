@@ -61,7 +61,7 @@ The default config file location is `~/.config/airmcp/config.json`. You can over
 
 | Variable | Description |
 |----------|-------------|
-| `AIRMCP_FULL=true` | Enable all standard 31 modules (profile-only modules stay opt-in) |
+| `AIRMCP_FULL=true` | Enable all standard 32 modules (profile-only modules stay opt-in) |
 | `AIRMCP_PROFILE=starter` | Select a module profile: `starter`, `communications-safe`, `productivity`, `full`, or `custom` |
 | `AIRMCP_TOOL_EXPOSURE=progressive` | Keep `tools/list` thin; use `profile` or `full` to expose more tools |
 | `AIRMCP_MODULE_PACKS=core,productivity` | Activate selected DLC-like module packs |

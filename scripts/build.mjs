@@ -40,6 +40,6 @@ for (const entry of readdirSync(srcDir)) {
   copyFileSync(join(srcDir, entry), join(destDir, entry));
 }
 
-// Copy CLI runtime data files that are imported from compiled modules.
-mkdirSync("dist/cli", { recursive: true });
-copyFileSync("src/cli/workflows-catalog.json", "dist/cli/workflows-catalog.json");
+// Copy shared runtime data files that are imported from compiled modules.
+mkdirSync("dist/shared", { recursive: true });
+copyFileSync("src/shared/workflows-catalog.json", "dist/shared/workflows-catalog.json");

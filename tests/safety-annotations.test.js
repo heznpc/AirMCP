@@ -392,7 +392,7 @@ describe('Safety Annotations consistency', () => {
 
   test('registered tool count is at least 200', () => {
     const count = server._tools.size;
-    // Sanity check: we expect ~262 tools from 27+ modules
+    // Sanity check: we expect a broad 200+ tool catalog from many modules.
     expect(count).toBeGreaterThanOrEqual(200);
   });
 

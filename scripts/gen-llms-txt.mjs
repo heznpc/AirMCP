@@ -138,12 +138,19 @@ const MODULE_NAMES = {
 // as the fresh-checkout fallback when the manifest isn't present.
 const TOOL_REGEX = /server\.registerTool\(/g;
 const PROMPT_REGEX = /server\.prompt\(/g;
+const PRESENTATION_SKIP_DIRS = new Set([
+  // Runtime assembly helpers register front-door/control tools, but `server`
+  // is not a user-facing module and would make the Modules list disagree with
+  // the canonical module manifest.
+  "server",
+]);
 function walkDir(dir, modules, counts) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = join(dir, entry.name);
     if (entry.isDirectory()) walkDir(full, modules, counts);
     else if (entry.name.endsWith(".ts")) {
       const modDir = basename(dirname(full));
+      if (PRESENTATION_SKIP_DIRS.has(modDir)) continue;
       if (OPT_IN_MODULES.has(modDir)) continue;
       const content = readFileSync(full, "utf-8");
       counts.totalTools += (content.match(TOOL_REGEX) || []).length;

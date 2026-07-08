@@ -7,7 +7,7 @@ jest.unstable_mockModule("../dist/shared/resources.js", () => ({
 }));
 
 const { WORKFLOWS, runWorkflows } = await import("../dist/cli/workflows.js");
-const { MODULE_NAMES, STARTER_MODULES } = await import("../dist/shared/config.js");
+const { MODULE_NAMES, MODULE_PACK_MANIFEST, STARTER_MODULES } = await import("../dist/shared/config.js");
 
 describe("cli workflows command", () => {
   let logSpy;
@@ -187,35 +187,48 @@ describe("cli workflows command", () => {
   });
 
   test("keeps onboarding workflow cards aligned with the CLI catalog", () => {
-    const onboarding = readFileSync(
-      new URL("../app/Sources/AirMCPApp/Views/OnboardingView.swift", import.meta.url),
+    const appCatalog = readFileSync(
+      new URL("../app/Sources/AirMCPApp/Generated/AppCatalog.swift", import.meta.url),
       "utf8",
     );
 
     for (const workflow of WORKFLOWS) {
-      expect(onboarding).toContain(`id: "${workflow.id}"`);
+      expect(appCatalog).toContain(`id: "${workflow.id}"`);
       const camelId = workflow.id.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
-      expect(onboarding).toContain(`promptKey: "workflow.${camelId}.prompt"`);
+      expect(appCatalog).toContain(`promptKey: "workflow.${camelId}.prompt"`);
       for (const moduleName of workflow.requiredModules) {
-        expect(onboarding).toContain(`"${moduleName}"`);
+        expect(appCatalog).toContain(`"${moduleName}"`);
       }
     }
   });
 
   test("keeps menubar workflow tools aligned with the CLI catalog", () => {
-    const menu = readFileSync(
-      new URL("../app/Sources/AirMCPApp/Views/MenuContent.swift", import.meta.url),
+    const appCatalog = readFileSync(
+      new URL("../app/Sources/AirMCPApp/Generated/AppCatalog.swift", import.meta.url),
       "utf8",
     );
 
     function menuToolsFor(id) {
-      const match = menu.match(new RegExp(`WorkflowInfo\\(\\s*id: "${id}"[\\s\\S]*?tools: \\[([^\\]]*)\\]`));
+      const match = appCatalog.match(new RegExp(`WorkflowInfo\\(\\s*id: "${id}"[\\s\\S]*?tools: \\[([^\\]]*)\\]`));
       expect(match).not.toBeNull();
       return [...match[1].matchAll(/"([^"]+)"/g)].map((tool) => tool[1]);
     }
 
     for (const workflow of WORKFLOWS) {
       expect(menuToolsFor(workflow.id)).toEqual(workflow.tools);
+    }
+  });
+
+  test("keeps generated app module packs aligned with the runtime manifest", () => {
+    const appCatalog = readFileSync(
+      new URL("../app/Sources/AirMCPApp/Generated/AppCatalog.swift", import.meta.url),
+      "utf8",
+    );
+    const appPackIds = [...appCatalog.matchAll(/ModulePackInfo\(\s*id: "([^"]+)"/g)].map((match) => match[1]);
+
+    expect(appPackIds).toEqual(MODULE_PACK_MANIFEST.map((pack) => pack.name));
+    for (const pack of MODULE_PACK_MANIFEST) {
+      expect(appCatalog).toContain(`packageName: "${pack.packageName}"`);
     }
   });
 

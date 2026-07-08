@@ -109,6 +109,8 @@
     "build:mcpb:check": "node scripts/build-mcpb.mjs --check",
     "gen:manifest": "node scripts/dump-tool-manifest.mjs",
     "gen:manifest:check": "node scripts/dump-tool-manifest.mjs --check",
+    "gen:app-catalog": "node scripts/gen-app-catalog.mjs",
+    "gen:app-catalog:check": "node scripts/gen-app-catalog.mjs --check",
     "gen:intents": "node scripts/gen-swift-intents.mjs",
     "gen:intents:check": "node scripts/gen-swift-intents.mjs --check",
     "qa": "node scripts/qa-test.mjs",

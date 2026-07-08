@@ -168,6 +168,10 @@
 "module.audit.desc" = "Query the on-device log of every tool call";
 "module.spatial_prep" = "Spatial Prep";
 "module.spatial_prep.desc" = "Read-only VR/spatial asset context";
+"module.webhooks" = "Webhooks";
+"module.webhooks.desc" = "Inbound HTTP event listener";
+"module.powerautomate" = "Power Automate";
+"module.powerautomate.desc" = "Trigger Microsoft Cloud Flows";
 "module.requiresMacOS" = "requires macOS %d+";
 
 /* Module Add-ons */
@@ -214,6 +218,10 @@
 "addon.google.desc" = "Google Workspace integration.";
 "addon.spatial" = "Spatial";
 "addon.spatial.desc" = "VR/spatial asset and project context preparation.";
+"addon.webhooks" = "Webhooks";
+"addon.webhooks.desc" = "Inbound webhook listener for external HTTP callbacks.";
+"addon.powerautomate" = "Power Automate";
+"addon.powerautomate.desc" = "Outbound Microsoft Power Automate Cloud Flow trigger.";
 
 /* Onboarding */
 "onboarding.back" = "Back";

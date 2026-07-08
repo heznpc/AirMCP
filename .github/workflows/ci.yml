@@ -86,6 +86,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Verify generated app catalog
+        run: npm run gen:app-catalog:check
+
       - name: Type check
         run: npm run typecheck
 
@@ -190,6 +193,9 @@ jobs:
 
       - name: Swift — Build AirMCPKit
         run: cd swift && swift build
+
+      - name: Swift — Build AirMCP menu bar app
+        run: cd app && swift build
 
       - name: Swift — Test AirMCPKit
         run: cd swift && swift test

@@ -168,6 +168,10 @@
 "module.audit.desc" = "AirMCP가 실행한 모든 툴 호출을 조회";
 "module.spatial_prep" = "Spatial 준비";
 "module.spatial_prep.desc" = "VR/spatial asset 맥락을 읽기 전용으로 준비";
+"module.webhooks" = "Webhooks";
+"module.webhooks.desc" = "외부 HTTP callback을 받는 이벤트 listener";
+"module.powerautomate" = "Power Automate";
+"module.powerautomate.desc" = "Microsoft Cloud Flow를 트리거";
 "module.requiresMacOS" = "macOS %d 이상 필요";
 
 /* Module Add-ons */
@@ -214,6 +218,10 @@
 "addon.google.desc" = "Google Workspace 연동.";
 "addon.spatial" = "Spatial";
 "addon.spatial.desc" = "VR/spatial asset과 프로젝트 맥락 준비.";
+"addon.webhooks" = "Webhooks";
+"addon.webhooks.desc" = "외부 HTTP callback을 받는 inbound webhook listener.";
+"addon.powerautomate" = "Power Automate";
+"addon.powerautomate.desc" = "Microsoft Power Automate Cloud Flow outbound trigger.";
 
 /* Onboarding */
 "onboarding.back" = "이전";

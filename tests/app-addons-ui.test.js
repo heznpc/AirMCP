@@ -2,6 +2,10 @@ import { describe, expect, test } from "@jest/globals";
 import { readFileSync } from "node:fs";
 
 const menuContent = readFileSync(new URL("../app/Sources/AirMCPApp/Views/MenuContent.swift", import.meta.url), "utf8");
+const appCatalog = readFileSync(
+  new URL("../app/Sources/AirMCPApp/Generated/AppCatalog.swift", import.meta.url),
+  "utf8",
+);
 const app = readFileSync(new URL("../app/Sources/AirMCPApp/AirMCPApp.swift", import.meta.url), "utf8");
 const addonManager = readFileSync(new URL("../app/Sources/AirMCPApp/AddonManager.swift", import.meta.url), "utf8");
 const enStrings = readFileSync(
@@ -31,8 +35,10 @@ describe("AirMCP.app module add-on management", () => {
     expect(menuContent).toContain("addonManager.versionSummary(pack: pack.id)");
     expect(menuContent).toContain("addonManager.sizeSummary(pack: pack.id)");
     expect(menuContent).toContain('"addons.activeButMissing"');
-    expect(menuContent).toContain("@heznpc/airmcp-productivity");
-    expect(menuContent).toContain("@heznpc/airmcp-spatial");
+    expect(appCatalog).toContain("@heznpc/airmcp-productivity");
+    expect(appCatalog).toContain("@heznpc/airmcp-spatial");
+    expect(appCatalog).toContain("@heznpc/airmcp-webhooks");
+    expect(appCatalog).toContain("@heznpc/airmcp-powerautomate");
   });
 
   test("app install path invokes the pinned AirMCP package specifier", () => {

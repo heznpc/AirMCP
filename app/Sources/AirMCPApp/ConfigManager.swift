@@ -11,20 +11,6 @@ enum HitlLevel: String, Codable, Sendable, CaseIterable {
 @MainActor
 @Observable
 final class ConfigManager {
-    private static let allModulePacks = [
-        "core",
-        "communications",
-        "productivity",
-        "browser",
-        "media",
-        "visual",
-        "location",
-        "device",
-        "intelligence",
-        "google-workspace",
-        "spatial",
-    ]
-
     struct HitlConfig: Codable, Sendable {
         var level: HitlLevel
         var whitelist: [String]
@@ -166,11 +152,11 @@ final class ConfigManager {
     }
 
     var modulePacks: [String] {
-        get { config.modulePacks ?? Self.allModulePacks }
+        get { config.modulePacks ?? allModulePacks.map(\.id) }
         set {
             var seen = Set<String>()
             var next = newValue.filter { pack in
-                guard Self.allModulePacks.contains(pack), !seen.contains(pack) else { return false }
+                guard allModulePackIds.contains(pack), !seen.contains(pack) else { return false }
                 seen.insert(pack)
                 return true
             }

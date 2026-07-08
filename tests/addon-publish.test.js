@@ -1,9 +1,17 @@
 import { describe, expect, test } from "@jest/globals";
 import { readFileSync } from "node:fs";
+import { parse as parseYaml } from "yaml";
 
 const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
 const script = readFileSync(new URL("../scripts/publish-addon-packages.mjs", import.meta.url), "utf8");
 const cdWorkflow = readFileSync(new URL("../.github/workflows/cd.yml", import.meta.url), "utf8");
+const cd = parseYaml(cdWorkflow);
+
+function publishStep(name) {
+  const step = cd.jobs.publish.steps.find((candidate) => candidate.name === name);
+  expect(step).toBeDefined();
+  return step;
+}
 
 describe("add-on publish release lane", () => {
   test("package scripts expose a publish command that is dry-run by default", () => {
@@ -39,5 +47,36 @@ describe("add-on publish release lane", () => {
     expect(cdWorkflow).toContain("is already published; skipping root publish");
     expect(cdWorkflow).toContain("npm run addons:publish -- --publish --all --no-build --skip-verify");
     expect(cdWorkflow).toContain("build/release-preflight/airmcp-${{ steps.pkg.outputs.version }}.mcpb");
+  });
+
+  test("CD defaults to trusted publishing and isolates NPM_TOKEN fallback", () => {
+    const input = cd.on.workflow_dispatch.inputs.npm_auth_mode;
+    expect(input.default).toBe("trusted-publishing");
+    expect(input.options).toEqual(["trusted-publishing", "token"]);
+
+    const selectAuth = publishStep("Select npm auth mode");
+    expect(selectAuth.id).toBe("npm-auth");
+    expect(selectAuth.env.NPM_AUTH_MODE).toBe("${{ inputs.npm_auth_mode || 'trusted-publishing' }}");
+    expect(selectAuth.run).toContain("NPM_TOKEN is ignored even if the secret is set");
+    expect(selectAuth.run).toContain("npm_auth_mode=token requires the NPM_TOKEN secret");
+
+    const preflight = publishStep("npm auth preflight");
+    expect(preflight.if).toBe("steps.npm-auth.outputs.mode == 'token'");
+    expect(preflight.env.NODE_AUTH_TOKEN).toBe("${{ secrets.NPM_TOKEN }}");
+
+    for (const stepName of ["Publish root with provenance", "Publish add-ons with provenance"]) {
+      const publish = publishStep(stepName);
+      expect(publish.if).toBe("steps.npm-auth.outputs.mode == 'trusted-publishing'");
+      expect(publish.env?.NODE_AUTH_TOKEN).toBeUndefined();
+    }
+
+    for (const stepName of [
+      "Publish root with provenance (token fallback)",
+      "Publish add-ons with provenance (token fallback)",
+    ]) {
+      const publish = publishStep(stepName);
+      expect(publish.if).toBe("steps.npm-auth.outputs.mode == 'token'");
+      expect(publish.env.NODE_AUTH_TOKEN).toBe("${{ secrets.NPM_TOKEN }}");
+    }
   });
 });

@@ -2,6 +2,15 @@ name: Publish to npm
 
 on:
   workflow_dispatch:
+    inputs:
+      npm_auth_mode:
+        description: 'npm auth mode. Use trusted publishing by default; token mode is only for fallback.'
+        required: true
+        default: trusted-publishing
+        type: choice
+        options:
+          - trusted-publishing
+          - token
 
 concurrency:
   group: deploy
@@ -45,16 +54,36 @@ jobs:
           cache: 'npm'
           registry-url: 'https://registry.npmjs.org'
 
+      - name: Select npm auth mode
+        id: npm-auth
+        env:
+          NPM_AUTH_MODE: ${{ inputs.npm_auth_mode || 'trusted-publishing' }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          case "$NPM_AUTH_MODE" in
+            trusted-publishing)
+              echo "mode=trusted-publishing" >> "$GITHUB_OUTPUT"
+              echo "::notice::Using npm trusted publishing. NPM_TOKEN is ignored even if the secret is set."
+              ;;
+            token)
+              if [ -z "${NPM_TOKEN:-}" ]; then
+                echo "::error::npm_auth_mode=token requires the NPM_TOKEN secret."
+                exit 1
+              fi
+              echo "mode=token" >> "$GITHUB_OUTPUT"
+              echo "::notice::Using NPM_TOKEN fallback for npm publish."
+              ;;
+            *)
+              echo "::error::Unsupported npm_auth_mode: $NPM_AUTH_MODE"
+              exit 1
+              ;;
+          esac
+
       - name: npm auth preflight
+        if: steps.npm-auth.outputs.mode == 'token'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          if [ -n "${NODE_AUTH_TOKEN:-}" ]; then
-            echo "NPM_TOKEN is set; validating npm identity before publish."
-            npm whoami
-          else
-            echo "::notice::NPM_TOKEN is empty. Publish will rely on npm trusted publishing for this GitHub environment/workflow."
-          fi
+        run: npm whoami
 
       - name: Install dependencies
         run: npm ci
@@ -63,19 +92,36 @@ jobs:
         run: npm run release:preflight
 
       - name: Publish root with provenance
+        if: steps.npm-auth.outputs.mode == 'trusted-publishing'
         run: |
           if npm view "${{ steps.pkg.outputs.name }}@${{ steps.pkg.outputs.version }}" version >/dev/null 2>&1; then
             echo "${{ steps.pkg.outputs.name }}@${{ steps.pkg.outputs.version }} is already published; skipping root publish."
           else
             npm publish --provenance --access public
           fi
+
+      - name: Publish root with provenance (token fallback)
+        if: steps.npm-auth.outputs.mode == 'token'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if npm view "${{ steps.pkg.outputs.name }}@${{ steps.pkg.outputs.version }}" version >/dev/null 2>&1; then
+            echo "${{ steps.pkg.outputs.name }}@${{ steps.pkg.outputs.version }} is already published; skipping root publish."
+          else
+            npm publish --provenance --access public
+          fi
 
       - name: Publish add-ons with provenance
-        run: npm run addons:publish -- --publish --all --no-build --skip-verify
+        if: steps.npm-auth.outputs.mode == 'trusted-publishing'
+        run: |
+          npm run addons:publish -- --publish --all --no-build --skip-verify
+
+      - name: Publish add-ons with provenance (token fallback)
+        if: steps.npm-auth.outputs.mode == 'token'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          npm run addons:publish -- --publish --all --no-build --skip-verify
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v2.5.0

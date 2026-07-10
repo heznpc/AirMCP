@@ -20,7 +20,8 @@ describe("macOS trust and App Intent surfaces", () => {
     expect(store).toContain("AppRuntimeClient.callAppRuntimeToolJSON(");
     expect(store).toContain('"audit_log"');
     expect(intents).toContain('forHTTPHeaderField: "X-AirMCP-Run-ID"');
-    expect(intents).toContain("static func callAppRuntimeToolJSON<T: Decodable>");
+    expect(intents).toContain("static func callAppRuntimeToolJSON<T: Decodable & Sendable>");
+    expect(store).toContain("let args: AppRuntimeToolArguments");
     expect(trust).toContain("hitlManager.pendingRequests.count");
     expect(trust).toContain("permissionManager.runSetup()");
   });

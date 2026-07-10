@@ -32,7 +32,7 @@ final class ServicesProvider: NSObject {
     /// and the per-call HITL contract.
     private func executeTool(
         _ tool: String,
-        arguments: [String: Any],
+        arguments: AppRuntimeToolArguments,
         successMessage: String,
         onSuccess: ((String) -> Void)? = nil
     ) {

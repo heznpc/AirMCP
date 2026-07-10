@@ -60,7 +60,7 @@ struct CreateReminderIntent: AppIntent {
     var dueDate: Date?
 
     func perform() async throws -> some IntentResult & ReturnsValue<String> {
-        var args: [String: Any] = ["title": title]
+        var args: AppRuntimeToolArguments = ["title": title]
         if let date = dueDate {
             args["dueDate"] = ISO8601DateFormatter().string(from: date)
         }
@@ -183,11 +183,7 @@ struct HealthSummaryIntent: AppIntent {
 func installMCPIntentRouterForMacOS() {
     Task { @MainActor in
         await MCPIntentRouter.shared.setHandler { tool, args in
-            // Cast from [String: any Sendable] → [String: Any] for the
-            // existing runAirMCPTool(args:) signature. All inbound values
-            // come from @Parameter-wrapped primitives so the cast is safe.
-            let anyArgs: [String: Any] = args.reduce(into: [:]) { acc, kv in acc[kv.key] = kv.value }
-            return try await AppRuntimeClient.callTool(tool, args: anyArgs)
+            return try await AppRuntimeClient.callTool(tool, args: args)
         }
     }
 }
@@ -204,6 +200,11 @@ private enum AppIntentMCPTransportError: Error {
     case toolCallUncertain(Error)
 }
 
+/// JSON-compatible tool arguments crossing App Intent, Services, and
+/// Trust Center actor boundaries. Keeping the boundary Sendable prevents a
+/// main-actor `[String: Any]` dictionary from escaping into the transport.
+typealias AppRuntimeToolArguments = [String: any Sendable]
+
 /// Execute an AirMCP MCP tool through the app-owned HTTP runtime when it is
 /// already available, then fall back to the legacy stdio bridge. The fallback
 /// keeps cold App Intent/Services invocations working while the preferred path
@@ -214,7 +215,7 @@ enum AppRuntimeClient {
     /// audit, rate-limit, emergency-stop, and per-call HITL controls. A cold
     /// invocation may use the stdio transport, which reaches those same server
     /// guards and the app's owner-only HITL socket.
-    static func callTool(_ toolName: String, args: [String: Any]) async throws -> String {
+    static func callTool(_ toolName: String, args: AppRuntimeToolArguments) async throws -> String {
         do {
             return try await runAirMCPToolViaAppRuntime(toolName, args: args)
         } catch {
@@ -241,9 +242,9 @@ enum AppRuntimeClient {
     /// secondary process look like proof about the app-owned runtime. Every
     /// call carries a fresh validated UUID that the HTTP transport stamps into
     /// request context and the HMAC audit trail.
-    static func callAppRuntimeToolJSON<T: Decodable>(
+    static func callAppRuntimeToolJSON<T: Decodable & Sendable>(
         _ toolName: String,
-        args: [String: Any],
+        args: AppRuntimeToolArguments,
         runID: UUID = UUID()
     ) async throws -> T {
         let response = try await runAirMCPToolViaAppRuntimeResponse(
@@ -305,7 +306,10 @@ enum AppRuntimeClient {
 
 }
 
-private func runAirMCPToolViaAppRuntime(_ toolName: String, args: [String: Any]) async throws -> String {
+private func runAirMCPToolViaAppRuntime(
+    _ toolName: String,
+    args: AppRuntimeToolArguments
+) async throws -> String {
     let response = try await runAirMCPToolViaAppRuntimeResponse(
         toolName,
         args: args,
@@ -316,7 +320,7 @@ private func runAirMCPToolViaAppRuntime(_ toolName: String, args: [String: Any])
 
 private func runAirMCPToolViaAppRuntimeResponse(
     _ toolName: String,
-    args: [String: Any],
+    args: AppRuntimeToolArguments,
     runID: String
 ) async throws -> [String: Any] {
     let token = try AppRuntimeToken.ensure()
@@ -350,12 +354,15 @@ private func runAirMCPToolViaAppRuntimeResponse(
     )
 
     do {
+        let jsonArguments = args.reduce(into: [String: Any]()) { result, pair in
+            result[pair.key] = pair.value
+        }
         let toolResponse = try await postAppRuntimeMCPRequest(
             [
                 "jsonrpc": "2.0",
                 "id": 2,
                 "method": "tools/call",
-                "params": ["name": toolName, "arguments": args],
+                "params": ["name": toolName, "arguments": jsonArguments],
             ],
             token: token,
             sessionID: sessionID,
@@ -372,7 +379,10 @@ private func runAirMCPToolViaAppRuntimeResponse(
     }
 }
 
-private func runAirMCPToolViaStdio(_ toolName: String, args: [String: Any]) async throws -> String {
+private func runAirMCPToolViaStdio(
+    _ toolName: String,
+    args: AppRuntimeToolArguments
+) async throws -> String {
     let process = Process()
     if let runtime = AirMcpConstants.bundledServerRuntime {
         process.executableURL = URL(fileURLWithPath: runtime.node)
@@ -406,11 +416,14 @@ private func runAirMCPToolViaStdio(_ toolName: String, args: [String: Any]) asyn
             "clientInfo": ["name": "AirMCPApp", "version": "1.0"]
         ]
     ]
+    let jsonArguments = args.reduce(into: [String: Any]()) { result, pair in
+        result[pair.key] = pair.value
+    }
     let toolRequest: [String: Any] = [
         "jsonrpc": "2.0",
         "id": 2,
         "method": "tools/call",
-        "params": ["name": toolName, "arguments": args]
+        "params": ["name": toolName, "arguments": jsonArguments]
     ]
 
     let encoder = JSONSerialization.self

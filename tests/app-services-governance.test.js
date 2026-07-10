@@ -13,6 +13,8 @@ const intents = readFileSync(
 describe('macOS Services governance boundary', () => {
   test('all Services call the shared governed runtime client', () => {
     expect(intents).toContain('enum AppRuntimeClient');
+    expect(intents).toContain('typealias AppRuntimeToolArguments = [String: any Sendable]');
+    expect(services).toContain('arguments: AppRuntimeToolArguments');
     expect(services).toContain('AppRuntimeClient.callTool(tool, args: arguments)');
     expect(services).toContain('"create_note"');
     expect(services).toContain('"create_reminder"');

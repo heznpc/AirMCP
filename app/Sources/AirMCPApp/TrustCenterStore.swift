@@ -58,7 +58,7 @@ final class TrustCenterStore {
         }
 
         let since = requestedRange.since()
-        let args: [String: Any] = [
+        let args: AppRuntimeToolArguments = [
             "since": AirMCPDateParser.string(from: since),
             "limit": 1_000,
         ]
@@ -172,7 +172,7 @@ final class TrustCenterStore {
     /// eventually leave the in-memory `running` bridge state.
     @discardableResult
     func refreshPersistedRun(correlationId: String) async -> Int? {
-        let args: [String: Any] = [
+        let args: AppRuntimeToolArguments = [
             "since": AirMCPDateParser.string(from: timeRange.since()),
             "correlationId": correlationId,
             "limit": 1_000,

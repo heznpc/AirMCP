@@ -19,7 +19,7 @@
  *   4. _hmac field shape corruption — non-hex value → verified:false,
  *      reason:"malformed"
  *
- * If a future refactor weakens verifyAuditChain (e.g. silently tolerates
+ * If a future refactor weakens the chain scanner (e.g. silently tolerates
  * mismatches, or only checks the last line), this test fires.
  */
 import { describe, test, expect, beforeAll, beforeEach, afterAll } from '@jest/globals';
@@ -36,7 +36,7 @@ afterAll(async () => {
   if (workDir) await rm(workDir, { recursive: true, force: true }).catch(() => {});
 });
 
-const { auditLog, _testReset, _testFlush, summarizeAuditEntries } = await import(
+const { auditLog, _testReset, _testFlush, readAuditEntries, summarizeAuditEntries } = await import(
   '../dist/shared/audit.js'
 );
 
@@ -157,6 +157,67 @@ describe('audit chain tamper detection', () => {
       since: '2020-01-01T00:00:00Z',
     });
     expect(summary.verified).toBe(false);
+  });
+
+  test('6. valid unsigned rows are accepted only as a pre-chain legacy prefix', async () => {
+    const raw = await readFile(AUDIT_PATH, 'utf-8');
+    const legacy = JSON.stringify({
+      timestamp: '2026-05-12T23:59:59Z',
+      tool: 'legacy_before_chain',
+      status: 'ok',
+    });
+    await writeFile(AUDIT_PATH, `${legacy}\n${raw}`, 'utf-8');
+
+    const summary = await summarizeAuditEntries({ since: '2020-01-01T00:00:00Z' });
+    expect(summary.verified).toBe(true);
+    expect(summary.total).toBe(6);
+    expect(summary.topTools.some((row) => row.tool === 'legacy_before_chain')).toBe(true);
+  });
+
+  test('7. unsigned insertion after chain start fails closed and is never counted', async () => {
+    const lines = (await readFile(AUDIT_PATH, 'utf-8')).trimEnd().split('\n');
+    lines.splice(
+      2,
+      0,
+      JSON.stringify({
+        timestamp: '2026-05-13T00:00:02.500Z',
+        tool: 'unsigned_injected',
+        status: 'ok',
+      }),
+    );
+    await writeFile(AUDIT_PATH, lines.join('\n') + '\n', 'utf-8');
+
+    const summary = await summarizeAuditEntries({ since: '2020-01-01T00:00:00Z' });
+    expect(summary.verified).toBe(false);
+    expect(summary.verifiedFirstBreak).toEqual({
+      file: 'audit.jsonl',
+      lineIndex: 2,
+      reason: 'malformed',
+    });
+    // Fail closed at the insertion: neither the fake row nor later rows from
+    // the compromised ordering contribute to the trusted aggregate.
+    expect(summary.total).toBe(2);
+    expect(summary.topTools.map((row) => row.tool).sort()).toEqual(['tool_0', 'tool_1']);
+
+    const page = await readAuditEntries({ since: '2020-01-01T00:00:00Z', limit: 100 });
+    expect(page.total).toBe(2);
+    expect(page.entries.some((entry) => entry.tool === 'unsigned_injected')).toBe(false);
+  });
+
+  test('8. malformed insertion after chain start fails closed and is never counted', async () => {
+    const lines = (await readFile(AUDIT_PATH, 'utf-8')).trimEnd().split('\n');
+    lines.splice(2, 0, '{not valid json');
+    await writeFile(AUDIT_PATH, lines.join('\n') + '\n', 'utf-8');
+
+    const summary = await summarizeAuditEntries({ since: '2020-01-01T00:00:00Z' });
+    expect(summary.verified).toBe(false);
+    expect(summary.verifiedFirstBreak).toEqual({
+      file: 'audit.jsonl',
+      lineIndex: 2,
+      reason: 'malformed',
+    });
+    expect(summary.total).toBe(2);
+    expect(summary.topTools.map((row) => row.tool).sort()).toEqual(['tool_0', 'tool_1']);
   });
 });
 

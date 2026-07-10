@@ -7,6 +7,11 @@ enum AppRuntimeToken {
     private static let fileName = "http-token"
 
     static var tokenURL: URL {
+        if let override = ProcessInfo.processInfo.environment["AIRMCP_APP_RUNTIME_TOKEN_PATH"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !override.isEmpty {
+            return URL(fileURLWithPath: (override as NSString).expandingTildeInPath)
+        }
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Application Support")
         return base.appendingPathComponent(directoryName, isDirectory: true).appendingPathComponent(fileName)

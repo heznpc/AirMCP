@@ -5,6 +5,9 @@ import WidgetKit
 
 @main
 struct AirMCPApp: App {
+    @NSApplicationDelegateAdaptor(AirMCPApplicationDelegate.self)
+    private var applicationDelegate
+
     @State private var serverManager = ServerManager()
     @State private var permissionManager = PermissionManager()
     @State private var configManager = ConfigManager()
@@ -40,7 +43,7 @@ struct AirMCPApp: App {
         DispatchQueue.main.async {
             UNUserNotificationCenter.current().delegate = delegate
 
-            if let iconURL = Bundle.module.url(forResource: "AppIcon@2x", withExtension: "png", subdirectory: "Resources"),
+            if let iconURL = Bundle.module.url(forResource: "AppIcon@2x", withExtension: "png"),
                let icon = NSImage(contentsOf: iconURL) {
                 NSApp?.applicationIconImage = icon
             }
@@ -67,7 +70,8 @@ struct AirMCPApp: App {
                 hitlManager: hitlManager,
                 logManager: logManager,
                 updateManager: updateManager,
-                addonManager: addonManager
+                addonManager: addonManager,
+                onShowOnboarding: showOnboardingWindow
             )
             .onAppear {
                 initializeRuntimeIfNeeded()
@@ -87,9 +91,20 @@ struct AirMCPApp: App {
                 }
         }
         .menuBarExtraStyle(.menu)
+
+        Window(L("trust.title"), id: AirMcpConstants.trustCenterWindowID) {
+            TrustCenterView(
+                serverManager: serverManager,
+                permissionManager: permissionManager,
+                configManager: configManager,
+                hitlManager: hitlManager
+            )
+        }
+        .defaultSize(width: 900, height: 700)
     }
 
     private func initializeRuntimeIfNeeded() {
+        applicationDelegate.serverManager = serverManager
         serverManager.logManager = logManager
         serverManager.startPolling()
         if !hitlInitialized {
@@ -100,21 +115,31 @@ struct AirMCPApp: App {
             appInitialized = true
             addonManager.refreshIfNeeded()
             updateManager.startPeriodicChecks()
-            if ProcessInfo.processInfo.environment[AirMcpConstants.envForceAppRuntime] == "1" {
-                serverManager.startServer()
-            } else if !UserDefaults.standard.bool(forKey: AirMcpConstants.keyOnboardingCompleted) {
+            let defaults = UserDefaults.standard
+            let onboardingCompleted = defaults.bool(forKey: AirMcpConstants.keyOnboardingCompleted)
+            let onboardingPresented = defaults.bool(forKey: AirMcpConstants.keyOnboardingPresented)
+
+            if ProcessInfo.processInfo.environment[AirMcpConstants.envShowOnboarding] == "1" {
                 showOnboardingWindow()
-            } else {
+            } else if ProcessInfo.processInfo.environment[AirMcpConstants.envForceAppRuntime] == "1" {
+                serverManager.startServer()
+            } else if !onboardingCompleted && !onboardingPresented {
+                showOnboardingWindow()
+            } else if onboardingCompleted || serverManager.autoStartEnabled {
+                // The final setup step may have explicitly enabled and started
+                // the runtime before the user presses Finish. If that window is
+                // closed, preserve the user's choice on the next app launch
+                // instead of leaving an enabled MCP client without a runtime.
                 serverManager.autoStartIfNeeded()
             }
         }
     }
 
     private func setupHitl() {
-        HitlManager.requestNotificationPermission()
-        HitlManager.registerNotificationCategory()
         hitlManager.timeoutSeconds = configManager.hitlTimeout
         if configManager.hitlLevel != .off {
+            HitlManager.requestNotificationPermission()
+            HitlManager.registerNotificationCategory()
             hitlManager.startListening()
         } else {
             hitlManager.stopListening()
@@ -122,6 +147,14 @@ struct AirMCPApp: App {
     }
 
     private func showOnboardingWindow() {
+        UserDefaults.standard.set(true, forKey: AirMcpConstants.keyOnboardingPresented)
+
+        if let existingWindow = OnboardingWindowHolder.shared.window {
+            existingWindow.makeKeyAndOrderFront(nil)
+            NSApp.activate()
+            return
+        }
+
         let onboardingView = OnboardingView(configManager: configManager, serverManager: serverManager) { [serverManager] in
             // Enable auto-start by default after first onboarding
             serverManager.autoStartEnabled = true
@@ -130,15 +163,26 @@ struct AirMCPApp: App {
 
         let hostingController = NSHostingController(rootView: onboardingView)
         let window = NSWindow(contentViewController: hostingController)
-        window.title = "AirMCP Setup"
+        window.title = L("onboarding.windowTitle")
         window.styleMask = [.titled, .closable]
-        window.setContentSize(NSSize(width: 520, height: 480))
+        window.setContentSize(OnboardingView.preferredContentSize)
+        window.contentMinSize = OnboardingView.preferredContentSize
+        window.contentMaxSize = OnboardingView.preferredContentSize
         window.center()
         window.makeKeyAndOrderFront(nil)
         NSApp.activate()
 
         // Keep a reference so the window isn't deallocated
         OnboardingWindowHolder.shared.setWindow(window)
+    }
+}
+
+@MainActor
+final class AirMCPApplicationDelegate: NSObject, NSApplicationDelegate {
+    weak var serverManager: ServerManager?
+
+    func applicationWillTerminate(_ notification: Notification) {
+        serverManager?.prepareForApplicationTermination()
     }
 }
 

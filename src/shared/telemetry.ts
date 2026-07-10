@@ -53,7 +53,7 @@ function getTracer(): Tracer | null | Promise<Tracer | null> {
  */
 export async function traceApproval(
   toolName: string,
-  decision: "approved" | "denied" | "skipped",
+  decision: "approved" | "denied" | "timed_out" | "unavailable" | "skipped",
   channel: "elicitation" | "socket" | "unavailable",
   attrs?: { destructive?: boolean; managed?: boolean },
 ): Promise<void> {
@@ -66,7 +66,7 @@ export async function traceApproval(
     span.setAttribute("mcp.approval.channel", channel);
     if (attrs?.destructive !== undefined) span.setAttribute("mcp.approval.destructive", attrs.destructive);
     if (attrs?.managed !== undefined) span.setAttribute("mcp.approval.managed_client", attrs.managed);
-    span.setStatus({ code: decision === "denied" ? 2 /* ERROR */ : 1 /* OK */ });
+    span.setStatus({ code: decision === "approved" || decision === "skipped" ? 1 /* OK */ : 2 /* ERROR */ });
     span.end();
   });
 }

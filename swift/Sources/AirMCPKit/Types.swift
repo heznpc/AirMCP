@@ -299,13 +299,15 @@ public struct GenerateTextInput: Decodable, Sendable {
 
 public struct AiStatusOutput: Encodable, Sendable {
     public let available: Bool
+    public let classification: String
     public let message: String
     public let macOSVersion: String
     public let hasAppleSilicon: Bool
     public let foundationModelsSupported: Bool
-    public init(available: Bool, message: String, macOSVersion: String,
+    public init(available: Bool, classification: String, message: String, macOSVersion: String,
                 hasAppleSilicon: Bool, foundationModelsSupported: Bool) {
-        self.available = available; self.message = message; self.macOSVersion = macOSVersion
+        self.available = available; self.classification = classification
+        self.message = message; self.macOSVersion = macOSVersion
         self.hasAppleSilicon = hasAppleSilicon; self.foundationModelsSupported = foundationModelsSupported
     }
 }

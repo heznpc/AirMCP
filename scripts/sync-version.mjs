@@ -15,6 +15,7 @@
  *   10. .claude-plugin/plugin.json         (Claude Code plugin manifest)
  *   11. .mcp.json                          (Claude Code project/plugin MCP config — pinned npm version)
  *   12. docs/index.html                    (structured data softwareVersion)
+ *   13. app/widget/Info.plist              (widget short version)
  *
  * Usage:
  *   node scripts/sync-version.mjs           # sync all files
@@ -98,6 +99,14 @@ syncFile("scripts/bundle-app.sh", [
     pattern: /CFBundleShortVersionString string [\d.]+/,
     replacement: `CFBundleShortVersionString string ${VERSION}`,
     label: "CFBundleShortVersionString",
+  },
+]);
+
+syncFile("app/widget/Info.plist", [
+  {
+    pattern: /(<key>CFBundleShortVersionString<\/key>\s*<string>)[^<]+(<\/string>)/,
+    replacement: `$1${VERSION}$2`,
+    label: "widget CFBundleShortVersionString",
   },
 ]);
 

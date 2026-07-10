@@ -17,6 +17,19 @@ final class ConfigManager {
         var timeout: Int
 
         static let `default` = HitlConfig(level: .sensitiveOnly, whitelist: [], timeout: 30)
+
+        init(level: HitlLevel, whitelist: [String], timeout: Int) {
+            self.level = level
+            self.whitelist = whitelist
+            self.timeout = timeout
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            level = try container.decodeIfPresent(HitlLevel.self, forKey: .level) ?? .sensitiveOnly
+            whitelist = try container.decodeIfPresent([String].self, forKey: .whitelist) ?? []
+            timeout = try container.decodeIfPresent(Int.self, forKey: .timeout) ?? 30
+        }
     }
 
     struct Config: Codable, Sendable {
@@ -84,14 +97,25 @@ final class ConfigManager {
     }
 
     var config: Config = .default
-
-    private static let configDir: URL = {
-        FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".config/airmcp", isDirectory: true)
-    }()
+    var lastPersistenceError: String?
+    private var rawConfig: [String: Any] = [:]
 
     private static let configFile: URL = {
-        configDir.appendingPathComponent("config.json")
+        if let override = ProcessInfo.processInfo.environment["AIRMCP_CONFIG_PATH"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !override.isEmpty {
+            return URL(fileURLWithPath: (override as NSString).expandingTildeInPath)
+        }
+        return FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".config/airmcp/config.json")
+    }()
+
+    private static let configDir: URL = {
+        configFile.deletingLastPathComponent()
+    }()
+
+    private static let configBackupFile: URL = {
+        configFile.appendingPathExtension("backup")
     }()
 
     init() {
@@ -103,9 +127,19 @@ final class ConfigManager {
     func load() {
         do {
             let data = try Data(contentsOf: Self.configFile)
+            guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                throw CocoaError(.fileReadCorruptFile)
+            }
             config = try JSONDecoder().decode(Config.self, from: data)
+            rawConfig = object
+            lastPersistenceError = nil
+        } catch let error as CocoaError where error.code == .fileNoSuchFile {
+            rawConfig = [:]
+            lastPersistenceError = nil
         } catch {
-            // File missing or malformed — keep defaults
+            // Never replace a malformed owner config with defaults. Surface the
+            // error and keep the in-memory defaults until the file is repaired.
+            lastPersistenceError = error.localizedDescription
         }
     }
 
@@ -115,13 +149,61 @@ final class ConfigManager {
                 at: Self.configDir,
                 withIntermediateDirectories: true
             )
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            let data = try encoder.encode(config)
+            let merged = mergeKnownFields(into: rawConfig)
+            let data = try JSONSerialization.data(
+                withJSONObject: merged,
+                options: [.prettyPrinted, .sortedKeys]
+            )
+            // Validate the exact bytes before replacing the owner's config.
+            guard (try JSONSerialization.jsonObject(with: data)) is [String: Any] else {
+                throw CocoaError(.fileWriteUnknown)
+            }
+            if FileManager.default.fileExists(atPath: Self.configFile.path) {
+                try? FileManager.default.removeItem(at: Self.configBackupFile)
+                try FileManager.default.copyItem(at: Self.configFile, to: Self.configBackupFile)
+            }
             try data.write(to: Self.configFile, options: .atomic)
+            rawConfig = merged
+            lastPersistenceError = nil
         } catch {
-            // Silently fail — menubar app should not crash on write errors
+            lastPersistenceError = error.localizedDescription
         }
+    }
+
+    /// Merge only the fields owned by the app UI. Features, performance
+    /// tuning, and future Node-side keys survive round-trips unchanged.
+    private func mergeKnownFields(into original: [String: Any]) -> [String: Any] {
+        var merged = original
+
+        func setOptional(_ key: String, _ value: Any?) {
+            if let value {
+                merged[key] = value
+            } else {
+                merged.removeValue(forKey: key)
+            }
+        }
+
+        setOptional("profile", config.profile)
+        setOptional("toolExposure", config.toolExposure)
+        setOptional("modulePacks", config.modulePacks)
+        merged["requireToolSession"] = config.requireToolSession
+        merged["includeShared"] = config.includeShared
+        merged["allowSendMessages"] = config.allowSendMessages
+        merged["allowSendMail"] = config.allowSendMail
+        merged["disabledModules"] = config.disabledModules
+        setOptional("shareApproval", config.shareApproval)
+
+        if let hitl = config.hitl {
+            var hitlObject = merged["hitl"] as? [String: Any] ?? [:]
+            hitlObject["level"] = hitl.level.rawValue
+            hitlObject["whitelist"] = hitl.whitelist
+            hitlObject["timeout"] = hitl.timeout
+            merged["hitl"] = hitlObject
+        } else {
+            merged.removeValue(forKey: "hitl")
+        }
+
+        return merged
     }
 
     // MARK: - Convenience Bindings
@@ -242,9 +324,6 @@ final class ConfigManager {
 
     /// Check alongside the app bundle
     private var bundleBridgePath: String? {
-        let bundle = Bundle.main.bundlePath
-        let base = (bundle as NSString).deletingLastPathComponent
-        let path = (base as NSString).appendingPathComponent("swift/.build/release/AirMcpBridge")
-        return path
+        AirMcpConstants.bundledBridgePath
     }
 }

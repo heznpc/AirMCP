@@ -42,7 +42,7 @@ Breaking을 포함한 minor/patch는 **금지**. 직전 메이저에 묶어 둘 
 - [ ] `npm run stats:check` — 툴/모듈/리소스 수와 `server.json`·`glama.json`·README·docs/site·i18n이 일치
 - [ ] `npm run gen:manifest:check` — runtime tool schema와 `docs/tool-manifest.json` 일치
 - [ ] `npm run gen:intents:check` — generated AppIntents drift 없음
-- [ ] `npm run build:mcpb:check` — `.mcpb` manifest v0.3 substitution 일치
+- [ ] `npm run build:mcpb:check` — `.mcpb` manifest v0.3 치환, self-contained 번들 생성, `full/full` 교차 pack 부트 스모크 통과
 - [ ] `npm run llms:check` — public LLM summary drift 없음
 - [ ] `npm run version:check` — package/app/plugin/config version pin 일치
 - [ ] `npm run i18n:check` — 9 로케일 키 동기화 통과
@@ -52,6 +52,44 @@ Breaking을 포함한 minor/patch는 **금지**. 직전 메이저에 묶어 둘 
 - [ ] `npm audit` — high 이상 0건 확인
 - [ ] `npm audit --audit-level=moderate` — moderate 건수 기록 (RFC 0003 단계 따라 blocking 여부 판단)
 - [ ] 새로 도입된 의존성이 있다면 라이선스 감사 통과
+
+### 1.5 iOS App Store submission gate
+
+> **현재 판정: HOLD.** iOS 타겟은 정확히 8개 read-only tool만
+> 실행합니다. `ios/AppStore/`의 기존 설명·프로모션·리뷰 노트·
+> 프라이버시·스크린샷 초안은 18/40/92 tools, Notes/HealthKit,
+> write actions, Foundation Models/`Ask AirMCP` 등 현재 계약 밖 능력을
+> 주장하므로 App Store Connect에 붙여넣거나 제출하면 안 됩니다.
+> 아래 항목이 모두 통과하기 전에는 archive/upload/submission을 금지합니다.
+
+- [ ] `npm test -- --runInBand tests/ios-preview-boundary.test.js` — Swift
+  server, direct App Intent router, iOS `AppShortcutsProvider`가 동일한 8개 목록이고
+  전부 `readOnly=true`, `destructive=false`
+- [ ] `cd ios && swift test` — `tools/list`가 정확히 8개를 반환하고 write
+  tool registration을 거부
+- [ ] `npm test -- --runInBand tests/app-trust-center.test.js tests/codegen-destructive-dialog.test.js`
+  — macOS는 App Intent action만 컴파일하고 `AppShortcutsProvider`/Siri phrase
+  block은 `#if os(iOS)` 내부에만 존재
+- [ ] 아래 stale-claim scan이 **0건**. 현재 초안에서는 의도적으로
+  실패하며, 자산을 실행 계약에 맞게 새로 검수한 후에만 체크합니다.
+
+  ```bash
+  if rg -n -i \
+    '18 tools|40 tools|92 tools|HealthKit|health_summary|Ask AirMCP|Foundation Models|Calendar.*Reminders.*Notes|\*\*Notes\*\*|Send to Notes|creates? (a )?reminder|create, search|mark done|Writes \(|drafts? a summary' \
+    ios/AppStore --glob '*.md'; then
+    echo 'HOLD: App Store assets claim capabilities outside the 8-tool read-only iOS preview' >&2
+    exit 1
+  fi
+  ```
+
+- [ ] App Store description, promotional text, review notes, privacy answers,
+  keywords, and screenshot plan name only the exact current contract:
+  `get_location_permission`, `list_calendars`, `list_contacts`,
+  `list_reminder_lists`, `list_reminders`, `search_contacts`,
+  `search_reminders`, `today_events`
+- [ ] Fresh device screenshots come from the candidate binary and visibly show
+  `Running — 8 tools`; no 18/40/92 count, HealthKit, write action, or `Ask AirMCP`
+  flow remains
 
 ---
 
@@ -93,7 +131,7 @@ Breaking을 포함한 minor/patch는 **금지**. 직전 메이저에 묶어 둘 
 ## 3. 릴리스 실행
 
 ### 3.1 Dry release preflight (publish 금지)
-- [ ] `npm run release:preflight` 로 add-on verify/install, split size kill-test, first-user add-on drill, npm tarball dry-run, packaged server boot, `.mcpb` 구조 검증
+- [ ] `npm run release:preflight` 로 scoped add-on 호환성 verify/install, universal npm tarball dry-run + default/`full/full` 부트, universal `.mcpb` 구조 + 부트 검증
 - [ ] app 산출물까지 확인할 때는 `npm run release:preflight -- --app`
 - [ ] GitHub Actions **Release Preflight** workflow green 확인
 - [ ] workflow artifact에 `airmcp-X.Y.Z.mcpb`와 `AirMCP-X.Y.Z-adhoc.zip`이 생성되는지 확인
@@ -108,14 +146,14 @@ Breaking을 포함한 minor/patch는 **금지**. 직전 메이저에 묶어 둘 
 - [ ] `ci.yml` 전 단계 green
 - [ ] CodeQL·Scorecard 경고 신규 없음
 
-### 3.4 add-on publish + root npm publish + .mcpb → GitHub Release
-- [ ] CD workflow(`cd.yml`) 자동 트리거 확인. 수동 실행 시 `npm run release:preflight` 이후 `npm run addons:publish -- --publish --all --no-build --skip-verify`를 먼저 실행하고, 그 다음 root `npm publish --provenance --access public`을 실행한다.
+### 3.4 universal root npm publish + optional add-ons + .mcpb → GitHub Release
+- [ ] CD workflow(`cd.yml`) 자동 트리거 확인. 수동 실행 시 `npm run release:preflight` 이후 universal root `npm publish --provenance --access public`을 먼저 실행한다. 호환성 add-on을 함께 갱신할 때만 `npm run addons:publish -- --publish --all --no-build --skip-verify`를 이어서 실행한다.
 - [ ] `NPM_TOKEN`을 쓰는 경우 `npm whoami`가 통과하고 해당 토큰이 `airmcp` publish 권한을 가진 automation/granular token인지 확인. 토큰이 비어 있으면 npm trusted publishing이 GitHub environment `npm` + 이 workflow에 설정되어 있어야 한다.
-- [ ] `npm view @heznpc/airmcp-productivity@X.Y.Z` 등 add-on package가 같은 버전으로 반영됐는지 확인
+- [ ] 호환성 add-on을 publish했다면 `npm view @heznpc/airmcp-productivity@X.Y.Z` 등 scoped package가 같은 버전으로 반영됐는지 확인
 - [ ] `npm view airmcp@X.Y.Z` 로 반영 검증
 - [ ] `npx -y airmcp@X.Y.Z --version` 스모크
 - [ ] Release에 `airmcp-X.Y.Z.mcpb`가 첨부되어 있는지 확인 (Claude Desktop 원클릭 설치용)
-- [ ] `npm run release:verify -- --version=X.Y.Z` 로 root npm latest, 모든 `@heznpc/airmcp-*` add-on 버전, fresh registry install/import, fresh `npx`, GitHub Release `.mcpb` asset을 한 번에 검증
+- [ ] `npm run release:verify -- --version=X.Y.Z` 로 universal root npm latest, scoped add-on 버전, fresh registry install/import, fresh `npx`, GitHub Release `.mcpb` asset을 한 번에 검증
 
 ### 3.5 Signed .app → GitHub Release
 - [ ] `release-app.yml` 워크플로가 태그 푸시로 자동 실행됐는지 확인 (Actions 탭)

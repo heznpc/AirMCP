@@ -1,5 +1,6 @@
 /* Menu - Server */
 "menu.refreshStatus" = "상태 새로고침";
+"menu.trustCenter" = "Trust Center 열기";
 "menu.startServer" = "서버 시작";
 "menu.stopServer" = "서버 중지";
 "menu.checking" = "확인 중...";
@@ -21,12 +22,14 @@
 
 /* Menu - Update */
 "menu.updateAvailable" = "업데이트 가능: v%@";
-"menu.updateNow" = "지금 업데이트";
+"menu.updateNow" = "서명된 릴리스 열기";
+"update.signedReleaseUnavailable" = "서명된 앱 릴리스를 사용할 수 없습니다.";
 "menu.updating" = "업데이트 중...";
 
 /* Menu - Setup */
 "menu.getStarted" = "시작하기";
 "menu.setupPermissions" = "권한 설정...";
+"menu.openSetup" = "설정 도우미 열기...";
 "menu.settingUp" = "설정 중...";
 
 /* Menu - Config */
@@ -42,11 +45,10 @@
 "menu.clearLogs" = "로그 지우기";
 
 /* Workflows */
-"workflow.menuHint" = "프롬프트나 Siri 문구를 복사한 뒤 MCP 클라이언트나 단축어에서 실행하세요.";
+"workflow.menuHint" = "MCP 클라이언트용 프롬프트를 복사하거나 단축어에서 AirMCP 동작을 조합하세요.";
 "workflow.copyPrompt" = "프롬프트 복사";
-"workflow.copySiriPhrase" = "Siri 문구 복사";
 "workflow.copyToolList" = "도구 목록 복사";
-"workflow.openShortcutsDoc" = "단축어 가이드 열기";
+"workflow.openShortcutsDoc" = "단축어 동작 가이드 열기";
 "workflow.dailyBriefing" = "데일리 브리핑";
 "workflow.dailyBriefing.desc" = "캘린더, 미리알림, 메일, 최근 메모로 하루를 시작합니다.";
 "workflow.dailyBriefing.prompt" = "오늘 캘린더, 지난 미리알림, 읽지 않은 메일, 최근 메모를 브리핑해줘.";
@@ -83,6 +85,107 @@
 
 /* Settings */
 "settings.autoStart" = "실행 시 서버 자동 시작";
+"settings.launchAtLogin" = "로그인할 때 AirMCP 실행";
+"settings.launchAtLoginFailed" = "로그인 항목 업데이트 실패: %@";
+
+/* Trust Center */
+"trust.title" = "AirMCP Trust Center";
+"trust.subtitle" = "로컬 런타임과 macOS 권한 점검에서 얻은 실시간 근거입니다.";
+"trust.refresh" = "새로고침";
+"trust.runtimeSection" = "런타임";
+"trust.runtime" = "앱 소유 런타임";
+"trust.exposedTools" = "노출된 도구";
+"trust.pendingApprovals" = "대기 중 승인";
+"trust.safeguardsSection" = "안전장치";
+"trust.auditIntegrity" = "감사 체인";
+"trust.auditEntries" = "검증 창 내 항목 %d개";
+"trust.auditDisabled" = "기록 비활성";
+"trust.verified" = "검증됨";
+"trust.failed" = "검증 실패";
+"trust.unavailable" = "사용 불가";
+"trust.emergencyStop" = "비상정지";
+"trust.engaged" = "작동 중";
+"trust.ready" = "준비됨";
+"trust.emergencyEngage" = "파괴적 도구 차단";
+"trust.emergencyClear" = "파괴적 도구 다시 허용";
+"trust.emergencyClearTitle" = "비상정지를 해제할까요?";
+"trust.emergencyClearMessage" = "파괴적 도구 호출이 다시 실행 후보가 됩니다. 호출별 승인과 rate limit은 계속 적용됩니다.";
+"trust.permissionsSection" = "권한";
+"trust.permissionsNotChecked" = "실제 최소 읽기를 실행해 macOS 자동화 접근을 확인합니다.";
+"trust.checkPermissions" = "권한 확인";
+"trust.pending" = "대기 중";
+"trust.granted" = "허용됨";
+"trust.denied" = "거부됨";
+"trust.configurationSection" = "설정";
+"trust.cancel" = "취소";
+"trust.ok" = "확인";
+"trust.section" = "Trust Center 영역";
+"trust.activity" = "활동";
+"trust.range" = "조회 기간";
+"trust.rangeDay" = "24시간";
+"trust.rangeWeek" = "7일";
+"trust.rangeMonth" = "30일";
+"trust.statusFilter" = "상태 필터";
+"trust.filterAll" = "전체";
+"trust.filterAttention" = "확인 필요";
+"trust.filterFailed" = "실패";
+"trust.filterSucceeded" = "성공";
+"trust.searchRuns" = "실행 검색";
+"trust.loadingActivity" = "통제된 활동을 불러오는 중…";
+"trust.activityUnavailable" = "활동을 불러올 수 없음";
+"trust.noRuns" = "표시할 실행이 없습니다";
+"trust.noRunsMessage" = "조회 기간이나 필터를 바꾸거나 AirMCP 워크플로를 실행해 주세요.";
+"trust.selectRun" = "실행을 선택해 주세요";
+"trust.selectRunMessage" = "통제된 실행을 선택하면 승인 및 도구 타임라인을 확인할 수 있습니다.";
+"trust.historyTruncated" = "감사 이벤트 %2$d개 중 %1$d개 표시";
+"trust.actionCount" = "작업 %d개";
+"trust.runEvidence" = "실행 근거";
+"trust.runID" = "실행 ID";
+"trust.approval" = "승인";
+"trust.actor" = "시작 주체";
+"trust.duration" = "기록된 호출 시간";
+"trust.durationMs" = "%dms";
+"trust.durationSeconds" = "%.1f초";
+"trust.timeline" = "검증된 타임라인";
+"trust.awaitingAudit" = "결정은 반영됐으며 런타임이 감사 이벤트를 봉인하기를 기다리고 있습니다.";
+"trust.approvalRequired" = "승인 필요";
+"trust.localArguments" = "인자(로컬에서만 표시)";
+"trust.destructive" = "파괴적";
+"trust.sensitive" = "민감";
+"trust.network" = "네트워크";
+"trust.approvalEvent" = "%2$@ — %1$@";
+"trust.gateEvent" = "%1$@에서 %2$@ 차단";
+"trust.approvalNotRequired" = "필요 없음";
+"trust.approved" = "승인됨";
+"trust.timedOut" = "시간 초과";
+"trust.unknown" = "알 수 없음";
+"trust.channelApp" = "AirMCP 앱";
+"trust.channelClient" = "MCP 클라이언트";
+"trust.channelUnavailable" = "승인 채널 없음";
+"trust.gateOAuth" = "OAuth 범위";
+"trust.gateEmergency" = "비상 정지";
+"trust.gateRateLimit" = "호출 제한";
+"trust.actorUser" = "사용자 요청";
+"trust.actorDaemon" = "예약 워크플로";
+"trust.actorApprovedQueue" = "승인된 대기열";
+"trust.statusPending" = "승인 대기";
+"trust.statusRunning" = "완료 처리 중";
+"trust.statusSucceeded" = "성공";
+"trust.statusFailed" = "실패";
+"trust.statusDenied" = "거부됨";
+"trust.statusTimedOut" = "시간 초과";
+"trust.statusBlocked" = "차단됨";
+"trust.integrityVerifiedDetail" = "활동 기록과 판정이 동일한 HMAC 체인 검사에서 생성됐습니다.";
+"trust.integrityFailedDetail" = "검사에서 수락된 앞부분만 표시합니다. 이후 활동을 신뢰하기 전에 손상 지점을 확인해 주세요.";
+"trust.integrityDisabledDetail" = "감사 기록을 쓸 수 없어 활동 기록이 불완전할 수 있습니다.";
+"trust.integrityUnavailableDetail" = "로컬 활동을 검증하려면 앱 소유 런타임을 시작해 주세요.";
+"trust.safeguardsSubtitle" = "런타임, 감사 무결성, 승인 및 비상 제어를 확인합니다.";
+"trust.permissionsSubtitle" = "실제 최소 읽기로 macOS 앱 접근을 확인합니다.";
+"trust.export" = "안전 보고서 내보내기…";
+"trust.exportTitle" = "Trust Center 보고서 내보내기";
+"trust.exportFailed" = "내보내기 실패";
+"trust.exportComplete" = "보고서 내보내기 완료";
+"trust.exportCompleteMessage" = "%@에는 인자, 원문 오류, 자격 증명, 경로 또는 HMAC 정보가 포함되지 않습니다.";
 "settings.includeShared" = "공유 메모 포함";
 "settings.allowMessages" = "메시지 전송 허용";
 "settings.allowMail" = "메일 전송 허용";
@@ -224,18 +327,32 @@
 "addon.powerautomate.desc" = "Microsoft Power Automate Cloud Flow outbound trigger.";
 
 /* Onboarding */
+"onboarding.windowTitle" = "AirMCP 설정";
 "onboarding.back" = "이전";
 "onboarding.next" = "다음";
 "onboarding.finish" = "완료";
+"onboarding.stepWelcome" = "시작";
+"onboarding.stepRuntime" = "런타임";
+"onboarding.stepWorkflow" = "첫 워크플로";
+"onboarding.stepAccess" = "앱 접근";
+"onboarding.stepPermissions" = "권한";
+"onboarding.stepConnect" = "연결";
+"onboarding.progress" = "%d / %d 단계";
 "onboarding.welcome" = "AirMCP에 오신 것을 환영합니다";
-"onboarding.welcomeDesc" = "AirMCP는 Claude 같은 AI 어시스턴트가 Mac 앱(메모, 캘린더, 메일, 미리알림 등)과 MCP(Model Context Protocol)를 통해 소통할 수 있게 해줍니다.";
-"onboarding.welcomeTime" = "설정은 약 1분 정도 걸립니다.";
-"onboarding.nodeRequired" = "Node.js 필요";
-"onboarding.nodeChecking" = "Node.js 확인 중...";
-"onboarding.nodeFound" = "Node.js 발견됨";
-"onboarding.nodeNotFound" = "Node.js를 찾을 수 없음";
-"onboarding.nodeInstallHint" = "AirMCP를 실행하려면 Node.js가 필요합니다. 설치 후 앱을 다시 실행해주세요.";
-"onboarding.nodeDownload" = "Node.js 다운로드";
+"onboarding.welcomeDesc" = "하나의 로컬 거버넌스 런타임으로 MCP 클라이언트와 Apple 앱을 연결합니다.";
+"onboarding.welcomeLocalTitle" = "기본은 로컬 처리";
+"onboarding.welcomeLocalDesc" = "도구가 명시적으로 외부 전송을 수행하지 않는 한 Apple 앱 데이터는 이 Mac에 남습니다.";
+"onboarding.welcomeControlTitle" = "민감한 작업은 승인 후 실행";
+"onboarding.welcomeControlDesc" = "호출별 승인, 속도 제한, 비상 정지, 변조 감지 감사 로그가 변경 작업을 보호합니다.";
+"onboarding.welcomeClientTitle" = "쓰던 AI 클라이언트 그대로";
+"onboarding.welcomeClientDesc" = "Codex, Claude, Cursor 또는 다른 MCP 호환 클라이언트를 연결할 수 있습니다.";
+"onboarding.welcomeTime" = "간단한 6단계로, 약 1분이면 됩니다.";
+"onboarding.nodeRequired" = "런타임 확인";
+"onboarding.nodeChecking" = "내장 런타임 확인 중...";
+"onboarding.nodeFound" = "내장 AirMCP 런타임 준비됨";
+"onboarding.nodeNotFound" = "런타임을 찾을 수 없음";
+"onboarding.nodeInstallHint" = "릴리스 빌드에는 런타임이 포함됩니다. 이 개발 빌드는 fallback으로 Node.js 20+가 필요합니다.";
+"onboarding.nodeDownload" = "개발용 Node.js 다운로드";
 "onboarding.nodeCheckAgain" = "다시 확인";
 "onboarding.chooseWorkflow" = "AirMCP로 먼저 무엇을 할까요?";
 "onboarding.chooseWorkflowDesc" = "시작할 목표 하나를 고르세요. AirMCP가 필요한 Mac 앱만 설정합니다.";
@@ -248,16 +365,16 @@
 "onboarding.permissionsDesc" = "AirMCP는 워크플로에 필요한 순간에만 macOS 앱 권한을 요청합니다.";
 "onboarding.openSettings" = "시스템 설정 열기";
 "onboarding.connectClient" = "AI 클라이언트 연결";
-"onboarding.connectClientDesc" = "AirMCP가 다음 MCP 호환 클라이언트를 감지했습니다. 설정을 패치하여 AirMCP를 자동으로 추가할 수 있습니다.";
+"onboarding.connectClientDesc" = "감지된 MCP 호환 클라이언트에 AirMCP를 추가하려면 연결을 선택하세요.";
 "onboarding.copyPrompt" = "프롬프트 복사";
-"onboarding.copyCodexPrompt" = "Codex용 복사";
-"onboarding.copySiriPhrase" = "Siri 문구 복사";
 "onboarding.noClients" = "지원되는 클라이언트가 감지되지 않았습니다. 나중에 '설정 복사' 메뉴에서 수동으로 설정할 수 있습니다.";
 "onboarding.installed" = "설치됨";
 "onboarding.notFound" = "미발견";
-"onboarding.patched" = "패치됨";
+"onboarding.patched" = "연결됨";
 "onboarding.failed" = "실패";
-"onboarding.autoPatch" = "자동 패치";
+"onboarding.autoPatch" = "연결";
+"onboarding.enableInCodex" = "Codex에서 활성화";
+"onboarding.codexStartupDisclosure" = "활성화하면 MCP 서버가 계속 등록됩니다. Codex는 시작할 때마다 AirMCP 연결을 시도하며 필요하면 AirMCP.app을 열 수 있습니다.";
 "onboarding.firstRunWaiting" = "설정을 마치기 전에 AirMCP.app 소유 런타임을 시작합니다.";
 "onboarding.firstRunStarting" = "앱 소유 런타임을 시작하고 비공개 로컬 토큰을 준비하는 중...";
 "onboarding.firstRunReady" = "첫 실행 준비 완료";
@@ -298,9 +415,10 @@
 /* Services Menu */
 "services.noText" = "선택된 텍스트 없음";
 "services.savedNoteTitle" = "AirMCP - 저장된 텍스트";
-"services.saveNoteFailed" = "메모 저장 실패";
-"services.searchQuery" = "검색어 설정: %@...";
-"services.searchTitle" = "AirMCP 검색";
+"services.noteSaved" = "AirMCP의 통제된 런타임을 통해 메모를 만들었습니다.";
+"services.reminderCreated" = "AirMCP의 통제된 런타임을 통해 미리알림을 만들었습니다.";
+"services.searchCopied" = "검색 결과를 클립보드에 복사했습니다.";
+"services.actionFailed" = "작업 실패: %@";
 
 /* Onboarding - Permissions */
 "onboarding.permAutomation" = "자동화";

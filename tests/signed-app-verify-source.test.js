@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 
 const scriptPath = new URL("../scripts/verify-signed-app.sh", import.meta.url);
 const script = readFileSync(scriptPath, "utf8");
+const notarize = readFileSync(new URL("../scripts/notarize-app.sh", import.meta.url), "utf8");
 const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
 
 describe("signed app artifact verification script", () => {
@@ -24,5 +25,11 @@ describe("signed app artifact verification script", () => {
 
   test("package.json exposes the signed artifact gate", () => {
     expect(pkg.scripts["app:verify:signed"]).toBe("./scripts/verify-signed-app.sh");
+  });
+
+  test("notarization signs embedded runtime code and runs the final artifact gate", () => {
+    expect(notarize).toContain("Contents/Resources/airmcp/runtime/bin/node");
+    expect(notarize).toContain("Contents/Resources/airmcp/bin/AirMcpBridge");
+    expect(notarize).toContain('bash "$SCRIPT_DIR/verify-signed-app.sh"');
   });
 });

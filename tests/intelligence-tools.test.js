@@ -205,7 +205,9 @@ describe('Intelligence tool handlers', () => {
 
     const result = await server.callTool('ai_plan_metrics', { limit: 3, seed: 1 });
     expect(result.isError).toBeUndefined();
+    expect(result.structuredContent).toBeDefined();
     const sc = JSON.parse(result.content[0].text);
+    expect(result.structuredContent).toEqual(sc);
     expect(sc.sampled).toBe(3);
     expect(sc.parseRate).toBe(1);
     expect(sc.averageScore).toBeGreaterThan(0);

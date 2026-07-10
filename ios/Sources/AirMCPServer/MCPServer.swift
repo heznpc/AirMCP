@@ -73,8 +73,22 @@ public actor MCPServer {
         self.serverVersion = version
     }
 
-    public func registerTool<T: MCPTool>(_ tool: T) {
-        tools[type(of: tool).name] = ToolBox(tool)
+    /// Register a tool only when it belongs to the governed iOS preview
+    /// catalog. The iOS server has no shared HITL/audit path yet, so writes and
+    /// ad-hoc read tools fail closed at registration rather than merely being
+    /// hidden from `tools/list`.
+    @discardableResult
+    public func registerTool<T: MCPTool>(_ tool: T) -> Bool {
+        let toolType = type(of: tool)
+        guard IOSPreviewContract.allows(
+            name: toolType.name,
+            readOnly: toolType.readOnly,
+            destructive: toolType.destructive
+        ) else {
+            return false
+        }
+        tools[toolType.name] = ToolBox(tool)
+        return true
     }
 
     public var toolCount: Int { tools.count }
@@ -181,6 +195,9 @@ public actor MCPServer {
     /// error. Non-throwing success returns the first text content block,
     /// or empty string if the tool returns non-text-only content.
     public func callToolText(name: String, args: [String: any Sendable]) async throws -> String {
+        guard IOSPreviewContract.toolNames.contains(name) else {
+            throw MCPIntentCallError.previewToolNotAllowed(name)
+        }
         guard let tool = tools[name] else {
             throw MCPIntentCallError.unknownTool(name)
         }
@@ -194,7 +211,19 @@ public actor MCPServer {
     }
 }
 
-public enum MCPIntentCallError: Error, Sendable {
+public enum MCPIntentCallError: LocalizedError, Sendable {
+    case previewToolNotAllowed(String)
     case unknownTool(String)
     case toolFailed(name: String, message: String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .previewToolNotAllowed(let name):
+            return "\(name) is not available in the read-only iOS preview."
+        case .unknownTool(let name):
+            return "Unknown iOS preview tool: \(name)."
+        case .toolFailed(let name, let message):
+            return "\(name) failed: \(message)"
+        }
+    }
 }

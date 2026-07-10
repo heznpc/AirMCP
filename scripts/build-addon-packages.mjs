@@ -2,10 +2,10 @@
 /**
  * Stage physical AirMCP add-on packages from the built dist tree.
  *
- * This is intentionally a build artifact, not checked-in package output:
- * runtime code can prefer installed add-on packages today, while prepack turns
- * the root `airmcp` artifact into a slim package that keeps non-core entrypoints
- * in these companion packages.
+ * This is intentionally a build artifact, not checked-in package output.
+ * Runtime code can prefer installed compatibility packages or require them in
+ * `external-only` mode, while normal npm and MCPB artifacts retain the complete
+ * bundled module catalog.
  */
 
 import {

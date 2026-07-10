@@ -6,13 +6,15 @@ import { eventBus } from "../shared/event-bus.js";
 import { startPollers } from "../shared/pollers.js";
 import { resourceCache } from "../shared/cache.js";
 import { checkSwiftBridge, runSwift } from "../shared/swift.js";
-import { toolRegistry } from "../shared/tool-registry.js";
+import type { ToolRegistry } from "../shared/tool-registry.js";
 
 export interface RegisterEventToolsOptions {
   notifyResourceListChanged: () => void;
+  toolRegistry: ToolRegistry;
 }
 
 export function registerEventTools(server: McpServer, options: RegisterEventToolsOptions): () => void {
+  const { toolRegistry } = options;
   const SNAPSHOT_KEYS = ["snapshot:standard", "snapshot:brief", "snapshot:full"];
 
   function invalidateAndNotify(keys: string[]): void {

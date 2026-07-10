@@ -91,13 +91,14 @@ describe('registerSkillEngine', () => {
 
   test('orchestrates full skill registration flow', async () => {
     const skills = [makeSkill('skill-a'), makeSkill('skill-b', true)];
+    const runtimeRegistry = { identity: 'per-server-registry' };
     const mockClose = jest.fn();
     mockLoadAllSkills.mockReturnValue({ builtins: skills, user: [] });
     mockMergeSkills.mockReturnValue(skills);
     mockRegisterSkills.mockReturnValue({ prompts: 0, tools: 2 });
     mockWatchUserSkills.mockReturnValue({ close: mockClose });
 
-    await registerSkillEngine(fakeServer);
+    await registerSkillEngine(fakeServer, runtimeRegistry);
 
     // loadAllSkills called with builtins directory
     expect(mockLoadAllSkills).toHaveBeenCalledTimes(1);
@@ -107,7 +108,7 @@ describe('registerSkillEngine', () => {
     expect(mockMergeSkills).toHaveBeenCalledWith(skills, []);
 
     // registerSkills called with server and merged skills
-    expect(mockRegisterSkills).toHaveBeenCalledWith(fakeServer, skills);
+    expect(mockRegisterSkills).toHaveBeenCalledWith(fakeServer, skills, runtimeRegistry);
 
     // resetTriggers called before registering new triggers
     expect(mockResetTriggers).toHaveBeenCalledTimes(1);

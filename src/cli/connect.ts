@@ -1,6 +1,7 @@
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { JSONRPCMessage, RequestId } from "@modelcontextprotocol/sdk/types.js";
+import { spawn } from "node:child_process";
 import { IDENTITY } from "../shared/constants.js";
 
 const DEFAULT_URL = `http://127.0.0.1:${IDENTITY.HTTP_PORT}/mcp`;
@@ -16,8 +17,8 @@ function usage(): string {
     "Usage: npx airmcp connect [--url http://127.0.0.1:3847/mcp] [--token <token>]",
     "",
     "Connect a stdio-only MCP client to the AirMCP.app-owned local HTTP runtime.",
-    "Start AirMCP.app first, then configure Claude Desktop or other stdio clients",
-    "to run this command instead of launching a second AirMCP server.",
+    "For the default loopback URL, this command launches AirMCP.app on demand",
+    "and waits for its runtime instead of launching a second server.",
   ].join("\n");
 }
 
@@ -89,8 +90,50 @@ function makeProxyUnavailableResponse(message: JSONRPCMessage, error: unknown): 
   };
 }
 
+export function shouldAutoLaunchApp(url: string): boolean {
+  if (process.env.AIRMCP_CONNECT_NO_LAUNCH === "1" || process.platform !== "darwin") return false;
+  const parsed = new URL(url);
+  const loopback = parsed.hostname === "127.0.0.1" || parsed.hostname === "localhost" || parsed.hostname === "[::1]";
+  return loopback && Number(parsed.port || "80") === IDENTITY.HTTP_PORT && parsed.pathname === "/mcp";
+}
+
+async function healthReady(mcpUrl: string): Promise<boolean> {
+  const health = new URL("/health", mcpUrl);
+  try {
+    const response = await fetch(health, { signal: AbortSignal.timeout(750) });
+    if (!response.ok) return false;
+    const body = (await response.json()) as { status?: unknown; version?: unknown };
+    return body.status === "ok" && typeof body.version === "string";
+  } catch {
+    return false;
+  }
+}
+
+async function launchLocalAppAndWait(mcpUrl: string): Promise<void> {
+  if (!shouldAutoLaunchApp(mcpUrl) || (await healthReady(mcpUrl))) return;
+
+  const bundleId = process.env.AIRMCP_APP_BUNDLE_ID ?? "com.heznpc.AirMCP";
+  const launcher = spawn("/usr/bin/open", ["-b", bundleId], {
+    detached: true,
+    stdio: "ignore",
+  });
+  launcher.unref();
+
+  const deadline = Date.now() + 15_000;
+  while (Date.now() < deadline) {
+    if (await healthReady(mcpUrl)) return;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  throw new Error(`AirMCP.app launched but its local runtime did not become ready at ${mcpUrl}`);
+}
+
 export async function runConnect(args = process.argv.slice(3)): Promise<void> {
   const options = parseArgs(args);
+  try {
+    await launchLocalAppAndWait(options.url);
+  } catch (error) {
+    console.error(`[AirMCP connect] ${error instanceof Error ? error.message : String(error)}`);
+  }
   const stdio = new StdioServerTransport();
   const requestInit: RequestInit = options.token ? { headers: { Authorization: `Bearer ${options.token}` } } : {};
   const http = new StreamableHTTPClientTransport(new URL(options.url), { requestInit });

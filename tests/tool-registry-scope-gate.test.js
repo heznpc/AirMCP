@@ -20,6 +20,7 @@ jest.unstable_mockModule('../dist/shared/usage-tracker.js', () => ({
 }));
 jest.unstable_mockModule('../dist/shared/audit.js', () => ({
   auditLog: auditLogMock,
+  readAuditEntries: jest.fn(),
 }));
 jest.unstable_mockModule('../dist/shared/tool-filter.js', () => ({
   compactDescription: (d) => (d ? d.substring(0, 80) : d),

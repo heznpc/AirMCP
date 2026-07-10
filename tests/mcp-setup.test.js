@@ -140,24 +140,26 @@ jest.unstable_mockModule('../dist/shared/hitl.js', () => ({
 // tool-registry — instrumented to record installation order vs module calls.
 const toolRegistryEvents = [];
 let toolRegistryInstalled = false;
+const mockedToolRegistry = {
+  installOn: jest.fn((_server) => {
+    toolRegistryInstalled = true;
+    toolRegistryEvents.push({ kind: 'install', t: Date.now() });
+  }),
+  configureExposure: jest.fn(),
+  pruneStaleRegistrations: jest.fn(),
+  getToolCount: () => 0,
+  getExposedToolCount: () => 0,
+  getExposedToolNames: () => [],
+  getPromptCount: () => 0,
+  getToolNames: () => [],
+  searchTools: () => [],
+  callTool: jest.fn(),
+  reset: jest.fn(),
+};
 jest.unstable_mockModule('../dist/shared/tool-registry.js', () => ({
   ToolInputValidationError: class ToolInputValidationError extends Error {},
-  toolRegistry: {
-    installOn: jest.fn((_server) => {
-      toolRegistryInstalled = true;
-      toolRegistryEvents.push({ kind: 'install', t: Date.now() });
-    }),
-    configureExposure: jest.fn(),
-    pruneStaleRegistrations: jest.fn(),
-    getToolCount: () => 0,
-    getExposedToolCount: () => 0,
-    getExposedToolNames: () => [],
-    getPromptCount: () => 0,
-    getToolNames: () => [],
-    searchTools: () => [],
-    callTool: jest.fn(),
-    reset: jest.fn(),
-  },
+  toolRegistry: mockedToolRegistry,
+  createToolRegistry: jest.fn(() => mockedToolRegistry),
 }));
 
 // tool-search — discover_tools handler hits this.

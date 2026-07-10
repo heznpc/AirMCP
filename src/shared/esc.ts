@@ -56,19 +56,28 @@ export function escShell(str: string): string {
  *   raw '  → shell ignores  → JXA needs \\'
  *   newline/CR → JXA \n/\r  → shell receives literal newline/CR (valid in double quotes)
  */
+const JXA_SHELL_ESCAPES = new Map<string, string>([
+  ["\\", "\\\\\\\\"],
+  ['"', '\\\\\\"'],
+  ["`", "\\\\`"],
+  ["$", "\\\\$"],
+  ["'", "\\'"],
+  ["\n", "\\n"],
+  ["\r", "\\r"],
+  ["\u2028", "\\u2028"],
+  ["\u2029", "\\u2029"],
+]);
+
 export function escJxaShell(str: string): string {
-  return str
-    .replace(/\0/g, "")
-    .replace(RE_CTRL, "")
-    .replace(/\\/g, "\\\\\\\\") // \ → \\\\ (4 backslashes in source = 2 literal)
-    .replace(/"/g, '\\\\\\"') // " → \\\"
-    .replace(/`/g, "\\\\`") // ` → \\`
-    .replace(/\$/g, "\\\\$") // $ → \\$
-    .replace(/'/g, "\\'") // ' → \'
-    .replace(/\n/g, "\\n") // newline → \n (JXA interprets as newline char)
-    .replace(/\r/g, "\\r") // CR → \r (JXA interprets as CR char)
-    .replace(/\u2028/g, "\\u2028") // LS — escape so JXA single-quoted string doesn't break
-    .replace(/\u2029/g, "\\u2029"); // PS — escape so JXA single-quoted string doesn't break
+  let result = "";
+  for (const char of str) {
+    const code = char.charCodeAt(0);
+    if (code === 0 || (code >= 1 && code <= 8) || code === 11 || code === 12 || (code >= 14 && code <= 31)) {
+      continue;
+    }
+    result += JXA_SHELL_ESCAPES.get(char) ?? char;
+  }
+  return result;
 }
 
 /** Ensure n is a finite integer — prevents shell injection if a non-number leaks through validation. */

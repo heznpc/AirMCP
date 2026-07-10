@@ -20,7 +20,7 @@ import { resolveModuleCompatibility } from "../shared/compatibility.js";
 import { registerDynamicShortcutTools } from "../shortcuts/tools.js";
 import { HitlClient } from "../shared/hitl.js";
 import { installHitlGuard } from "../shared/hitl-guard.js";
-import { toolRegistry } from "../shared/tool-registry.js";
+import { createToolRegistry, type ToolRegistry } from "../shared/tool-registry.js";
 import { indexToolDescriptions } from "../shared/tool-search.js";
 import { isCompactMode } from "../shared/tool-filter.js";
 import { resolveHarnessAdapter } from "../shared/task-adapters.js";
@@ -39,9 +39,12 @@ export interface CreateServerOptions {
   pkg: { version: string; description?: string; license?: string; homepage?: string };
 }
 
-export async function createServer(
-  options: CreateServerOptions,
-): Promise<{ server: SdkMcpServer; bannerInfo: BannerInfo; cleanupEventListeners: () => void }> {
+export async function createServer(options: CreateServerOptions): Promise<{
+  server: SdkMcpServer;
+  toolRegistry: ToolRegistry;
+  bannerInfo: BannerInfo;
+  cleanupEventListeners: () => void;
+}> {
   const { config, hitlClient, osVersion, pkg } = options;
   const harness = resolveHarnessAdapter(config);
 
@@ -54,6 +57,7 @@ export async function createServer(
   });
   // Cast to lightweight McpServer for module registration (avoids heavy generic inference)
   const lServer = server as unknown as LightMcpServer;
+  const toolRegistry = createToolRegistry();
 
   // Install tool/prompt registry FIRST so its interception runs as the
   // innermost wrapper. The HITL guard then re-patches registerTool, becoming
@@ -158,7 +162,7 @@ export async function createServer(
   registerResources(lServer, config);
   registerSetupTools(lServer, config);
 
-  const skillCounts = await registerSkillEngine(lServer);
+  const skillCounts = await registerSkillEngine(lServer, toolRegistry);
 
   registerApps(lServer, {
     calendar: enabled.includes("calendar"),
@@ -179,6 +183,7 @@ export async function createServer(
     });
 
   registerFrontDoorTools(lServer, {
+    toolRegistry,
     config,
     harness,
     version: pkg.version,
@@ -192,15 +197,16 @@ export async function createServer(
     missingPackInstallHints,
     buildWorkflowReadiness,
   });
-  registerToolSessionTools(lServer, { config, harness });
+  registerToolSessionTools(lServer, { config, harness, toolRegistry });
   const cleanupEventListeners = registerEventTools(lServer, {
+    toolRegistry,
     notifyResourceListChanged: () => server.sendResourceListChanged(),
   });
 
   toolRegistry.pruneStaleRegistrations();
 
   if (config.features.semanticToolSearch) {
-    indexToolDescriptions().catch((e) => {
+    indexToolDescriptions(toolRegistry).catch((e) => {
       log.error("semantic tool index failed", { err: errToCtx(e) });
     });
   }
@@ -229,5 +235,5 @@ export async function createServer(
     compactTools: isCompactMode(),
   };
 
-  return { server, bannerInfo, cleanupEventListeners };
+  return { server, toolRegistry, bannerInfo, cleanupEventListeners };
 }

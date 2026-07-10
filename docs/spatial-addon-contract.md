@@ -2,7 +2,7 @@
 
 The `spatial` add-on is a context bridge, not a renderer.
 
-AirMCP's job is to collect local Apple-workspace context and produce auditable, editable handoff artifacts for downstream VR/spatial tools. The add-on may grow to support headset or scene workflows, but it must keep the same boundary as the other optional packs: install on demand, activate through `modulePacks`, and stay removable without weakening `core`.
+AirMCP's job is to collect local Apple-workspace context and produce auditable, editable handoff artifacts for downstream VR/spatial tools. The module ships inside the universal artifact but remains opt-in through `modulePacks`; the optional scoped add-on exists only for compatibility with `external-only` deployments. Either path must stay removable without weakening `core`.
 
 ## Allowed Scope
 
@@ -25,8 +25,8 @@ AirMCP's job is to collect local Apple-workspace context and produce auditable, 
 Future VR/spatial packages should follow the same shape as current add-ons:
 
 1. Keep `core` as the transport, config, audit, HITL, and safety runtime.
-2. Publish optional package code under `@heznpc/airmcp-<name>` with no `pack-*` naming.
-3. Register modules only when the pack is active and installed.
+2. Keep any optional compatibility package under `@heznpc/airmcp-<name>` with no `pack-*` naming.
+3. Register modules only when the pack is active; require a separate install only in explicit `external-only` deployments.
 4. Provide `dryRun` previews for install/export operations before writes.
 5. Keep renderer-specific integrations behind separate add-ons or downstream handoff tools.
 

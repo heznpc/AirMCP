@@ -32,6 +32,7 @@ import { assessWorkflowsReadiness, summarizeWorkflowsReadiness } from "../shared
 import { RESET, BOLD, DIM, WHITE, GREEN, SYM, heading, line, divider, spinner, sleep } from "./style.js";
 import { APP_RUNTIME_TOKEN_PATH } from "../shared/app-runtime-token.js";
 import { probeAppRuntimeMcp } from "./app-runtime-probe.js";
+import { LATEST_PROTOCOL_VERSION } from "@modelcontextprotocol/sdk/types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 /** Package root — works in repo checkout, npm cache, and git worktrees. */
@@ -216,6 +217,8 @@ export async function runDoctor(): Promise<void> {
     const shape = codexAirmcpRuntimeShape();
     if (shape === "app-owned") {
       ok("Codex", `${GREEN}connected${RESET} ${DIM}(AirMCP.app runtime)${RESET}`);
+    } else if (shape === "app-owned-disabled" || shape === "direct-disabled") {
+      meh("Codex", "AirMCP is disabled for Codex startup — run: npx airmcp codex enable");
     } else if (shape === "app-owned-pending-restart") {
       meh("Codex", `config uses AirMCP.app runtime — restart Codex to reload MCP servers`);
     } else if (shape === "direct") {
@@ -280,7 +283,7 @@ export async function runDoctor(): Promise<void> {
         id: 1,
         method: "initialize",
         params: {
-          protocolVersion: "2025-03-26",
+          protocolVersion: LATEST_PROTOCOL_VERSION,
           capabilities: {},
           clientInfo: { name: "airmcp-doctor", version: "0" },
         },
@@ -359,7 +362,7 @@ export async function runDoctor(): Promise<void> {
   if (runtimeConfig?.modulePacksConfigured ?? packSelection.configured)
     ok("Pack source", process.env.AIRMCP_MODULE_PACKS ? "AIRMCP_MODULE_PACKS" : "config.json");
   else meh("Pack source", "default all built-in packs");
-  ok("Add-on import mode", process.env.AIRMCP_ADDON_PACKAGE_MODE ?? "prefer-installed");
+  ok("Add-on import mode", process.env.AIRMCP_ADDON_PACKAGE_MODE ?? "bundled");
   for (const pack of packStatuses) {
     const detail = `${pack.packageName} · ${pack.modules.join(", ")}`;
     if (pack.available) ok(`pack:${pack.name}`, detail);

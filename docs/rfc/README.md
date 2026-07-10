@@ -97,7 +97,7 @@ Draft ──► Proposed ──► Accepted ──► Implemented
 | 0012 _(reserved)_                           | Daemon mode — autonomous scheduler (code prep in `src/skills/scheduler/*`; RFC doc pending) | Reserved | — |
 | [0013](./0013-review-process.md)            | Stratified review process for a broad codebase                | Accepted | Process                                           |
 | [0014](./0014-scope-review.md)              | Tool-surface scope review (post-WWDC 2026)                    | Accepted | v3.0.0                                            |
-| [0015](./0015-modular-install-and-task-harness.md) | Modular install and task-scoped harness                 | Add-on Staging Implemented | v2.15.0 task harness · add-on package staging    |
+| [0015](./0015-modular-install-and-task-harness.md) | Modular install and task-scoped harness                 | Universal Distribution Implemented | v2.16.0 task harness · logical packs · universal artifacts |
 
 ## 관련 문서
 

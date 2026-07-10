@@ -30,10 +30,11 @@ describe("add-on first-user drills and modular kill-test", () => {
     expect(killTest).toContain("installed-addon-load-bearing");
   });
 
-  test("release preflight copies first-user and kill-test artifacts", () => {
-    expect(preflight).toContain('run("npm", ["run", "addons:first-user-drill"');
-    expect(preflight).toContain('run("npm", ["run", "addons:kill-test"');
-    expect(preflight).toContain("first-user-addon-drill.json");
-    expect(preflight).toContain("modular-distribution-kill-test.json");
+  test("release preflight treats split drills as diagnostics, not universal-release blockers", () => {
+    expect(preflight).toContain('run("npm", ["run", "addons:verify-install"');
+    expect(preflight).not.toContain('run("npm", ["run", "addons:first-user-drill"');
+    expect(preflight).not.toContain('run("npm", ["run", "addons:kill-test"');
+    expect(preflight).toContain('run("npm", ["run", "verify:package"');
+    expect(preflight).toContain('run("npm", ["run", "verify:mcpb"');
   });
 });

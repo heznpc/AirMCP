@@ -37,7 +37,7 @@ describe("add-on publish release lane", () => {
     expect(script).toContain("previously published versions");
   });
 
-  test("CD publishes the slim root before add-ons and releases the preflight mcpb", () => {
+  test("CD publishes the universal root independently and releases the preflight mcpb", () => {
     expect(cdWorkflow).toContain("npm run release:preflight");
     expect(cdWorkflow).toContain('git show-ref --tags --verify --quiet "refs/tags/v${{ steps.pkg.outputs.version }}"');
     expect(cdWorkflow.indexOf("Publish root with provenance")).toBeLessThan(

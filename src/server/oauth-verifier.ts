@@ -119,6 +119,14 @@ function parseScopes(payload: JWTPayload): string[] {
 
 function claimsFromPayload(payload: JWTPayload): OAuthClaims | null {
   if (typeof payload.sub !== "string" || payload.sub === "") return null;
+  const rawClientId = (payload as Record<string, unknown>).client_id;
+  const rawAuthorizedParty = (payload as Record<string, unknown>).azp;
+  const clientId =
+    typeof rawClientId === "string" && rawClientId !== ""
+      ? rawClientId
+      : typeof rawAuthorizedParty === "string" && rawAuthorizedParty !== ""
+        ? rawAuthorizedParty
+        : undefined;
   // The RFC 8707 `resource` claim is intentionally NOT used for the
   // audience decision — jose already enforced `aud` above (a token whose
   // `resource` matched but `aud` did not was rejected as wrong_audience
@@ -126,6 +134,7 @@ function claimsFromPayload(payload: JWTPayload): OAuthClaims | null {
   // in `raw` for downstream inspection.
   return {
     subject: payload.sub,
+    ...(clientId ? { clientId } : {}),
     scopes: parseScopes(payload),
     raw: payload as Record<string, unknown>,
   };

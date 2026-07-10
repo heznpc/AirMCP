@@ -17,6 +17,7 @@ import { cleanBootEnv } from "./lib/clean-boot-env.mjs";
 import {
   expectNoWireError,
   firstText,
+  MCP_PROTOCOL_VERSION,
   parseStructuredResult,
   startMcp as startMcpClient,
 } from "./lib/mcp-stdio-client.mjs";
@@ -74,7 +75,7 @@ async function verifyCase(testCase) {
     const initResp = await client.request(
       "initialize",
       {
-        protocolVersion: "2025-06-18",
+        protocolVersion: MCP_PROTOCOL_VERSION,
         capabilities: {},
         clientInfo: { name: "airmcp-harness-adapter-verify", version: "0.0.0" },
       },

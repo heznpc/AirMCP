@@ -14,9 +14,14 @@ export function runHelp(): void {
   console.log("");
   console.log(`  ${BOLD}Usage${RESET}`);
   console.log("");
-  console.log(`    ${GREEN}$${RESET} npx airmcp ${BOLD}init${RESET}            ${DIM}Interactive setup wizard${RESET}`);
   console.log(
-    `    ${GREEN}$${RESET} npx airmcp ${BOLD}init --profile starter --yes${RESET} ${DIM}Non-interactive profile setup${RESET}`,
+    `    ${GREEN}$${RESET} npx airmcp ${BOLD}init${RESET}            ${DIM}Interactive setup; client connection asks first and defaults to No${RESET}`,
+  );
+  console.log(
+    `    ${GREEN}$${RESET} npx airmcp ${BOLD}init --profile starter --yes${RESET} ${DIM}Non-interactive config only; clients skipped${RESET}`,
+  );
+  console.log(
+    `    ${GREEN}$${RESET} npx airmcp ${BOLD}init --profile starter --yes --connect-clients${RESET} ${DIM}Also configure detected clients (explicit opt-in)${RESET}`,
   );
   console.log(`    ${GREEN}$${RESET} npx airmcp ${BOLD}doctor${RESET}          ${DIM}Diagnose installation${RESET}`);
   console.log(
@@ -40,6 +45,9 @@ export function runHelp(): void {
   console.log(
     `    ${GREEN}$${RESET} npx airmcp ${BOLD}connect-clients --client-runtime direct${RESET} ${DIM}Use direct stdio configs${RESET}`,
   );
+  console.log(
+    `    ${GREEN}$${RESET} npx airmcp ${BOLD}codex disable${RESET}   ${DIM}Disable AirMCP at Codex startup without deleting its config${RESET}`,
+  );
   console.log(`    ${GREEN}$${RESET} npx airmcp                  ${DIM}Start MCP server (stdio)${RESET}`);
   console.log(`    ${GREEN}$${RESET} npx airmcp ${BOLD}--http${RESET}          ${DIM}Start as HTTP server${RESET}`);
   console.log(
@@ -55,13 +63,16 @@ export function runHelp(): void {
   console.log("");
   console.log(`  ${BOLD}Commands${RESET}`);
   console.log("");
-  console.log(`    ${CYAN}init${RESET}       ${DIM}Choose language, select modules, configure MCP clients${RESET}`);
+  console.log(
+    `    ${CYAN}init${RESET}       ${DIM}Choose language and modules; MCP client settings stay unchanged by default${RESET}`,
+  );
   console.log(`    ${CYAN}doctor${RESET}     ${DIM}Check Node.js, macOS, permissions, clients, modules${RESET}`);
   console.log(`    ${CYAN}modules${RESET}    ${DIM}List, install, enable, disable, or doctor module add-ons${RESET}`);
   console.log(`    ${CYAN}connect${RESET}    ${DIM}Bridge stdio clients into the app-owned local runtime${RESET}`);
   console.log(
     `    ${CYAN}connect-clients${RESET} ${DIM}Configure installed clients for app-owned or direct stdio runtime${RESET}`,
   );
+  console.log(`    ${CYAN}codex${RESET}      ${DIM}Inspect, enable, or disable the persistent Codex MCP entry${RESET}`);
   console.log(
     `    ${CYAN}workflows${RESET}  ${DIM}Show target workflows, prompts, modules, Siri phrases, safety notes${RESET}`,
   );
@@ -79,7 +90,7 @@ export function runHelp(): void {
     `    ${WHITE}AIRMCP_MODULE_PACKS${RESET}=${DIM}core,productivity${RESET} ${DIM}Activate selected module add-ons${RESET}`,
   );
   console.log(
-    `    ${WHITE}AIRMCP_ADDON_PACKAGE_MODE${RESET}=${DIM}prefer-installed|bundled|external-only${RESET} ${DIM}Choose module import mode${RESET}`,
+    `    ${WHITE}AIRMCP_ADDON_PACKAGE_MODE${RESET}=${DIM}bundled|prefer-installed|external-only${RESET} ${DIM}Choose module import mode${RESET}`,
   );
   console.log(
     `    ${WHITE}AIRMCP_HARNESS_ADAPTER${RESET}=${DIM}compatible|strict|app-runtime|agent${RESET} ${DIM}Choose task harness policy${RESET}`,

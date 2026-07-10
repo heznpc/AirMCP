@@ -25,4 +25,18 @@ describe("release:verify add-on registry coverage", () => {
     expect(script).toContain("cwd: work");
     expect(script).toContain("verifyNpxSmoke()");
   });
+
+  test("fresh-installs the public root and boots its universal full/full surface", () => {
+    expect(script).toContain('const skipRootInstall = args.includes("--skip-root-install")');
+    expect(script).toContain("verifyRootRegistryInstall");
+    expect(script).toContain('AIRMCP_PROFILE: "full"');
+    expect(script).toContain('AIRMCP_ADDON_PACKAGE_MODE: "bundled"');
+    expect(script).toContain('"numbers_set_cell"');
+    expect(script).toContain('"gws_sheets_read"');
+  });
+
+  test("requires registry integrity and HTTPS tarball metadata", () => {
+    expect(script).toContain('dist.integrity.startsWith("sha512-")');
+    expect(script).toContain('dist.tarball.startsWith("https://")');
+  });
 });

@@ -100,11 +100,15 @@ On the AirMCP side, flip the network policy to an OAuth mode and point at your A
 export AIRMCP_ALLOW_NETWORK=with-oauth+origin
 export AIRMCP_OAUTH_ISSUER=https://auth.example.com/realms/airmcp
 export AIRMCP_OAUTH_AUDIENCE=https://airmcp.example.com/mcp
+# Optional: publish RFC 8414 metadata when these external-AS endpoints are
+# intentionally reverse-proxied/co-hosted through AirMCP's HTTP origin.
+export AIRMCP_OAUTH_AUTHORIZATION_ENDPOINT=https://auth.example.com/realms/airmcp/protocol/openid-connect/auth
+export AIRMCP_OAUTH_TOKEN_ENDPOINT=https://auth.example.com/realms/airmcp/protocol/openid-connect/token
 export AIRMCP_ALLOWED_ORIGINS=https://claude.ai,https://chrome-extension://<your_ext_id>
 npx airmcp --http --port 3847 --bind-all
 ```
 
-Startup refuses to boot unless `AIRMCP_OAUTH_ISSUER` (must be https://), `AIRMCP_OAUTH_AUDIENCE`, and the allow-list are all set (see `validateNetworkPolicy` in `src/server/http-transport.ts`). The `with-oauth+origin` variant additionally enforces the CORS allow-list at the middleware layer.
+Startup refuses to boot unless `AIRMCP_OAUTH_ISSUER` (must be https://), `AIRMCP_OAUTH_AUDIENCE`, and the allow-list are all set (see `validateNetworkPolicy` in `src/server/http-transport.ts`). The `with-oauth+origin` variant additionally enforces the CORS allow-list at the middleware layer. The two RFC 8414 endpoint variables are optional, but they are a pair: setting only one also refuses startup.
 
 Verify discovery came up:
 
@@ -118,6 +122,14 @@ curl -s http://localhost:3847/.well-known/oauth-protected-resource | jq .
 #     "bearer_methods_supported": ["header"],
 #     "resource_signing_alg_values_supported": ["RS256", "ES256"],
 #     "scopes_supported": ["mcp:read", "mcp:write", "mcp:destructive", "mcp:admin"] }
+
+# RFC 9728 also uses the audience-derived insertion path. For the audience
+# above this is the canonical path; the root path remains a compatibility alias.
+curl -s http://localhost:3847/.well-known/oauth-protected-resource/mcp | jq .
+
+# Present only when both optional endpoint variables are configured. Because
+# the issuer has /realms/airmcp, RFC 8414 inserts that path after .well-known.
+curl -s http://localhost:3847/.well-known/oauth-authorization-server/realms/airmcp | jq .
 ```
 
 If either endpoint 404s or the `authorization_servers` array is empty, recheck the env vars — Step 1 (#138) rejects half-configured OAuth policies on purpose so crawlers never see an empty card.
@@ -213,9 +225,10 @@ Password grant is **only** for local verification. Production browser clients mu
 | 401 `error_description="wrong_issuer"`                                    | Token's `iss` claim doesn't exactly equal `AIRMCP_OAUTH_ISSUER`              | Issuer string is case-sensitive and must match byte-for-byte including trailing slash policy.                                          |
 | 401 `error_description="unsupported_alg"`                                 | Token signed with HS256 / none / other excluded alg                          | AirMCP only accepts RS256 + ES256 per RFC 0005 R4. Configure your AS to sign with an asymmetric key.                                   |
 | 503 `Retry-After: 10`                                                     | AirMCP could not reach the AS's JWKS endpoint                                | Check AS health + network reachability from AirMCP. JWKS is lazily fetched, so the first call after an AS outage hits this.            |
-| `[forbidden] scope mcp:destructive required for tool "delete_note"`       | Token missing the required scope                                             | Either mint a broader token (`mcp:destructive`) or keep the client on read/write-only tools. Admin implicitly includes all the others. |
+| 403 `WWW-Authenticate: Bearer error="insufficient_scope"`                | Token is valid but lacks the scope required by one or more `tools/call` requests | Mint a token containing the advertised `scope`, or keep the client on read/write-only tools. AirMCP performs this gate before SDK dispatch. |
+| 403 when reusing an existing MCP session                                  | The request's `(sub, client_id\|azp)` differs from the principal that created the session | Start a new MCP session. Token refresh is allowed only for the same subject and OAuth client.                                           |
 | CORS preflight 403                                                        | Origin not in `AIRMCP_ALLOWED_ORIGINS`                                       | Add the exact origin (scheme + host + port, no trailing slash). Chrome extensions use `chrome-extension://<id>`.                       |
-| Startup refuses to boot on `with-oauth*`                                  | `AIRMCP_OAUTH_ISSUER` or `AIRMCP_OAUTH_AUDIENCE` missing, or issuer not https:// | Set both. Issuer must be https:// (prevents MITM-able discovery doc).                                                                  |
+| Startup refuses to boot on `with-oauth*`                                  | Issuer/audience is missing or invalid, or only one RFC 8414 endpoint variable is set | Set issuer + audience; if publishing authorization-server metadata, set both authorization + token endpoints. Issuer must be https://. |
 | Token exchange at step 8 returns `invalid_grant`                          | `code_verifier` doesn't match the original `code_challenge` for this `code`  | Make sure the same verifier → challenge pair is used end-to-end. The code is one-use; a retry without a fresh authorize will fail.     |
 
 ---

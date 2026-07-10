@@ -11,6 +11,7 @@ import { jest } from '@jest/globals';
 
 export function createMockServer() {
   const tools = new Map();
+  const prompts = new Map();
 
   const server = {
     /** Nested server property used by HITL guard and sampling (createMessage). */
@@ -23,8 +24,23 @@ export function createMockServer() {
       tools.set(name, { name, opts, handler });
     }),
 
+    /** Legacy SDK registration shape used by a small number of modules. */
+    tool: jest.fn((name, ...rest) => {
+      const handler = rest.at(-1);
+      tools.set(name, { name, opts: {}, handler });
+    }),
+
+    registerPrompt: jest.fn((name, opts, handler) => {
+      prompts.set(name, { name, opts, handler });
+    }),
+
+    prompt: jest.fn((name, ...rest) => {
+      prompts.set(name, { name, opts: {}, handler: rest.at(-1) });
+    }),
+
     /** Direct access to registered tools for assertions. */
     _tools: tools,
+    _prompts: prompts,
 
     /**
      * Invoke a registered tool by name with the given arguments.

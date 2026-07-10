@@ -13,13 +13,26 @@ import { log, errToCtx } from "./../shared/logger.js";
 import { printBanner } from "../shared/banner.js";
 import { auditLog } from "../shared/audit.js";
 import { SERVER_ICON, WEBSITE_URL } from "../shared/icons.js";
-import { toolRegistry } from "../shared/tool-registry.js";
-import { runWithRequestContext } from "../shared/request-context.js";
+import type { ToolRegistry } from "../shared/tool-registry.js";
+import { getOAuthClaims, getRequestContext, runWithRequestContext } from "../shared/request-context.js";
 import { checkIpRateLimit, pruneStaleIpBuckets } from "../shared/rate-limit.js";
 import { createServer, type CreateServerOptions } from "./mcp-setup.js";
 import { registerShutdownHook } from "./shutdown.js";
-import { buildServerCard, buildOAuthProtectedResourceCard } from "./well-known-card.js";
+import {
+  buildServerCard,
+  buildOAuthProtectedResourceCard,
+  buildOAuthAuthorizationServerMetadata,
+} from "./well-known-card.js";
 import { verifyBearer, type VerifyResult } from "./oauth-verifier.js";
+import {
+  buildBearerChallenge,
+  isSameOAuthSessionPrincipal,
+  missingScopesForMcpRequest,
+  toOAuthSessionPrincipal,
+  wellKnownPath,
+  wellKnownUrl,
+  type OAuthSessionPrincipal,
+} from "./oauth-http.js";
 
 // Per-IP rate limiting now lives in src/shared/rate-limit.ts so the
 // bucket math is shared with the per-tenant tool-call gate. Prune
@@ -30,6 +43,18 @@ if (ratePruneTimer.unref) ratePruneTimer.unref();
 
 // Compiled once — used in Origin validation middleware
 const LOCALHOST_ORIGIN_RE = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
+
+/** Optional run identifier supplied by native app surfaces and diagnostic
+ *  clients. Only UUIDs are accepted so an untrusted HTTP peer cannot inject
+ *  arbitrary text or high-cardinality labels into the audit trail. */
+export const RUN_ID_HEADER = "x-airmcp-run-id";
+const RUN_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function parseRunCorrelationId(value: string | string[] | undefined): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return RUN_ID_RE.test(trimmed) ? trimmed.toLowerCase() : undefined;
+}
 
 /**
  * Declarative network-exposure policy (see docs/rfc/0002-http-allow-network.md).
@@ -47,12 +72,7 @@ const LOCALHOST_ORIGIN_RE = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?
  *                         into.
  */
 export type AllowNetwork =
-  | "loopback-only"
-  | "with-token"
-  | "with-token+origin"
-  | "with-oauth"
-  | "with-oauth+origin"
-  | "unauthenticated";
+  "loopback-only" | "with-token" | "with-token+origin" | "with-oauth" | "with-oauth+origin" | "unauthenticated";
 
 const ALLOW_NETWORK_VALUES: readonly AllowNetwork[] = [
   "loopback-only",
@@ -86,13 +106,24 @@ export interface OAuthContext {
   /** Resource Indicators target per RFC 8707 — the `aud` claim a valid
    *  token must carry. Typically the server's public MCP endpoint URL. */
   audience: string;
+  /** Optional RFC 8414 publication contract for deployments that co-host or
+   *  reverse-proxy their authorization server through this HTTP process. */
+  authorizationEndpoint?: string;
+  tokenEndpoint?: string;
 }
 
 export function readOAuthContext(): OAuthContext | null {
   const issuer = (process.env.AIRMCP_OAUTH_ISSUER ?? "").trim();
   const audience = (process.env.AIRMCP_OAUTH_AUDIENCE ?? "").trim();
-  if (!issuer && !audience) return null;
-  return { issuer, audience };
+  const authorizationEndpoint = (process.env.AIRMCP_OAUTH_AUTHORIZATION_ENDPOINT ?? "").trim();
+  const tokenEndpoint = (process.env.AIRMCP_OAUTH_TOKEN_ENDPOINT ?? "").trim();
+  if (!issuer && !audience && !authorizationEndpoint && !tokenEndpoint) return null;
+  return {
+    issuer,
+    audience,
+    ...(authorizationEndpoint ? { authorizationEndpoint } : {}),
+    ...(tokenEndpoint ? { tokenEndpoint } : {}),
+  };
 }
 
 /** Derive the effective policy from explicit overrides + CLI/env signals.
@@ -174,6 +205,8 @@ export function validateNetworkPolicy(ctx: {
   allowedOriginsCount: number;
   oauthIssuer?: string;
   oauthAudience?: string;
+  oauthAuthorizationEndpoint?: string;
+  oauthTokenEndpoint?: string;
 }): void {
   switch (ctx.policy) {
     case "loopback-only":
@@ -205,7 +238,7 @@ export function validateNetworkPolicy(ctx: {
       }
       return;
     case "with-oauth":
-    case "with-oauth+origin":
+    case "with-oauth+origin": {
       // OAuth policy validation. Startup refuses when
       // AIRMCP_OAUTH_ISSUER or AIRMCP_OAUTH_AUDIENCE is missing so the
       // .well-known/oauth-protected-resource card never goes live with
@@ -217,7 +250,19 @@ export function validateNetworkPolicy(ctx: {
             '(the authorization server base URL, e.g. "https://auth.example.com/realms/airmcp").',
         );
       }
-      if (!/^https:\/\//.test(ctx.oauthIssuer)) {
+      let issuerUrl: URL;
+      try {
+        issuerUrl = new URL(ctx.oauthIssuer);
+      } catch {
+        throw new Error("AIRMCP_OAUTH_ISSUER must be a valid https:// URL.");
+      }
+      if (
+        issuerUrl.protocol !== "https:" ||
+        issuerUrl.search ||
+        issuerUrl.hash ||
+        issuerUrl.username ||
+        issuerUrl.password
+      ) {
         // No part of the issuer value flows into the error message — not
         // even the scheme. The URL can carry an internal hostname an
         // operator treats as sensitive, and this error reaches stderr via
@@ -236,10 +281,42 @@ export function validateNetworkPolicy(ctx: {
             "(RFC 8707 Resource Indicator — the URL your MCP endpoint is reachable at).",
         );
       }
+      let audienceUrl: URL;
+      try {
+        audienceUrl = new URL(ctx.oauthAudience);
+      } catch {
+        throw new Error("AIRMCP_OAUTH_AUDIENCE must be a valid https:// resource URL.");
+      }
+      if (audienceUrl.protocol !== "https:" || audienceUrl.hash || audienceUrl.username || audienceUrl.password) {
+        throw new Error("AIRMCP_OAUTH_AUDIENCE must be a valid https:// resource URL without a fragment or userinfo.");
+      }
+      const hasAuthorizationEndpoint = !!ctx.oauthAuthorizationEndpoint;
+      const hasTokenEndpoint = !!ctx.oauthTokenEndpoint;
+      if (hasAuthorizationEndpoint !== hasTokenEndpoint) {
+        throw new Error(
+          "RFC 8414 publication requires both AIRMCP_OAUTH_AUTHORIZATION_ENDPOINT and AIRMCP_OAUTH_TOKEN_ENDPOINT.",
+        );
+      }
+      for (const [name, value] of [
+        ["AIRMCP_OAUTH_AUTHORIZATION_ENDPOINT", ctx.oauthAuthorizationEndpoint],
+        ["AIRMCP_OAUTH_TOKEN_ENDPOINT", ctx.oauthTokenEndpoint],
+      ] as const) {
+        if (!value) continue;
+        let endpoint: URL;
+        try {
+          endpoint = new URL(value);
+        } catch {
+          throw new Error(`${name} must be a valid https:// URL.`);
+        }
+        if (endpoint.protocol !== "https:" || endpoint.hash || endpoint.username || endpoint.password) {
+          throw new Error(`${name} must be a valid https:// URL without a fragment or userinfo.`);
+        }
+      }
       if (ctx.policy === "with-oauth+origin" && ctx.allowedOriginsCount === 0) {
         throw new Error("allowNetwork=with-oauth+origin requires AIRMCP_ALLOWED_ORIGINS.");
       }
       return;
+    }
     case "unauthenticated":
       // No invariant — but loudly warn so the choice is visible.
       log.warn("allowNetwork=unauthenticated — tool surface exposed without auth", {
@@ -281,6 +358,8 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
       allowedOriginsCount: allowedOrigins.size,
       oauthIssuer: oauth?.issuer,
       oauthAudience: oauth?.audience,
+      oauthAuthorizationEndpoint: oauth?.authorizationEndpoint,
+      oauthTokenEndpoint: oauth?.tokenEndpoint,
     });
   } catch (e) {
     // Only the error MESSAGE is logged, never the stack. Stacks can capture
@@ -327,7 +406,23 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
   // with-token* (legacy) → static Bearer token + constant-time compare.
   // Everything else (loopback-only, unauthenticated) skips both paths.
   const isOAuthPolicy = allowNetwork === "with-oauth" || allowNetwork === "with-oauth+origin";
-  const AUTH_SKIP_PATHS = new Set(["/health", "/.well-known/mcp.json", "/.well-known/oauth-protected-resource"]);
+  const resourceMetadataPath =
+    isOAuthPolicy && oauth?.audience
+      ? wellKnownPath(oauth.audience, "oauth-protected-resource")
+      : "/.well-known/oauth-protected-resource";
+  const resourceMetadataUrl =
+    isOAuthPolicy && oauth?.audience ? wellKnownUrl(oauth.audience, "oauth-protected-resource") : "";
+  const authorizationServerMetadataPath =
+    isOAuthPolicy && oauth?.issuer
+      ? wellKnownPath(oauth.issuer, "oauth-authorization-server")
+      : "/.well-known/oauth-authorization-server";
+  const AUTH_SKIP_PATHS = new Set([
+    "/health",
+    "/.well-known/mcp.json",
+    "/.well-known/oauth-protected-resource",
+    resourceMetadataPath,
+    authorizationServerMetadataPath,
+  ]);
 
   if (isOAuthPolicy && oauth) {
     // RFC 0005 Step 2 — real JWT verification. issuer + audience are
@@ -348,10 +443,6 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
               },
               status: "error",
             });
-            // RFC 6750 §3 — advertise resource + error on 401 so
-            // conforming clients can retry with corrected audience /
-            // scope before giving up.
-            const resource = oauth.audience;
             if (result.reason === "jwks_unreachable") {
               // AS-side problem — retry-safe, not a bad-token signal.
               res.set("Retry-After", "10");
@@ -366,9 +457,17 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
                   : "invalid_request";
             res.set(
               "WWW-Authenticate",
-              `Bearer resource="${resource}", error="${errCode}", error_description="${result.reason}"`,
+              buildBearerChallenge({
+                resourceMetadata: resourceMetadataUrl,
+                ...(result.reason === "missing_header" ? {} : { error: errCode }),
+                scopes: ["mcp:read"],
+                ...(result.reason === "missing_header" ? {} : { errorDescription: result.reason }),
+              }),
             );
-            res.status(401).json({ error: "Unauthorized", code: errCode });
+            res.status(401).json({
+              error: "Unauthorized",
+              code: result.reason === "missing_header" ? "authorization_required" : errCode,
+            });
             return;
           }
           // Happy path — claims available to the tool handler via
@@ -406,6 +505,20 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
       next();
     });
   }
+
+  // Native app workflows may span more than one MCP request. Carry their
+  // explicit UUID through AsyncLocalStorage so approval events, tool results,
+  // telemetry, and typed errors can be rendered as one governed run. Invalid
+  // or absent headers are ignored; the tool-registry still generates its
+  // normal per-call correlation ID. Preserve any OAuth claims installed by
+  // the preceding authentication middleware.
+  app.use((req, _res, next) => {
+    if (req.path !== "/mcp") return next();
+    const correlationId = parseRunCorrelationId(req.headers[RUN_ID_HEADER]);
+    if (!correlationId) return next();
+    return runWithRequestContext({ ...(getRequestContext() ?? {}), correlationId }, () => next());
+  });
+
   // The legacy `--bind-all without token` fatal path is now subsumed by
   // `validateNetworkPolicy` above — we arrive here only after the policy
   // resolver has confirmed the configuration is internally consistent.
@@ -413,10 +526,56 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
   interface Session {
     transport: StreamableHTTPServerTransport;
     server: import("@modelcontextprotocol/sdk/server/mcp.js").McpServer;
+    toolRegistry: ToolRegistry;
     lastActive: number;
+    oauthPrincipal?: OAuthSessionPrincipal;
     cleanupEventListeners?: () => void;
   }
   const sessions = new Map<string, Session>();
+
+  function rejectSessionPrincipalMismatch(req: import("express").Request, res: import("express").Response): void {
+    auditLog({
+      timestamp: new Date().toISOString(),
+      tool: "__authorization_failure",
+      args: { path: req.path, reason: "session_principal_mismatch" },
+      status: "error",
+    });
+    res.status(403).json({ error: "Forbidden", code: "session_principal_mismatch" });
+  }
+
+  function rejectInsufficientScopes(
+    req: import("express").Request,
+    res: import("express").Response,
+    session: Session,
+  ): boolean {
+    if (!isOAuthPolicy) return false;
+    const claims = getOAuthClaims();
+    if (!claims) return false;
+    const missingScopes = missingScopesForMcpRequest(req.body, session.toolRegistry, claims);
+    if (missingScopes.length === 0) return false;
+    auditLog({
+      timestamp: new Date().toISOString(),
+      tool: "__authorization_failure",
+      args: { path: req.path, reason: "insufficient_scope", requiredScopes: missingScopes },
+      status: "error",
+    });
+    res.set(
+      "WWW-Authenticate",
+      buildBearerChallenge({
+        resourceMetadata: resourceMetadataUrl,
+        error: "insufficient_scope",
+        scopes: missingScopes,
+        errorDescription: "Additional permission required for this operation",
+      }),
+    );
+    res.status(403).json({
+      error: "Forbidden",
+      code: "insufficient_scope",
+      required_scope: missingScopes.join(" "),
+      resource_metadata: resourceMetadataUrl,
+    });
+    return true;
+  }
 
   /** Clean up all resources for a session (transport, server, event listeners). Idempotent.
    *  Each cleanup step is wrapped individually so a failure in one step does not
@@ -466,6 +625,7 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
   // enabled-module list via closure so it reflects the live module
   // selection once `createServer` runs (depends on config + OS gates).
   let enabledModuleNames: string[] = [];
+  let discoveryRegistry: ToolRegistry | null = null;
   // True until the background warmup resolves the live module list. While
   // false the module list is not yet known, so the discovery card must NOT
   // claim `modules: []` — it advertises a `warming` status instead so a
@@ -488,8 +648,8 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
       // hot-reload, profile change, or later `listChanged` notification
       // doesn't leave the discovery card stale or wider than active exposure.
       tools: {
-        count: toolRegistry.getExposedToolCount(),
-        names: toolRegistry.getExposedToolNames(),
+        count: discoveryRegistry?.getExposedToolCount() ?? 0,
+        names: discoveryRegistry?.getExposedToolNames() ?? [],
       },
       modules: enabledModuleNames,
       oauth: oauth ?? undefined,
@@ -502,13 +662,36 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
   // the active policy is an OAuth policy AND issuer + audience are
   // both configured (otherwise returning the card with empty fields
   // would mislead Managed Agents into bootstrapping against nothing).
-  app.get("/.well-known/oauth-protected-resource", (_req, res) => {
+  const serveProtectedResourceMetadata = (_req: import("express").Request, res: import("express").Response) => {
     const isOAuth = allowNetwork === "with-oauth" || allowNetwork === "with-oauth+origin";
     if (!isOAuth || !oauth?.issuer || !oauth.audience) {
       res.status(404).json({ error: "Not Found — server is not in an OAuth policy" });
       return;
     }
     res.json(buildOAuthProtectedResourceCard(oauth.audience, oauth.issuer));
+  };
+  // The path derived from a path-bearing resource identifier is normative
+  // (RFC 9728 §3.1). Keep the legacy root location as an explicit compatibility
+  // alias; WWW-Authenticate always points clients at the derived path.
+  for (const path of new Set(["/.well-known/oauth-protected-resource", resourceMetadataPath])) {
+    app.get(path, serveProtectedResourceMetadata);
+  }
+
+  // RFC 8414 metadata publication is opt-in because AirMCP remains a resource
+  // server by default. It becomes authoritative only when the operator routes
+  // the configured issuer origin to this process and provides both endpoints.
+  app.get(authorizationServerMetadataPath, (_req, res) => {
+    if (!isOAuthPolicy || !oauth?.authorizationEndpoint || !oauth.tokenEndpoint) {
+      res.status(404).json({ error: "Not Found — authorization-server metadata is not configured" });
+      return;
+    }
+    res.json(
+      buildOAuthAuthorizationServerMetadata({
+        issuer: oauth.issuer,
+        authorizationEndpoint: oauth.authorizationEndpoint,
+        tokenEndpoint: oauth.tokenEndpoint,
+      }),
+    );
   });
 
   // Request ID middleware for tracing
@@ -568,9 +751,15 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
   app.post("/mcp", async (req, res) => {
     try {
       const sessionId = req.headers["mcp-session-id"] as string | undefined;
+      const requestPrincipal = toOAuthSessionPrincipal(getOAuthClaims());
 
       const existing = sessionId ? sessions.get(sessionId) : undefined;
       if (existing) {
+        if (!isSameOAuthSessionPrincipal(existing.oauthPrincipal, requestPrincipal)) {
+          rejectSessionPrincipalMismatch(req, res);
+          return;
+        }
+        if (rejectInsufficientScopes(req, res, existing)) return;
         existing.lastActive = Date.now();
         await existing.transport.handleRequest(req, res, req.body);
         return;
@@ -594,14 +783,21 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
         return;
       }
 
-      const { server, cleanupEventListeners } = await createServer(serverOptions);
+      const { server, toolRegistry, cleanupEventListeners } = await createServer(serverOptions);
       let assignedSessionId: string | undefined;
 
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: () => randomUUID(),
         onsessioninitialized: (id) => {
           assignedSessionId = id;
-          sessions.set(id, { transport, server, lastActive: Date.now(), cleanupEventListeners });
+          sessions.set(id, {
+            transport,
+            server,
+            toolRegistry,
+            lastActive: Date.now(),
+            oauthPrincipal: requestPrincipal,
+            cleanupEventListeners,
+          });
         },
         onsessionclosed: (id) => {
           const s = sessions.get(id);
@@ -650,6 +846,11 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
         res.status(400).json({ error: "Invalid or missing session ID" });
         return;
       }
+      const requestPrincipal = toOAuthSessionPrincipal(getOAuthClaims());
+      if (!isSameOAuthSessionPrincipal(s.oauthPrincipal, requestPrincipal)) {
+        rejectSessionPrincipalMismatch(req, res);
+        return;
+      }
       s.lastActive = Date.now();
 
       // For SSE GET streams: clean up immediately when the client disconnects
@@ -681,6 +882,7 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
     const {
       bannerInfo: bi,
       server: warmupServer,
+      toolRegistry: warmupRegistry,
       cleanupEventListeners: warmupCleanup,
     } = await createServer(serverOptions);
     warmupCleanup();
@@ -689,6 +891,7 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
     // card's closure so registry crawlers see what's actually loaded
     // on this host (module enablement depends on config + OS gates).
     enabledModuleNames = bi.modulesEnabled;
+    discoveryRegistry = warmupRegistry;
     modulesWarming = false;
     return bi;
   })();

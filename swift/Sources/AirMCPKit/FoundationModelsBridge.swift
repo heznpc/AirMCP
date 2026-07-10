@@ -6,8 +6,8 @@ import Foundation
 
 // FoundationModels host mode is preview and remains opt-in at compile time.
 // Build with:
-//   swift build -Xswiftc -DAIRMCP_ENABLE_FOUNDATION_MODELS
-#if AIRMCP_ENABLE_FOUNDATION_MODELS && canImport(FoundationModels) && compiler(>=6.3)
+//   npm run swift-build:fm
+#if AIRMCP_ENABLE_FOUNDATION_MODELS && canImport(FoundationModels) && compiler(>=6.2)
 import FoundationModels
 
 // MARK: - AirMCP Tools for Foundation Models

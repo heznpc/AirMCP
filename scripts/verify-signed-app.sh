@@ -21,6 +21,10 @@ if [ ! -d "$APP_BUNDLE" ]; then
   exit 1
 fi
 
+trap 'pkill -x "$APP_EXECUTABLE" >/dev/null 2>&1 || true' EXIT
+
+bash "$SCRIPT_DIR/verify-bundle-structure.sh" "$APP_BUNDLE" "com.heznpc.AirMCP" "$APP_EXECUTABLE"
+
 echo "verify-signed-app: checking signature tree..."
 codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
 
@@ -94,7 +98,7 @@ UNAUTH_STATUS="$(
   curl -sS --max-time 2 -o /dev/null -w "%{http_code}" \
     -X POST "$APP_MCP_URL" \
     -H "Content-Type: application/json" \
-    --data '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"signed-artifact-verify","version":"0"}}}' \
+    --data '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"signed-artifact-verify","version":"0"}}}' \
     2>/dev/null || true
 )"
 if [ "$UNAUTH_STATUS" != "401" ]; then

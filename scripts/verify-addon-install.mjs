@@ -22,7 +22,13 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { cleanBootEnv } from "./lib/clean-boot-env.mjs";
-import { expectNoWireError, firstText, parseStructuredResult, startMcp } from "./lib/mcp-stdio-client.mjs";
+import {
+  expectNoWireError,
+  firstText,
+  MCP_PROTOCOL_VERSION,
+  parseStructuredResult,
+  startMcp,
+} from "./lib/mcp-stdio-client.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const TIMEOUT_MS = Number(process.env.ADDON_INSTALL_VERIFY_TIMEOUT_MS ?? 45_000);
@@ -133,11 +139,7 @@ function getPackPackageName(packManifest, packName) {
 function getAddonLoadFailureLines(stderr) {
   return stderr
     .split(/\r?\n/)
-    .filter(
-      (line) =>
-        line.includes("required add-on package module failed to load") ||
-        line.includes("Cannot find package '@heznpc/airmcp-"),
-    );
+    .filter((line) => line.includes("required add-on package module failed to load"));
 }
 
 function hasAddonLoadFailureForModule(stderr, moduleName) {
@@ -182,7 +184,7 @@ async function verifyInstalledRuntime({ work, entry, packNames, packManifest }) 
     const initResp = await client.request(
       "initialize",
       {
-        protocolVersion: "2025-06-18",
+        protocolVersion: MCP_PROTOCOL_VERSION,
         capabilities: {},
         clientInfo: { name: "airmcp-addon-install-verify", version: "0.0.0" },
       },
@@ -288,7 +290,7 @@ async function verifyInstalledRuntime({ work, entry, packNames, packManifest }) 
     };
   } catch (error) {
     const stderr = client.stderr();
-    if (/required add-on package module failed to load|Cannot find package '@heznpc\/airmcp-/.test(stderr)) {
+    if (stderr.includes("required add-on package module failed to load")) {
       throw new Error(
         `${error instanceof Error ? error.message : String(error)}\n--- stderr ---\n${stderr.slice(-4000)}`,
       );
@@ -326,7 +328,7 @@ async function verifyBundledFallbackRefused({ work, entry, packNames, packManife
     const initResp = await client.request(
       "initialize",
       {
-        protocolVersion: "2025-06-18",
+        protocolVersion: MCP_PROTOCOL_VERSION,
         capabilities: {},
         clientInfo: { name: "airmcp-addon-negative-verify", version: "0.0.0" },
       },
@@ -373,7 +375,7 @@ async function verifyBundledFallbackRefused({ work, entry, packNames, packManife
     return { tools: tools.length, registered: status.toolsRegistered, modulesEnabled: status.modulesEnabled };
   } catch (error) {
     const stderr = client.stderr();
-    if (/required add-on package module failed to load|Cannot find package '@heznpc\/airmcp-/.test(stderr)) {
+    if (stderr.includes("required add-on package module failed to load")) {
       throw new Error(
         `${error instanceof Error ? error.message : String(error)}\n--- stderr ---\n${stderr.slice(-4000)}`,
       );

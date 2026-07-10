@@ -18,13 +18,30 @@ let package = Package(
                 .product(name: "AirMCPKit", package: "swift"),
             ],
             path: "Sources/AirMCPApp",
+            exclude: [
+                // bundle-app.sh merges this distribution plist into the .app.
+                // SwiftPM must not try to compile or copy it as a resource.
+                "Resources/Info.plist",
+            ],
             resources: [
                 .copy("Resources/AppIcon.png"),
                 .copy("Resources/AppIcon@2x.png"),
                 .copy("Resources/MenuBarIcon.png"),
+                .process("Resources/de.lproj"),
                 .process("Resources/en.lproj"),
+                .process("Resources/es.lproj"),
+                .process("Resources/fr.lproj"),
+                .process("Resources/ja.lproj"),
                 .process("Resources/ko.lproj"),
+                .process("Resources/pt-BR.lproj"),
+                .process("Resources/zh-Hans.lproj"),
+                .process("Resources/zh-Hant.lproj"),
             ]
+        ),
+        .testTarget(
+            name: "AirMCPAppTests",
+            dependencies: ["AirMCPApp"],
+            path: "Tests/AirMCPAppTests"
         ),
     ]
 )

@@ -29,26 +29,16 @@ final class ServerManager {
     func start() async {
         let mcp = MCPServer(name: "airmcp-ios", version: "1.0.0")
 
-        // Register modules
-        let eventKit = EventKitService()
-        await registerCalendarTools(on: mcp, service: eventKit)
-        await registerReminderTools(on: mcp, service: eventKit)
-
-        let contacts = ContactsService()
-        await registerContactsTools(on: mcp, service: contacts)
-
-        await registerLocationTools(on: mcp)
-
-        #if canImport(HealthKit)
-        let health = HealthService()
-        await registerHealthTools(on: mcp, service: health)
-        #endif
+        // iOS is a preview, not the macOS shipping surface. Its server and
+        // AppIntent router expose the same small, read-only demonstrator set
+        // until the shared HITL/rate-limit/audit governance path exists here.
+        await registerIOSPreviewTools(on: mcp)
 
         toolCount = await mcp.toolCount
 
-        // RFC 0007 A.2a: route generated AppIntents directly into this
-        // in-process MCPServer. No HTTP hop; Siri / Shortcuts / Spotlight
-        // invocations become actor calls.
+        // Route generated AppIntents directly into this in-process server.
+        // MCPServer.callToolText enforces IOSPreviewContract again, so an
+        // unlisted generated action fails closed even if invoked by the OS.
         await MCPIntentRouter.shared.setHandler { [mcp] tool, args in
             return try await mcp.callToolText(name: tool, args: args)
         }
@@ -105,14 +95,11 @@ struct ContentView: View {
                     }
                 }
 
-                Section("Modules") {
+                Section("Read-only preview") {
                     Label("Calendar", systemImage: "calendar")
                     Label("Reminders", systemImage: "checklist")
                     Label("Contacts", systemImage: "person.crop.circle")
-                    Label("Location", systemImage: "location")
-                    #if canImport(HealthKit)
-                    Label("Health", systemImage: "heart.fill")
-                    #endif
+                    Label("Location permission", systemImage: "location")
                 }
             }
             .navigationTitle("AirMCP")

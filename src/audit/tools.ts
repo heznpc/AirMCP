@@ -4,6 +4,27 @@ import type { AirMcpConfig } from "../shared/config.js";
 import { okStructured, toolError } from "../shared/result.js";
 import { readAuditEntries, summarizeAuditEntries } from "../shared/audit.js";
 
+const auditBreakSchema = z.object({
+  file: z.string(),
+  lineIndex: z.number(),
+  reason: z.enum(["hmac_mismatch", "prev_mismatch", "malformed", "truncated", "checkpoint_forged"]),
+});
+
+const auditHistoryEntrySchema = z.object({
+  timestamp: z.string(),
+  kind: z.enum(["tool", "approval"]),
+  tool: z.string(),
+  status: z.enum(["ok", "error"]),
+  durationMs: z.number().optional(),
+  args: z.record(z.string(), z.unknown()).optional(),
+  correlationId: z.string().optional(),
+  actor: z.string().optional(),
+  errorCategory: z.string().optional(),
+  approvalDecision: z.enum(["approved", "denied", "timed_out", "unavailable"]).optional(),
+  approvalChannel: z.enum(["elicitation", "socket", "unavailable"]).optional(),
+  gate: z.enum(["oauth_scope", "emergency_stop", "rate_limit"]).optional(),
+});
+
 /**
  * Audit log consumption tools.
  *
@@ -38,6 +59,8 @@ export function registerAuditTools(server: McpServer, _config: AirMcpConfig): vo
           .describe("Lower-bound ISO 8601 timestamp. Entries older than this are dropped. Defaults to 7 days ago."),
         tool: z.string().max(120).optional().describe("Filter to a single tool name (exact match)."),
         status: z.enum(["ok", "error"]).optional().describe("Filter by status. Omit to include both."),
+        correlationId: z.string().max(200).optional().describe("Filter to one correlated tool/approval trace."),
+        kind: z.enum(["tool", "approval"]).optional().describe("Filter tool calls or approval decisions."),
         limit: z
           .number()
           .int()
@@ -51,21 +74,16 @@ export function registerAuditTools(server: McpServer, _config: AirMcpConfig): vo
         total: z.number(),
         returned: z.number(),
         scannedFiles: z.number(),
-        entries: z.array(
-          z.object({
-            timestamp: z.string(),
-            tool: z.string(),
-            status: z.enum(["ok", "error"]),
-            durationMs: z.number().optional(),
-            args: z.record(z.string(), z.unknown()).optional(),
-          }),
-        ),
+        entries: z.array(auditHistoryEntrySchema),
+        verified: z.boolean(),
+        firstBreak: auditBreakSchema.optional(),
+        auditDisabled: z.boolean(),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async ({ since, tool, status, limit }) => {
+    async ({ since, tool, status, correlationId, kind, limit }) => {
       try {
-        const result = await readAuditEntries({ since, tool, status, limit });
+        const result = await readAuditEntries({ since, tool, status, correlationId, kind, limit });
         return okStructured(result);
       } catch (e) {
         return toolError("read audit log", e);
@@ -103,13 +121,7 @@ export function registerAuditTools(server: McpServer, _config: AirMcpConfig): vo
         // the first break location) in the tool contract lets a consumer act
         // on `verified === false` instead of trusting the log blindly.
         verified: z.boolean(),
-        verifiedFirstBreak: z
-          .object({
-            file: z.string(),
-            lineIndex: z.number(),
-            reason: z.enum(["hmac_mismatch", "prev_mismatch", "malformed", "truncated", "checkpoint_forged"]),
-          })
-          .optional(),
+        verifiedFirstBreak: auditBreakSchema.optional(),
         // Audit logging currently halted (disk full / permission / repeated
         // flush failures). Surfaced so a doctor / health check can flag a gap
         // in coverage rather than reading silence as "nothing happened".

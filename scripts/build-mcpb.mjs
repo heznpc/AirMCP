@@ -20,6 +20,8 @@
 //   pre-populated locally.
 // - We do NOT sign or notarize the archive. Notarization is a follow-up
 //   (P2-1); Claude Desktop currently accepts unsigned .mcpb.
+// - The complete JavaScript module catalog is copied into the bundle. Logical
+//   profiles still control what loads and what tools/list exposes by default.
 // - We do NOT ship a swift-bridge binary yet. Cloud-path tools work
 //   out of the box; Swift-backed tools (EventKit, HealthKit, etc.)
 //   require `npm run swift-build` on the user side. A future pass can
@@ -45,18 +47,23 @@ const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf-8"));
 
 // ── Substitute manifest placeholders ─────────────────────────────────
 const template = readFileSync(TEMPLATE_PATH, "utf-8");
-const manifestText = template
-  .replaceAll("{{VERSION}}", pkg.version)
-  .replaceAll("{{DESCRIPTION}}", pkg.description.replace(/"/g, '\\"'));
-
-// Parse-validate so a bad template fails here, not at Claude Desktop load.
 let manifest;
 try {
-  manifest = JSON.parse(manifestText);
+  manifest = JSON.parse(template);
 } catch (e) {
-  console.error(`[mcpb] template produced invalid JSON: ${e.message}`);
+  console.error(`[mcpb] template is invalid JSON: ${e.message}`);
   process.exit(1);
 }
+
+// Assign parsed fields instead of hand-escaping values into JSON source. This
+// keeps quotes, backslashes, control characters, and Unicode data lossless;
+// JSON.stringify below owns the only serialization boundary.
+if (manifest.version !== "{{VERSION}}" || manifest.description !== "{{DESCRIPTION}}") {
+  console.error("[mcpb] template metadata placeholders are missing or malformed");
+  process.exit(1);
+}
+manifest.version = pkg.version;
+manifest.description = pkg.description;
 
 if (manifest.manifest_version !== "0.3") {
   console.error(`[mcpb] manifest_version mismatch (expected "0.3", got "${manifest.manifest_version}")`);
@@ -107,23 +114,7 @@ if (!existsSync(join(ROOT, "dist", "index.js"))) {
   console.error(`[mcpb] dist/index.js not found — run \`npm run build\` first`);
   process.exit(1);
 }
-const slimApply = spawnSync(process.execPath, ["scripts/slim-root-package.mjs", "--apply"], { cwd: ROOT, stdio: "inherit" });
-if (slimApply.status !== 0) {
-  console.error(`[mcpb] slim root apply failed with status ${slimApply.status}`);
-  process.exit(1);
-}
-try {
-  cpSync(join(ROOT, "dist"), join(serverDir, "dist"), { recursive: true });
-} finally {
-  const slimRestore = spawnSync(process.execPath, ["scripts/slim-root-package.mjs", "--restore"], {
-    cwd: ROOT,
-    stdio: "inherit",
-  });
-  if (slimRestore.status !== 0) {
-    console.error(`[mcpb] slim root restore failed with status ${slimRestore.status}`);
-    process.exit(1);
-  }
-}
+cpSync(join(ROOT, "dist"), join(serverDir, "dist"), { recursive: true });
 
 // ── Install production deps into the bundle ──────────────────────────
 console.error("[mcpb] installing production dependencies into bundle…");

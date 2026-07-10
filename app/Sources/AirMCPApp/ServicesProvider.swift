@@ -8,31 +8,14 @@ import UserNotifications
 @MainActor
 final class ServicesProvider: NSObject {
 
-    /// Escape a string for safe interpolation into an AppleScript string literal.
-    private func escapeForAppleScript(_ str: String) -> String {
-        var result = str
-        // Strip null bytes and control characters (0x00-0x08, 0x0b, 0x0c, 0x0e-0x1f)
-        result = result.unicodeScalars.filter { scalar in
-            scalar.value == 0x09 || scalar.value == 0x0a || scalar.value == 0x0d || scalar.value >= 0x20
-        }.map { String($0) }.joined()
-        // Escape special characters
-        return result
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "\"", with: "\\\"")
-            .replacingOccurrences(of: "\n", with: "\\n")
-            .replacingOccurrences(of: "\r", with: "\\r")
-            .replacingOccurrences(of: "\t", with: "\\t")
-    }
-
-    /// Run an AppleScript string on a background queue.
-    private nonisolated func runAppleScript(_ source: String, onError: (@Sendable () -> Void)? = nil) {
-        DispatchQueue.global(qos: .userInitiated).async {
-            var appleScriptError: NSDictionary?
-            if let appleScript = NSAppleScript(source: source) {
-                appleScript.executeAndReturnError(&appleScriptError)
-            }
-            if appleScriptError != nil { onError?() }
-        }
+    private func escapedHTML(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
+            .replacingOccurrences(of: "'", with: "&#39;")
+            .replacingOccurrences(of: "\n", with: "<br>")
     }
 
     /// Post a local notification.
@@ -44,6 +27,27 @@ final class ServicesProvider: NSObject {
         UNUserNotificationCenter.current().add(request)
     }
 
+    /// Services share the governed MCP path used by App Intents. Direct
+    /// AppleScript/JXA here would bypass audit, rate limits, emergency stop,
+    /// and the per-call HITL contract.
+    private func executeTool(
+        _ tool: String,
+        arguments: [String: Any],
+        successMessage: String,
+        onSuccess: ((String) -> Void)? = nil
+    ) {
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let result = try await AppRuntimeClient.callTool(tool, args: arguments)
+                onSuccess?(result)
+                postNotification(title: "AirMCP", body: successMessage)
+            } catch {
+                postNotification(title: "AirMCP", body: L("services.actionFailed", error.localizedDescription))
+            }
+        }
+    }
+
     /// Save selected text as a new Apple Note.
     @objc func saveToNotes(_ pboard: NSPasteboard, userData: String, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
         guard let text = pboard.string(forType: .string), !text.isEmpty else {
@@ -51,18 +55,13 @@ final class ServicesProvider: NSObject {
             return
         }
 
-        let escaped = escapeForAppleScript(text)
-        let script = """
-        tell application "Notes"
-            make new note at folder "Notes" with properties {name:"\(L("services.savedNoteTitle"))", body:"\(escaped)"}
-        end tell
-        """
-
-        runAppleScript(script) { [weak self] in
-            DispatchQueue.main.async {
-                self?.postNotification(title: "AirMCP", body: L("services.saveNoteFailed"))
-            }
-        }
+        let title = escapedHTML(L("services.savedNoteTitle"))
+        let body = "<h1>\(title)</h1><p>\(escapedHTML(text))</p>"
+        executeTool(
+            "create_note",
+            arguments: ["body": body],
+            successMessage: L("services.noteSaved")
+        )
     }
 
     /// Create a reminder from selected text.
@@ -72,16 +71,11 @@ final class ServicesProvider: NSObject {
             return
         }
 
-        let escaped = escapeForAppleScript(text)
-        let escapedTitle = escapeForAppleScript(String(text.prefix(100)))
-
-        let script = """
-        tell application "Reminders"
-            make new reminder with properties {name:"\(escapedTitle)", body:"\(escaped)"}
-        end tell
-        """
-
-        runAppleScript(script)
+        executeTool(
+            "create_reminder",
+            arguments: ["title": String(text.prefix(100)), "body": text],
+            successMessage: L("services.reminderCreated")
+        )
     }
 
     /// Search AirMCP semantic index with selected text.
@@ -91,13 +85,14 @@ final class ServicesProvider: NSObject {
             return
         }
 
-        let pb = NSPasteboard.general
-        pb.clearContents()
-        pb.setString("airmcp-search:\(text)", forType: .string)
-
-        let body = L("services.searchQuery", String(text.prefix(50)))
-        DispatchQueue.main.async { [weak self] in
-            self?.postNotification(title: L("services.searchTitle"), body: body)
+        executeTool(
+            "semantic_search",
+            arguments: ["query": String(text.prefix(500)), "limit": 10],
+            successMessage: L("services.searchCopied")
+        ) { result in
+            let output = NSPasteboard.general
+            output.clearContents()
+            output.setString(result, forType: .string)
         }
     }
 }

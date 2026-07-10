@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // MCP stdio smoke test — boots `dist/index.js`, performs the required
-// MCP 2025-06-18 handshake (initialize → notifications/initialized),
+// latest stable MCP handshake (initialize → notifications/initialized),
 // asks for tools/list, and asserts the server returns a plausible
 // number of tools.
 //
@@ -24,6 +24,7 @@
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { cleanBootEnv } from "./lib/clean-boot-env.mjs";
+import { MCP_PROTOCOL_VERSION } from "./lib/mcp-stdio-client.mjs";
 
 const MIN_TOOLS = Number(process.env.SMOKE_MIN_TOOLS ?? 10);
 const TIMEOUT_MS = Number(process.env.SMOKE_TIMEOUT_MS ?? 20_000);
@@ -82,7 +83,7 @@ try {
   const initResp = await request(
     "initialize",
     {
-      protocolVersion: "2025-06-18",
+      protocolVersion: MCP_PROTOCOL_VERSION,
       capabilities: {},
       clientInfo: { name: "airmcp-smoke", version: "0.0.0" },
     },

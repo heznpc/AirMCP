@@ -16,7 +16,7 @@ import {
   resolveModulePackSelection,
   type ModulePackName,
 } from "../shared/module-packs.js";
-import { toolRegistry } from "../shared/tool-registry.js";
+import type { ToolRegistry } from "../shared/tool-registry.js";
 import { toolSessions } from "../shared/tool-sessions.js";
 import { WORKFLOWS, findWorkflow, summarizeWorkflowsReadiness, type WorkflowReadiness } from "../shared/workflows.js";
 import type { HarnessAdapterPolicy } from "../shared/task-adapters.js";
@@ -50,6 +50,7 @@ export interface ModulePackInstallIssue {
 }
 
 export interface RegisterFrontDoorToolsOptions {
+  toolRegistry: ToolRegistry;
   config: AirMcpConfig;
   harness: HarnessAdapterPolicy;
   version: string;
@@ -147,6 +148,7 @@ const workflowReadinessSchema = z.object({
 
 export function registerFrontDoorTools(server: McpServer, options: RegisterFrontDoorToolsOptions): void {
   const {
+    toolRegistry,
     config,
     harness,
     version,

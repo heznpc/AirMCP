@@ -2,11 +2,11 @@
 
 AirMCP is useful when an AI client needs to work across your Apple workspace, not just answer a question about one app. The product shape is:
 
-- Siri and Shortcuts can be the Apple-native front door.
+- The macOS Shortcuts action library can be an Apple-native front door; iOS preview builds can additionally expose App Shortcuts and Siri phrases.
 - Claude, Codex, Cursor, Raycast, and other MCP clients can be the external agent brain.
 - AirMCP supplies the local action runtime: Apple app access, workflow skills, semantic memory, approvals for sensitive actions, audit logs, rate limits, and OAuth scopes.
 
-This is not positioned as a Siri replacement. Siri can launch or phrase a workflow; AirMCP gives that workflow governed hands across Notes, Calendar, Reminders, Mail, Safari, Finder, Contacts, and the Swift-backed Apple frameworks.
+This is not positioned as a Siri replacement. AirMCP gives MCP clients and macOS Shortcuts actions governed access across Notes, Calendar, Reminders, Mail, Safari, Finder, Contacts, and the Swift-backed Apple frameworks.
 
 ## Target Users
 
@@ -57,7 +57,7 @@ npx airmcp workflows --readiness --json
 npx airmcp workflows project-digest --json
 ```
 
-The CLI prints the same curated workflow catalog that the macOS menubar app exposes under **Workflows**. Each workflow includes a copyable prompt, core tools, optional Siri phrase, and safety note.
+The CLI prints the same curated workflow catalog that the macOS menubar app exposes under **Workflows**. The Mac app includes a copyable MCP prompt, core tools, and a safety note; optional Siri metadata is for iOS/launcher integrations only.
 
 Use a workflow id with `--prompt`, `--siri`, `--tools`, `--modules`, `--safety`, or `--json` when you want only one field for a shell script, launcher, onboarding screen, or agent prompt. `--readiness` checks profile, module-pack, add-on package, and write opt-in readiness without launching the live server; the MCP `workflow_readiness` tool checks live tool registration inside the active runtime. `daily-briefing --preview` performs a real read-only snapshot of Calendar, Reminders, Mail, and Notes; it does not write data.
 
@@ -73,7 +73,7 @@ For Claude Code:
 claude mcp add --env AIRMCP_HTTP_TOKEN=<token> airmcp -- npx -y airmcp connect --url http://127.0.0.1:3847/mcp
 ```
 
-For Siri and Shortcuts, see [shortcuts.md](shortcuts.md). The default AppShortcuts are workflow-first; `Ask AirMCP` is a separate FoundationModels preview shortcut that only appears in opt-in builds with `AIRMCP_ENABLE_FOUNDATION_MODELS`.
+For the platform split, see [shortcuts.md](shortcuts.md). macOS exposes App Intent actions but no App Shortcuts provider. The exact eight-action phrase provider is iOS-only; `AskAirMCPIntent` is a separate opt-in Foundation Models action for supported macOS/iOS builds that define `AIRMCP_ENABLE_FOUNDATION_MODELS`, and is not advertised by that provider.
 
 ## What Exists Today
 
@@ -82,7 +82,7 @@ For Siri and Shortcuts, see [shortcuts.md](shortcuts.md). The default AppShortcu
 - Menubar Workflows menu: `app/Sources/AirMCPApp/Views/MenuContent.swift`
 - Built-in workflow skills: `src/skills/builtins/*.yaml`
 - Workflow safety annotations for exposed skills: `src/skills/types.ts`, `src/skills/register.ts`
-- Auto-generated AppIntents and workflow-first AppShortcuts: `scripts/gen-swift-intents.mjs`
+- Auto-generated App Intents plus an iOS-only workflow-first App Shortcuts provider: `scripts/gen-swift-intents.mjs`
 - Codex setup support: `src/cli/codex-mcp.ts`, `src/cli/init.ts`, `src/cli/doctor.ts`
 
 ## Product Direction

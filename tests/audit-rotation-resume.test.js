@@ -8,7 +8,7 @@
  *   - audit.jsonl missing → readFile catches → `lastHmac` stays at
  *     HMAC_GENESIS
  *   - next flush seals new entries with `_prev = HMAC_GENESIS`
- *   - verifyAuditChain walks files in lex order; reaches the rotated
+ *   - the audit-chain scanner walks files in lex order; reaches the rotated
  *     file's tail (hmac=X), then reads the new audit.jsonl whose first
  *     line has `_prev = HMAC_GENESIS ≠ X` → reports `verified: false`
  *

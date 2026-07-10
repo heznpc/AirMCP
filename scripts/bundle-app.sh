@@ -9,12 +9,14 @@ set -euo pipefail
 
 usage() {
   cat <<'USAGE_EOF'
-Usage: scripts/bundle-app.sh [bundle|run|verify|verify-appintents|logs|telemetry|debug|widget-debug|widget-release]
+Usage: scripts/bundle-app.sh [bundle|run|verify|verify-governed|verify-appintents|logs|telemetry|debug|widget-debug|widget-release]
 
 Modes:
   bundle     Build AirMCP.app only (default)
   run        Build AirMCP.app and launch it
   verify     Build, launch, and assert the app-owned HTTP runtime contract
+  verify-governed
+             Prove read, approved/denied writes, emergency stop, and audit integrity
   verify-appintents
              Require a trusted signing identity, then verify AppIntents registration
   logs       Build, launch, and stream logs for the AirMCP process
@@ -37,6 +39,7 @@ case "$MODE" in
   bundle|--bundle) MODE="bundle" ;;
   run|--run) MODE="run" ;;
   verify|--verify) MODE="verify" ;;
+  verify-governed|--verify-governed) MODE="verify-governed" ;;
   verify-appintents|--verify-appintents) MODE="verify-appintents" ;;
   logs|--logs) MODE="logs" ;;
   telemetry|--telemetry) MODE="telemetry" ;;
@@ -55,7 +58,7 @@ esac
 
 if [ -z "${AIRMCP_SKIP_WIDGET+x}" ]; then
   case "$MODE" in
-    run|verify|verify-appintents|logs|telemetry|debug) AIRMCP_SKIP_WIDGET=1 ;;
+    run|verify|verify-governed|verify-appintents|logs|telemetry|debug) AIRMCP_SKIP_WIDGET=1 ;;
     *) AIRMCP_SKIP_WIDGET=0 ;;
   esac
 fi
@@ -69,13 +72,28 @@ APP_EXECUTABLE="AirMCP"
 APP_BINARY="$BUNDLE_DIR/Contents/MacOS/$APP_EXECUTABLE"
 LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
 SIGN_IDENTITY="${AIRMCP_SIGN_IDENTITY:--}"
-APP_HEALTH_URL="http://127.0.0.1:3847/health"
-APP_MCP_URL="http://127.0.0.1:3847/mcp"
-TOKEN_FILE="$HOME/Library/Application Support/AirMCP/http-token"
+AIRMCP_EMBED_RUNTIME="${AIRMCP_EMBED_RUNTIME:-1}"
+if [ "$MODE" = "verify-governed" ]; then
+  # This gate claims to exercise the shipping, self-contained app. Never let a
+  # developer-shell override silently turn it into an npx/checkout fallback.
+  AIRMCP_EMBED_RUNTIME=1
+fi
+APP_HTTP_PORT=3847
+APP_HEALTH_URL="http://127.0.0.1:$APP_HTTP_PORT/health"
+APP_MCP_URL="http://127.0.0.1:$APP_HTTP_PORT/mcp"
+TOKEN_FILE="${AIRMCP_APP_RUNTIME_TOKEN_PATH:-$HOME/Library/Application Support/AirMCP/http-token}"
+GOVERNED_STATE_DIR=""
+GOVERNED_STATE_PARENT="${TMPDIR:-/tmp}"
+PROCESS_SHUTDOWN_WAIT_STEPS=70 # 7s, above the server's 5s graceful-shutdown budget
 EXPECTED_VERSION="$(
   node -e 'const fs = require("fs"); console.log(JSON.parse(fs.readFileSync(process.argv[1], "utf8")).version)' \
     "$PROJECT_DIR/package.json"
 )"
+BUILD_NUMBER="${AIRMCP_BUILD_NUMBER:-$(git -C "$PROJECT_DIR" rev-list --count HEAD)}"
+if ! [[ "$BUILD_NUMBER" =~ ^[0-9]+$ ]]; then
+  echo "✗ AIRMCP_BUILD_NUMBER must be a positive integer, got: $BUILD_NUMBER" >&2
+  exit 2
+fi
 
 if [ "$MODE" = "verify-appintents" ]; then
   if [ "$SIGN_IDENTITY" = "-" ]; then
@@ -102,7 +120,20 @@ if [ "$MODE" = "widget-debug" ] || [ "$MODE" = "widget-release" ]; then
   exec /usr/bin/time -p sh -c "cd \"$APP_DIR/widget\" && swift build -c \"$WIDGET_CONFIG\""
 fi
 
+if [ "$AIRMCP_EMBED_RUNTIME" = "1" ]; then
+  echo "Building universal AirMCP JavaScript catalog..."
+  (cd "$PROJECT_DIR" && npm run build)
+  echo "Building AirMcpBridge..."
+  (cd "$PROJECT_DIR/swift" && swift build -c release)
+  BRIDGE_BUILD_DIR="$(cd "$PROJECT_DIR/swift" && swift build -c release --show-bin-path)"
+fi
+
 echo "Building AirMCPApp..."
+PREVIOUS_APP_BUILD_DIR="$(cd "$APP_DIR" && swift build -c release --show-bin-path)"
+# SwiftPM can leave removed .lproj directories in an incremental resource
+# bundle. Recreate that generated bundle so renamed locales cannot leak into
+# the packaged app.
+rm -rf "$PREVIOUS_APP_BUILD_DIR/AirMCPApp_AirMCPApp.bundle"
 (cd "$APP_DIR" && swift build -c release)
 BUILD_DIR="$(cd "$APP_DIR" && swift build -c release --show-bin-path)"
 
@@ -125,6 +156,31 @@ done
 RESOURCE_BUNDLE="$BUILD_DIR/AirMCPApp_AirMCPApp.bundle"
 if [ -d "$RESOURCE_BUNDLE" ]; then
   cp -R "$RESOURCE_BUNDLE" "$BUNDLE_DIR/Contents/Resources/"
+fi
+
+# Embed a fixed Node runtime, the universal JS server, production dependencies,
+# and the Swift bridge. The signed app therefore does not depend on npx, a
+# global npm install, or a developer checkout at runtime.
+if [ "$AIRMCP_EMBED_RUNTIME" = "1" ]; then
+  RUNTIME_ROOT="$BUNDLE_DIR/Contents/Resources/airmcp"
+  SERVER_ROOT="$RUNTIME_ROOT/server"
+  NODE_ROOT="$RUNTIME_ROOT/runtime/bin"
+  BRIDGE_ROOT="$RUNTIME_ROOT/bin"
+  NODE_SOURCE="${AIRMCP_BUNDLED_NODE:-$(command -v node || true)}"
+  if [ -z "$NODE_SOURCE" ] || [ ! -x "$NODE_SOURCE" ]; then
+    echo "✗ a Node executable is required to build the self-contained app" >&2
+    exit 1
+  fi
+  mkdir -p "$SERVER_ROOT" "$NODE_ROOT" "$BRIDGE_ROOT"
+  cp -R "$PROJECT_DIR/dist" "$SERVER_ROOT/dist"
+  cp "$PROJECT_DIR/package.json" "$PROJECT_DIR/package-lock.json" "$SERVER_ROOT/"
+  if [ -f "$PROJECT_DIR/LICENSE" ]; then cp "$PROJECT_DIR/LICENSE" "$SERVER_ROOT/"; fi
+  npm ci --omit=dev --ignore-scripts --no-audit --no-fund --prefix "$SERVER_ROOT"
+  cp "$NODE_SOURCE" "$NODE_ROOT/node"
+  chmod 755 "$NODE_ROOT/node"
+  cp "$BRIDGE_BUILD_DIR/AirMcpBridge" "$BRIDGE_ROOT/AirMcpBridge"
+  chmod 755 "$BRIDGE_ROOT/AirMcpBridge"
+  echo "  ✓ Embedded Node runtime, universal server, production dependencies, and Swift bridge"
 fi
 
 # Copy Info.plist with services declarations
@@ -156,6 +212,8 @@ elif [ -f "$WIDGET_DIR/Package.swift" ]; then
 
     cp "$WIDGET_BIN" "$APPEX_DIR/MacOS/AirMCPWidget"
     cp "$WIDGET_DIR/Info.plist" "$APPEX_DIR/Info.plist"
+    /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $EXPECTED_VERSION" "$APPEX_DIR/Info.plist"
+    /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$APPEX_DIR/Info.plist"
 
     # Copy resource bundle (localization strings)
     WIDGET_RESOURCE="$WIDGET_BUILD_DIR/AirMCPWidget_AirMCPWidget.bundle"
@@ -206,35 +264,211 @@ fi
 /usr/libexec/PlistBuddy -c "Delete :CFBundlePackageType" "$PLIST" 2>/dev/null || true
 /usr/libexec/PlistBuddy -c "Add :CFBundlePackageType string APPL" "$PLIST"
 /usr/libexec/PlistBuddy -c "Delete :CFBundleShortVersionString" "$PLIST" 2>/dev/null || true
-/usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 2.15.0" "$PLIST"
+/usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 2.16.0" "$PLIST"
+/usr/libexec/PlistBuddy -c "Delete :CFBundleVersion" "$PLIST" 2>/dev/null || true
+/usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $BUILD_NUMBER" "$PLIST"
 /usr/libexec/PlistBuddy -c "Delete :LSUIElement" "$PLIST" 2>/dev/null || true
 /usr/libexec/PlistBuddy -c "Add :LSUIElement bool true" "$PLIST"
 /usr/libexec/PlistBuddy -c "Delete :NSMicrophoneUsageDescription" "$PLIST" 2>/dev/null || true
 /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string AirMCP uses the microphone for speech recognition." "$PLIST"
 
-# Sign the main app after embedding extensions.
+# Sign embedded executable code before signing the main app.
+if [ "$AIRMCP_EMBED_RUNTIME" = "1" ]; then
+  codesign --force --sign "$SIGN_IDENTITY" "$BUNDLE_DIR/Contents/Resources/airmcp/runtime/bin/node"
+  codesign --force --sign "$SIGN_IDENTITY" "$BUNDLE_DIR/Contents/Resources/airmcp/bin/AirMcpBridge"
+fi
+
+# Sign the main app after embedding extensions and runtime executables.
 codesign --force --sign "$SIGN_IDENTITY" "$BUNDLE_DIR"
 "$SCRIPT_DIR/verify-bundle-structure.sh" "$BUNDLE_DIR" "$BUNDLE_ID" "$APP_EXECUTABLE"
 if [ -x "$LSREGISTER" ]; then
   "$LSREGISTER" -f "$BUNDLE_DIR" 2>/dev/null || true
 fi
 
-launch_app() {
-  if pgrep -x "$APP_EXECUTABLE" >/dev/null 2>&1; then
-    pkill -x "$APP_EXECUTABLE" || true
-    sleep 0.5
+find_matching_commands() {
+  local match_mode="$1"
+  local target="$2"
+  local pid
+  local command
+
+  while read -r pid command; do
+    case "$match_mode" in
+      exact)
+        if [ "$command" = "$target" ]; then echo "$pid $command"; fi
+        ;;
+      prefix)
+        case "$command" in
+          "$target"|"$target "*) echo "$pid $command" ;;
+        esac
+        ;;
+      contains)
+        case "$command" in
+          *"$target"*) echo "$pid $command" ;;
+        esac
+        ;;
+    esac
+  done < <(ps -axo pid=,command=)
+}
+
+terminate_matching_command() {
+  local match_mode="$1"
+  local target="$2"
+  local pids=""
+  local pid
+  local command
+
+  while read -r pid command; do
+    if [ -n "$pid" ]; then pids="$pids $pid"; fi
+  done < <(find_matching_commands "$match_mode" "$target")
+
+  if [ -z "$pids" ]; then return 0; fi
+  for pid in $pids; do kill "$pid" 2>/dev/null || true; done
+  for _ in $(seq 1 "$PROCESS_SHUTDOWN_WAIT_STEPS"); do
+    local any_running=0
+    for pid in $pids; do
+      if kill -0 "$pid" 2>/dev/null; then any_running=1; fi
+    done
+    if [ "$any_running" -eq 0 ]; then return 0; fi
+    sleep 0.1
+  done
+  for pid in $pids; do
+    if kill -0 "$pid" 2>/dev/null; then kill -KILL "$pid" 2>/dev/null || true; fi
+  done
+}
+
+stop_bundle_processes() {
+  local bundled_runtime="$BUNDLE_DIR/Contents/Resources/airmcp/runtime/bin/node $BUNDLE_DIR/Contents/Resources/airmcp/server/dist/index.js --http --port $APP_HTTP_PORT"
+  local bundled_bridge="$BUNDLE_DIR/Contents/Resources/airmcp/bin/AirMcpBridge"
+  terminate_matching_command prefix "$APP_BINARY"
+  terminate_matching_command exact "$bundled_runtime"
+  terminate_matching_command prefix "$bundled_bridge"
+  # App startup also refreshes add-on status through one short-lived npx
+  # subprocess. Match the full current-checkout operation so unrelated Codex /
+  # MCP proxy processes using the same checkout are never touched.
+  terminate_matching_command contains "$PROJECT_DIR modules list --json"
+}
+
+assert_no_bundle_processes() {
+  local bundled_runtime="$BUNDLE_DIR/Contents/Resources/airmcp/runtime/bin/node $BUNDLE_DIR/Contents/Resources/airmcp/server/dist/index.js --http --port $APP_HTTP_PORT"
+  local bundled_bridge="$BUNDLE_DIR/Contents/Resources/airmcp/bin/AirMcpBridge"
+  local remaining=""
+  remaining="$({
+    find_matching_commands prefix "$APP_BINARY"
+    find_matching_commands exact "$bundled_runtime"
+    find_matching_commands prefix "$bundled_bridge"
+    find_matching_commands contains "$PROJECT_DIR modules list --json"
+  } | sed '/^[[:space:]]*$/d')"
+  if [ -n "$remaining" ]; then
+    echo "✗ governed verification left current-checkout processes running:" >&2
+    echo "$remaining" >&2
+    return 1
   fi
+}
+
+launch_app() {
+  # Limit cleanup to this checkout's generated app/runtime. A different
+  # installed AirMCP build must not be terminated merely because its process
+  # name is also AirMCP.
+  stop_bundle_processes
   export AIRMCP_NPM_PACKAGE_SPECIFIER="${AIRMCP_NPM_PACKAGE_SPECIFIER:-$PROJECT_DIR}"
   case "$MODE" in
-    verify|verify-appintents) export AIRMCP_FORCE_APP_RUNTIME=1 ;;
+    verify|verify-governed|verify-appintents) export AIRMCP_FORCE_APP_RUNTIME=1 ;;
   esac
   /usr/bin/open -n "$BUNDLE_DIR"
 }
 
+setup_governed_environment() {
+  local env_name
+  local config_path
+
+  # A host profile/module override would make the acceptance surface depend on
+  # the developer's shell. Clear inherited AirMCP settings after the bundle is
+  # built, then install only the isolated contract below.
+  for env_name in $(env | awk -F= '/^AIRMCP_/ { print $1 }'); do
+    unset "$env_name"
+  done
+
+  GOVERNED_STATE_PARENT="${GOVERNED_STATE_PARENT%/}"
+  GOVERNED_STATE_DIR="$(mktemp -d "$GOVERNED_STATE_PARENT/airmcp-governed.XXXXXX")"
+  mkdir -p "$GOVERNED_STATE_DIR/home" "$GOVERNED_STATE_DIR/audit" "$GOVERNED_STATE_DIR/tmp"
+  config_path="$GOVERNED_STATE_DIR/config.json"
+  node -e '
+    const fs = require("fs");
+    const path = process.argv[1];
+    const config = {
+      profile: "full",
+      toolExposure: "full",
+      requireToolSession: false,
+      hitl: { level: "off", whitelist: [], timeout: 5 }
+    };
+    fs.writeFileSync(path, JSON.stringify(config, null, 2) + "\n", { mode: 0o600 });
+  ' "$config_path"
+
+  # Swift reads the temp config and keeps its notification/socket UI off. The
+  # Node child deliberately overrides HITL back to sensitive-only so the MCP
+  # elicitation client exercises the production approval gate.
+  export HOME="$GOVERNED_STATE_DIR/home"
+  # Foundation's NSHomeDirectory ignores HOME on macOS. This supported test
+  # override moves the app's fixed home-relative surfaces (including its HITL
+  # socket cleanup) under the same disposable root.
+  export CFFIXED_USER_HOME="$GOVERNED_STATE_DIR/home"
+  export AIRMCP_CONFIG_PATH="$config_path"
+  export AIRMCP_PROFILE="full"
+  export AIRMCP_TOOL_EXPOSURE="full"
+  export AIRMCP_REQUIRE_TOOL_SESSION="false"
+  export AIRMCP_HITL_LEVEL="sensitive-only"
+  export AIRMCP_HITL_SOCKET_PATH="$GOVERNED_STATE_DIR/hitl.sock"
+  export AIRMCP_APP_RUNTIME_TOKEN_PATH="$GOVERNED_STATE_DIR/http-token"
+  export AIRMCP_MEMORY_STORE_PATH="$GOVERNED_STATE_DIR/memory.json"
+  export AIRMCP_VECTOR_STORE_DIR="$GOVERNED_STATE_DIR/audit"
+  export AIRMCP_USAGE_PROFILE_PATH="$GOVERNED_STATE_DIR/usage.json"
+  export AIRMCP_EMERGENCY_STOP_PATH="$GOVERNED_STATE_DIR/emergency-stop"
+  export AIRMCP_TEMP_DIR="$GOVERNED_STATE_DIR/tmp"
+  export AIRMCP_AUDIT_LOG="true"
+  export AIRMCP_AUDIT_FLUSH_INTERVAL="25"
+  export AIRMCP_AUDIT_HMAC_KEY
+  AIRMCP_AUDIT_HMAC_KEY="$(node -e 'process.stdout.write(require("crypto").randomBytes(32).toString("hex"))')"
+  export AIRMCP_RATE_LIMIT="true"
+  export AIRMCP_ELICITATION_DISABLE="false"
+  export AIRMCP_FORCE_APP_RUNTIME="1"
+  export AIRMCP_NPM_PACKAGE_SPECIFIER="$PROJECT_DIR"
+  TOKEN_FILE="$AIRMCP_APP_RUNTIME_TOKEN_PATH"
+}
+
+verify_governed_workflow() {
+  local token
+  local output
+  token="$(tr -d "\r\n" < "$TOKEN_FILE")"
+  if ! output="$(
+    node "$SCRIPT_DIR/verify-governed-workflow.mjs" \
+      --url "$APP_MCP_URL" \
+      --token "$token" \
+      --memory-store "$AIRMCP_MEMORY_STORE_PATH" \
+      --audit-dir "$AIRMCP_VECTOR_STORE_DIR" \
+      --emergency-stop "$AIRMCP_EMERGENCY_STOP_PATH" \
+      --timeout-ms 10000 2>&1
+  )"; then
+    echo "✗ governed workflow acceptance failed" >&2
+    echo "$output" >&2
+    exit 1
+  fi
+  echo "✓ $output"
+}
+
 wait_for_pid() {
   local pid=""
+  local candidate
+  local command
   for _ in $(seq 1 40); do
-    pid="$(pgrep -x "$APP_EXECUTABLE" | head -n 1 || true)"
+    pid=""
+    while read -r candidate command; do
+      case "$command" in
+        "$APP_BINARY"|"$APP_BINARY "*)
+          pid="$candidate"
+          break
+          ;;
+      esac
+    done < <(ps -axo pid=,command=)
     if [ -n "$pid" ]; then
       echo "$pid"
       return 0
@@ -297,7 +531,7 @@ verify_app_owned_runtime() {
     curl -sS --max-time 2 -o /dev/null -w "%{http_code}" \
       -X POST "$APP_MCP_URL" \
       -H "Content-Type: application/json" \
-      --data '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"bundle-verify","version":"0"}}}' \
+      --data '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"bundle-verify","version":"0"}}}' \
       2>/dev/null || true
   )"
   if [ "$unauth_status" != "401" ]; then
@@ -382,6 +616,44 @@ verify_appintents() {
   echo "✓ AppIntents registration did not emit runtime errors."
 }
 
+cleanup_verification() {
+  local original_status=$?
+  local cleanup_failed=0
+  local state_dir="$GOVERNED_STATE_DIR"
+
+  stop_bundle_processes
+  if ! assert_no_bundle_processes; then cleanup_failed=1; fi
+
+  if [ -n "$state_dir" ]; then
+    case "$state_dir" in
+      "$GOVERNED_STATE_PARENT"/airmcp-governed.*)
+        if ! rm -rf "$state_dir"; then cleanup_failed=1; fi
+        if [ -e "$state_dir" ]; then
+          echo "✗ governed verification left temporary state behind: $state_dir" >&2
+          cleanup_failed=1
+        fi
+        ;;
+      *)
+        echo "✗ Refusing to remove unexpected governed state path: $state_dir" >&2
+        cleanup_failed=1
+        ;;
+    esac
+  fi
+
+  trap - EXIT
+  if [ "$original_status" -ne 0 ]; then exit "$original_status"; fi
+  if [ "$cleanup_failed" -ne 0 ]; then exit 1; fi
+  exit 0
+}
+
+case "$MODE" in
+  verify|verify-governed|verify-appintents)
+    # Verification is non-interactive: never leave an app-owned Node process
+    # listening after success or an early failure.
+    trap cleanup_verification EXIT
+    ;;
+esac
+
 echo ""
 echo "✓ AirMCP.app created at: $BUNDLE_DIR"
 echo "  Run with: open $BUNDLE_DIR"
@@ -396,6 +668,11 @@ case "$MODE" in
     ;;
   verify)
     verify_running
+    ;;
+  verify-governed)
+    setup_governed_environment
+    verify_running
+    verify_governed_workflow
     ;;
   verify-appintents)
     verify_appintents

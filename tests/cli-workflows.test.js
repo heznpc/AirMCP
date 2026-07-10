@@ -255,13 +255,17 @@ describe("cli workflows command", () => {
 
     expect(onboarding).toContain('id: "codex"');
     expect(onboarding).toContain('NodeEnvironment.findExecutable(named: "codex")');
+    expect(onboarding).toContain('["mcp", "get", "airmcp", "--json"]');
     expect(onboarding).toContain('"mcp", "remove", "airmcp"');
     expect(onboarding).toContain('"mcp",');
     expect(onboarding).toContain('"add",');
     expect(onboarding).toContain('"--env"');
     expect(onboarding).toContain('"AIRMCP_HTTP_TOKEN=\\(token)"');
-    expect(onboarding).toContain('"connect"');
+    expect(onboarding).toContain("AirMcpConstants.appOwnedProxyArgs");
     expect(onboarding).toContain("AirMcpConstants.appOwnedProxyEntry(token: token)");
+    expect(onboarding).toContain("restoreCodexConfig(codex, json: existing.output)");
+    expect(onboarding).toContain('path + ".airmcp-backup"');
+    expect(onboarding).toContain("A malformed existing file is");
   });
 
   test("onboarding final step can copy the selected workflow prompt", () => {
@@ -272,6 +276,6 @@ describe("cli workflows command", () => {
 
     expect(onboarding).toContain("selectedWorkflowActions");
     expect(onboarding).toContain("AirMcpConstants.copyToClipboard(selectedWorkflow.prompt)");
-    expect(onboarding).toContain('AirMcpConstants.copyToClipboard("Hey Siri, \\(siriPhrase)")');
+    expect(onboarding).not.toContain('AirMcpConstants.copyToClipboard("Hey Siri, \\(siriPhrase)")');
   });
 });

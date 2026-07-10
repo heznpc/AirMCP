@@ -3,9 +3,9 @@ import Foundation
 import AirMCPKit
 
 // MARK: - AirMCP App Intents
-// These make AirMCP actions accessible via Siri, Spotlight, and Shortcuts.
-// MCP clients use the HTTP/stdio AirMCP surfaces; App Intents are the Apple
-// system-surface path for Siri, Shortcuts, Spotlight, and Apple Intelligence.
+// These make AirMCP actions available in the macOS Shortcuts action library.
+// MCP clients use the HTTP/stdio AirMCP surfaces. macOS supports App Intent
+// actions, but not the App Shortcuts phrase surface used on iOS.
 
 // MARK: - Existing Intents
 
@@ -19,7 +19,7 @@ struct SearchNotesIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ReturnsValue<String> {
-        let result = try await runAirMCPTool("search_notes", args: ["query": query])
+        let result = try await AppRuntimeClient.callTool("search_notes", args: ["query": query])
         return .result(value: result)
     }
 }
@@ -31,7 +31,7 @@ struct DailyBriefingIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ReturnsValue<String> {
-        let result = try await runAirMCPTool("summarize_context", args: [:])
+        let result = try await AppRuntimeClient.callTool("summarize_context", args: [:])
         return .result(value: result)
     }
 }
@@ -42,7 +42,7 @@ struct CheckCalendarIntent: AppIntent {
     nonisolated(unsafe) static var openAppWhenRun: Bool = false
 
     func perform() async throws -> some IntentResult & ReturnsValue<String> {
-        let result = try await runAirMCPTool("today_events", args: [:])
+        let result = try await AppRuntimeClient.callTool("today_events", args: [:])
         return .result(value: result)
     }
 }
@@ -68,7 +68,7 @@ struct CreateReminderIntent: AppIntent {
             actionName: .go,
             dialog: IntentDialog("Create Reminder with AirMCP? Create a new reminder via AirMCP.")
         )
-        let result = try await runAirMCPTool("create_reminder", args: args)
+        let result = try await AppRuntimeClient.callTool("create_reminder", args: args)
         return .result(value: result)
     }
 }
@@ -86,7 +86,7 @@ struct SearchContactsIntent: AppIntent {
     var query: String
 
     func perform() async throws -> some IntentResult & ReturnsValue<String> {
-        let result = try await runAirMCPTool("search_contacts", args: ["query": query])
+        let result = try await AppRuntimeClient.callTool("search_contacts", args: ["query": query])
         return .result(value: result)
     }
 }
@@ -99,7 +99,7 @@ struct DueRemindersIntent: AppIntent {
     nonisolated(unsafe) static var openAppWhenRun: Bool = false
 
     func perform() async throws -> some IntentResult & ReturnsValue<String> {
-        let result = try await runAirMCPTool("list_reminders", args: [
+        let result = try await AppRuntimeClient.callTool("list_reminders", args: [
             "completed": false,
             "dueBefore": ISO8601DateFormatter().string(from: Date()),
         ])
@@ -115,7 +115,7 @@ struct ListCalendarsIntent: AppIntent {
     nonisolated(unsafe) static var openAppWhenRun: Bool = false
 
     func perform() async throws -> some IntentResult & ReturnsValue<String> {
-        let result = try await runAirMCPTool("list_calendars", args: [:])
+        let result = try await AppRuntimeClient.callTool("list_calendars", args: [:])
         return .result(value: result)
     }
 }
@@ -134,29 +134,27 @@ struct HealthSummaryIntent: AppIntent {
             actionName: .go,
             dialog: IntentDialog("Health Summary with AirMCP? Get an aggregated health summary including steps, heart rate, sleep, and exercise.")
         )
-        let result = try await runAirMCPTool("health_summary", args: [:])
+        let result = try await AppRuntimeClient.callTool("health_summary", args: [:])
         return .result(value: result)
     }
 }
 #endif
 
-// MARK: - App Shortcuts (Siri trigger phrases)
+// MARK: - App Intent actions
 //
-// AirMCP's `AppShortcutsProvider` is `AirMCPGeneratedShortcuts` in
+// AirMCP's iOS-only `AppShortcutsProvider` is `AirMCPGeneratedShortcuts` in
 // `swift/Sources/AirMCPKit/Generated/MCPIntents.swift` — auto-generated
-// from the tool manifest with 1 + 9 entries (AskAirMCPIntent + 9 top tools)
-// pinned per Apple's 10-entry app cap.
+// from the tool manifest with the exact 8-action read-only iOS preview
+// allowlist. The optional AskAirMCPIntent is not advertised by that provider.
 //
-// Apple constrains an app target to a single `AppShortcutsProvider`
-// conformance. The hand-written `AirMCPShortcuts` that previously lived
-// here pre-dated the codegen and conflicted with the generated one;
-// keeping both produced an ambiguity at build time and a runtime tie
-// that Apple resolves arbitrarily.
+// On macOS the generated `AppIntent` types remain available as actions inside
+// the Shortcuts app; no `AppShortcutsProvider` or suggested Siri phrase is
+// compiled for the Mac target.
 //
 // The hand-written-only intents (`DailyBriefingIntent`,
 // `HealthSummaryIntent`) stay defined as standalone `AppIntent` types
-// above — they remain invocable from the Shortcuts app, Spotlight, and
-// Action Button. They just aren't pinned as Siri-first phrases. A future
+// above — they remain invocable from the macOS Shortcuts action library.
+// They just aren't pinned as Siri-first phrases. A future
 // codegen `APP_SHORTCUTS_TOP` entry can re-pin them by adding their tool
 // names to `scripts/gen-swift-intents.mjs` once the corresponding tools
 // (`daily_briefing`, `health_summary`) are first-party tool manifest
@@ -189,7 +187,7 @@ func installMCPIntentRouterForMacOS() {
             // existing runAirMCPTool(args:) signature. All inbound values
             // come from @Parameter-wrapped primitives so the cast is safe.
             let anyArgs: [String: Any] = args.reduce(into: [:]) { acc, kv in acc[kv.key] = kv.value }
-            return try await runAirMCPTool(tool, args: anyArgs)
+            return try await AppRuntimeClient.callTool(tool, args: anyArgs)
         }
     }
 }
@@ -208,21 +206,119 @@ private enum AppIntentMCPTransportError: Error {
 
 /// Execute an AirMCP MCP tool through the app-owned HTTP runtime when it is
 /// already available, then fall back to the legacy stdio bridge. The fallback
-/// keeps cold Shortcuts/Siri invocations working while the preferred path
+/// keeps cold App Intent/Services invocations working while the preferred path
 /// shares the same token-gated, app-owned runtime as Claude/Codex/Cursor.
-private func runAirMCPTool(_ toolName: String, args: [String: Any]) async throws -> String {
-    do {
-        return try await runAirMCPToolViaAppRuntime(toolName, args: args)
-    } catch {
-        if let transportError = error as? AppIntentMCPTransportError,
-           case .toolCallUncertain = transportError {
-            throw error
+enum AppRuntimeClient {
+    /// Shared governed execution path for macOS App Intents and Services.
+    /// The app-owned HTTP runtime is preferred so calls share the same token,
+    /// audit, rate-limit, emergency-stop, and per-call HITL controls. A cold
+    /// invocation may use the stdio transport, which reaches those same server
+    /// guards and the app's owner-only HITL socket.
+    static func callTool(_ toolName: String, args: [String: Any]) async throws -> String {
+        do {
+            return try await runAirMCPToolViaAppRuntime(toolName, args: args)
+        } catch {
+            if let transportError = error as? AppIntentMCPTransportError {
+                switch transportError {
+                case .toolCallUncertain, .rpcError, .missingToolText:
+                    // The tools/call request may have reached the governed
+                    // runtime, or the runtime returned a definitive tool
+                    // failure. Retrying through stdio could duplicate a
+                    // mutation or bypass the original run's decision trail.
+                    throw error
+                default:
+                    break
+                }
+            }
+            return try await runAirMCPToolViaStdio(toolName, args: args)
         }
-        return try await runAirMCPToolViaStdio(toolName, args: args)
     }
+
+    /// App-owned-runtime-only typed call for Trust Center evidence.
+    ///
+    /// Unlike App Intents and Services, evidence collection must never fall
+    /// back to a short-lived stdio process: doing so would make a healthy
+    /// secondary process look like proof about the app-owned runtime. Every
+    /// call carries a fresh validated UUID that the HTTP transport stamps into
+    /// request context and the HMAC audit trail.
+    static func callAppRuntimeToolJSON<T: Decodable>(
+        _ toolName: String,
+        args: [String: Any],
+        runID: UUID = UUID()
+    ) async throws -> T {
+        let response = try await runAirMCPToolViaAppRuntimeResponse(
+            toolName,
+            args: args,
+            runID: runID.uuidString.lowercased()
+        )
+        return try decodeToolJSON(from: response, as: T.self)
+    }
+
+    /// Authenticated readiness probe used by onboarding and ServerManager.
+    /// A bare HTTP 200 is insufficient: this proves that the token belongs to
+    /// a runtime that completes MCP initialize and advertises tools.
+    static func probe() async -> Bool {
+        do {
+            return !(try await listTools()).isEmpty
+        } catch {
+            return false
+        }
+    }
+
+    static func listTools() async throws -> [String] {
+        let token = try AppRuntimeToken.ensure()
+        let initialized = try await postAppRuntimeMCPRequest(
+            [
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": [
+                    "protocolVersion": AirMcpConstants.mcpProtocolVersion,
+                    "capabilities": [:] as [String: Any],
+                    "clientInfo": ["name": "AirMCPAppProbe", "version": "1.0"],
+                ],
+            ],
+            token: token
+        )
+        guard let sessionID = initialized.sessionID else {
+            throw AppIntentMCPTransportError.missingSessionID
+        }
+        defer {
+            Task { try? await closeAppRuntimeMCPSession(sessionID: sessionID, token: token) }
+        }
+        _ = try await postAppRuntimeMCPRequest(
+            ["jsonrpc": "2.0", "method": "notifications/initialized", "params": [:] as [String: Any]],
+            token: token,
+            sessionID: sessionID,
+            allowsEmptyResponse: true
+        )
+        let listed = try await postAppRuntimeMCPRequest(
+            ["jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": [:] as [String: Any]],
+            token: token,
+            sessionID: sessionID
+        )
+        guard let result = listed.json["result"] as? [String: Any],
+              let tools = result["tools"] as? [[String: Any]]
+        else { throw AppIntentMCPTransportError.invalidJSONResponse("tools/list result missing tools") }
+        return tools.compactMap { $0["name"] as? String }
+    }
+
 }
 
 private func runAirMCPToolViaAppRuntime(_ toolName: String, args: [String: Any]) async throws -> String {
+    let response = try await runAirMCPToolViaAppRuntimeResponse(
+        toolName,
+        args: args,
+        runID: UUID().uuidString.lowercased()
+    )
+    return try extractToolText(from: response)
+}
+
+private func runAirMCPToolViaAppRuntimeResponse(
+    _ toolName: String,
+    args: [String: Any],
+    runID: String
+) async throws -> [String: Any] {
     let token = try AppRuntimeToken.ensure()
     let initResponse = try await postAppRuntimeMCPRequest(
         [
@@ -263,9 +359,14 @@ private func runAirMCPToolViaAppRuntime(_ toolName: String, args: [String: Any])
             ],
             token: token,
             sessionID: sessionID,
-            timeoutInterval: 30
+            runID: runID,
+            // The HITL setting allows up to 120 seconds. Keep the HTTP caller
+            // alive beyond that boundary so it receives the definitive
+            // approved/denied/timed-out result instead of returning an
+            // uncertain failure while the governed call is still pending.
+            timeoutInterval: 135
         )
-        return try extractToolText(from: toolResponse.json)
+        return toolResponse.json
     } catch {
         throw AppIntentMCPTransportError.toolCallUncertain(error)
     }
@@ -273,8 +374,18 @@ private func runAirMCPToolViaAppRuntime(_ toolName: String, args: [String: Any])
 
 private func runAirMCPToolViaStdio(_ toolName: String, args: [String: Any]) async throws -> String {
     let process = Process()
-    process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-    process.arguments = ["npx", "-y", AirMcpConstants.npmPackageSpecifier]
+    if let runtime = AirMcpConstants.bundledServerRuntime {
+        process.executableURL = URL(fileURLWithPath: runtime.node)
+        process.arguments = [runtime.entry]
+    } else {
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.arguments = ["npx", "-y", AirMcpConstants.npmPackageSpecifier]
+    }
+    var environment = NodeEnvironment.buildEnv()
+    if let bridge = AirMcpConstants.bundledBridgePath {
+        environment["AIRMCP_BRIDGE_PATH"] = bridge
+    }
+    process.environment = environment
 
     let stdinPipe = Pipe()
     let stdoutPipe = Pipe()
@@ -326,6 +437,9 @@ private func runAirMCPToolViaStdio(_ toolName: String, args: [String: Any]) asyn
        let result = json["result"] as? [String: Any],
        let content = result["content"] as? [[String: Any]],
        let text = content.first?["text"] as? String {
+        if result["isError"] as? Bool == true {
+            throw AppIntentMCPTransportError.rpcError(text)
+        }
         return text
     }
 
@@ -343,6 +457,7 @@ private func postAppRuntimeMCPRequest(
     _ payload: [String: Any],
     token: String,
     sessionID: String? = nil,
+    runID: String? = nil,
     allowsEmptyResponse: Bool = false,
     timeoutInterval: TimeInterval = 2
 ) async throws -> (json: [String: Any], sessionID: String?) {
@@ -354,6 +469,9 @@ private func postAppRuntimeMCPRequest(
     request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
     if let sessionID {
         request.setValue(sessionID, forHTTPHeaderField: "Mcp-Session-Id")
+    }
+    if let runID {
+        request.setValue(runID, forHTTPHeaderField: "X-AirMCP-Run-ID")
     }
     request.httpBody = try JSONSerialization.data(withJSONObject: payload)
 
@@ -408,12 +526,43 @@ private func extractToolText(from json: [String: Any]) throws -> String {
         let message = error["message"] as? String ?? String(describing: error)
         throw AppIntentMCPTransportError.rpcError(message)
     }
+    guard let result = json["result"] as? [String: Any] else {
+        throw AppIntentMCPTransportError.missingToolText
+    }
+    if result["isError"] as? Bool == true {
+        let text = (result["content"] as? [[String: Any]])?.first?["text"] as? String
+        throw AppIntentMCPTransportError.rpcError(text ?? "tool returned an error")
+    }
     guard
-        let result = json["result"] as? [String: Any],
         let content = result["content"] as? [[String: Any]],
         let text = content.first?["text"] as? String
     else {
         throw AppIntentMCPTransportError.missingToolText
     }
     return text
+}
+
+private func decodeToolJSON<T: Decodable>(from json: [String: Any], as type: T.Type) throws -> T {
+    if let error = json["error"] as? [String: Any] {
+        let message = error["message"] as? String ?? String(describing: error)
+        throw AppIntentMCPTransportError.rpcError(message)
+    }
+    guard let result = json["result"] as? [String: Any] else {
+        throw AppIntentMCPTransportError.invalidJSONResponse("tool result missing")
+    }
+    if result["isError"] as? Bool == true {
+        let text = (result["content"] as? [[String: Any]])?.first?["text"] as? String
+        throw AppIntentMCPTransportError.rpcError(text ?? "tool returned an error")
+    }
+
+    let data: Data
+    if let structured = result["structuredContent"], JSONSerialization.isValidJSONObject(structured) {
+        data = try JSONSerialization.data(withJSONObject: structured)
+    } else if let text = (result["content"] as? [[String: Any]])?.first?["text"] as? String,
+              let textData = text.data(using: .utf8) {
+        data = textData
+    } else {
+        throw AppIntentMCPTransportError.missingToolText
+    }
+    return try JSONDecoder().decode(type, from: data)
 }

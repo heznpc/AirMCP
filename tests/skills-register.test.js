@@ -26,11 +26,12 @@ jest.unstable_mockModule('../dist/shared/result.js', () => ({
 }));
 
 // ─── Mock tool-registry (register.ts consults it for name collisions) ──
+const mockToolRegistry = {
+  getPromptNames: jest.fn(() => []),
+  getToolNames: jest.fn(() => []),
+};
 jest.unstable_mockModule('../dist/shared/tool-registry.js', () => ({
-  toolRegistry: {
-    getPromptNames: jest.fn(() => []),
-    getToolNames: jest.fn(() => []),
-  },
+  toolRegistry: mockToolRegistry,
 }));
 
 // ─── Mock prompt helper ─────────────────────────────────────────────────
@@ -198,7 +199,7 @@ describe('registerAsTool handler', () => {
     const handler = server.registerTool.mock.calls[0][2];
     const response = await handler();
 
-    expect(mockExecuteSkill).toHaveBeenCalledWith(server, skill, {});
+    expect(mockExecuteSkill).toHaveBeenCalledWith(server, skill, {}, mockToolRegistry);
     expect(ok).toHaveBeenCalledWith(skillResult);
     expect(response.isError).toBeUndefined();
   });
@@ -399,7 +400,7 @@ describe('registerSkills — runtime inputs', () => {
     const [, , handler] = server.registerTool.mock.calls[0];
     await handler({ query: 'invoice' });
 
-    expect(mockExecuteSkill).toHaveBeenCalledWith(server, skill, { query: 'invoice' });
+    expect(mockExecuteSkill).toHaveBeenCalledWith(server, skill, { query: 'invoice' }, mockToolRegistry);
   });
 
   test('handler without args still works (empty object default)', async () => {
@@ -410,7 +411,7 @@ describe('registerSkills — runtime inputs', () => {
     const [, , handler] = server.registerTool.mock.calls[0];
     await handler();
 
-    expect(mockExecuteSkill).toHaveBeenCalledWith(server, skill, {});
+    expect(mockExecuteSkill).toHaveBeenCalledWith(server, skill, {}, mockToolRegistry);
   });
 });
 

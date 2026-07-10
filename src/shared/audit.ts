@@ -12,8 +12,15 @@ const AUDIT_DIR = PATHS.VECTOR_STORE;
 const AUDIT_ROTATED_PREFIX = "audit.";
 const AUDIT_ROTATED_SUFFIX = ".jsonl";
 
-interface AuditEntry {
+export type AuditEventKind = "tool" | "approval";
+export type AuditApprovalDecision = "approved" | "denied" | "timed_out" | "unavailable";
+export type AuditApprovalChannel = "elicitation" | "socket" | "unavailable";
+export type AuditGate = "oauth_scope" | "emergency_stop" | "rate_limit";
+
+export interface AuditEntry {
   timestamp: string;
+  /** Event discriminator. Legacy rows omit this and normalize to `tool`. */
+  kind?: AuditEventKind;
   tool: string;
   args?: Record<string, unknown>;
   status: "ok" | "error";
@@ -39,6 +46,32 @@ interface AuditEntry {
    *                             pending entry is also archived.
    */
   actor?: string;
+  /** Machine-readable failure category only. Human error text is deliberately
+   *  excluded from audit metadata to avoid duplicating sensitive output. */
+  errorCategory?: string;
+  /** Present only on `kind: "approval"` events. */
+  approvalDecision?: AuditApprovalDecision;
+  /** Approval transport, or `unavailable` when no channel could answer. */
+  approvalChannel?: AuditApprovalChannel;
+  /** Pre-handler policy gate that blocked a tool call. */
+  gate?: AuditGate;
+}
+
+/** Public history row. Chain internals (`seq`, `_prev`, `_hmac`) never cross
+ *  the audit_log tool boundary. */
+export interface AuditHistoryEntry {
+  timestamp: string;
+  kind: AuditEventKind;
+  tool: string;
+  status: "ok" | "error";
+  durationMs?: number;
+  args?: Record<string, unknown>;
+  correlationId?: string;
+  actor?: string;
+  errorCategory?: string;
+  approvalDecision?: AuditApprovalDecision;
+  approvalChannel?: AuditApprovalChannel;
+  gate?: AuditGate;
 }
 
 /**
@@ -82,7 +115,7 @@ function computeHmac(prev: string, body: string): string {
  * but NOT removal of the most recent lines: a truncated chain is still a valid
  * shorter chain rooted at genesis. So every sealed line carries a monotonic
  * `seq`, and on each flush we overwrite a single signed checkpoint recording
- * the highest `seq` + chain head. `verifyAuditChain` reports
+ * the highest `seq` + chain head. The audit-chain scan reports
  * `truncated` when the checkpoint references a `seq` past the chain's last
  * line. The checkpoint's MAC is domain-separated from chain HMACs, so it can't
  * be forged or rolled back without the key — same trust grade as the chain.
@@ -152,7 +185,6 @@ async function ensureDir(): Promise<void> {
 export function auditLog(entry: AuditEntry): void {
   if (auditDisabled) {
     maybeAttemptRecovery();
-    if (auditDisabled) return;
   }
   let sanitized: Record<string, unknown> | undefined;
   if (isSensitiveTool(entry.tool)) {
@@ -164,16 +196,27 @@ export function auditLog(entry: AuditEntry): void {
   // one. Falls through to undefined for synthetic / pre-context callers
   // (e.g. startup banner, direct test invocations).
   const correlationId = entry.correlationId ?? getCorrelationId();
-  let line = JSON.stringify({ ...entry, args: sanitized, correlationId });
+  const normalizedEntry = {
+    ...entry,
+    kind: entry.kind ?? "tool",
+    args: sanitized,
+    correlationId,
+  };
+  let line = JSON.stringify(normalizedEntry);
   if (line.length > AUDIT.MAX_ENTRY_SIZE) {
     line = JSON.stringify({
-      ...entry,
+      ...normalizedEntry,
       args: { _truncated: true },
       _note: `entry exceeded ${AUDIT.MAX_ENTRY_SIZE} char limit`,
     });
   }
   buffer.push(line);
-  ensureFlushTimer();
+  // A repeated append failure pauses disk retries, but it must not create an
+  // unreported audit gap. Keep accepting entries into the in-memory spool
+  // while disabled; the first recovery attempt drains the complete backlog.
+  // (When the underlying disk itself is unavailable there is no safer
+  // durable spool to write to.)
+  if (!auditDisabled) ensureFlushTimer();
 }
 
 function ensureFlushTimer(): void {
@@ -221,7 +264,7 @@ function maybeAttemptRecovery(): void {
  *  entries, falls back to the most recent rotated file. Without this
  *  fallback, a process restart that lands inside the "rotation just
  *  happened, no new flush yet" window would silently reset the chain
- *  to genesis and `verifyAuditChain` would report `verified: false` at
+ *  to genesis and the audit summary would report `verified: false` at
  *  the seam — a false-positive that erodes the strongest trust signal
  *  in the codebase.
  */
@@ -301,19 +344,28 @@ async function flushBuffer(): Promise<void> {
   // Swap buffer reference before flushing so auditLog() writes to a fresh array
   const toFlush = buffer;
   buffer = [];
-  // Seal each line into the HMAC chain at flush time so the chain head
-  // resumes correctly across process restarts (vs. computing in auditLog
-  // where each turn would assume the in-memory head is current).
-  await resumeChainHead();
-  const sealedLines: string[] = [];
-  for (const raw of toFlush) {
-    try {
+  let appended = false;
+  let candidateHmac = lastHmac;
+  let candidateSeq = lastSeq;
+  try {
+    // Seal each line into the HMAC chain at flush time so the chain head
+    // resumes correctly across process restarts (vs. computing in auditLog
+    // where each turn would assume the in-memory head is current).
+    await resumeChainHead();
+    // Build the candidate batch against local state. The live chain head and
+    // sequence are a commit record for bytes known to be on disk; advancing
+    // them before appendFile succeeds forks every future entry after a
+    // transient write failure.
+    candidateHmac = lastHmac;
+    candidateSeq = lastSeq;
+    const sealedLines: string[] = [];
+    for (const raw of toFlush) {
       const obj = JSON.parse(raw) as Record<string, unknown>;
-      const prev = lastHmac;
+      const prev = candidateHmac;
       // Stamp a monotonic seq into the SIGNED body (added last so the parsed-
       // object insertion order the verifier relies on is preserved). The
       // truncation checkpoint anchors against this seq.
-      obj.seq = ++lastSeq;
+      obj.seq = ++candidateSeq;
       // _hmac is computed from the body PRE-attachment. The signed payload is
       // the JSON without _hmac/_prev, so verifiers reconstruct the same body.
       const body = JSON.stringify(obj);
@@ -329,55 +381,74 @@ async function flushBuffer(): Promise<void> {
       // exactly `body` because V8 preserves parsed-object insertion order.
       const sealed = body.slice(0, -1) + `,"_prev":"${prev}","_hmac":"${hmac}"}`;
       sealedLines.push(sealed);
-      lastHmac = hmac;
-    } catch {
-      // Malformed pre-buffer entry — skip rather than crash the flush.
-      // This shouldn't happen because auditLog itself JSON.stringify's.
+      candidateHmac = hmac;
     }
-  }
-  const lines = sealedLines.join("\n") + "\n";
-  let appended = false;
-  try {
-    await ensureDir();
-    await appendFile(AUDIT_PATH, lines, { encoding: "utf-8", mode: 0o600 });
-    await rotateIfNeeded();
-    consecutiveFlushFailures = 0;
-    appended = true;
-  } catch {
-    // Retry once
+    const lines = sealedLines.join("\n") + "\n";
+
     try {
+      await ensureDir();
       await appendFile(AUDIT_PATH, lines, { encoding: "utf-8", mode: 0o600 });
+      await rotateIfNeeded();
       consecutiveFlushFailures = 0;
       appended = true;
-    } catch (retryErr) {
-      consecutiveFlushFailures++;
-      log.error("audit: flush failed", {
-        attempts: consecutiveFlushFailures,
-        max: AUDIT.MAX_FLUSH_FAILURES,
-        err: errToCtx(retryErr),
-      });
-      if (consecutiveFlushFailures >= AUDIT.MAX_FLUSH_FAILURES) {
-        auditDisabled = true;
-        auditDisabledSince = Date.now();
-        if (flushTimer) {
-          clearTimeout(flushTimer);
-          flushTimer = null;
-        }
-        log.error("audit: too many consecutive flush failures — audit logging disabled", {
-          retryAfterMinutes: AUDIT_RECOVERY_INTERVAL_MS / 60_000,
-          note: "auto-retry after that window or on next auditLog call",
-        });
+    } catch {
+      // Retry the exact sealed payload once. Candidate state remains local
+      // until one complete append reports success.
+      try {
+        await appendFile(AUDIT_PATH, lines, { encoding: "utf-8", mode: 0o600 });
+        consecutiveFlushFailures = 0;
+        appended = true;
+      } catch (retryErr) {
+        recordFlushFailure(retryErr);
       }
     }
+  } catch (unexpectedErr) {
+    // Includes recovery scans, serialization, and other failures outside the
+    // two append attempts. The batch still follows the same lossless requeue
+    // rule instead of being abandoned by the timer-level catch.
+    recordFlushFailure(unexpectedErr);
   } finally {
+    if (appended) {
+      // Commit chain state only after the complete sealed batch is known to
+      // have landed. Entries logged concurrently remain in the fresh buffer
+      // and will chain from this newly committed head on the next flush.
+      lastHmac = candidateHmac;
+      lastSeq = candidateSeq;
+    } else {
+      // Preserve FIFO order: the failed batch predates any entries that
+      // arrived while the write was in flight.
+      buffer = [...toFlush, ...buffer];
+    }
     flushing = false;
   }
+  if (!appended && !auditDisabled) ensureFlushTimer();
   // Outside the flush critical section: a checkpoint failure must never fail
   // or retry the append. Anchors the truncation guard at the seq just sealed.
   if (appended) {
     await writeCheckpoint();
     warnHostKeyOnce();
   }
+}
+
+function recordFlushFailure(err: unknown): void {
+  consecutiveFlushFailures++;
+  log.error("audit: flush failed", {
+    attempts: consecutiveFlushFailures,
+    max: AUDIT.MAX_FLUSH_FAILURES,
+    err: errToCtx(err),
+  });
+  if (consecutiveFlushFailures < AUDIT.MAX_FLUSH_FAILURES) return;
+
+  auditDisabled = true;
+  auditDisabledSince = Date.now();
+  if (flushTimer) {
+    clearTimeout(flushTimer);
+    flushTimer = null;
+  }
+  log.error("audit: too many consecutive flush failures — audit logging disabled", {
+    retryAfterMinutes: AUDIT_RECOVERY_INTERVAL_MS / 60_000,
+    note: "auto-retry after that window or on next auditLog call",
+  });
 }
 
 /** Persist the signed tail-truncation checkpoint (single small write — a
@@ -544,96 +615,217 @@ export interface ReadAuditOptions {
   tool?: string;
   /** Filter by status. Omit to include both. */
   status?: "ok" | "error";
+  /** Filter to one trace/run. */
+  correlationId?: string;
+  /** Filter by event kind. Legacy rows normalize to `tool`. */
+  kind?: AuditEventKind;
   /** Cap on returned entries. Most recent first. */
   limit?: number;
 }
 
 export interface ReadAuditResult {
-  entries: AuditEntry[];
+  entries: AuditHistoryEntry[];
   total: number;
   returned: number;
   scannedFiles: number;
-}
-
-/** Yield every JSONL line across the current file + rotated siblings, in
- *  oldest→newest order. Rotated files are named `audit.<timestamp>.jsonl`
- *  so we can sort lexicographically by the embedded timestamp. */
-async function* readAllAuditLines(): AsyncGenerator<{ line: string; file: string }> {
-  let files: string[];
-  try {
-    files = await readdir(AUDIT_DIR);
-  } catch {
-    return;
-  }
-  const logFiles = files
-    .filter((f) => f === "audit.jsonl" || (f.startsWith(AUDIT_ROTATED_PREFIX) && f.endsWith(AUDIT_ROTATED_SUFFIX)))
-    .sort((a, b) => {
-      // audit.jsonl is the current (newest) — put it last.
-      if (a === "audit.jsonl") return 1;
-      if (b === "audit.jsonl") return -1;
-      return a.localeCompare(b);
-    });
-  for (const f of logFiles) {
-    let raw: string;
-    try {
-      raw = await readFile(join(AUDIT_DIR, f), "utf-8");
-    } catch {
-      continue;
-    }
-    for (const line of raw.split("\n")) {
-      if (!line) continue;
-      yield { line, file: f };
-    }
-  }
-}
-
-/** Read audit entries with optional filters. Walks every log file so
- *  rotated history stays queryable; the limit bounds memory at the end,
- *  not during scan. Buffered entries still in memory are included so a
- *  user asking for "today" doesn't miss the last 30 seconds. */
-export async function readAuditEntries(opts: ReadAuditOptions = {}): Promise<ReadAuditResult> {
-  const sinceIso = opts.since ?? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const limit = Math.max(1, Math.min(10_000, opts.limit ?? 100));
-  const matched: AuditEntry[] = [];
-  let scannedFiles = 0;
-  const seenFiles = new Set<string>();
-
-  const lineSources: Array<() => AsyncGenerator<{ line: string; file: string }>> = [
-    () =>
-      (async function* () {
-        for (const line of buffer) yield { line, file: "<buffer>" };
-      })(),
-    () => readAllAuditLines(),
-  ];
-
-  for (const source of lineSources) {
-    for await (const { line, file } of source()) {
-      if (!seenFiles.has(file)) {
-        seenFiles.add(file);
-        scannedFiles++;
-      }
-      let entry: AuditEntry;
-      try {
-        entry = JSON.parse(line) as AuditEntry;
-      } catch {
-        continue; // tolerate malformed lines (partial writes, old formats)
-      }
-      if (typeof entry.timestamp !== "string" || typeof entry.tool !== "string") continue;
-      if (entry.timestamp < sinceIso) continue;
-      if (opts.tool && entry.tool !== opts.tool) continue;
-      if (opts.status && entry.status !== opts.status) continue;
-      matched.push(entry);
-    }
-  }
-  // Newest first.
-  matched.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
-  const sliced = matched.slice(0, limit);
-  return { entries: sliced, total: matched.length, returned: sliced.length, scannedFiles };
+  verified: boolean;
+  firstBreak?: { file: string; lineIndex: number; reason: AuditChainBreakReason };
+  auditDisabled: boolean;
 }
 
 /** Why the HMAC chain failed to verify. `truncated` / `checkpoint_forged`
  *  come from the tail-truncation checkpoint; the rest from chain replay. */
 export type AuditChainBreakReason = "hmac_mismatch" | "prev_mismatch" | "malformed" | "truncated" | "checkpoint_forged";
+
+interface AuditChainScanResult {
+  /** Entries accepted before the first integrity break. This is either the
+   *  explicit legacy prefix (valid audit rows before the chain starts) or
+   *  rows whose HMAC was replayed successfully. */
+  entries: AuditEntry[];
+  scannedFiles: number;
+  verified: boolean;
+  firstBreak?: { file: string; lineIndex: number; reason: AuditChainBreakReason };
+}
+
+function asAuditEntry(entry: Record<string, unknown>): AuditEntry | null {
+  if (
+    typeof entry.timestamp !== "string" ||
+    typeof entry.tool !== "string" ||
+    (entry.status !== "ok" && entry.status !== "error")
+  ) {
+    return null;
+  }
+  return entry as unknown as AuditEntry;
+}
+
+function normalizeAuditEntry(entry: AuditEntry): AuditHistoryEntry {
+  const raw = entry as AuditEntry & Record<string, unknown>;
+  const approvalDecision =
+    raw.approvalDecision === "approved" ||
+    raw.approvalDecision === "denied" ||
+    raw.approvalDecision === "timed_out" ||
+    raw.approvalDecision === "unavailable"
+      ? raw.approvalDecision
+      : undefined;
+  const approvalChannel =
+    raw.approvalChannel === "elicitation" || raw.approvalChannel === "socket" || raw.approvalChannel === "unavailable"
+      ? raw.approvalChannel
+      : undefined;
+  const gate =
+    raw.gate === "oauth_scope" || raw.gate === "emergency_stop" || raw.gate === "rate_limit" ? raw.gate : undefined;
+  return {
+    timestamp: entry.timestamp,
+    kind: entry.kind === "approval" ? "approval" : "tool",
+    tool: entry.tool,
+    status: entry.status,
+    ...(typeof raw.durationMs === "number" ? { durationMs: raw.durationMs } : {}),
+    ...(raw.args && typeof raw.args === "object" && !Array.isArray(raw.args)
+      ? { args: raw.args as Record<string, unknown> }
+      : {}),
+    ...(typeof raw.correlationId === "string" ? { correlationId: raw.correlationId } : {}),
+    ...(typeof raw.actor === "string" ? { actor: raw.actor } : {}),
+    ...(typeof raw.errorCategory === "string" ? { errorCategory: raw.errorCategory } : {}),
+    ...(approvalDecision ? { approvalDecision } : {}),
+    ...(approvalChannel ? { approvalChannel } : {}),
+    ...(gate ? { gate } : {}),
+  };
+}
+
+/** Replay and decode the log in a single oldest→newest pass.
+ *
+ * Compatibility is deliberately narrow: valid unsigned audit rows are
+ * accepted only as one contiguous legacy prefix before the first chained
+ * row. Once the chain starts, malformed JSON, a partial signature envelope,
+ * or another unsigned row is an integrity break. The returned entry list
+ * stops at that break so callers never aggregate attacker-inserted data (or
+ * later rows whose full file ordering is no longer trustworthy). */
+async function scanAuditChain(): Promise<AuditChainScanResult> {
+  const entries: AuditEntry[] = [];
+  const seenFiles = new Set<string>();
+  let prev: string = HMAC_GENESIS;
+  let chainStarted = false;
+  let chainLastSeq = -1;
+  let chainHeadHmac: string = HMAC_GENESIS;
+
+  const broken = (file: string, lineIndex: number, reason: AuditChainBreakReason): AuditChainScanResult => ({
+    entries,
+    scannedFiles: seenFiles.size,
+    verified: false,
+    firstBreak: { file, lineIndex, reason },
+  });
+
+  for await (const { line, file, lineIndex } of readAllAuditLinesIndexed()) {
+    seenFiles.add(file);
+    let entry: Record<string, unknown>;
+    try {
+      entry = JSON.parse(line) as Record<string, unknown>;
+    } catch {
+      return broken(file, lineIndex, "malformed");
+    }
+
+    const hasHmac = Object.prototype.hasOwnProperty.call(entry, "_hmac");
+    const hasPrev = Object.prototype.hasOwnProperty.call(entry, "_prev");
+    if (!hasHmac && !hasPrev) {
+      const legacyEntry = asAuditEntry(entry);
+      if (chainStarted || !legacyEntry) return broken(file, lineIndex, "malformed");
+      entries.push(legacyEntry);
+      continue;
+    }
+
+    const hmacField = entry._hmac;
+    const prevField = entry._prev;
+    if (
+      !hasHmac ||
+      !hasPrev ||
+      typeof hmacField !== "string" ||
+      typeof prevField !== "string" ||
+      !/^[0-9a-f]{64}$/.test(hmacField) ||
+      !/^[0-9a-f]{64}$/.test(prevField)
+    ) {
+      return broken(file, lineIndex, "malformed");
+    }
+
+    const expectedPrev = chainStarted ? prev : HMAC_GENESIS;
+    if (prevField !== expectedPrev) return broken(file, lineIndex, "prev_mismatch");
+
+    // Reconstruct the exact body that was signed: parsed insertion order is
+    // retained by V8 and `_prev` / `_hmac` were appended after the body.
+    const {
+      _hmac: _h,
+      _prev: _p,
+      ...body
+    } = entry as {
+      _hmac: unknown;
+      _prev: unknown;
+    } & Record<string, unknown>;
+    void _h;
+    void _p;
+    const expected = computeHmac(prevField, JSON.stringify(body));
+    if (expected !== hmacField) return broken(file, lineIndex, "hmac_mismatch");
+
+    const decoded = asAuditEntry(entry);
+    if (!decoded) return broken(file, lineIndex, "malformed");
+    entries.push(decoded);
+    prev = hmacField;
+    chainStarted = true;
+    chainHeadHmac = hmacField;
+    if (typeof entry.seq === "number" && Number.isInteger(entry.seq)) chainLastSeq = entry.seq;
+  }
+
+  // A valid signed checkpoint anchors the tail. Its integrity verdict is part
+  // of this same snapshot so the rows used by readers and the `verified`
+  // signal can never come from two different filesystem walks.
+  const ck = await readCheckpoint();
+  if (ck) {
+    if (ck.mac !== checkpointMac(ck.seq, ck.hmac)) {
+      return broken("audit.checkpoint", -1, "checkpoint_forged");
+    }
+    if (ck.seq > chainLastSeq || (ck.seq === chainLastSeq && ck.hmac !== chainHeadHmac)) {
+      return broken("audit.checkpoint", -1, "truncated");
+    }
+  }
+
+  return { entries, scannedFiles: seenFiles.size, verified: true };
+}
+
+function filterAuditEntries(
+  entries: AuditEntry[],
+  opts: ReadAuditOptions,
+): { entries: AuditHistoryEntry[]; total: number; returned: number } {
+  const sinceIso = opts.since ?? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const limit = Math.max(1, Math.min(10_000, opts.limit ?? 100));
+  const matched = entries.filter((entry) => {
+    if (entry.timestamp < sinceIso) return false;
+    if (opts.tool && entry.tool !== opts.tool) return false;
+    if (opts.status && entry.status !== opts.status) return false;
+    if (opts.correlationId && entry.correlationId !== opts.correlationId) return false;
+    if (opts.kind && (entry.kind ?? "tool") !== opts.kind) return false;
+    return true;
+  });
+  matched.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+  const normalized = matched.slice(0, limit).map(normalizeAuditEntry);
+  return { entries: normalized, total: matched.length, returned: normalized.length };
+}
+
+/** Read audit entries with optional filters. Walks every log file so
+ *  rotated history stays queryable; the limit bounds memory at the end,
+ *  not during scan. Only the accepted legacy prefix + HMAC-verified chain
+ *  prefix is returned. Pending entries are sealed before the scan so `entries`
+ *  and the integrity verdict describe one HMAC-backed snapshot. */
+export async function readAuditEntries(opts: ReadAuditOptions = {}): Promise<ReadAuditResult> {
+  await flushBuffer();
+  const scan = await scanAuditChain();
+  const page = filterAuditEntries(scan.entries, opts);
+  return {
+    entries: page.entries,
+    total: page.total,
+    returned: page.returned,
+    scannedFiles: scan.scannedFiles,
+    verified: scan.verified,
+    ...(scan.firstBreak ? { firstBreak: scan.firstBreak } : {}),
+    auditDisabled,
+  };
+}
 
 export interface AuditSummary {
   since: string;
@@ -642,11 +834,9 @@ export interface AuditSummary {
   errorRate: number;
   topTools: Array<{ tool: string; count: number; errors: number }>;
   scannedFiles: number;
-  /** True when every line carrying `_hmac` verifies against the chain.
-   *  Legacy lines (no `_hmac` — written before this version) are skipped
-   *  and don't break verification on their own. False means a chained
-   *  line was tampered with or removed. `verifiedFirstBreak` carries the
-   *  file + line index of the first mismatch when verification fails. */
+  /** True when the audit file is one valid legacy prefix followed by an
+   *  intact HMAC chain. Once the chain starts, unsigned or malformed rows
+   *  fail verification. `verifiedFirstBreak` carries the first mismatch. */
   verified: boolean;
   verifiedFirstBreak?: { file: string; lineIndex: number; reason: AuditChainBreakReason };
   /** Audit logging is currently disabled (disk full / permission error /
@@ -655,17 +845,22 @@ export interface AuditSummary {
   auditDisabled: boolean;
 }
 
-/** Aggregate statistics over the audit log: total calls, error rate,
- *  and the top-N busiest tools. `since` defaults to 7 days. `topN`
- *  bounds the returned leaderboard (default 10, max 50). Also walks the
- *  HMAC chain and reports `verified: true` only when every chained line
- *  passes its prev/hmac check (legacy un-chained lines are tolerated). */
+/** Aggregate statistics over the accepted audit prefix: total calls, error
+ *  rate, and the top-N busiest tools. Rows at or after the first integrity
+ *  break are excluded, so the numbers never bless an inserted unsigned or
+ *  malformed record. `since` defaults to 7 days. */
 export async function summarizeAuditEntries(opts: { since?: string; topN?: number } = {}): Promise<AuditSummary> {
   const sinceIso = opts.since ?? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const topN = Math.max(1, Math.min(50, opts.topN ?? 10));
-  // Pull everything inside the window — limit set high enough that the
-  // caller gets the real population rather than a truncated sample.
-  const page = await readAuditEntries({ since: sinceIso, limit: 10_000 });
+  await flushBuffer();
+  const chainResult = await scanAuditChain();
+  // Summary counts are based on the exact snapshot that produced the chain
+  // verdict. Pending, not-yet-sealed buffer rows are intentionally omitted.
+  const page = filterAuditEntries(chainResult.entries, {
+    since: sinceIso,
+    kind: "tool",
+    limit: 10_000,
+  });
   const byTool = new Map<string, { count: number; errors: number }>();
   let errors = 0;
   for (const e of page.entries) {
@@ -680,97 +875,17 @@ export async function summarizeAuditEntries(opts: { since?: string; topN?: numbe
     .sort((a, b) => b.count - a.count)
     .slice(0, topN);
   const total = page.entries.length;
-  const chainResult = await verifyAuditChain();
   return {
     since: sinceIso,
     total,
     errors,
     errorRate: total > 0 ? Number((errors / total).toFixed(4)) : 0,
     topTools,
-    scannedFiles: page.scannedFiles,
+    scannedFiles: chainResult.scannedFiles,
     verified: chainResult.verified,
     verifiedFirstBreak: chainResult.firstBreak,
     auditDisabled,
   };
-}
-
-/** Walk every audit file in oldest→newest order and replay the HMAC
- *  chain. A line carrying `_hmac` + `_prev` is "chained": the body
- *  (entry minus those two fields) is fed to HMAC-SHA256(prev || \0 ||
- *  body) and the result must equal `_hmac`; `_prev` must equal the
- *  previous chained line's `_hmac` (or `HMAC_GENESIS` if first).
- *
- *  Lines without `_hmac` (legacy, pre-chain) are skipped — they don't
- *  themselves break verification, but a malicious actor inserting a
- *  legacy-shaped line in the middle of the chain would just mean the
- *  next chained line's `_prev` doesn't match the prior `_hmac`, which
- *  IS reported. So legacy interleaving cannot be used to launder a
- *  tampered insertion. */
-async function verifyAuditChain(): Promise<{
-  verified: boolean;
-  firstBreak?: { file: string; lineIndex: number; reason: AuditChainBreakReason };
-}> {
-  let prev: string = HMAC_GENESIS;
-  let chainStarted = false;
-  // Highest seq + head hmac seen in the chain — compared against the signed
-  // checkpoint after the walk to catch lines removed from the end.
-  let chainLastSeq = -1;
-  let chainHeadHmac: string = HMAC_GENESIS;
-  for await (const { line, file, lineIndex } of readAllAuditLinesIndexed()) {
-    let entry: Record<string, unknown>;
-    try {
-      entry = JSON.parse(line) as Record<string, unknown>;
-    } catch {
-      // Tolerate malformed lines (partial writes, manual edits) — they
-      // don't break the chain because they have no `_hmac` to check.
-      continue;
-    }
-    const hmacField = entry._hmac;
-    const prevField = entry._prev;
-    if (typeof hmacField !== "string" || typeof prevField !== "string") continue; // legacy line
-    if (!/^[0-9a-f]{64}$/.test(hmacField)) {
-      return { verified: false, firstBreak: { file, lineIndex, reason: "malformed" } };
-    }
-    // The first chained line we encounter must trace back to genesis;
-    // every subsequent line must trace to the prior line's hmac.
-    // Folding both checks into one expression closes the audit gap from
-    // 2026-05-13: pre-fix, an attacker with the HMAC key could swap the
-    // entire on-disk file for a freshly-signed chain rooted at any
-    // arbitrary `_prev` value and still report `verified: true`, because
-    // the first-line `_prev` check was skipped (`chainStarted=false`).
-    const expectedPrev = chainStarted ? prev : HMAC_GENESIS;
-    if (prevField !== expectedPrev) {
-      return { verified: false, firstBreak: { file, lineIndex, reason: "prev_mismatch" } };
-    }
-    // Reconstruct the body that was signed: entry minus _hmac/_prev.
-    const { _hmac: _h, _prev: _p, ...body } = entry as { _hmac: unknown; _prev: unknown } & Record<string, unknown>;
-    void _h;
-    void _p;
-    const expected = computeHmac(prevField, JSON.stringify(body));
-    if (expected !== hmacField) {
-      return { verified: false, firstBreak: { file, lineIndex, reason: "hmac_mismatch" } };
-    }
-    prev = hmacField;
-    chainStarted = true;
-    chainHeadHmac = hmacField;
-    if (typeof entry.seq === "number" && Number.isInteger(entry.seq)) chainLastSeq = entry.seq;
-  }
-  // Tail-truncation check: the signed checkpoint records the highest seq +
-  // head sealed at the last flush. A chain that doesn't reach that seq means
-  // lines were removed from the end after they were anchored (a plain chain
-  // replay can't see this — a truncated chain is a valid shorter chain).
-  const ck = await readCheckpoint();
-  if (ck) {
-    if (ck.mac !== checkpointMac(ck.seq, ck.hmac)) {
-      // Present but the MAC (which needs the key) doesn't match → the
-      // checkpoint itself was edited / rolled back.
-      return { verified: false, firstBreak: { file: "audit.checkpoint", lineIndex: -1, reason: "checkpoint_forged" } };
-    }
-    if (ck.seq > chainLastSeq || (ck.seq === chainLastSeq && ck.hmac !== chainHeadHmac)) {
-      return { verified: false, firstBreak: { file: "audit.checkpoint", lineIndex: -1, reason: "truncated" } };
-    }
-  }
-  return { verified: true };
 }
 
 /** Read + shape-validate the truncation checkpoint. Returns null when absent
@@ -779,7 +894,7 @@ async function verifyAuditChain(): Promise<{
  *  write is indistinguishable from corruption, and the moat must not cry wolf;
  *  deleting the checkpoint is already an undetectable disable, documented).
  *  A well-formed checkpoint with a WRONG MAC is the real forgery signal —
- *  that's returned here so `verifyAuditChain` reports `checkpoint_forged`. */
+ *  that's returned here so the chain scan reports `checkpoint_forged`. */
 async function readCheckpoint(): Promise<{ seq: number; hmac: string; mac: string } | null> {
   let raw: string;
   try {

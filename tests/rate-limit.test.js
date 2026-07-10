@@ -61,6 +61,7 @@ describe('checkRateLimit — global bucket', () => {
     expect(checkRateLimit(false).allowed).toBe(true);
     const denied = checkRateLimit(false);
     expect(denied.allowed).toBe(false);
+    expect(denied.gate).toBe('rate_limit');
     expect(denied.reason).toMatch(/Global tool-call budget/);
     expect(denied.retryAfterMs).toBeGreaterThan(0);
   });
@@ -76,6 +77,29 @@ describe('checkRateLimit — destructive bucket', () => {
     const denied = checkRateLimit(true);
     expect(denied.allowed).toBe(false);
     expect(denied.reason).toMatch(/Destructive-call budget/);
+  });
+
+  test('rolling-hour ceiling does not reopen as the token bucket gradually refills', () => {
+    jest.useFakeTimers({ now: new Date('2026-07-10T00:00:00Z') });
+    try {
+      _resetRateLimitForTests();
+      expect(checkRateLimit(true).allowed).toBe(true);
+      expect(checkRateLimit(true).allowed).toBe(true);
+
+      // Half an hour refills one destructive token in the smoothing bucket,
+      // but both successful calls are still inside the rolling hour.
+      jest.advanceTimersByTime(30 * 60_000);
+      const denied = checkRateLimit(true);
+      expect(denied.allowed).toBe(false);
+      expect(denied.reason).toMatch(/hard ceiling 2 in any rolling hour/);
+      expect(denied.retryAfterMs).toBe(30 * 60_000);
+
+      // Once the oldest calls leave the rolling window, the hard ceiling opens.
+      jest.advanceTimersByTime(30 * 60_000 + 1);
+      expect(checkRateLimit(true).allowed).toBe(true);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   test('non-destructive calls do NOT consume the destructive bucket', () => {
@@ -97,6 +121,17 @@ describe('emergency stop file', () => {
     expect(isEmergencyStopActive()).toBe(false);
   });
 
+  test('creating the stop file after an absent probe blocks the next destructive call', () => {
+    expect(isEmergencyStopActive()).toBe(false);
+    writeFileSync(STOP_FILE, '');
+
+    // No reset or TTL wait: negative probes must never be cached.
+    const destructive = checkRateLimit(true);
+    expect(destructive.allowed).toBe(false);
+    expect(destructive.gate).toBe('emergency_stop');
+    expect(destructive.reason).toMatch(/Emergency stop engaged/);
+  });
+
   test('existing emergency-stop blocks destructive calls but allows reads', () => {
     writeFileSync(STOP_FILE, '');
     // Bust the 1s TTL cache by resetting
@@ -104,6 +139,7 @@ describe('emergency stop file', () => {
     expect(isEmergencyStopActive()).toBe(true);
     const destructive = checkRateLimit(true);
     expect(destructive.allowed).toBe(false);
+    expect(destructive.gate).toBe('emergency_stop');
     expect(destructive.reason).toMatch(/Emergency stop engaged/);
     // Non-destructive still allowed (read-only tools aren't the concern).
     const readOnly = checkRateLimit(false);

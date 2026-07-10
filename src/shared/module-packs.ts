@@ -1,10 +1,10 @@
 /**
  * Module-pack manifest.
  *
- * Packs are AirMCP's DLC-like install/activation boundary. The current npm
- * package still ships every module, but this manifest is the runtime contract
- * that lets operators activate only selected packs and lets staged add-on
- * packages prove their boundaries before bundled fallback can be removed.
+ * Packs are AirMCP's logical install/activation boundary. The root package and
+ * MCPB remain universal so every standard module is available after one
+ * install. Scoped add-ons remain an optional compatibility surface for
+ * external-only deployments and pack-boundary verification.
  */
 
 export const CORE_MODULE_PACK_NAME = "core";

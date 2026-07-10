@@ -41,6 +41,14 @@ describe('memory_query untrusted framing', () => {
       const found = res.structuredContent.entries.find((e) => e.key === key);
       expect(found).toBeDefined();
       expect(found.value).toBe(injection);
+
+      const stats = await server.callTool('memory_stats', {});
+      expect(stats.structuredContent.total).toBeGreaterThanOrEqual(1);
+      expect(stats.structuredContent.byKind.episode).toBeGreaterThanOrEqual(1);
+
+      const forgotten = await server.callTool('memory_forget', { key });
+      expect(forgotten.structuredContent.count).toBe(1);
+      expect(forgotten.structuredContent.removed).toContain(found.id);
     } finally {
       const store = getMemoryStore();
       await store.forget({ key }).catch(() => {});

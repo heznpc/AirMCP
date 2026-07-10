@@ -1,7 +1,7 @@
 # Privacy Policy
 
-**AirMCP v2.15.0** — MCP Server for the Apple Ecosystem on macOS
-Last updated: 2026-03-28
+**AirMCP v2.16.0** — MCP Server for the Apple Ecosystem on macOS
+Last updated: 2026-07-10
 
 ## Overview
 
@@ -19,14 +19,14 @@ When you use third-party APIs (Gemini, Nominatim, Open-Meteo, Google Workspace),
 
 ## Data Collection
 
-AirMCP does not collect analytics, telemetry, usage tracking, or crash reports. There is no advertising or marketing data collection.
+AirMCP has no maintainer-operated analytics, advertising, crash-reporting, or marketing collection service. It keeps a local usage profile by default to rank tools and may emit OpenTelemetry signals only when the owner explicitly enables and configures that integration. Those records are controlled by the owner, not sent to an AirMCP-operated backend.
 
 ## Legal Basis for Processing
 
 Under GDPR Article 6, AirMCP relies on the following legal bases:
 
 - **Legitimate interest (Art. 6(1)(f)):** Local automation operations (reading/writing Apple app data, on-device AI processing, local file operations) are performed based on the user's legitimate interest in automating their own macOS workflows. All such processing occurs entirely on the user's machine.
-- **Consent (Art. 6(1)(a)):** External API calls to Google Gemini, OpenStreetMap Nominatim, and Open-Meteo are only made when the user explicitly configures the relevant API keys or invokes the corresponding tools. Users may withdraw consent at any time by removing API keys from the configuration or by not using the relevant tools.
+- **Consent (Art. 6(1)(a)):** External API calls to Google Gemini, OpenStreetMap Nominatim, Open-Meteo, Google Workspace, custom webhook destinations, or Power Automate are made only after the owner configures or invokes those paths. Consent can be withdrawn by removing the related credentials/configuration and not invoking those tools.
 
 ## How Your Data Is Handled
 
@@ -48,8 +48,10 @@ AirMCP connects to external services in the following cases:
 | **Geocoding** | Open-Meteo Geocoding (`geocoding-api.open-meteo.com`) | Place names/addresses | When maps tools search for locations |
 | **Reverse geocoding** | OpenStreetMap Nominatim (`nominatim.openstreetmap.org`) | GPS coordinates | When maps tools resolve coordinates to addresses |
 | **Google Workspace** | Google APIs (via `gws` CLI) | Gmail, Drive, Sheets, Calendar, Docs data | When Google Workspace tools are used (requires separate Google auth) |
+| **Outbound webhook** | Owner-selected HTTPS destination | URL, headers, and JSON payload supplied to `webhook_send` | Only when the outbound webhook tool is explicitly invoked and network policy allows the destination |
+| **Power Automate** | Owner-configured Microsoft flow URL | JSON payload supplied to `powerautomate_trigger` | Only when the Power Automate tool is explicitly invoked and network policy allows the destination |
 
-**If you do not configure `GEMINI_API_KEY` and do not use weather, maps, or Google Workspace tools, no data leaves your Mac.**
+AirMCP itself sends no data to an AirMCP-operated backend. Data can still leave the Mac through a connected MCP client or when you use any external-service path listed above.
 
 ### Local Data Storage
 
@@ -59,6 +61,9 @@ AirMCP stores the following data on disk:
 |------|---------|---------|
 | `~/.config/airmcp/config.json` | Module preferences, HITL settings | User configuration |
 | `~/.airmcp/vectors.json` | Text excerpts + embedding vectors from notes, email, calendar, reminders | Semantic search index |
+| `~/.airmcp/audit.jsonl`, rotations, and `audit.checkpoint` | HMAC-chained tool-call metadata with sensitive values scrubbed | Local accountability and tamper/truncation detection |
+| `~/.airmcp/profile.json` | Local tool-frequency and sequence counters | Progressive tool ranking and suggestions |
+| `~/Library/Application Support/AirMCP/http-token` | Owner-only bearer token (`0600`) | Authenticate the app-owned local HTTP runtime |
 | macOS Spotlight Index | Note titles, email subjects, reminder names, calendar event titles | System-wide Spotlight/Siri discoverability (opt-in via `spotlight_sync` tool) |
 
 The vector store (`vectors.json`) contains text previews of your personal data. It is not encrypted. You can delete it at any time:
@@ -77,26 +82,28 @@ AirMCP does not operate any server-side data storage. All retention is local to 
 |------|-----------|---------------|
 | `~/.airmcp/vectors.json` (semantic index) | Retained until the user deletes it | Use the `semantic_clear` tool or manually run `rm -rf ~/.airmcp` |
 | `~/.config/airmcp/config.json` (configuration) | Retained until the user removes or edits the file | Delete or edit the file manually |
+| `~/.airmcp/audit.jsonl`, rotations, and checkpoint | Retained locally with rotation | Remove those files manually after stopping AirMCP; removal intentionally destroys audit history |
+| `~/.airmcp/profile.json` (local usage profile) | Retained until reset or deletion | Delete the file or disable local usage tracking |
 | macOS Spotlight entries | Retained until the user clears them | Use the `spotlight_clear` or `semantic_clear` tool |
 
-For data sent to external APIs (Gemini, Nominatim, Open-Meteo, Google Workspace), AirMCP does not control the retention period. Refer to each provider's privacy policy for their data retention practices.
+For data sent to external APIs or owner-selected webhook/Power Automate destinations, AirMCP does not control the retention period. Refer to each destination's privacy and retention policy.
 
 ## Apple Intelligence / Foundation Models
 
-AirMCP's intelligence tools (`summarize_text`, `rewrite_text`, `proofread_text`, `generate_text`, `generate_structured`, `tag_content`, `ai_chat`, `generate_plan`, `generate_image`) process user-provided text through Apple's on-device Foundation Model (~3B parameters, running on Apple Silicon Neural Engine).
+When the optional Foundation Models build is enabled on a supported Mac, AirMCP's intelligence tools process user-provided text through Apple's Foundation Models framework.
 
-- **On-device by default**: All Foundation Model processing runs locally on your Mac.
-- **Private Cloud Compute**: Apple may route complex requests to its Private Cloud Compute servers. AirMCP does not explicitly opt out of PCC. Apple states that PCC data is not retained or accessible to Apple.
+- **Opt-in build and availability check**: The default build does not claim that the Foundation Models bridge is available. AirMCP checks the bridge and system-model availability before evaluation or use.
+- **Apple framework boundary**: AirMCP does not add its own network fallback for Foundation Models requests. Apple's platform privacy terms govern the framework itself.
 - **`summarize_context` fallback**: When MCP Sampling is unavailable, this tool sends a context snapshot (calendar events, reminders, note previews, clipboard contents, mail metadata) to the on-device model.
 - **`generate_image`**: Prompts are processed by Apple's on-device Image Playground model.
 - **`scan_document`**: Images are processed locally via Apple Vision OCR. No network involvement.
 
-## Siri / App Intents
+## macOS App Intents
 
-AirMCP's companion app registers App Intents (Search Notes, Daily Briefing, Check Calendar, Create Reminder) accessible via Siri and Shortcuts.
+AirMCP's companion app registers App Intent actions that owners can compose inside the macOS Shortcuts app. Apple does not support the iOS App Shortcuts phrase surface on macOS, so the Mac app does not register `AppShortcutsProvider` phrases or advertise “Hey Siri” triggers.
 
-- Results from Siri invocations may flow through Apple's Siri infrastructure depending on system configuration.
-- Apple's own privacy policy governs how Siri processes this data.
+- Running an AirMCP action from Shortcuts sends the action through the same local, token-gated AirMCP runtime and its HITL, rate-limit, emergency-stop, and audit controls.
+- Apple's own privacy policy governs the Shortcuts application and other system surfaces.
 - Spotlight-synced data becomes visible in macOS Spotlight search UI.
 
 ## Sensitive Data in MCP Tool Results
@@ -112,13 +119,15 @@ All data returned by AirMCP tools is sent to the connected MCP client (AI model)
 ## Safety Controls
 
 - **Sending email/messages** is disabled by default (`allowSendMail: false`, `allowSendMessages: false`). You must explicitly enable these in config or via environment variables.
-- **Human-in-the-loop (HITL)** approval can be enabled to require confirmation before sensitive or destructive operations (create, send, delete, move).
+- **Human-in-the-loop (HITL)** defaults to sensitive operations and is evaluated per tool call. It can be tightened or disabled by the owner.
 - **Destructive tools** are annotated with `destructiveHint: true` so MCP clients can warn before execution.
+- **Rate limits and emergency stop** bound destructive activity; creating `~/.config/airmcp/emergency-stop` blocks the next destructive call without waiting for a negative cache.
+- **HMAC-chained audit log** detects modified, inserted, truncated, or malformed entries after the signed chain begins.
 
 ## Transport Modes
 
 - **stdio (default):** Communication between the MCP client and AirMCP happens via standard input/output on your local machine. No network traffic.
-- **HTTP/SSE (`--http`):** AirMCP listens on a local network port. **This mode has no built-in authentication.** You are responsible for securing access. Do not expose to the public internet.
+- **HTTP (`--http`):** The server is loopback-only by default. Non-loopback operation is fail-closed unless an explicit `allowNetwork` policy is selected. Token mode validates `Authorization: Bearer …`; OAuth mode uses the configured OAuth 2.1 resource server and the fixed `mcp:read`, `mcp:write`, `mcp:destructive`, and `mcp:admin` scopes. Do not expose the service through a proxy without preserving these controls.
 
 ## macOS Permissions
 
@@ -137,7 +146,7 @@ Under the GDPR, you have the following rights regarding your personal data:
 
 **For locally-stored data:** Because AirMCP runs entirely on your machine, you have full filesystem access to all data it stores. You can inspect, modify, export, or delete `vectors.json`, `config.json`, and Spotlight entries at any time without needing to contact anyone.
 
-**For data sent to external APIs:** If you have exercised Gemini, Nominatim, Open-Meteo, or Google Workspace tools, refer to the respective provider's privacy policy to exercise your data subject rights with them:
+**For data sent to external APIs:** If you have exercised Gemini, Nominatim, Open-Meteo, Google Workspace, webhook, or Power Automate tools, refer to the respective destination's privacy policy to exercise your data subject rights with it:
 
 - Google Gemini: [Google Privacy Policy](https://policies.google.com/privacy)
 - OpenStreetMap Nominatim: [OSMF Privacy Policy](https://wiki.osmfoundation.org/wiki/Privacy_Policy)
@@ -151,8 +160,9 @@ AirMCP processes data locally on your Mac by default. When external APIs are use
 - **OpenStreetMap Nominatim:** Requests are sent to OSM servers based in the European Union.
 - **Open-Meteo:** Servers are based in the European Union.
 - **Google Workspace (via `gws` CLI):** Data is transferred to Google servers. Refer to Google's data processing terms.
+- **Custom webhooks / Power Automate:** Data is transferred to the destination configured by the owner; its location and safeguards depend on that destination.
 
-No international transfers occur if you do not use these external services.
+AirMCP itself performs no international transfer to an AirMCP-operated service. Transfers may still be made by the connected MCP client or an external destination selected by the owner.
 
 ## Data Protection Officer
 

@@ -23,6 +23,7 @@ if (
   _sub === "workflows" ||
   _sub === "connect" ||
   _sub === "connect-clients" ||
+  _sub === "codex" ||
   _sub === "--help" ||
   _sub === "-h" ||
   _sub === "help"
@@ -45,6 +46,9 @@ if (
   } else if (_sub === "connect-clients") {
     const mod = await import("./cli/connect-clients.js");
     mod.runConnectClients();
+  } else if (_sub === "codex") {
+    const mod = await import("./cli/codex.js");
+    mod.runCodex();
   } else {
     const mod = await import("./cli/help.js");
     mod.runHelp();

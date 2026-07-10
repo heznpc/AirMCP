@@ -237,6 +237,25 @@ describe("client config repair", () => {
     expect(configure).not.toHaveBeenCalled();
   });
 
+  test("explicit Codex connection re-enables a matching disabled entry", async () => {
+    const home = mkdtempSync(join(tmpdir(), "airmcp-client-config-"));
+    tempHomes.push(home);
+    const { configureMcpClients } = await loadClientConfig(home);
+    const configure = jest.fn(() => "configured");
+
+    const results = configureMcpClients({
+      clients: [],
+      codex: {
+        isAvailable: () => true,
+        shape: () => "app-owned-disabled",
+        configure,
+      },
+    });
+
+    expect(results).toEqual([{ name: "Codex", status: "configured", detail: "token-gated AirMCP.app runtime" }]);
+    expect(configure).toHaveBeenCalledTimes(1);
+  });
+
   test("supports dry-run Codex direct runtime repair without shelling out", async () => {
     const home = mkdtempSync(join(tmpdir(), "airmcp-client-config-"));
     tempHomes.push(home);

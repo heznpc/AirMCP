@@ -20,6 +20,8 @@ private struct MCPClient: Identifiable {
 // MARK: - Onboarding View
 
 struct OnboardingView: View {
+    static let preferredContentSize = NSSize(width: 640, height: 520)
+
     let configManager: ConfigManager
     let serverManager: ServerManager
     let onComplete: () -> Void
@@ -40,24 +42,47 @@ struct OnboardingView: View {
 
     private let totalSteps = 6
 
+    private var currentStepTitle: String {
+        let titles = [
+            L("onboarding.stepWelcome"),
+            L("onboarding.stepRuntime"),
+            L("onboarding.stepWorkflow"),
+            L("onboarding.stepAccess"),
+            L("onboarding.stepPermissions"),
+            L("onboarding.stepConnect"),
+        ]
+        return titles[currentStep]
+    }
+
     private var selectedWorkflow: OnboardingWorkflow {
         onboardingWorkflows.first { $0.id == selectedWorkflowID } ?? onboardingWorkflows[0]
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            // Progress dots
-            HStack(spacing: 8) {
-                ForEach(0..<totalSteps, id: \.self) { step in
-                    Circle()
-                        .fill(step == currentStep ? Color.accentColor : Color.secondary.opacity(0.3))
-                        .frame(width: 8, height: 8)
-                }
-            }
-            .padding(.top, 20)
-            .padding(.bottom, 16)
+            VStack(spacing: 10) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(currentStepTitle)
+                        .font(.headline)
 
-            // Step content
+                    Spacer()
+
+                    Text(L("onboarding.progress", currentStep + 1, totalSteps))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+
+                ProgressView(value: Double(currentStep + 1), total: Double(totalSteps))
+                    .progressViewStyle(.linear)
+                    .controlSize(.small)
+                    .tint(Color.accentColor)
+            }
+            .padding(.horizontal, 22)
+            .padding(.vertical, 14)
+
+            Divider()
+
             Group {
                 switch currentStep {
                 case 0: welcomeStep
@@ -71,11 +96,12 @@ struct OnboardingView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            // Navigation buttons
+            Divider()
+
             HStack {
                 if currentStep > 0 {
                     Button(L("onboarding.back")) {
-                        withAnimation { currentStep -= 1 }
+                        currentStep -= 1
                     }
                     .keyboardShortcut(.cancelAction)
                 }
@@ -96,48 +122,108 @@ struct OnboardingView: View {
                     .disabled(!firstRunReady)
                 }
             }
-            .padding(20)
+            .padding(.horizontal, 20)
+            .frame(height: 58)
         }
-        .frame(width: 540, height: 540)
+        .frame(
+            width: Self.preferredContentSize.width,
+            height: Self.preferredContentSize.height
+        )
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 
     // MARK: - Step 1: Welcome
 
     private var welcomeStep: some View {
-        VStack(spacing: 16) {
-            Spacer()
+        VStack(alignment: .leading, spacing: 22) {
+            HStack(alignment: .center, spacing: 18) {
+                appIcon(size: 64)
 
-            if let iconURL = Bundle.module.url(forResource: "AppIcon@2x", withExtension: "png", subdirectory: "Resources"),
-               let nsImage = NSImage(contentsOf: iconURL) {
-                Image(nsImage: nsImage)
-                    .resizable()
-                    .frame(width: 72, height: 72)
+                VStack(alignment: .leading, spacing: 7) {
+                    Text(L("onboarding.welcome"))
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+
+                    Text(L("onboarding.welcomeDesc"))
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
 
-            Text(L("onboarding.welcome"))
-                .font(.title)
-                .fontWeight(.bold)
+            VStack(spacing: 0) {
+                welcomeFeatureRow(
+                    icon: "macbook.and.iphone",
+                    title: L("onboarding.welcomeLocalTitle"),
+                    detail: L("onboarding.welcomeLocalDesc")
+                )
+                Divider().padding(.leading, 42)
+                welcomeFeatureRow(
+                    icon: "checkmark.shield",
+                    title: L("onboarding.welcomeControlTitle"),
+                    detail: L("onboarding.welcomeControlDesc")
+                )
+                Divider().padding(.leading, 42)
+                welcomeFeatureRow(
+                    icon: "point.3.connected.trianglepath.dotted",
+                    title: L("onboarding.welcomeClientTitle"),
+                    detail: L("onboarding.welcomeClientDesc")
+                )
+            }
+            .padding(.horizontal, 14)
+            .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
 
-            Text(L("onboarding.welcomeDesc"))
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: 400)
-
-            Text(L("onboarding.welcomeTime"))
+            Label(L("onboarding.welcomeTime"), systemImage: "clock")
                 .font(.callout)
-                .foregroundStyle(.tertiary)
-
-            Spacer()
+                .foregroundStyle(.secondary)
         }
-        .padding(.horizontal, 32)
+        .frame(maxWidth: 540)
+        .padding(.horizontal, 36)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+    }
+
+    @ViewBuilder
+    private func appIcon(size: CGFloat) -> some View {
+        if let iconURL = Bundle.module.url(forResource: "AppIcon@2x", withExtension: "png"),
+           let nsImage = NSImage(contentsOf: iconURL) {
+            Image(nsImage: nsImage)
+                .resizable()
+                .interpolation(.high)
+                .frame(width: size, height: size)
+        } else {
+            Image(systemName: "a.square.fill")
+                .resizable()
+                .scaledToFit()
+                .foregroundStyle(Color.accentColor)
+                .frame(width: size, height: size)
+        }
+    }
+
+    private func welcomeFeatureRow(icon: String, title: String, detail: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .foregroundStyle(Color.accentColor)
+                .frame(width: 28, height: 28)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.callout)
+                    .fontWeight(.semibold)
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 10)
     }
 
     // MARK: - Step 2: Node.js Check
 
     private var nodeCheckStep: some View {
         VStack(spacing: 16) {
-            Spacer()
-
             Image(systemName: "shippingbox")
                 .font(.system(size: 44))
                 .foregroundStyle(Color.accentColor)
@@ -173,10 +259,9 @@ struct OnboardingView: View {
                     Task { await checkNode() }
                 }
             }
-
-            Spacer()
         }
         .padding(.horizontal, 32)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         .task { await checkNode() }
     }
 
@@ -238,7 +323,7 @@ struct OnboardingView: View {
 
                 Label(workflow.accessSummary, systemImage: "checkmark.shield")
                     .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
                     .lineLimit(2)
             }
             .frame(minHeight: 108, alignment: .top)
@@ -276,7 +361,7 @@ struct OnboardingView: View {
 
             Text(L("onboarding.workflowPresetHint", selectedWorkflow.title))
                 .font(.caption)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 420)
 
@@ -352,8 +437,6 @@ struct OnboardingView: View {
 
     private var permissionStep: some View {
         VStack(spacing: 16) {
-            Spacer()
-
             Image(systemName: "lock.shield")
                 .font(.system(size: 44))
                 .foregroundStyle(Color.accentColor)
@@ -396,11 +479,10 @@ struct OnboardingView: View {
 
             Text(L("onboarding.permRuntimeHint"))
                 .font(.caption)
-                .foregroundStyle(.tertiary)
-
-            Spacer()
+                .foregroundStyle(.secondary)
         }
         .padding(.horizontal, 24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
     }
 
     @ViewBuilder
@@ -422,42 +504,41 @@ struct OnboardingView: View {
     // MARK: - Step 6: Client Detection
 
     private var clientDetectionStep: some View {
-        VStack(spacing: 16) {
-            Spacer()
+        ScrollView {
+            VStack(spacing: 14) {
+                Image(systemName: "app.connected.to.app.below.fill")
+                    .font(.system(size: 38))
+                    .foregroundStyle(Color.accentColor)
 
-            Image(systemName: "app.connected.to.app.below.fill")
-                .font(.system(size: 44))
-                .foregroundStyle(Color.accentColor)
+                Text(L("onboarding.connectClient"))
+                    .font(.title2)
+                    .fontWeight(.semibold)
 
-            Text(L("onboarding.connectClient"))
-                .font(.title2)
-                .fontWeight(.semibold)
+                Text(L("onboarding.connectClientDesc"))
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: 460)
 
-            Text(L("onboarding.connectClientDesc"))
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: 400)
+                selectedWorkflowActions
 
-            selectedWorkflowActions
+                firstRunStatusCard
 
-            firstRunStatusCard
+                VStack(spacing: 8) {
+                    ForEach($mcpClients) { $client in
+                        clientRow(client: client)
+                    }
+                }
+                .padding(.horizontal, 24)
 
-            VStack(spacing: 8) {
-                ForEach($mcpClients) { $client in
-                    clientRow(client: client)
+                if mcpClients.allSatisfy({ !$0.detected }) {
+                    Text(L("onboarding.noClients"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: 420)
                 }
             }
-            .padding(.horizontal, 24)
-
-            if mcpClients.allSatisfy({ !$0.detected }) {
-                Text(L("onboarding.noClients"))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 380)
-            }
-
-            Spacer()
+            .padding(.vertical, 18)
         }
         .padding(.horizontal, 24)
         .task {
@@ -481,18 +562,6 @@ struct OnboardingView: View {
                     AirMcpConstants.copyToClipboard(selectedWorkflow.prompt)
                 }
                 .controlSize(.small)
-
-                Button(L("onboarding.copyCodexPrompt")) {
-                    AirMcpConstants.copyToClipboard(selectedWorkflow.prompt)
-                }
-                .controlSize(.small)
-
-                if let siriPhrase = selectedWorkflow.siriPhrase {
-                    Button(L("onboarding.copySiriPhrase")) {
-                        AirMcpConstants.copyToClipboard("Hey Siri, \(siriPhrase)")
-                    }
-                    .controlSize(.small)
-                }
             }
         }
         .padding(10)
@@ -553,12 +622,19 @@ struct OnboardingView: View {
             Image(systemName: client.icon)
                 .frame(width: 24)
                 .foregroundStyle(client.detected ? Color.accentColor : Color.secondary)
-            VStack(alignment: .leading) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(client.name)
                     .fontWeight(.medium)
                 Text(client.detected ? L("onboarding.installed") : L("onboarding.notFound"))
                     .font(.caption)
                     .foregroundStyle(client.detected ? .green : .secondary)
+                if client.id == "codex" && client.detected {
+                    Text(L("onboarding.codexStartupDisclosure"))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("onboarding.codexStartupDisclosure")
+                }
             }
 
             Spacer()
@@ -572,7 +648,7 @@ struct OnboardingView: View {
                     ProgressView()
                         .controlSize(.small)
                 } else {
-                    Button(L("onboarding.autoPatch")) {
+                    Button(client.id == "codex" ? L("onboarding.enableInCodex") : L("onboarding.autoPatch")) {
                         patchClient(client)
                     }
                     .controlSize(.small)
@@ -589,10 +665,15 @@ struct OnboardingView: View {
     // MARK: - Logic
 
     private func advanceStep() {
-        withAnimation { currentStep += 1 }
+        currentStep += 1
     }
 
     private func checkNode() async {
+        if AirMcpConstants.bundledServerRuntime != nil {
+            nodeChecking = false
+            nodeAvailable = true
+            return
+        }
         let found = await Task.detached {
             Self.nodeExists()
         }.value
@@ -694,7 +775,7 @@ struct OnboardingView: View {
         }
 
         for _ in 0..<24 {
-            if let version = await Self.runtimeHealthVersion() {
+            if let version = await ServerManager.authenticatedAppOwnedRuntimeVersion() {
                 firstRunReady = true
                 firstRunChecking = false
                 firstRunMessage = L("onboarding.firstRunReadyDesc", version, selectedWorkflow.title)
@@ -707,22 +788,6 @@ struct OnboardingView: View {
         firstRunMessage = L("onboarding.firstRunRuntimeFailed")
     }
 
-    private nonisolated static func runtimeHealthVersion() async -> String? {
-        guard let url = URL(string: AirMcpConstants.appOwnedHealthURL) else { return nil }
-        var request = URLRequest(url: url)
-        request.timeoutInterval = 1.0
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard (response as? HTTPURLResponse)?.statusCode == 200,
-                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  (json["status"] as? String) == "ok"
-            else { return nil }
-            return (json["version"] as? String) ?? "unknown"
-        } catch {
-            return nil
-        }
-    }
-
     private nonisolated static func patchCodexConfig() -> Bool {
         guard let codex = NodeEnvironment.findExecutable(named: "codex") else {
             return false
@@ -731,8 +796,12 @@ struct OnboardingView: View {
             return false
         }
 
-        _ = runProcess(codex, arguments: ["mcp", "remove", "airmcp"])
-        return runProcess(
+        let existing = runProcessCaptured(codex, arguments: ["mcp", "get", "airmcp", "--json"])
+        if existing.success && !runProcess(codex, arguments: ["mcp", "remove", "airmcp"]) {
+            return false
+        }
+
+        let added = runProcess(
             codex,
             arguments: [
                 "mcp",
@@ -741,14 +810,68 @@ struct OnboardingView: View {
                 "AIRMCP_HTTP_TOKEN=\(token)",
                 "airmcp",
                 "--",
-                "npx",
-                "-y",
-                AirMcpConstants.npmPackageSpecifier,
-                "connect",
-                "--url",
-                AirMcpConstants.appOwnedHttpURL,
-            ]
+                AirMcpConstants.appOwnedProxyCommand,
+            ] + AirMcpConstants.appOwnedProxyArgs
         )
+        if added { return true }
+
+        // `codex mcp add` has no in-place update operation. If the replacement
+        // fails after removal, reconstruct the prior entry captured above.
+        if existing.success {
+            _ = restoreCodexConfig(codex, json: existing.output)
+        }
+        return false
+    }
+
+    private nonisolated static func restoreCodexConfig(_ codex: String, json: String) -> Bool {
+        guard let data = json.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let transport = object["transport"] as? [String: Any],
+              let type = transport["type"] as? String
+        else { return false }
+
+        if type == "stdio",
+           let command = transport["command"] as? String,
+           let commandArgs = transport["args"] as? [String] {
+            var arguments = ["mcp", "add"]
+            if let environment = transport["env"] as? [String: String] {
+                for key in environment.keys.sorted() {
+                    if let value = environment[key] {
+                        arguments.append(contentsOf: ["--env", "\(key)=\(value)"])
+                    }
+                }
+            }
+            arguments.append(contentsOf: ["airmcp", "--", command])
+            arguments.append(contentsOf: commandArgs)
+            return runProcess(codex, arguments: arguments)
+        }
+
+        if type == "streamable_http", let url = transport["url"] as? String {
+            return runProcess(codex, arguments: ["mcp", "add", "airmcp", "--url", url])
+        }
+        return false
+    }
+
+    private nonisolated static func runProcessCaptured(
+        _ executable: String,
+        arguments: [String]
+    ) -> (success: Bool, output: String) {
+        let process = Process()
+        let output = Pipe()
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = arguments
+        process.environment = NodeEnvironment.buildEnv()
+        process.standardOutput = output
+        process.standardError = FileHandle.nullDevice
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+            let data = output.fileHandleForReading.readDataToEndOfFile()
+            return (process.terminationStatus == 0, String(data: data, encoding: .utf8) ?? "")
+        } catch {
+            return (false, "")
+        }
     }
 
     private nonisolated static func runProcess(_ executable: String, arguments: [String]) -> Bool {
@@ -768,18 +891,20 @@ struct OnboardingView: View {
         }
     }
 
-    private nonisolated static func patchConfig(at path: String) -> Bool {
+    nonisolated static func patchConfig(at path: String) -> Bool {
         let fm = FileManager.default
 
         // Ensure directory exists
         let dir = (path as NSString).deletingLastPathComponent
         try? fm.createDirectory(atPath: dir, withIntermediateDirectories: true)
 
-        // Read existing config or start fresh
+        // Read existing config or start fresh. A malformed existing file is
+        // never replaced with an empty object.
         var config: [String: Any]
-        if let data = fm.contents(atPath: path),
-           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        {
+        if fm.fileExists(atPath: path) {
+            guard let data = fm.contents(atPath: path),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            else { return false }
             config = json
         } else {
             config = [:]
@@ -792,21 +917,83 @@ struct OnboardingView: View {
         let airmcpEntry = AirMcpConstants.appOwnedProxyEntry(token: token)
 
         // Merge into mcpServers
+        if config["mcpServers"] != nil && !(config["mcpServers"] is [String: Any]) {
+            return false
+        }
         var servers = config["mcpServers"] as? [String: Any] ?? [:]
         servers["airmcp"] = airmcpEntry
         config["mcpServers"] = servers
 
-        // Write back
+        // Write back. The proxy entry contains the local bearer token, so the
+        // destination and backup must never be created world-readable.
         do {
             let data = try JSONSerialization.data(
                 withJSONObject: config,
                 options: [.prettyPrinted, .sortedKeys]
             )
-            try data.write(to: URL(fileURLWithPath: path), options: .atomic)
+            guard (try JSONSerialization.jsonObject(with: data)) is [String: Any] else {
+                return false
+            }
+            let backupPath = path + ".airmcp-backup"
+            let originalData = fm.contents(atPath: path)
+            let originalPermissions = ((try? fm.attributesOfItem(atPath: path)[.posixPermissions]) as? NSNumber)?.intValue
+
+            if let originalData {
+                try installFileAtomically(originalData, at: backupPath, permissions: 0o600)
+            }
+
+            do {
+                try installFileAtomically(data, at: path, permissions: 0o600)
+            } catch {
+                // Keep the operation transactional: a failed permission or
+                // replacement step must not leave a partially patched config.
+                if let originalData {
+                    try? installFileAtomically(
+                        originalData,
+                        at: path,
+                        permissions: originalPermissions ?? 0o600
+                    )
+                } else {
+                    try? fm.removeItem(atPath: path)
+                }
+                return false
+            }
             return true
         } catch {
             return false
         }
+    }
+
+    private nonisolated static func installFileAtomically(
+        _ data: Data,
+        at path: String,
+        permissions: Int
+    ) throws {
+        let fm = FileManager.default
+        let destination = URL(fileURLWithPath: path)
+        let temporary = destination.deletingLastPathComponent().appendingPathComponent(
+            ".\(destination.lastPathComponent).airmcp-\(UUID().uuidString).tmp"
+        )
+        let attributes: [FileAttributeKey: Any] = [
+            .posixPermissions: NSNumber(value: permissions),
+        ]
+
+        guard fm.createFile(atPath: temporary.path, contents: data, attributes: attributes) else {
+            throw NSError(
+                domain: "AirMCPOnboardingConfig",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Failed to create an owner-only client config."]
+            )
+        }
+        defer { try? fm.removeItem(at: temporary) }
+        try fm.setAttributes(attributes, ofItemAtPath: temporary.path)
+
+        if fm.fileExists(atPath: path) {
+            _ = try fm.replaceItemAt(destination, withItemAt: temporary)
+        } else {
+            try fm.moveItem(at: temporary, to: destination)
+        }
+        try fm.setAttributes(attributes, ofItemAtPath: path)
     }
 
     private func saveAndComplete() {

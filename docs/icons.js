@@ -88,8 +88,6 @@ const ModIcons = (() => {
 
   // Intelligence uses a gradient — patch its SVG
   icons.intelligence = icons.intelligence.replace(
-    '<svg ',
-    '<svg ').replace(
     '</svg>',
     '<defs><linearGradient id="ai-grad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#FF6482"/><stop offset="50%" stop-color="#A17BF0"/><stop offset="100%" stop-color="#5FC3E4"/></linearGradient></defs></svg>'
   );

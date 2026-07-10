@@ -1,6 +1,6 @@
 {
   "generatedAt": "STABLE_PLACEHOLDER",
-  "protocolVersion": "2025-06-18",
+  "protocolVersion": "2025-11-25",
   "toolCount": 296,
   "eligibleCount": 290,
   "ineligibleCount": 6,
@@ -470,6 +470,19 @@
               "error"
             ]
           },
+          "correlationId": {
+            "description": "Filter to one correlated tool/approval trace.",
+            "type": "string",
+            "maxLength": 200
+          },
+          "kind": {
+            "description": "Filter tool calls or approval decisions.",
+            "type": "string",
+            "enum": [
+              "tool",
+              "approval"
+            ]
+          },
           "limit": {
             "default": 100,
             "description": "Max entries to return (default: 100, max: 1000).",
@@ -500,6 +513,13 @@
                 "timestamp": {
                   "type": "string"
                 },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "tool",
+                    "approval"
+                  ]
+                },
                 "tool": {
                   "type": "string"
                 },
@@ -519,22 +539,92 @@
                     "type": "string"
                   },
                   "additionalProperties": {}
+                },
+                "correlationId": {
+                  "type": "string"
+                },
+                "actor": {
+                  "type": "string"
+                },
+                "errorCategory": {
+                  "type": "string"
+                },
+                "approvalDecision": {
+                  "type": "string",
+                  "enum": [
+                    "approved",
+                    "denied",
+                    "timed_out",
+                    "unavailable"
+                  ]
+                },
+                "approvalChannel": {
+                  "type": "string",
+                  "enum": [
+                    "elicitation",
+                    "socket",
+                    "unavailable"
+                  ]
+                },
+                "gate": {
+                  "type": "string",
+                  "enum": [
+                    "oauth_scope",
+                    "emergency_stop",
+                    "rate_limit"
+                  ]
                 }
               },
               "required": [
                 "timestamp",
+                "kind",
                 "tool",
                 "status"
               ],
               "additionalProperties": false
             }
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "firstBreak": {
+            "type": "object",
+            "properties": {
+              "file": {
+                "type": "string"
+              },
+              "lineIndex": {
+                "type": "number"
+              },
+              "reason": {
+                "type": "string",
+                "enum": [
+                  "hmac_mismatch",
+                  "prev_mismatch",
+                  "malformed",
+                  "truncated",
+                  "checkpoint_forged"
+                ]
+              }
+            },
+            "required": [
+              "file",
+              "lineIndex",
+              "reason"
+            ],
+            "additionalProperties": false
+          },
+          "auditDisabled": {
+            "type": "boolean"
           }
         },
         "required": [
           "total",
           "returned",
           "scannedFiles",
-          "entries"
+          "entries",
+          "verified",
+          "auditDisabled"
         ],
         "additionalProperties": false
       },

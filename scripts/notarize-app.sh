@@ -83,6 +83,22 @@ find "$APP_BUNDLE" -name "*.appex" -print0 | while IFS= read -r -d '' appex; do
   fi
   codesign --remove-signature "$appex" 2>/dev/null || true
 done
+
+# The self-contained app embeds executable Node and Swift bridge binaries.
+# They are nested code and must receive the same Developer ID + hardened
+# runtime treatment before the outer bundle is signed.
+for nested in \
+  "$APP_BUNDLE/Contents/Resources/airmcp/runtime/bin/node" \
+  "$APP_BUNDLE/Contents/Resources/airmcp/bin/AirMcpBridge"; do
+  if [ ! -x "$nested" ]; then
+    echo "notarize-app: required embedded executable missing: $nested" >&2
+    exit 1
+  fi
+  echo "  signing $nested"
+  codesign --force --options=runtime --timestamp \
+    --sign "$APPLE_DEVELOPER_ID" \
+    "$nested"
+done
 codesign --remove-signature "$APP_BUNDLE" 2>/dev/null || true
 
 # Sign embedded extensions first (innermost-out), re-applying the entitlements
@@ -165,4 +181,6 @@ xcrun stapler staple "$APP_BUNDLE"
 xcrun stapler validate "$APP_BUNDLE"
 
 rm -f "$ZIP_PATH"
-echo "notarize-app: ✓ $APP_BUNDLE signed, notarized, and stapled"
+echo "notarize-app: running final signed-artifact verification …"
+APP_BUNDLE_PATH="$APP_BUNDLE" bash "$SCRIPT_DIR/verify-signed-app.sh"
+echo "notarize-app: ✓ $APP_BUNDLE signed, notarized, stapled, and runtime-verified"

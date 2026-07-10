@@ -93,7 +93,7 @@ describe('flushBuffer: first-attempt failure → retry → success', () => {
 });
 
 describe('flushBuffer: both attempts fail → consecutiveFlushFailures increments', () => {
-  test('increments by 1 per double-failure', async () => {
+  test('increments by 1 per double-failure and requeues the complete batch', async () => {
     appendFile.mockRejectedValue(Object.assign(new Error('ENOSPC'), { code: 'ENOSPC' }));
 
     auditLog({ timestamp: 'T1', tool: 'tool_x', status: 'ok' });
@@ -102,6 +102,40 @@ describe('flushBuffer: both attempts fail → consecutiveFlushFailures increment
     const state = _testGetState();
     expect(state.consecutiveFlushFailures).toBe(1);
     expect(state.auditDisabled).toBe(false); // not yet at threshold
+    expect(state.bufferLength).toBe(1); // failed audit row is never dropped
+  });
+
+  test('two append failures then recovery preserves rows and chain continuity', async () => {
+    const diskError = Object.assign(new Error('EAGAIN'), { code: 'EAGAIN' });
+    appendFile
+      .mockRejectedValueOnce(diskError)
+      .mockRejectedValueOnce(diskError)
+      .mockResolvedValueOnce(undefined);
+
+    auditLog({ timestamp: 'T1', tool: 'first', status: 'ok' });
+    await _testFlush(); // initial attempt + retry both fail
+    expect(_testGetState().bufferLength).toBe(1);
+
+    // A newer row arrives before the retry window. Recovery must retain FIFO
+    // order and reseal from the last chain head known to be on disk.
+    auditLog({ timestamp: 'T2', tool: 'second', status: 'error' });
+    await _testFlush();
+
+    expect(appendFile).toHaveBeenCalledTimes(3);
+    const recovered = appendFile.mock.calls[2][1].trimEnd().split('\n').map(JSON.parse);
+    expect(recovered.map((entry) => entry.tool)).toEqual(['first', 'second']);
+    expect(recovered.map((entry) => entry.seq)).toEqual([0, 1]);
+    expect(recovered[0]._prev).toBe('0'.repeat(64));
+    expect(recovered[1]._prev).toBe(recovered[0]._hmac);
+    expect(_testGetState().bufferLength).toBe(0);
+
+    // The next successful batch must continue from the recovered batch, not
+    // from the speculative head computed during either failed append.
+    auditLog({ timestamp: 'T3', tool: 'third', status: 'ok' });
+    await _testFlush();
+    const next = JSON.parse(appendFile.mock.calls[3][1].trim());
+    expect(next.seq).toBe(2);
+    expect(next._prev).toBe(recovered[1]._hmac);
   });
 
   test('reaches MAX_FLUSH_FAILURES (5) → auditDisabled trips, timer cleared', async () => {
@@ -115,6 +149,7 @@ describe('flushBuffer: both attempts fail → consecutiveFlushFailures increment
     const state = _testGetState();
     expect(state.consecutiveFlushFailures).toBeGreaterThanOrEqual(5);
     expect(state.auditDisabled).toBe(true);
+    expect(state.bufferLength).toBe(5);
   });
 });
 
@@ -130,10 +165,12 @@ describe('maybeAttemptRecovery: window-gated re-enable', () => {
     }
     expect(_testGetState().auditDisabled).toBe(true);
 
-    // Within window → next log is dropped (auditDisabled stays true)
+    // Within window → retry stays paused, but the row remains spooled.
+    const before = _testGetState().bufferLength;
     _testSetAuditDisabledSince(Date.now()); // just tripped
     auditLog({ timestamp: 'T-fresh', tool: 't', status: 'ok' });
     expect(_testGetState().auditDisabled).toBe(true);
+    expect(_testGetState().bufferLength).toBe(before + 1);
   });
 
   test('re-enables when 5-minute window elapses + clears consecutiveFailures', async () => {

@@ -2,7 +2,7 @@
 // RFC 0007 Phase A.0 — MCP tool manifest dumper.
 //
 // Boots the AirMCP stdio server the same way scripts/smoke-mcp.mjs does,
-// performs the MCP 2025-06-18 handshake, asks for `tools/list`, and writes
+// performs the latest stable MCP handshake, asks for `tools/list`, and writes
 // the normalized manifest to docs/tool-manifest.json (or --out).
 //
 // The manifest is the input to scripts/gen-swift-intents.mjs (which codegens
@@ -24,6 +24,7 @@ import { createInterface } from "node:readline";
 import { writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { MCP_PROTOCOL_VERSION } from "./lib/mcp-stdio-client.mjs";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const OUT_PATH = process.env.AIRMCP_MANIFEST_OUT ?? join(ROOT, "docs", "tool-manifest.json");
@@ -132,7 +133,7 @@ try {
   const initResp = await request(
     "initialize",
     {
-      protocolVersion: "2025-06-18",
+      protocolVersion: MCP_PROTOCOL_VERSION,
       capabilities: {},
       clientInfo: { name: "airmcp-manifest-dump", version: "0.0.0" },
     },
@@ -183,7 +184,7 @@ try {
 
   const manifest = {
     generatedAt: new Date().toISOString(),
-    protocolVersion: "2025-06-18",
+    protocolVersion: MCP_PROTOCOL_VERSION,
     toolCount: normalized.length,
     eligibleCount: normalized.filter((t) => t.appIntentEligible).length,
     ineligibleCount,

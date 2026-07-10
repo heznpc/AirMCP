@@ -1,5 +1,6 @@
 /* Menu - Server */
 "menu.refreshStatus" = "Refresh Status";
+"menu.trustCenter" = "Open Trust Center";
 "menu.startServer" = "Start Server";
 "menu.stopServer" = "Stop Server";
 "menu.checking" = "Checking...";
@@ -21,12 +22,14 @@
 
 /* Menu - Update */
 "menu.updateAvailable" = "Update Available: v%@";
-"menu.updateNow" = "Update Now";
+"menu.updateNow" = "Open Signed Release";
+"update.signedReleaseUnavailable" = "A signed app release is not available.";
 "menu.updating" = "Updating...";
 
 /* Menu - Setup */
 "menu.getStarted" = "Get Started";
 "menu.setupPermissions" = "Setup Permissions...";
+"menu.openSetup" = "Open Setup...";
 "menu.settingUp" = "Setting Up...";
 
 /* Menu - Config */
@@ -42,11 +45,10 @@
 "menu.clearLogs" = "Clear Logs";
 
 /* Workflows */
-"workflow.menuHint" = "Copy a prompt or Siri phrase, then run it from your MCP client or Shortcuts.";
+"workflow.menuHint" = "Copy a prompt for your MCP client, or compose an AirMCP action in Shortcuts.";
 "workflow.copyPrompt" = "Copy Prompt";
-"workflow.copySiriPhrase" = "Copy Siri Phrase";
 "workflow.copyToolList" = "Copy Tool List";
-"workflow.openShortcutsDoc" = "Open Shortcuts Guide";
+"workflow.openShortcutsDoc" = "Open Shortcuts Actions Guide";
 "workflow.dailyBriefing" = "Daily Briefing";
 "workflow.dailyBriefing.desc" = "Start the day with calendar, reminders, mail, and recent notes.";
 "workflow.dailyBriefing.prompt" = "Brief me on today's calendar, overdue reminders, unread mail, and recent notes.";
@@ -83,6 +85,107 @@
 
 /* Settings */
 "settings.autoStart" = "Start Server on Launch";
+"settings.launchAtLogin" = "Launch AirMCP at Login";
+"settings.launchAtLoginFailed" = "Login item update failed: %@";
+
+/* Trust Center */
+"trust.title" = "AirMCP Trust Center";
+"trust.subtitle" = "Live evidence from the local runtime and macOS permission probes.";
+"trust.refresh" = "Refresh";
+"trust.runtimeSection" = "Runtime";
+"trust.runtime" = "App-owned runtime";
+"trust.exposedTools" = "Advertised tools";
+"trust.pendingApprovals" = "Pending approvals";
+"trust.safeguardsSection" = "Safeguards";
+"trust.auditIntegrity" = "Audit chain";
+"trust.auditEntries" = "%d verified-window entries";
+"trust.auditDisabled" = "Logging disabled";
+"trust.verified" = "Verified";
+"trust.failed" = "Verification failed";
+"trust.unavailable" = "Unavailable";
+"trust.emergencyStop" = "Emergency stop";
+"trust.engaged" = "Engaged";
+"trust.ready" = "Ready";
+"trust.emergencyEngage" = "Block Destructive Tools";
+"trust.emergencyClear" = "Allow Destructive Tools Again";
+"trust.emergencyClearTitle" = "Disengage emergency stop?";
+"trust.emergencyClearMessage" = "Destructive tool calls will be eligible to run again, subject to per-call approval and rate limits.";
+"trust.permissionsSection" = "Permissions";
+"trust.permissionsNotChecked" = "Run real minimal reads to verify macOS Automation access.";
+"trust.checkPermissions" = "Check Permissions";
+"trust.pending" = "Pending";
+"trust.granted" = "Granted";
+"trust.denied" = "Denied";
+"trust.configurationSection" = "Configuration";
+"trust.cancel" = "Cancel";
+"trust.ok" = "OK";
+"trust.section" = "Trust Center section";
+"trust.activity" = "Activity";
+"trust.range" = "Time range";
+"trust.rangeDay" = "24h";
+"trust.rangeWeek" = "7d";
+"trust.rangeMonth" = "30d";
+"trust.statusFilter" = "Status filter";
+"trust.filterAll" = "All";
+"trust.filterAttention" = "Attention";
+"trust.filterFailed" = "Failed";
+"trust.filterSucceeded" = "Succeeded";
+"trust.searchRuns" = "Search runs";
+"trust.loadingActivity" = "Loading governed activity…";
+"trust.activityUnavailable" = "Activity unavailable";
+"trust.noRuns" = "No runs in this view";
+"trust.noRunsMessage" = "Change the time range or filter, or run an AirMCP workflow.";
+"trust.selectRun" = "Select a run";
+"trust.selectRunMessage" = "Choose a governed run to inspect its approval and tool timeline.";
+"trust.historyTruncated" = "Showing %d of %d audit events";
+"trust.actionCount" = "%d actions";
+"trust.runEvidence" = "Run evidence";
+"trust.runID" = "Run ID";
+"trust.approval" = "Approval";
+"trust.actor" = "Origin";
+"trust.duration" = "Recorded call time";
+"trust.durationMs" = "%d ms";
+"trust.durationSeconds" = "%.1f sec";
+"trust.timeline" = "Verified timeline";
+"trust.awaitingAudit" = "The decision is live; waiting for the runtime to seal its audit event.";
+"trust.approvalRequired" = "Approval required";
+"trust.localArguments" = "Arguments (local only)";
+"trust.destructive" = "Destructive";
+"trust.sensitive" = "Sensitive";
+"trust.network" = "Network";
+"trust.approvalEvent" = "%@ — %@";
+"trust.gateEvent" = "%@ blocked %@";
+"trust.approvalNotRequired" = "Not required";
+"trust.approved" = "Approved";
+"trust.timedOut" = "Timed out";
+"trust.unknown" = "Unknown";
+"trust.channelApp" = "AirMCP app";
+"trust.channelClient" = "MCP client";
+"trust.channelUnavailable" = "No approval channel";
+"trust.gateOAuth" = "OAuth scope";
+"trust.gateEmergency" = "Emergency stop";
+"trust.gateRateLimit" = "Rate limit";
+"trust.actorUser" = "User-initiated";
+"trust.actorDaemon" = "Scheduled workflow";
+"trust.actorApprovedQueue" = "Approved queue";
+"trust.statusPending" = "Awaiting approval";
+"trust.statusRunning" = "Completing";
+"trust.statusSucceeded" = "Succeeded";
+"trust.statusFailed" = "Failed";
+"trust.statusDenied" = "Denied";
+"trust.statusTimedOut" = "Timed out";
+"trust.statusBlocked" = "Blocked";
+"trust.integrityVerifiedDetail" = "History and this verdict come from the same HMAC-chain scan.";
+"trust.integrityFailedDetail" = "Only the accepted prefix is shown. Review the break before trusting later activity.";
+"trust.integrityDisabledDetail" = "Audit writes are unavailable; activity may be incomplete.";
+"trust.integrityUnavailableDetail" = "Start the app-owned runtime to verify local activity.";
+"trust.safeguardsSubtitle" = "Runtime, audit integrity, approvals, and emergency controls.";
+"trust.permissionsSubtitle" = "Real minimal reads verify macOS app access.";
+"trust.export" = "Export Redacted Report…";
+"trust.exportTitle" = "Export Trust Center Report";
+"trust.exportFailed" = "Export failed";
+"trust.exportComplete" = "Report exported";
+"trust.exportCompleteMessage" = "%@ contains no arguments, raw errors, credentials, paths, or HMAC material.";
 "settings.includeShared" = "Include Shared Notes";
 "settings.allowMessages" = "Allow Send Messages";
 "settings.allowMail" = "Allow Send Mail";
@@ -224,18 +327,32 @@
 "addon.powerautomate.desc" = "Outbound Microsoft Power Automate Cloud Flow trigger.";
 
 /* Onboarding */
+"onboarding.windowTitle" = "AirMCP Setup";
 "onboarding.back" = "Back";
 "onboarding.next" = "Next";
 "onboarding.finish" = "Finish";
+"onboarding.stepWelcome" = "Welcome";
+"onboarding.stepRuntime" = "Runtime";
+"onboarding.stepWorkflow" = "First workflow";
+"onboarding.stepAccess" = "App access";
+"onboarding.stepPermissions" = "Permissions";
+"onboarding.stepConnect" = "Connect";
+"onboarding.progress" = "Step %d of %d";
 "onboarding.welcome" = "Welcome to AirMCP";
-"onboarding.welcomeDesc" = "AirMCP lets AI assistants like Claude interact with your Mac apps - Notes, Calendar, Mail, Reminders, and more - through the Model Context Protocol (MCP).";
-"onboarding.welcomeTime" = "This setup will take about a minute.";
-"onboarding.nodeRequired" = "Node.js Required";
-"onboarding.nodeChecking" = "Checking for Node.js...";
-"onboarding.nodeFound" = "Node.js found";
-"onboarding.nodeNotFound" = "Node.js not found";
-"onboarding.nodeInstallHint" = "AirMCP requires Node.js to run. Please install it and relaunch the app.";
-"onboarding.nodeDownload" = "Download Node.js";
+"onboarding.welcomeDesc" = "Connect MCP clients to your Apple apps through one local, governed runtime.";
+"onboarding.welcomeLocalTitle" = "Local by default";
+"onboarding.welcomeLocalDesc" = "Apple app data stays on this Mac unless a tool explicitly sends it elsewhere.";
+"onboarding.welcomeControlTitle" = "Sensitive actions stay gated";
+"onboarding.welcomeControlDesc" = "Per-call approval, rate limits, emergency stop, and a tamper-evident audit trail protect changes.";
+"onboarding.welcomeClientTitle" = "Use the client you already have";
+"onboarding.welcomeClientDesc" = "Connect Codex, Claude, Cursor, or another MCP-compatible client.";
+"onboarding.welcomeTime" = "Six short steps. About a minute.";
+"onboarding.nodeRequired" = "Runtime Check";
+"onboarding.nodeChecking" = "Checking the embedded runtime...";
+"onboarding.nodeFound" = "Embedded AirMCP runtime ready";
+"onboarding.nodeNotFound" = "Runtime not found";
+"onboarding.nodeInstallHint" = "Release builds include the runtime. This development build needs Node.js 20+ as a fallback.";
+"onboarding.nodeDownload" = "Download Node.js for Development";
 "onboarding.nodeCheckAgain" = "Check Again";
 "onboarding.chooseWorkflow" = "What should AirMCP help with first?";
 "onboarding.chooseWorkflowDesc" = "Pick one starting goal. AirMCP will set up only the Mac apps it needs.";
@@ -248,16 +365,16 @@
 "onboarding.permissionsDesc" = "AirMCP asks macOS for app permissions only when a workflow needs them.";
 "onboarding.openSettings" = "Open System Settings";
 "onboarding.connectClient" = "Connect to an AI Client";
-"onboarding.connectClientDesc" = "AirMCP detected the following MCP-compatible clients. Patch their config to add AirMCP automatically.";
+"onboarding.connectClientDesc" = "Choose Connect to add AirMCP to a detected MCP-compatible client.";
 "onboarding.copyPrompt" = "Copy Prompt";
-"onboarding.copyCodexPrompt" = "Copy for Codex";
-"onboarding.copySiriPhrase" = "Copy Siri Phrase";
 "onboarding.noClients" = "No supported clients detected. You can configure manually later using the \"Copy Config\" menu items.";
 "onboarding.installed" = "Installed";
 "onboarding.notFound" = "Not found";
-"onboarding.patched" = "Patched";
+"onboarding.patched" = "Connected";
 "onboarding.failed" = "Failed";
-"onboarding.autoPatch" = "Auto-Patch";
+"onboarding.autoPatch" = "Connect";
+"onboarding.enableInCodex" = "Enable in Codex";
+"onboarding.codexStartupDisclosure" = "Enabling adds a persistent MCP server. Codex will try to connect at every startup and may open AirMCP.app when needed.";
 "onboarding.firstRunWaiting" = "AirMCP will start the app-owned runtime before finishing setup.";
 "onboarding.firstRunStarting" = "Starting the app-owned runtime and preparing a private local token...";
 "onboarding.firstRunReady" = "Ready for first run";
@@ -298,9 +415,10 @@
 /* Services Menu */
 "services.noText" = "No text selected";
 "services.savedNoteTitle" = "AirMCP - Saved Text";
-"services.saveNoteFailed" = "Failed to save note";
-"services.searchQuery" = "Search query set: %@...";
-"services.searchTitle" = "AirMCP Search";
+"services.noteSaved" = "Note created through the governed AirMCP runtime.";
+"services.reminderCreated" = "Reminder created through the governed AirMCP runtime.";
+"services.searchCopied" = "Search results copied to the clipboard.";
+"services.actionFailed" = "Action failed: %@";
 
 /* Onboarding - Permissions */
 "onboarding.permAutomation" = "Automation";

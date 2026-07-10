@@ -1,16 +1,16 @@
 import Foundation
 
 private let appProbes: [(name: String, script: String)] = [
-    ("Notes", "Application('Notes'); void 0"),
-    ("Reminders", "Application('Reminders'); void 0"),
-    ("Calendar", "Application('Calendar'); void 0"),
-    ("Contacts", "Application('Contacts'); void 0"),
-    ("Mail", "Application('Mail'); void 0"),
-    ("Music", "Application('Music'); void 0"),
-    ("Finder", "Application('Finder'); void 0"),
-    ("Safari", "Application('Safari'); void 0"),
-    ("System Events", "Application('System Events'); void 0"),
-    ("Photos", "Application('Photos'); void 0"),
+    ("Notes", "const a=Application('Notes'); JSON.stringify({ok:true,count:a.folders().length})"),
+    ("Reminders", "const a=Application('Reminders'); JSON.stringify({ok:true,count:a.lists().length})"),
+    ("Calendar", "const a=Application('Calendar'); JSON.stringify({ok:true,count:a.calendars().length})"),
+    ("Contacts", "const a=Application('Contacts'); JSON.stringify({ok:true,count:a.people().length})"),
+    ("Mail", "const a=Application('Mail'); JSON.stringify({ok:true,count:a.accounts().length})"),
+    ("Music", "const a=Application('Music'); JSON.stringify({ok:true,count:a.playlists().length})"),
+    ("Finder", "const a=Application('Finder'); JSON.stringify({ok:true,name:a.startupDisk().name()})"),
+    ("Safari", "const a=Application('Safari'); JSON.stringify({ok:true,count:a.windows().length})"),
+    ("System Events", "const a=Application('System Events'); JSON.stringify({ok:true,count:a.applicationProcesses().length})"),
+    ("Photos", "const a=Application('Photos'); JSON.stringify({ok:true,count:a.mediaItems().length})"),
 ]
 
 @MainActor
@@ -31,6 +31,7 @@ final class PermissionManager {
 
     var apps: [AppPermission] = []
     var isRunning = false
+    var lastCheckedAt: Date?
 
     func runSetup() {
         guard !isRunning else { return }
@@ -46,6 +47,7 @@ final class PermissionManager {
                 self?.apps[index].status = result
             }
             self?.isRunning = false
+            self?.lastCheckedAt = Date()
         }
     }
 
@@ -55,14 +57,19 @@ final class PermissionManager {
         process.arguments = ["-l", "JavaScript", "-e", script]
 
         let errorPipe = Pipe()
-        process.standardOutput = FileHandle.nullDevice
+        let outputPipe = Pipe()
+        process.standardOutput = outputPipe
         process.standardError = errorPipe
 
         do {
             try process.run()
             process.waitUntilExit()
             if process.terminationStatus == 0 {
-                return .granted
+                let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
+                let output = String(data: outputData, encoding: .utf8) ?? ""
+                return output.contains("\"ok\":true")
+                    ? .granted
+                    : .failed("Permission probe did not complete a real read")
             } else {
                 let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
                 let errorMessage = String(data: errorData, encoding: .utf8) ?? "Unknown error"

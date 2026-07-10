@@ -115,13 +115,14 @@ describe('verifyBearer — signing, iss/aud, exp/nbf, alg allow-list', () => {
     const token = await signFor({
       privateKey: rsaKey.privateKey,
       kid: 'test-rsa-1',
-      payload: { scope: 'mcp:read mcp:write' },
+      payload: { scope: 'mcp:read mcp:write', client_id: 'desktop-client' },
       issuer,
       audience,
     });
     const r = await verifyBearer(`Bearer ${token}`, { issuer, audience, jwksUri: jwks.url });
     if (!r.ok) throw new Error(`expected ok, got ${r.reason}: ${r.detail}`);
     expect(r.claims.scopes).toEqual(['mcp:read', 'mcp:write']);
+    expect(r.claims.clientId).toBe('desktop-client');
     expect(typeof r.claims.subject).toBe('string');
   });
 
@@ -235,6 +236,19 @@ describe('verifyBearer — signing, iss/aud, exp/nbf, alg allow-list', () => {
     const r = await verifyBearer(`Bearer ${token}`, { issuer, audience, jwksUri: jwks.url });
     expect(r.ok).toBe(true);
     expect(r.claims.scopes).toEqual(['mcp:read', 'mcp:admin']);
+  });
+
+  test('OIDC azp is used as the client identity when client_id is absent', async () => {
+    const token = await signFor({
+      privateKey: rsaKey.privateKey,
+      kid: 'test-rsa-1',
+      payload: { scope: 'mcp:read', azp: 'keycloak-client' },
+      issuer,
+      audience,
+    });
+    const r = await verifyBearer(`Bearer ${token}`, { issuer, audience, jwksUri: jwks.url });
+    expect(r.ok).toBe(true);
+    expect(r.claims.clientId).toBe('keycloak-client');
   });
 
   test('missing sub claim → malformed_claims', async () => {

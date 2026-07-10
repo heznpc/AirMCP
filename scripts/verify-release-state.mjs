@@ -11,6 +11,8 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { cleanBootEnv } from "./lib/clean-boot-env.mjs";
+import { MCP_PROTOCOL_VERSION, startMcp } from "./lib/mcp-stdio-client.mjs";
 
 const ROOT = dirname(fileURLToPath(new URL("../package.json", import.meta.url)));
 const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
@@ -22,6 +24,29 @@ const skipNpx = args.includes("--skip-npx");
 const skipGithub = args.includes("--skip-github");
 const skipAddons = args.includes("--skip-addons");
 const skipAddonInstall = args.includes("--skip-addon-install");
+const skipRootInstall = args.includes("--skip-root-install");
+const MIN_FULL_TOOLS = 290;
+const UNIVERSAL_FILE_CANARIES = [
+  "notes/tools.js",
+  "mail/tools.js",
+  "safari/tools.js",
+  "photos/tools.js",
+  "numbers/tools.js",
+  "google/tools.js",
+  "bluetooth/tools.js",
+  "memory/tools.js",
+];
+const REQUIRED_FULL_TOOLS = [
+  "list_notes",
+  "list_contacts",
+  "send_mail",
+  "list_tabs",
+  "list_photos",
+  "numbers_set_cell",
+  "gws_sheets_read",
+  "get_bluetooth_state",
+  "memory_query",
+];
 
 function run(cmd, cmdArgs, options = {}) {
   const result = spawnSync(cmd, cmdArgs, {
@@ -75,7 +100,80 @@ function verifyPublishedPackage(packageName, packageVersion, label) {
   if (latestVersion !== packageVersion && !allowNotLatest) {
     fail(`${label} latest points at ${latestVersion}, not ${packageVersion}`);
   }
+  const dist = npmJson(["view", `${packageName}@${packageVersion}`, "dist", "--json"], `${label} dist metadata`);
+  if (typeof dist?.integrity !== "string" || !dist.integrity.startsWith("sha512-")) {
+    fail(`${label} is missing sha512 registry integrity metadata`);
+  }
+  if (typeof dist?.tarball !== "string" || !dist.tarball.startsWith("https://")) {
+    fail(`${label} has invalid registry tarball metadata: ${dist?.tarball ?? "missing"}`);
+  }
   console.log(`ok: npm has ${packageName}@${packageVersion} (latest=${latestVersion})`);
+}
+
+async function verifyRootRegistryInstall() {
+  const work = mkdtempSync(join(tmpdir(), "airmcp-release-root-"));
+  let client = null;
+  let failure = null;
+  try {
+    writeFileSync(join(work, "package.json"), JSON.stringify({ private: true, type: "module" }, null, 2) + "\n");
+    const install = run(
+      "npm",
+      ["install", "--no-audit", "--no-fund", "--ignore-scripts", "--no-save", `${pkg.name}@${version}`],
+      { cwd: work, timeout: 180_000 },
+    );
+    if (install.status !== 0) throw new Error(install.stderr || install.stdout || "npm install failed");
+
+    const distDir = join(work, "node_modules", pkg.name, "dist");
+    const entry = join(distDir, "index.js");
+    const missingFiles = UNIVERSAL_FILE_CANARIES.filter((path) => !existsSync(join(distDir, path)));
+    if (!existsSync(entry) || missingFiles.length) {
+      throw new Error(`registry root is missing universal entrypoints: ${missingFiles.join(", ") || "dist/index.js"}`);
+    }
+
+    client = startMcp({
+      entry,
+      cwd: work,
+      timeoutMs: 60_000,
+      env: {
+        ...cleanBootEnv(),
+        AIRMCP_PROFILE: "full",
+        AIRMCP_TOOL_EXPOSURE: "full",
+        AIRMCP_MODULE_PACKS: "all",
+        AIRMCP_ADDON_PACKAGE_MODE: "bundled",
+        AIRMCP_FAKE_OS_VERSION: "0",
+      },
+    });
+    const initResp = await client.request(
+      "initialize",
+      {
+        protocolVersion: MCP_PROTOCOL_VERSION,
+        capabilities: {},
+        clientInfo: { name: "airmcp-release-registry-verify", version: "0.0.0" },
+      },
+      1,
+    );
+    if (!initResp.result) throw new Error(`initialize failed: ${JSON.stringify(initResp)}`);
+    client.notify("notifications/initialized");
+    const listResp = await client.request("tools/list", {}, 2);
+    const tools = listResp.result?.tools;
+    if (!Array.isArray(tools) || tools.length < MIN_FULL_TOOLS) {
+      throw new Error(`registry root full/full tools/list is incomplete: ${Array.isArray(tools) ? tools.length : "malformed"}`);
+    }
+    const names = new Set(tools.map((tool) => tool.name));
+    const missingTools = REQUIRED_FULL_TOOLS.filter((name) => !names.has(name));
+    if (missingTools.length) throw new Error(`registry root is missing representative tools: ${missingTools.join(", ")}`);
+    const stderr = client.stderr();
+    if (/ERR_MODULE_NOT_FOUND|Cannot find (?:module|package)/.test(stderr)) {
+      throw new Error(`registry root emitted missing-module errors:\n${stderr.slice(-4000)}`);
+    }
+    console.log(`ok: fresh registry root boots universal full/full (${tools.length} tools)`);
+  } catch (error) {
+    failure = error;
+  } finally {
+    if (client) await client.stop();
+    rmSync(work, { recursive: true, force: true });
+  }
+  if (failure) fail("fresh registry root universal smoke failed", failure instanceof Error ? failure.message : String(failure));
 }
 
 function verifyAddonRegistryInstall(addonPacks) {
@@ -128,6 +226,10 @@ verifyPublishedPackage(pkg.name, version, "npm root");
 
 if (!skipNpx) {
   verifyNpxSmoke();
+}
+
+if (!skipRootInstall) {
+  await verifyRootRegistryInstall();
 }
 
 if (!skipGithub) {

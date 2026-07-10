@@ -10,7 +10,7 @@
 [![GitHub stars](https://img.shields.io/github/stars/heznpc/AirMCP)](https://github.com/heznpc/AirMCP/stargazers)
 
 **Apple-native action runtime for MCP clients.** AirMCP lets Claude, Codex,
-Cursor, Raycast, Siri, Shortcuts, Xcode agents, and other MCP-capable AI clients
+Cursor, Raycast, macOS Shortcuts actions, Xcode agents, and other MCP-capable AI clients
 read, organize, and act across your Mac apps through one governed local runtime.
 
 The catalog is broad: 296 tools across 32 modules. The important part is the
@@ -31,8 +31,8 @@ controls for sensitive Apple workspace actions.
   door instead of every loaded tool.
 - **Skills DSL workflows** with `parallel`, `loop`, `retry`, `on_error`, runtime
   inputs, and event triggers.
-- **Siri and Shortcuts bridge** generated from the MCP manifest through
-  AppIntents, with destructive intents gated separately.
+- **App Intent action bridge** generated from the MCP manifest for macOS
+  Shortcuts, with an iOS-only App Shortcuts provider and destructive intents gated separately.
 - **Native Swift bridge, optional** for EventKit, PhotoKit, HealthKit, Vision,
   on-device semantic search, and FoundationModels preview builds.
 - **Dual transport**: stdio for standard MCP clients, HTTP/SSE for shared
@@ -120,8 +120,8 @@ npx airmcp workflows daily-briefing --prompt
 The complete generated tool manifest is in
 [docs/tool-manifest.json](docs/tool-manifest.json).
 
-Current generated surfaces: 233 Shortcuts / Siri AppIntents, 84 Interactive Snippet views,
-and 13 AppEnum pickers. The sessionless discovery card uses MCP schema version
+Current generated surfaces: 233 App Intent action types, 84 Interactive Snippet views,
+14 AppEnum pickers, and an iOS-only provider with 8 read-only App Shortcuts that match the preview runtime. The sessionless discovery card uses MCP schema version
 2025-11-25.
 
 ## Safety Model
@@ -180,11 +180,12 @@ Browser-based MCP clients should use HTTP mode with token and origin checks. See
 [docs/oauth-browser-pkce.md](docs/oauth-browser-pkce.md) for the browser/OAuth
 path.
 
-## Siri and Shortcuts
+## App Intents and Shortcuts
 
-AirMCP can generate AppIntents and AppShortcuts from the same MCP tool manifest.
-That gives Siri, Shortcuts, Spotlight, widgets, and the Action Button typed
-access to the same governed runtime.
+AirMCP generates App Intent actions from the same MCP tool manifest. On macOS,
+those actions are available in the Shortcuts action library; Apple does not
+support the `AppShortcutsProvider` phrase surface on macOS. iOS preview builds
+can additionally compile the workflow-first App Shortcuts provider.
 
 Destructive intents are opt-in with `AIRMCP_APPINTENTS_DESTRUCTIVE=true`.
 `AskAirMCPIntent` and FoundationModels-backed Apple Intelligence paths are
@@ -256,7 +257,7 @@ runtime.
 - [Tool manifest](docs/tool-manifest.json): generated list of registered tools.
 - [Workflows](docs/workflows.md): target workflows and prompt catalog.
 - [Skills DSL](docs/skills.md): YAML workflow syntax and built-ins.
-- [Shortcuts](docs/shortcuts.md): Siri, Shortcuts, Spotlight, and AppIntents.
+- [Shortcuts](docs/shortcuts.md): macOS App Intent actions and the iOS-only App Shortcuts surface.
 - [Environment variables](docs/environment.md): all runtime knobs.
 - [MCPB install](docs/mcpb.md): Claude Desktop extension package.
 - [OAuth browser PKCE](docs/oauth-browser-pkce.md): browser client setup.

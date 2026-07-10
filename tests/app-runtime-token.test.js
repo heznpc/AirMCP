@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { jest } from "@jest/globals";
 
 const originalHome = process.env.HOME;
+const originalTokenPath = process.env.AIRMCP_APP_RUNTIME_TOKEN_PATH;
 const tempHomes = [];
 
 async function loadTokenModule(home) {
@@ -14,6 +15,8 @@ async function loadTokenModule(home) {
 
 afterEach(() => {
   process.env.HOME = originalHome;
+  if (originalTokenPath === undefined) delete process.env.AIRMCP_APP_RUNTIME_TOKEN_PATH;
+  else process.env.AIRMCP_APP_RUNTIME_TOKEN_PATH = originalTokenPath;
   jest.resetModules();
   for (const home of tempHomes.splice(0)) {
     rmSync(home, { recursive: true, force: true });
@@ -47,6 +50,20 @@ describe("app runtime token", () => {
     const { ensureAppRuntimeToken } = await loadTokenModule(home);
 
     expect(ensureAppRuntimeToken()).toBe("existing-token");
+    expect(statSync(path).mode & 0o777).toBe(0o600);
+  });
+
+  test("honors an isolated app-runtime token path", async () => {
+    const home = mkdtempSync(join(tmpdir(), "airmcp-token-"));
+    tempHomes.push(home);
+    const path = join(home, "acceptance-state", "http-token");
+    process.env.AIRMCP_APP_RUNTIME_TOKEN_PATH = path;
+
+    const { APP_RUNTIME_TOKEN_PATH, ensureAppRuntimeToken } = await loadTokenModule(home);
+    const token = ensureAppRuntimeToken();
+
+    expect(APP_RUNTIME_TOKEN_PATH).toBe(path);
+    expect(readFileSync(path, "utf8").trim()).toBe(token);
     expect(statSync(path).mode & 0o777).toBe(0o600);
   });
 });

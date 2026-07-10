@@ -5,7 +5,7 @@
 // serve as the canonical reference for what codegen output should look
 // like for their respective tools. This script ensures:
 //
-//   1. Every `runAirMCPTool("<name>", ...)` call-site references a tool
+//   1. Every `AppRuntimeClient.callTool("<name>", ...)` call-site references a tool
 //      that actually exists in the manifest (catches renames / deletions
 //      that silently break the menubar app's Shortcuts entries).
 //   2. For every such tool, the generated MCPIntents.swift contains a
@@ -88,18 +88,20 @@ const sensitiveGoldenTools = new Set([
   "health_summary",
 ]);
 
-// Extract every `runAirMCPTool("name", ...)` call from golden. The regex
+// Extract every `AppRuntimeClient.callTool("name", ...)` call from golden. The regex
 // is intentionally tight — we want to miss if someone ever renames the
 // helper so the check notices instead of going stale.
-const callRegex = /runAirMCPTool\("([a-z0-9_]+)"/g;
+const callRegex = /AppRuntimeClient\.callTool\(\s*"([a-z0-9_]+)"/g;
 const goldenTools = new Set();
+const goldenCallSites = new Map();
 let m;
 while ((m = callRegex.exec(golden))) {
   goldenTools.add(m[1]);
+  if (!goldenCallSites.has(m[1])) goldenCallSites.set(m[1], m.index);
 }
 
 if (goldenTools.size === 0) {
-  die(`no runAirMCPTool("...") calls found in ${GOLDEN_PATH} — regex drift?`);
+  die(`no AppRuntimeClient.callTool("...") calls found in ${GOLDEN_PATH} — regex drift?`);
 }
 
 // toPascalCase mirror of gen-swift-intents.mjs so we can predict the
@@ -119,11 +121,11 @@ const skips = [];
 for (const toolName of [...goldenTools].sort()) {
   const entry = manifestByName.get(toolName);
   const mustConfirm = Boolean(entry?.annotations?.destructiveHint || entry?.annotations?.sensitiveHint || sensitiveGoldenTools.has(toolName));
-  const callSite = golden.indexOf(`runAirMCPTool("${toolName}"`);
+  const callSite = goldenCallSites.get(toolName) ?? -1;
   const confirmationSlice = golden.slice(Math.max(0, callSite - 1600), callSite);
   if (mustConfirm && !confirmationSlice.includes("requestConfirmation(")) {
     failures.push(
-      `tool "${toolName}" is sensitive/destructive but its hand-written AppIntent calls runAirMCPTool without requestConfirmation`,
+      `tool "${toolName}" is sensitive/destructive but its hand-written AppIntent calls AppRuntimeClient.callTool without requestConfirmation`,
     );
   }
   if (!entry) {

@@ -49,7 +49,8 @@ describe("app-owned runtime npm package pin", () => {
     expect(appIntents).toContain("static func probe() async -> Bool");
     expect(appIntents).toContain('"method": "tools/list"');
     expect(serverManager).toContain("await AppRuntimeClient.probe()");
-    expect(serverManager).toContain('(json["version"] as? String) == AirMcpConstants.npmPackageVersion');
+    expect(serverManager).toContain("static func authenticatedAppOwnedRuntimeVersion() async -> String?");
+    expect(serverManager).toContain("version == AirMcpConstants.npmPackageVersion");
   });
 
   test("supports a persistent app-owned runtime through the system login item", () => {

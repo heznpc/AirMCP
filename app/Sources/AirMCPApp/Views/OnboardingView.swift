@@ -17,6 +17,44 @@ private struct MCPClient: Identifiable {
     var detected: Bool
 }
 
+/// Resolve the persistent runtime-start preference at the end of one explicit
+/// Setup activation attempt. A failed attempt must be observational with
+/// respect to an existing preference, while an authenticated ready receipt is
+/// the only outcome that can record a new opt-in.
+enum OnboardingAutoStartConsentPolicy {
+    static func resolvedValue(previouslyEnabled: Bool, activationReady: Bool) -> Bool {
+        previouslyEnabled || activationReady
+    }
+}
+
+/// A successful activation receipt is only a point-in-time observation: the
+/// child can exit before Setup records auto-start consent. Commit that consent
+/// first, ask ServerManager to recover a known-stopped runtime, then require a
+/// fresh authenticated receipt. If the lightweight recovery races with process
+/// termination, the full activation transaction is the final fallback.
+@MainActor
+enum OnboardingRuntimeReadyBarrier {
+    static func stabilize(
+        commitAutoStart: () -> Void,
+        requestAutoStart: () -> Void,
+        scopeIsCurrent: () -> Bool,
+        validate: () async -> ServerManager.OnboardingRuntimeActivationResult,
+        recover: () async -> ServerManager.OnboardingRuntimeActivationResult
+    ) async -> ServerManager.OnboardingRuntimeActivationResult? {
+        commitAutoStart()
+        requestAutoStart()
+
+        let validation = await validate()
+        guard scopeIsCurrent() else { return nil }
+        if case .failed = validation {
+            let recovered = await recover()
+            guard scopeIsCurrent() else { return nil }
+            return recovered
+        }
+        return validation
+    }
+}
+
 // MARK: - Onboarding View
 
 struct OnboardingView: View {
@@ -1030,6 +1068,15 @@ struct OnboardingView: View {
     /// opt into automatic startup, and launch the app-owned runtime.
     private func startFirstRunRuntime() async {
         if firstRunChecking { return }
+        let previousAutoStartEnabled = serverManager.autoStartEnabled
+        var activationReady = false
+        defer {
+            serverManager.autoStartEnabled = OnboardingAutoStartConsentPolicy.resolvedValue(
+                previouslyEnabled: previousAutoStartEnabled,
+                activationReady: activationReady
+            )
+            firstRunChecking = false
+        }
         firstRunChecking = true
         firstRunReady = false
         firstRunMessage = L("onboarding.firstRunStarting")
@@ -1047,31 +1094,77 @@ struct OnboardingView: View {
         do {
             _ = try AppRuntimeToken.ensure()
         } catch {
-            firstRunChecking = false
             firstRunMessage = L("onboarding.firstRunTokenFailed", error.localizedDescription)
             return
         }
 
         let scope = currentRuntimeScope
         runtimeReceipt = nil
-        serverManager.autoStartEnabled = true
         let result = await serverManager.activateOnboardingRuntime(
             for: scope,
             configManager: configManager
         )
-        firstRunChecking = false
         guard currentRuntimeScope == scope else {
             firstRunReady = false
             firstRunMessage = L("onboarding.firstRunScopeChanged")
             return
         }
         switch result {
-        case .ready(let receipt):
-            runtimeReceipt = receipt
-            appliedScopeFingerprint = scope.draftFingerprint
-            persistOnboardingDraft()
-            firstRunReady = true
-            firstRunMessage = readyMessage(receipt)
+        case .ready:
+            let runtimeToken = (try? AppRuntimeToken.loadExisting()) ?? nil
+            let stabilized = await OnboardingRuntimeReadyBarrier.stabilize(
+                commitAutoStart: {
+                    // Temporary restart authority only. The deferred consent
+                    // transaction restores the previous preference unless the
+                    // final authenticated barrier also returns `.ready`.
+                    serverManager.autoStartEnabled = true
+                },
+                requestAutoStart: {
+                    serverManager.autoStartIfNeeded()
+                },
+                scopeIsCurrent: {
+                    currentRuntimeScope == scope
+                },
+                validate: {
+                    guard let runtimeToken else {
+                        return .failed("The app runtime token disappeared after activation.")
+                    }
+                    return await serverManager.validateOnboardingRuntime(
+                        for: scope,
+                        authorizedDraftFingerprint: scope.draftFingerprint,
+                        runtimeToken: runtimeToken,
+                        configManager: configManager
+                    )
+                },
+                recover: {
+                    await serverManager.activateOnboardingRuntime(
+                        for: scope,
+                        configManager: configManager
+                    )
+                }
+            )
+            guard let stabilized else {
+                firstRunReady = false
+                firstRunMessage = L("onboarding.firstRunScopeChanged")
+                return
+            }
+            switch stabilized {
+            case .ready(let receipt):
+                activationReady = true
+                runtimeReceipt = receipt
+                appliedScopeFingerprint = scope.draftFingerprint
+                persistOnboardingDraft()
+                firstRunReady = true
+                firstRunMessage = readyMessage(receipt)
+            case .manualRuntime:
+                appliedScopeFingerprint = nil
+                persistOnboardingDraft()
+                firstRunReady = false
+                firstRunMessage = L("onboarding.firstRunManualRuntime")
+            case .failed(let message):
+                firstRunReady = false
+                firstRunMessage = L("onboarding.firstRunConfigFailed", message)
+            }
         case .manualRuntime:
             appliedScopeFingerprint = nil
             persistOnboardingDraft()

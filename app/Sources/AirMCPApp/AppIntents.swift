@@ -282,7 +282,10 @@ enum AppRuntimeClient {
     /// back to a short-lived stdio process: doing so would make a healthy
     /// secondary process look like proof about the app-owned runtime. Every
     /// call carries a fresh validated UUID that the HTTP transport stamps into
-    /// request context and the HMAC audit trail.
+    /// request context and the HMAC audit trail. Trust Center tools may be
+    /// hidden by progressive exposure, so the call opens a task-scoped tool
+    /// session and delegates through `run_tool` instead of widening
+    /// `tools/list`.
     static func callAppRuntimeToolJSON<T: Decodable & Sendable>(
         _ toolName: String,
         args: AppRuntimeToolArguments,
@@ -291,11 +294,24 @@ enum AppRuntimeClient {
         guard let token = try AppRuntimeToken.loadExisting() else {
             throw AppIntentMCPTransportError.missingRuntimeToken
         }
-        let response = try await runAirMCPToolViaAppRuntimeResponse(
+        let response = try await runAppRuntimeProgressiveToolCall(
             toolName,
             args: args,
             runID: runID.uuidString.lowercased(),
-            token: token
+            token: token,
+            post: { payload, requestToken, sessionID, requestRunID, allowsEmptyResponse, timeoutInterval in
+                try await postAppRuntimeMCPRequest(
+                    payload,
+                    token: requestToken,
+                    sessionID: sessionID,
+                    runID: requestRunID,
+                    allowsEmptyResponse: allowsEmptyResponse,
+                    timeoutInterval: timeoutInterval
+                )
+            },
+            close: { sessionID, requestToken in
+                try await closeAppRuntimeMCPSession(sessionID: sessionID, token: requestToken)
+            }
         )
         return try decodeToolJSON(from: response, as: T.self)
     }
@@ -508,6 +524,223 @@ private func runAirMCPToolViaAppRuntimeResponse(
     } catch {
         throw AppIntentMCPTransportError.toolCallUncertain(error)
     }
+}
+
+typealias AppRuntimeMCPPost = (
+    _ payload: [String: Any],
+    _ token: String,
+    _ sessionID: String?,
+    _ runID: String?,
+    _ allowsEmptyResponse: Bool,
+    _ timeoutInterval: TimeInterval
+) async throws -> (json: [String: Any], sessionID: String?)
+
+typealias AppRuntimeMCPClose = (
+    _ sessionID: String,
+    _ token: String
+) async throws -> Void
+
+/// Bounds for Trust Center's delegated progressive read. The native settings
+/// UI allows one HITL decision to remain pending for at most 120 seconds.
+/// `run_tool` itself may be approved before the nested target receives its own
+/// per-call approval under the `all` policy, so its HTTP timeout covers two
+/// decisions while the capability only needs to survive the first decision
+/// and a small dispatch margin.
+enum AppRuntimeProgressiveSessionPolicy {
+    static let maximumApprovalWaitSeconds = 120
+    static let executionHeadroomSeconds = 30
+    static let toolSessionTTLSeconds = maximumApprovalWaitSeconds + executionHeadroomSeconds
+    static let controlCallTimeout = TimeInterval(maximumApprovalWaitSeconds + 15)
+    static let delegatedCallTimeout = TimeInterval(
+        maximumApprovalWaitSeconds * 2 + executionHeadroomSeconds
+    )
+}
+
+private struct AppRuntimeToolSessionStart: Decodable {
+    let sessionId: String
+}
+
+private struct AppRuntimeToolSessionEnd: Decodable {
+    let sessionId: String
+    let ended: Bool
+}
+
+/// Execute a progressive-only tool without adding it to the global
+/// `tools/list` surface. The task-scoped allowlist and the delegated tool both
+/// run through the ordinary MCP `tools/call` path, so registry rate limits,
+/// per-call HITL, HMAC audit, and emergency-stop checks remain authoritative.
+///
+/// This function is internal to give the Swift contract tests a deterministic
+/// transport seam. Production always supplies the authenticated app-runtime
+/// HTTP transport above.
+func runAppRuntimeProgressiveToolCall(
+    _ toolName: String,
+    args: AppRuntimeToolArguments,
+    runID: String,
+    token: String,
+    post: AppRuntimeMCPPost,
+    close: AppRuntimeMCPClose
+) async throws -> [String: Any] {
+    guard UUID(uuidString: runID) != nil else {
+        throw AppIntentMCPTransportError.invalidJSONResponse("invalid run ID")
+    }
+
+    let initialized = try await post(
+        [
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": [
+                "protocolVersion": AirMcpConstants.mcpProtocolVersion,
+                "capabilities": [:] as [String: Any],
+                "clientInfo": ["name": "AirMCPTrustCenter", "version": "1.0"],
+            ],
+        ],
+        token,
+        nil,
+        nil,
+        false,
+        2
+    )
+    guard let mcpSessionID = initialized.sessionID else {
+        throw AppIntentMCPTransportError.missingSessionID
+    }
+
+    var toolSessionID: String?
+    var toolResponse: [String: Any]?
+    var firstError: Error?
+
+    do {
+        _ = try await post(
+            ["jsonrpc": "2.0", "method": "notifications/initialized", "params": [:] as [String: Any]],
+            token,
+            mcpSessionID,
+            nil,
+            true,
+            2
+        )
+
+        let startedResponse = try await post(
+            [
+                "jsonrpc": "2.0",
+                "id": 2,
+                "method": "tools/call",
+                "params": [
+                    "name": "start_tool_session",
+                    "arguments": [
+                        "tools": [toolName],
+                        // Outlive the longest supported outer HITL decision,
+                        // while keeping a lost-cleanup capability bounded.
+                        "ttlSeconds": AppRuntimeProgressiveSessionPolicy.toolSessionTTLSeconds,
+                        "label": "AirMCP Trust Center evidence read",
+                    ],
+                ],
+            ],
+            token,
+            mcpSessionID,
+            runID,
+            false,
+            AppRuntimeProgressiveSessionPolicy.controlCallTimeout
+        )
+        let started = try decodeToolJSON(
+            from: startedResponse.json,
+            as: AppRuntimeToolSessionStart.self
+        )
+        guard UUID(uuidString: started.sessionId) != nil else {
+            throw AppIntentMCPTransportError.invalidJSONResponse("start_tool_session returned an invalid session ID")
+        }
+        toolSessionID = started.sessionId
+
+        let jsonArguments = args.reduce(into: [String: Any]()) { result, pair in
+            result[pair.key] = pair.value
+        }
+        do {
+            toolResponse = try await post(
+                [
+                    "jsonrpc": "2.0",
+                    "id": 3,
+                    "method": "tools/call",
+                    "params": [
+                        "name": "run_tool",
+                        "arguments": [
+                            "name": toolName,
+                            "args": jsonArguments,
+                            "sessionId": started.sessionId,
+                        ],
+                    ],
+                ],
+                token,
+                mcpSessionID,
+                runID,
+                false,
+                AppRuntimeProgressiveSessionPolicy.delegatedCallTimeout
+            ).json
+        } catch {
+            // The delegated call may already have reached the governed
+            // registry. Preserve the no-retry uncertainty boundary used by
+            // ordinary App Intent calls.
+            throw AppIntentMCPTransportError.toolCallUncertain(error)
+        }
+    } catch {
+        firstError = error
+    }
+
+    if let toolSessionID {
+        do {
+            let endedResponse = try await post(
+                [
+                    "jsonrpc": "2.0",
+                    "id": 4,
+                    "method": "tools/call",
+                    "params": [
+                        "name": "end_tool_session",
+                        "arguments": ["sessionId": toolSessionID],
+                    ],
+                ],
+                token,
+                mcpSessionID,
+                runID,
+                false,
+                AppRuntimeProgressiveSessionPolicy.controlCallTimeout
+            )
+            let ended = try decodeToolJSON(
+                from: endedResponse.json,
+                as: AppRuntimeToolSessionEnd.self
+            )
+            guard ended.sessionId == toolSessionID else {
+                throw AppIntentMCPTransportError.invalidJSONResponse(
+                    "end_tool_session returned a mismatched session ID"
+                )
+            }
+            // `ended == false` means the short-lived session already expired
+            // and was pruned, which is also a successfully cleaned state.
+            _ = ended.ended
+        } catch {
+            // A definitive delegated response is authoritative. Discarding it
+            // because cleanup lost its response would make Trust Center retry
+            // the governed read and duplicate its audit trail. The allowlist
+            // has a bounded TTL sized to the maximum approval window, so keep
+            // the result and let expiry contain the residual capability. If
+            // the delegated call itself failed or is uncertain, preserve that
+            // original error instead.
+            if firstError == nil && toolResponse == nil {
+                firstError = error
+            }
+        }
+    }
+
+    // Closing the HTTP MCP session is best-effort after the tool-session
+    // cleanup. A lost DELETE response must not discard a definitive governed
+    // tool result or invite the caller to repeat the audit read.
+    try? await close(mcpSessionID, token)
+
+    if let firstError {
+        throw firstError
+    }
+    guard let toolResponse else {
+        throw AppIntentMCPTransportError.invalidJSONResponse("run_tool result missing")
+    }
+    return toolResponse
 }
 
 private func runAirMCPToolViaStdio(

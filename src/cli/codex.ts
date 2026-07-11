@@ -17,7 +17,9 @@ function usage(): string {
   return [
     "Usage: npx airmcp codex [status|enable|disable] [--json]",
     "",
-    "Inspect or toggle the persistent AirMCP entry in ~/.codex/config.toml.",
+    "Inspect or toggle the persistent AirMCP entry in the active Codex user config.",
+    "Path priority: AIRMCP_CODEX_CONFIG_PATH, CODEX_HOME/config.toml, then ~/.codex/config.toml.",
+    "A relative explicit path is resolved from the invoking directory and must be named config.toml.",
     "A project-local .codex/config.toml is never edited and may override the global setting.",
   ].join("\n");
 }

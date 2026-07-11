@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, jest, test } from "@jest/globals";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 const originalHome = process.env.HOME;
 const originalCodexConfigPath = process.env.AIRMCP_CODEX_CONFIG_PATH;
@@ -33,6 +33,7 @@ const {
   directStdioEntry,
   inspectCodexAirmcpRegistration,
   isCodexAirmcpConfigured,
+  resolveCodexConfigPath,
   setCodexAirmcpEnabled,
   stdioProxyEntry,
   updateCodexAirmcpEnabledInToml,
@@ -103,6 +104,58 @@ afterAll(() => {
 });
 
 describe("codex MCP setup", () => {
+  test("resolves the user config with explicit path, CODEX_HOME, then HOME precedence", () => {
+    expect(
+      resolveCodexConfigPath({
+        AIRMCP_CODEX_CONFIG_PATH: "/explicit/config.toml",
+        CODEX_HOME: "/custom/codex",
+        HOME: "/user/home",
+      }),
+    ).toBe("/explicit/config.toml");
+    expect(resolveCodexConfigPath({ CODEX_HOME: "/custom/codex", HOME: "/user/home" })).toBe(
+      "/custom/codex/config.toml",
+    );
+    expect(resolveCodexConfigPath({ HOME: "/user/home" })).toBe("/user/home/.codex/config.toml");
+  });
+
+  test("canonicalizes relative config roots before deriving the child Codex home", () => {
+    expect(resolveCodexConfigPath({ AIRMCP_CODEX_CONFIG_PATH: "relative-codex/config.toml" })).toBe(
+      resolve("relative-codex/config.toml"),
+    );
+    expect(resolveCodexConfigPath({ CODEX_HOME: "relative-codex-home" })).toBe(
+      resolve("relative-codex-home/config.toml"),
+    );
+  });
+
+  test("rejects an explicit filename that child Codex cannot address", () => {
+    expect(() => resolveCodexConfigPath({ AIRMCP_CODEX_CONFIG_PATH: "/isolated/custom-codex.toml" })).toThrow(
+      "AIRMCP_CODEX_CONFIG_PATH must name config.toml",
+    );
+  });
+
+  test("captures one config directory for every child Codex call", () => {
+    codexGetOutput = [
+      "airmcp",
+      "  enabled: true",
+      "  transport: stdio",
+      "  command: npx",
+      `  args: -y ${packageSpecifier}`,
+    ].join("\n");
+
+    const selectedPath = process.env.AIRMCP_CODEX_CONFIG_PATH;
+    process.env.AIRMCP_CODEX_CONFIG_PATH = join(testHome, "later-environment", "config.toml");
+    try {
+      expect(isCodexAirmcpConfigured()).toBe(true);
+      expect(execFileSync).toHaveBeenCalledWith(
+        "codex",
+        ["mcp", "get", "airmcp"],
+        expect.objectContaining({ env: expect.objectContaining({ CODEX_HOME: testHome }) }),
+      );
+    } finally {
+      process.env.AIRMCP_CODEX_CONFIG_PATH = selectedPath;
+    }
+  });
+
   test("classifies stale direct stdio config separately from app-owned runtime", () => {
     codexGetOutput = [
       "airmcp",

@@ -184,6 +184,12 @@ npx airmcp codex status
 npx airmcp codex disable
 ```
 
+The `npx airmcp codex` commands follow their child Codex CLI's active user
+config root: `AIRMCP_CODEX_CONFIG_PATH` first, then
+`$CODEX_HOME/config.toml`, then `~/.codex/config.toml`. The explicit override
+is resolved against the invoking working directory and must be named
+`config.toml`.
+
 Stdio clients can proxy into the app-owned HTTP runtime:
 
 ```bash

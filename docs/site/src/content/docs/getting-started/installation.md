@@ -42,6 +42,12 @@ npx airmcp codex disable
 ```
 
 Use `npx airmcp codex enable` only after you want Codex to connect at startup.
+These `npx airmcp codex` commands resolve the persistent user config used by
+their child Codex CLI in this order:
+`AIRMCP_CODEX_CONFIG_PATH`, `$CODEX_HOME/config.toml`, then
+`~/.codex/config.toml`. The explicit override is resolved against the invoking
+working directory and must be named `config.toml`. Project-local overrides are
+reported but never edited.
 
 ### Claude Desktop
 

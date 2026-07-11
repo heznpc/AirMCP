@@ -17,7 +17,53 @@ export type CodexAirmcpRuntimeShape =
   | "missing";
 type CodexConfigFileRuntimeShape = "app-owned" | "app-owned-disabled" | "direct" | "direct-disabled" | "unknown";
 export type CodexAirmcpEnabledState = "enabled" | "disabled" | "missing" | "invalid";
-const CODEX_CONFIG_PATH = process.env.AIRMCP_CODEX_CONFIG_PATH || join(HOME, ".codex", "config.toml");
+
+interface CodexConfigPathSelection {
+  absolutePath?: string;
+  errorMessage?: string;
+}
+
+class CodexConfigPathError extends Error {
+  override readonly name = "CodexConfigPathError";
+}
+
+function selectCodexConfigPath(env: NodeJS.ProcessEnv): CodexConfigPathSelection {
+  const candidate = env.AIRMCP_CODEX_CONFIG_PATH
+    ? env.AIRMCP_CODEX_CONFIG_PATH
+    : env.CODEX_HOME
+      ? join(env.CODEX_HOME, "config.toml")
+      : join(env.HOME ?? env.USERPROFILE ?? HOME, ".codex", "config.toml");
+  try {
+    const absolutePath = resolve(candidate);
+    if (basename(absolutePath) !== "config.toml") {
+      return {
+        errorMessage: "AIRMCP_CODEX_CONFIG_PATH must name config.toml because Codex only reads CODEX_HOME/config.toml",
+      };
+    }
+    return { absolutePath };
+  } catch {
+    return { errorMessage: "The selected Codex config must be a valid filesystem path named config.toml" };
+  }
+}
+
+/** Resolve one candidate for tests and callers that need explicit validation. */
+export function resolveCodexConfigPath(env: NodeJS.ProcessEnv = process.env): string {
+  const selection = selectCodexConfigPath(env);
+  if (selection.errorMessage) throw new CodexConfigPathError(selection.errorMessage);
+  return selection.absolutePath!;
+}
+
+// Capture environment selection once without throwing during module import.
+// Unrelated/config-only commands may import this module without touching Codex;
+// the first actual Codex boundary below fails closed with the stored error.
+const CODEX_CONFIG_SELECTION = selectCodexConfigPath(process.env);
+
+function requireCodexConfigPath(): string {
+  if (CODEX_CONFIG_SELECTION.errorMessage) {
+    throw new CodexConfigPathError(CODEX_CONFIG_SELECTION.errorMessage);
+  }
+  return CODEX_CONFIG_SELECTION.absolutePath!;
+}
 
 export interface CodexProjectOverride {
   path: string;
@@ -48,12 +94,17 @@ export interface ConfigureCodexAirmcpOptions {
   enabled?: boolean;
 }
 
-function runCodex(args: string[]): string {
+function runCodex(args: string[], usesConfig = true): string {
+  const configPath = usesConfig ? requireCodexConfigPath() : undefined;
   return execFileSync("codex", args, {
     // `codex mcp get` resolves a trusted project's `.codex/config.toml` ahead
     // of the user config. AirMCP's setup owns only the persistent user entry,
     // so run from HOME and report project overrides separately.
     cwd: HOME,
+    // Codex accepts a config directory rather than a config-file flag. Point
+    // every CLI read/write at the same config.toml selected above, including
+    // the AirMCP-only explicit path override used by isolated integrations.
+    env: configPath ? { ...process.env, CODEX_HOME: dirname(configPath) } : process.env,
     encoding: "utf8",
     timeout: 10_000,
     stdio: ["ignore", "pipe", "pipe"],
@@ -178,7 +229,7 @@ function findCodexProjectOverride(startDirectory: string, globalConfigPath: stri
 }
 
 export function inspectCodexAirmcpRegistration(options: CodexAirmcpConfigOptions = {}): CodexAirmcpRegistrationState {
-  const globalConfigPath = options.configPath ?? CODEX_CONFIG_PATH;
+  const globalConfigPath = options.configPath ?? requireCodexConfigPath();
   const projectOverride = findCodexProjectOverride(options.projectDirectory ?? process.cwd(), globalConfigPath);
   return {
     globalConfigPath,
@@ -220,7 +271,10 @@ function atomicReplaceFile(path: string, content: string, mode: number): void {
 
 export function isCodexCliAvailable(): boolean {
   try {
-    runCodex(["--version"]);
+    // Executable detection does not read or mutate config. Delaying config
+    // validation lets client setup report the selected-path error accurately
+    // instead of misclassifying a present Codex CLI as absent.
+    runCodex(["--version"], false);
     return true;
   } catch {
     return false;
@@ -230,7 +284,8 @@ export function isCodexCliAvailable(): boolean {
 export function getCodexAirmcpConfig(): string | null {
   try {
     return runCodex(["mcp", "get", "airmcp"]);
-  } catch {
+  } catch (error) {
+    if (error instanceof CodexConfigPathError) throw error;
     return null;
   }
 }
@@ -359,11 +414,12 @@ export function codexConfigTomlRuntimeShape(toml: string, liveToken?: string): C
 }
 
 function codexConfigFileRuntimeShape(): CodexConfigFileRuntimeShape {
+  const configPath = requireCodexConfigPath();
   try {
-    if (!existsSync(CODEX_CONFIG_PATH)) return "unknown";
+    if (!existsSync(configPath)) return "unknown";
     // Pass the live runtime token so a config carrying a stale/wrong token
     // is not classified app-owned — it falls through and gets repaired.
-    return codexConfigTomlRuntimeShape(readFileSync(CODEX_CONFIG_PATH, "utf8"), ensureAppRuntimeToken());
+    return codexConfigTomlRuntimeShape(readFileSync(configPath, "utf8"), ensureAppRuntimeToken());
   } catch {
     return "unknown";
   }
@@ -376,7 +432,7 @@ export function codexAirmcpRuntimeShape(): CodexAirmcpRuntimeShape {
   const fileShape = codexConfigFileRuntimeShape();
   if (fileShape === "app-owned") return "app-owned-pending-restart";
   if (fileShape === "app-owned-disabled" || fileShape === "direct" || fileShape === "direct-disabled") return fileShape;
-  if (cliShape === "missing" && readCodexEnabledState(CODEX_CONFIG_PATH) !== "missing") return "unknown";
+  if (cliShape === "missing" && readCodexEnabledState(requireCodexConfigPath()) !== "missing") return "unknown";
   return cliShape;
 }
 
@@ -470,16 +526,18 @@ function captureCodexMcpSnapshot(): CodexMcpSnapshot {
   try {
     raw = runCodex(["mcp", "get", "airmcp", "--json"]);
   } catch (cause) {
+    if (cause instanceof CodexConfigPathError) throw cause;
     throw new Error("Codex could not snapshot the existing AirMCP entry; replacement was not attempted", { cause });
   }
   return parseCodexMcpSnapshot(raw);
 }
 
 function captureCodexConfigFileSnapshot(): CodexConfigFileSnapshot | null {
-  if (!existsSync(CODEX_CONFIG_PATH)) return null;
+  const configPath = requireCodexConfigPath();
+  if (!existsSync(configPath)) return null;
   return {
-    content: readFileSync(CODEX_CONFIG_PATH, "utf8"),
-    mode: statSync(CODEX_CONFIG_PATH).mode & 0o777,
+    content: readFileSync(configPath, "utf8"),
+    mode: statSync(configPath).mode & 0o777,
   };
 }
 
@@ -524,7 +582,7 @@ function replaceCodexMcpWithRollback(
         // Codex's JSON surface intentionally omits some TOML fields (cwd,
         // timeouts, tool filters, env indirection). Restoring the complete
         // pre-remove file is the only lossless rollback for the user config.
-        atomicReplaceFile(CODEX_CONFIG_PATH, configFileSnapshot.content, configFileSnapshot.mode);
+        atomicReplaceFile(requireCodexConfigPath(), configFileSnapshot.content, configFileSnapshot.mode);
       } else {
         // A nonstandard Codex home can expose an entry while the configured
         // global path is absent. Fall back to the supported transport fields.

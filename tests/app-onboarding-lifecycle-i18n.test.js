@@ -158,8 +158,30 @@ describe("macOS onboarding lifecycle", () => {
     expect(listTools).toContain("AppRuntimeToken.loadExisting()");
     expect(listTools).not.toContain("AppRuntimeToken.ensure()");
     expect(explicitStart).toContain("AppRuntimeToken.ensure()");
+    expect(explicitStart).toContain("let previousAutoStartEnabled = serverManager.autoStartEnabled");
+    expect(explicitStart).toContain("defer {");
+    expect(explicitStart).toContain("previouslyEnabled: previousAutoStartEnabled");
+    expect(explicitStart).toContain("activationReady: activationReady");
+    expect(explicitStart).toContain("case .ready:");
+    expect(explicitStart).toContain("OnboardingRuntimeReadyBarrier.stabilize(");
+    expect(explicitStart).toContain("commitAutoStart:");
+    expect(explicitStart).toContain("activationReady = true");
+    expect(explicitStart).toContain("serverManager.autoStartIfNeeded()");
+    expect(explicitStart).toContain("serverManager.validateOnboardingRuntime(");
     expect(explicitStart).toContain("serverManager.autoStartEnabled = true");
     expect(explicitStart).toContain("serverManager.activateOnboardingRuntime(");
+    expect(explicitStart.indexOf("let previousAutoStartEnabled")).toBeLessThan(
+      explicitStart.indexOf("AppRuntimeToken.ensure()"),
+    );
+    expect(explicitStart.indexOf("serverManager.activateOnboardingRuntime(")).toBeLessThan(
+      explicitStart.indexOf("activationReady = true"),
+    );
+    expect(explicitStart.indexOf("serverManager.autoStartEnabled = true")).toBeLessThan(
+      explicitStart.indexOf("serverManager.validateOnboardingRuntime("),
+    );
+    expect(explicitStart.indexOf("serverManager.validateOnboardingRuntime(")).toBeLessThan(
+      explicitStart.indexOf("activationReady = true"),
+    );
     expect(onboarding).toContain(".disabled(!firstRunReady || firstRunChecking || !patchingClients.isEmpty)");
     expect(onboarding).not.toContain(".disabled(!firstRunReady)");
     expect(app).toContain("onComplete: {}");

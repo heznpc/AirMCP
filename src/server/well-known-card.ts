@@ -142,6 +142,10 @@ export interface OAuthAuthorizationServerMetadataInput {
   issuer: string;
   authorizationEndpoint: string;
   tokenEndpoint: string;
+  /** Exact operator-configured RFC 8414 capability. Public PKCE clients use
+   *  `none`; confidential deployments must explicitly advertise their real
+   *  method(s) instead of inheriting that default. */
+  tokenEndpointAuthMethodsSupported: string[];
 }
 
 /** RFC 8414 authorization-server metadata for co-hosted or reverse-proxied
@@ -154,6 +158,7 @@ export function buildOAuthAuthorizationServerMetadata(
     issuer: input.issuer,
     authorization_endpoint: input.authorizationEndpoint,
     token_endpoint: input.tokenEndpoint,
+    token_endpoint_auth_methods_supported: [...input.tokenEndpointAuthMethodsSupported],
     response_types_supported: ["code"],
     grant_types_supported: ["authorization_code"],
     code_challenge_methods_supported: ["S256"],

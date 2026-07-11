@@ -6,6 +6,8 @@
     <string>en</string>
     <key>CFBundleAllowMixedLocalizations</key>
     <true/>
+    <key>LSMultipleInstancesProhibited</key>
+    <true/>
     <key>CFBundleLocalizations</key>
     <array>
         <string>de</string>

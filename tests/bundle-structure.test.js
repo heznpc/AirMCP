@@ -69,6 +69,8 @@ int main(int argc, char **argv) {
   <string>en</string>
   <key>CFBundleAllowMixedLocalizations</key>
   <true/>
+  <key>LSMultipleInstancesProhibited</key>
+  <true/>
   <key>CFBundleLocalizations</key>
   <array>
     <string>de</string>
@@ -100,8 +102,11 @@ int main(int argc, char **argv) {
   return { temp, bundle, binary, executable, bundleId };
 }
 
-function verifyBundle(bundle, bundleId, executable) {
-  return spawnSync("bash", [verifier, bundle, bundleId, executable], { encoding: "utf8" });
+function verifyBundle(bundle, bundleId, executable, env = {}) {
+  return spawnSync("bash", [verifier, bundle, bundleId, executable], {
+    encoding: "utf8",
+    env: { ...process.env, ...env },
+  });
 }
 
 describe("macOS bundle structure verifier", () => {
@@ -156,6 +161,23 @@ describe("macOS bundle structure verifier", () => {
       const result = verifyBundle(fixture.bundle, fixture.bundleId, fixture.executable);
       expect(result.status).toBe(1);
       expect(result.stderr).toContain("packaged localization is not declared");
+    } finally {
+      rmSync(fixture.temp, { recursive: true, force: true });
+    }
+  });
+
+  test("requires the widget when building a signed distribution", () => {
+    if (process.platform !== "darwin") return;
+    const fixture = makeBundle();
+    try {
+      const optional = verifyBundle(fixture.bundle, fixture.bundleId, fixture.executable);
+      expect(optional.status).toBe(0);
+
+      const required = verifyBundle(fixture.bundle, fixture.bundleId, fixture.executable, {
+        AIRMCP_REQUIRE_WIDGET: "1",
+      });
+      expect(required.status).toBe(1);
+      expect(required.stderr).toContain("requires a complete AirMCPWidget.appex");
     } finally {
       rmSync(fixture.temp, { recursive: true, force: true });
     }

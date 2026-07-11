@@ -46,6 +46,17 @@ final class TrustCenterStore {
 
     var integrity: AuditIntegrity { AuditIntegrity(response: response) }
 
+    func requireManualAuditRefresh() {
+        // Invalidate both whole-history and correlated refreshes already in
+        // flight so an approval-policy change cannot repopulate stale data.
+        refreshGeneration += 1
+        isLoading = false
+        response = nil
+        persistedRuns = []
+        selectedRunID = nil
+        loadError = nil
+    }
+
     func refresh() async {
         refreshGeneration += 1
         let generation = refreshGeneration
@@ -155,46 +166,15 @@ final class TrustCenterStore {
         return byID.values.sorted { $0.startedAt > $1.startedAt }
     }
 
-    func persistedEventCount(correlationId: String?) -> Int {
-        guard let correlationId else { return 0 }
-        return persistedRuns.first(where: { $0.correlationId == correlationId })?.entries.count ?? 0
-    }
-
-    func persistedToolEventCount(correlationId: String?, tool: String) -> Int {
-        guard let correlationId,
-              let run = persistedRuns.first(where: { $0.correlationId == correlationId })
-        else { return 0 }
-        return run.entries.filter { $0.kind == .toolCall && $0.tool == tool }.count
-    }
-
-    /// Refresh one correlated run without replacing the global history window.
-    /// Used by the bounded post-approval completion probe so long-running tools
-    /// eventually leave the in-memory `running` bridge state.
-    @discardableResult
-    func refreshPersistedRun(correlationId: String) async -> Int? {
-        let args: AppRuntimeToolArguments = [
-            "since": AirMCPDateParser.string(from: timeRange.since()),
-            "correlationId": correlationId,
-            "limit": 1_000,
-        ]
-        do {
-            let snapshot: AuditLogResponse = try await AppRuntimeClient.callAppRuntimeToolJSON(
-                "audit_log",
-                args: args
-            )
-            guard let updated = GovernedRun.grouped(entries: snapshot.entries)
-                .first(where: { $0.correlationId == correlationId })
-            else { return 0 }
-            if let index = persistedRuns.firstIndex(where: { $0.correlationId == correlationId }) {
-                persistedRuns[index] = updated
-            } else {
-                persistedRuns.append(updated)
-            }
-            persistedRuns.sort { $0.startedAt > $1.startedAt }
-            return updated.entries.count
-        } catch {
-            return nil
-        }
+    /// Live approval cards are safety controls, not historical search results.
+    /// Always place them ahead of filtered audit history so a stale search or a
+    /// "Succeeded" filter cannot hide the approval created by an explicit Load.
+    func visibleRunsPreservingPending(from runs: [GovernedRun]) -> [GovernedRun] {
+        let pending = runs.filter { !$0.pendingApprovals.isEmpty }
+        let pendingIDs = Set(pending.map(\.id))
+        let filtered = filteredRuns(from: runs).filter { !pendingIDs.contains($0.id) }
+        return pending.sorted { $0.startedAt > $1.startedAt }
+            + filtered.sorted { $0.startedAt > $1.startedAt }
     }
 
     func filteredRuns(from runs: [GovernedRun]) -> [GovernedRun] {

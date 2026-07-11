@@ -22,6 +22,9 @@ describe("macOS trust and App Intent surfaces", () => {
     expect(intents).toContain('forHTTPHeaderField: "X-AirMCP-Run-ID"');
     expect(intents).toContain("static func callAppRuntimeToolJSON<T: Decodable & Sendable>");
     expect(store).toContain("let args: AppRuntimeToolArguments");
+    expect(trust).toContain("TrustCenterRefreshPolicy.allowsAuditHistoryRead(");
+    expect(trust).toContain(".task { await refresh(userInitiatedAuditRead: false) }");
+    expect(trust).toContain('L("trust.auditApprovalLoad")');
     expect(trust).toContain("hitlManager.pendingRequests.count");
     expect(trust).toContain("permissionManager.runSetup()");
   });
@@ -51,12 +54,29 @@ describe("macOS trust and App Intent surfaces", () => {
     expect(models).toContain("this file is not the original HMAC evidence");
   });
 
-  test("latest range wins and post-approval completion is re-queried with bounded backoff", () => {
+  test("latest range wins while audit history remains explicit-only", () => {
     expect(store).toContain("private var refreshGeneration = 0");
     expect(store).toContain("guard generation == refreshGeneration else { return }");
-    expect(store).toContain("func refreshPersistedRun(correlationId: String)");
-    expect(trust).toContain("scheduleOutcomeRefresh(");
-    expect(trust).toContain("currentToolEvents > baselineToolEvents");
+    expect(store).toMatch(/func requireManualAuditRefresh\(\) \{[\s\S]*?refreshGeneration \+= 1/);
+    expect(trust).toContain("userInitiatedAuditRead: true");
+    expect(trust).toContain("let auditHistoryRequested = page == .activity");
+    expect(trust).toContain("refresh(userInitiatedAuditRead: auditHistoryRequested)");
+    expect(trust.match(/store\.requireManualAuditRefresh\(\)/g)).toHaveLength(1);
+    expect(trust.match(/await store\.refresh\(\)/g)).toHaveLength(1);
+    expect(trust).not.toContain("scheduleOutcomeRefresh(");
+    expect(store).not.toContain("refreshPersistedRun(");
+  });
+
+  test("live approvals bypass history filters and loading placeholders", () => {
+    expect(store).toContain("func visibleRunsPreservingPending(from runs: [GovernedRun])");
+    expect(store).toContain("let pending = runs.filter { !$0.pendingApprovals.isEmpty }");
+    expect(trust).toContain("store.visibleRunsPreservingPending(from: mergedRuns)");
+    expect(trust.indexOf("store.isLoading && visibleRuns.isEmpty")).toBeGreaterThan(
+      trust.indexOf("store.visibleRunsPreservingPending(from: mergedRuns)"),
+    );
+    expect(trust.indexOf("let loadError = store.loadError")).toBeLessThan(
+      trust.indexOf("store.response == nil && visibleRuns.isEmpty"),
+    );
   });
 
   test("emergency stop removal requires an explicit confirmation dialog", () => {

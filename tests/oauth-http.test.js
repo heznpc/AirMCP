@@ -108,7 +108,30 @@ describe("HTTP tools/call scope preflight", () => {
     expect(missing).toEqual(["mcp:write", "mcp:destructive", "mcp:admin"]);
   });
 
-  test("leaves unknown tools and non-tool requests to the MCP dispatcher", () => {
+  test("requires cumulative mcp:read capability for every resource operation", () => {
+    expect(
+      missingScopesForMcpRequest(
+        [
+          { method: "resources/list" },
+          { method: "resources/templates/list" },
+          { method: "resources/read", params: { uri: "notes://recent" } },
+          { method: "resources/subscribe", params: { uri: "calendar://today" } },
+        ],
+        registry,
+        { subject: "user-1", scopes: ["openid"], raw: {} },
+      ),
+    ).toEqual(["mcp:read"]);
+
+    expect(
+      missingScopesForMcpRequest({ method: "resources/read" }, registry, {
+        subject: "user-1",
+        scopes: ["mcp:write"],
+        raw: {},
+      }),
+    ).toEqual([]);
+  });
+
+  test("leaves unknown tools and unrelated requests to the MCP dispatcher", () => {
     expect(
       missingScopesForMcpRequest({ method: "tools/call", params: { name: "missing_tool" } }, registry, {
         subject: "user-1",
@@ -118,6 +141,9 @@ describe("HTTP tools/call scope preflight", () => {
     ).toEqual([]);
     expect(
       missingScopesForMcpRequest({ method: "tools/list" }, registry, { subject: "user-1", scopes: [], raw: {} }),
+    ).toEqual([]);
+    expect(
+      missingScopesForMcpRequest({ method: "ping" }, registry, { subject: "user-1", scopes: [], raw: {} }),
     ).toEqual([]);
   });
 });

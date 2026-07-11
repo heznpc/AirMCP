@@ -14,11 +14,26 @@ describe("signed app artifact verification script", () => {
 
   test("verifies an existing signed artifact instead of rebuilding it", () => {
     expect(script).toContain("codesign --verify --deep --strict");
-    expect(script).toContain("Authority=Developer ID Application:");
+    expect(script).toContain("SIGN_AUTHORITY=");
+    expect(script).toContain("Developer\\ ID\\ Application:\\ Heznpc");
+    expect(script).toContain("TeamIdentifier=");
     expect(script).toContain("spctl --assess --type execute");
     expect(script).toContain("xcrun stapler validate");
     expect(script).toContain("probe-app-runtime.mjs");
+    expect(script).toContain("/app/runtime-state");
+    expect(script).toContain("AIRMCP_APP_RUNTIME_OWNER_PATH");
+    expect(script).toContain('--env "AIRMCP_APP_RUNTIME_TOKEN_PATH=$AIRMCP_APP_RUNTIME_TOKEN_PATH"');
+    expect(script).toContain('--env "AIRMCP_FORCE_APP_RUNTIME=$AIRMCP_FORCE_APP_RUNTIME"');
+    expect(script).toContain("ownerFingerprint");
+    expect(script).toContain("pid_matches_prefix");
+    expect(script).toContain('--token-file "$TOKEN_FILE"');
+    expect(script).toContain("processIdentifier == $APP_PID");
+    expect(script).toContain("AIRMCP_REQUIRE_WIDGET=1");
+    expect(script).toContain("bundle structure verification failed");
+    expect(script).toContain('"$APP_BUNDLE" >/dev/null 2>&1');
     expect(script).toContain("Error registering app with intents");
+    expect(script).not.toContain("pkill");
+    expect(script).not.toContain('--token "$TOKEN"');
     expect(script).not.toContain("swift build");
     expect(script).not.toContain("bundle-app.sh");
   });
@@ -31,5 +46,13 @@ describe("signed app artifact verification script", () => {
     expect(notarize).toContain("Contents/Resources/airmcp/runtime/bin/node");
     expect(notarize).toContain("Contents/Resources/airmcp/bin/AirMcpBridge");
     expect(notarize).toContain('bash "$SCRIPT_DIR/verify-signed-app.sh"');
+    expect(notarize).toContain('bash "$SCRIPT_DIR/verify-signing-identity.sh"');
+    expect(notarize).not.toContain('codesigning with $APPLE_DEVELOPER_ID');
+    expect(notarize).not.toContain('echo "$SUBMIT_OUTPUT"');
+    expect(notarize).not.toContain("preserved entitlements: $appex");
+    expect(notarize).not.toContain('echo "  signing $nested"');
+    expect(notarize).not.toContain('echo "  signing $appex"');
+    expect(notarize).not.toContain('zipping $APP_BUNDLE');
+    expect(notarize).not.toContain('✓ $APP_BUNDLE');
   });
 });

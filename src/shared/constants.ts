@@ -221,6 +221,8 @@ export const AUDIT = {
   MAX_ARG_LENGTH: 500,
   /** Max size of a single audit entry (JSON line) before placeholder substitution */
   MAX_ENTRY_SIZE: 10_000,
+  /** Hard in-memory audit spool bound while disk persistence is unavailable */
+  MAX_BUFFER_SIZE: envInt("AIRMCP_AUDIT_MAX_BUFFER_BYTES", 8 * 1024 * 1024),
   /** Max audit log file size before rotation */
   MAX_FILE_SIZE: 10 * 1024 * 1024,
   /** Max consecutive flush failures before disabling audit */

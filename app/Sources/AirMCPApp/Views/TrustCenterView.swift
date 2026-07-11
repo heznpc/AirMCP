@@ -20,6 +20,8 @@ struct TrustCenterView: View {
     @State private var emergencyStopActive = false
     @State private var emergencyStopError: String?
     @State private var confirmEmergencyStopClear = false
+    @State private var auditRefreshInFlight = false
+    @State private var runtimeStateRefreshInFlight = false
 
     private static let emergencyStopURL: URL = {
         if let override = ProcessInfo.processInfo.environment["AIRMCP_EMERGENCY_STOP_PATH"]?
@@ -39,7 +41,7 @@ struct TrustCenterView: View {
             detail
         }
         .frame(minWidth: 760, minHeight: 600)
-        .task { await refresh() }
+        .task { await refresh(userInitiatedAuditRead: false) }
         .toolbar {
             ToolbarItemGroup {
                 if page == .activity {
@@ -51,11 +53,15 @@ struct TrustCenterView: View {
                     .disabled(persistedVisibleRuns.isEmpty || store.isLoading)
                 }
                 Button {
-                    Task { await refresh() }
+                    // Audit history is an Activity-only action. Refreshing
+                    // Safeguards or Permissions must never create an audit_log
+                    // approval that is hidden on another page.
+                    let auditHistoryRequested = page == .activity
+                    Task { await refresh(userInitiatedAuditRead: auditHistoryRequested) }
                 } label: {
                     Label(L("trust.refresh"), systemImage: "arrow.clockwise")
                 }
-                .disabled(store.isLoading)
+                .disabled(store.isLoading || auditRefreshInFlight || runtimeStateRefreshInFlight)
             }
         }
         .confirmationDialog(
@@ -102,7 +108,7 @@ struct TrustCenterView: View {
     }
 
     private var visibleRuns: [GovernedRun] {
-        store.filteredRuns(from: mergedRuns)
+        store.visibleRunsPreservingPending(from: mergedRuns)
     }
 
     /// Export never receives pending/recent in-memory state. Those rows are
@@ -162,7 +168,7 @@ struct TrustCenterView: View {
             .padding(.horizontal, 10)
             .padding(.bottom, 8)
             .onChange(of: store.timeRange) {
-                Task { await store.refresh() }
+                store.requireManualAuditRefresh()
             }
 
             if store.isLoading && visibleRuns.isEmpty {
@@ -175,7 +181,21 @@ struct TrustCenterView: View {
                 } description: {
                     Text(loadError)
                 } actions: {
-                    Button(L("trust.refresh")) { Task { await refresh() } }
+                    Button(L("trust.refresh")) {
+                        Task { await refresh(userInitiatedAuditRead: true) }
+                    }
+                    .disabled(auditRefreshInFlight || runtimeStateRefreshInFlight)
+                }
+            } else if store.response == nil && visibleRuns.isEmpty {
+                ContentUnavailableView {
+                    Label(L("trust.auditApprovalTitle"), systemImage: "hand.raised.fill")
+                } description: {
+                    Text(L("trust.auditApprovalMessage"))
+                } actions: {
+                    Button(L("trust.auditApprovalLoad")) {
+                        Task { await refresh(userInitiatedAuditRead: true) }
+                    }
+                    .disabled(auditRefreshInFlight || runtimeStateRefreshInFlight)
                 }
             } else if visibleRuns.isEmpty {
                 ContentUnavailableView(
@@ -622,62 +642,27 @@ struct TrustCenterView: View {
     }
 
     private func respond(to pending: LivePendingApproval, approved: Bool) {
-        let baselineToolEvents = store.persistedToolEventCount(
-            correlationId: pending.correlationId,
-            tool: pending.tool
-        )
         hitlManager.respond(id: pending.id, approved: approved, tool: pending.tool)
-        scheduleOutcomeRefresh(
-            correlationId: pending.correlationId,
-            tool: pending.tool,
-            baselineToolEvents: baselineToolEvents
-        )
-    }
-
-    private func scheduleOutcomeRefresh(
-        correlationId: String?,
-        tool: String,
-        baselineToolEvents: Int
-    ) {
-        // audit_log itself is approval-gated at Maximum. Avoid creating a
-        // chain of background approval prompts in that mode; one delayed probe
-        // is enough and a manual Refresh remains available.
-        let auditReadNeedsApproval = configManager.hitlLevel == .all
-            && !configManager.hitlWhitelist.contains("audit_log")
-        let delays: [UInt64] = auditReadNeedsApproval
-            ? [15_000_000_000]
-            : [500_000_000, 1_500_000_000, 3_000_000_000, 6_000_000_000, 12_000_000_000, 24_000_000_000]
-
-        Task {
-            for delay in delays {
-                try? await Task.sleep(nanoseconds: delay)
-                guard !Task.isCancelled else { return }
-
-                if let correlationId {
-                    _ = await store.refreshPersistedRun(correlationId: correlationId)
-                    let currentToolEvents = store.persistedToolEventCount(
-                        correlationId: correlationId,
-                        tool: tool
-                    )
-                    if currentToolEvents > baselineToolEvents {
-                        await store.refresh()
-                        return
-                    }
-                } else {
-                    // Legacy socket peers do not carry a correlation ID. A
-                    // full refresh is the only safe way to observe completion.
-                    await store.refresh()
-                    return
-                }
-            }
-        }
     }
 
     @MainActor
-    private func refresh() async {
+    private func refresh(userInitiatedAuditRead: Bool) async {
+        guard !runtimeStateRefreshInFlight,
+              !userInitiatedAuditRead || !auditRefreshInFlight
+        else { return }
+        runtimeStateRefreshInFlight = true
+        if userInitiatedAuditRead { auditRefreshInFlight = true }
+        defer {
+            runtimeStateRefreshInFlight = false
+            if userInitiatedAuditRead { auditRefreshInFlight = false }
+        }
         emergencyStopActive = FileManager.default.fileExists(atPath: Self.emergencyStopURL.path)
         exposedToolCount = try? await AppRuntimeClient.listTools().count
-        await store.refresh()
+        if TrustCenterRefreshPolicy.allowsAuditHistoryRead(
+            userInitiated: userInitiatedAuditRead
+        ) {
+            await store.refresh()
+        }
     }
 
     private func engageEmergencyStop() {

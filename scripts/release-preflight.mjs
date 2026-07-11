@@ -16,6 +16,7 @@ const ROOT = dirname(fileURLToPath(new URL("../package.json", import.meta.url)))
 const OUT_DIR = join(ROOT, "build", "release-preflight");
 const args = new Set(process.argv.slice(2));
 const INCLUDE_APP = args.has("--app");
+const REQUIRE_WIDGET = process.env.AIRMCP_REQUIRE_WIDGET === "1";
 const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
 const version = pkg.version;
 
@@ -158,7 +159,11 @@ function verifyMcpb(path) {
 
 function buildAppArchive() {
   run("bash", ["scripts/bundle-app.sh", "bundle"], {
-    env: { ...process.env, AIRMCP_SKIP_WIDGET: "1" },
+    env: {
+      ...process.env,
+      AIRMCP_REQUIRE_WIDGET: REQUIRE_WIDGET ? "1" : "0",
+      AIRMCP_SKIP_WIDGET: REQUIRE_WIDGET ? "0" : "1",
+    },
   });
   const appPath = join(ROOT, "AirMCP.app");
   assertFile(join(appPath, "Contents", "MacOS", "AirMCP"), "AirMCP.app executable");
@@ -189,6 +194,17 @@ verifyMcpb(mcpbPath);
 copyFileSync(mcpbPath, join(OUT_DIR, `airmcp-${version}.mcpb`));
 
 if (INCLUDE_APP) {
+  // Exercise the shipping, self-contained app through the real MCP transport
+  // before archiving it: authenticated read, approved and denied writes,
+  // emergency stop, and HMAC audit verification. This is deliberately part of
+  // the app preflight rather than a source-wiring-only test.
+  run("npm", ["run", "app:verify:governed"], {
+    env: {
+      ...process.env,
+      AIRMCP_REQUIRE_WIDGET: REQUIRE_WIDGET ? "1" : "0",
+      AIRMCP_SKIP_WIDGET: REQUIRE_WIDGET ? "0" : "1",
+    },
+  });
   buildAppArchive();
 } else {
   console.log("release-preflight: skipping app bundle archive (pass --app to include it)");

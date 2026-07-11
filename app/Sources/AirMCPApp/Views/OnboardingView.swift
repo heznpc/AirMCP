@@ -26,21 +26,73 @@ struct OnboardingView: View {
     let serverManager: ServerManager
     let onComplete: () -> Void
 
-    @State private var currentStep = 0
+    @State private var currentStep: Int
     @State private var nodeAvailable = false
     @State private var nodeChecking = true
-    @State private var selectedWorkflowID = "daily-briefing"
-    @State private var disabledModules: Set<String> = onboardingModuleIds.subtracting(
-        onboardingWorkflows.first?.requiredModules ?? []
-    )
+    @State private var selectedWorkflowID: String
+    @State private var disabledModules: Set<String>
+    @State private var unmanagedDisabledModules: Set<String>
+    @State private var appliedScopeFingerprint: String?
+    @State private var runtimeReceipt: ServerManager.OnboardingRuntimeReceipt?
     @State private var mcpClients: [MCPClient] = []
-    @State private var patchingClient: String?
+    @State private var patchingClients: Set<String> = []
     @State private var patchResults: [String: Bool] = [:]
     @State private var firstRunChecking = false
     @State private var firstRunReady = false
     @State private var firstRunMessage = L("onboarding.firstRunWaiting")
+    @State private var completionError: String?
 
     private let totalSteps = 6
+
+    init(
+        configManager: ConfigManager,
+        serverManager: ServerManager,
+        onComplete: @escaping () -> Void
+    ) {
+        self.configManager = configManager
+        self.serverManager = serverManager
+        self.onComplete = onComplete
+
+        let defaults = UserDefaults.standard
+        let firstWorkflow = onboardingWorkflows[0]
+        let onboardingCompleted = defaults.bool(forKey: AirMcpConstants.keyOnboardingCompleted)
+        let fallback = OnboardingDraftStore.fallbackState(
+            onboardingCompleted: onboardingCompleted,
+            configuredDisabledModules: configManager.disabledModules,
+            defaultWorkflowID: firstWorkflow.id,
+            defaultDisabledModules: onboardingModuleIds.subtracting(firstWorkflow.requiredModules),
+            validModuleIDs: onboardingModuleIds
+        )
+        // A completed Setup has no resumable draft: reopening is an editor and
+        // must reflect the currently persisted module selection. Only an
+        // incomplete first run restores its workflow/module draft.
+        let draft = onboardingCompleted
+            ? fallback
+            : OnboardingDraftStore.load(
+                defaults: defaults,
+                validWorkflowIDs: Set(onboardingWorkflows.map(\.id)),
+                validModuleIDs: onboardingModuleIds,
+                fallback: fallback
+            )
+        _currentStep = State(
+            initialValue: min(
+                max(defaults.integer(forKey: AirMcpConstants.keyOnboardingStep), 0),
+                5
+            )
+        )
+        _selectedWorkflowID = State(initialValue: draft.workflowID)
+        _disabledModules = State(initialValue: draft.disabledModules)
+        _appliedScopeFingerprint = State(initialValue: draft.appliedScopeFingerprint)
+        _runtimeReceipt = State(initialValue: nil)
+        _unmanagedDisabledModules = State(
+            initialValue: OnboardingDraftStore.unmanagedDisabledModules(
+                onboardingCompleted: onboardingCompleted,
+                configuredDisabledModules: configManager.disabledModules,
+                managedModuleIDs: onboardingModuleIds,
+                allModuleIDs: Set(allModules.map(\.id))
+            )
+        )
+    }
 
     private var currentStepTitle: String {
         let titles = [
@@ -56,6 +108,13 @@ struct OnboardingView: View {
 
     private var selectedWorkflow: OnboardingWorkflow {
         onboardingWorkflows.first { $0.id == selectedWorkflowID } ?? onboardingWorkflows[0]
+    }
+
+    private var currentRuntimeScope: OnboardingRuntimeScope {
+        OnboardingRuntimeScope(
+            workflowID: selectedWorkflowID,
+            disabledModules: disabledModules.union(unmanagedDisabledModules)
+        )
     }
 
     var body: some View {
@@ -101,9 +160,10 @@ struct OnboardingView: View {
             HStack {
                 if currentStep > 0 {
                     Button(L("onboarding.back")) {
-                        currentStep -= 1
+                        setCurrentStep(currentStep - 1)
                     }
                     .keyboardShortcut(.cancelAction)
+                    .disabled(firstRunChecking || !patchingClients.isEmpty)
                 }
 
                 Spacer()
@@ -113,13 +173,17 @@ struct OnboardingView: View {
                         advanceStep()
                     }
                     .keyboardShortcut(.defaultAction)
-                    .disabled(currentStep == 1 && !nodeAvailable)
+                    .disabled(
+                        (currentStep == 1 && !nodeAvailable)
+                            || firstRunChecking
+                            || !patchingClients.isEmpty
+                    )
                 } else {
                     Button(L("onboarding.finish")) {
-                        saveAndComplete()
+                        Task { await saveAndComplete() }
                     }
                     .keyboardShortcut(.defaultAction)
-                    .disabled(!firstRunReady)
+                    .disabled(firstRunChecking || !patchingClients.isEmpty)
                 }
             }
             .padding(.horizontal, 20)
@@ -130,6 +194,17 @@ struct OnboardingView: View {
             height: Self.preferredContentSize.height
         )
         .background(Color(nsColor: .windowBackgroundColor))
+        .alert(
+            L("onboarding.saveFailed"),
+            isPresented: Binding(
+                get: { completionError != nil },
+                set: { if !$0 { completionError = nil } }
+            )
+        ) {
+            Button(L("trust.ok")) { completionError = nil }
+        } message: {
+            Text(completionError ?? "")
+        }
     }
 
     // MARK: - Step 1: Welcome
@@ -341,8 +416,12 @@ struct OnboardingView: View {
     }
 
     private func applyWorkflowPreset(_ workflow: OnboardingWorkflow) {
+        guard !firstRunChecking, patchingClients.isEmpty else { return }
+        let nextDisabledModules = onboardingModuleIds.subtracting(workflow.requiredModules)
+        guard selectedWorkflowID != workflow.id || disabledModules != nextDisabledModules else { return }
         selectedWorkflowID = workflow.id
-        disabledModules = onboardingModuleIds.subtracting(workflow.requiredModules)
+        disabledModules = nextDisabledModules
+        scopeSelectionDidChange()
     }
 
     // MARK: - Step 4: Module Selection
@@ -377,13 +456,22 @@ struct OnboardingView: View {
 
             HStack(spacing: 16) {
                 Button(L("onboarding.enableAll")) {
+                    guard !firstRunChecking, patchingClients.isEmpty else { return }
+                    guard !disabledModules.isEmpty else { return }
                     disabledModules.removeAll()
+                    scopeSelectionDidChange()
                 }
                 .font(.caption)
+                .disabled(firstRunChecking || !patchingClients.isEmpty)
                 Button(L("onboarding.disableAll")) {
-                    disabledModules = Set(onboardingModules.map(\.id))
+                    guard !firstRunChecking, patchingClients.isEmpty else { return }
+                    let allDisabled = Set(onboardingModules.map(\.id))
+                    guard disabledModules != allDisabled else { return }
+                    disabledModules = allDisabled
+                    scopeSelectionDidChange()
                 }
                 .font(.caption)
+                .disabled(firstRunChecking || !patchingClients.isEmpty)
             }
         }
         .padding(.horizontal, 24)
@@ -394,11 +482,13 @@ struct OnboardingView: View {
         let isEnabled = !disabledModules.contains(module.id)
 
         Button {
+            guard !firstRunChecking, patchingClients.isEmpty else { return }
             if isEnabled {
                 disabledModules.insert(module.id)
             } else {
                 disabledModules.remove(module.id)
             }
+            scopeSelectionDidChange()
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: module.icon)
@@ -431,6 +521,7 @@ struct OnboardingView: View {
             )
         }
         .buttonStyle(.plain)
+        .disabled(firstRunChecking || !patchingClients.isEmpty)
     }
 
     // MARK: - Step 5: Permissions
@@ -523,6 +614,14 @@ struct OnboardingView: View {
 
                 firstRunStatusCard
 
+                if !firstRunReady {
+                    Label(L("onboarding.clientNeedsRuntime"), systemImage: "lock.fill")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 24)
+                }
+
                 VStack(spacing: 8) {
                     ForEach($mcpClients) { $client in
                         clientRow(client: client)
@@ -543,7 +642,7 @@ struct OnboardingView: View {
         .padding(.horizontal, 24)
         .task {
             detectClients()
-            await prepareFirstRun()
+            await checkFirstRunReadiness()
         }
     }
 
@@ -601,8 +700,14 @@ struct OnboardingView: View {
 
             Spacer()
 
-            Button(L("onboarding.firstRunCheckAgain")) {
-                Task { await prepareFirstRun(force: true) }
+            Button(firstRunReady ? L("onboarding.firstRunCheckAgain") : L("onboarding.startRuntime")) {
+                Task {
+                    if firstRunReady {
+                        await checkFirstRunReadiness()
+                    } else {
+                        await startFirstRunRuntime()
+                    }
+                }
             }
             .controlSize(.small)
             .disabled(firstRunChecking)
@@ -644,7 +749,7 @@ struct OnboardingView: View {
                     Label(result ? L("onboarding.patched") : L("onboarding.failed"), systemImage: result ? "checkmark.circle.fill" : "xmark.circle")
                         .foregroundStyle(result ? .green : .red)
                         .font(.caption)
-                } else if patchingClient == client.id {
+                } else if patchingClients.contains(client.id) {
                     ProgressView()
                         .controlSize(.small)
                 } else {
@@ -652,6 +757,8 @@ struct OnboardingView: View {
                         patchClient(client)
                     }
                     .controlSize(.small)
+                    .disabled(!firstRunReady || firstRunChecking || !patchingClients.isEmpty)
+                    .help(firstRunReady ? "" : L("onboarding.clientNeedsRuntime"))
                 }
             }
         }
@@ -665,7 +772,35 @@ struct OnboardingView: View {
     // MARK: - Logic
 
     private func advanceStep() {
-        currentStep += 1
+        guard !firstRunChecking, patchingClients.isEmpty else { return }
+        setCurrentStep(currentStep + 1)
+    }
+
+    private func setCurrentStep(_ step: Int) {
+        guard !firstRunChecking, patchingClients.isEmpty else { return }
+        currentStep = min(max(step, 0), totalSteps - 1)
+        UserDefaults.standard.set(currentStep, forKey: AirMcpConstants.keyOnboardingStep)
+    }
+
+    private func persistOnboardingDraft() {
+        OnboardingDraftStore.save(
+            OnboardingDraftState(
+                workflowID: selectedWorkflowID,
+                disabledModules: disabledModules,
+                appliedScopeFingerprint: appliedScopeFingerprint
+            )
+        )
+    }
+
+    private func scopeSelectionDidChange() {
+        guard !firstRunChecking, patchingClients.isEmpty else { return }
+        appliedScopeFingerprint = nil
+        runtimeReceipt = nil
+        firstRunReady = false
+        firstRunMessage = L("onboarding.firstRunScopeChanged")
+        patchResults.removeAll()
+        persistOnboardingDraft()
+        serverManager.noteOnboardingScopeChanged()
     }
 
     private func checkNode() async {
@@ -739,27 +874,175 @@ struct OnboardingView: View {
     }
 
     private func patchClient(_ client: MCPClient) {
-        patchingClient = client.id
+        // Client configuration writes are transactional but share the local
+        // runtime token. Keep the consent action single-flight across rows.
+        let scope = currentRuntimeScope
+        let capturedStep = currentStep
+        guard patchingClients.isEmpty,
+              firstRunReady,
+              capturedStep == totalSteps - 1,
+              appliedScopeFingerprint == scope.draftFingerprint,
+              let authorizedReceipt = runtimeReceipt,
+              authorizedReceipt.draftFingerprint == scope.draftFingerprint,
+              authorizedReceipt.runtimeFingerprint == scope.runtimeFingerprint,
+              let runtimeToken = (try? AppRuntimeToken.loadExisting()) ?? nil,
+              authorizedReceipt.tokenFingerprint == AppRuntimeToken.fingerprint(for: runtimeToken),
+              configManager.isOnboardingRuntimeScopePersisted(scope)
+        else { return }
+        patchingClients.insert(client.id)
         Task {
+            let validation = await serverManager.validateOnboardingRuntime(
+                for: scope,
+                authorizedDraftFingerprint: scope.draftFingerprint,
+                runtimeToken: runtimeToken,
+                configManager: configManager
+            )
+            guard runtimeReceipt == authorizedReceipt,
+                  case .ready(let receipt) = validation
+            else {
+                firstRunReady = false
+                runtimeReceipt = nil
+                if case .manualRuntime = validation {
+                    firstRunMessage = L("onboarding.firstRunManualRuntime")
+                } else {
+                    firstRunMessage = L("onboarding.firstRunScopeChanged")
+                }
+                patchingClients.remove(client.id)
+                return
+            }
+            runtimeReceipt = receipt
+            guard clientPatchAuthorizationIsCurrent(
+                clientID: client.id,
+                capturedStep: capturedStep,
+                scope: scope,
+                receipt: receipt,
+                runtimeToken: runtimeToken
+            ) else {
+                firstRunReady = false
+                runtimeReceipt = nil
+                firstRunMessage = L("onboarding.firstRunScopeChanged")
+                patchingClients.remove(client.id)
+                return
+            }
             let success = await Task.detached {
                 switch client.kind {
                 case .jsonConfig:
-                    return Self.patchConfig(at: client.configPath)
+                    return Self.patchConfig(at: client.configPath, token: runtimeToken)
                 case .codexCli:
-                    return Self.patchCodexConfig()
+                    return Self.patchCodexConfig(token: runtimeToken)
                 }
             }.value
-            patchResults[client.id] = success
-            patchingClient = nil
-            await prepareFirstRun(force: true)
+            let authorizationStillCurrent = clientPatchAuthorizationIsCurrent(
+                clientID: client.id,
+                capturedStep: capturedStep,
+                scope: scope,
+                receipt: receipt,
+                runtimeToken: runtimeToken
+            )
+            patchResults[client.id] = success && authorizationStillCurrent
+            patchingClients.remove(client.id)
+            guard success, authorizationStillCurrent else {
+                firstRunReady = false
+                runtimeReceipt = nil
+                firstRunMessage = L("onboarding.firstRunScopeChanged")
+                return
+            }
+            await checkFirstRunReadiness()
         }
     }
 
-    private func prepareFirstRun(force: Bool = false) async {
-        if firstRunChecking && !force { return }
+    private func clientPatchAuthorizationIsCurrent(
+        clientID: String,
+        capturedStep: Int,
+        scope: OnboardingRuntimeScope,
+        receipt: ServerManager.OnboardingRuntimeReceipt,
+        runtimeToken: String
+    ) -> Bool {
+        currentStep == capturedStep
+            && capturedStep == totalSteps - 1
+            && patchingClients == [clientID]
+            && currentRuntimeScope == scope
+            && appliedScopeFingerprint == scope.draftFingerprint
+            && runtimeReceipt == receipt
+            && receipt.draftFingerprint == scope.draftFingerprint
+            && receipt.runtimeFingerprint == scope.runtimeFingerprint
+            && receipt.tokenFingerprint == AppRuntimeToken.fingerprint(for: runtimeToken)
+            && scope.assessRuntimeSurface(
+                enabledModules: receipt.enabledModules,
+                unavailableModules: receipt.unavailableModules
+            ).isAcceptable
+            && configManager.isOnboardingRuntimeScopePersisted(scope)
+            && AppRuntimeToken.matchesExisting(runtimeToken)
+    }
+
+    /// Readiness checks are observational. Entering the final onboarding step
+    /// must not create credentials, enable auto-start, or launch a process.
+    private func checkFirstRunReadiness() async {
+        if firstRunChecking { return }
+        firstRunChecking = true
+        firstRunReady = false
+
+        let scope = currentRuntimeScope
+        guard serverManager.autoStartEnabled,
+              let appliedScopeFingerprint,
+              appliedScopeFingerprint == scope.draftFingerprint,
+              let runtimeToken = (try? AppRuntimeToken.loadExisting()) ?? nil,
+              configManager.isOnboardingRuntimeScopePersisted(scope)
+        else {
+            firstRunChecking = false
+            firstRunMessage = appliedScopeFingerprint == nil
+                ? L("onboarding.firstRunWaiting")
+                : L("onboarding.firstRunScopeChanged")
+            return
+        }
+
+        let validation = await serverManager.validateOnboardingRuntime(
+            for: scope,
+            authorizedDraftFingerprint: appliedScopeFingerprint,
+            runtimeToken: runtimeToken,
+            configManager: configManager
+        )
+        guard currentRuntimeScope == scope,
+              self.appliedScopeFingerprint == appliedScopeFingerprint
+        else {
+            firstRunChecking = false
+            firstRunMessage = L("onboarding.firstRunScopeChanged")
+            return
+        }
+        if case .ready(let receipt) = validation {
+            runtimeReceipt = receipt
+            firstRunReady = true
+            firstRunChecking = false
+            firstRunMessage = readyMessage(receipt)
+            return
+        }
+
+        runtimeReceipt = nil
+        firstRunChecking = false
+        if case .manualRuntime = validation {
+            firstRunMessage = L("onboarding.firstRunManualRuntime")
+        } else {
+            firstRunMessage = L("onboarding.firstRunRuntimeFailed")
+        }
+    }
+
+    /// This is the sole onboarding action allowed to create the local token,
+    /// opt into automatic startup, and launch the app-owned runtime.
+    private func startFirstRunRuntime() async {
+        if firstRunChecking { return }
         firstRunChecking = true
         firstRunReady = false
         firstRunMessage = L("onboarding.firstRunStarting")
+
+        // This button is the first explicit runtime consent in Setup. Keep
+        // notification authorization coupled to that action rather than app
+        // launch or passive readiness checks.
+        if RuntimeStartConsentPolicy.shouldRequestApprovalNotifications(
+            hitlLevel: configManager.hitlLevel,
+            userInitiated: true
+        ) {
+            HitlManager.requestNotificationPermission()
+        }
 
         do {
             _ = try AppRuntimeToken.ensure()
@@ -769,130 +1052,66 @@ struct OnboardingView: View {
             return
         }
 
+        let scope = currentRuntimeScope
+        runtimeReceipt = nil
         serverManager.autoStartEnabled = true
-        if serverManager.status != .running {
-            serverManager.startServer()
-        }
-
-        for _ in 0..<24 {
-            if let version = await ServerManager.authenticatedAppOwnedRuntimeVersion() {
-                firstRunReady = true
-                firstRunChecking = false
-                firstRunMessage = L("onboarding.firstRunReadyDesc", version, selectedWorkflow.title)
-                return
-            }
-            try? await Task.sleep(nanoseconds: 500_000_000)
-        }
-
+        let result = await serverManager.activateOnboardingRuntime(
+            for: scope,
+            configManager: configManager
+        )
         firstRunChecking = false
-        firstRunMessage = L("onboarding.firstRunRuntimeFailed")
+        guard currentRuntimeScope == scope else {
+            firstRunReady = false
+            firstRunMessage = L("onboarding.firstRunScopeChanged")
+            return
+        }
+        switch result {
+        case .ready(let receipt):
+            runtimeReceipt = receipt
+            appliedScopeFingerprint = scope.draftFingerprint
+            persistOnboardingDraft()
+            firstRunReady = true
+            firstRunMessage = readyMessage(receipt)
+        case .manualRuntime:
+            appliedScopeFingerprint = nil
+            persistOnboardingDraft()
+            firstRunReady = false
+            firstRunMessage = L("onboarding.firstRunManualRuntime")
+        case .failed(let message):
+            firstRunReady = false
+            firstRunMessage = L("onboarding.firstRunConfigFailed", message)
+        }
     }
 
-    private nonisolated static func patchCodexConfig() -> Bool {
+    private func readyMessage(_ receipt: ServerManager.OnboardingRuntimeReceipt) -> String {
+        let ready = L("onboarding.firstRunReadyDesc", receipt.version, selectedWorkflow.title)
+        let unavailable = receipt.unavailableModules.map(\.module).sorted()
+        guard !unavailable.isEmpty else { return ready }
+        return ready + "\n" + L("onboarding.firstRunUnavailableModules", unavailable.joined(separator: ", "))
+    }
+
+    private nonisolated static func patchCodexConfig(token: String) -> Bool {
         guard let codex = NodeEnvironment.findExecutable(named: "codex") else {
             return false
         }
-        guard let token = try? AppRuntimeToken.ensure() else {
-            return false
-        }
 
-        let existing = runProcessCaptured(codex, arguments: ["mcp", "get", "airmcp", "--json"])
-        if existing.success && !runProcess(codex, arguments: ["mcp", "remove", "airmcp"]) {
-            return false
-        }
-
-        let added = runProcess(
-            codex,
-            arguments: [
-                "mcp",
-                "add",
-                "--env",
-                "AIRMCP_HTTP_TOKEN=\(token)",
-                "airmcp",
-                "--",
-                AirMcpConstants.appOwnedProxyCommand,
-            ] + AirMcpConstants.appOwnedProxyArgs
+        return CodexOnboardingConfigurator.configure(
+            codex: codex,
+            homeDirectory: FileManager.default.homeDirectoryForCurrentUser,
+            token: token,
+            proxyCommand: AirMcpConstants.appOwnedProxyCommand,
+            proxyArguments: AirMcpConstants.appOwnedProxyArgs,
+            tokenStillCurrent: { AppRuntimeToken.matchesExisting(token) }
         )
-        if added { return true }
-
-        // `codex mcp add` has no in-place update operation. If the replacement
-        // fails after removal, reconstruct the prior entry captured above.
-        if existing.success {
-            _ = restoreCodexConfig(codex, json: existing.output)
-        }
-        return false
     }
 
-    private nonisolated static func restoreCodexConfig(_ codex: String, json: String) -> Bool {
-        guard let data = json.data(using: .utf8),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let transport = object["transport"] as? [String: Any],
-              let type = transport["type"] as? String
-        else { return false }
-
-        if type == "stdio",
-           let command = transport["command"] as? String,
-           let commandArgs = transport["args"] as? [String] {
-            var arguments = ["mcp", "add"]
-            if let environment = transport["env"] as? [String: String] {
-                for key in environment.keys.sorted() {
-                    if let value = environment[key] {
-                        arguments.append(contentsOf: ["--env", "\(key)=\(value)"])
-                    }
-                }
-            }
-            arguments.append(contentsOf: ["airmcp", "--", command])
-            arguments.append(contentsOf: commandArgs)
-            return runProcess(codex, arguments: arguments)
-        }
-
-        if type == "streamable_http", let url = transport["url"] as? String {
-            return runProcess(codex, arguments: ["mcp", "add", "airmcp", "--url", url])
-        }
-        return false
-    }
-
-    private nonisolated static func runProcessCaptured(
-        _ executable: String,
-        arguments: [String]
-    ) -> (success: Bool, output: String) {
-        let process = Process()
-        let output = Pipe()
-        process.executableURL = URL(fileURLWithPath: executable)
-        process.arguments = arguments
-        process.environment = NodeEnvironment.buildEnv()
-        process.standardOutput = output
-        process.standardError = FileHandle.nullDevice
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-            let data = output.fileHandleForReading.readDataToEndOfFile()
-            return (process.terminationStatus == 0, String(data: data, encoding: .utf8) ?? "")
-        } catch {
-            return (false, "")
-        }
-    }
-
-    private nonisolated static func runProcess(_ executable: String, arguments: [String]) -> Bool {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: executable)
-        process.arguments = arguments
-        process.environment = NodeEnvironment.buildEnv()
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-            return process.terminationStatus == 0
-        } catch {
-            return false
-        }
-    }
-
-    nonisolated static func patchConfig(at path: String) -> Bool {
+    nonisolated static func patchConfig(
+        at path: String,
+        token: String,
+        tokenValidator: (() -> Bool)? = nil
+    ) -> Bool {
         let fm = FileManager.default
+        let tokenIsCurrent = tokenValidator ?? { AppRuntimeToken.matchesExisting(token) }
 
         // Ensure directory exists
         let dir = (path as NSString).deletingLastPathComponent
@@ -910,10 +1129,10 @@ struct OnboardingView: View {
             config = [:]
         }
 
-        // Build the token-gated app-owned runtime entry
-        guard let token = try? AppRuntimeToken.ensure() else {
-            return false
-        }
+        // The caller authenticated runtime-state with this exact existing
+        // token. Never call ensure() here: replacement/deletion must fail the
+        // transaction instead of silently writing a different credential.
+        guard tokenIsCurrent() else { return false }
         let airmcpEntry = AirMcpConstants.appOwnedProxyEntry(token: token)
 
         // Merge into mcpServers
@@ -937,9 +1156,31 @@ struct OnboardingView: View {
             let backupPath = path + ".airmcp-backup"
             let originalData = fm.contents(atPath: path)
             let originalPermissions = ((try? fm.attributesOfItem(atPath: path)[.posixPermissions]) as? NSNumber)?.intValue
+            let originalBackupData = fm.contents(atPath: backupPath)
+            let originalBackupPermissions = ((try? fm.attributesOfItem(atPath: backupPath)[.posixPermissions]) as? NSNumber)?.intValue
+
+            func restoreSnapshot(_ snapshot: Data?, at destination: String, permissions: Int?) {
+                if let snapshot {
+                    try? installFileAtomically(snapshot, at: destination, permissions: permissions ?? 0o600)
+                } else {
+                    try? fm.removeItem(atPath: destination)
+                }
+            }
+
+            func rollbackClientFiles() {
+                restoreSnapshot(originalData, at: path, permissions: originalPermissions)
+                restoreSnapshot(originalBackupData, at: backupPath, permissions: originalBackupPermissions)
+            }
+
+            guard tokenIsCurrent() else { return false }
 
             if let originalData {
                 try installFileAtomically(originalData, at: backupPath, permissions: 0o600)
+            }
+
+            guard tokenIsCurrent() else {
+                rollbackClientFiles()
+                return false
             }
 
             do {
@@ -947,15 +1188,11 @@ struct OnboardingView: View {
             } catch {
                 // Keep the operation transactional: a failed permission or
                 // replacement step must not leave a partially patched config.
-                if let originalData {
-                    try? installFileAtomically(
-                        originalData,
-                        at: path,
-                        permissions: originalPermissions ?? 0o600
-                    )
-                } else {
-                    try? fm.removeItem(atPath: path)
-                }
+                rollbackClientFiles()
+                return false
+            }
+            guard tokenIsCurrent() else {
+                rollbackClientFiles()
                 return false
             }
             return true
@@ -996,12 +1233,197 @@ struct OnboardingView: View {
         try fm.setAttributes(attributes, ofItemAtPath: path)
     }
 
-    private func saveAndComplete() {
-        // Save module selection
-        configManager.disabledModules = Array(disabledModules)
+    private func saveAndComplete() async {
+        guard !firstRunChecking else { return }
+        firstRunChecking = true
+        defer { firstRunChecking = false }
+
+        let scope = currentRuntimeScope
+        var exactRuntimeRequiredAtCompletion = false
+        let initialProbe = await ServerManager.probeAppOwnedRuntime()
+        guard currentRuntimeScope == scope else {
+            completionError = L("onboarding.firstRunScopeChanged")
+            return
+        }
+
+        switch initialProbe {
+        case .ready(_, appOwned: false):
+            completionError = L("onboarding.firstRunManualRuntime")
+            return
+        case .ready(let version, appOwned: true):
+            guard let runtimeToken = (try? AppRuntimeToken.loadExisting()) ?? nil,
+                  let state = try? await AppRuntimeClient.runtimeState(token: runtimeToken),
+                  let expectedOwnerFingerprint = try? AppRuntimeToken.expectedOwnerFingerprint(),
+                  ServerManager.authenticatedOwnedRuntimeIdentity(
+                      state: state,
+                      expectedVersion: version,
+                      expectedOwnerFingerprint: expectedOwnerFingerprint
+                  ) != nil
+            else {
+                completionError = L("onboarding.firstRunRuntimeFailed")
+                return
+            }
+            let surfaceAssessment = scope.assessRuntimeSurface(
+                enabledModules: state.enabledModules,
+                unavailableModules: state.unavailableModules
+            )
+            let runtimeMatches = AppRuntimeToken.matchesExisting(runtimeToken)
+                && state.disabledModules == scope.disabledModules
+                && state.scopeFingerprint == scope.runtimeFingerprint
+                && surfaceAssessment.isAcceptable
+
+            if !runtimeMatches {
+                let result = await serverManager.activateOnboardingRuntime(
+                    for: scope,
+                    configManager: configManager
+                )
+                guard currentRuntimeScope == scope else {
+                    completionError = L("onboarding.firstRunScopeChanged")
+                    return
+                }
+                switch result {
+                case .ready(let receipt):
+                    runtimeReceipt = receipt
+                    appliedScopeFingerprint = scope.draftFingerprint
+                    persistOnboardingDraft()
+                    exactRuntimeRequiredAtCompletion = true
+                case .manualRuntime:
+                    completionError = L("onboarding.firstRunManualRuntime")
+                    return
+                case .failed(let message):
+                    completionError = L("onboarding.firstRunConfigFailed", message)
+                    return
+                }
+            } else if !configManager.isOnboardingRuntimeScopePersisted(scope) {
+                guard let transaction = configManager.beginOnboardingRuntimeScopeTransaction(scope) else {
+                    completionError = configManager.lastPersistenceError
+                        ?? L("onboarding.firstRunConfigFailed", "unknown")
+                    return
+                }
+                guard currentRuntimeScope == scope else {
+                    _ = configManager.rollbackOnboardingRuntimeScope(transaction)
+                    completionError = L("onboarding.firstRunScopeChanged")
+                    return
+                }
+            }
+            exactRuntimeRequiredAtCompletion = true
+        case .unavailable:
+            if serverManager.canStopRuntime {
+                let result = await serverManager.activateOnboardingRuntime(
+                    for: scope,
+                    configManager: configManager
+                )
+                switch result {
+                case .ready(let receipt):
+                    runtimeReceipt = receipt
+                    appliedScopeFingerprint = scope.draftFingerprint
+                    persistOnboardingDraft()
+                    exactRuntimeRequiredAtCompletion = true
+                    break
+                case .manualRuntime:
+                    completionError = L("onboarding.firstRunManualRuntime")
+                    return
+                case .failed(let message):
+                    completionError = L("onboarding.firstRunConfigFailed", message)
+                    return
+                }
+                break
+            }
+            // Finishing first-run Setup is not runtime consent. Persist and
+            // verify the selection, but do not create a token or start Node.
+            guard let transaction = configManager.beginOnboardingRuntimeScopeTransaction(scope) else {
+                completionError = configManager.lastPersistenceError
+                    ?? L("onboarding.firstRunConfigFailed", "unknown")
+                return
+            }
+            guard currentRuntimeScope == scope else {
+                _ = configManager.rollbackOnboardingRuntimeScope(transaction)
+                completionError = L("onboarding.firstRunScopeChanged")
+                return
+            }
+
+            // Close the probe→save race. If a process appeared, accept only an
+            // exact scope; otherwise restore and require an explicit retry.
+            let postSaveProbe = await ServerManager.probeAppOwnedRuntime()
+            if case .ready(_, appOwned: false) = postSaveProbe {
+                _ = configManager.rollbackOnboardingRuntimeScope(transaction)
+                completionError = L("onboarding.firstRunManualRuntime")
+                return
+            } else if case .ready(let version, appOwned: true) = postSaveProbe {
+                guard let runtimeToken = (try? AppRuntimeToken.loadExisting()) ?? nil,
+                      case .ready(let receipt) = await serverManager.validateOnboardingRuntime(
+                          for: scope,
+                          authorizedDraftFingerprint: scope.draftFingerprint,
+                          runtimeToken: runtimeToken,
+                          configManager: configManager
+                      ),
+                      receipt.version == version
+                else {
+                    _ = configManager.rollbackOnboardingRuntimeScope(transaction)
+                    completionError = L("onboarding.firstRunManualRuntime")
+                    return
+                }
+                runtimeReceipt = receipt
+                exactRuntimeRequiredAtCompletion = true
+            } else if postSaveProbe != .unavailable {
+                _ = configManager.rollbackOnboardingRuntimeScope(transaction)
+                completionError = L("onboarding.firstRunRuntimeFailed")
+                return
+            }
+        case .portOccupied, .versionMismatch, .authenticationFailed:
+            completionError = serverManager.statusLabel
+            return
+        }
+
+        guard currentRuntimeScope == scope,
+              configManager.isOnboardingRuntimeScopePersisted(scope)
+        else {
+            completionError = configManager.lastPersistenceError
+                ?? L("onboarding.firstRunConfigFailed", "verification failed")
+            return
+        }
+
+        // Final completion barrier. The scope captured before any await must
+        // still be current and byte-for-byte persisted. A consented runtime is
+        // re-authenticated against that exact scope/surface; the no-consent path
+        // proves the runtime is still absent immediately before setting the flag.
+        if exactRuntimeRequiredAtCompletion {
+            guard let runtimeToken = (try? AppRuntimeToken.loadExisting()) ?? nil,
+                  case .ready(let finalReceipt) = await serverManager.validateOnboardingRuntime(
+                      for: scope,
+                      authorizedDraftFingerprint: scope.draftFingerprint,
+                      runtimeToken: runtimeToken,
+                      configManager: configManager
+                  ),
+                  currentRuntimeScope == scope,
+                  configManager.isOnboardingRuntimeScopePersisted(scope),
+                  finalReceipt.draftFingerprint == scope.draftFingerprint,
+                  finalReceipt.runtimeFingerprint == scope.runtimeFingerprint,
+                  finalReceipt.tokenFingerprint == AppRuntimeToken.fingerprint(for: runtimeToken)
+            else {
+                completionError = L("onboarding.firstRunRuntimeFailed")
+                return
+            }
+            runtimeReceipt = finalReceipt
+        } else {
+            let finalProbe = await ServerManager.probeAppOwnedRuntime()
+            guard currentRuntimeScope == scope,
+                  configManager.isOnboardingRuntimeScopePersisted(scope),
+                  finalProbe == .unavailable
+            else {
+                if case .ready(_, appOwned: false) = finalProbe {
+                    completionError = L("onboarding.firstRunManualRuntime")
+                } else {
+                    completionError = L("onboarding.firstRunRuntimeFailed")
+                }
+                return
+            }
+        }
 
         // Mark onboarding complete
         UserDefaults.standard.set(true, forKey: AirMcpConstants.keyOnboardingCompleted)
+        UserDefaults.standard.removeObject(forKey: AirMcpConstants.keyOnboardingStep)
+        OnboardingDraftStore.clear()
 
         onComplete()
 

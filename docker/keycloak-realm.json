@@ -2,7 +2,7 @@
   "realm": "airmcp",
   "enabled": true,
   "accessTokenLifespan": 3600,
-  "sslRequired": "none",
+  "sslRequired": "all",
   "registrationAllowed": false,
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
@@ -73,15 +73,26 @@
       "directAccessGrantsEnabled": true,
       "standardFlowEnabled": true,
       "serviceAccountsEnabled": false,
-      "redirectUris": [
-        "http://localhost:3000/*",
-        "http://127.0.0.1:3000/*"
-      ],
+      "redirectUris": ["http://localhost:3000/*", "http://127.0.0.1:3000/*"],
       "webOrigins": ["http://localhost:3000", "http://127.0.0.1:3000"],
       "attributes": {
         "pkce.code.challenge.method": "S256",
         "access.token.lifespan": "3600"
       },
+      "protocolMappers": [
+        {
+          "name": "airmcp-local-resource-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "https://127.0.0.1:3443/mcp",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ],
       "defaultClientScopes": ["mcp:read"],
       "optionalClientScopes": ["mcp:write", "mcp:destructive", "mcp:admin"]
     }

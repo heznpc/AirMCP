@@ -13,12 +13,14 @@ import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { cleanBootEnv } from "./lib/clean-boot-env.mjs";
 import { MCP_PROTOCOL_VERSION, startMcp } from "./lib/mcp-stdio-client.mjs";
+import { verifyPublishedIdentity } from "./lib/publish-identity.mjs";
 
 const ROOT = dirname(fileURLToPath(new URL("../package.json", import.meta.url)));
 const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
 const args = process.argv.slice(2);
 const versionArg = args.find((arg) => arg.startsWith("--version="));
 const version = versionArg ? versionArg.split("=")[1] : pkg.version;
+const expectedShaArg = args.find((arg) => arg.startsWith("--expected-sha="));
 const allowNotLatest = args.includes("--allow-not-latest");
 const skipNpx = args.includes("--skip-npx");
 const skipGithub = args.includes("--skip-github");
@@ -88,10 +90,19 @@ async function loadAddonPackages() {
     fail("dist/shared/module-packs.js missing; run npm run build before release:verify");
   }
   const { MODULE_PACK_MANIFEST, CORE_MODULE_PACK_NAME } = await import(pathToFileURL(modulePacksPath));
-  return MODULE_PACK_MANIFEST.filter((pack) => pack.name !== CORE_MODULE_PACK_NAME);
+  const stagedManifestPath = join(ROOT, "build", "addons", "manifest.json");
+  if (!existsSync(stagedManifestPath)) {
+    fail("build/addons/manifest.json missing; run release:preflight before release:verify");
+  }
+  const staged = JSON.parse(readFileSync(stagedManifestPath, "utf8"));
+  return MODULE_PACK_MANIFEST.filter((pack) => pack.name !== CORE_MODULE_PACK_NAME).map((pack) => {
+    const artifact = staged.packages?.find((candidate) => candidate.name === pack.name);
+    if (!artifact?.packageDir) fail(`staged add-on package root missing for ${pack.name}`);
+    return { ...pack, packageRoot: join(ROOT, artifact.packageDir) };
+  });
 }
 
-function verifyPublishedPackage(packageName, packageVersion, label) {
+function verifyPublishedPackage(packageName, packageVersion, label, packageRoot, expectedGitHead) {
   const publishedVersion = npmJson(["view", `${packageName}@${packageVersion}`, "version", "--json"], `${label} version`);
   if (publishedVersion !== packageVersion) {
     fail(`${label} version mismatch: expected ${packageVersion}, got ${publishedVersion}`);
@@ -107,7 +118,33 @@ function verifyPublishedPackage(packageName, packageVersion, label) {
   if (typeof dist?.tarball !== "string" || !dist.tarball.startsWith("https://")) {
     fail(`${label} has invalid registry tarball metadata: ${dist?.tarball ?? "missing"}`);
   }
+  try {
+    verifyPublishedIdentity({ packageRoot, expectedGitHead, retryTimeoutMs: 60_000 });
+  } catch (error) {
+    fail(`${label} source identity mismatch`, error instanceof Error ? error.message : String(error));
+  }
   console.log(`ok: npm has ${packageName}@${packageVersion} (latest=${latestVersion})`);
+}
+
+function expectedReleaseSha() {
+  const explicit = expectedShaArg?.split("=")[1] ?? "";
+  if (explicit && !/^[0-9a-f]{40}$/i.test(explicit)) fail("--expected-sha must be a full Git commit SHA");
+  if (explicit) return explicit;
+  const result = run("git", ["rev-parse", "HEAD"]);
+  if (result.status !== 0 || !/^[0-9a-f]{40}$/i.test(result.stdout)) {
+    fail("could not resolve the current Git commit for release identity verification", result.stderr);
+  }
+  return result.stdout;
+}
+
+function repositorySlug() {
+  if (/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(process.env.GITHUB_REPOSITORY ?? "")) {
+    return process.env.GITHUB_REPOSITORY;
+  }
+  const url = typeof pkg.repository === "string" ? pkg.repository : pkg.repository?.url;
+  const match = String(url ?? "").match(/github\.com[/:]([^/]+)\/([^/.]+)(?:\.git)?$/);
+  if (!match) fail("could not derive the GitHub repository slug");
+  return `${match[1]}/${match[2]}`;
 }
 
 async function verifyRootRegistryInstall() {
@@ -220,9 +257,11 @@ function verifyNpxSmoke() {
   }
 }
 
+const expectedGitHead = expectedReleaseSha();
+
 console.log(`release-verify: ${pkg.name}@${version}`);
 
-verifyPublishedPackage(pkg.name, version, "npm root");
+verifyPublishedPackage(pkg.name, version, "npm root", ROOT, expectedGitHead);
 
 if (!skipNpx) {
   verifyNpxSmoke();
@@ -237,6 +276,13 @@ if (!skipGithub) {
   if (gh.status !== 0) fail(`GitHub Release v${version} not found`, gh.stderr || gh.stdout);
   const release = parseJson("gh release view", gh.stdout);
   const expectedAsset = `airmcp-${version}.mcpb`;
+  if (release.tagName !== `v${version}`) fail(`GitHub Release tag mismatch: ${release.tagName}`);
+  if (release.targetCommitish !== expectedGitHead) {
+    fail(`GitHub Release target differs from expected release SHA`);
+  }
+  const tag = run("gh", ["api", `repos/${repositorySlug()}/commits/v${version}`, "--jq", ".sha"]);
+  if (tag.status !== 0) fail(`could not resolve GitHub tag v${version}`, tag.stderr || tag.stdout);
+  if (tag.stdout !== expectedGitHead) fail(`GitHub tag v${version} differs from expected release SHA`);
   const asset = release.assets?.find((candidate) => candidate.name === expectedAsset);
   if (!asset) {
     fail(`GitHub Release v${version} is missing ${expectedAsset}`);
@@ -251,7 +297,13 @@ if (!skipGithub) {
 if (!skipAddons) {
   const addonPacks = await loadAddonPackages();
   for (const addonPack of addonPacks) {
-    verifyPublishedPackage(addonPack.packageName, version, `npm add-on ${addonPack.name}`);
+    verifyPublishedPackage(
+      addonPack.packageName,
+      version,
+      `npm add-on ${addonPack.name}`,
+      addonPack.packageRoot,
+      expectedGitHead,
+    );
   }
   if (!skipAddonInstall) {
     verifyAddonRegistryInstall(addonPacks);

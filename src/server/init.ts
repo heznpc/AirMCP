@@ -12,7 +12,9 @@ import { setShareGuardHitlClient } from "../shared/share-guard.js";
 import { closeSkillsWatcher } from "../skills/index.js";
 import { closeSwiftBridge } from "../shared/swift.js";
 import { usageTracker } from "../shared/usage-tracker.js";
-import { runShutdownHooks } from "./shutdown.js";
+import { flushAuditLog } from "../shared/audit.js";
+import { drainGovernedActivityForShutdown } from "../shared/governed-activity.js";
+import { registerShutdownFinalizer, registerShutdownHook, runShutdownHooks } from "./shutdown.js";
 import { log, errToCtx } from "../shared/logger.js";
 
 // Re-export so callers that depend on `init.js` do not need to know about
@@ -26,6 +28,7 @@ export interface ServerContext {
   osVersion: number;
   pkg: { version: string; description?: string };
   hitlClient: HitlClient | null;
+  shutdown: (code?: number) => Promise<void>;
 }
 
 export function initializeServer(): ServerContext {
@@ -37,6 +40,8 @@ export function initializeServer(): ServerContext {
 
   const config = parseConfig();
   const osVersion = getOsVersion();
+  registerShutdownHook(drainGovernedActivityForShutdown);
+  registerShutdownFinalizer(flushAuditLog);
 
   // HITL client — shared across all servers, created once if enabled
   let hitlClient: HitlClient | null = null;
@@ -62,15 +67,18 @@ export function initializeServer(): ServerContext {
       setShareGuardHitlClient(null);
     }
   }
-  async function gracefulShutdown(code: number): Promise<void> {
-    if (exited) return;
-    // Run async hooks first (bounded by shutdown.ts's timeout), then the
-    // synchronous onExit cleanup, then finally exit. Keeping hook ownership
-    // in a separate module means transport code can register cleanup
-    // without pulling in init's heavy dependency graph.
-    await runShutdownHooks();
-    onExit();
-    process.exit(code);
+  let shutdownPromise: Promise<void> | null = null;
+  function gracefulShutdown(code = 0): Promise<void> {
+    if (shutdownPromise) return shutdownPromise;
+    if (exited) return Promise.resolve();
+    shutdownPromise = (async () => {
+      // Run async hooks and the reserved audit finalizer first, then the
+      // synchronous onExit cleanup, then finally exit.
+      await runShutdownHooks();
+      onExit();
+      process.exit(code);
+    })();
+    return shutdownPromise;
   }
   process.on("exit", onExit);
   process.on("SIGINT", () => {
@@ -89,5 +97,5 @@ export function initializeServer(): ServerContext {
     void gracefulShutdown(1);
   });
 
-  return { config, osVersion, pkg, hitlClient };
+  return { config, osVersion, pkg, hitlClient, shutdown: gracefulShutdown };
 }

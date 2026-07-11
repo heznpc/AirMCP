@@ -192,6 +192,7 @@ func installMCPIntentRouterForMacOS() {
 
 private enum AppIntentMCPTransportError: Error {
     case invalidRuntimeURL
+    case missingRuntimeToken
     case missingSessionID
     case httpStatus(Int, String)
     case invalidJSONResponse(String)
@@ -204,6 +205,46 @@ private enum AppIntentMCPTransportError: Error {
 /// Trust Center actor boundaries. Keeping the boundary Sendable prevents a
 /// main-actor `[String: Any]` dictionary from escaping into the transport.
 typealias AppRuntimeToolArguments = [String: any Sendable]
+
+struct AppOwnedRuntimeIdentity: Sendable, Equatable {
+    let processIdentifier: Int32
+    let ownerFingerprint: String
+
+    init?(processIdentifier: Int, ownerFingerprint: String) {
+        guard processIdentifier > 1,
+              processIdentifier <= Int(Int32.max),
+              ownerFingerprint.range(of: #"^[0-9a-f]{64}$"#, options: .regularExpression) != nil
+        else { return nil }
+        self.processIdentifier = Int32(processIdentifier)
+        self.ownerFingerprint = ownerFingerprint
+    }
+}
+
+struct AppRuntimeState: Decodable, Sendable, Equatable {
+    let status: String
+    let version: String
+    let appOwned: Bool
+    let pid: Int
+    let ownerFingerprint: String
+    let disabledModules: [String]
+    let scopeFingerprint: String
+    let enabledModules: [String]
+    let unavailableModules: [AppRuntimeModuleUnavailable]
+
+    var ownedIdentity: AppOwnedRuntimeIdentity? {
+        guard appOwned else { return nil }
+        return AppOwnedRuntimeIdentity(
+            processIdentifier: pid,
+            ownerFingerprint: ownerFingerprint
+        )
+    }
+}
+
+struct AppRuntimeModuleUnavailable: Decodable, Sendable, Equatable {
+    let module: String
+    let reason: String
+    let detail: String?
+}
 
 /// Execute an AirMCP MCP tool through the app-owned HTTP runtime when it is
 /// already available, then fall back to the legacy stdio bridge. The fallback
@@ -247,10 +288,14 @@ enum AppRuntimeClient {
         args: AppRuntimeToolArguments,
         runID: UUID = UUID()
     ) async throws -> T {
+        guard let token = try AppRuntimeToken.loadExisting() else {
+            throw AppIntentMCPTransportError.missingRuntimeToken
+        }
         let response = try await runAirMCPToolViaAppRuntimeResponse(
             toolName,
             args: args,
-            runID: runID.uuidString.lowercased()
+            runID: runID.uuidString.lowercased(),
+            token: token
         )
         return try decodeToolJSON(from: response, as: T.self)
     }
@@ -267,7 +312,9 @@ enum AppRuntimeClient {
     }
 
     static func listTools() async throws -> [String] {
-        let token = try AppRuntimeToken.ensure()
+        guard let token = try AppRuntimeToken.loadExisting() else {
+            throw AppIntentMCPTransportError.missingRuntimeToken
+        }
         let initialized = try await postAppRuntimeMCPRequest(
             [
                 "jsonrpc": "2.0",
@@ -304,16 +351,100 @@ enum AppRuntimeClient {
         return tools.compactMap { $0["name"] as? String }
     }
 
+    /// Authenticated process-generation evidence used only by native Setup.
+    /// Public /health deliberately omits the effective module selection.
+    static func runtimeState() async throws -> AppRuntimeState {
+        guard let token = try AppRuntimeToken.loadExisting() else {
+            throw AppIntentMCPTransportError.missingRuntimeToken
+        }
+        return try await runtimeState(token: token)
+    }
+
+    /// Token-pinned runtime evidence for Setup transactions. The caller can
+    /// bind one credential to both this authenticated read and a later client
+    /// configuration write without re-reading or creating a credential.
+    static func runtimeState(token: String) async throws -> AppRuntimeState {
+        try await runtimeState(token: token, requestTimeout: 2)
+    }
+
+    private static func runtimeState(
+        token: String,
+        requestTimeout: TimeInterval
+    ) async throws -> AppRuntimeState {
+        guard let url = URL(string: AirMcpConstants.appOwnedRuntimeStateURL) else {
+            throw AppIntentMCPTransportError.invalidRuntimeURL
+        }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = requestTimeout
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw AppIntentMCPTransportError.invalidJSONResponse("missing HTTP response")
+        }
+        guard (200..<300).contains(http.statusCode) else {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            throw AppIntentMCPTransportError.httpStatus(http.statusCode, body)
+        }
+        return try JSONDecoder().decode(AppRuntimeState.self, from: data)
+    }
+
+    /// `/app/runtime-state` is deliberately 503 until Node's warmup publishes
+    /// the actual module surface. Retry only that explicit transient state;
+    /// authentication, identity, decoding, and transport failures fail fast.
+    static func runtimeStateWhenReady(
+        token: String,
+        timeout: Duration = .seconds(12)
+    ) async throws -> AppRuntimeState {
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: timeout)
+        while true {
+            let remaining = clock.now.duration(to: deadline)
+            guard remaining > .zero else {
+                throw AppIntentMCPTransportError.httpStatus(503, "warmup timeout")
+            }
+            do {
+                let state = try await runtimeState(
+                    token: token,
+                    requestTimeout: max(0.000_001, min(2, timeInterval(for: remaining)))
+                )
+                guard clock.now <= deadline else {
+                    throw AppIntentMCPTransportError.httpStatus(503, "warmup timeout")
+                }
+                return state
+            } catch AppIntentMCPTransportError.httpStatus(let status, _) where status == 503 {
+                let remainingAfterRequest = clock.now.duration(to: deadline)
+                guard remainingAfterRequest > .zero else {
+                    throw AppIntentMCPTransportError.httpStatus(503, "warmup timeout")
+                }
+                try await Task.sleep(
+                    for: remainingAfterRequest < .milliseconds(100)
+                        ? remainingAfterRequest
+                        : .milliseconds(100)
+                )
+            } catch {
+                throw error
+            }
+        }
+    }
+
+    private static func timeInterval(for duration: Duration) -> TimeInterval {
+        let components = duration.components
+        return TimeInterval(components.seconds)
+            + TimeInterval(components.attoseconds) / 1_000_000_000_000_000_000
+    }
+
 }
 
 private func runAirMCPToolViaAppRuntime(
     _ toolName: String,
     args: AppRuntimeToolArguments
 ) async throws -> String {
+    let token = try AppRuntimeToken.ensure()
     let response = try await runAirMCPToolViaAppRuntimeResponse(
         toolName,
         args: args,
-        runID: UUID().uuidString.lowercased()
+        runID: UUID().uuidString.lowercased(),
+        token: token
     )
     return try extractToolText(from: response)
 }
@@ -321,9 +452,9 @@ private func runAirMCPToolViaAppRuntime(
 private func runAirMCPToolViaAppRuntimeResponse(
     _ toolName: String,
     args: AppRuntimeToolArguments,
-    runID: String
+    runID: String,
+    token: String
 ) async throws -> [String: Any] {
-    let token = try AppRuntimeToken.ensure()
     let initResponse = try await postAppRuntimeMCPRequest(
         [
             "jsonrpc": "2.0",

@@ -33,8 +33,10 @@ controls for sensitive Apple workspace actions.
   inputs, and event triggers.
 - **App Intent action bridge** generated from the MCP manifest for macOS
   Shortcuts, with an iOS-only App Shortcuts provider and destructive intents gated separately.
-- **Native Swift bridge, optional** for EventKit, PhotoKit, HealthKit, Vision,
-  on-device semantic search, and FoundationModels preview builds.
+- **Native Swift bridge** for EventKit, PhotoKit, HealthKit, Vision, on-device
+  semantic search, and FoundationModels preview builds. AirMCP.app embeds the
+  normal bridge; it is optional for npm and MCPB users, who can build it
+  separately when needed.
 - **Dual transport**: stdio for standard MCP clients, HTTP/SSE for shared
   local runtimes, browser clients, registries, and always-on hosts.
 
@@ -58,8 +60,10 @@ Install Node.js 20+, then run:
 npx airmcp init
 ```
 
-The wizard selects a profile, writes MCP client config, and stores preferences
-in `~/.config/airmcp/config.json`.
+The wizard selects a profile and stores preferences in
+`~/.config/airmcp/config.json`. Client registration is a separate consent
+step whose default is **No**; no Claude, Codex, Cursor, or Windsurf setting is
+read or changed until you opt in.
 
 Non-interactive examples:
 
@@ -67,7 +71,8 @@ Non-interactive examples:
 npx airmcp init --profile starter --yes
 npx airmcp init --profile communications-safe --yes
 npx airmcp init --profile productivity --yes
-npx airmcp init --profile productivity --yes --client-runtime direct
+npx airmcp init --profile productivity --yes --connect-clients
+npx airmcp init --profile productivity --yes --connect-clients --client-runtime direct
 ```
 
 Check the install:
@@ -133,6 +138,11 @@ agents.
   default `sensitive-only` HITL level.
 - **HMAC-chained audit log** at `~/.airmcp/audit.jsonl`, with tamper detection
   covered by tests.
+- **Native Trust Center** for governed-run timelines, approval state, audit
+  integrity, emergency controls, permission probes, and redacted local export.
+  Audit history is never read in the background: **Load** or **Refresh** makes
+  one explicit `audit_log` request, and the effective HITL policy may require
+  approval for that call.
 - **Rate limits**: 60/min globally and 10 destructive/hr.
 - **Emergency stop**: `touch ~/.config/airmcp/emergency-stop` blocks destructive
   tools without restarting the server.
@@ -149,10 +159,29 @@ HTTP policy details are in
 ## Client Setup
 
 The recommended desktop pattern is one local AirMCP runtime, with clients
-connecting to it. The app or setup wizard generates a per-install token at:
+connecting to it. A per-install token is created only by an explicit action:
+**Start Local Runtime** in AirMCP.app, or an opted-in app-runtime client
+connection such as `--connect-clients` / `connect-clients`. It is stored at:
 
 ```text
 ~/Library/Application Support/AirMCP/http-token
+```
+
+The macOS Setup window is consent-driven: it appears automatically once and
+resumes its last step when reopened. Merely opening or moving through Setup
+does not start the runtime or edit a client, and first-run **Finish** with no
+runtime saves the selection only. If an app-owned runtime is already running
+and the selection changed, **Finish** may stop and restart that exact owned
+generation so the persisted and effective scopes match. **Start Local Runtime**
+creates the token and opts into automatic startup; each client is registered
+only after its own **Connect** action and a fresh scope/readiness check.
+
+Existing Codex registrations can be inspected or disabled without deleting
+their settings:
+
+```bash
+npx airmcp codex status
+npx airmcp codex disable
 ```
 
 Stdio clients can proxy into the app-owned HTTP runtime:
@@ -187,7 +216,9 @@ those actions are available in the Shortcuts action library; Apple does not
 support the `AppShortcutsProvider` phrase surface on macOS. iOS preview builds
 can additionally compile the workflow-first App Shortcuts provider.
 
-Destructive intents are opt-in with `AIRMCP_APPINTENTS_DESTRUCTIVE=true`.
+Destructive intent source generation is opt-in at build/codegen time with
+`AIRMCP_APPINTENTS_DESTRUCTIVE=true`; setting it beside an already-built app
+does not expand that binary's intent surface.
 `AskAirMCPIntent` and FoundationModels-backed Apple Intelligence paths are
 preview-only and require explicit Swift builds.
 
@@ -244,8 +275,9 @@ Testing guide: [docs/testing.md](docs/testing.md).
 - Node.js 20 or newer.
 - macOS Automation, Accessibility, Full Disk Access, Location, Bluetooth, or
   Photos permissions as required by the modules you enable.
-- Optional Swift bridge built from source for Swift-backed tools. It is not
-  bundled into the npm package, `.mcpb`, or menubar app distribution.
+- The self-contained AirMCP.app distribution embeds its fixed Node runtime and
+  the normal Swift bridge. The npm package and `.mcpb` do not embed the Swift
+  binary; users of those artifacts build it from source for Swift-backed tools.
 - FoundationModels-backed Apple Intelligence preview requires macOS 26+, Apple
   Silicon, and `AIRMCP_ENABLE_FOUNDATION_MODELS`.
 

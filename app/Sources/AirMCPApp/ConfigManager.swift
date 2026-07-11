@@ -41,6 +41,7 @@ final class ConfigManager {
         var allowSendMessages: Bool
         var allowSendMail: Bool
         var disabledModules: [String]
+        var onboardingWorkflow: String?
         var shareApproval: [String]?
         var hitl: HitlConfig?
 
@@ -53,6 +54,7 @@ final class ConfigManager {
             allowSendMessages: false,
             allowSendMail: false,
             disabledModules: [],
+            onboardingWorkflow: nil,
             shareApproval: nil,
             hitl: nil
         )
@@ -66,6 +68,7 @@ final class ConfigManager {
             allowSendMessages: Bool,
             allowSendMail: Bool,
             disabledModules: [String],
+            onboardingWorkflow: String?,
             shareApproval: [String]?,
             hitl: HitlConfig?
         ) {
@@ -77,6 +80,7 @@ final class ConfigManager {
             self.allowSendMessages = allowSendMessages
             self.allowSendMail = allowSendMail
             self.disabledModules = disabledModules
+            self.onboardingWorkflow = onboardingWorkflow
             self.shareApproval = shareApproval
             self.hitl = hitl
         }
@@ -91,6 +95,7 @@ final class ConfigManager {
             allowSendMessages = try container.decodeIfPresent(Bool.self, forKey: .allowSendMessages) ?? false
             allowSendMail = try container.decodeIfPresent(Bool.self, forKey: .allowSendMail) ?? false
             disabledModules = try container.decodeIfPresent([String].self, forKey: .disabledModules) ?? []
+            onboardingWorkflow = try container.decodeIfPresent(String.self, forKey: .onboardingWorkflow)
             shareApproval = try container.decodeIfPresent([String].self, forKey: .shareApproval)
             hitl = try container.decodeIfPresent(HitlConfig.self, forKey: .hitl)
         }
@@ -99,8 +104,25 @@ final class ConfigManager {
     var config: Config = .default
     var lastPersistenceError: String?
     private var rawConfig: [String: Any] = [:]
+    private var persistenceBlockedByLoadError = false
 
-    private static let configFile: URL = {
+    struct OnboardingScopeTransaction {
+        fileprivate let previousConfig: Config
+        fileprivate let previousRawConfig: [String: Any]
+        fileprivate let previousFile: ConfigFileSnapshot
+        fileprivate let previousBackupFile: ConfigFileSnapshot
+        let scope: OnboardingRuntimeScope
+        let previousDisabledModules: [String]
+        let previousRuntimeFingerprint: String
+    }
+
+    fileprivate struct ConfigFileSnapshot {
+        let existed: Bool
+        let data: Data?
+        let permissions: Int?
+    }
+
+    private static var defaultConfigFile: URL {
         if let override = ProcessInfo.processInfo.environment["AIRMCP_CONFIG_PATH"]?
             .trimmingCharacters(in: .whitespacesAndNewlines),
            !override.isEmpty {
@@ -108,45 +130,51 @@ final class ConfigManager {
         }
         return FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".config/airmcp/config.json")
-    }()
+    }
 
-    private static let configDir: URL = {
-        configFile.deletingLastPathComponent()
-    }()
+    private let configFile: URL
+    private var configDir: URL { configFile.deletingLastPathComponent() }
+    private var configBackupFile: URL { configFile.appendingPathExtension("backup") }
 
-    private static let configBackupFile: URL = {
-        configFile.appendingPathExtension("backup")
-    }()
-
-    init() {
+    init(configFile: URL? = nil) {
+        self.configFile = configFile ?? Self.defaultConfigFile
         load()
     }
 
     // MARK: - Persistence
 
     func load() {
+        guard FileManager.default.fileExists(atPath: configFile.path) else {
+            config = .default
+            rawConfig = [:]
+            lastPersistenceError = nil
+            persistenceBlockedByLoadError = false
+            return
+        }
         do {
-            let data = try Data(contentsOf: Self.configFile)
+            let data = try Data(contentsOf: configFile)
             guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
                 throw CocoaError(.fileReadCorruptFile)
             }
             config = try JSONDecoder().decode(Config.self, from: data)
             rawConfig = object
             lastPersistenceError = nil
-        } catch let error as CocoaError where error.code == .fileNoSuchFile {
-            rawConfig = [:]
-            lastPersistenceError = nil
+            persistenceBlockedByLoadError = false
         } catch {
             // Never replace a malformed owner config with defaults. Surface the
             // error and keep the in-memory defaults until the file is repaired.
             lastPersistenceError = error.localizedDescription
+            persistenceBlockedByLoadError = true
         }
     }
 
     func save() {
+        // A failed load means `rawConfig` is not an authoritative snapshot.
+        // Refuse to merge defaults over an unreadable or malformed owner file.
+        guard !persistenceBlockedByLoadError else { return }
         do {
             try FileManager.default.createDirectory(
-                at: Self.configDir,
+                at: configDir,
                 withIntermediateDirectories: true
             )
             let merged = mergeKnownFields(into: rawConfig)
@@ -158,15 +186,141 @@ final class ConfigManager {
             guard (try JSONSerialization.jsonObject(with: data)) is [String: Any] else {
                 throw CocoaError(.fileWriteUnknown)
             }
-            if FileManager.default.fileExists(atPath: Self.configFile.path) {
-                try? FileManager.default.removeItem(at: Self.configBackupFile)
-                try FileManager.default.copyItem(at: Self.configFile, to: Self.configBackupFile)
+            if FileManager.default.fileExists(atPath: configFile.path) {
+                try? FileManager.default.removeItem(at: configBackupFile)
+                try FileManager.default.copyItem(at: configFile, to: configBackupFile)
             }
-            try data.write(to: Self.configFile, options: .atomic)
+            try data.write(to: configFile, options: .atomic)
             rawConfig = merged
             lastPersistenceError = nil
         } catch {
             lastPersistenceError = error.localizedDescription
+        }
+    }
+
+    /// Persist the exact Setup scope as a reversible transaction. The caller
+    /// may start a runtime only after this method has read the written bytes
+    /// back and verified both workflow identity and normalized module scope.
+    /// Any write/verification failure restores the previous file and in-memory
+    /// configuration before returning nil.
+    func beginOnboardingRuntimeScopeTransaction(
+        _ scope: OnboardingRuntimeScope
+    ) -> OnboardingScopeTransaction? {
+        guard !persistenceBlockedByLoadError else { return nil }
+        let validWorkflows = Set(onboardingWorkflows.map(\.id))
+        let validModules = Set(allModules.map(\.id))
+        guard validWorkflows.contains(scope.workflowID),
+              Set(scope.disabledModules).isSubset(of: validModules),
+              let workflow = onboardingWorkflows.first(where: { $0.id == scope.workflowID }),
+              Set(scope.requiredModules) == workflow.requiredModules,
+              Set(scope.requestedModules) == onboardingModuleIds.subtracting(scope.disabledModules)
+        else {
+            lastPersistenceError = "Setup contains an unknown workflow or module."
+            return nil
+        }
+
+        let previousFile: ConfigFileSnapshot
+        do {
+            previousFile = try captureConfigFile(at: configFile)
+            let previousBackupFile = try captureConfigFile(at: configBackupFile)
+            let transaction = OnboardingScopeTransaction(
+                previousConfig: config,
+                previousRawConfig: rawConfig,
+                previousFile: previousFile,
+                previousBackupFile: previousBackupFile,
+                scope: scope,
+                previousDisabledModules: Array(Set(config.disabledModules)).sorted(),
+                previousRuntimeFingerprint: OnboardingRuntimeScope(
+                    workflowID: config.onboardingWorkflow ?? "previous",
+                    disabledModules: config.disabledModules
+                ).runtimeFingerprint
+            )
+            config.profile = "custom"
+            config.toolExposure = config.toolExposure ?? "profile"
+            config.disabledModules = scope.disabledModules
+            config.onboardingWorkflow = scope.workflowID
+            save()
+
+            let failure: String?
+            if let lastPersistenceError {
+                failure = lastPersistenceError
+            } else if !isOnboardingRuntimeScopePersisted(scope) {
+                failure = "The saved Setup scope could not be verified."
+            } else {
+                failure = nil
+            }
+
+            guard let failure else { return transaction }
+            if rollbackOnboardingRuntimeScope(transaction) {
+                lastPersistenceError = failure
+            }
+            return nil
+        } catch {
+            lastPersistenceError = error.localizedDescription
+            return nil
+        }
+    }
+
+    /// Restore the byte-for-byte configuration that preceded a scoped runtime
+    /// activation. A failed restore is surfaced and leaves persistence blocked
+    /// by the error rather than claiming the old configuration is active.
+    @discardableResult
+    func rollbackOnboardingRuntimeScope(
+        _ transaction: OnboardingScopeTransaction
+    ) -> Bool {
+        do {
+            try restoreConfigFile(transaction.previousBackupFile, at: configBackupFile)
+            try restoreConfigFile(transaction.previousFile, at: configFile)
+            config = transaction.previousConfig
+            rawConfig = transaction.previousRawConfig
+            persistenceBlockedByLoadError = false
+            lastPersistenceError = nil
+            return true
+        } catch {
+            lastPersistenceError = error.localizedDescription
+            return false
+        }
+    }
+
+    func isOnboardingRuntimeScopePersisted(
+        _ scope: OnboardingRuntimeScope
+    ) -> Bool {
+        guard let data = try? Data(contentsOf: configFile),
+              let persisted = try? JSONDecoder().decode(Config.self, from: data)
+        else { return false }
+        return persisted.profile == "custom"
+            && persisted.onboardingWorkflow == scope.workflowID
+            && persisted.disabledModules == scope.disabledModules
+    }
+
+    private func captureConfigFile(at url: URL) throws -> ConfigFileSnapshot {
+        let fileManager = FileManager.default
+        guard fileManager.fileExists(atPath: url.path) else {
+            return ConfigFileSnapshot(existed: false, data: nil, permissions: nil)
+        }
+        let data = try Data(contentsOf: url)
+        let attributes = try fileManager.attributesOfItem(atPath: url.path)
+        let permissions = (attributes[.posixPermissions] as? NSNumber)?.intValue
+        return ConfigFileSnapshot(existed: true, data: data, permissions: permissions)
+    }
+
+    private func restoreConfigFile(_ snapshot: ConfigFileSnapshot, at url: URL) throws {
+        let fileManager = FileManager.default
+        if snapshot.existed {
+            guard let data = snapshot.data else { throw CocoaError(.fileReadCorruptFile) }
+            try fileManager.createDirectory(
+                at: url.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try data.write(to: url, options: .atomic)
+            if let permissions = snapshot.permissions {
+                try fileManager.setAttributes(
+                    [.posixPermissions: NSNumber(value: permissions)],
+                    ofItemAtPath: url.path
+                )
+            }
+        } else if fileManager.fileExists(atPath: url.path) {
+            try fileManager.removeItem(at: url)
         }
     }
 
@@ -191,6 +345,7 @@ final class ConfigManager {
         merged["allowSendMessages"] = config.allowSendMessages
         merged["allowSendMail"] = config.allowSendMail
         merged["disabledModules"] = config.disabledModules
+        setOptional("onboardingWorkflow", config.onboardingWorkflow)
         setOptional("shareApproval", config.shareApproval)
 
         if let hitl = config.hitl {

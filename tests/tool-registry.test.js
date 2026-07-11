@@ -17,6 +17,7 @@ jest.unstable_mockModule("../dist/shared/tool-filter.js", () => ({
 
 const { toolRegistry, createToolRegistry, ToolInputValidationError } = await import("../dist/shared/tool-registry.js");
 const { installHitlGuard } = await import("../dist/shared/hitl-guard.js");
+const { withResourceGovernance } = await import("../dist/shared/resource-governance.js");
 const { McpServer } = await import("@modelcontextprotocol/sdk/server/mcp.js");
 const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
 
@@ -384,6 +385,7 @@ describe("ToolRegistry (mock server)", () => {
     const approval = auditLogMock.mock.calls[0][0];
     expect(approval).toMatchObject({
       kind: "approval",
+      approvalId: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/),
       approvalDecision: "approved",
       approvalChannel: "socket",
       correlationId: expect.any(String),
@@ -706,6 +708,43 @@ describe("ToolRegistry monkey-patch on real McpServer (SDK integration)", () => 
         correlationId: expect.any(String),
       });
       expect(result).not.toHaveProperty("error");
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
+  test("real SDK client receives a categorized resource denial on the wire", async () => {
+    const original = jest.fn(async () => ({
+      contents: [{ uri: "secret://current", mimeType: "text/plain", text: "must not leak" }],
+    }));
+    installHitlGuard(
+      server,
+      {
+        isReachable: async () => true,
+        requestApproval: async () => false,
+      },
+      { hitl: { level: "sensitive-only", whitelist: new Set() } },
+    );
+    server.registerResource(
+      "secret-current",
+      "secret://current",
+      withResourceGovernance(
+        { title: "Secret", description: "Sensitive resource", mimeType: "text/plain" },
+        { sensitiveHint: true },
+      ),
+      original,
+    );
+
+    const { serverTransport, clientTransport } = createLinkedTransports();
+    const client = new Client({ name: "resource-regression", version: "1.0.0" });
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+
+    try {
+      await client.listResources();
+      await expect(client.readResource({ uri: "secret://current" })).rejects.toThrow(/permission_denied/);
+      expect(original).not.toHaveBeenCalled();
     } finally {
       await client.close();
       await server.close();

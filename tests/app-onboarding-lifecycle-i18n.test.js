@@ -8,11 +8,19 @@ const app = read("app/Sources/AirMCPApp/AirMCPApp.swift");
 const menu = read("app/Sources/AirMCPApp/Views/MenuContent.swift");
 const onboarding = read("app/Sources/AirMCPApp/Views/OnboardingView.swift");
 const serverManager = read("app/Sources/AirMCPApp/ServerManager.swift");
+const appIntents = read("app/Sources/AirMCPApp/AppIntents.swift");
+const appRuntimeToken = read("app/Sources/AirMCPApp/AppRuntimeToken.swift");
+const setupManager = read("app/Sources/AirMCPApp/SetupManager.swift");
+const runtimeConsent = read("app/Sources/AirMCPApp/RuntimeStartConsentPolicy.swift");
+const configManager = read("app/Sources/AirMCPApp/ConfigManager.swift");
+const draftStore = read("app/Sources/AirMCPApp/OnboardingDraftStore.swift");
+const runtimeScope = read("app/Sources/AirMCPApp/OnboardingRuntimeScope.swift");
 const packageManifest = read("app/Package.swift");
 const infoPlist = read("app/Sources/AirMCPApp/Resources/Info.plist");
 const english = read("app/Sources/AirMCPApp/Resources/en.lproj/Localizable.strings");
 
 const locales = ["de", "es", "fr", "ja", "ko", "pt-BR", "zh-Hans", "zh-Hant"];
+const allLocales = ["en", ...locales];
 const quickSetupKeys = [
   "menu.getStarted",
   "menu.setupPermissions",
@@ -71,6 +79,20 @@ function formatTokens(value) {
   return [...value.matchAll(/%(?:\d+\$)?(?:\.\d+)?[@df]/g)].map((match) => match[0]).sort();
 }
 
+function formatArguments(value) {
+  let nextImplicitPosition = 1;
+  return [...value.matchAll(/%(?:(\d+)\$)?(\.\d+)?([@df])/g)]
+    .map((match) => ({
+      position: match[1] ? Number(match[1]) : nextImplicitPosition++,
+      conversion: `${match[2] ?? ""}${match[3]}`,
+    }))
+    .sort((left, right) =>
+      left.position === right.position
+        ? left.conversion.localeCompare(right.conversion)
+        : left.position - right.position,
+    );
+}
+
 describe("macOS onboarding lifecycle", () => {
   test("automatically presents setup once, while keeping manual reopen available", () => {
     expect(menu).toContain('static let keyOnboardingPresented = "onboardingPresented"');
@@ -92,11 +114,153 @@ describe("macOS onboarding lifecycle", () => {
     expect(app).toContain("serverManager.autoStartIfNeeded()");
   });
 
+  test("persists the current step until setup is completed", () => {
+    expect(menu).toContain('static let keyOnboardingStep = "onboardingCurrentStep"');
+    expect(onboarding).toContain("defaults.integer(forKey: AirMcpConstants.keyOnboardingStep)");
+    expect(onboarding).toContain("UserDefaults.standard.set(currentStep, forKey: AirMcpConstants.keyOnboardingStep)");
+    expect(onboarding).toContain("UserDefaults.standard.removeObject(forKey: AirMcpConstants.keyOnboardingStep)");
+  });
+
+  test("restores the workflow/module draft and clears it only after a successful finish", () => {
+    expect(menu).toContain('static let keyOnboardingDraft = "onboardingDraft"');
+    expect(onboarding).toContain("OnboardingDraftStore.load(");
+    expect(onboarding).toContain("OnboardingDraftStore.save(");
+    expect(onboarding).toContain("OnboardingDraftStore.clear()");
+    expect(onboarding.indexOf("configManager.isOnboardingRuntimeScopePersisted(scope)")).toBeLessThan(
+      onboarding.indexOf("OnboardingDraftStore.clear()"),
+    );
+    expect(onboarding).toContain('L("onboarding.saveFailed")');
+    expect(onboarding).toMatch(/let draft = onboardingCompleted\s*\? fallback/);
+    expect(onboarding).toContain("configuredDisabledModules: configManager.disabledModules");
+    expect(onboarding).toContain(".union(unmanagedDisabledModules)");
+  });
+
+  test("serializes client configuration consent actions", () => {
+    expect(onboarding).toContain("@State private var patchingClients: Set<String> = []");
+    expect(onboarding).toContain("guard patchingClients.isEmpty,");
+    expect(onboarding).toContain("|| !patchingClients.isEmpty");
+    expect(onboarding).toContain(".disabled(firstRunChecking || !patchingClients.isEmpty)");
+    expect(onboarding).toContain("guard !firstRunChecking, patchingClients.isEmpty else { return }");
+  });
+
+  test("starts the runtime only after the explicit final-step action", () => {
+    const readinessCheck = onboarding.match(/private func checkFirstRunReadiness\(\) async \{([\s\S]*?)\n    \}/)?.[1];
+    const explicitStart = onboarding.match(/private func startFirstRunRuntime\(\) async \{([\s\S]*?)\n    \}/)?.[1];
+    const listTools = appIntents.match(
+      /static func listTools\(\) async throws -> \[String\] \{([\s\S]*?)\n    \}\n\n\}/,
+    )?.[1];
+
+    expect(readinessCheck).toBeDefined();
+    expect(readinessCheck).not.toContain("AppRuntimeToken.ensure()");
+    expect(readinessCheck).not.toContain("startServer()");
+    expect(readinessCheck).not.toContain("autoStartEnabled = true");
+    expect(appRuntimeToken).toContain("static func loadExisting() throws -> String?");
+    expect(listTools).toContain("AppRuntimeToken.loadExisting()");
+    expect(listTools).not.toContain("AppRuntimeToken.ensure()");
+    expect(explicitStart).toContain("AppRuntimeToken.ensure()");
+    expect(explicitStart).toContain("serverManager.autoStartEnabled = true");
+    expect(explicitStart).toContain("serverManager.activateOnboardingRuntime(");
+    expect(onboarding).toContain(".disabled(!firstRunReady || firstRunChecking || !patchingClients.isEmpty)");
+    expect(onboarding).not.toContain(".disabled(!firstRunReady)");
+    expect(app).toContain("onComplete: {}");
+  });
+
+  test("requests approval notifications only from explicit runtime actions", () => {
+    const passiveSetup = app.match(/private func setupHitl\(\)[\s\S]*?\n    }/)?.[0] ?? "";
+    expect(passiveSetup).not.toContain("requestNotificationPermission()");
+    expect(runtimeConsent).toContain("userInitiated && hitlLevel != .off");
+    expect(onboarding).toContain("RuntimeStartConsentPolicy.shouldRequestApprovalNotifications(");
+    expect(onboarding).toContain("HitlManager.requestNotificationPermission()");
+    expect(menu).toContain("requestApprovalNotificationsForExplicitRuntimeStart()");
+    expect(setupManager).toContain("RuntimeStartConsentPolicy.shouldRequestApprovalNotifications(");
+  });
+
+  test("Quick Setup fails closed when runtime readiness never succeeds", () => {
+    expect(setupManager).toContain("guard Self.runtimeReadyForConfiguration(serverManager.status) else");
+    expect(setupManager).toMatch(/guard Self\.runtimeReadyForConfiguration[\s\S]*?state = \.failed[\s\S]*?return/);
+    expect(setupManager.indexOf("guard Self.runtimeReadyForConfiguration")).toBeLessThan(
+      setupManager.indexOf("AirMcpConstants.copyToClipboard"),
+    );
+  });
+
   test("accepts only the exact authenticated app-owned runtime as ready", () => {
-    expect(onboarding).toContain("ServerManager.authenticatedAppOwnedRuntimeVersion()");
+    expect(onboarding).toContain("serverManager.validateOnboardingRuntime(");
     expect(onboarding).not.toContain("runtimeHealthVersion()");
-    expect(serverManager).toContain("version == AirMcpConstants.npmPackageVersion");
+    expect(serverManager).toContain("expectedVersion: String = AirMcpConstants.npmPackageVersion");
+    expect(serverManager).toContain("version == expectedVersion");
     expect(serverManager).toContain("await AppRuntimeClient.probe()");
+    expect(appIntents).toContain("static func runtimeState() async throws -> AppRuntimeState");
+    expect(appIntents).toContain("static func runtimeState(token: String) async throws -> AppRuntimeState");
+    expect(appIntents).toContain("static func runtimeStateWhenReady(");
+    expect(appIntents).toContain("catch AppIntentMCPTransportError.httpStatus(let status, _) where status == 503");
+    expect(appIntents).toContain("clock.now.duration(to: deadline)");
+    expect(appIntents).toContain("requestTimeout: max(0.000_001, min(2, timeInterval(for: remaining)))");
+    expect(serverManager).toContain("timeout: .seconds(Self.appOwnedReadinessTimeoutSeconds)");
+    expect(serverManager).toContain("activatedState.scopeFingerprint == scope.runtimeFingerprint");
+    expect(serverManager).toContain("configManager.isOnboardingRuntimeScopePersisted(scope)");
+  });
+
+  test("binds client patching to a persisted scope and runtime generation", () => {
+    const patchStart = onboarding.indexOf("private func patchClient(");
+    const patchEnd = onboarding.indexOf("/// Readiness checks are observational", patchStart);
+    const patchSource = onboarding.slice(patchStart, patchEnd);
+
+    expect(draftStore).toContain("var appliedScopeFingerprint: String?");
+    expect(onboarding).toContain("authorizedReceipt.draftFingerprint == scope.draftFingerprint");
+    expect(onboarding).toContain("configManager.isOnboardingRuntimeScopePersisted(scope)");
+    expect(onboarding).toContain("scopeSelectionDidChange()");
+    expect(onboarding).toContain("serverManager.noteOnboardingScopeChanged()");
+    expect(serverManager).toContain("private var onboardingScopeRevision: UInt64 = 0");
+    expect(serverManager).toContain("capturedRevision == onboardingScopeRevision");
+    expect(patchSource.match(/AppRuntimeToken\.loadExisting\(\)/g)).toHaveLength(1);
+    expect(patchSource).not.toContain("AppRuntimeToken.ensure()");
+    expect(patchSource).toContain("runtimeToken: runtimeToken");
+    expect(patchSource).toContain("Self.patchConfig(at: client.configPath, token: runtimeToken)");
+    expect(patchSource).toContain("Self.patchCodexConfig(token: runtimeToken)");
+    expect(patchSource.indexOf("clientPatchAuthorizationIsCurrent(")).toBeLessThan(
+      patchSource.indexOf("let success = await Task.detached"),
+    );
+    expect(onboarding).toContain("runtimeReceipt == receipt");
+    expect(onboarding).toContain("AppRuntimeToken.matchesExisting(runtimeToken)");
+  });
+
+  test("runtime receipts prove the effective module surface and fail closed on omissions", () => {
+    expect(appIntents).toContain("let enabledModules: [String]");
+    expect(appIntents).toContain("let unavailableModules: [AppRuntimeModuleUnavailable]");
+    expect(serverManager).toContain("surfaceAssessment?.isAcceptable == true");
+    expect(serverManager).toContain("enabledModules: activatedState.enabledModules.sorted()");
+    expect(serverManager).toContain("unavailableModules: surfaceAssessment?.diagnosedUnavailableModules ?? []");
+    expect(runtimeScope).toContain("missingRequiredModules: Set(requiredModules).subtracting(enabled).sorted()");
+    expect(runtimeScope).toContain("undiagnosedRequestedModules:");
+    expect(runtimeScope).toContain("unexpectedlyEnabledModules:");
+    expect(runtimeScope).toContain("&& unexpectedlyEnabledModules.isEmpty");
+  });
+
+  test("persists and read-back verifies Setup scope before runtime launch", () => {
+    expect(configManager).toContain("beginOnboardingRuntimeScopeTransaction(");
+    expect(configManager).toContain("isOnboardingRuntimeScopePersisted(scope)");
+    expect(configManager).toContain("rollbackOnboardingRuntimeScope(");
+    expect(serverManager.indexOf("beginOnboardingRuntimeScopeTransaction(scope)")).toBeLessThan(
+      serverManager.indexOf("startServerForOnboardingActivation()"),
+    );
+    expect(serverManager.indexOf("if let manualRuntimeVersion {")).toBeLessThan(
+      serverManager.indexOf("guard configManager.rollbackOnboardingRuntimeScope(transaction)"),
+    );
+  });
+
+  test("Finish never starts a first runtime but blocks or replaces mismatched live runtimes", () => {
+    expect(onboarding).toContain("Finishing first-run Setup is not runtime consent");
+    expect(onboarding).toContain("case .ready(_, appOwned: false):");
+    expect(onboarding).toContain('completionError = L("onboarding.firstRunManualRuntime")');
+    expect(onboarding).toContain("if !runtimeMatches");
+    expect(onboarding).toContain("ServerManager.authenticatedOwnedRuntimeIdentity(");
+    expect(onboarding).toContain("serverManager.activateOnboardingRuntime(");
+    expect(onboarding).toContain("// Final completion barrier.");
+    expect(
+      onboarding.indexOf("case .ready(let finalReceipt) = await serverManager.validateOnboardingRuntime("),
+    ).toBeLessThan(
+      onboarding.indexOf("UserDefaults.standard.set(true, forKey: AirMcpConstants.keyOnboardingCompleted)"),
+    );
   });
 
   test("writes token-bearing client configs and backups owner-only", () => {
@@ -147,5 +311,53 @@ describe("macOS onboarding localization", () => {
 
   test.each(locales)("%s is packaged as a SwiftPM localization", (locale) => {
     expect(packageManifest).toContain(`.process("Resources/${locale}.lproj")`);
+  });
+});
+
+describe("Trust Center and runtime-diagnostic localization", () => {
+  const en = stringsMap(english);
+  const trustKeys = [...en.keys()].filter((key) => key.startsWith("trust.")).sort();
+  const runtimeDiagnosticKeys = [
+    "server.runtimeVersionConflict",
+    "server.runtimePortOwnerConflict",
+    "server.runtimePortOccupied",
+  ];
+
+  test.each(allLocales)("%s contains the complete Trust Center surface", (locale) => {
+    const source = read(`app/Sources/AirMCPApp/Resources/${locale}.lproj/Localizable.strings`);
+    const translated = stringsMap(source);
+    const translatedTrustKeys = [...translated.keys()].filter((key) => key.startsWith("trust.")).sort();
+
+    expect(translatedTrustKeys).toEqual(trustKeys);
+    for (const key of trustKeys) {
+      expect(translated.get(key)?.trim()).not.toBe("");
+      expect(formatArguments(translated.get(key) ?? "")).toEqual(formatArguments(en.get(key) ?? ""));
+    }
+  });
+
+  test.each(allLocales)("%s contains localized runtime conflict diagnostics", (locale) => {
+    const source = read(`app/Sources/AirMCPApp/Resources/${locale}.lproj/Localizable.strings`);
+    const translated = stringsMap(source);
+
+    for (const key of runtimeDiagnosticKeys) {
+      expect(translated.has(key)).toBe(true);
+      expect(translated.get(key)?.trim()).not.toBe("");
+      expect(formatArguments(translated.get(key) ?? "")).toEqual(formatArguments(en.get(key) ?? ""));
+    }
+  });
+
+  test.each(allLocales)("%s localizes the Trust Center supporting controls", (locale) => {
+    const source = read(`app/Sources/AirMCPApp/Resources/${locale}.lproj/Localizable.strings`);
+    const translated = stringsMap(source);
+    for (const key of [
+      "menu.trustCenter",
+      "server.running",
+      "server.stopped",
+      "server.checking",
+      "hitl.approve",
+      "hitl.deny",
+    ]) {
+      expect(translated.get(key)?.trim()).not.toBe("");
+    }
   });
 });

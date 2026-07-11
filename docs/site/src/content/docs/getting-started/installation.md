@@ -11,7 +11,7 @@ description: How to install and set up AirMCP on your Mac.
 
 ## Quick Install
 
-The recommended desktop runtime is AirMCP.app: start the menubar app once, then connect Claude, Codex, Cursor, Windsurf, or another MCP client to the app-owned loopback server. The CLI wizard configures detected clients for that shape:
+The recommended desktop runtime is AirMCP.app. Open the menubar app, explicitly start its local runtime, then connect Claude, Codex, Cursor, Windsurf, or another MCP client to the app-owned loopback server:
 
 ```bash
 npx airmcp init
@@ -19,14 +19,29 @@ npx airmcp init
 
 This will:
 
-1. Ask which modules you want to enable (or choose "all")
-2. Detect installed MCP clients (Claude Desktop, Claude Code, Cursor, Windsurf)
-3. Write an AirMCP.app-owned runtime entry to each client's config file
-4. Create `~/.config/airmcp/config.json` with your module selection
+1. Ask which modules you want to enable
+2. Create `~/.config/airmcp/config.json` with your selection
+3. Ask whether to connect installed MCP clients, defaulting to **No**
+4. Only after a Yes, detect clients and write the app-owned runtime entry
+
+Non-interactive setup also leaves every client unchanged unless
+`--connect-clients` is present.
 
 ## Manual Setup
 
-If you prefer manual configuration, start AirMCP.app first. It owns the local Apple permissions and starts a token-gated runtime on `http://127.0.0.1:3847/mcp`. Stdio-only clients use `npx -y airmcp connect` as a proxy into that runtime with `AIRMCP_HTTP_TOKEN` set. The app and setup wizard generate the per-install token at `~/Library/Application Support/AirMCP/http-token`.
+If you prefer manual configuration, open AirMCP.app and choose **Start Local Runtime**. That explicit action creates the owner-only token at `~/Library/Application Support/AirMCP/http-token` and starts the loopback runtime at `http://127.0.0.1:3847/mcp`. Merely opening or finishing Setup does neither. Stdio-only clients use `npx -y airmcp connect` as a proxy into that runtime with `AIRMCP_HTTP_TOKEN` set.
+
+### Codex
+
+AirMCP never needs to be active in Codex unless you choose it. Inspect or
+disable an existing persistent entry without deleting its other settings:
+
+```bash
+npx airmcp codex status
+npx airmcp codex disable
+```
+
+Use `npx airmcp codex enable` only after you want Codex to connect at startup.
 
 ### Claude Desktop
 

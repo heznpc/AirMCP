@@ -1,4 +1,4 @@
-import { describe, test, expect, jest, beforeAll, afterEach } from "@jest/globals";
+import { describe, test, expect, jest, beforeAll, beforeEach, afterEach } from "@jest/globals";
 
 // Mock all heavy dependencies that would fail in test environment
 jest.unstable_mockModule("@modelcontextprotocol/sdk/server/streamableHttp.js", () => ({
@@ -37,12 +37,17 @@ jest.unstable_mockModule("../dist/server/mcp-setup.js", () => ({
       getExposedToolNames: () => [],
       getToolDetails: () => undefined,
     },
-    bannerInfo: { transport: "http", version: "2.6.0", modulesEnabled: [] },
+    bannerInfo: { transport: "http", version: "2.6.0", modulesEnabled: ["calendar", "reminders"] },
+    runtimeModuleState: {
+      enabledModules: ["calendar", "reminders"],
+      unavailableModules: [{ module: "intelligence", reason: "host_unavailable", detail: "requires macOS 26" }],
+    },
     cleanupEventListeners: jest.fn(),
   })),
 }));
 jest.unstable_mockModule("../dist/server/shutdown.js", () => ({
   registerShutdownHook: jest.fn(),
+  unregisterShutdownHook: jest.fn(),
 }));
 // tool-registry's transitive deps (usage-tracker, audit) touch
 // PATHS + FS — not relevant to http-transport's surface tests, so
@@ -83,6 +88,20 @@ describe("HTTP governed-run correlation header", () => {
     expect(parseRunCorrelationId("daily-briefing-owner-name")).toBeUndefined();
     expect(parseRunCorrelationId(["a9e26e70-52a9-4fc5-9a91-7ce5d3291c68"])).toBeUndefined();
     expect(parseRunCorrelationId("x".repeat(512))).toBeUndefined();
+  });
+});
+
+describe("native runtime owner identity", () => {
+  let runtimeOwnerFingerprint;
+
+  beforeAll(async () => {
+    ({ runtimeOwnerFingerprint } = await import("../dist/server/http-transport.js"));
+  });
+
+  test("fingerprints only canonical app owner credentials", () => {
+    expect(runtimeOwnerFingerprint("a".repeat(43))).toMatch(/^[0-9a-f]{64}$/);
+    expect(runtimeOwnerFingerprint("short")).toBeUndefined();
+    expect(runtimeOwnerFingerprint(undefined)).toBeUndefined();
   });
 });
 
@@ -158,6 +177,24 @@ describe("HTTP Origin allow-list helpers", () => {
     ]);
   });
 
+  test("accepts only canonical Chrome extension origins", () => {
+    const extensionId = "abcdefghijklmnopabcdefghijklmnop";
+    expect([...parseAllowedOrigins(`chrome-extension://${extensionId}`)]).toEqual([
+      `chrome-extension://${extensionId}`,
+    ]);
+    for (const invalid of [
+      `chrome-extension://${extensionId}/`,
+      `chrome-extension://${extensionId}:443`,
+      `chrome-extension://${extensionId}?x=1`,
+      `chrome-extension://${extensionId}#fragment`,
+      "chrome-extension://abcdefghijklmnopabcdefghijklmnopq",
+      "chrome-extension://ABCDEFGHIJKLMNOPABCDEFGHIJKLMNOP",
+      `https://chrome-extension://${extensionId}`,
+    ]) {
+      expect(parseAllowedOrigins(invalid).size).toBe(0);
+    }
+  });
+
   test("+origin policies require the explicit allow-list, even for localhost", () => {
     const allowedOrigins = parseAllowedOrigins("https://claude.ai");
     expect(
@@ -176,9 +213,39 @@ describe("HTTP Origin allow-list helpers", () => {
     ).toBe(false);
   });
 
+  test("loopback-only rejects browser origins by default and allows only explicit entries", () => {
+    expect(
+      isOriginAllowed("http://localhost:5173", {
+        policy: "loopback-only",
+        bindAll: false,
+        allowedOrigins: new Set(),
+      }),
+    ).toBe(false);
+    expect(
+      isOriginAllowed("http://localhost:5173", {
+        policy: "loopback-only",
+        bindAll: false,
+        allowedOrigins: parseAllowedOrigins("http://localhost:5173"),
+      }),
+    ).toBe(true);
+    expect(
+      isOriginAllowed(undefined, {
+        policy: "loopback-only",
+        bindAll: false,
+        allowedOrigins: new Set(),
+      }),
+    ).toBe(true);
+  });
+
   test("rejects opaque or path-bearing Origin values defensively", () => {
     const allowedOrigins = parseAllowedOrigins("https://claude.ai");
-    for (const origin of ["null", "file://local", "https://claude.ai/path", "https://claude.ai?x=1"]) {
+    for (const origin of [
+      "null",
+      "file://local",
+      "https://user@claude.ai",
+      "https://claude.ai/path",
+      "https://claude.ai?x=1",
+    ]) {
       expect(
         isOriginAllowed(origin, {
           policy: "with-token+origin",
@@ -414,8 +481,61 @@ describe("validateNetworkPolicy — OAuth branches (RFC 0005 Step 1)", () => {
         oauthAudience: "https://airmcp.example/mcp",
         oauthAuthorizationEndpoint: "https://auth.example.com/tenant/authorize",
         oauthTokenEndpoint: "https://auth.example.com/tenant/token",
+        oauthTokenEndpointAuthMethods: ["none"],
       }),
     ).not.toThrow();
+  });
+
+  test("validates JWKS overrides and RFC 8414 token endpoint auth methods", () => {
+    expect(() =>
+      validateNetworkPolicy({
+        ...base,
+        oauthIssuer: "https://auth.example.com/tenant",
+        oauthAudience: "https://airmcp.example/mcp",
+        oauthJwksUri: "http://auth.example.com/tenant/certs",
+      }),
+    ).toThrow(/AIRMCP_OAUTH_JWKS_URI must be a valid https:\/\//);
+
+    expect(() =>
+      validateNetworkPolicy({
+        ...base,
+        oauthIssuer: "https://auth.example.com/tenant",
+        oauthAudience: "https://airmcp.example/mcp",
+        oauthAuthorizationEndpoint: "https://auth.example.com/tenant/authorize",
+        oauthTokenEndpoint: "https://auth.example.com/tenant/token",
+      }),
+    ).toThrow(/requires at least one token endpoint authentication method/);
+
+    expect(() =>
+      validateNetworkPolicy({
+        ...base,
+        oauthIssuer: "https://auth.example.com/tenant",
+        oauthAudience: "https://airmcp.example/mcp",
+        oauthTokenEndpointAuthMethods: ["none"],
+      }),
+    ).toThrow(/requires RFC 8414 endpoint publication/);
+
+    expect(() =>
+      validateNetworkPolicy({
+        ...base,
+        oauthIssuer: "https://auth.example.com/tenant",
+        oauthAudience: "https://airmcp.example/mcp",
+        oauthAuthorizationEndpoint: "https://auth.example.com/tenant/authorize",
+        oauthTokenEndpoint: "https://auth.example.com/tenant/token",
+        oauthTokenEndpointAuthMethods: ["client_secret_basic", "client_secret_jwt", "private_key_jwt"],
+      }),
+    ).not.toThrow();
+
+    expect(() =>
+      validateNetworkPolicy({
+        ...base,
+        oauthIssuer: "https://auth.example.com/tenant",
+        oauthAudience: "https://airmcp.example/mcp",
+        oauthAuthorizationEndpoint: "https://auth.example.com/tenant/authorize",
+        oauthTokenEndpoint: "https://auth.example.com/tenant/token",
+        oauthTokenEndpointAuthMethods: ["made_up_method"],
+      }),
+    ).toThrow(/contains an unsupported method/);
   });
 
   test("with-oauth+origin requires allowed origins on top of OAuth env", () => {
@@ -456,13 +576,21 @@ describe("validateNetworkPolicy — OAuth branches (RFC 0005 Step 1)", () => {
 
 describe("startHttpServer live middleware", () => {
   let startHttpServer;
+  let resetIpRateLimit;
+  let registerShutdownHook;
+  let unregisterShutdownHook;
   let errorSpy;
 
   beforeAll(async () => {
     ({ startHttpServer } = await import("../dist/server/http-transport.js"));
+    ({ _resetIpRateLimitForTests: resetIpRateLimit } = await import("../dist/shared/rate-limit.js"));
+    ({ registerShutdownHook, unregisterShutdownHook } = await import("../dist/server/shutdown.js"));
   });
 
   beforeEach(() => {
+    resetIpRateLimit();
+    delete process.env.AIRMCP_APP_OWNED_RUNTIME;
+    delete process.env.AIRMCP_APP_RUNTIME_OWNER_SECRET;
     errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
   });
 
@@ -473,6 +601,10 @@ describe("startHttpServer live middleware", () => {
     delete process.env.AIRMCP_OAUTH_AUDIENCE;
     delete process.env.AIRMCP_OAUTH_AUTHORIZATION_ENDPOINT;
     delete process.env.AIRMCP_OAUTH_TOKEN_ENDPOINT;
+    delete process.env.AIRMCP_OAUTH_JWKS_URI;
+    delete process.env.AIRMCP_OAUTH_TOKEN_ENDPOINT_AUTH_METHODS;
+    delete process.env.AIRMCP_APP_OWNED_RUNTIME;
+    delete process.env.AIRMCP_APP_RUNTIME_OWNER_SECRET;
   });
 
   function options(overrides = {}) {
@@ -481,6 +613,7 @@ describe("startHttpServer live middleware", () => {
       bindAll: true,
       httpToken: "secret",
       allowNetwork: "with-token",
+      config: { disabledModules: new Set(["notes", "mail"]) },
       pkg: {
         version: "9.9.9-test",
         description: "AirMCP test server",
@@ -501,12 +634,55 @@ describe("startHttpServer live middleware", () => {
     await new Promise((resolve) => server.close(resolve));
   }
 
+  test("repeated start/close restores exit listeners, cleanup timers, and shutdown hooks", async () => {
+    const baselineExitListeners = process.listenerCount("exit");
+    const activeShutdownHooks = new Set();
+    registerShutdownHook.mockImplementation((hook) => {
+      activeShutdownHooks.add(hook);
+    });
+    unregisterShutdownHook.mockImplementation((hook) => {
+      activeShutdownHooks.delete(hook);
+    });
+    const setIntervalSpy = jest.spyOn(global, "setInterval");
+    const clearIntervalSpy = jest.spyOn(global, "clearInterval");
+    const cleanupTimers = [];
+
+    try {
+      for (let iteration = 0; iteration < 12; iteration += 1) {
+        const timersBeforeStart = setIntervalSpy.mock.results.length;
+        const server = await startHttpServer(options());
+        const newTimers = setIntervalSpy.mock.results
+          .slice(timersBeforeStart)
+          .map((result) => result.value)
+          .filter(Boolean);
+        expect(newTimers).toHaveLength(1);
+        cleanupTimers.push(newTimers[0]);
+        expect(process.listenerCount("exit")).toBe(baselineExitListeners + 1);
+        expect(activeShutdownHooks.size).toBe(1);
+
+        await closeServer(server);
+
+        expect(process.listenerCount("exit")).toBe(baselineExitListeners);
+        expect(activeShutdownHooks.size).toBe(0);
+      }
+
+      for (const timer of cleanupTimers) {
+        expect(clearIntervalSpy).toHaveBeenCalledWith(timer);
+      }
+    } finally {
+      setIntervalSpy.mockRestore();
+      clearIntervalSpy.mockRestore();
+      registerShutdownHook.mockReset();
+      unregisterShutdownHook.mockReset();
+    }
+  });
+
   test("health stays public while /mcp requires the bearer token", async () => {
     const server = await startHttpServer(options());
     try {
       const health = await fetch(serverUrl(server, "/health"));
       expect(health.status).toBe(200);
-      expect(await health.json()).toEqual({ status: "ok", version: "9.9.9-test" });
+      expect(await health.json()).toEqual({ status: "ok", version: "9.9.9-test", appOwned: false });
 
       const protectedRoute = await fetch(serverUrl(server, "/mcp"), {
         method: "POST",
@@ -515,6 +691,197 @@ describe("startHttpServer live middleware", () => {
       });
       expect(protectedRoute.status).toBe(401);
       expect(await protectedRoute.json()).toEqual({ error: "Unauthorized: invalid or missing Bearer token" });
+    } finally {
+      await closeServer(server);
+    }
+  });
+
+  test("health exposes only the non-sensitive app-owned process bit", async () => {
+    process.env.AIRMCP_APP_OWNED_RUNTIME = "1";
+    process.env.AIRMCP_APP_RUNTIME_OWNER_SECRET = "a".repeat(43);
+    const server = await startHttpServer(options());
+    try {
+      const health = await fetch(serverUrl(server, "/health"));
+      expect(await health.json()).toEqual({ status: "ok", version: "9.9.9-test", appOwned: true });
+    } finally {
+      await closeServer(server);
+    }
+  });
+
+  test("loopback-only rejects unsolicited browser origins while preserving native clients", async () => {
+    const server = await startHttpServer(options({ allowNetwork: "loopback-only", bindAll: false, httpToken: "" }));
+    try {
+      const browser = await fetch(serverUrl(server, "/mcp"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Origin: "http://localhost:5173" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize" }),
+      });
+      expect(browser.status).toBe(403);
+      expect(browser.headers.get("access-control-allow-origin")).toBeNull();
+
+      const nativeClient = await fetch(serverUrl(server, "/mcp"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "initialize" }),
+      });
+      expect(nativeClient.status).not.toBe(403);
+    } finally {
+      await closeServer(server);
+    }
+  });
+
+  test("loopback-only permits an explicitly allow-listed browser origin", async () => {
+    process.env.AIRMCP_ALLOWED_ORIGINS = "http://localhost:5173";
+    const server = await startHttpServer(options({ allowNetwork: "loopback-only", bindAll: false, httpToken: "" }));
+    try {
+      const response = await fetch(serverUrl(server, "/mcp"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Origin: "http://localhost:5173" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize" }),
+      });
+      expect(response.status).not.toBe(403);
+      expect(response.headers.get("access-control-allow-origin")).toBe("http://localhost:5173");
+    } finally {
+      await closeServer(server);
+    }
+  });
+
+  test("authenticated app runtime-state proves the effective module scope", async () => {
+    process.env.AIRMCP_APP_OWNED_RUNTIME = "1";
+    process.env.AIRMCP_APP_RUNTIME_OWNER_SECRET = "a".repeat(43);
+    const server = await startHttpServer(options());
+    try {
+      const unauthenticated = await fetch(serverUrl(server, "/app/runtime-state"));
+      expect(unauthenticated.status).toBe(401);
+
+      const response = await fetch(serverUrl(server, "/app/runtime-state"), {
+        headers: { Authorization: "Bearer secret" },
+      });
+      expect(response.status).toBe(200);
+      const state = await response.json();
+      expect(state).toEqual({
+        status: "ok",
+        version: "9.9.9-test",
+        appOwned: true,
+        pid: process.pid,
+        ownerFingerprint: expect.stringMatching(/^[0-9a-f]{64}$/),
+        disabledModules: ["mail", "notes"],
+        scopeFingerprint: expect.stringMatching(/^[0-9a-f]{64}$/),
+        enabledModules: ["calendar", "reminders"],
+        unavailableModules: [{ module: "intelligence", reason: "host_unavailable", detail: "requires macOS 26" }],
+      });
+      expect(JSON.stringify(state)).not.toContain("a".repeat(43));
+    } finally {
+      await closeServer(server);
+    }
+  });
+
+  test("runtime-state refuses false empty readiness until the effective module warmup completes", async () => {
+    process.env.AIRMCP_APP_OWNED_RUNTIME = "1";
+    process.env.AIRMCP_APP_RUNTIME_OWNER_SECRET = "a".repeat(43);
+    const { createServer } = await import("../dist/server/mcp-setup.js");
+    let releaseWarmup;
+    createServer.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseWarmup = () =>
+            resolve({
+              server: { connect: jest.fn(), close: jest.fn(), sendResourceListChanged: jest.fn() },
+              toolRegistry: {
+                getExposedToolCount: () => 0,
+                getExposedToolNames: () => [],
+                getToolDetails: () => undefined,
+              },
+              bannerInfo: { transport: "http", version: "2.6.0", modulesEnabled: ["calendar"] },
+              runtimeModuleState: {
+                enabledModules: ["calendar"],
+                unavailableModules: [{ module: "mail", reason: "module_pack" }],
+              },
+              cleanupEventListeners: jest.fn(),
+            });
+        }),
+    );
+
+    const server = await startHttpServer(options());
+    try {
+      const warming = await fetch(serverUrl(server, "/app/runtime-state"), {
+        headers: { Authorization: "Bearer secret" },
+      });
+      expect(warming.status).toBe(503);
+      expect(warming.headers.get("retry-after")).toBe("1");
+      expect(await warming.json()).toEqual({ error: "Runtime module surface is still warming" });
+
+      releaseWarmup();
+      let ready;
+      for (let attempt = 0; attempt < 50; attempt += 1) {
+        ready = await fetch(serverUrl(server, "/app/runtime-state"), {
+          headers: { Authorization: "Bearer secret" },
+        });
+        if (ready.status === 200) break;
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      expect(ready.status).toBe(200);
+      expect(await ready.json()).toEqual(
+        expect.objectContaining({
+          enabledModules: ["calendar"],
+          unavailableModules: [{ module: "mail", reason: "module_pack" }],
+        }),
+      );
+    } finally {
+      await closeServer(server);
+    }
+  });
+
+  test("runtime-state stays unavailable without the app-only owner credential", async () => {
+    process.env.AIRMCP_APP_OWNED_RUNTIME = "1";
+    const server = await startHttpServer(options());
+    try {
+      const health = await fetch(serverUrl(server, "/health"));
+      expect(await health.json()).toEqual({ status: "ok", version: "9.9.9-test", appOwned: false });
+      const response = await fetch(serverUrl(server, "/app/runtime-state"), {
+        headers: { Authorization: "Bearer secret" },
+      });
+      expect(response.status).toBe(404);
+      expect(await response.json()).toEqual({ error: "Not found" });
+    } finally {
+      await closeServer(server);
+    }
+  });
+
+  test("runtime-state stays unavailable with a malformed owner credential", async () => {
+    process.env.AIRMCP_APP_OWNED_RUNTIME = "1";
+    process.env.AIRMCP_APP_RUNTIME_OWNER_SECRET = "not-a-generation-secret";
+    const server = await startHttpServer(options());
+    try {
+      const response = await fetch(serverUrl(server, "/app/runtime-state"), {
+        headers: { Authorization: "Bearer secret" },
+      });
+      expect(response.status).toBe(404);
+    } finally {
+      await closeServer(server);
+    }
+  });
+
+  test("runtime-state stays unavailable when the app runtime has no HTTP token", async () => {
+    process.env.AIRMCP_APP_OWNED_RUNTIME = "1";
+    process.env.AIRMCP_APP_RUNTIME_OWNER_SECRET = "a".repeat(43);
+    const server = await startHttpServer(options({ allowNetwork: "loopback-only", bindAll: false, httpToken: "" }));
+    try {
+      const response = await fetch(serverUrl(server, "/app/runtime-state"));
+      expect(response.status).toBe(404);
+    } finally {
+      await closeServer(server);
+    }
+  });
+
+  test("runtime-state stays unavailable on a non-app-owned server", async () => {
+    const server = await startHttpServer(options());
+    try {
+      const response = await fetch(serverUrl(server, "/app/runtime-state"), {
+        headers: { Authorization: "Bearer secret" },
+      });
+      expect(response.status).toBe(404);
+      expect(await response.json()).toEqual({ error: "Not found" });
     } finally {
       await closeServer(server);
     }
@@ -534,6 +901,7 @@ describe("startHttpServer live middleware", () => {
         getToolDetails: () => undefined,
       },
       bannerInfo: { transport: "http", version: "2.6.0", modulesEnabled: ["calendar", "reminders"] },
+      runtimeModuleState: { enabledModules: ["calendar", "reminders"], unavailableModules: [] },
       cleanupEventListeners: jest.fn(),
     });
     const server = await startHttpServer(options());
@@ -573,7 +941,145 @@ describe("startHttpServer live middleware", () => {
         body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize" }),
       });
       expect(response.status).toBe(403);
+      expect(response.headers.get("ratelimit-limit")).toBe("120");
+      expect(response.headers.get("ratelimit-remaining")).toBe("119");
+      expect(response.headers.get("access-control-allow-origin")).toBeNull();
       expect(await response.json()).toEqual({ error: "Forbidden: Origin not allowed" });
+
+      const allowed = await fetch(serverUrl(server, "/.well-known/mcp.json"), {
+        headers: { Origin: "https://allowed.example" },
+      });
+      expect(allowed.status).toBe(200);
+      expect(allowed.headers.get("ratelimit-remaining")).toBe("118");
+    } finally {
+      await closeServer(server);
+    }
+  });
+
+  test("authenticated malformed JSON is metered and returns a fixed CORS-safe error without a stack", async () => {
+    process.env.AIRMCP_ALLOWED_ORIGINS = "https://allowed.example";
+    const server = await startHttpServer(options({ allowNetwork: "with-token+origin" }));
+    try {
+      const response = await fetch(serverUrl(server, "/mcp"), {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer secret",
+          Origin: "https://allowed.example",
+          "Content-Type": "application/json",
+        },
+        body: "{",
+      });
+      expect(response.status).toBe(400);
+      expect(response.headers.get("access-control-allow-origin")).toBe("https://allowed.example");
+      expect(response.headers.get("x-request-id")).toMatch(/^[0-9a-f]{16}$/);
+      expect(response.headers.get("ratelimit-limit")).toBe("120");
+      expect(response.headers.get("ratelimit-remaining")).toBe("119");
+      const body = await response.text();
+      expect(JSON.parse(body)).toEqual({ error: "Invalid JSON body" });
+      expect(body).not.toContain(process.cwd());
+      expect(body).not.toMatch(/SyntaxError|node_modules|\bat\s/);
+      const serverLogs = errorSpy.mock.calls.flat().join("\n");
+      expect(serverLogs).not.toContain(process.cwd());
+      expect(serverLogs).not.toMatch(/SyntaxError|body-parser|raw-body/);
+    } finally {
+      await closeServer(server);
+    }
+  });
+
+  test("OAuth CORS preflight succeeds before bearer auth and publishes the browser contract", async () => {
+    process.env.AIRMCP_ALLOWED_ORIGINS = "https://allowed.example";
+    process.env.AIRMCP_OAUTH_ISSUER = "https://auth.example.com";
+    process.env.AIRMCP_OAUTH_AUDIENCE = "https://airmcp.example/mcp";
+    const server = await startHttpServer(options({ allowNetwork: "with-oauth+origin", httpToken: "" }));
+    try {
+      const response = await fetch(serverUrl(server, "/mcp"), {
+        method: "OPTIONS",
+        headers: {
+          Origin: "https://allowed.example/",
+          "Access-Control-Request-Method": "POST",
+          "Access-Control-Request-Headers":
+            "authorization, content-type, mcp-session-id, mcp-protocol-version, last-event-id, x-airmcp-run-id",
+        },
+      });
+      expect(response.status).toBe(204);
+      expect(response.headers.get("access-control-allow-origin")).toBe("https://allowed.example");
+      expect(response.headers.get("vary")).toContain("Origin");
+      expect(response.headers.get("access-control-allow-methods")).toBe("GET, POST, DELETE, OPTIONS");
+      expect(response.headers.get("access-control-allow-headers")).toBe(
+        "Authorization, Content-Type, Mcp-Session-Id, MCP-Protocol-Version, Last-Event-ID, X-AirMCP-Run-Id",
+      );
+      const exposed = response.headers.get("access-control-expose-headers");
+      for (const header of [
+        "Mcp-Session-Id",
+        "MCP-Protocol-Version",
+        "X-Request-ID",
+        "WWW-Authenticate",
+        "Retry-After",
+        "RateLimit-Limit",
+      ]) {
+        expect(exposed).toContain(header);
+      }
+      expect(response.headers.get("x-request-id")).toMatch(/^[0-9a-f]{16}$/);
+      expect(response.headers.get("ratelimit-limit")).toBeTruthy();
+      expect(response.headers.get("ratelimit-remaining")).toBeTruthy();
+
+      const protectedRequest = await fetch(serverUrl(server, "/mcp"), {
+        method: "POST",
+        headers: {
+          Origin: "https://allowed.example",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize" }),
+      });
+      expect(protectedRequest.status).toBe(401);
+      expect(protectedRequest.headers.get("access-control-allow-origin")).toBe("https://allowed.example");
+      expect(protectedRequest.headers.get("www-authenticate")).toContain("Bearer");
+      expect(protectedRequest.headers.get("access-control-expose-headers")).toContain("WWW-Authenticate");
+    } finally {
+      await closeServer(server);
+    }
+  });
+
+  test("CORS rejects unlisted origins and non-contract request headers without bearer auth", async () => {
+    process.env.AIRMCP_ALLOWED_ORIGINS = "https://allowed.example";
+    process.env.AIRMCP_OAUTH_ISSUER = "https://auth.example.com";
+    process.env.AIRMCP_OAUTH_AUDIENCE = "https://airmcp.example/mcp";
+    const server = await startHttpServer(options({ allowNetwork: "with-oauth+origin", httpToken: "" }));
+    try {
+      const deniedOrigin = await fetch(serverUrl(server, "/mcp"), {
+        method: "OPTIONS",
+        headers: {
+          Origin: "https://evil.example",
+          "Access-Control-Request-Method": "POST",
+        },
+      });
+      expect(deniedOrigin.status).toBe(403);
+      expect(deniedOrigin.headers.get("access-control-allow-origin")).toBeNull();
+
+      const deniedHeader = await fetch(serverUrl(server, "/mcp"), {
+        method: "OPTIONS",
+        headers: {
+          Origin: "https://allowed.example",
+          "Access-Control-Request-Method": "POST",
+          "Access-Control-Request-Headers": "Authorization, X-Not-Allowed",
+        },
+      });
+      expect(deniedHeader.status).toBe(403);
+    } finally {
+      await closeServer(server);
+    }
+  });
+
+  test("browser discovery GET carries CORS headers for an allowed Chrome extension", async () => {
+    const extensionId = "abcdefghijklmnopabcdefghijklmnop";
+    const origin = `chrome-extension://${extensionId}`;
+    process.env.AIRMCP_ALLOWED_ORIGINS = origin;
+    const server = await startHttpServer(options({ allowNetwork: "with-token+origin" }));
+    try {
+      const response = await fetch(serverUrl(server, "/.well-known/mcp.json"), { headers: { Origin: origin } });
+      expect(response.status).toBe(200);
+      expect(response.headers.get("access-control-allow-origin")).toBe(origin);
+      expect(response.headers.get("vary")).toContain("Origin");
     } finally {
       await closeServer(server);
     }
@@ -615,6 +1121,7 @@ describe("startHttpServer live middleware", () => {
     process.env.AIRMCP_OAUTH_AUDIENCE = "https://airmcp.example/mcp";
     process.env.AIRMCP_OAUTH_AUTHORIZATION_ENDPOINT = "https://auth.example.com/realms/airmcp/authorize";
     process.env.AIRMCP_OAUTH_TOKEN_ENDPOINT = "https://auth.example.com/realms/airmcp/token";
+    process.env.AIRMCP_OAUTH_TOKEN_ENDPOINT_AUTH_METHODS = "none";
     const server = await startHttpServer(options({ allowNetwork: "with-oauth", httpToken: "" }));
     try {
       const response = await fetch(serverUrl(server, "/.well-known/oauth-authorization-server/realms/airmcp"));
@@ -625,6 +1132,7 @@ describe("startHttpServer live middleware", () => {
         token_endpoint: "https://auth.example.com/realms/airmcp/token",
         response_types_supported: ["code"],
         code_challenge_methods_supported: ["S256"],
+        token_endpoint_auth_methods_supported: ["none"],
       });
     } finally {
       await closeServer(server);
@@ -643,6 +1151,8 @@ describe("readOAuthContext", () => {
     delete process.env.AIRMCP_OAUTH_AUDIENCE;
     delete process.env.AIRMCP_OAUTH_AUTHORIZATION_ENDPOINT;
     delete process.env.AIRMCP_OAUTH_TOKEN_ENDPOINT;
+    delete process.env.AIRMCP_OAUTH_JWKS_URI;
+    delete process.env.AIRMCP_OAUTH_TOKEN_ENDPOINT_AUTH_METHODS;
   });
 
   test("returns null when both env vars are unset", () => {
@@ -668,11 +1178,30 @@ describe("readOAuthContext", () => {
     process.env.AIRMCP_OAUTH_AUDIENCE = "https://a/mcp";
     process.env.AIRMCP_OAUTH_AUTHORIZATION_ENDPOINT = "https://auth.example.com/tenant/authorize";
     process.env.AIRMCP_OAUTH_TOKEN_ENDPOINT = "https://auth.example.com/tenant/token";
+    process.env.AIRMCP_OAUTH_TOKEN_ENDPOINT_AUTH_METHODS = "none";
     expect(readOAuthContext()).toEqual({
       issuer: "https://auth.example.com/tenant",
       audience: "https://a/mcp",
       authorizationEndpoint: "https://auth.example.com/tenant/authorize",
       tokenEndpoint: "https://auth.example.com/tenant/token",
+      tokenEndpointAuthMethods: ["none"],
+    });
+  });
+
+  test("reads an explicit JWKS URI and truthful token endpoint auth method list", () => {
+    process.env.AIRMCP_OAUTH_ISSUER = "https://auth.example.com/tenant";
+    process.env.AIRMCP_OAUTH_AUDIENCE = "https://a/mcp";
+    process.env.AIRMCP_OAUTH_AUTHORIZATION_ENDPOINT = "https://auth.example.com/tenant/authorize";
+    process.env.AIRMCP_OAUTH_TOKEN_ENDPOINT = "https://auth.example.com/tenant/token";
+    process.env.AIRMCP_OAUTH_JWKS_URI = "https://auth.example.com/tenant/certs";
+    process.env.AIRMCP_OAUTH_TOKEN_ENDPOINT_AUTH_METHODS = "client_secret_basic, private_key_jwt";
+    expect(readOAuthContext()).toEqual({
+      issuer: "https://auth.example.com/tenant",
+      audience: "https://a/mcp",
+      authorizationEndpoint: "https://auth.example.com/tenant/authorize",
+      tokenEndpoint: "https://auth.example.com/tenant/token",
+      jwksUri: "https://auth.example.com/tenant/certs",
+      tokenEndpointAuthMethods: ["client_secret_basic", "private_key_jwt"],
     });
   });
 });

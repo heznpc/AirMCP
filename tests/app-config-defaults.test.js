@@ -43,12 +43,26 @@ describe("AirMCP.app ConfigManager defaults", () => {
   test("validates and backs up before an atomic config replacement", () => {
     expect(source).toContain('configFile.appendingPathExtension("backup")');
     expect(source).toContain("JSONSerialization.jsonObject(with: data)");
-    expect(source).toContain("data.write(to: Self.configFile, options: .atomic)");
+    expect(source).toContain("data.write(to: configFile, options: .atomic)");
     expect(source).toContain("var lastPersistenceError: String?");
+  });
+
+  test("never overwrites an owner config after a failed load", () => {
+    expect(source).toContain("private var persistenceBlockedByLoadError = false");
+    expect(source).toContain("persistenceBlockedByLoadError = true");
+    expect(source).toContain("guard !persistenceBlockedByLoadError else { return }");
   });
 
   test("honors the shared config-path override for isolated app validation", () => {
     expect(source).toContain('environment["AIRMCP_CONFIG_PATH"]');
     expect(source).toContain("configFile.deletingLastPathComponent()");
+  });
+
+  test("scope activation uses a reversible read-back-verified transaction", () => {
+    expect(source).toContain("func beginOnboardingRuntimeScopeTransaction(");
+    expect(source).toContain("func rollbackOnboardingRuntimeScope(");
+    expect(source).toContain("func isOnboardingRuntimeScopePersisted(");
+    expect(source).toContain('config.onboardingWorkflow = scope.workflowID');
+    expect(source).toContain("persisted.disabledModules == scope.disabledModules");
   });
 });

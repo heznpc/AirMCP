@@ -17,7 +17,8 @@ import type { ToolRegistry } from "../shared/tool-registry.js";
 import { getOAuthClaims, getRequestContext, runWithRequestContext } from "../shared/request-context.js";
 import { checkIpRateLimit, pruneStaleIpBuckets } from "../shared/rate-limit.js";
 import { createServer, type CreateServerOptions } from "./mcp-setup.js";
-import { registerShutdownHook } from "./shutdown.js";
+import type { RuntimeModuleState } from "./mcp-setup.js";
+import { registerShutdownHook, unregisterShutdownHook } from "./shutdown.js";
 import {
   buildServerCard,
   buildOAuthProtectedResourceCard,
@@ -41,9 +42,6 @@ import {
 const ratePruneTimer = setInterval(() => pruneStaleIpBuckets(), 60_000);
 if (ratePruneTimer.unref) ratePruneTimer.unref();
 
-// Compiled once — used in Origin validation middleware
-const LOCALHOST_ORIGIN_RE = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
-
 /** Optional run identifier supplied by native app surfaces and diagnostic
  *  clients. Only UUIDs are accepted so an untrusted HTTP peer cannot inject
  *  arbitrary text or high-cardinality labels into the audit trail. */
@@ -54,6 +52,23 @@ export function parseRunCorrelationId(value: string | string[] | undefined): str
   if (typeof value !== "string") return undefined;
   const trimmed = value.trim();
   return RUN_ID_RE.test(trimmed) ? trimmed.toLowerCase() : undefined;
+}
+
+/** Stable, non-secret comparison token for the effective module scope loaded
+ * by this process. It is served only from the authenticated app runtime-state
+ * endpoint; public /health intentionally omits module-selection evidence. */
+export function runtimeScopeFingerprint(disabledModules: Iterable<string>): string {
+  const canonical = [...new Set(disabledModules)].sort().join("\n");
+  return createHash("sha256").update(`airmcp-runtime-scope-v1\n${canonical}`, "utf8").digest("hex");
+}
+
+/** Fingerprint the native app's private process-owner credential without ever
+ * returning the credential itself. Invalid or missing credentials cannot make
+ * a process eligible for app lifecycle adoption. */
+export function runtimeOwnerFingerprint(ownerSecret: string | undefined): string | undefined {
+  const normalized = ownerSecret?.trim();
+  if (!normalized || !/^[A-Za-z0-9_-]{43}$/.test(normalized)) return undefined;
+  return createHash("sha256").update(`airmcp-app-owner-v1\n${normalized}`, "utf8").digest("hex");
 }
 
 /**
@@ -110,19 +125,48 @@ export interface OAuthContext {
    *  reverse-proxy their authorization server through this HTTP process. */
   authorizationEndpoint?: string;
   tokenEndpoint?: string;
+  /** Optional operator override for the verifier key set. When absent, the
+   *  verifier discovers `jwks_uri` from issuer metadata (RFC 8414 / OIDC). */
+  jwksUri?: string;
+  /** Methods this co-hosted RFC 8414 document truthfully advertises. Required
+   *  when metadata publication is enabled; public PKCE deployments explicitly
+   *  configure `none` rather than having AirMCP infer AS capability. */
+  tokenEndpointAuthMethods?: string[];
 }
+
+export const OAUTH_TOKEN_ENDPOINT_AUTH_METHODS = [
+  "none",
+  "client_secret_basic",
+  "client_secret_post",
+  "client_secret_jwt",
+  "private_key_jwt",
+  "tls_client_auth",
+  "self_signed_tls_client_auth",
+] as const;
 
 export function readOAuthContext(): OAuthContext | null {
   const issuer = (process.env.AIRMCP_OAUTH_ISSUER ?? "").trim();
   const audience = (process.env.AIRMCP_OAUTH_AUDIENCE ?? "").trim();
   const authorizationEndpoint = (process.env.AIRMCP_OAUTH_AUTHORIZATION_ENDPOINT ?? "").trim();
   const tokenEndpoint = (process.env.AIRMCP_OAUTH_TOKEN_ENDPOINT ?? "").trim();
-  if (!issuer && !audience && !authorizationEndpoint && !tokenEndpoint) return null;
+  const jwksUri = (process.env.AIRMCP_OAUTH_JWKS_URI ?? "").trim();
+  const rawTokenEndpointAuthMethods = (process.env.AIRMCP_OAUTH_TOKEN_ENDPOINT_AUTH_METHODS ?? "").trim();
+  if (!issuer && !audience && !authorizationEndpoint && !tokenEndpoint && !jwksUri && !rawTokenEndpointAuthMethods) {
+    return null;
+  }
+  const tokenEndpointAuthMethods = rawTokenEndpointAuthMethods
+    ? rawTokenEndpointAuthMethods
+        .split(",")
+        .map((method) => method.trim())
+        .filter(Boolean)
+    : undefined;
   return {
     issuer,
     audience,
     ...(authorizationEndpoint ? { authorizationEndpoint } : {}),
     ...(tokenEndpoint ? { tokenEndpoint } : {}),
+    ...(jwksUri ? { jwksUri } : {}),
+    ...(tokenEndpointAuthMethods ? { tokenEndpointAuthMethods } : {}),
   };
 }
 
@@ -150,13 +194,20 @@ export function resolveAllowNetwork(opts: {
   return "loopback-only";
 }
 
+const CHROME_EXTENSION_ORIGIN_RE = /^chrome-extension:\/\/[a-p]{32}$/;
+
 function normalizeOrigin(value: string): string | null {
   const trimmed = value.trim();
   if (!trimmed || trimmed === "null") return null;
+  // URL.origin is `null` for custom schemes, so validate Chrome extension
+  // origins explicitly. Chrome IDs are exactly 32 lowercase characters from
+  // a-p. Requiring the canonical string also rejects ports, paths, query,
+  // fragments, userinfo, and lookalike schemes.
+  if (CHROME_EXTENSION_ORIGIN_RE.test(trimmed)) return trimmed;
   try {
     const url = new URL(trimmed);
     if (url.protocol !== "http:" && url.protocol !== "https:") return null;
-    if (url.pathname !== "/" || url.search || url.hash) return null;
+    if (url.username || url.password || url.pathname !== "/" || url.search || url.hash) return null;
     return url.origin;
   } catch {
     return null;
@@ -191,7 +242,12 @@ export function isOriginAllowed(
   if (ctx.policy === "with-token+origin" || ctx.policy === "with-oauth+origin") {
     return ctx.allowedOrigins.has(normalized);
   }
-  if (LOCALHOST_ORIGIN_RE.test(normalized)) return true;
+  // Loopback binding protects the socket from remote hosts, but it does not
+  // make every local web page trustworthy. A hostile page at an arbitrary
+  // localhost port can still drive a browser request to 127.0.0.1. Browser
+  // origins therefore require an explicit allow-list even in the default
+  // loopback-only mode. Native MCP clients omit Origin and pass above.
+  if (ctx.policy === "loopback-only") return ctx.allowedOrigins.has(normalized);
   if (ctx.allowedOrigins.has(normalized)) return true;
   return ctx.bindAll && ctx.allowedOrigins.size === 0;
 }
@@ -207,6 +263,8 @@ export function validateNetworkPolicy(ctx: {
   oauthAudience?: string;
   oauthAuthorizationEndpoint?: string;
   oauthTokenEndpoint?: string;
+  oauthJwksUri?: string;
+  oauthTokenEndpointAuthMethods?: string[];
 }): void {
   switch (ctx.policy) {
     case "loopback-only":
@@ -312,6 +370,38 @@ export function validateNetworkPolicy(ctx: {
           throw new Error(`${name} must be a valid https:// URL without a fragment or userinfo.`);
         }
       }
+      if (ctx.oauthJwksUri) {
+        let jwksUri: URL;
+        try {
+          jwksUri = new URL(ctx.oauthJwksUri);
+        } catch {
+          throw new Error("AIRMCP_OAUTH_JWKS_URI must be a valid https:// URL.");
+        }
+        if (jwksUri.protocol !== "https:" || jwksUri.hash || jwksUri.username || jwksUri.password) {
+          throw new Error("AIRMCP_OAUTH_JWKS_URI must be a valid https:// URL without a fragment or userinfo.");
+        }
+      }
+      const tokenEndpointAuthMethods = ctx.oauthTokenEndpointAuthMethods;
+      if (tokenEndpointAuthMethods && !hasAuthorizationEndpoint && !hasTokenEndpoint) {
+        throw new Error(
+          "AIRMCP_OAUTH_TOKEN_ENDPOINT_AUTH_METHODS requires RFC 8414 endpoint publication to be configured.",
+        );
+      }
+      if (
+        hasAuthorizationEndpoint &&
+        hasTokenEndpoint &&
+        (!tokenEndpointAuthMethods || tokenEndpointAuthMethods.length === 0)
+      ) {
+        throw new Error("RFC 8414 publication requires at least one token endpoint authentication method.");
+      }
+      for (const method of tokenEndpointAuthMethods ?? []) {
+        if (!(OAUTH_TOKEN_ENDPOINT_AUTH_METHODS as readonly string[]).includes(method)) {
+          throw new Error(
+            "AIRMCP_OAUTH_TOKEN_ENDPOINT_AUTH_METHODS contains an unsupported method. " +
+              `Expected a comma-separated subset of: ${OAUTH_TOKEN_ENDPOINT_AUTH_METHODS.join(", ")}.`,
+          );
+        }
+      }
       if (ctx.policy === "with-oauth+origin" && ctx.allowedOriginsCount === 0) {
         throw new Error("allowNetwork=with-oauth+origin requires AIRMCP_ALLOWED_ORIGINS.");
       }
@@ -332,7 +422,6 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
 
   const express = (await import("express")).default;
   const app = express();
-  app.use(express.json({ limit: "1mb" }));
 
   // Origin validation — MCP spec 2025-11-25 requires 403 for invalid Origin
   const allowedOrigins = parseAllowedOrigins(process.env.AIRMCP_ALLOWED_ORIGINS ?? "");
@@ -360,6 +449,8 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
       oauthAudience: oauth?.audience,
       oauthAuthorizationEndpoint: oauth?.authorizationEndpoint,
       oauthTokenEndpoint: oauth?.tokenEndpoint,
+      oauthJwksUri: oauth?.jwksUri,
+      oauthTokenEndpointAuthMethods: oauth?.tokenEndpointAuthMethods,
     });
   } catch (e) {
     // Only the error MESSAGE is logged, never the stack. Stacks can capture
@@ -377,11 +468,63 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
   // token/OAuth) — denying it would break curl / native MCP clients for no
   // security gain, since browsers always send Origin.
   const denyNoOrigin = /^(1|true)$/i.test((process.env.AIRMCP_DENY_NO_ORIGIN ?? "").trim());
+  // Install request IDs before CORS / auth so browser clients can correlate
+  // preflight, rejected-origin, rate-limit, and bearer-challenge responses.
   app.use((req, res, next) => {
-    if (req.path !== "/mcp") return next();
-    if (isOriginAllowed(req.headers.origin, { policy: allowNetwork, bindAll, allowedOrigins, denyNoOrigin }))
-      return next();
-    res.status(403).json({ error: "Forbidden: Origin not allowed" });
+    const requestId = (req.headers["x-request-id"] as string) || randomBytes(8).toString("hex");
+    res.set("X-Request-ID", requestId);
+    (req as unknown as Record<string, string>).__requestId = requestId;
+    next();
+  });
+
+  const CORS_METHODS = ["GET", "POST", "DELETE", "OPTIONS"] as const;
+  // Match the headers emitted by the real StreamableHTTPClientTransport.
+  // After initialize it sends MCP-Protocol-Version on every request, and a
+  // resumed SSE GET carries Last-Event-ID. Omitting either makes a browser
+  // fail at preflight before the MCP client can reach this server.
+  const CORS_ALLOWED_HEADERS = [
+    "Authorization",
+    "Content-Type",
+    "Mcp-Session-Id",
+    "MCP-Protocol-Version",
+    "Last-Event-ID",
+    "X-AirMCP-Run-Id",
+  ] as const;
+  const CORS_EXPOSED_HEADERS = [
+    "Mcp-Session-Id",
+    "MCP-Protocol-Version",
+    "X-Request-ID",
+    "WWW-Authenticate",
+    "Retry-After",
+    "RateLimit",
+    "RateLimit-Limit",
+    "RateLimit-Remaining",
+    "RateLimit-Reset",
+    "RateLimit-Policy",
+  ] as const;
+  const corsAllowedHeaderNames = new Set(CORS_ALLOWED_HEADERS.map((header) => header.toLowerCase()));
+  const isCorsRoute = (path: string): boolean => path === "/mcp" || path.startsWith("/.well-known/");
+  const corsOriginAllowed = new WeakMap<object, boolean>();
+
+  // Canonicalize the browser origin and prepare response headers before the IP
+  // bucket runs, but defer rejection until afterwards. This keeps CORS headers
+  // on an allowed-origin 429 while ensuring a forged/denied Origin cannot use
+  // the cheap 403 path to bypass HTTP abuse accounting.
+  app.use((req, res, next) => {
+    if (!isCorsRoute(req.path)) return next();
+    res.vary("Origin");
+    const origin = req.headers.origin;
+    const allowed = isOriginAllowed(origin, { policy: allowNetwork, bindAll, allowedOrigins, denyNoOrigin });
+    corsOriginAllowed.set(req, allowed);
+    const canonicalOrigin = origin ? normalizeOrigin(origin) : null;
+    if (allowed && canonicalOrigin) {
+      // Echo the validated canonical origin (instead of `*`) so configuration,
+      // discovery, and the response never disagree about default ports or a
+      // syntactically tolerated HTTP(S) trailing slash.
+      res.set("Access-Control-Allow-Origin", canonicalOrigin);
+      res.set("Access-Control-Expose-Headers", CORS_EXPOSED_HEADERS.join(", "));
+    }
+    next();
   });
 
   // Per-IP rate limiting (default 120 req/min) with standard RateLimit headers.
@@ -399,6 +542,38 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
       return;
     }
     next();
+  });
+
+  // Origin validation is deliberately enforced after rate accounting. A
+  // denied browser still receives no Access-Control-Allow-Origin header, but
+  // it consumes the same per-IP budget as every other HTTP peer.
+  app.use((req, res, next) => {
+    if (!isCorsRoute(req.path) || corsOriginAllowed.get(req) !== false) return next();
+    res.status(403).json({ error: "Forbidden: Origin not allowed" });
+  });
+
+  // Answer a valid preflight after the IP bucket has accounted for it but
+  // before bearer authentication. This avoids both auth deadlock and an
+  // unmetered browser-request path.
+  app.use((req, res, next) => {
+    if (!isCorsRoute(req.path) || req.method !== "OPTIONS") return next();
+    const origin = req.headers.origin;
+    const requestedMethod = req.headers["access-control-request-method"]?.toUpperCase();
+    if (!origin || !requestedMethod || !(CORS_METHODS as readonly string[]).includes(requestedMethod)) {
+      res.status(403).json({ error: "Forbidden: invalid CORS preflight" });
+      return;
+    }
+    const requestedHeaders = (req.headers["access-control-request-headers"] ?? "")
+      .split(",")
+      .map((header) => header.trim().toLowerCase())
+      .filter(Boolean);
+    if (requestedHeaders.some((header) => !corsAllowedHeaderNames.has(header))) {
+      res.status(403).json({ error: "Forbidden: invalid CORS preflight headers" });
+      return;
+    }
+    res.set("Access-Control-Allow-Methods", CORS_METHODS.join(", "));
+    res.set("Access-Control-Allow-Headers", CORS_ALLOWED_HEADERS.join(", "));
+    res.status(204).end();
   });
 
   // Auth middleware — the branch depends on the active network policy.
@@ -427,7 +602,11 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
   if (isOAuthPolicy && oauth) {
     // RFC 0005 Step 2 — real JWT verification. issuer + audience are
     // guaranteed present at this point by `validateNetworkPolicy`.
-    const oauthCfg = { issuer: oauth.issuer, audience: oauth.audience };
+    const oauthCfg = {
+      issuer: oauth.issuer,
+      audience: oauth.audience,
+      ...(oauth.jwksUri ? { jwksUri: oauth.jwksUri } : {}),
+    };
     app.use((req, res, next) => {
       if (AUTH_SKIP_PATHS.has(req.path)) return next();
       verifyBearer(req.headers.authorization, oauthCfg)
@@ -505,6 +684,26 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
       next();
     });
   }
+
+  // Parse MCP JSON only after origin, rate-limit, preflight, and authentication
+  // gates. The parser's errors are normalized here instead of falling through
+  // to Express's development handler, which otherwise returns a stack trace
+  // containing local absolute paths to an unauthenticated HTTP peer.
+  app.use("/mcp", express.json({ limit: "1mb" }));
+  app.use(
+    "/mcp",
+    (
+      error: unknown,
+      _req: import("express").Request,
+      res: import("express").Response,
+      next: import("express").NextFunction,
+    ) => {
+      const bodyError = error as { status?: unknown; type?: unknown } | null;
+      if (!bodyError || typeof bodyError.type !== "string") return next(error);
+      const tooLarge = bodyError.status === 413 || bodyError.type === "entity.too.large";
+      res.status(tooLarge ? 413 : 400).json({ error: tooLarge ? "JSON body too large" : "Invalid JSON body" });
+    },
+  );
 
   // Native app workflows may span more than one MCP request. Carry their
   // explicit UUID through AsyncLocalStorage so approval events, tool results,
@@ -611,12 +810,56 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
   }, TIMEOUT.SESSION_CLEANUP);
   if (cleanupInterval.unref) cleanupInterval.unref();
 
-  // Health check — for load balancers, monitoring, and readiness probes
-  // Note: session counts and uptime omitted to prevent information leakage
+  // Health check — for load balancers, monitoring, and readiness probes.
+  // `appOwned` is deliberately non-sensitive: the macOS app still requires
+  // the private bearer token and an MCP round trip before it trusts a listener.
+  // The bit only prevents it from adopting/killing a same-token runtime the
+  // user launched manually on the reserved port.
+  const appRuntimeOwnerFingerprint = runtimeOwnerFingerprint(process.env.AIRMCP_APP_RUNTIME_OWNER_SECRET);
+  const appOwnedRuntime =
+    process.env.AIRMCP_APP_OWNED_RUNTIME === "1" && Boolean(httpToken) && Boolean(appRuntimeOwnerFingerprint);
+  // Warmup owns the authoritative effective module surface. Keep it nullable
+  // until createServer has applied module packs, add-on presence, and host/OS
+  // compatibility; an empty array before then would be false readiness.
+  let runtimeModuleState: RuntimeModuleState | null = null;
+  let enabledModuleNames: string[] = [];
+  let discoveryRegistry: ToolRegistry | null = null;
+  let modulesWarming = true;
+  // Note: session counts and uptime omitted to prevent information leakage.
   app.get("/health", (_req, res) => {
     res.json({
       status: "ok",
       version: pkg.version,
+      appOwned: appOwnedRuntime,
+    });
+  });
+
+  // Authenticated native-app state: unlike public /health, this may reveal the
+  // effective module selection. Setup uses it to prove the running generation
+  // actually parsed the exact scope saved immediately before launch. PID plus
+  // the app-only owner fingerprint binds lifecycle control to this exact
+  // process instead of every process with a matching command line.
+  app.get("/app/runtime-state", (_req, res) => {
+    if (!appOwnedRuntime || !httpToken || !appRuntimeOwnerFingerprint) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    if (!runtimeModuleState) {
+      res.set("Retry-After", "1");
+      res.status(503).json({ error: "Runtime module surface is still warming" });
+      return;
+    }
+    const disabledModules = [...(serverOptions.config?.disabledModules ?? [])].sort();
+    res.json({
+      status: "ok",
+      version: pkg.version,
+      appOwned: appOwnedRuntime,
+      pid: process.pid,
+      ownerFingerprint: appRuntimeOwnerFingerprint,
+      disabledModules,
+      scopeFingerprint: runtimeScopeFingerprint(disabledModules),
+      enabledModules: runtimeModuleState.enabledModules,
+      unavailableModules: runtimeModuleState.unavailableModules,
     });
   });
 
@@ -624,14 +867,11 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
   // Shape + rationale lives in well-known-card.ts; we capture the
   // enabled-module list via closure so it reflects the live module
   // selection once `createServer` runs (depends on config + OS gates).
-  let enabledModuleNames: string[] = [];
-  let discoveryRegistry: ToolRegistry | null = null;
   // True until the background warmup resolves the live module list. While
   // false the module list is not yet known, so the discovery card must NOT
   // claim `modules: []` — it advertises a `warming` status instead so a
   // crawler hitting the warmup window can distinguish "no modules" from
   // "not resolved yet". Tools are read live from toolRegistry and stay valid.
-  let modulesWarming = true;
   app.get("/.well-known/mcp.json", (_req, res) => {
     const card = buildServerCard({
       name: NPM_PACKAGE_NAME,
@@ -681,7 +921,12 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
   // server by default. It becomes authoritative only when the operator routes
   // the configured issuer origin to this process and provides both endpoints.
   app.get(authorizationServerMetadataPath, (_req, res) => {
-    if (!isOAuthPolicy || !oauth?.authorizationEndpoint || !oauth.tokenEndpoint) {
+    if (
+      !isOAuthPolicy ||
+      !oauth?.authorizationEndpoint ||
+      !oauth.tokenEndpoint ||
+      !oauth.tokenEndpointAuthMethods?.length
+    ) {
       res.status(404).json({ error: "Not Found — authorization-server metadata is not configured" });
       return;
     }
@@ -690,16 +935,9 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
         issuer: oauth.issuer,
         authorizationEndpoint: oauth.authorizationEndpoint,
         tokenEndpoint: oauth.tokenEndpoint,
+        tokenEndpointAuthMethodsSupported: oauth.tokenEndpointAuthMethods,
       }),
     );
-  });
-
-  // Request ID middleware for tracing
-  app.use((req, res, next) => {
-    const requestId = (req.headers["x-request-id"] as string) || randomBytes(8).toString("hex");
-    res.set("X-Request-ID", requestId);
-    (req as unknown as Record<string, string>).__requestId = requestId;
-    next();
   });
 
   // Reverse-proxy header soft-detection (RFC 0002 Phase 2).
@@ -883,6 +1121,7 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
       bannerInfo: bi,
       server: warmupServer,
       toolRegistry: warmupRegistry,
+      runtimeModuleState: warmedRuntimeModuleState,
       cleanupEventListeners: warmupCleanup,
     } = await createServer(serverOptions);
     warmupCleanup();
@@ -890,7 +1129,8 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
     // Publish the resolved enabled-module list into the .well-known
     // card's closure so registry crawlers see what's actually loaded
     // on this host (module enablement depends on config + OS gates).
-    enabledModuleNames = bi.modulesEnabled;
+    runtimeModuleState = warmedRuntimeModuleState;
+    enabledModuleNames = warmedRuntimeModuleState.enabledModules;
     discoveryRegistry = warmupRegistry;
     modulesWarming = false;
     return bi;
@@ -936,19 +1176,32 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
       });
     });
 
-  // Release the listening socket and per-process timers on shutdown so
-  // in-flight requests are not left dangling and the port can be reused.
-  // The "exit" hook only handles synchronous teardown (Node disallows async
-  // work there); graceful shutdown of active sessions runs via the shutdown
-  // hook installed below, which is bounded by GRACEFUL_SHUTDOWN_TIMEOUT.
-  process.on("exit", () => {
+  // One server lifecycle owns one idle-session timer, one process exit
+  // listener, and one async shutdown hook. Explicit `server.close()` must
+  // release all three; otherwise an embedded/repeated start-close cycle keeps
+  // the whole server closure alive until process exit. The process-wide IP
+  // prune timer is intentionally retained across an explicit server close and
+  // is stopped only when the process itself is shutting down.
+  let lifecycleDisposed = false;
+  const disposeLifecycle = (): void => {
+    if (lifecycleDisposed) return;
+    lifecycleDisposed = true;
     clearInterval(cleanupInterval);
+    process.off("exit", onProcessExit);
+    unregisterShutdownHook(shutdownHook);
+  };
+
+  function onProcessExit(): void {
+    disposeLifecycle();
     clearInterval(ratePruneTimer);
     httpServer.close();
-  });
+  }
 
-  registerShutdownHook(async () => {
-    clearInterval(cleanupInterval);
+  async function shutdownHook(): Promise<void> {
+    // Unregister first so an already-completed shutdown cannot be retained or
+    // executed again. runShutdownHooks() iterates a snapshot, so removing this
+    // callback while it is running does not disturb the audit finalizer stage.
+    disposeLifecycle();
     clearInterval(ratePruneTimer);
     // Tear down active sessions so SSE streams close cleanly and HITL
     // timers stop. `destroySession` is idempotent — duplicate calls from
@@ -964,6 +1217,10 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
       httpServer.close(() => done());
       setTimeout(done, 3000);
     });
-  });
+  }
+
+  registerShutdownHook(shutdownHook);
+  process.on("exit", onProcessExit);
+  httpServer.once("close", disposeLifecycle);
   return httpServer;
 }

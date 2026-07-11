@@ -13,6 +13,7 @@
  */
 
 import { readFile, rm, writeFile } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -22,7 +23,7 @@ import { ElicitRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 function usage() {
   return [
     "Usage: node scripts/verify-governed-workflow.mjs \\",
-    "  --url http://127.0.0.1:3847/mcp --token <token> \\",
+    "  --url http://127.0.0.1:3847/mcp --token-file <owner-only-file> \\",
     "  --memory-store <temp-memory.json> --audit-dir <temp-audit-dir> \\",
     "  --emergency-stop <temp-stop-file>",
   ].join("\n");
@@ -32,6 +33,7 @@ function parseArgs(argv) {
   const options = {
     url: "",
     token: "",
+    tokenFile: "",
     memoryStore: "",
     auditDir: "",
     emergencyStop: "",
@@ -40,6 +42,7 @@ function parseArgs(argv) {
   const names = new Map([
     ["--url", "url"],
     ["--token", "token"],
+    ["--token-file", "tokenFile"],
     ["--memory-store", "memoryStore"],
     ["--audit-dir", "auditDir"],
     ["--emergency-stop", "emergencyStop"],
@@ -60,9 +63,16 @@ function parseArgs(argv) {
     options[key] = argv[++index] ?? "";
   }
 
-  for (const key of ["url", "token", "memoryStore", "auditDir", "emergencyStop"]) {
+  for (const key of ["url", "memoryStore", "auditDir", "emergencyStop"]) {
     if (!options[key])
       throw new Error(`--${key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)} is required`);
+  }
+  if (Boolean(options.token) === Boolean(options.tokenFile)) {
+    throw new Error("exactly one of --token or --token-file is required");
+  }
+  if (options.tokenFile) {
+    options.token = readFileSync(options.tokenFile, "utf8").trim();
+    if (!options.token) throw new Error("--token-file is empty");
   }
   if (!Number.isFinite(options.timeoutMs) || options.timeoutMs <= 0) {
     throw new Error("--timeout-ms must be a positive number");

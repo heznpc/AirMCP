@@ -6,6 +6,7 @@ import XCTest
 final class OnboardingConfigSecurityTests: XCTestCase {
     private var temporaryDirectory: URL!
     private var tokenPath: String!
+    private var runtimeToken: String!
 
     override func setUpWithError() throws {
         temporaryDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(
@@ -19,6 +20,7 @@ final class OnboardingConfigSecurityTests: XCTestCase {
         )
         tokenPath = temporaryDirectory.appendingPathComponent("runtime-token").path
         setenv("AIRMCP_APP_RUNTIME_TOKEN_PATH", tokenPath, 1)
+        runtimeToken = try AppRuntimeToken.ensure()
     }
 
     override func tearDownWithError() throws {
@@ -32,6 +34,7 @@ final class OnboardingConfigSecurityTests: XCTestCase {
         }
         temporaryDirectory = nil
         tokenPath = nil
+        runtimeToken = nil
     }
 
     func testExistingConfigAndBackupBecomeOwnerOnly() throws {
@@ -43,7 +46,7 @@ final class OnboardingConfigSecurityTests: XCTestCase {
             ofItemAtPath: configURL.path
         )
 
-        XCTAssertTrue(OnboardingView.patchConfig(at: configURL.path))
+        XCTAssertTrue(OnboardingView.patchConfig(at: configURL.path, token: runtimeToken))
 
         let backupURL = URL(fileURLWithPath: configURL.path + ".airmcp-backup")
         XCTAssertEqual(try permissions(of: configURL), 0o600)
@@ -63,7 +66,7 @@ final class OnboardingConfigSecurityTests: XCTestCase {
     func testNewTokenBearingConfigIsCreatedOwnerOnly() throws {
         let configURL = temporaryDirectory.appendingPathComponent("nested/client.json")
 
-        XCTAssertTrue(OnboardingView.patchConfig(at: configURL.path))
+        XCTAssertTrue(OnboardingView.patchConfig(at: configURL.path, token: runtimeToken))
 
         XCTAssertEqual(try permissions(of: configURL), 0o600)
         XCTAssertFalse(FileManager.default.fileExists(atPath: configURL.path + ".airmcp-backup"))
@@ -76,10 +79,33 @@ final class OnboardingConfigSecurityTests: XCTestCase {
         let malformed = Data("{not-json\n".utf8)
         try malformed.write(to: configURL)
 
-        XCTAssertFalse(OnboardingView.patchConfig(at: configURL.path))
+        XCTAssertFalse(OnboardingView.patchConfig(at: configURL.path, token: runtimeToken))
 
         XCTAssertEqual(try Data(contentsOf: configURL), malformed)
         XCTAssertFalse(FileManager.default.fileExists(atPath: configURL.path + ".airmcp-backup"))
+    }
+
+    func testTokenReplacementDuringWriteRollsBackConfigAndBackup() throws {
+        let configURL = temporaryDirectory.appendingPathComponent("client.json")
+        let backupURL = URL(fileURLWithPath: configURL.path + ".airmcp-backup")
+        let original = Data("{\"mcpServers\":{\"existing\":{\"command\":\"keep\"}}}\n".utf8)
+        let originalBackup = Data("pre-existing-backup\n".utf8)
+        try original.write(to: configURL)
+        try originalBackup.write(to: backupURL)
+        var checks = 0
+
+        let result = OnboardingView.patchConfig(
+            at: configURL.path,
+            token: runtimeToken,
+            tokenValidator: {
+                checks += 1
+                return checks < 4
+            }
+        )
+
+        XCTAssertFalse(result)
+        XCTAssertEqual(try Data(contentsOf: configURL), original)
+        XCTAssertEqual(try Data(contentsOf: backupURL), originalBackup)
     }
 
     private func permissions(of url: URL) throws -> Int {

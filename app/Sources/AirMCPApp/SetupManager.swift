@@ -30,9 +30,20 @@ final class SetupManager {
 
     func runSetup(
         permissionManager: PermissionManager,
-        serverManager: ServerManager
+        serverManager: ServerManager,
+        hitlLevel: HitlLevel
     ) {
         guard !isRunning else { return }
+
+        if RuntimeStartConsentPolicy.shouldRequestApprovalNotifications(
+            hitlLevel: hitlLevel,
+            userInitiated: true
+        ) {
+            // Quick Setup is an explicit user action. It is therefore allowed
+            // to request the approval-notification permission that passive app
+            // initialization must not request.
+            HitlManager.requestNotificationPermission()
+        }
 
         state = .step(1, L("setup.permissions"))
 
@@ -60,6 +71,13 @@ final class SetupManager {
                 attempts += 1
             }
 
+            guard Self.runtimeReadyForConfiguration(serverManager.status) else {
+                await MainActor.run {
+                    self?.state = .failed(serverManager.statusLabel)
+                }
+                return
+            }
+
             // Step 3: Copy config
             await MainActor.run {
                 self?.state = .step(3, L("setup.copyingConfig"))
@@ -72,6 +90,13 @@ final class SetupManager {
                 self?.state = .done
             }
         }
+    }
+
+    nonisolated static func runtimeReadyForConfiguration(
+        _ status: ServerManager.Status
+    ) -> Bool {
+        if case .running = status { return true }
+        return false
     }
 
     func reset() {

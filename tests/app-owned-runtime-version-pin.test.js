@@ -49,8 +49,9 @@ describe("app-owned runtime npm package pin", () => {
     expect(appIntents).toContain("static func probe() async -> Bool");
     expect(appIntents).toContain('"method": "tools/list"');
     expect(serverManager).toContain("await AppRuntimeClient.probe()");
-    expect(serverManager).toContain("static func authenticatedAppOwnedRuntimeVersion() async -> String?");
-    expect(serverManager).toContain("version == AirMcpConstants.npmPackageVersion");
+    expect(serverManager).toContain("static func authenticatedRuntimeVersionAtAppEndpoint() async -> String?");
+    expect(serverManager).toContain("expectedVersion: String = AirMcpConstants.npmPackageVersion");
+    expect(serverManager).toContain("guard version == expectedVersion else");
   });
 
   test("supports a persistent app-owned runtime through the system login item", () => {
@@ -64,7 +65,7 @@ describe("app-owned runtime npm package pin", () => {
     expect(app).toContain("@NSApplicationDelegateAdaptor(AirMCPApplicationDelegate.self)");
     expect(app).toContain("serverManager?.prepareForApplicationTermination()");
     expect(serverManager).toContain("func prepareForApplicationTermination()");
-    expect(serverManager).toContain("serverProcess?.terminationHandler = nil");
+    expect(serverManager).toContain("managedProcess?.terminationHandler = nil");
     expect(serverManager).toContain("if self.isShuttingDown");
   });
 

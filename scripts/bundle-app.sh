@@ -29,6 +29,8 @@ Modes:
 
 Runtime modes skip the widget extension by default for fast app iteration.
 Set AIRMCP_SKIP_WIDGET=0 to force a widget build, or =1 to skip explicitly.
+Set AIRMCP_REQUIRE_WIDGET=1 for signed distribution: widget build failure or
+absence becomes fatal and AIRMCP_SKIP_WIDGET=1 is rejected.
 Set AIRMCP_SIGN_IDENTITY to a valid signing identity for Shortcuts/AppIntents
 registration; ad-hoc signing is used when it is unset.
 USAGE_EOF
@@ -56,11 +58,25 @@ case "$MODE" in
     ;;
 esac
 
+AIRMCP_REQUIRE_WIDGET="${AIRMCP_REQUIRE_WIDGET:-0}"
+if [ "$AIRMCP_REQUIRE_WIDGET" != "0" ] && [ "$AIRMCP_REQUIRE_WIDGET" != "1" ]; then
+  echo "✗ AIRMCP_REQUIRE_WIDGET must be 0 or 1, got: $AIRMCP_REQUIRE_WIDGET" >&2
+  exit 2
+fi
+
 if [ -z "${AIRMCP_SKIP_WIDGET+x}" ]; then
-  case "$MODE" in
-    run|verify|verify-governed|verify-appintents|logs|telemetry|debug) AIRMCP_SKIP_WIDGET=1 ;;
-    *) AIRMCP_SKIP_WIDGET=0 ;;
-  esac
+  if [ "$AIRMCP_REQUIRE_WIDGET" = "1" ]; then
+    AIRMCP_SKIP_WIDGET=0
+  else
+    case "$MODE" in
+      run|verify|verify-governed|verify-appintents|logs|telemetry|debug) AIRMCP_SKIP_WIDGET=1 ;;
+      *) AIRMCP_SKIP_WIDGET=0 ;;
+    esac
+  fi
+fi
+if [ "$AIRMCP_REQUIRE_WIDGET" = "1" ] && [ "$AIRMCP_SKIP_WIDGET" = "1" ]; then
+  echo "✗ signed distribution requires AirMCPWidget; AIRMCP_SKIP_WIDGET=1 is not allowed" >&2
+  exit 2
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -196,6 +212,10 @@ elif [ -f "$WIDGET_DIR/Package.swift" ]; then
   echo "Building AirMCPWidget extension..."
   widget_built=0
   (cd "$WIDGET_DIR" && swift build -c release) 2>&1 && widget_built=1 || {
+    if [ "$AIRMCP_REQUIRE_WIDGET" = "1" ]; then
+      echo "✗ Widget build failed and AIRMCP_REQUIRE_WIDGET=1" >&2
+      exit 1
+    fi
     echo "⚠ Widget build failed — skipping widget extension"
   }
 
@@ -238,6 +258,14 @@ elif [ -f "$WIDGET_DIR/Package.swift" ]; then
 </plist>
 ENTITLEMENTS_EOF
     echo "  ✓ Widget extension embedded"
+  fi
+fi
+
+if [ "$AIRMCP_REQUIRE_WIDGET" = "1" ]; then
+  REQUIRED_WIDGET="$BUNDLE_DIR/Contents/PlugIns/AirMCPWidget.appex"
+  if [ ! -x "$REQUIRED_WIDGET/Contents/MacOS/AirMCPWidget" ] || [ ! -f "$REQUIRED_WIDGET/Contents/Info.plist" ]; then
+    echo "✗ signed distribution requires a complete AirMCPWidget.appex" >&2
+    exit 1
   fi
 fi
 
@@ -436,13 +464,11 @@ setup_governed_environment() {
 }
 
 verify_governed_workflow() {
-  local token
   local output
-  token="$(tr -d "\r\n" < "$TOKEN_FILE")"
   if ! output="$(
     node "$SCRIPT_DIR/verify-governed-workflow.mjs" \
       --url "$APP_MCP_URL" \
-      --token "$token" \
+      --token-file "$TOKEN_FILE" \
       --memory-store "$AIRMCP_MEMORY_STORE_PATH" \
       --audit-dir "$AIRMCP_VECTOR_STORE_DIR" \
       --emergency-stop "$AIRMCP_EMERGENCY_STOP_PATH" \
@@ -500,7 +526,6 @@ verify_app_owned_runtime() {
   local actual_version
   local token_mode
   local unauth_status
-  local token
 
   health="$(wait_for_http_runtime)" || {
     echo "✗ app-owned HTTP runtime did not become healthy at $APP_HEALTH_URL" >&2
@@ -540,12 +565,11 @@ verify_app_owned_runtime() {
   fi
   echo "✓ Unauthenticated /mcp request is rejected (401)"
 
-  token="$(tr -d "\r\n" < "$TOKEN_FILE")"
   local probe_output
   if ! probe_output="$(
     node "$SCRIPT_DIR/probe-app-runtime.mjs" \
       --url "$APP_MCP_URL" \
-      --token "$token" \
+      --token-file "$TOKEN_FILE" \
       --min-tools 1 \
       --timeout-ms 5000 2>&1
   )"; then

@@ -104,11 +104,22 @@ export AIRMCP_OAUTH_AUDIENCE=https://airmcp.example.com/mcp
 # intentionally reverse-proxied/co-hosted through AirMCP's HTTP origin.
 export AIRMCP_OAUTH_AUTHORIZATION_ENDPOINT=https://auth.example.com/realms/airmcp/protocol/openid-connect/auth
 export AIRMCP_OAUTH_TOKEN_ENDPOINT=https://auth.example.com/realms/airmcp/protocol/openid-connect/token
-export AIRMCP_ALLOWED_ORIGINS=https://claude.ai,https://chrome-extension://<your_ext_id>
+# This deployment serves public Authorization Code + PKCE clients, so the AS
+# accepts no client secret at its token endpoint.
+export AIRMCP_OAUTH_TOKEN_ENDPOINT_AUTH_METHODS=none
+# Replace the example ID with the extension's exact 32-character lowercase
+# a-p ID. Do not prefix chrome-extension:// with https://.
+export AIRMCP_ALLOWED_ORIGINS='https://claude.ai,chrome-extension://abcdefghijklmnopabcdefghijklmnop'
 npx airmcp --http --port 3847 --bind-all
 ```
 
-Startup refuses to boot unless `AIRMCP_OAUTH_ISSUER` (must be https://), `AIRMCP_OAUTH_AUDIENCE`, and the allow-list are all set (see `validateNetworkPolicy` in `src/server/http-transport.ts`). The `with-oauth+origin` variant additionally enforces the CORS allow-list at the middleware layer. The two RFC 8414 endpoint variables are optional, but they are a pair: setting only one also refuses startup.
+Startup refuses to boot unless `AIRMCP_OAUTH_ISSUER` (must be https://), `AIRMCP_OAUTH_AUDIENCE`, and the allow-list are all set (see `validateNetworkPolicy` in `src/server/http-transport.ts`). The `with-oauth+origin` variant enforces the CORS allow-list before authentication, so an allowed browser can complete an unauthenticated `OPTIONS` preflight while the subsequent `/mcp` request still requires its bearer token. The two RFC 8414 endpoint variables are optional, but they are a pair: setting only one also refuses startup. Opting into that metadata publication also requires `AIRMCP_OAUTH_TOKEN_ENDPOINT_AUTH_METHODS`; AirMCP never guesses an external AS capability. The public PKCE example explicitly uses `none`. A confidential-client deployment must list the AS's actual supported method(s).
+
+JWT verification does not guess a fixed key path. AirMCP fetches issuer metadata at the RFC 8414 path (falling back on 404 to the Keycloak-compatible OIDC discovery suffix), requires the metadata `issuer` to exactly match `AIRMCP_OAUTH_ISSUER`, validates the HTTPS `jwks_uri`, then lets `jose` cache and rotate that key set. `AIRMCP_OAUTH_JWKS_URI` is an optional explicit HTTPS override for operators whose AS cannot publish metadata. A JWT access token must contain both a non-empty `sub` and an `exp`; a correctly signed token without an expiry is rejected as malformed rather than treated as indefinitely valid.
+
+For browser calls, AirMCP echoes `Access-Control-Allow-Origin` only for an allowed origin and returns `Vary: Origin`. Preflight permits `GET`, `POST`, `DELETE`, and `OPTIONS`, with request headers `Authorization`, `Content-Type`, `Mcp-Session-Id`, `MCP-Protocol-Version`, `Last-Event-ID`, and `X-AirMCP-Run-Id`. Those include the headers emitted by the real Streamable HTTP SDK after initialization and during SSE resumption. Browser JavaScript may read `Mcp-Session-Id`, `MCP-Protocol-Version`, `X-Request-ID`, `WWW-Authenticate`, `Retry-After`, and the `RateLimit-*` response headers. The discovery endpoints under `/.well-known/` use the same origin policy so a browser can bootstrap OAuth safely.
+
+Loopback binding is not browser trust. Under the default `loopback-only` policy, a request carrying an `Origin` header is denied unless that exact origin is present in `AIRMCP_ALLOWED_ORIGINS`; an arbitrary page served from `http://localhost:<port>` is not implicitly trusted. Native MCP clients and `curl` normally omit `Origin` and remain compatible. Operators who intentionally want to reject those no-Origin clients can separately set `AIRMCP_DENY_NO_ORIGIN=1`.
 
 Verify discovery came up:
 
@@ -130,6 +141,8 @@ curl -s http://localhost:3847/.well-known/oauth-protected-resource/mcp | jq .
 # Present only when both optional endpoint variables are configured. Because
 # the issuer has /realms/airmcp, RFC 8414 inserts that path after .well-known.
 curl -s http://localhost:3847/.well-known/oauth-authorization-server/realms/airmcp | jq .
+# → includes "token_endpoint_auth_methods_supported": ["none"] for the
+# public PKCE configuration above.
 ```
 
 If either endpoint 404s or the `authorization_servers` array is empty, recheck the env vars — Step 1 (#138) rejects half-configured OAuth policies on purpose so crawlers never see an empty card.
@@ -182,38 +195,49 @@ AirMCP maps scopes to tool classes via the `evaluateScopeGate` in `src/shared/oa
 
 | Scope             | Unlocks                                          |
 | ----------------- | ------------------------------------------------ |
-| `mcp:read`        | Every `readOnlyHint: true` tool                  |
+| `mcp:read`        | Every `readOnlyHint: true` tool and every MCP `resources/*` operation |
 | `mcp:write`       | Non-destructive writes (`create_*`, `update_*`) |
 | `mcp:destructive` | `destructiveHint: true` tools (`delete_*`, `trash_*`, `send_*`) |
 | `mcp:admin`       | `audit_log`, `audit_summary`, `memory_forget`, `setup_permissions` |
 
 Scope hierarchy is cumulative — `mcp:admin` implies all three others, `mcp:destructive` implies `write` + `read`, and so on. You don't need your AS to mint stacked scope sets unless your auth policy wants explicit enumeration.
 
+The `resources/*` rule covers discovery operations as well as reads: OAuth callers need `mcp:read` for `resources/list`, `resources/templates/list`, `resources/read`, subscriptions, and related resource methods. A registered live-resource read then crosses the same core runtime boundary as a tool call: per-tenant rate limiting, a namespaced `resource:<name>` HMAC audit outcome, and (for sensitive resources) per-call HITL. AirMCP's built-in live Apple-data resources—including clipboard and composite context snapshots—are sensitive by default. An approved read does not enter its callback until that exact random-`approvalId` decision is durable and verified in the audit chain; a denial stays a categorized JSON-RPC error and never returns resource content.
+
 **Rule of thumb**: mint the minimum scope for the client's actual use case. A note-taking integration probably wants `mcp:read mcp:write` and nothing destructive. A company-internal "AI assistant" likely wants `mcp:destructive` to perform cleanup but **not** `mcp:admin` — admin is reserved for audit introspection, which needs its own approval gate.
 
 ---
 
-## 7. Local development — the fast loop
+## 7. Local development — Node/curl verification loop
 
-`npm run dev:oauth` spins up a pinned Keycloak 26 devcontainer with an `airmcp` realm, `dev/dev` user, and all four scopes pre-declared. After the container is up (~15s):
+`npm run dev:oauth` is a Node/curl verifier integration harness. It spins up a pinned Keycloak 26 devcontainer with an `airmcp` realm, `dev/dev` user, and all four scopes pre-declared. The launcher creates a seven-day, process-local CA certificate, starts Keycloak on HTTPS, and owns a loopback-only reverse proxy from `https://127.0.0.1:3443` to AirMCP's internal `http://127.0.0.1:3000` listener. It does not relax AirMCP's rule that every OAuth issuer and resource audience use `https://`. Copy the certificate path printed by the launcher. The proxy, container, and certificate are removed together when you stop it.
+
+After the container is up (~15s), run the exact commands printed in its banner:
 
 ```bash
-export AIRMCP_OAUTH_ISSUER=http://localhost:8081/realms/airmcp
-export AIRMCP_OAUTH_AUDIENCE=http://localhost:3000/mcp
+export NODE_EXTRA_CA_CERTS='/path/printed/by/dev-oauth/localhost.pem'
+export AIRMCP_OAUTH_ISSUER=https://localhost:8443/realms/airmcp
+export AIRMCP_OAUTH_AUDIENCE=https://127.0.0.1:3443/mcp
 export AIRMCP_ALLOW_NETWORK=with-oauth
 npm run dev -- --http --port 3000
 
 # In another shell: fetch a token (password grant, dev-only shortcut)
-curl -s -X POST http://localhost:8081/realms/airmcp/protocol/openid-connect/token \
+curl -s --cacert "$NODE_EXTRA_CA_CERTS" \
+  -X POST https://localhost:8443/realms/airmcp/protocol/openid-connect/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "grant_type=password&client_id=airmcp-dev&username=dev&password=dev&scope=mcp:read mcp:write"
 # → { "access_token": "eyJhbGci...", ... }
 
-# Call an MCP endpoint with it
-curl -s http://localhost:3000/.well-known/mcp.json | jq .authorization
+# Use the public resource URL, not AirMCP's internal HTTP upstream
+curl -s --cacert "$NODE_EXTRA_CA_CERTS" \
+  https://127.0.0.1:3443/.well-known/oauth-protected-resource | jq .
+curl -s --cacert "$NODE_EXTRA_CA_CERTS" \
+  https://127.0.0.1:3443/.well-known/mcp.json | jq .authorization
 ```
 
-Password grant is **only** for local verification. Production browser clients must use Authorization Code + PKCE; Keycloak's `airmcp-dev` client is configured to support both so you can switch flows without reconfiguring the realm.
+`NODE_EXTRA_CA_CERTS` must be present when the AirMCP Node process starts; setting it afterward does not update Node's trust store. The local realm maps `https://127.0.0.1:3443/mcp` into the access token's `aud` claim so the verifier exercises the same issuer/audience checks as production. The proxy binds only to IPv4 loopback and forwards only to the fixed IPv4-loopback AirMCP upstream; it is not a general-purpose proxy.
+
+Password grant is **only** for this local Node/curl verification. Production browser clients must use Authorization Code + PKCE, but this launcher is not a browser PKCE harness: its ephemeral CA is trusted only by the explicitly configured Node process and `curl --cacert`, not installed into the macOS or browser trust store, and it does not host a browser callback application. Use a separately trusted HTTPS development origin and a non-conflicting callback port when testing the browser flow. HTTP remains an internal implementation detail for the fixed proxy upstream—not an OAuth issuer, metadata, JWKS, or resource identity.
 
 ---
 
@@ -224,10 +248,10 @@ Password grant is **only** for local verification. Production browser clients mu
 | 401 `WWW-Authenticate: error="invalid_token", error_description="wrong_audience"` | Token's `aud` claim doesn't match `AIRMCP_OAUTH_AUDIENCE`                    | Include the `resource` parameter on both authorize + token requests (RFC 8707). Some AS require explicit audience mapping.             |
 | 401 `error_description="wrong_issuer"`                                    | Token's `iss` claim doesn't exactly equal `AIRMCP_OAUTH_ISSUER`              | Issuer string is case-sensitive and must match byte-for-byte including trailing slash policy.                                          |
 | 401 `error_description="unsupported_alg"`                                 | Token signed with HS256 / none / other excluded alg                          | AirMCP only accepts RS256 + ES256 per RFC 0005 R4. Configure your AS to sign with an asymmetric key.                                   |
-| 503 `Retry-After: 10`                                                     | AirMCP could not reach the AS's JWKS endpoint                                | Check AS health + network reachability from AirMCP. JWKS is lazily fetched, so the first call after an AS outage hits this.            |
+| 503 `Retry-After: 10`                                                             | AirMCP could not load valid issuer metadata or the advertised JWKS                        | Check AS health, the metadata `issuer` exact match, and its HTTPS `jwks_uri`. Metadata and JWKS are fetched lazily and cached.              |
 | 403 `WWW-Authenticate: Bearer error="insufficient_scope"`                | Token is valid but lacks the scope required by one or more `tools/call` requests | Mint a token containing the advertised `scope`, or keep the client on read/write-only tools. AirMCP performs this gate before SDK dispatch. |
 | 403 when reusing an existing MCP session                                  | The request's `(sub, client_id\|azp)` differs from the principal that created the session | Start a new MCP session. Token refresh is allowed only for the same subject and OAuth client.                                           |
-| CORS preflight 403                                                        | Origin not in `AIRMCP_ALLOWED_ORIGINS`                                       | Add the exact origin (scheme + host + port, no trailing slash). Chrome extensions use `chrome-extension://<id>`.                       |
+| CORS preflight 403                                                                | Origin/method/header is outside the browser contract                                      | Add the exact HTTP(S) origin, or canonical `chrome-extension://<32 lowercase a-p ID>`. Only documented CORS methods/headers are accepted.   |
 | Startup refuses to boot on `with-oauth*`                                  | Issuer/audience is missing or invalid, or only one RFC 8414 endpoint variable is set | Set issuer + audience; if publishing authorization-server metadata, set both authorization + token endpoints. Issuer must be https://. |
 | Token exchange at step 8 returns `invalid_grant`                          | `code_verifier` doesn't match the original `code_challenge` for this `code`  | Make sure the same verifier → challenge pair is used end-to-end. The code is one-use; a retry without a fresh authorize will fail.     |
 

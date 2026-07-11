@@ -4,11 +4,21 @@ import type { HitlApprovalDecision, HitlClient } from "./hitl.js";
 import { errPermission, toolErr } from "./result.js";
 import { traceApproval } from "./telemetry.js";
 import { getRequestContext, runWithRequestContext, type RequestContext } from "./request-context.js";
+import { randomUUID } from "node:crypto";
+import {
+  getResourceGovernance,
+  isResourceTemplateRegistration,
+  resourceAuditName,
+  resourceRequestMetadata,
+} from "./resource-governance.js";
 
 /** Sentinel: elicitation offered no channel for this call — caller falls back. */
 const NOT_HANDLED = Symbol("hitl-elicitation-not-handled");
 
 export interface PendingApprovalAuditEvent {
+  /** Cryptographically random per-decision identity. Correlation IDs group a
+   * workflow; they are deliberately not authority for one specific call. */
+  approvalId: string;
   timestamp: string;
   tool: string;
   decision: HitlApprovalDecision;
@@ -44,6 +54,7 @@ async function recordApprovalDecision(
   const context = getRequestContext() as ApprovalRequestContext | undefined;
   if (!context) return;
   const event: PendingApprovalAuditEvent = {
+    approvalId: randomUUID(),
     timestamp: new Date().toISOString(),
     tool,
     decision,
@@ -229,8 +240,8 @@ async function tryElicitApproval(
 }
 
 /**
- * Monkey-patches server.registerTool so every subsequent registration
- * goes through HITL approval when the policy requires it.
+ * Monkey-patches server.registerTool and classified server.registerResource
+ * callbacks so both surfaces use the same per-call approval policy.
  *
  * Channel order (gated-call approval is preserved in every path — only the
  * channel that answers differs by what is actually available):
@@ -372,4 +383,145 @@ export function installHitlGuard(server: McpServer, hitlClient: HitlClient, conf
     return original(name, toolConfig as Parameters<typeof original>[1], wrapped as Parameters<typeof original>[2]);
   };
   server.registerTool = patched as typeof server.registerTool;
+
+  // Resource callbacks have a different wire contract from tool callbacks:
+  // returning `errPermission()` would be interpreted as a malformed
+  // ReadResourceResult. Denials therefore throw a categorized JSON-RPC error,
+  // while approved callbacks retain their native `{ contents: [...] }` shape.
+  if (typeof server.registerResource === "function") {
+    const originalResource = server.registerResource.bind(server);
+    const resourceDeny = (category: "permission_denied" | "hitl_timeout", message: string): never => {
+      throw new Error(`[${category}] ${message}`);
+    };
+    const wrapResource = (
+      governedName: string,
+      annotations: ToolAnnotations,
+      callback: (...args: unknown[]) => unknown,
+      isTemplate: boolean,
+    ) => {
+      const telemetryEnabled = process.env.AIRMCP_TELEMETRY === "true";
+      return async (...args: unknown[]) => {
+        const requestArgs = resourceRequestMetadata(args, isTemplate);
+        const sensitive = annotations.sensitiveHint === true;
+        const managed = isManagedClient(server);
+
+        const viaElicitation = async (): Promise<unknown> => {
+          const result = await tryElicitApproval(server, governedName, requestArgs, false, sensitive);
+          if (result === undefined) return NOT_HANDLED;
+          if (telemetryEnabled) {
+            traceApproval(governedName, result ? "approved" : "denied", "elicitation", {
+              destructive: false,
+              managed,
+            });
+          }
+          await recordApprovalDecision(governedName, result ? "approved" : "denied", "elicitation");
+          if (!result) {
+            return resourceDeny(
+              "permission_denied",
+              `Action denied: "${governedName}" was rejected via MCP elicitation.`,
+            );
+          }
+          return callback(...args);
+        };
+
+        if (!managed) {
+          const handled = await viaElicitation();
+          if (handled !== NOT_HANDLED) return handled;
+        } else if (!(await hitlClient.isReachable())) {
+          const handled = await viaElicitation();
+          if (handled !== NOT_HANDLED) return handled;
+          if (telemetryEnabled) {
+            traceApproval(governedName, "denied", "unavailable", { destructive: false, managed });
+          }
+          await recordApprovalDecision(governedName, "unavailable", "unavailable");
+          return resourceDeny(
+            "permission_denied",
+            `Action denied: "${governedName}" requires approval, but no approval channel is available. ` +
+              `Start the AirMCP menubar app or use an MCP client that supports elicitation.`,
+          );
+        }
+
+        if (!(await hitlClient.isReachable())) {
+          if (telemetryEnabled) {
+            traceApproval(governedName, "denied", "unavailable", { destructive: false, managed });
+          }
+          await recordApprovalDecision(governedName, "unavailable", "unavailable");
+          return resourceDeny(
+            "permission_denied",
+            `Action denied: "${governedName}" requires approval, but the AirMCP approval socket is unavailable.`,
+          );
+        }
+
+        const decisionClient = hitlClient as unknown as {
+          requestApprovalDecision?: (
+            tool: string,
+            requestArgs: Record<string, unknown>,
+            destructive: boolean,
+            openWorld: boolean,
+            sensitive?: boolean,
+          ) => Promise<HitlApprovalDecision>;
+        };
+        const rawDecision =
+          typeof decisionClient.requestApprovalDecision === "function"
+            ? await decisionClient.requestApprovalDecision.call(
+                hitlClient,
+                governedName,
+                requestArgs,
+                false,
+                false,
+                sensitive,
+              )
+            : (await hitlClient.requestApproval(governedName, requestArgs, false, false, sensitive))
+              ? "approved"
+              : "denied";
+        const decision = normalizeApprovalDecision(rawDecision);
+        if (telemetryEnabled) {
+          traceApproval(governedName, decision, "socket", { destructive: false, managed });
+        }
+        await recordApprovalDecision(governedName, decision, "socket");
+        if (decision === "timed_out") {
+          return resourceDeny(
+            "hitl_timeout",
+            `Action denied: approval for "${governedName}" timed out before a decision.`,
+          );
+        }
+        if (decision === "unavailable") {
+          return resourceDeny(
+            "permission_denied",
+            `Action denied: the approval channel became unavailable before "${governedName}" received a decision.`,
+          );
+        }
+        if (decision === "denied") {
+          return resourceDeny(
+            "permission_denied",
+            `Action denied: "${governedName}" requires user approval. The user denied this call.`,
+          );
+        }
+        if (decision !== "approved") {
+          return resourceDeny(
+            "permission_denied",
+            `Action denied: "${governedName}" did not receive a valid approval decision.`,
+          );
+        }
+        return callback(...args);
+      };
+    };
+
+    server.registerResource = ((name: string, ...rest: unknown[]) => {
+      const callback = rest[rest.length - 1];
+      if (typeof callback !== "function") {
+        return (originalResource as (...args: unknown[]) => unknown)(name, ...rest);
+      }
+      const resourceCallback = callback as (...args: unknown[]) => unknown;
+      const resourceConfig = rest.length >= 3 ? rest[rest.length - 2] : undefined;
+      const annotations = getResourceGovernance(resourceConfig);
+      const governedName = resourceAuditName(name);
+      if (!shouldRequireApproval(config.hitl.level, annotations, config.hitl.whitelist, governedName)) {
+        return (originalResource as (...args: unknown[]) => unknown)(name, ...rest);
+      }
+      const isTemplate = isResourceTemplateRegistration(rest[0]);
+      rest[rest.length - 1] = wrapResource(governedName, annotations, resourceCallback, isTemplate);
+      return (originalResource as (...args: unknown[]) => unknown)(name, ...rest);
+    }) as typeof server.registerResource;
+  }
 }

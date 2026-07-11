@@ -35,6 +35,8 @@ import { z } from "zod";
 import { evaluateScopeGate } from "./oauth-scope.js";
 import { isErrorCategory, parseCategoryPrefix } from "./error-categories.js";
 import { consumeApprovalAuditEvents, runWithApprovalAuditSink, type PendingApprovalAuditEvent } from "./hitl-guard.js";
+import { isResourceTemplateRegistration, resourceAuditName, resourceRequestMetadata } from "./resource-governance.js";
+import { runGovernedActivity } from "./governed-activity.js";
 
 /** Threshold in characters above which we auto-attach a result size hint. */
 const SIZE_HINT_THRESHOLD = 10_000;
@@ -127,9 +129,19 @@ function thrownErrorCategory(error: unknown): string | undefined {
 }
 
 async function sealApprovalAuditEvent(event: PendingApprovalAuditEvent): Promise<void> {
-  if (process.env.AIRMCP_AUDIT_LOG === "false") return;
+  if (process.env.AIRMCP_AUDIT_LOG === "false") {
+    // Disabling general audit emission is an operator-supported diagnostic
+    // mode, but it cannot turn an approved HITL callback into an ungoverned
+    // mutation. Negative decisions already fail at the guard and may preserve
+    // their normal permission result without a durable row.
+    if (event.decision === "approved") {
+      throw new Error(`[internal_error] Approval audit is disabled; "${event.tool}" was not executed.`);
+    }
+    return;
+  }
   const correlationId = event.correlationId ?? getCorrelationId();
   auditLog({
+    approvalId: event.approvalId,
     timestamp: event.timestamp,
     kind: "approval",
     tool: event.tool,
@@ -153,6 +165,7 @@ async function sealApprovalAuditEvent(event: PendingApprovalAuditEvent): Promise
     if (event.decision !== "approved") return;
     const decisionIsSealed = snapshot.entries.some(
       (entry) =>
+        entry.approvalId === event.approvalId &&
         entry.timestamp === event.timestamp &&
         entry.kind === "approval" &&
         entry.tool === event.tool &&
@@ -414,8 +427,8 @@ export class ToolRegistry {
 
   /**
    * Install interception on the server so every `server.tool()`,
-   * `server.registerTool()`, `server.prompt()`, and `server.registerPrompt()`
-   * call automatically tracks the registration in this registry.
+   * `server.registerTool()`, `server.registerResource()`, `server.prompt()`,
+   * and `server.registerPrompt()` call automatically traverses core policy.
    *
    * Must be called once per server, before any module registrations.
    * Call this BEFORE `installHitlGuard` — the HITL guard will then become
@@ -437,6 +450,7 @@ export class ToolRegistry {
     this.registrationGeneration += 1;
     const generation = this.registrationGeneration;
     this.interceptToolRegistration(server, generation);
+    this.interceptResourceRegistration(server);
     this.interceptPromptRegistration(server, generation);
   }
 
@@ -504,38 +518,69 @@ export class ToolRegistry {
 
     const wrapHandler = (name: string, handler: AnyFn): AnyFn => {
       return (async (...args: unknown[]) => {
-        if (process.env.AIRMCP_USAGE_TRACKING !== "false") usageTracker.record(name);
+        return runGovernedActivity(async () => {
+          if (process.env.AIRMCP_USAGE_TRACKING !== "false") usageTracker.record(name);
 
-        const entry = tools.get(name);
+          const entry = tools.get(name);
 
-        // Stamp a correlation ID on the active context (or open one if
-        // the call came in over stdio with no upstream middleware) so
-        // every audit / telemetry / error line for this tool call shares
-        // an identifier. Honors any ID already set by a transport
-        // middleware so external tracing systems can drive it.
-        const existing = getRequestContext();
-        if (!existing?.correlationId) {
-          const ctx = { ...(existing ?? {}), correlationId: randomUUID() };
-          return runWithRequestContext(ctx, () => runWrapped());
-        }
-        return runWrapped();
+          // Stamp a correlation ID on the active context (or open one if
+          // the call came in over stdio with no upstream middleware) so
+          // every audit / telemetry / error line for this tool call shares
+          // an identifier. Honors any ID already set by a transport
+          // middleware so external tracing systems can drive it.
+          const existing = getRequestContext();
+          if (!existing?.correlationId) {
+            const ctx = { ...(existing ?? {}), correlationId: randomUUID() };
+            return runWithRequestContext(ctx, () => runWrapped());
+          }
+          return runWrapped();
 
-        async function runWrapped(): Promise<unknown> {
-          // OAuth scope gate (RFC 0005 §3.4 — Step 2). Runs BEFORE the
-          // rate-limit bucket so a token missing `mcp:destructive` can't
-          // burn the destructive bucket's budget just to hit a 403.
-          // Absence of claims means we're on a non-OAuth path (stdio,
-          // loopback, legacy Bearer) — skip the gate entirely.
-          const claims = getOAuthClaims();
-          if (claims) {
-            const decision = evaluateScopeGate({
-              toolName: name,
-              isReadOnly: entry?.readOnly === true,
-              isDestructive: entry?.destructive === true,
-              callerScopes: claims.scopes,
-            });
-            if (!decision.allowed) {
-              const msg = `[forbidden] scope ${decision.missing} required for tool "${name}"`;
+          async function runWrapped(): Promise<unknown> {
+            // OAuth scope gate (RFC 0005 §3.4 — Step 2). Runs BEFORE the
+            // rate-limit bucket so a token missing `mcp:destructive` can't
+            // burn the destructive bucket's budget just to hit a 403.
+            // Absence of claims means we're on a non-OAuth path (stdio,
+            // loopback, legacy Bearer) — skip the gate entirely.
+            const claims = getOAuthClaims();
+            if (claims) {
+              const decision = evaluateScopeGate({
+                toolName: name,
+                isReadOnly: entry?.readOnly === true,
+                isDestructive: entry?.destructive === true,
+                callerScopes: claims.scopes,
+              });
+              if (!decision.allowed) {
+                const msg = `[forbidden] scope ${decision.missing} required for tool "${name}"`;
+                if (process.env.AIRMCP_AUDIT_LOG !== "false") {
+                  auditLog({
+                    timestamp: new Date().toISOString(),
+                    kind: "tool",
+                    tool: name,
+                    args: args[0] as Record<string, unknown>,
+                    status: "error",
+                    actor: getActor(),
+                    errorCategory: "permission_denied",
+                    gate: "oauth_scope",
+                  });
+                }
+                throw new Error(msg);
+              }
+            }
+
+            // Rate-limit + emergency-stop gate. Runs before the call reaches
+            // the handler so a runaway agent burning through the bucket can
+            // never touch the filesystem/APIs on the denied call. Denials
+            // throw so the error is captured by audit and surfaces to the
+            // caller with the same shape as any other failure.
+            // Tenant isolation: when OAuth claims are present (HTTP transport),
+            // the bucket is keyed on the JWT subject so one tenant's runaway
+            // agent can't exhaust budget for everyone else. Stdio / loopback
+            // share the default tenant.
+            const gate = checkRateLimit(entry?.destructive === true, claims?.subject);
+            if (!gate.allowed) {
+              const msg = `[rate_limited] ${gate.reason ?? "Rate limit exceeded"}${
+                gate.retryAfterMs ? ` (retry in ~${Math.ceil(gate.retryAfterMs / 1000)}s)` : ""
+              }`;
               if (process.env.AIRMCP_AUDIT_LOG !== "false") {
                 auditLog({
                   timestamp: new Date().toISOString(),
@@ -544,95 +589,66 @@ export class ToolRegistry {
                   args: args[0] as Record<string, unknown>,
                   status: "error",
                   actor: getActor(),
-                  errorCategory: "permission_denied",
-                  gate: "oauth_scope",
+                  errorCategory: "rate_limited",
+                  gate: gate.gate ?? "rate_limit",
                 });
               }
               throw new Error(msg);
             }
-          }
 
-          // Rate-limit + emergency-stop gate. Runs before the call reaches
-          // the handler so a runaway agent burning through the bucket can
-          // never touch the filesystem/APIs on the denied call. Denials
-          // throw so the error is captured by audit and surfaces to the
-          // caller with the same shape as any other failure.
-          // Tenant isolation: when OAuth claims are present (HTTP transport),
-          // the bucket is keyed on the JWT subject so one tenant's runaway
-          // agent can't exhaust budget for everyone else. Stdio / loopback
-          // share the default tenant.
-          const gate = checkRateLimit(entry?.destructive === true, claims?.subject);
-          if (!gate.allowed) {
-            const msg = `[rate_limited] ${gate.reason ?? "Rate limit exceeded"}${
-              gate.retryAfterMs ? ` (retry in ~${Math.ceil(gate.retryAfterMs / 1000)}s)` : ""
-            }`;
-            if (process.env.AIRMCP_AUDIT_LOG !== "false") {
-              auditLog({
-                timestamp: new Date().toISOString(),
-                kind: "tool",
-                tool: name,
-                args: args[0] as Record<string, unknown>,
-                status: "error",
-                actor: getActor(),
-                errorCategory: "rate_limited",
-                gate: gate.gate ?? "rate_limit",
-              });
+            const execute = async () => {
+              const start = Date.now();
+              try {
+                // HITL normally runs inside this registry wrapper and seals its
+                // decision through the sink. The pending-event drain covers the
+                // inverse wrapper order and still runs before the callback.
+                await sealPendingApprovalAuditEvents();
+                let result = await runWithApprovalAuditSink(sealApprovalAuditEvent, () => handler(...args));
+                const returnedError = isReturnedToolError(result);
+                const safeError = safeReturnedToolError(result);
+                const errorCategory = safeError.category;
+                if (process.env.AIRMCP_AUDIT_LOG !== "false") {
+                  auditLog({
+                    timestamp: new Date().toISOString(),
+                    kind: "tool",
+                    tool: name,
+                    args: args[0] as Record<string, unknown>,
+                    status: returnedError ? "error" : "ok",
+                    durationMs: Date.now() - start,
+                    actor: getActor(),
+                    ...(errorCategory ? { errorCategory } : {}),
+                  });
+                }
+                if (returnedError && entry?.outputSchema !== undefined) {
+                  result = normalizeOutputSchemaToolError(result, safeError);
+                }
+                result = autoSizeHint(result);
+                return result;
+              } catch (e) {
+                const errorCategory = thrownErrorCategory(e);
+                if (process.env.AIRMCP_AUDIT_LOG !== "false") {
+                  auditLog({
+                    timestamp: new Date().toISOString(),
+                    kind: "tool",
+                    tool: name,
+                    args: args[0] as Record<string, unknown>,
+                    status: "error",
+                    durationMs: Date.now() - start,
+                    actor: getActor(),
+                    ...(errorCategory ? { errorCategory } : {}),
+                  });
+                }
+                throw e;
+              }
+            };
+
+            if (process.env.AIRMCP_TELEMETRY === "true") {
+              const toolArgs = args[0] as Record<string, unknown> | undefined;
+              return traceToolCall(name, toolArgs ? Object.keys(toolArgs).length : 0, execute);
             }
-            throw new Error(msg);
+            return execute();
           }
-
-          const execute = async () => {
-            const start = Date.now();
-            try {
-              // HITL normally runs inside this registry wrapper and seals its
-              // decision through the sink. The pending-event drain covers the
-              // inverse wrapper order and still runs before the callback.
-              await sealPendingApprovalAuditEvents();
-              let result = await runWithApprovalAuditSink(sealApprovalAuditEvent, () => handler(...args));
-              const returnedError = isReturnedToolError(result);
-              const safeError = safeReturnedToolError(result);
-              const errorCategory = safeError.category;
-              if (process.env.AIRMCP_AUDIT_LOG !== "false") {
-                auditLog({
-                  timestamp: new Date().toISOString(),
-                  kind: "tool",
-                  tool: name,
-                  args: args[0] as Record<string, unknown>,
-                  status: returnedError ? "error" : "ok",
-                  durationMs: Date.now() - start,
-                  actor: getActor(),
-                  ...(errorCategory ? { errorCategory } : {}),
-                });
-              }
-              if (returnedError && entry?.outputSchema !== undefined) {
-                result = normalizeOutputSchemaToolError(result, safeError);
-              }
-              result = autoSizeHint(result);
-              return result;
-            } catch (e) {
-              const errorCategory = thrownErrorCategory(e);
-              if (process.env.AIRMCP_AUDIT_LOG !== "false") {
-                auditLog({
-                  timestamp: new Date().toISOString(),
-                  kind: "tool",
-                  tool: name,
-                  args: args[0] as Record<string, unknown>,
-                  status: "error",
-                  durationMs: Date.now() - start,
-                  actor: getActor(),
-                  ...(errorCategory ? { errorCategory } : {}),
-                });
-              }
-              throw e;
-            }
-          };
-
-          if (process.env.AIRMCP_TELEMETRY === "true") {
-            const toolArgs = args[0] as Record<string, unknown> | undefined;
-            return traceToolCall(name, toolArgs ? Object.keys(toolArgs).length : 0, execute);
-          }
-          return execute();
-        }
+        });
       }) as AnyFn;
     };
 
@@ -709,6 +725,117 @@ export class ToolRegistry {
       });
       return result;
     }) as typeof server.tool;
+  }
+
+  /** Route MCP resource reads through the same scope, rate, HITL audit sink,
+   * and outcome audit boundary as tool calls. Resource contents are never
+   * included in audit args; only URI/template variables are recorded. */
+  private interceptResourceRegistration(server: McpServer): void {
+    if (typeof server.registerResource !== "function") return;
+    const origRegisterResource = server.registerResource.bind(server);
+
+    const wrapHandler = (name: string, handler: AnyFn, isTemplate: boolean): AnyFn => {
+      const activityName = resourceAuditName(name);
+      return (async (...args: unknown[]) => {
+        return runGovernedActivity(async () => {
+          const existing = getRequestContext();
+          if (!existing?.correlationId) {
+            return runWithRequestContext({ ...(existing ?? {}), correlationId: randomUUID() }, () => runWrapped());
+          }
+          return runWrapped();
+
+          async function runWrapped(): Promise<unknown> {
+            const requestMetadata = resourceRequestMetadata(args, isTemplate);
+            const claims = getOAuthClaims();
+            if (claims) {
+              const decision = evaluateScopeGate({
+                toolName: activityName,
+                isReadOnly: true,
+                isDestructive: false,
+                callerScopes: claims.scopes,
+              });
+              if (!decision.allowed) {
+                if (process.env.AIRMCP_AUDIT_LOG !== "false") {
+                  auditLog({
+                    timestamp: new Date().toISOString(),
+                    kind: "tool",
+                    tool: activityName,
+                    args: requestMetadata,
+                    status: "error",
+                    actor: getActor(),
+                    errorCategory: "permission_denied",
+                    gate: "oauth_scope",
+                  });
+                }
+                throw new Error(`[forbidden] scope ${decision.missing} required for resource "${name}"`);
+              }
+            }
+
+            const gate = checkRateLimit(false, claims?.subject);
+            if (!gate.allowed) {
+              if (process.env.AIRMCP_AUDIT_LOG !== "false") {
+                auditLog({
+                  timestamp: new Date().toISOString(),
+                  kind: "tool",
+                  tool: activityName,
+                  args: requestMetadata,
+                  status: "error",
+                  actor: getActor(),
+                  errorCategory: "rate_limited",
+                  gate: gate.gate ?? "rate_limit",
+                });
+              }
+              throw new Error(
+                `[rate_limited] ${gate.reason ?? "Rate limit exceeded"}${
+                  gate.retryAfterMs ? ` (retry in ~${Math.ceil(gate.retryAfterMs / 1000)}s)` : ""
+                }`,
+              );
+            }
+
+            const start = Date.now();
+            try {
+              await sealPendingApprovalAuditEvents();
+              const result = await runWithApprovalAuditSink(sealApprovalAuditEvent, () => handler(...args));
+              if (process.env.AIRMCP_AUDIT_LOG !== "false") {
+                auditLog({
+                  timestamp: new Date().toISOString(),
+                  kind: "tool",
+                  tool: activityName,
+                  args: requestMetadata,
+                  status: "ok",
+                  durationMs: Date.now() - start,
+                  actor: getActor(),
+                });
+              }
+              return result;
+            } catch (error) {
+              if (process.env.AIRMCP_AUDIT_LOG !== "false") {
+                const errorCategory = thrownErrorCategory(error);
+                auditLog({
+                  timestamp: new Date().toISOString(),
+                  kind: "tool",
+                  tool: activityName,
+                  args: requestMetadata,
+                  status: "error",
+                  durationMs: Date.now() - start,
+                  actor: getActor(),
+                  ...(errorCategory ? { errorCategory } : {}),
+                });
+              }
+              throw error;
+            }
+          }
+        });
+      }) as AnyFn;
+    };
+
+    server.registerResource = ((name: string, ...rest: unknown[]) => {
+      const callback = this.validateCallback("registerResource", "Resource", name, rest, origRegisterResource as AnyFn);
+      if (!callback) return;
+      const isTemplate = isResourceTemplateRegistration(rest[0]);
+      rest[rest.length - 1] = wrapHandler(name, callback, isTemplate);
+      return (origRegisterResource as AnyFn)(name, ...rest);
+    }) as typeof server.registerResource;
   }
 
   private interceptPromptRegistration(server: McpServer, generation: number): void {

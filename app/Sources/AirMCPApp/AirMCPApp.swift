@@ -104,6 +104,10 @@ struct AirMCPApp: App {
     }
 
     private func initializeRuntimeIfNeeded() {
+        guard applicationDelegate.guardPrimaryInstance() else {
+            applicationDelegate.redirectDuplicateLaunch()
+            return
+        }
         applicationDelegate.serverManager = serverManager
         serverManager.logManager = logManager
         serverManager.startPolling()
@@ -126,10 +130,8 @@ struct AirMCPApp: App {
             } else if !onboardingCompleted && !onboardingPresented {
                 showOnboardingWindow()
             } else if onboardingCompleted || serverManager.autoStartEnabled {
-                // The final setup step may have explicitly enabled and started
-                // the runtime before the user presses Finish. If that window is
-                // closed, preserve the user's choice on the next app launch
-                // instead of leaving an enabled MCP client without a runtime.
+                // Only an explicit runtime-start action opts into auto-start.
+                // Completing or revisiting onboarding does not change it.
                 serverManager.autoStartIfNeeded()
             }
         }
@@ -138,7 +140,9 @@ struct AirMCPApp: App {
     private func setupHitl() {
         hitlManager.timeoutSeconds = configManager.hitlTimeout
         if configManager.hitlLevel != .off {
-            HitlManager.requestNotificationPermission()
+            // Register the local approval channel without prompting. macOS
+            // notification authorization is requested only from an explicit
+            // user-initiated runtime start action.
             HitlManager.registerNotificationCategory()
             hitlManager.startListening()
         } else {
@@ -155,11 +159,11 @@ struct AirMCPApp: App {
             return
         }
 
-        let onboardingView = OnboardingView(configManager: configManager, serverManager: serverManager) { [serverManager] in
-            // Enable auto-start by default after first onboarding
-            serverManager.autoStartEnabled = true
-            serverManager.autoStartIfNeeded()
-        }
+        let onboardingView = OnboardingView(
+            configManager: configManager,
+            serverManager: serverManager,
+            onComplete: {}
+        )
 
         let hostingController = NSHostingController(rootView: onboardingView)
         let window = NSWindow(contentViewController: hostingController)
@@ -180,6 +184,71 @@ struct AirMCPApp: App {
 @MainActor
 final class AirMCPApplicationDelegate: NSObject, NSApplicationDelegate {
     weak var serverManager: ServerManager?
+    private(set) var isDuplicateLaunch = false
+    private var existingApplication: NSRunningApplication?
+
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        guardPrimaryInstance()
+    }
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        if isDuplicateLaunch {
+            redirectDuplicateLaunch()
+        }
+    }
+
+    /// Runtime fallback for launches that bypass LaunchServices (for example,
+    /// directly invoking an archived app executable). The Info.plist guard is
+    /// the first line of defense, while this check prevents a second copy from
+    /// opening Setup or starting another app-owned runtime.
+    @discardableResult
+    func guardPrimaryInstance() -> Bool {
+        if isDuplicateLaunch { return false }
+        guard let bundleIdentifier = Bundle.main.bundleIdentifier else { return true }
+
+        let runningApplications = NSRunningApplication.runningApplications(
+            withBundleIdentifier: bundleIdentifier
+        )
+        var snapshots = runningApplications.map {
+            RunningApplicationSnapshot(
+                processIdentifier: $0.processIdentifier,
+                bundleIdentifier: $0.bundleIdentifier,
+                launchDate: $0.launchDate,
+                isTerminated: $0.isTerminated
+            )
+        }
+        let currentProcessIdentifier = ProcessInfo.processInfo.processIdentifier
+        if !snapshots.contains(where: { $0.processIdentifier == currentProcessIdentifier }) {
+            let currentApplication = NSRunningApplication.current
+            snapshots.append(
+                RunningApplicationSnapshot(
+                    processIdentifier: currentProcessIdentifier,
+                    bundleIdentifier: currentApplication.bundleIdentifier ?? bundleIdentifier,
+                    launchDate: currentApplication.launchDate,
+                    isTerminated: currentApplication.isTerminated
+                )
+            )
+        }
+        guard let existingProcessIdentifier = SingleInstancePolicy.existingProcessIdentifier(
+            bundleIdentifier: bundleIdentifier,
+            currentProcessIdentifier: currentProcessIdentifier,
+            candidates: snapshots
+        ) else { return true }
+
+        isDuplicateLaunch = true
+        existingApplication = runningApplications.first {
+            $0.processIdentifier == existingProcessIdentifier
+        } ?? NSRunningApplication(processIdentifier: existingProcessIdentifier)
+        return false
+    }
+
+    func redirectDuplicateLaunch() {
+        guard isDuplicateLaunch else { return }
+        existingApplication?.activate(options: [.activateAllWindows])
+        DispatchQueue.main.async {
+            NSApp.terminate(nil)
+        }
+    }
 
     func applicationWillTerminate(_ notification: Notification) {
         serverManager?.prepareForApplicationTermination()

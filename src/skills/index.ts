@@ -43,7 +43,7 @@ export async function registerSkillEngine(
   for (const skill of merged) {
     registerTrigger(skill);
   }
-  startTriggerListener(server);
+  startTriggerListener(server, registry);
 
   // Watch user skills directory for changes — only once per process
   if (!skillsWatcher) {

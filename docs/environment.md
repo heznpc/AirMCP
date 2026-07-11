@@ -29,13 +29,16 @@ If a variable accepts a path, `~` expands to `$HOME`. Booleans are `"true"` / `"
 | Variable | Default | Notes |
 |---|---|---|
 | `AIRMCP_ALLOW_NETWORK` | `loopback-only` | Inbound HTTP exposure policy. One of `loopback-only` / `with-token` / `with-token+origin` / `with-oauth` / `with-oauth+origin` / `unauthenticated`. Startup invariant refuses to boot a misconfigured server. Not an outbound egress allow-list. |
-| `AIRMCP_ALLOWED_ORIGINS` | (empty) | Comma-separated list. Required when `ALLOW_NETWORK` ends in `+origin`. |
+| `AIRMCP_ALLOWED_ORIGINS`                   | (empty)                                       | Comma-separated browser-origin allow-list. Browser requests are denied by default in `loopback-only`; list each trusted local web origin explicitly. Required when `ALLOW_NETWORK` ends in `+origin`. Native MCP clients without an `Origin` header remain allowed unless `AIRMCP_DENY_NO_ORIGIN=1`. HTTP(S) values must be origin-only. Chrome extensions use the exact canonical form `chrome-extension://<32 lowercase a-p characters>`; paths, ports, queries, fragments, uppercase IDs, and `https://chrome-extension://…` are rejected. |
+| `AIRMCP_DENY_NO_ORIGIN` | (off) | `1` / `true` rejects MCP and discovery requests that omit the `Origin` header. Leave this off for native clients such as Codex, Claude Desktop, and `curl`; their active loopback/Bearer/OAuth policy remains the authentication boundary. |
 | `AIRMCP_HTTP_TOKEN` | (empty) | Bearer token. Required when `ALLOW_NETWORK=with-token*`. |
 | `AIRMCP_HTTP_PORT` | `3847` | TCP port for the HTTP transport. |
-| `AIRMCP_OAUTH_ISSUER` | (empty) | https:// origin of the authorization server. Required when `ALLOW_NETWORK=with-oauth*`. |
+| `AIRMCP_OAUTH_ISSUER`                      | (empty)                                       | Exact HTTPS issuer URL of the authorization server (path-bearing issuers are supported). Required when `ALLOW_NETWORK=with-oauth*`. AirMCP discovers `jwks_uri` from RFC 8414 metadata, with the Keycloak-compatible OIDC discovery document as a 404 fallback. The returned `issuer` must byte-match this value.                                                                                                         |
 | `AIRMCP_OAUTH_AUDIENCE` | (empty) | RFC 8707 resource indicator (the `aud` claim a valid token must carry). Required when `ALLOW_NETWORK=with-oauth*`. |
 | `AIRMCP_OAUTH_AUTHORIZATION_ENDPOINT` | (empty) | Optional RFC 8414 authorization endpoint. Must be set together with `AIRMCP_OAUTH_TOKEN_ENDPOINT`; partial configuration fails closed. When both are present, AirMCP publishes issuer-path-aware authorization-server metadata. |
 | `AIRMCP_OAUTH_TOKEN_ENDPOINT` | (empty) | Optional RFC 8414 token endpoint. Must be set together with `AIRMCP_OAUTH_AUTHORIZATION_ENDPOINT`. AirMCP publishes metadata only; it does not implement an authorization server. |
+| `AIRMCP_OAUTH_TOKEN_ENDPOINT_AUTH_METHODS` | (required with RFC 8414 endpoint publication) | Comma-separated methods truthfully supported by the external authorization server: `none`, `client_secret_basic`, `client_secret_post`, `client_secret_jwt`, `private_key_jwt`, `tls_client_auth`, or `self_signed_tls_client_auth`. Public PKCE deployments explicitly set `none`; confidential-client deployments set their actual method(s). Missing or invalid values fail startup instead of guessing AS capability. |
+| `AIRMCP_OAUTH_JWKS_URI`                    | (discovered)                                  | Optional explicit HTTPS `jwks_uri` override. Normally omit it and let AirMCP use issuer metadata. Userinfo and fragments are rejected; network or metadata/JWKS parse failure fails closed.                                                                                                                                                                                                                               |
 | `AIRMCP_OAUTH_RESOURCE_DOCS` | (empty) | Optional URL. Surfaces in `/.well-known/oauth-protected-resource` per RFC 9728. |
 | `AIRMCP_OAUTH_RESOURCE_POLICY` | (empty) | Optional privacy-policy URL for the same discovery card. |
 | `AIRMCP_OAUTH_RESOURCE_TOS` | (empty) | Optional ToS URL for the same discovery card. |
@@ -48,7 +51,7 @@ If a variable accepts a path, `~` expands to `$HOME`. Booleans are `"true"` / `"
 
 | Variable | Default | Notes |
 |---|---|---|
-| `AIRMCP_RATE_LIMIT` | (enabled) | `false` disables every bucket. Both tool gate and HTTP IP gate honor it. |
+| `AIRMCP_RATE_LIMIT`                   | (enabled)                         | `false` disables the tool-call and HTTP IP buckets. The emergency-stop file remains an independent destructive-call panic control. |
 | `AIRMCP_MAX_TOOL_CALLS_PER_MINUTE` | `60` | Per-tenant global bucket. |
 | `AIRMCP_MAX_DESTRUCTIVE_PER_HOUR` | `10` | Per-tenant destructive bucket. |
 | `AIRMCP_RATE_LIMIT_TENANT_CAP` | `256` | Max distinct OAuth `sub` values tracked. LRU-evicted past the cap. |
@@ -62,9 +65,18 @@ If a variable accepts a path, `~` expands to `$HOME`. Booleans are `"true"` / `"
 
 | Variable | Default | Notes |
 |---|---|---|
-| `AIRMCP_AUDIT_LOG` | (enabled) | `false` skips audit emission entirely. |
+| `AIRMCP_AUDIT_LOG` | (enabled) | `false` skips general audit emission. A positive HITL decision cannot bypass the durable barrier: approval-gated mutations fail closed while audit is disabled. |
 | `AIRMCP_AUDIT_FLUSH_INTERVAL` | `30000` (30s) | ms between buffer flushes. |
+| `AIRMCP_AUDIT_MAX_BUFFER_BYTES` | `8388608` (8 MiB) | Hard cap for the in-memory audit spool during persistence failures. Crossing it permanently fails audit authority closed for that process; repair storage and restart before governed writes can resume. |
 | `AIRMCP_AUDIT_HMAC_KEY` | host-derived | Operator-provided key enables cross-host integrity verification (move `audit.jsonl` to a different machine + verify with the same key). The host-derived fallback is tamper-detection grade only. |
+
+The HMAC chain authenticates audit contents, not external freshness. The running process remembers the highest checkpoint it has observed and rejects an older pair or complete deletion during that lifetime. After restart, restoring both the log and its matching older checkpoint—or deleting both—cannot be detected without an external monotonic anchor. `AIRMCP_AUDIT_HMAC_KEY` strengthens authenticity but does not change that rollback boundary.
+
+Each signed JSONL row is verified against the exact raw JSON body bytes emitted by AirMCP, before the trailing `_prev` / `_hmac` envelope. Verification does not parse and re-serialize the body, so duplicate-key, alternate-escape, or whitespace edits break the chain even when they decode to the same JavaScript object. Signed rows written before `seq` was introduced use the same envelope and remain verifiable.
+
+Every new HITL decision also carries a cryptographically random `approvalId`. A correlation ID groups calls into one governed workflow, while `approvalId` is the per-call identity the mutation barrier must find in the verified chain; an older approval from the same workflow, tool, timestamp, and channel cannot authorize a later call. Older approval rows without this additive field remain readable but are never used as evidence for a newly approved mutation.
+
+On the first signed write after an upgrade, parseable unsigned legacy rows are moved to owner-only `audit.legacy-untrusted.*` quarantine files. They remain available for manual local inspection but are excluded from active HMAC verification, `audit_log`, and trusted summaries. Any existing signed suffix is preserved byte-for-byte and re-verified before the new write is sealed.
 
 ---
 
@@ -79,6 +91,8 @@ If a variable accepts a path, `~` expands to `$HOME`. Booleans are `"true"` / `"
 | `AIRMCP_ALLOW_SEND_MAIL` | (off) | Gates `send_mail`. |
 | `AIRMCP_ALLOW_SEND_MESSAGES` | (off) | Gates `send_message`. |
 | `AIRMCP_ALLOW_RUN_JAVASCRIPT` | (off) | Gates the JXA `eval` surface. |
+
+MCP `resources/*` methods require `mcp:read` under OAuth. Live callbacks registered through `registerResource` also cross the core per-tenant rate limit and HMAC outcome audit boundary under the namespaced activity `resource:<name>`. Built-in Apple-data resources are classified sensitive, including `system://clipboard` and `context://snapshot*`; with the default `sensitive-only` HITL policy, each read needs its own approval. The exact `approvalId` is persisted and verified before resource contents are fetched. Resource governance classification is held server-side and is not exposed through `resources/list` metadata.
 
 ---
 

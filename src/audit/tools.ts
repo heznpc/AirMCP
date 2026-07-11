@@ -20,6 +20,7 @@ const auditHistoryEntrySchema = z.object({
   correlationId: z.string().optional(),
   actor: z.string().optional(),
   errorCategory: z.string().optional(),
+  approvalId: z.string().uuid().optional(),
   approvalDecision: z.enum(["approved", "denied", "timed_out", "unavailable"]).optional(),
   approvalChannel: z.enum(["elicitation", "socket", "unavailable"]).optional(),
   gate: z.enum(["oauth_scope", "emergency_stop", "rate_limit"]).optional(),

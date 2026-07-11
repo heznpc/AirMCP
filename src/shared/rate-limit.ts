@@ -43,7 +43,8 @@ import { assertTestMode } from "./errors.js";
  *   drop stale buckets.
  *
  * Env overrides:
- *   AIRMCP_RATE_LIMIT=false                — disable entirely
+ *   AIRMCP_RATE_LIMIT=false                — disable rate buckets only;
+ *                                             emergency stop remains active
  *   AIRMCP_MAX_TOOL_CALLS_PER_MINUTE=<n>   — global bucket (default 60)
  *   AIRMCP_MAX_DESTRUCTIVE_PER_HOUR=<n>    — destructive bucket (default 10)
  *   AIRMCP_RATE_LIMIT_TENANT_CAP=<n>       — max tracked tenants (default 256)
@@ -190,8 +191,9 @@ export interface RateLimitCheckResult {
  *  `sub` claim for HTTP requests; omit (or pass undefined) for stdio /
  *  loopback paths to share the default tenant. */
 export function checkRateLimit(destructive: boolean, tenantKey?: string): RateLimitCheckResult {
-  if (!RATE_LIMIT_ENABLED) return { allowed: true };
-
+  // Emergency stop is an independent panic control, not a rate-limit
+  // feature. Operators must be able to disable token buckets without also
+  // disabling the destructive-call kill switch.
   if (destructive && isEmergencyStopActive()) {
     return {
       allowed: false,
@@ -200,6 +202,8 @@ export function checkRateLimit(destructive: boolean, tenantKey?: string): RateLi
       retryAfterMs: 60_000,
     };
   }
+
+  if (!RATE_LIMIT_ENABLED) return { allowed: true };
 
   const buckets = getOrCreateTenant(tenantKey ?? DEFAULT_TENANT_KEY);
   const now = Date.now();
@@ -306,8 +310,8 @@ export interface IpRateLimitResult {
 
 /** Token-bucket consume for HTTP requests. Returns response-header-
  *  friendly metadata (limit / remaining / retry-after) plus the
- *  allow/deny verdict. Disabled by AIRMCP_RATE_LIMIT=false (matches
- *  tool-call gate so a single switch turns everything off). */
+ *  allow/deny verdict. Disabled by AIRMCP_RATE_LIMIT=false together with
+ *  the tool-call buckets; the emergency-stop panic control remains active. */
 export function checkIpRateLimit(ip: string): IpRateLimitResult {
   if (!RATE_LIMIT_ENABLED) {
     return { allowed: true, remaining: HTTP_MAX_REQUESTS_PER_MINUTE, limit: HTTP_MAX_REQUESTS_PER_MINUTE };

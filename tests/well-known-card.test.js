@@ -288,11 +288,13 @@ describe("buildOAuthAuthorizationServerMetadata (RFC 8414)", () => {
         issuer: "https://auth.example/realms/airmcp",
         authorizationEndpoint: "https://auth.example/realms/airmcp/authorize",
         tokenEndpoint: "https://auth.example/realms/airmcp/token",
+        tokenEndpointAuthMethodsSupported: ["none"],
       }),
     ).toEqual({
       issuer: "https://auth.example/realms/airmcp",
       authorization_endpoint: "https://auth.example/realms/airmcp/authorize",
       token_endpoint: "https://auth.example/realms/airmcp/token",
+      token_endpoint_auth_methods_supported: ["none"],
       response_types_supported: ["code"],
       grant_types_supported: ["authorization_code"],
       code_challenge_methods_supported: ["S256"],

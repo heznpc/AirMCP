@@ -30,6 +30,7 @@ describe("self-contained macOS app bundle", () => {
     expect(verify).toContain('APP_ARCHS="$(lipo -archs "$APP_BINARY")"');
     expect(verify).toContain("widget version/build");
     expect(verify).toContain("CFBundleAllowMixedLocalizations");
+    expect(verify).toContain("LSMultipleInstancesProhibited");
     expect(verify).toContain("SUPPORTED_LOCALES");
     expect(verify).toContain("packaged localization missing");
     expect(verify).toContain("packaged localization is not declared");

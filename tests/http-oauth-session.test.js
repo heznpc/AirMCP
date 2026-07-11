@@ -36,7 +36,10 @@ jest.unstable_mockModule("../dist/shared/constants.js", () => ({
 
 jest.unstable_mockModule("../dist/shared/banner.js", () => ({ printBanner: jest.fn() }));
 jest.unstable_mockModule("../dist/shared/audit.js", () => ({ auditLog: jest.fn() }));
-jest.unstable_mockModule("../dist/server/shutdown.js", () => ({ registerShutdownHook: jest.fn() }));
+jest.unstable_mockModule("../dist/server/shutdown.js", () => ({
+  registerShutdownHook: jest.fn(),
+  unregisterShutdownHook: jest.fn(),
+}));
 
 const toolRegistry = {
   getExposedToolCount: () => 2,
@@ -53,6 +56,7 @@ jest.unstable_mockModule("../dist/server/mcp-setup.js", () => ({
     server: { connect: jest.fn(), close: jest.fn(), sendResourceListChanged: jest.fn() },
     toolRegistry,
     bannerInfo: { transport: "http", version: "2.16.0", modulesEnabled: [] },
+    runtimeModuleState: { enabledModules: [], unavailableModules: [] },
     cleanupEventListeners: jest.fn(),
   })),
 }));
@@ -125,6 +129,18 @@ describe("OAuth Streamable HTTP session authorization", () => {
     });
   }
 
+  async function callMcp(token, method, params = {}) {
+    return fetch(`${baseUrl}/mcp`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        "Mcp-Session-Id": "oauth-session-1",
+      },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 4, method, params }),
+    });
+  }
+
   test("keeps invalid-token authentication failures on 401", async () => {
     const response = await fetch(`${baseUrl}/mcp`, {
       method: "POST",
@@ -160,6 +176,26 @@ describe("OAuth Streamable HTTP session authorization", () => {
 
   test("allows a refreshed token with the same subject/client and sufficient scope", async () => {
     const response = await callTool("alice|desktop|mcp:write", "create_note");
+    expect(response.status).toBe(200);
+  });
+
+  test.each(["", "openid"])(
+    "rejects resources/read before dispatch when the refreshed token scope is %p",
+    async (scope) => {
+      const before = transportRequests.length;
+      const response = await callMcp(`alice|desktop|${scope}`, "resources/read", { uri: "notes://recent" });
+      expect(response.status).toBe(403);
+      expect(response.headers.get("www-authenticate")).toContain('scope="mcp:read"');
+      expect(await response.json()).toMatchObject({
+        code: "insufficient_scope",
+        required_scope: "mcp:read",
+      });
+      expect(transportRequests).toHaveLength(before);
+    },
+  );
+
+  test("allows resources/read with an implied read capability", async () => {
+    const response = await callMcp("alice|desktop|mcp:write", "resources/read", { uri: "notes://recent" });
     expect(response.status).toBe(200);
   });
 });

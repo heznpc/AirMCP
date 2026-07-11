@@ -6,6 +6,7 @@ import { runWithRequestContext, getRequestContext } from "../shared/request-cont
 import { randomUUID } from "node:crypto";
 import { parseIntEnv } from "../shared/env.js";
 import { log, errToCtx } from "../shared/logger.js";
+import { toolRegistry, type ToolRegistry } from "../shared/tool-registry.js";
 
 interface TriggerBinding {
   skill: SkillDefinition;
@@ -35,7 +36,7 @@ function computeBackoff(attempt: number): number {
   return exp + jitter;
 }
 
-function runWithRetry(server: McpServer, skill: SkillDefinition, attempt: number): void {
+function runWithRetry(server: McpServer, registry: ToolRegistry, skill: SkillDefinition, attempt: number): void {
   // Stamp an autonomous-origin actor + fresh correlation ID on the
   // AsyncLocalStorage context so every tool call inside this skill
   // execution lands in the audit log as `actor: "daemon-skill:<name>"`.
@@ -48,11 +49,11 @@ function runWithRetry(server: McpServer, skill: SkillDefinition, attempt: number
     correlationId: existing?.correlationId ?? randomUUID(),
   };
   runWithRequestContext(ctx, () => {
-    executeSkill(server, skill).catch((e) => {
+    executeSkill(server, skill, {}, registry).catch((e) => {
       log.warn("trigger failed", { skill: skill.name, attempt, err: errToCtx(e) });
       if (attempt >= 1 + TRIGGER_MAX_RETRIES) return;
       const delay = computeBackoff(attempt);
-      const t = setTimeout(() => runWithRetry(server, skill, attempt + 1), delay);
+      const t = setTimeout(() => runWithRetry(server, registry, skill, attempt + 1), delay);
       t.unref?.();
     });
   });
@@ -64,8 +65,14 @@ function runWithRetry(server: McpServer, skill: SkillDefinition, attempt: number
  *  flag so triggers survive an eventBus.stop() + restart cycle. */
 export function resetTriggers(): void {
   bindings.clear();
+  // `registerSkillEngine` runs for HTTP warmup and again for every MCP
+  // session. Resetting only the boolean made each subsequent start attach the
+  // same dispatch function again, so one event executed the newest registry N
+  // times. Remove our exact listener; do not disturb other event consumers.
+  if (listenerInstalled) eventBus.off("event", dispatch);
   listenerInstalled = false;
   activeServer = null;
+  activeRegistry = null;
 }
 
 /** Register a skill's trigger with the event bus. */
@@ -82,11 +89,13 @@ export function registerTrigger(skill: SkillDefinition): void {
 // a new listener, so per-session createServer calls don't accumulate listeners
 // on the eventBus.
 let activeServer: McpServer | null = null;
+let activeRegistry: ToolRegistry | null = null;
 let listenerInstalled = false;
 
 function dispatch(evt: AirMCPEvent): void {
   const server = activeServer;
-  if (!server) return;
+  const registry = activeRegistry;
+  if (!server || !registry) return;
   const list = bindings.get(evt.type);
   if (!list) return;
 
@@ -98,13 +107,14 @@ function dispatch(evt: AirMCPEvent): void {
     // Fire and forget — don't block the event loop. `runWithRetry` handles
     // exponential backoff with jitter so bursty events (e.g. many calendar
     // updates in quick succession) don't line their retries up.
-    runWithRetry(server, binding.skill, 1);
+    runWithRetry(server, registry, binding.skill, 1);
   }
 }
 
 /** Start listening for events and dispatching skills. Idempotent. */
-export function startTriggerListener(server: McpServer): void {
+export function startTriggerListener(server: McpServer, registry: ToolRegistry = toolRegistry): void {
   activeServer = server;
+  activeRegistry = registry;
   if (listenerInstalled) return;
   eventBus.on("event", dispatch);
   listenerInstalled = true;

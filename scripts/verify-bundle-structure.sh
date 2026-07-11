@@ -20,6 +20,12 @@ BUNDLED_SERVER="$RUNTIME_ROOT/server/dist/index.js"
 BUNDLED_BRIDGE="$RUNTIME_ROOT/bin/AirMcpBridge"
 LOCALIZATION_BUNDLE="$BUNDLE_DIR/Contents/Resources/AirMCPApp_AirMCPApp.bundle"
 SUPPORTED_LOCALES="de en es fr ja ko pt-BR zh-Hans zh-Hant"
+REQUIRE_WIDGET="${AIRMCP_REQUIRE_WIDGET:-0}"
+
+if [ "$REQUIRE_WIDGET" != "0" ] && [ "$REQUIRE_WIDGET" != "1" ]; then
+  echo "✗ AIRMCP_REQUIRE_WIDGET must be 0 or 1, got: $REQUIRE_WIDGET" >&2
+  exit 2
+fi
 
 require_plist_value() {
   local key="$1"
@@ -43,6 +49,7 @@ require_plist_value ":CFBundleExecutable" "$APP_EXECUTABLE"
 require_plist_value ":CFBundlePackageType" "APPL"
 require_plist_value ":CFBundleDevelopmentRegion" "en"
 require_plist_value ":CFBundleAllowMixedLocalizations" "true"
+require_plist_value ":LSMultipleInstancesProhibited" "true"
 
 PLIST_LOCALIZATIONS="$(/usr/libexec/PlistBuddy -c "Print :CFBundleLocalizations" "$PLIST" 2>/dev/null || true)"
 for locale in $SUPPORTED_LOCALES; do
@@ -107,6 +114,11 @@ for executable in "$BUNDLED_NODE" "$BUNDLED_BRIDGE"; do
 done
 
 WIDGET_PLIST="$BUNDLE_DIR/Contents/PlugIns/AirMCPWidget.appex/Contents/Info.plist"
+WIDGET_BINARY="$BUNDLE_DIR/Contents/PlugIns/AirMCPWidget.appex/Contents/MacOS/AirMCPWidget"
+if [ "$REQUIRE_WIDGET" = "1" ] && { [ ! -f "$WIDGET_PLIST" ] || [ ! -x "$WIDGET_BINARY" ]; }; then
+  echo "✗ signed distribution requires a complete AirMCPWidget.appex" >&2
+  exit 1
+fi
 if [ -f "$WIDGET_PLIST" ]; then
   WIDGET_VERSION="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$WIDGET_PLIST")"
   WIDGET_BUILD="$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$WIDGET_PLIST")"

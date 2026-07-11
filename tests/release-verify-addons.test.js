@@ -8,7 +8,10 @@ describe("release:verify add-on registry coverage", () => {
     expect(script).toContain('const skipAddons = args.includes("--skip-addons")');
     expect(script).toContain("loadAddonPackages");
     expect(script).toContain("MODULE_PACK_MANIFEST.filter");
-    expect(script).toContain("verifyPublishedPackage(addonPack.packageName");
+    expect(script).toContain("for (const addonPack of addonPacks)");
+    expect(script).toMatch(/verifyPublishedPackage\(\s*addonPack\.packageName,/);
+    expect(script).toContain("addonPack.packageRoot");
+    expect(script).toContain("expectedGitHead");
   });
 
   test("fresh-installs root plus every add-on from the registry", () => {

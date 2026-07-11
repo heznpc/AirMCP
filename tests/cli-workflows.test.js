@@ -252,18 +252,25 @@ describe("cli workflows command", () => {
       new URL("../app/Sources/AirMCPApp/Views/OnboardingView.swift", import.meta.url),
       "utf8",
     );
+    const codexConfigurator = readFileSync(
+      new URL("../app/Sources/AirMCPApp/CodexOnboardingConfigurator.swift", import.meta.url),
+      "utf8",
+    );
 
     expect(onboarding).toContain('id: "codex"');
     expect(onboarding).toContain('NodeEnvironment.findExecutable(named: "codex")');
-    expect(onboarding).toContain('["mcp", "get", "airmcp", "--json"]');
-    expect(onboarding).toContain('"mcp", "remove", "airmcp"');
-    expect(onboarding).toContain('"mcp",');
-    expect(onboarding).toContain('"add",');
-    expect(onboarding).toContain('"--env"');
-    expect(onboarding).toContain('"AIRMCP_HTTP_TOKEN=\\(token)"');
+    expect(onboarding).toContain("CodexOnboardingConfigurator.configure(");
+    expect(codexConfigurator).toContain('["mcp", "get", "airmcp", "--json"]');
+    expect(codexConfigurator).toContain('["mcp", "remove", "airmcp"]');
+    expect(codexConfigurator).toContain('var addArguments = ["mcp", "add"]');
+    expect(codexConfigurator).toContain('replacementEnvironment["AIRMCP_HTTP_TOKEN"] = token');
+    expect(codexConfigurator).toContain("ConfigSnapshot.capture(at: configURL)");
+    expect(codexConfigurator).toContain("snapshot.containsAirMCPServerEntry");
+    expect(codexConfigurator).toContain("snapshot.restore(at: configURL)");
+    expect(codexConfigurator).toContain("process.currentDirectoryURL = currentDirectory");
+    expect(codexConfigurator).toContain('environment.removeValue(forKey: "CODEX_HOME")');
     expect(onboarding).toContain("AirMcpConstants.appOwnedProxyArgs");
     expect(onboarding).toContain("AirMcpConstants.appOwnedProxyEntry(token: token)");
-    expect(onboarding).toContain("restoreCodexConfig(codex, json: existing.output)");
     expect(onboarding).toContain('path + ".airmcp-backup"');
     expect(onboarding).toContain("A malformed existing file is");
   });

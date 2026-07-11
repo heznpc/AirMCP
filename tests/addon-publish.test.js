@@ -30,10 +30,12 @@ describe("add-on publish release lane", () => {
     expect(script).toContain('"--provenance"');
   });
 
-  test("publish command can resume when an add-on version already exists", () => {
-    expect(script).toContain("function isVersionPublished(packageName, version)");
-    expect(script).toContain('["view", `${packageName}@${version}`, "version"]');
-    expect(script).toContain("already published");
+  test("publish command resumes only when the existing package has the same immutable identity", () => {
+    expect(script).toContain("inspectLocalPackage");
+    expect(script).toContain("queryPublishedIdentity");
+    expect(script).toContain("assertPublishedIdentity");
+    expect(script).toContain("waitForPublishedIdentity");
+    expect(script).toContain("registry SRI and gitHead match");
     expect(script).toContain("previously published versions");
   });
 
@@ -43,8 +45,11 @@ describe("add-on publish release lane", () => {
     expect(cdWorkflow.indexOf("Publish root with provenance")).toBeLessThan(
       cdWorkflow.indexOf("Publish add-ons with provenance"),
     );
+    expect(cdWorkflow).toContain("Verify signed release environment protection");
+    expect(cdWorkflow).toContain("Inspect root registry identity");
+    expect(cdWorkflow).toContain("node scripts/verify-publish-identity.mjs --allow-missing");
     expect(cdWorkflow).toContain("npm publish --provenance --access public");
-    expect(cdWorkflow).toContain("is already published; skipping root publish");
+    expect(cdWorkflow).toContain("node scripts/verify-publish-identity.mjs --retry-seconds=60");
     expect(cdWorkflow).toContain("npm run addons:publish -- --publish --all --no-build --skip-verify");
     expect(cdWorkflow).toContain("build/release-preflight/airmcp-${{ steps.pkg.outputs.version }}.mcpb");
   });
@@ -64,19 +69,24 @@ describe("add-on publish release lane", () => {
     expect(preflight.if).toBe("steps.npm-auth.outputs.mode == 'token'");
     expect(preflight.env.NODE_AUTH_TOKEN).toBe("${{ secrets.NPM_TOKEN }}");
 
-    for (const stepName of ["Publish root with provenance", "Publish add-ons with provenance"]) {
-      const publish = publishStep(stepName);
-      expect(publish.if).toBe("steps.npm-auth.outputs.mode == 'trusted-publishing'");
-      expect(publish.env?.NODE_AUTH_TOKEN).toBeUndefined();
-    }
+    const trustedRoot = publishStep("Publish root with provenance");
+    expect(trustedRoot.if).toBe(
+      "steps.npm-auth.outputs.mode == 'trusted-publishing' && steps.root-identity.outputs.published != 'true'",
+    );
+    expect(trustedRoot.env?.NODE_AUTH_TOKEN).toBeUndefined();
 
-    for (const stepName of [
-      "Publish root with provenance (token fallback)",
-      "Publish add-ons with provenance (token fallback)",
-    ]) {
-      const publish = publishStep(stepName);
-      expect(publish.if).toBe("steps.npm-auth.outputs.mode == 'token'");
-      expect(publish.env.NODE_AUTH_TOKEN).toBe("${{ secrets.NPM_TOKEN }}");
-    }
+    const trustedAddons = publishStep("Publish add-ons with provenance");
+    expect(trustedAddons.if).toBe("steps.npm-auth.outputs.mode == 'trusted-publishing'");
+    expect(trustedAddons.env?.NODE_AUTH_TOKEN).toBeUndefined();
+
+    const tokenRoot = publishStep("Publish root with provenance (token fallback)");
+    expect(tokenRoot.if).toBe(
+      "steps.npm-auth.outputs.mode == 'token' && steps.root-identity.outputs.published != 'true'",
+    );
+    expect(tokenRoot.env.NODE_AUTH_TOKEN).toBe("${{ secrets.NPM_TOKEN }}");
+
+    const tokenAddons = publishStep("Publish add-ons with provenance (token fallback)");
+    expect(tokenAddons.if).toBe("steps.npm-auth.outputs.mode == 'token'");
+    expect(tokenAddons.env.NODE_AUTH_TOKEN).toBe("${{ secrets.NPM_TOKEN }}");
   });
 });

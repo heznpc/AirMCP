@@ -1,6 +1,6 @@
 # AirMCP Release Checklist
 
-릴리스 때마다 실행하는 체크리스트. **TODO.md ↔ CHANGELOG ↔ 코드 드리프트**를 구조적으로 방지하기 위한 문서. 2026-04-17 QUALITY_DIAGNOSIS의 HIGH-2 대응.
+릴리스 때마다 실행하는 체크리스트. **GitHub Issues/RFC backlog ↔ CHANGELOG ↔ 코드 드리프트**를 구조적으로 방지하기 위한 문서. 2026-04-17 QUALITY_DIAGNOSIS의 HIGH-2 대응.
 
 > 목표 시간: patch 릴리스 20분, minor 45분, major 2시간.
 
@@ -102,13 +102,12 @@ Breaking을 포함한 minor/patch는 **금지**. 직전 메이저에 묶어 둘 
 - [ ] Breaking 항목은 **마이그레이션 가이드** 포함 ("envvar/flag가 이렇게 바뀜")
 - [ ] 이슈·PR 번호(#NN) 참조
 
-### 2.2 TODO.md (가장 자주 잊히는 곳)
-- [ ] CHANGELOG delta와 대조하여 **완료된 항목 체크오프**
-  - 새로 닫힌 contract / artifact gate 반영
-  - "완료" 섹션 맨 위에 새 버전 한 줄 요약 추가
-- [ ] 새 버전에서 생긴 후속 작업 P0/P1/P2에 삽입
-- [ ] 헤더의 "X.Y.Z 기준 (YYYY-MM-DD 동기화)" 라인 갱신
-- [ ] "등록 현황" 테이블의 npm 버전·일자 갱신
+### 2.2 GitHub Issues / RFC backlog
+- [ ] CHANGELOG delta와 대조하여 **완료된 이슈를 닫거나 릴리스 라벨을 갱신**
+  - 새로 닫힌 contract / artifact gate를 릴리스 이슈와 연결
+  - 릴리스 후속 작업은 P0/P1/P2 이슈로 분리하고 소유 범위를 명시
+- [ ] 구현 상태가 바뀐 RFC는 본문 상태와 `docs/rfc/README.md` 인덱스를 함께 갱신
+- [ ] npm·GitHub Release·registry 반영 상태는 이 체크리스트와 릴리스 이슈에 기록
 
 ### 2.3 버전·메타데이터
 - [ ] `package.json` version
@@ -132,22 +131,33 @@ Breaking을 포함한 minor/patch는 **금지**. 직전 메이저에 묶어 둘 
 
 ### 3.1 Dry release preflight (publish 금지)
 - [ ] `npm run release:preflight` 로 scoped add-on 호환성 verify/install, universal npm tarball dry-run + default/`full/full` 부트, universal `.mcpb` 구조 + 부트 검증
-- [ ] app 산출물까지 확인할 때는 `npm run release:preflight -- --app`
+- [ ] 앱을 포함하는 실제 릴리스 경로에서는 반드시 `npm run release:preflight -- --app`을 사용한다. 이 모드는 실제 MCP transport에서 read, 승인 write, 거부 write, emergency stop, HMAC audit 검증을 완주한 뒤 앱 산출물을 만든다.
 - [ ] GitHub Actions **Release Preflight** workflow green 확인
 - [ ] workflow artifact에 `airmcp-X.Y.Z.mcpb`와 `AirMCP-X.Y.Z-adhoc.zip`이 생성되는지 확인
 - [ ] 이 단계는 태그·npm publish·GitHub Release를 만들지 않는다. 실패 시 publish 단계로 넘어가지 않는다.
 
 ### 3.2 커밋
 - [ ] `chore(release): vX.Y.Z` 커밋에 위 모든 파일 동시 포함
-- [ ] `git tag vX.Y.Z` (서명 권장: `git tag -s`)
-- [ ] `git push origin main --tags`
+- [ ] 버전 커밋을 `main`에 push하되 **tag는 미리 만들지 않는다.**
+  `cd.yml`이 고정된 `main` SHA에서 preflight·publish를 통과한 후
+  그 SHA를 `target_commitish`로 삼아 `vX.Y.Z` tag/Release를 생성한다.
+- [ ] `git push origin main`
 
 ### 3.3 CI 통과 확인
 - [ ] `ci.yml` 전 단계 green
 - [ ] CodeQL·Scorecard 경고 신규 없음
 
 ### 3.4 universal root npm publish + optional add-ons + .mcpb → GitHub Release
-- [ ] CD workflow(`cd.yml`) 자동 트리거 확인. 수동 실행 시 `npm run release:preflight` 이후 universal root `npm publish --provenance --access public`을 먼저 실행한다. 호환성 add-on을 함께 갱신할 때만 `npm run addons:publish -- --publish --all --no-build --skip-verify`를 이어서 실행한다.
+- [ ] Actions에서 **Publish to npm** (`cd.yml`)을 `main` ref로 수동
+  dispatch한다. 이 workflow는 checkout SHA가 dispatch 시점의 `main`과
+  일치하지 않으면 실패한다.
+- [ ] CD가 `npm run release:preflight -- --app`의 governed app acceptance를
+  통과한 후 universal root/add-on을 publish하고, 고정된 `github.sha`에
+  `vX.Y.Z` tag·GitHub Release·`.mcpb`를 생성하는지 확인한다.
+- [ ] 같은 버전이 npm에 이미 존재하는 재시도는 자동으로 신뢰하지 않는다.
+  root와 모든 add-on의 로컬 `npm pack` SHA-512 SRI, registry
+  `dist.integrity`, registry `gitHead`, `github.sha`가 모두 일치할 때만
+  멱등 skip하며 하나라도 다르거나 registry 조회가 불확실하면 실패해야 한다.
 - [ ] `NPM_TOKEN`을 쓰는 경우 `npm whoami`가 통과하고 해당 토큰이 `airmcp` publish 권한을 가진 automation/granular token인지 확인. 토큰이 비어 있으면 npm trusted publishing이 GitHub environment `npm` + 이 workflow에 설정되어 있어야 한다.
 - [ ] 호환성 add-on을 publish했다면 `npm view @heznpc/airmcp-productivity@X.Y.Z` 등 scoped package가 같은 버전으로 반영됐는지 확인
 - [ ] `npm view airmcp@X.Y.Z` 로 반영 검증
@@ -156,23 +166,56 @@ Breaking을 포함한 minor/patch는 **금지**. 직전 메이저에 묶어 둘 
 - [ ] `npm run release:verify -- --version=X.Y.Z` 로 universal root npm latest, scoped add-on 버전, fresh registry install/import, fresh `npx`, GitHub Release `.mcpb` asset을 한 번에 검증
 
 ### 3.5 Signed .app → GitHub Release
-- [ ] `release-app.yml` 워크플로가 태그 푸시로 자동 실행됐는지 확인 (Actions 탭)
-- [ ] Apple signing secret이 없으면 태그 푸시에서는 signed app job이 **skip** 되는 것이 정상이다. 수동 dispatch에서 반드시 실패시키려면 `require_signing=true`로 실행한다.
-- [ ] signed app 릴리스가 필요하면 아래 6개를 Settings → Secrets and variables → Actions에 등록:
-  - `APPLE_DEVELOPER_ID` — Developer ID Application certificate 공통명 (예: `Developer ID Application: Jane Doe (A1B2C3D4E5)`)
+
+> **현재 판정: HOLD (2026-07-11).** GitHub의 `release` environment는
+> 존재하지만 required reviewer, admin-bypass 차단, deployment tag policy가
+> 아직 설정되지 않았고 Apple signing secret도 등록되지 않았다. 코드의
+> signed lane은 이 상태에서 의도적으로 실패한다. 외부 설정과 identity
+> 조건을 아래 순서로 닫기 전에는 secret 등록·서명·공증을 시작하지 않는다.
+
+- [ ] Settings → Environments → `release`에 required reviewer를 설정하고,
+  administrator bypass를 끄고, custom deployment tag policy `v*.*.*`
+  (`type: tag`)를 설정한다.
+- [ ] `node scripts/verify-release-environment.mjs --repo=heznpc/AirMCP --tag=vX.Y.Z`
+  가 required review + no-admin-bypass + tag-only policy를 API에서 확인한다.
+- [ ] CD가 GitHub Release를 생성한 직후 `release-app.yml`을
+  `workflow_dispatch` 이벤트로 명시적 호출했는지 확인한다.
+  `GITHUB_TOKEN`이 만든 tag가 다른 workflow의 tag-push trigger를
+  재귀적으로 발생시킨다고 가정하지 않는다.
+- [ ] Signed workflow가 요청 tag를 직접 checkout하고,
+  tag commit = `HEAD`, tag version = `package.json` = app/widget bundle version을
+  검증하며, tag가 `origin/main`에서 도달 가능하고 기존 GitHub Release의
+  exact target SHA와 같은지 확인한 후에만 서명 재료를 import하는지 확인한다.
+- [ ] signing secret이 준비된 실행은 인증서 import·앱 서명·공증 전에 `npm run release:preflight -- --app`을 다시 통과해야 한다. 이 게이트 실패는 signed app job을 즉시 중단한다.
+- [ ] Apple signing secret은 위 API gate가 통과한 `release` environment에만 저장한다.
+  secret 존재 확인도 environment 승인 후에만 실행된다. secret이
+  없으면 CD가 호출한 signed job은 변경 없이 종료하며,
+  반드시 실패시키려면 수동 dispatch에서 `require_signing=true`를 선택한다.
+- [ ] signed app 릴리스가 필요하면 아래 6개를 Settings →
+  Environments → `release` → Environment secrets에 등록:
+  - `APPLE_DEVELOPER_ID` — Developer ID Application certificate 공통명 (예: `Developer ID Application: Heznpc (TEAMID)`)
   - `APPLE_ID` — notarytool용 Apple ID 이메일
   - `APPLE_ID_PASSWORD` — [App-specific password](https://appleid.apple.com) (Sign-in and security → App-specific passwords)
   - `APPLE_TEAM_ID` — 10자리 팀 ID
   - `APPLE_CERT_P12_BASE64` — `.p12` 인증서 + 개인키를 base64 인코딩 (`base64 -i cert.p12 | pbcopy`)
   - `APPLE_CERT_P12_PASSWORD` — `.p12` import 암호
+- [ ] 인증서 import 직후 `scripts/verify-signing-identity.sh`가 Common Name과
+  Organization을 모두 public identity `Heznpc`로, OU/team suffix를
+  `APPLE_TEAM_ID`와 동일하게 확인해야 한다. 개인 법적 이름이나 다른 조직명이
+  들어간 Developer ID 인증서는 바이너리 자체에 그 이름을 공개하므로 사용 금지.
 - [ ] 성공 시 Release에 signed app 산출물이 첨부되어 있어야 함:
   - `AirMCP-X.Y.Z.zip` (Developer ID 서명 + 공증 + staple 완료)
-- [ ] `.mcpb`는 3.3의 CD workflow가 같은 Release에 이미 첨부했는지 확인
-- [ ] 공증 실패 시 Actions 로그의 `notarytool log` 출력에서 거부 사유 확인 (hardened runtime / timestamp / 빠진 entitlement 등)
-- [ ] 신호용 검증: `codesign -dv --verbose=4 AirMCP.app` 에서 `Authority=Developer ID Application: …` 확인
+- [ ] `.mcpb`는 3.4의 CD workflow가 같은 Release에 이미 첨부했는지 확인
+- [ ] 공증 실패 시 Actions에는 정제된 issue code와 `AirMCP.app` 기준 상대
+  경로만 남는지 확인한다. raw `notarytool log`, submission ID, 계정·team·인증서
+  주체는 공개 로그에 복사하지 않고, 필요하면 권한 있는 로컬 환경에서만 조회한다.
+- [ ] 비공개 로컬 shell 검증: `codesign -dv --verbose=4 AirMCP.app` 에서 `Authority=Developer ID Application: Heznpc (TEAMID)` 확인
 - [ ] Gatekeeper 검증: `spctl -a -vvv AirMCP.app` → `accepted, source=Notarized Developer ID`
 - [ ] 배포 artifact 검증: `APP_BUNDLE_PATH=/path/to/AirMCP.app npm run app:verify:signed`
-  - 기존 번들을 다시 빌드하지 않고 Developer ID 서명, Gatekeeper, staple, app-owned runtime, 토큰 인증, AppIntents 런타임 로그를 한 번에 확인
+  - 기존 번들을 다시 빌드하지 않고 Developer ID 서명, Gatekeeper, staple,
+    격리된 token + owner-generation fingerprint + exact embedded runtime PID,
+    AppIntents 런타임 로그를 한 번에 확인한다. 다른 AirMCP 프로세스를 이름으로
+    종료하거나 이미 실행 중인 same-version listener를 증거로 사용하면 실패다.
 
 ### 3.6 GitHub Release notes
 - [ ] Release notes는 CHANGELOG 섹션 복사 (요약 강조, 이미지/GIF는 README 링크)
@@ -183,7 +226,7 @@ Breaking을 포함한 minor/patch는 **금지**. 직전 메이저에 묶어 둘 
 
 ## 4. 사후 작업 (release 후 24시간 내)
 
-- [ ] **TODO.md 등록 현황**에 다운스트림 반영 확인
+- [ ] **릴리스 추적 이슈**에 다운스트림 반영 확인
   - cursor.directory 자동 인덱싱 확인
   - PulseMCP / Glama 메타데이터 반영 (필요 시 수동 요청)
 - [ ] **doctor 서버 응답** 체크: `.well-known/mcp.json`의 version·authorization 블록 최신화
@@ -218,10 +261,10 @@ Breaking을 포함한 minor/patch는 **금지**. 직전 메이저에 묶어 둘 
 
 드리프트를 **사람의 주의력**이 아니라 **CI 게이트**로 막는 작업:
 
-- [ ] **TODO.md 동기화 린터** — CHANGELOG의 `[x]` 체크박스와 TODO.md 상태를 교차검증
-- [ ] **버전 sync 검증** (이미 존재: `scripts/verify-versions.mjs` 형태) — CI blocking
+- [ ] **CHANGELOG/이슈 라벨 동기화 게이트** — 릴리스 CHANGELOG 항목과 GitHub Issues 마일스톤·라벨 상태를 교차검증
+- [ ] **버전 sync 검증** (이미 존재: `scripts/sync-version.mjs --check`) — CI blocking
 - [ ] **Release Drafter** — 이슈·PR 라벨로 CHANGELOG 초안 자동 생성
-- [ ] **ts-release-please** 등으로 버전 bump PR 자동화 후보 검토
+- [ ] **release-please** 등으로 버전 bump PR 자동화 후보 검토
 
 ---
 
@@ -244,9 +287,9 @@ npm run addons:kill-test
 # 취약점
 npm audit --audit-level=moderate
 
-# 릴리스
-git tag -s vX.Y.Z -m "Release vX.Y.Z"
-git push origin main --tags
+# 릴리스 (tag는 CD가 검증된 github.sha에 생성)
+git push origin main
+gh workflow run cd.yml --ref main
 
 # 스모크
 npx -y airmcp@X.Y.Z --version

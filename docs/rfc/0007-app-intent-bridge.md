@@ -40,7 +40,7 @@ Waiting for a consumer "system MCP" API is not a blocker for App Intents because
 
 - Auto-implementing tool **bodies** in Swift. The tool body still executes in Node (macOS) or via AirMCPKit Swift services (iOS Phase 3, tracked separately).
 - Replacing the Hummingbird HTTP server. Dual transport stays unless Apple publishes a consumer MCP transport.
-- Solving HITL or elicitation in AppIntents (deferred — see §5).
+- Replacing AirMCP's core per-call HITL authority with an AppIntent-wide or batched approval. Phase A.3 ships an AppIntent confirmation UI for each destructive invocation; socket/elicitation HITL remains the authority for non-AppIntent paths (see §5).
 
 ## 3. Proposed Design — Phase A (buildable today)
 
@@ -226,10 +226,16 @@ Phase B is schema enrichment, not a hidden MCP transport.
 - **Risk**: Zod `.union()` / `.discriminatedUnion()` / recursive schemas don't map cleanly to Swift `Codable`
 - **Mitigation**: Fall back to `String` (raw JSON) return value for those tools. Annotate the intent with a disclaimer. ~5% of tools affected.
 
-### R7. 10-tool cap on iOS `AppShortcutsProvider` selection
+### R7. Exact 8-tool iOS `AppShortcutsProvider` preview contract
 
-- **Open**: Do we pick top-N by usage, or let the user configure via AirMCP app UI?
-- **Current default**: fixed workflow-first shortcuts from `APP_SHORTCUTS_TOP`, currently nine default entries so the optional FoundationModels `Ask AirMCP` provider can occupy the remaining platform slot in opt-in builds. A future AirMCP app UI can let users choose their own pinned shortcuts.
+- **Resolved current contract**: `APP_SHORTCUTS_TOP` contains the exact eight
+  read-only tools in `IOSPreviewContract`. Generator and iOS runtime tests fail
+  if those lists drift.
+- `AskAirMCPIntent` remains an opt-in action only. It is not a second
+  `AppShortcutsProvider` and does not consume a provider entry.
+- A future configurable top-N surface requires a separate contract change that
+  preserves the iOS executable allowlist; generated source presence alone is
+  never sufficient to advertise a shortcut.
 
 ## 6. Rollout
 

@@ -70,6 +70,7 @@ import { IDENTITY } from "./shared/constants.js";
 import { initializeServer } from "./server/init.js";
 import { createServer } from "./server/mcp-setup.js";
 import { startHttpServer } from "./server/http-transport.js";
+import { wireStdioShutdown } from "./server/stdio-shutdown.js";
 
 const ctx = initializeServer();
 
@@ -96,12 +97,13 @@ async function main() {
   } else {
     const { server, bannerInfo } = await createServer(ctx);
     const transport = new StdioServerTransport();
+    wireStdioShutdown(transport, process.stdin, ctx.shutdown);
     await server.connect(transport);
     await printBanner(bannerInfo);
   }
 }
 
-main().catch((error) => {
+main().catch(async (error) => {
   console.error("Fatal error:", error);
-  process.exit(1);
+  await ctx.shutdown(1);
 });

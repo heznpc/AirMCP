@@ -42,6 +42,7 @@ const { registerTrigger, startTriggerListener, resetTriggers } = await import(
 const { eventBus } = await import('../dist/shared/event-bus.js');
 
 const fakeServer = { /* triggers.ts only forwards this to executeSkill */ };
+const fakeRegistry = { identity: 'per-server-registry' };
 
 describe('autonomous trigger actor stamping', () => {
   test('skill fired from event-bus runs inside an actor="daemon-skill:<name>" context', async () => {
@@ -54,7 +55,7 @@ describe('autonomous trigger actor stamping', () => {
       steps: [],
       trigger: { event: 'calendar_changed', debounce_ms: 0 },
     });
-    startTriggerListener(fakeServer);
+    startTriggerListener(fakeServer, fakeRegistry);
 
     // Fire a synthetic event. dispatch() schedules executeSkill via
     // runWithRetry, which itself awaits executeSkill inside the
@@ -70,6 +71,12 @@ describe('autonomous trigger actor stamping', () => {
     await new Promise((r) => setTimeout(r, 30));
 
     expect(mockExecuteSkill).toHaveBeenCalledTimes(1);
+    expect(mockExecuteSkill).toHaveBeenCalledWith(
+      fakeServer,
+      expect.objectContaining({ name: 'probe-skill' }),
+      {},
+      fakeRegistry,
+    );
     expect(capturedContext).not.toBeNull();
     expect(capturedContext.actor).toBe('daemon-skill:probe-skill');
     // Correlation ID must be present so any audit/trace lines emitted

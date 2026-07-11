@@ -30,9 +30,12 @@ enum AirMcpConstants {
     static let appOwnedHttpPort = 3847
     static let appOwnedHttpURL = "http://127.0.0.1:\(appOwnedHttpPort)/mcp"
     static let appOwnedHealthURL = "http://127.0.0.1:\(appOwnedHttpPort)/health"
+    static let appOwnedRuntimeStateURL = "http://127.0.0.1:\(appOwnedHttpPort)/app/runtime-state"
     static let keyAutoStart = "autoStartServer"
     static let keyOnboardingCompleted = "onboardingCompleted"
     static let keyOnboardingPresented = "onboardingPresented"
+    static let keyOnboardingStep = "onboardingCurrentStep"
+    static let keyOnboardingDraft = "onboardingDraft"
     static let envForceAppRuntime = "AIRMCP_FORCE_APP_RUNTIME"
     static let envShowOnboarding = "AIRMCP_SHOW_ONBOARDING"
     static let trustCenterWindowID = "trust-center"
@@ -215,22 +218,36 @@ struct MenuContent: View {
 
     @ViewBuilder
     private var serverControlButton: some View {
-        switch serverManager.status {
-        case .running:
+        // Ownership wins over the last health probe. If the app's child is
+        // still alive but HTTP/auth readiness has degraded, the user must keep
+        // a working Stop control instead of seeing a Start action that the
+        // live-process guard will reject.
+        if serverManager.canStopRuntime {
             Button {
                 serverManager.stopServer()
             } label: {
                 Label(L("menu.stopServer"), systemImage: "stop.circle")
             }
-        case .stopped, .error:
-            Button {
-                serverManager.startServer()
-            } label: {
-                Label(L("menu.startServer"), systemImage: "play.circle")
-            }
-        case .checking:
-            Button(L("menu.checking")) {}
+        } else {
+            switch serverManager.status {
+            case .running:
+                // Authenticated manual runtimes are visible and usable, but
+                // their process lifecycle belongs to whoever launched them.
+                Button {} label: {
+                    Label(L("menu.stopServer"), systemImage: "stop.circle")
+                }
                 .disabled(true)
+            case .stopped, .error:
+                Button {
+                    requestApprovalNotificationsForExplicitRuntimeStart()
+                    serverManager.startServer()
+                } label: {
+                    Label(L("menu.startServer"), systemImage: "play.circle")
+                }
+            case .checking:
+                Button(L("menu.checking")) {}
+                    .disabled(true)
+            }
         }
     }
 
@@ -310,7 +327,8 @@ struct MenuContent: View {
             Button {
                 setupManager.runSetup(
                     permissionManager: permissionManager,
-                    serverManager: serverManager
+                    serverManager: serverManager,
+                    hitlLevel: configManager.hitlLevel
                 )
             } label: {
                 Label(L("menu.getStarted"), systemImage: "sparkles")
@@ -327,6 +345,14 @@ struct MenuContent: View {
             } else if case .failed = setupManager.state {
                 Label(label, systemImage: "exclamationmark.triangle")
                     .foregroundStyle(.red)
+                Button(L("onboarding.firstRunCheckAgain")) {
+                    setupManager.reset()
+                    setupManager.runSetup(
+                        permissionManager: permissionManager,
+                        serverManager: serverManager,
+                        hitlLevel: configManager.hitlLevel
+                    )
+                }
                 Divider()
             } else {
                 Label(label, systemImage: "progress.indicator")
@@ -334,6 +360,14 @@ struct MenuContent: View {
                 Divider()
             }
         }
+    }
+
+    private func requestApprovalNotificationsForExplicitRuntimeStart() {
+        guard RuntimeStartConsentPolicy.shouldRequestApprovalNotifications(
+            hitlLevel: configManager.hitlLevel,
+            userInitiated: true
+        ) else { return }
+        HitlManager.requestNotificationPermission()
     }
 
     // MARK: 3 - Workflows

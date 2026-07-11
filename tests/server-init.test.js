@@ -34,6 +34,8 @@ describe('Server init', () => {
     expect(ctx).toHaveProperty('osVersion');
     expect(ctx).toHaveProperty('pkg');
     expect(ctx).toHaveProperty('hitlClient');
+    expect(ctx).toHaveProperty('shutdown');
+    expect(typeof ctx.shutdown).toBe('function');
     expect(ctx.osVersion).toBe(26);
     expect(ctx.hitlClient).toBeNull(); // hitl level is 'off'
   });

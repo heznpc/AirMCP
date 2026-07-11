@@ -119,7 +119,7 @@ describe('registerSkillEngine', () => {
     expect(mockRegisterTrigger).toHaveBeenCalledWith(skills[1]);
 
     // startTriggerListener called with server
-    expect(mockStartTriggerListener).toHaveBeenCalledWith(fakeServer);
+    expect(mockStartTriggerListener).toHaveBeenCalledWith(fakeServer, runtimeRegistry);
 
     // watchUserSkills called (first time — watcher was null)
     expect(mockWatchUserSkills).toHaveBeenCalledTimes(1);

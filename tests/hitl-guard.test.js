@@ -96,6 +96,24 @@ describe("installHitlGuard export", () => {
 });
 
 describe("approval audit events", () => {
+  test("assigns a distinct cryptographic UUID to every approval decision", async () => {
+    const { server, registrations } = makeMockServer();
+    installHitlGuard(server, makeMockHitlClient(true, true), makeConfig("all"));
+    server.registerTool("repeat_write", { annotations: { readOnlyHint: false } }, () => "ran");
+
+    const events = await runWithRequestContext({ correlationId: "same-workflow" }, async () => {
+      await registrations[0].callback({});
+      await registrations[0].callback({});
+      return consumeApprovalAuditEvents();
+    });
+
+    expect(events).toHaveLength(2);
+    expect(events[0].approvalId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(events[1].approvalId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(events[0].approvalId).not.toBe(events[1].approvalId);
+    expect(events[0].correlationId).toBe(events[1].correlationId);
+  });
+
   test("records an elicitation approval as a separate approval event", async () => {
     const { server, registrations } = makeMockServer({ withElicitation: true });
     installHitlGuard(server, makeMockHitlClient(), makeConfig("all"));
@@ -108,6 +126,7 @@ describe("approval audit events", () => {
 
     expect(events).toContainEqual(
       expect.objectContaining({
+        approvalId: expect.any(String),
         timestamp: expect.any(String),
         tool: "write_note",
         decision: "approved",

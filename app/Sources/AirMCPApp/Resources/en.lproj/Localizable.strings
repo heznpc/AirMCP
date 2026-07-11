@@ -331,6 +331,7 @@
 "onboarding.back" = "Back";
 "onboarding.next" = "Next";
 "onboarding.finish" = "Finish";
+"onboarding.saveFailed" = "Couldn’t Save Configuration";
 "onboarding.stepWelcome" = "Welcome";
 "onboarding.stepRuntime" = "Runtime";
 "onboarding.stepWorkflow" = "First workflow";
@@ -359,8 +360,8 @@
 "onboarding.workflowPresetHint" = "%@ is selected. Adjust any app access before continuing.";
 "onboarding.chooseModules" = "Choose Modules";
 "onboarding.chooseModulesDesc" = "Select which Mac apps AirMCP can access. You can change these later in Settings.";
-"onboarding.enableAll" = "Enable All";
-"onboarding.disableAll" = "Disable All";
+"onboarding.enableAll" = "Enable All Shown";
+"onboarding.disableAll" = "Disable All Shown";
 "onboarding.permissions" = "macOS Permissions";
 "onboarding.permissionsDesc" = "AirMCP asks macOS for app permissions only when a workflow needs them.";
 "onboarding.openSettings" = "Open System Settings";
@@ -375,13 +376,19 @@
 "onboarding.autoPatch" = "Connect";
 "onboarding.enableInCodex" = "Enable in Codex";
 "onboarding.codexStartupDisclosure" = "Enabling adds a persistent MCP server. Codex will try to connect at every startup and may open AirMCP.app when needed.";
-"onboarding.firstRunWaiting" = "AirMCP will start the app-owned runtime before finishing setup.";
+"onboarding.firstRunWaiting" = "The local runtime is off. Start it to create a private token and enable automatic startup.";
 "onboarding.firstRunStarting" = "Starting the app-owned runtime and preparing a private local token...";
+"onboarding.startRuntime" = "Start Local Runtime";
+"onboarding.clientNeedsRuntime" = "Start the local runtime before connecting a client.";
 "onboarding.firstRunReady" = "Ready for first run";
 "onboarding.firstRunNotReady" = "First run not ready";
 "onboarding.firstRunReadyDesc" = "Runtime v%@ is reachable. Copy the %@ prompt into your client to run the first workflow.";
+"onboarding.firstRunUnavailableModules" = "Unavailable on this Mac: %@";
 "onboarding.firstRunRuntimeFailed" = "The local runtime did not become reachable. Keep AirMCP open, then check again.";
 "onboarding.firstRunTokenFailed" = "Could not create the local runtime token: %@";
+"onboarding.firstRunScopeChanged" = "Access changed. Start the runtime again before connecting a client.";
+"onboarding.firstRunManualRuntime" = "A manually managed runtime is using AirMCP’s local port with a different access scope. Stop it from its launcher, then try again; AirMCP will not terminate it.";
+"onboarding.firstRunConfigFailed" = "The selected access scope could not be applied safely: %@";
 "onboarding.firstRunCheckAgain" = "Check Again";
 
 /* Log Viewer */
@@ -395,6 +402,9 @@
 "server.running" = "Server Running";
 "server.stopped" = "Server Stopped";
 "server.checking" = "Checking...";
+"server.runtimeVersionConflict" = "Conflicting AirMCP runtime on port %d: version %@ owns the port, but this app expects %@. Quit the other AirMCP copy, then retry.";
+"server.runtimePortOwnerConflict" = "Port %d is owned by another or stale AirMCP runtime: version %@ answered /health, but authenticated readiness failed. Quit the other AirMCP copy, then retry.";
+"server.runtimePortOccupied" = "Port %d is already occupied by a process that does not expose the AirMCP health contract. Stop that process, then retry.";
 
 /* Setup Wizard */
 "setup.step" = "Step %d/3: ";
@@ -426,5 +436,8 @@
 "onboarding.permAccessibility" = "Accessibility (optional)";
 "onboarding.permAccessibilityDesc" = "Needed for some System module features";
 "onboarding.permNotifications" = "Notifications";
-"onboarding.permNotificationsDesc" = "For approval prompts (HITL confirmation)";
+"onboarding.permNotificationsDesc" = "Requested only when you explicitly start the runtime, for approval prompts.";
 "onboarding.permRuntimeHint" = "You can also grant permissions as they are requested at runtime.";
+"trust.auditApprovalTitle" = "Audit history loads only on request";
+"trust.auditApprovalMessage" = "AirMCP never reads audit history in the background. Load it to make one explicit audit_log request; your HITL policy may ask for approval.";
+"trust.auditApprovalLoad" = "Load Audit Evidence";

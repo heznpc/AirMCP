@@ -61,7 +61,7 @@ AirMCP stores the following data on disk:
 |------|---------|---------|
 | `~/.config/airmcp/config.json` | Module preferences, HITL settings | User configuration |
 | `~/.airmcp/vectors.json` | Text excerpts + embedding vectors from notes, email, calendar, reminders | Semantic search index |
-| `~/.airmcp/audit.jsonl`, rotations, and `audit.checkpoint` | HMAC-chained tool-call metadata with sensitive values scrubbed | Local accountability and tamper/truncation detection |
+| `~/.airmcp/audit.jsonl`, rotations, and `audit.checkpoint` | HMAC-chained tool-call metadata with sensitive values scrubbed | Local accountability and current-snapshot integrity checks |
 | `~/.airmcp/profile.json` | Local tool-frequency and sequence counters | Progressive tool ranking and suggestions |
 | `~/Library/Application Support/AirMCP/http-token` | Owner-only bearer token (`0600`) | Authenticate the app-owned local HTTP runtime |
 | macOS Spotlight Index | Note titles, email subjects, reminder names, calendar event titles | System-wide Spotlight/Siri discoverability (opt-in via `spotlight_sync` tool) |
@@ -122,7 +122,7 @@ All data returned by AirMCP tools is sent to the connected MCP client (AI model)
 - **Human-in-the-loop (HITL)** defaults to sensitive operations and is evaluated per tool call. It can be tightened or disabled by the owner.
 - **Destructive tools** are annotated with `destructiveHint: true` so MCP clients can warn before execution.
 - **Rate limits and emergency stop** bound destructive activity; creating `~/.config/airmcp/emergency-stop` blocks the next destructive call without waiting for a negative cache.
-- **HMAC-chained audit log** detects modified, inserted, truncated, or malformed entries after the signed chain begins.
+- **HMAC-chained audit log** detects modified, inserted, malformed, or checkpoint-inconsistent entries after the signed chain begins. While AirMCP remains running, an observed checkpoint floor also detects replacement with an older valid log/checkpoint pair or deletion of both. That floor is process-local: after restart, a complete older pair or complete deletion cannot be distinguished from an intentional restore or fresh state without an external monotonic anchor.
 
 ## Transport Modes
 

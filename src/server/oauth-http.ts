@@ -7,7 +7,7 @@
  */
 
 import type { OAuthClaims } from "../shared/request-context.js";
-import { evaluateScopeGate, type ScopeRequirement } from "../shared/oauth-scope.js";
+import { callerSatisfies, evaluateScopeGate, type ScopeRequirement } from "../shared/oauth-scope.js";
 
 export interface OAuthSessionPrincipal {
   subject: string;
@@ -63,10 +63,17 @@ function toolNameFrom(request: JsonRpcRequest): string | null {
   return typeof name === "string" && name !== "" ? name : null;
 }
 
+function isResourceOperation(request: JsonRpcRequest): boolean {
+  return typeof request.method === "string" && request.method.startsWith("resources/");
+}
+
 /**
- * Return every scope missing from the tools/call operations carried by one
- * HTTP request. Unknown tools stay with the MCP dispatcher so this preflight
- * cannot turn a normal "tool not found" error into an authorization oracle.
+ * Return every scope missing from protected MCP operations carried by one
+ * HTTP request. Resource methods can expose Apple app data without traversing
+ * ToolRegistry, so every `resources/*` request requires the cumulative
+ * `mcp:read` capability. Unknown tools stay with the MCP dispatcher so this
+ * preflight cannot turn a normal "tool not found" error into an authorization
+ * oracle.
  */
 export function missingScopesForMcpRequest(
   body: unknown,
@@ -75,6 +82,9 @@ export function missingScopesForMcpRequest(
 ): ScopeRequirement[] {
   const missing = new Set<ScopeRequirement>();
   for (const request of asRequests(body)) {
+    if (isResourceOperation(request) && !callerSatisfies("mcp:read", claims.scopes)) {
+      missing.add("mcp:read");
+    }
     const name = toolNameFrom(request);
     if (!name) continue;
     const details = registry.getToolDetails(name);

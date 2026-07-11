@@ -116,7 +116,9 @@ describe("audit_log tool", () => {
 
   test("returns one normalized HMAC-backed history surface with approval evidence", async () => {
     const correlationId = "corr-governed-loop";
+    const approvalId = "88888888-8888-4888-8888-888888888888";
     auditLog({
+      approvalId,
       timestamp: new Date().toISOString(),
       kind: "approval",
       tool: "create_reminder",
@@ -150,6 +152,7 @@ describe("audit_log tool", () => {
           kind: "approval",
           tool: "create_reminder",
           correlationId,
+          approvalId,
           approvalDecision: "timed_out",
           approvalChannel: "socket",
         }),
@@ -194,23 +197,22 @@ describe("audit_log tool", () => {
 describe("audit_summary tool", () => {
   test("counts tool outcomes without double-counting separate approval events", async () => {
     const now = new Date().toISOString();
-    writeJsonl("audit.jsonl", [
-      {
-        timestamp: now,
-        kind: "approval",
-        tool: "memory_put",
-        status: "error",
-        approvalDecision: "denied",
-        approvalChannel: "socket",
-      },
-      {
-        timestamp: now,
-        kind: "tool",
-        tool: "memory_put",
-        status: "error",
-        errorCategory: "permission_denied",
-      },
-    ]);
+    auditLog({
+      timestamp: now,
+      kind: "approval",
+      tool: "memory_put",
+      status: "error",
+      approvalDecision: "denied",
+      approvalChannel: "socket",
+    });
+    auditLog({
+      timestamp: now,
+      kind: "tool",
+      tool: "memory_put",
+      status: "error",
+      errorCategory: "permission_denied",
+    });
+    await _testFlush();
     const server = createMockServer();
     registerAuditTools(server, createMockConfig());
     const result = await server.callTool("audit_summary", {});
@@ -222,12 +224,11 @@ describe("audit_summary tool", () => {
 
   test("computes count / errorRate / topTools", async () => {
     const now = new Date().toISOString();
-    writeJsonl("audit.jsonl", [
-      { timestamp: now, tool: "alpha", status: "ok" },
-      { timestamp: now, tool: "alpha", status: "ok" },
-      { timestamp: now, tool: "alpha", status: "error" },
-      { timestamp: now, tool: "beta", status: "ok" },
-    ]);
+    auditLog({ timestamp: now, tool: "alpha", status: "ok" });
+    auditLog({ timestamp: now, tool: "alpha", status: "ok" });
+    auditLog({ timestamp: now, tool: "alpha", status: "error" });
+    auditLog({ timestamp: now, tool: "beta", status: "ok" });
+    await _testFlush();
     const server = createMockServer();
     registerAuditTools(server, createMockConfig());
     const result = await server.callTool("audit_summary", { topN: 5 });
@@ -237,15 +238,15 @@ describe("audit_summary tool", () => {
     expect(sc.errorRate).toBeCloseTo(0.25, 4);
     expect(sc.topTools[0]).toEqual({ tool: "alpha", count: 3, errors: 1 });
     expect(sc.topTools[1]).toEqual({ tool: "beta", count: 1, errors: 0 });
-    // Tamper-evidence surfaces in the summary. A contiguous valid legacy
-    // prefix (no _hmac) is supported until the first chained row appears.
+    // Tamper-evidence surfaces in the summary for the sealed chain.
     expect(sc.verified).toBe(true);
     expect(sc.auditDisabled).toBe(false);
   });
 
   test("exposes tamper-evidence (verified) as part of the declared contract", async () => {
     const now = new Date().toISOString();
-    writeJsonl("audit.jsonl", [{ timestamp: now, tool: "alpha", status: "ok" }]);
+    auditLog({ timestamp: now, tool: "alpha", status: "ok" });
+    await _testFlush();
     const server = createMockServer();
     registerAuditTools(server, createMockConfig());
     const result = await server.callTool("audit_summary", {});

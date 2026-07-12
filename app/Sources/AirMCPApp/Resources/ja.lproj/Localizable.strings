@@ -21,6 +21,11 @@
 "setup.copyingConfig" = "Claudeの設定をコピーしています...";
 
 /* Workflows */
+"workflow.todayOverview" = "今日の概要";
+"workflow.todayOverview.desc" = "何も変更せずに、今日のカレンダーと期限切れのリマインダーを確認します。";
+"workflow.todayOverview.prompt" = "今日のカレンダーイベントと期限切れのリマインダーを教えてください。何も変更しないでください。";
+"workflow.todayOverview.safety" = "読み取り専用です。カレンダーとリマインダーだけを読み取り、データは書き込みません。";
+"workflow.todayOverview.access" = "カレンダーとリマインダーを読み取ります。書き込みはありません。";
 "workflow.dailyBriefing" = "デイリーブリーフィング";
 "workflow.dailyBriefing.desc" = "カレンダー、リマインダー、メール、最近のメモを確認して一日を始めます。";
 "workflow.dailyBriefing.prompt" = "今日のカレンダー、期限切れのリマインダー、未読メール、最近のメモをまとめてください。";
@@ -109,6 +114,8 @@
 "onboarding.back" = "戻る";
 "onboarding.next" = "次へ";
 "onboarding.finish" = "完了";
+"onboarding.finishLater" = "後で完了";
+"onboarding.finishSetup" = "セットアップを完了";
 "onboarding.saveFailed" = "設定を保存できませんでした";
 "onboarding.stepWelcome" = "ようこそ";
 "onboarding.stepRuntime" = "ランタイム";
@@ -146,6 +153,16 @@
 "onboarding.connectClient" = "AIクライアントに接続";
 "onboarding.connectClientDesc" = "「接続」を選択すると、検出されたMCP対応クライアントにAirMCPを追加します。";
 "onboarding.copyPrompt" = "プロンプトをコピー";
+"onboarding.readSuccessTitle" = "1. 最初の成功：Macから読み取る";
+"onboarding.readSuccessNeedsModules" = "この読み取り専用プロンプトをコピーするには、「アプリへのアクセス」でカレンダーとリマインダーを有効にしてください。";
+"onboarding.governedWriteTitle" = "2. 管理された変更を1回試す";
+"onboarding.governedWriteDesc" = "読み取りに成功したら、このフォローアッププロンプトをコピーします。作成できるリマインダーは1件だけで、そのcreate_reminder呼び出しにはAirMCPの個別承認が必要です。";
+"onboarding.governedWritePrompt" = "上の読み取り専用結果から、最も緊急な項目を1つ選んでください。リマインダーの正確なタイトルと期限を先に表示し、その後create_reminderを1回だけ呼び出してください。AirMCPはその呼び出しについて私の承認を求める必要があります。承認が拒否された場合や利用できない場合は、何も変更せずに停止してください。";
+"onboarding.copyGovernedWritePrompt" = "管理された書き込みプロンプトをコピー";
+"onboarding.governedWriteCopyDisclosure" = "コピーだけでは実行も承認も行われません。その1回の呼び出しを承認した場合にのみリマインダーが作成されます。";
+"onboarding.governedWriteNeedsReminders" = "この管理された書き込みを試す前に、「Appアクセス」でリマインダーを有効にしてください。";
+"onboarding.governedWriteNeedsApproval" = "呼び出しごとの承認が無効か、create_reminderが承認対象外です。この管理された書き込みを試す前に承認を再度有効にしてください。";
+"onboarding.openTrustCenter" = "トラストセンターを開く";
 "onboarding.noClients" = "対応クライアントが見つかりません。後で「設定をコピー」メニューから手動で構成できます。";
 "onboarding.installed" = "インストール済み";
 "onboarding.notFound" = "見つかりません";
@@ -161,6 +178,7 @@
 "onboarding.firstRunReady" = "初回実行の準備ができました";
 "onboarding.firstRunNotReady" = "初回実行の準備ができていません";
 "onboarding.firstRunReadyDesc" = "ランタイムv%@に接続できます。%@のプロンプトをクライアントにコピーして、最初のワークフローを実行してください。";
+"onboarding.firstRunSelectedScopeReadyDesc" = "ランタイムv%@は選択した%@の範囲で利用できます。読み取り専用の最初の成功プロンプトを使うには、カレンダーとリマインダーを有効にしてください。";
 "onboarding.firstRunUnavailableModules" = "このMacでは利用できません: %@";
 "onboarding.firstRunRuntimeFailed" = "ローカルランタイムに接続できませんでした。AirMCPを開いたまま、もう一度確認してください。";
 "onboarding.firstRunTokenFailed" = "ローカルランタイムトークンを作成できませんでした：%@";

@@ -11,7 +11,9 @@ final class OnboardingAutoStartConsentPolicyTests: XCTestCase {
             runtimeFingerprint: String(repeating: "b", count: 64),
             tokenFingerprint: String(repeating: "c", count: 64),
             enabledModules: ["audit"],
-            unavailableModules: []
+            unavailableModules: [],
+            effectiveHitlLevel: .sensitiveOnly,
+            effectiveHitlWhitelist: []
         )
     }
 

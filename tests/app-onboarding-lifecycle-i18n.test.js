@@ -18,6 +18,7 @@ const runtimeScope = read("app/Sources/AirMCPApp/OnboardingRuntimeScope.swift");
 const packageManifest = read("app/Package.swift");
 const infoPlist = read("app/Sources/AirMCPApp/Resources/Info.plist");
 const english = read("app/Sources/AirMCPApp/Resources/en.lproj/Localizable.strings");
+const toolManifest = JSON.parse(read("docs/tool-manifest.json"));
 
 const locales = ["de", "es", "fr", "ja", "ko", "pt-BR", "zh-Hans", "zh-Hant"];
 const allLocales = ["en", ...locales];
@@ -33,6 +34,7 @@ const quickSetupKeys = [
   "setup.copyingConfig",
 ];
 const workflowPrefixes = [
+  "workflow.todayOverview",
   "workflow.dailyBriefing",
   "workflow.inboxTriage",
   "workflow.meetingPrep",
@@ -143,6 +145,95 @@ describe("macOS onboarding lifecycle", () => {
     expect(onboarding).toContain("guard !firstRunChecking, patchingClients.isEmpty else { return }");
   });
 
+  test("offers one governed reminder write after the read-only first success", () => {
+    const governedWrite = onboarding.match(
+      /private var governedWriteActions: some View \{([\s\S]*?)\n    \}\n\n    \/\/\/ Probe the port/,
+    )?.[1];
+    const governedPolicyProbe = onboarding.match(
+      /private func governedReminderCopyAllowed\(for scope: OnboardingRuntimeScope\) async -> Bool \{([\s\S]*?)\n    \}\n\n    \/\/\/ Copying remains observational/,
+    )?.[1];
+    const governedCopy = onboarding.match(
+      /private func copyGovernedReminderPromptIfAllowed\(\) async \{([\s\S]*?)\n    \}\n\n    @ViewBuilder/,
+    )?.[1];
+
+    expect(governedWrite).toBeDefined();
+    expect(governedPolicyProbe).toBeDefined();
+    expect(governedCopy).toBeDefined();
+    expect(onboarding.indexOf("firstSuccessActions")).toBeLessThan(
+      onboarding.indexOf("governedWriteActions"),
+    );
+    expect(onboarding).toContain('onboardingWorkflows.first(where: { $0.id == "today-overview" })');
+    expect(onboarding).toContain('preconditionFailure("The generated onboarding catalog must contain today-overview.")');
+    expect(onboarding).toContain("Label(firstSuccessWorkflow.title");
+    expect(onboarding).toContain("Text(firstSuccessWorkflow.prompt)");
+    expect(onboarding).toContain("Label(firstSuccessWorkflow.accessSummary");
+    expect(onboarding).toContain("AirMcpConstants.copyToClipboard(firstSuccessWorkflow.prompt)");
+    expect(onboarding).toContain(".disabled(!firstSuccessModulesEnabled)");
+    expect(onboarding).toContain('L("onboarding.readSuccessNeedsModules")');
+    expect(onboarding).not.toContain("AirMcpConstants.copyToClipboard(selectedWorkflow.prompt)");
+    expect(onboarding).toMatch(
+      /let ready = firstSuccessModulesEnabled\s*\? L\("onboarding\.firstRunReadyDesc", receipt\.version, firstSuccessWorkflow\.title\)\s*:\s*L\("onboarding\.firstRunSelectedScopeReadyDesc", receipt\.version, selectedWorkflow\.title\)/,
+    );
+    expect(onboarding).toContain('L("onboarding.governedWritePrompt")');
+    expect(governedWrite).toContain("Task { await copyGovernedReminderPromptIfAllowed() }");
+    expect(governedWrite).toContain(".disabled(!governedReminderAvailable)");
+    expect(governedWrite).toContain("openWindow(id: AirMcpConstants.trustCenterWindowID)");
+    expect(governedWrite).not.toContain("startFirstRunRuntime()");
+    expect(governedWrite).not.toContain("activateOnboardingRuntime(");
+    expect(governedWrite).not.toContain("autoStartEnabled");
+    expect(onboarding).toContain("case .sensitiveOnly, .allWrites, .all: true");
+    expect(onboarding).toContain('private static let reminderTool = "create_reminder"');
+    expect(onboarding).toContain("guard !whitelist.contains(reminderTool) else { return false }");
+    expect(onboarding).toContain("OnboardingGovernedWritePolicy.allowsReminderExample(");
+    expect(onboarding).toContain("case .running(let hitlLevel, let whitelist):");
+    expect(onboarding).toContain("AppRuntimeClient.runtimeState(token: runtimeToken)");
+    expect(onboarding).toContain("state.effectiveHitlLevel");
+    expect(onboarding).toContain("state.effectiveHitlWhitelist");
+    expect(governedPolicyProbe).toContain("let probe = await ServerManager.probeAppOwnedRuntime()");
+    expect(governedPolicyProbe).toContain("guard currentRuntimeScope == scope else { return false }");
+    expect(governedPolicyProbe).toContain("ServerManager.runtimeIsConfirmedUnavailable(probe)");
+    expect(governedPolicyProbe).toContain("runtimePolicy: .stopped");
+    expect(governedPolicyProbe).toContain("guard case .ready(let version, appOwned: true) = probe");
+    expect(governedPolicyProbe).toContain("AppRuntimeToken.loadExisting()");
+    expect(governedPolicyProbe).toContain("expectedVersion: version");
+    expect(governedPolicyProbe).not.toContain("switch serverManager.status");
+    expect(governedCopy).toContain("await governedReminderCopyAllowed(for: scope)");
+    expect(governedCopy).toContain("currentRuntimeScope == scope");
+    expect(governedCopy).toContain("AirMcpConstants.copyToClipboard(governedReminderPrompt)");
+    const governedPath = `${governedPolicyProbe}\n${governedCopy}`;
+    expect(governedPath).not.toContain("AppRuntimeToken.ensure()");
+    expect(governedPath).not.toContain("startFirstRunRuntime()");
+    expect(governedPath).not.toContain("activateOnboardingRuntime(");
+    expect(governedPath).not.toContain("patchConfig(");
+    expect(governedPath).not.toContain("patchCodexConfig(");
+    expect(onboarding).toContain('L("onboarding.governedWriteNeedsApproval")');
+
+    const createReminder = toolManifest.tools.find((tool) => tool.name === "create_reminder");
+    expect(createReminder?.annotations).toMatchObject({
+      readOnlyHint: false,
+      destructiveHint: false,
+      sensitiveHint: true,
+    });
+
+    const en = stringsMap(english);
+    expect(en.get("onboarding.governedWritePrompt")).toContain("create_reminder exactly once");
+    expect(en.get("onboarding.governedWritePrompt")).toContain(
+      "If approval is denied or unavailable, stop without making changes.",
+    );
+    expect(en.get("onboarding.governedWriteCopyDisclosure")).toContain(
+      "Copying does not run this prompt or grant approval.",
+    );
+  });
+
+  test("labels no-consent completion as Finish Later until the runtime is ready", () => {
+    expect(onboarding).toContain(
+      'Button(firstRunReady ? L("onboarding.finishSetup") : L("onboarding.finishLater"))',
+    );
+    expect(onboarding).toMatch(
+      /Button\(firstRunReady \? L\("onboarding\.finishSetup"\) : L\("onboarding\.finishLater"\)\) \{\s*Task \{ await saveAndComplete\(\) \}/,
+    );
+  });
+
   test("starts the runtime only after the explicit final-step action", () => {
     const readinessCheck = onboarding.match(/private func checkFirstRunReadiness\(\) async \{([\s\S]*?)\n    \}/)?.[1];
     const explicitStart = onboarding.match(/private func startFirstRunRuntime\(\) async \{([\s\S]*?)\n    \}/)?.[1];
@@ -214,6 +305,8 @@ describe("macOS onboarding lifecycle", () => {
     expect(appIntents).toContain("static func runtimeState() async throws -> AppRuntimeState");
     expect(appIntents).toContain("static func runtimeState(token: String) async throws -> AppRuntimeState");
     expect(appIntents).toContain("static func runtimeStateWhenReady(");
+    expect(appIntents).toContain("let effectiveHitlLevel: HitlLevel");
+    expect(appIntents).toContain("let effectiveHitlWhitelist: [String]");
     expect(appIntents).toContain("catch AppIntentMCPTransportError.httpStatus(let status, _) where status == 503");
     expect(appIntents).toContain("clock.now.duration(to: deadline)");
     expect(appIntents).toContain("requestTimeout: max(0.000_001, min(2, timeInterval(for: remaining)))");

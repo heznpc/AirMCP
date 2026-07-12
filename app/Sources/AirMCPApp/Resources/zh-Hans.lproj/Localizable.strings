@@ -21,6 +21,11 @@
 "setup.copyingConfig" = "正在拷贝Claude配置...";
 
 /* Workflows */
+"workflow.todayOverview" = "今日概览";
+"workflow.todayOverview.desc" = "查看今天的日历和逾期提醒事项，不作任何更改。";
+"workflow.todayOverview.prompt" = "请告诉我今天的日历日程和逾期提醒事项。不要更改任何内容。";
+"workflow.todayOverview.safety" = "仅限读取。只读取日历和提醒事项，绝不写入数据。";
+"workflow.todayOverview.access" = "读取日历和提醒事项。不写入。";
 "workflow.dailyBriefing" = "每日简报";
 "workflow.dailyBriefing.desc" = "通过日历、提醒事项、邮件和最近的备忘录开启一天。";
 "workflow.dailyBriefing.prompt" = "请汇总我今天的日历、逾期的提醒事项、未读邮件和最近的备忘录。";
@@ -109,6 +114,8 @@
 "onboarding.back" = "返回";
 "onboarding.next" = "下一步";
 "onboarding.finish" = "完成";
+"onboarding.finishLater" = "稍后完成";
+"onboarding.finishSetup" = "完成设置";
 "onboarding.saveFailed" = "无法保存配置";
 "onboarding.stepWelcome" = "欢迎";
 "onboarding.stepRuntime" = "运行时";
@@ -146,6 +153,16 @@
 "onboarding.connectClient" = "连接到AI客户端";
 "onboarding.connectClientDesc" = "选择“连接”，将AirMCP添加到检测到的MCP兼容客户端。";
 "onboarding.copyPrompt" = "拷贝提示词";
+"onboarding.readSuccessTitle" = "1. 首次成功：从Mac读取";
+"onboarding.readSuccessNeedsModules" = "请在App访问权限中启用日历和提醒事项，以复制此只读提示。";
+"onboarding.governedWriteTitle" = "2. 尝试一次受控更改";
+"onboarding.governedWriteDesc" = "读取成功后，拷贝这条后续提示词。它只能创建一个提醒事项，AirMCP会要求对该次create_reminder调用进行单独批准。";
+"onboarding.governedWritePrompt" = "从上面的只读结果中选择最紧急的一项。先向我显示提醒事项的准确标题和到期日期，然后只调用一次create_reminder。AirMCP必须请求我批准该调用。如果批准被拒绝或不可用，请停止且不要进行任何更改。";
+"onboarding.copyGovernedWritePrompt" = "拷贝受控写入提示词";
+"onboarding.governedWriteCopyDisclosure" = "拷贝不会运行此提示词，也不会授予批准。只有在您批准这一次调用后，才会创建提醒事项。";
+"onboarding.governedWriteNeedsReminders" = "请先在“App访问”中启用“提醒事项”，再尝试此受控写入。";
+"onboarding.governedWriteNeedsApproval" = "逐次调用批准已关闭，或create_reminder已被豁免。请先重新启用批准，再尝试此受控写入。";
+"onboarding.openTrustCenter" = "打开信任中心";
 "onboarding.noClients" = "未检测到受支持的客户端。您可以稍后使用“拷贝配置”菜单手动配置。";
 "onboarding.installed" = "已安装";
 "onboarding.notFound" = "未找到";
@@ -161,6 +178,7 @@
 "onboarding.firstRunReady" = "已准备好首次运行";
 "onboarding.firstRunNotReady" = "尚未准备好首次运行";
 "onboarding.firstRunReadyDesc" = "已可访问运行时v%@。将%@提示词拷贝到客户端以运行首个工作流。";
+"onboarding.firstRunSelectedScopeReadyDesc" = "运行时v%@可用于所选%@范围。请启用日历和提醒事项，以使用只读首次成功提示。";
 "onboarding.firstRunUnavailableModules" = "此Mac上不可用: %@";
 "onboarding.firstRunRuntimeFailed" = "无法访问本地运行时。请保持AirMCP打开，然后重新检查。";
 "onboarding.firstRunTokenFailed" = "无法创建本地运行时令牌：%@";

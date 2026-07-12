@@ -21,6 +21,11 @@
 "setup.copyingConfig" = "Copie de la configuration Claude...";
 
 /* Workflows */
+"workflow.todayOverview" = "Aperçu du jour";
+"workflow.todayOverview.desc" = "Consultez le calendrier du jour et les rappels en retard sans rien modifier.";
+"workflow.todayOverview.prompt" = "Indique-moi les événements du calendrier d’aujourd’hui et les rappels en retard. Ne modifie rien.";
+"workflow.todayOverview.safety" = "Lecture seule. Seuls Calendrier et Rappels sont lus ; aucune donnée n’est écrite.";
+"workflow.todayOverview.access" = "Lit Calendrier et Rappels. Aucune écriture.";
 "workflow.dailyBriefing" = "Résumé quotidien";
 "workflow.dailyBriefing.desc" = "Commencez la journée avec le calendrier, les rappels, les e-mails et les notes récentes.";
 "workflow.dailyBriefing.prompt" = "Résume mon calendrier du jour, les rappels en retard, les e-mails non lus et les notes récentes.";
@@ -109,6 +114,8 @@
 "onboarding.back" = "Retour";
 "onboarding.next" = "Suivant";
 "onboarding.finish" = "Terminer";
+"onboarding.finishLater" = "Terminer plus tard";
+"onboarding.finishSetup" = "Terminer la configuration";
 "onboarding.saveFailed" = "Impossible d’enregistrer la configuration";
 "onboarding.stepWelcome" = "Bienvenue";
 "onboarding.stepRuntime" = "Environnement";
@@ -146,6 +153,16 @@
 "onboarding.connectClient" = "Se connecter à un client d’IA";
 "onboarding.connectClientDesc" = "Choisissez Se connecter pour ajouter AirMCP à un client compatible avec MCP qui a été détecté.";
 "onboarding.copyPrompt" = "Copier l’instruction";
+"onboarding.readSuccessTitle" = "1. Premier succès : lire depuis votre Mac";
+"onboarding.readSuccessNeedsModules" = "Activez Calendrier et Rappels dans Accès aux apps pour copier cette invite en lecture seule.";
+"onboarding.governedWriteTitle" = "2. Essayez une modification contrôlée";
+"onboarding.governedWriteDesc" = "Une fois la lecture réussie, copiez ce prompt de suivi. Il peut créer exactement un rappel et AirMCP exigera une approbation distincte pour cet appel à create_reminder.";
+"onboarding.governedWritePrompt" = "Choisis l’unique élément le plus urgent dans le résultat en lecture seule ci-dessus. Montre-moi d’abord le titre exact et l’échéance du rappel, puis appelle create_reminder exactement une fois. AirMCP doit demander mon approbation pour cet appel. Si elle est refusée ou indisponible, arrête-toi sans rien modifier.";
+"onboarding.copyGovernedWritePrompt" = "Copier le prompt d’écriture contrôlée";
+"onboarding.governedWriteCopyDisclosure" = "La copie n’exécute pas ce prompt et n’accorde aucune approbation. Le rappel n’est créé que si vous approuvez cet appel unique.";
+"onboarding.governedWriteNeedsReminders" = "Activez Rappels dans Accès aux apps avant d’essayer cette écriture contrôlée.";
+"onboarding.governedWriteNeedsApproval" = "L’approbation par appel est désactivée ou create_reminder en est exempté. Réactivez l’approbation avant d’essayer cette écriture contrôlée.";
+"onboarding.openTrustCenter" = "Ouvrir le Centre de confiance";
 "onboarding.noClients" = "Aucun client pris en charge n’a été détecté. Vous pourrez le configurer manuellement plus tard à l’aide des options « Copier la configuration ».";
 "onboarding.installed" = "Installé";
 "onboarding.notFound" = "Introuvable";
@@ -161,6 +178,7 @@
 "onboarding.firstRunReady" = "Prêt pour la première exécution";
 "onboarding.firstRunNotReady" = "La première exécution n’est pas prête";
 "onboarding.firstRunReadyDesc" = "L’environnement v%@ est accessible. Copiez l’instruction %@ dans votre client pour lancer le premier flux de travail.";
+"onboarding.firstRunSelectedScopeReadyDesc" = "L’environnement v%@ est accessible pour le périmètre %@ sélectionné. Activez Calendrier et Rappels pour utiliser la première invite en lecture seule.";
 "onboarding.firstRunUnavailableModules" = "Indisponible sur ce Mac : %@";
 "onboarding.firstRunRuntimeFailed" = "L’environnement local n’est pas accessible. Laissez AirMCP ouvert, puis vérifiez à nouveau.";
 "onboarding.firstRunTokenFailed" = "Impossible de créer le jeton de l’environnement local : %@";

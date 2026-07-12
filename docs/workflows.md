@@ -28,6 +28,7 @@ These are the workflows AirMCP should make obvious in product, docs, demos, and 
 
 | Workflow | Type | Required modules | Core tools and skills | Safety shape |
 | --- | --- | --- | --- | --- |
+| Today Overview | prompt-recipe | `calendar`, `reminders` | `today_events`, `list_reminders` | Starter-safe and read-only; it never writes data. |
 | Daily Briefing | built-in-skill | `calendar`, `reminders`, `mail`, `notes` | `skill_daily-briefing`, `summarize_context`, `today_events`, `list_reminders`, `get_unread_count`, `list_notes` | Read-only by default; saving a note or reminder is a separate write action. |
 | Inbox Triage | built-in-skill | `mail`, `reminders` | `skill_inbox-triage`, `skill_sender-to-tasks`, `search_messages`, `create_reminder` | Reads mail first; reminder creation is auditable and prompts per call at the default HITL level. |
 | Meeting Prep | prompt-recipe | `calendar`, `notes`, `contacts`, `finder`, `reminders` | `today_events`, `search_notes`, `search_contacts`, `recent_files`, `list_reminders` | Read-only prep flow; agenda or task creation is an explicit follow-up write. |
@@ -37,6 +38,7 @@ These are the workflows AirMCP should make obvious in product, docs, demos, and 
 
 ## Copyable Prompts
 
+- **Today Overview**: "Tell me today's calendar events and overdue reminders. Do not change anything."
 - **Daily Briefing**: "Brief me on today's calendar, overdue reminders, unread mail, and recent notes."
 - **Inbox Triage**: "Find emails from Alex about the project and create reminders for action items."
 - **Meeting Prep**: "For my next meeting, find related notes, contacts, files, and reminders."
@@ -48,8 +50,8 @@ These are the workflows AirMCP should make obvious in product, docs, demos, and 
 
 ```bash
 npx airmcp workflows
+npx airmcp workflows today-overview --prompt
 npx airmcp workflows daily-briefing --prompt
-npx airmcp workflows daily-briefing --preview
 npx airmcp workflows meeting-prep --modules
 npx airmcp workflows inbox-triage --tools
 npx airmcp workflows --readiness
@@ -59,7 +61,29 @@ npx airmcp workflows project-digest --json
 
 The CLI prints the same curated workflow catalog that the macOS menubar app exposes under **Workflows**. The Mac app includes a copyable MCP prompt, core tools, and a safety note; optional Siri metadata is for iOS/launcher integrations only.
 
-Use a workflow id with `--prompt`, `--siri`, `--tools`, `--modules`, `--safety`, or `--json` when you want only one field for a shell script, launcher, onboarding screen, or agent prompt. `--readiness` checks profile, module-pack, add-on package, and write opt-in readiness without launching the live server; the MCP `workflow_readiness` tool checks live tool registration inside the active runtime. `daily-briefing --preview` performs a real read-only snapshot of Calendar, Reminders, Mail, and Notes; it does not write data.
+Use a workflow id with `--prompt`, `--siri`, `--tools`, `--modules`, `--safety`, or `--json` when you want only one field for a shell script, launcher, onboarding screen, or agent prompt. `--readiness` checks profile, module-pack, add-on package, and write opt-in readiness without launching the live server; the MCP `workflow_readiness` tool checks live tool registration inside the active runtime.
+
+For the governed first success, run
+`npx airmcp workflows today-overview --prompt` and paste the result into a
+connected MCP client. This exercises client authorization and records the MCP
+tool calls in AirMCP's audit path.
+
+The optional `--preview` mode is a direct-local diagnostic, not workflow
+execution. It bypasses MCP governance and AirMCP audit logging. Use it only to
+debug local Calendar or Reminders access:
+
+```bash
+npx airmcp workflows today-overview --preview
+npx airmcp workflows daily-briefing --preview
+```
+
+Every diagnostic preview first checks the active profile, module packs, and
+add-on packages. `today-overview --preview` returns only a bounded set of
+today's calendar events and reminders due before the current instant. It does
+not include reminders due later today, undated reminders, or aggregate
+incomplete-reminder counts. `daily-briefing --preview` keeps the broader local
+snapshot behavior and fails with a readiness explanation instead of reading
+Mail when Mail is not enabled.
 
 For Codex:
 

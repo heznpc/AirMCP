@@ -21,6 +21,11 @@
 "setup.copyingConfig" = "正在複製Claude設定...";
 
 /* Workflows */
+"workflow.todayOverview" = "今日概覽";
+"workflow.todayOverview.desc" = "查看今天的行事曆和逾期提醒事項，不作任何變更。";
+"workflow.todayOverview.prompt" = "請告訴我今天的行事曆行程和逾期提醒事項。不要變更任何內容。";
+"workflow.todayOverview.safety" = "僅限讀取。只讀取行事曆和提醒事項，絕不寫入資料。";
+"workflow.todayOverview.access" = "讀取行事曆和提醒事項。不寫入。";
 "workflow.dailyBriefing" = "每日簡報";
 "workflow.dailyBriefing.desc" = "透過行事曆、提醒事項、郵件和最近的備忘錄展開一天。";
 "workflow.dailyBriefing.prompt" = "請摘要我今天的行事曆、逾期的提醒事項、未讀郵件和最近的備忘錄。";
@@ -109,6 +114,8 @@
 "onboarding.back" = "返回";
 "onboarding.next" = "下一步";
 "onboarding.finish" = "完成";
+"onboarding.finishLater" = "稍後完成";
+"onboarding.finishSetup" = "完成設定";
 "onboarding.saveFailed" = "無法儲存設定";
 "onboarding.stepWelcome" = "歡迎";
 "onboarding.stepRuntime" = "執行環境";
@@ -146,6 +153,16 @@
 "onboarding.connectClient" = "連接AI用戶端";
 "onboarding.connectClientDesc" = "選擇「連接」，將AirMCP加入偵測到的MCP相容用戶端。";
 "onboarding.copyPrompt" = "複製提示";
+"onboarding.readSuccessTitle" = "1. 首次成功：從Mac讀取";
+"onboarding.readSuccessNeedsModules" = "請在App取用權限中啟用行事曆和提醒事項，以複製此唯讀提示。";
+"onboarding.governedWriteTitle" = "2. 嘗試一次受控變更";
+"onboarding.governedWriteDesc" = "讀取成功後，複製這段後續提示詞。它只能建立一個提醒事項，AirMCP會要求對該次create_reminder呼叫進行個別核准。";
+"onboarding.governedWritePrompt" = "從上面的唯讀結果中選擇最緊急的一項。先向我顯示提醒事項的確切標題和到期日，然後只呼叫一次create_reminder。AirMCP必須請求我核准該呼叫。如果核准遭拒或無法取得，請停止且不要進行任何變更。";
+"onboarding.copyGovernedWritePrompt" = "複製受控寫入提示詞";
+"onboarding.governedWriteCopyDisclosure" = "複製不會執行此提示詞，也不會授予核准。只有在您核准這一次呼叫後，才會建立提醒事項。";
+"onboarding.governedWriteNeedsReminders" = "請先在「App存取」中啟用「提醒事項」，再嘗試此受控寫入。";
+"onboarding.governedWriteNeedsApproval" = "逐次呼叫核准已關閉，或create_reminder已獲豁免。請先重新啟用核准，再嘗試此受控寫入。";
+"onboarding.openTrustCenter" = "開啟信任中心";
 "onboarding.noClients" = "未偵測到支援的用戶端。您可以稍後使用「複製設定」選單手動設定。";
 "onboarding.installed" = "已安裝";
 "onboarding.notFound" = "找不到";
@@ -161,6 +178,7 @@
 "onboarding.firstRunReady" = "已準備好首次執行";
 "onboarding.firstRunNotReady" = "尚未準備好首次執行";
 "onboarding.firstRunReadyDesc" = "執行環境v%@已可連線。將%@提示複製到用戶端，即可執行第一個工作流程。";
+"onboarding.firstRunSelectedScopeReadyDesc" = "執行環境v%@可用於所選%@範圍。請啟用行事曆和提醒事項，以使用唯讀的首次成功提示。";
 "onboarding.firstRunUnavailableModules" = "此Mac上無法使用: %@";
 "onboarding.firstRunRuntimeFailed" = "無法連線至本機執行環境。請保持AirMCP開啟，然後再次檢查。";
 "onboarding.firstRunTokenFailed" = "無法建立本機執行環境權杖：%@";

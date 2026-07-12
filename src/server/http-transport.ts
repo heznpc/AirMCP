@@ -56,7 +56,7 @@ export function parseRunCorrelationId(value: string | string[] | undefined): str
 
 /** Stable, non-secret comparison token for the effective module scope loaded
  * by this process. It is served only from the authenticated app runtime-state
- * endpoint; public /health intentionally omits module-selection evidence. */
+ * endpoint; public /health intentionally omits effective runtime evidence. */
 export function runtimeScopeFingerprint(disabledModules: Iterable<string>): string {
   const canonical = [...new Set(disabledModules)].sort().join("\n");
   return createHash("sha256").update(`airmcp-runtime-scope-v1\n${canonical}`, "utf8").digest("hex");
@@ -835,10 +835,10 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
   });
 
   // Authenticated native-app state: unlike public /health, this may reveal the
-  // effective module selection. Setup uses it to prove the running generation
-  // actually parsed the exact scope saved immediately before launch. PID plus
-  // the app-only owner fingerprint binds lifecycle control to this exact
-  // process instead of every process with a matching command line.
+  // effective module and HITL policies. Setup uses it to prove the running
+  // generation actually parsed the exact scope and per-call approval policy.
+  // PID plus the app-only owner fingerprint binds lifecycle control to this
+  // exact process instead of every process with a matching command line.
   app.get("/app/runtime-state", (_req, res) => {
     if (!appOwnedRuntime || !httpToken || !appRuntimeOwnerFingerprint) {
       res.status(404).json({ error: "Not found" });
@@ -850,6 +850,7 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
       return;
     }
     const disabledModules = [...(serverOptions.config?.disabledModules ?? [])].sort();
+    const effectiveHitlWhitelist = [...serverOptions.config.hitl.whitelist].sort();
     res.json({
       status: "ok",
       version: pkg.version,
@@ -860,6 +861,8 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
       scopeFingerprint: runtimeScopeFingerprint(disabledModules),
       enabledModules: runtimeModuleState.enabledModules,
       unavailableModules: runtimeModuleState.unavailableModules,
+      effectiveHitlLevel: serverOptions.config.hitl.level,
+      effectiveHitlWhitelist,
     });
   });
 

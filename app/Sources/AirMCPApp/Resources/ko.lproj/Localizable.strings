@@ -49,6 +49,11 @@
 "workflow.copyPrompt" = "프롬프트 복사";
 "workflow.copyToolList" = "도구 목록 복사";
 "workflow.openShortcutsDoc" = "단축어 동작 가이드 열기";
+"workflow.todayOverview" = "오늘 한눈에 보기";
+"workflow.todayOverview.desc" = "아무것도 변경하지 않고 오늘 일정과 기한이 지난 미리알림을 확인합니다.";
+"workflow.todayOverview.prompt" = "오늘 일정과 기한이 지난 미리알림을 알려줘. 아무것도 변경하지 마.";
+"workflow.todayOverview.safety" = "읽기 전용입니다. 캘린더와 미리알림만 읽고 데이터를 쓰지 않습니다.";
+"workflow.todayOverview.access" = "캘린더와 미리알림을 읽습니다. 쓰기 없음.";
 "workflow.dailyBriefing" = "데일리 브리핑";
 "workflow.dailyBriefing.desc" = "캘린더, 미리알림, 메일, 최근 메모로 하루를 시작합니다.";
 "workflow.dailyBriefing.prompt" = "오늘 캘린더, 지난 미리알림, 읽지 않은 메일, 최근 메모를 브리핑해줘.";
@@ -331,6 +336,8 @@
 "onboarding.back" = "이전";
 "onboarding.next" = "다음";
 "onboarding.finish" = "완료";
+"onboarding.finishLater" = "나중에 완료";
+"onboarding.finishSetup" = "설정 완료";
 "onboarding.saveFailed" = "설정을 저장할 수 없음";
 "onboarding.stepWelcome" = "시작";
 "onboarding.stepRuntime" = "런타임";
@@ -357,7 +364,7 @@
 "onboarding.nodeCheckAgain" = "다시 확인";
 "onboarding.chooseWorkflow" = "AirMCP로 먼저 무엇을 할까요?";
 "onboarding.chooseWorkflowDesc" = "시작할 목표 하나를 고르세요. AirMCP가 필요한 Mac 앱만 설정합니다.";
-"onboarding.workflowPresetHint" = "%@이 선택되었습니다. 계속하기 전에 앱 접근 범위를 조정할 수 있습니다.";
+"onboarding.workflowPresetHint" = "‘%@’ 워크플로를 선택했습니다. 계속하기 전에 앱 접근 범위를 조정할 수 있습니다.";
 "onboarding.chooseModules" = "모듈 선택";
 "onboarding.chooseModulesDesc" = "AirMCP가 접근할 Mac 앱을 선택하세요. 나중에 설정에서 변경할 수 있습니다.";
 "onboarding.enableAll" = "표시된 모듈 모두 활성화";
@@ -368,6 +375,16 @@
 "onboarding.connectClient" = "AI 클라이언트 연결";
 "onboarding.connectClientDesc" = "감지된 MCP 호환 클라이언트에 AirMCP를 추가하려면 연결을 선택하세요.";
 "onboarding.copyPrompt" = "프롬프트 복사";
+"onboarding.readSuccessTitle" = "1. 첫 성공: Mac에서 읽기";
+"onboarding.readSuccessNeedsModules" = "이 읽기 전용 프롬프트를 복사하려면 앱 접근에서 캘린더와 미리알림을 활성화하세요.";
+"onboarding.governedWriteTitle" = "2. 통제되는 변경 한 번 체험";
+"onboarding.governedWriteDesc" = "읽기가 성공하면 이 후속 프롬프트를 복사하세요. 미리알림을 정확히 하나만 만들 수 있으며, AirMCP는 해당 create_reminder 호출을 별도로 승인받습니다.";
+"onboarding.governedWritePrompt" = "위 읽기 전용 결과에서 가장 급한 항목 하나를 골라줘. 정확한 미리알림 제목과 기한을 먼저 보여준 다음 create_reminder를 정확히 한 번 호출해. AirMCP가 그 호출에 대해 내 승인을 요청해야 해. 승인이 거절되거나 불가능하면 아무것도 변경하지 말고 중단해.";
+"onboarding.copyGovernedWritePrompt" = "통제형 쓰기 프롬프트 복사";
+"onboarding.governedWriteCopyDisclosure" = "복사만으로는 실행되거나 승인되지 않습니다. 해당 호출을 승인한 경우에만 미리알림이 생성됩니다.";
+"onboarding.governedWriteNeedsReminders" = "이 통제형 쓰기를 체험하려면 앱 접근에서 미리알림을 활성화하세요.";
+"onboarding.governedWriteNeedsApproval" = "호출별 승인이 꺼져 있거나 create_reminder가 승인 대상에서 제외되어 있습니다. 이 통제형 쓰기를 체험하기 전에 승인을 다시 활성화하세요.";
+"onboarding.openTrustCenter" = "Trust Center 열기";
 "onboarding.noClients" = "지원되는 클라이언트가 감지되지 않았습니다. 나중에 '설정 복사' 메뉴에서 수동으로 설정할 수 있습니다.";
 "onboarding.installed" = "설치됨";
 "onboarding.notFound" = "미발견";
@@ -383,6 +400,7 @@
 "onboarding.firstRunReady" = "첫 실행 준비 완료";
 "onboarding.firstRunNotReady" = "첫 실행 준비 안 됨";
 "onboarding.firstRunReadyDesc" = "런타임 v%@에 연결할 수 있습니다. %@ 프롬프트를 클라이언트에 붙여넣어 첫 워크플로를 실행하세요.";
+"onboarding.firstRunSelectedScopeReadyDesc" = "런타임 v%@에 연결되었으며 선택한 ‘%@’ 범위가 준비되었습니다. 읽기 전용 첫 성공 프롬프트를 사용하려면 캘린더와 미리알림을 활성화하세요.";
 "onboarding.firstRunUnavailableModules" = "이 Mac에서 사용할 수 없음: %@";
 "onboarding.firstRunRuntimeFailed" = "로컬 런타임에 연결할 수 없습니다. AirMCP를 열어둔 뒤 다시 확인하세요.";
 "onboarding.firstRunTokenFailed" = "로컬 런타임 토큰을 만들 수 없습니다: %@";

@@ -102,7 +102,7 @@
   <!-- Hero -->
   <header class="relative z-[1] pt-[calc(56px+100px)] pb-16 text-center">
     <div class="max-w-[1080px] mx-auto px-5">
-      <p class="font-mono text-sm opacity-30 tracking-tight mb-6 reveal" data-i18n="hero_tag">npx airmcp init → connected</p>
+      <p class="font-mono text-sm opacity-30 tracking-tight mb-6 reveal" data-i18n="hero_tag">Choose your client. Then choose its install path.</p>
       <div class="flex flex-col items-center gap-5 reveal" data-delay="60">
         <img src="airmcp-icon-256.png" alt="AirMCP" width="120" height="120">
         <h1 class="text-[clamp(3.6rem,10vw,7rem)] leading-[.98] tracking-tighter hero-h1"><span class="font-light">Air</span><span class="font-bold">MCP</span></h1>
@@ -110,8 +110,8 @@
       <p class="mt-5 text-xl opacity-50 font-medium reveal" data-delay="90" data-i18n="hero_tagline">More than Siri. Open to every agent.</p>
       <p class="mt-3 text-base opacity-30 max-w-[50ch] mx-auto leading-relaxed reveal" data-delay="120" data-i18n="hero_sub">Pull action items from last week's meeting notes, drop them into Reminders, get pinged when they're done.</p>
       <div class="flex gap-3 justify-center mt-10 reveal" data-delay="160">
-        <a href="https://github.com/heznpc/AirMCP" target="_blank" rel="noopener" class="lg-btn"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="opacity:.7"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>GitHub</a>
-        <a href="https://www.npmjs.com/package/airmcp" target="_blank" rel="noopener" class="lg-btn lg-btn--ghost"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="opacity:.7"><path d="M0 7.334v8h6.666v1.332H12v-1.332h12v-8H0zm6.666 6.664H5.334v-4H3.999v4H1.335V8.667h5.331v5.331zm4 0h-2.666V8.667h2.666v5.331zm12 0h-1.33v-4h-1.337v4h-1.332v-4h-1.336v4h-2.669V8.667h8.004v5.331zM10 10h1.334v2.667H10V10z"/></svg>npm</a>
+        <a href="#install" class="lg-btn" data-i18n="hero_cta">Choose install path</a>
+        <a href="https://github.com/heznpc/AirMCP/releases" target="_blank" rel="noopener" class="lg-btn lg-btn--ghost" data-i18n="hero_releases">Release downloads</a>
         <a href="https://github.com/heznpc/AirMCP/discussions" target="_blank" rel="noopener" class="lg-btn lg-btn--ghost"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.7"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 10h.01"/><path d="M12 10h.01"/><path d="M16 10h.01"/></svg><span data-i18n="hero_discussions">Discussions</span></a>
       </div>
     </div>
@@ -604,7 +604,7 @@
           <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
           <div class="glass-content">
             <div class="flex gap-1.5 mb-3 flex-wrap">
-              <span class="wf-tag">Mail</span>
+              <span class="wf-tag" data-i18n="mod_mail">Mail</span>
               <span class="wf-tag">Reminders</span>
               <span class="wf-tag">loop</span>
             </div>
@@ -688,10 +688,11 @@
             <div class="flex gap-1.5 mb-3 flex-wrap">
               <span class="wf-tag">Calendar</span>
               <span class="wf-tag">Reminders</span>
+              <span class="wf-tag">Mail</span>
               <span class="wf-tag">Notes</span>
             </div>
             <h3 class="card-title"><code class="font-mono text-[.85em] opacity-80">daily-briefing</code></h3>
-            <p class="card-desc" data-i18n="wf_daily">Summarize today's events, due reminders, and recent notes.</p>
+            <p class="card-desc" data-i18n="wf_daily">Summarize today's events, due reminders, unread mail, and recent notes.</p>
           </div>
         </div>
 
@@ -843,23 +844,35 @@
 
   <!-- Install -->
   <section id="install" class="relative z-[1] py-20">
-    <div class="max-w-[560px] mx-auto px-5 text-center">
+    <div class="max-w-[900px] mx-auto px-5 text-center">
       <div>
         <p class="section-label reveal" data-i18n="install_label">Installation</p>
-        <h2 class="text-[clamp(2rem,5vw,3rem)] font-bold tracking-tight mt-2 reveal" data-delay="40" data-i18n="install_title">Start in seconds.</h2>
-        <p class="mt-3 text-sm opacity-35 reveal" data-delay="80" data-i18n="install_sub">Install globally, or run directly with npx.</p>
+        <h2 class="text-[clamp(2rem,5vw,3rem)] font-bold tracking-tight mt-2 reveal" data-delay="40" data-i18n="install_title">Choose the path for your client.</h2>
+        <p class="mt-3 text-sm opacity-35 reveal" data-delay="80" data-i18n="install_sub">The current public paths are a Claude Desktop extension and direct stdio for other MCP clients.</p>
       </div>
-      <div class="glass-card mt-10 reveal" data-delay="100">
-        <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
-        <div class="glass-content text-left">
-          <pre class="font-mono text-sm leading-8"><span class="opacity-25"># Install globally</span>
-<span class="opacity-40">$ </span><span class="opacity-70">npm install -g airmcp</span>
-
-<span class="opacity-25"># Or run directly</span>
-<span class="opacity-40">$ </span><span class="opacity-70">npx airmcp</span></pre>
+      <div class="grid grid-cols-2 gap-4 max-md:grid-cols-1 mt-10">
+        <div class="glass-card reveal" data-delay="100">
+          <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
+          <div class="glass-content text-left">
+            <small class="card-badge">Claude Desktop</small>
+            <h3 class="card-title mt-4" data-i18n="install_mcpb_title">Install the .mcpb</h3>
+            <p class="card-desc mt-2" data-i18n="install_mcpb_desc">Download airmcp-&lt;version&gt;.mcpb, then drag it into Claude Desktop. No app download or npm setup is required.</p>
+            <a href="https://github.com/heznpc/AirMCP/releases" target="_blank" rel="noopener" class="lg-btn mt-6 inline-flex" data-i18n="install_releases">Open Releases</a>
+          </div>
+        </div>
+        <div class="glass-card reveal" data-delay="140">
+          <div class="glass-fx"></div><div class="glass-tint"></div><div class="glass-shine"></div>
+          <div class="glass-content text-left">
+            <small class="card-badge">Codex · Claude Code · Cursor · Windsurf</small>
+            <h3 class="card-title mt-4" data-i18n="install_stdio_title">Connect direct stdio</h3>
+            <p class="card-desc mt-2" data-i18n="install_stdio_desc">Use the npm runtime directly when the current release does not include a signed AirMCP.app ZIP.</p>
+            <pre class="font-mono text-xs leading-7 mt-5 overflow-x-auto"><span class="opacity-40">$ </span><span class="opacity-70">npx airmcp init --no-clients</span>
+<span class="opacity-40">$ </span><span class="opacity-70">npx airmcp connect-clients --client-runtime direct</span></pre>
+          </div>
         </div>
       </div>
-      <p class="mt-6 text-xs opacity-25 reveal" data-delay="140" data-i18n="install_note">Requires Node.js 20+ and macOS. Works with Claude Code, Codex, and any MCP client.</p>
+      <p class="mt-6 text-xs opacity-30 reveal" data-delay="180" data-i18n="install_app_note">AirMCP.app is an additional app-owned runtime only when a release lists a signed AirMCP-&lt;version&gt;.zip. If that asset is absent, do not configure clients to wait for the app runtime.</p>
+      <p class="mt-3 text-xs opacity-25 reveal" data-delay="200" data-i18n="install_note">Direct stdio requires Node.js 20+ and macOS. Client configuration changes remain explicit.</p>
     </div>
   </section>
 

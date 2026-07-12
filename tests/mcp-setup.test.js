@@ -596,7 +596,7 @@ describe('createServer — module add-on install hints', () => {
         expect.objectContaining({ code: 'tool_not_registered', tool: 'today_events' }),
       ]),
     );
-    expect(status.structuredContent.workflowReadiness).toMatchObject({ total: 6, blocked: 6 });
+    expect(status.structuredContent.workflowReadiness).toMatchObject({ total: 7, blocked: 7 });
   });
 
   test('profile_status and list_module_packs expose on-demand install commands for missing packs', async () => {

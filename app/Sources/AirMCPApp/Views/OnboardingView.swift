@@ -27,6 +27,53 @@ enum OnboardingAutoStartConsentPolicy {
     }
 }
 
+/// The guided write example is offered only when its one tool call is covered
+/// by the current per-call approval policy. Setup never changes HITL settings
+/// or a user's whitelist just to make the example available.
+enum OnboardingGovernedWritePolicy {
+    private static let reminderTool = "create_reminder"
+
+    enum RuntimePolicyState: Equatable {
+        /// The app has confirmed that no runtime is serving the app-owned port,
+        /// so the persisted config is the policy a future start will load.
+        case stopped
+        /// Policy decoded from the authenticated app-owned runtime-state
+        /// endpoint. This is authoritative while that runtime is running.
+        case running(hitlLevel: HitlLevel, whitelist: [String])
+        /// Checking, conflicting, or running without authenticated policy
+        /// evidence. Never fall back to config in this state.
+        case unavailable
+    }
+
+    static func requiresPerCallApproval(hitlLevel: HitlLevel, whitelist: [String]) -> Bool {
+        guard !whitelist.contains(reminderTool) else { return false }
+        return switch hitlLevel {
+        case .sensitiveOnly, .allWrites, .all: true
+        case .off, .destructiveOnly: false
+        }
+    }
+
+    static func allowsReminderExample(
+        remindersEnabled: Bool,
+        configuredHitlLevel: HitlLevel,
+        configuredWhitelist: [String],
+        runtimePolicy: RuntimePolicyState
+    ) -> Bool {
+        guard remindersEnabled else { return false }
+        return switch runtimePolicy {
+        case .stopped:
+            requiresPerCallApproval(
+                hitlLevel: configuredHitlLevel,
+                whitelist: configuredWhitelist
+            )
+        case .running(let hitlLevel, let whitelist):
+            requiresPerCallApproval(hitlLevel: hitlLevel, whitelist: whitelist)
+        case .unavailable:
+            false
+        }
+    }
+}
+
 /// A successful activation receipt is only a point-in-time observation: the
 /// child can exit before Setup records auto-start consent. Commit that consent
 /// first, ask ServerManager to recover a known-stopped runtime, then require a
@@ -59,6 +106,8 @@ enum OnboardingRuntimeReadyBarrier {
 
 struct OnboardingView: View {
     static let preferredContentSize = NSSize(width: 640, height: 520)
+
+    @Environment(\.openWindow) private var openWindow
 
     let configManager: ConfigManager
     let serverManager: ServerManager
@@ -148,10 +197,65 @@ struct OnboardingView: View {
         onboardingWorkflows.first { $0.id == selectedWorkflowID } ?? onboardingWorkflows[0]
     }
 
+    /// The first success is intentionally invariant. A selected workflow may
+    /// configure a broader or different scope, but a write-capable workflow
+    /// prompt must never be presented as the read-only first run.
+    private var firstSuccessWorkflow: OnboardingWorkflow {
+        guard let workflow = onboardingWorkflows.first(where: { $0.id == "today-overview" }) else {
+            preconditionFailure("The generated onboarding catalog must contain today-overview.")
+        }
+        return workflow
+    }
+
     private var currentRuntimeScope: OnboardingRuntimeScope {
         OnboardingRuntimeScope(
             workflowID: selectedWorkflowID,
             disabledModules: disabledModules.union(unmanagedDisabledModules)
+        )
+    }
+
+    private var remindersEnabled: Bool {
+        !currentRuntimeScope.disabledModules.contains("reminders")
+    }
+
+    private var firstSuccessModulesEnabled: Bool {
+        firstSuccessWorkflow.requiredModules.isDisjoint(with: currentRuntimeScope.disabledModules)
+    }
+
+    private var governedReminderPrompt: String {
+        L("onboarding.governedWritePrompt")
+    }
+
+    private var governedRuntimePolicy: OnboardingGovernedWritePolicy.RuntimePolicyState {
+        switch serverManager.status {
+        case .stopped:
+            return .stopped
+        case .running:
+            guard let runtimeReceipt else { return .unavailable }
+            return .running(
+                hitlLevel: runtimeReceipt.effectiveHitlLevel,
+                whitelist: runtimeReceipt.effectiveHitlWhitelist
+            )
+        case .checking, .error:
+            return .unavailable
+        }
+    }
+
+    private var governedReminderApprovalEnabled: Bool {
+        OnboardingGovernedWritePolicy.allowsReminderExample(
+            remindersEnabled: true,
+            configuredHitlLevel: configManager.hitlLevel,
+            configuredWhitelist: configManager.hitlWhitelist,
+            runtimePolicy: governedRuntimePolicy
+        )
+    }
+
+    private var governedReminderAvailable: Bool {
+        OnboardingGovernedWritePolicy.allowsReminderExample(
+            remindersEnabled: remindersEnabled,
+            configuredHitlLevel: configManager.hitlLevel,
+            configuredWhitelist: configManager.hitlWhitelist,
+            runtimePolicy: governedRuntimePolicy
         )
     }
 
@@ -217,7 +321,7 @@ struct OnboardingView: View {
                             || !patchingClients.isEmpty
                     )
                 } else {
-                    Button(L("onboarding.finish")) {
+                    Button(firstRunReady ? L("onboarding.finishSetup") : L("onboarding.finishLater")) {
                         Task { await saveAndComplete() }
                     }
                     .keyboardShortcut(.defaultAction)
@@ -648,7 +752,9 @@ struct OnboardingView: View {
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: 460)
 
-                selectedWorkflowActions
+                firstSuccessActions
+
+                governedWriteActions
 
                 firstRunStatusCard
 
@@ -684,21 +790,39 @@ struct OnboardingView: View {
         }
     }
 
-    private var selectedWorkflowActions: some View {
+    private var firstSuccessActions: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label(selectedWorkflow.title, systemImage: selectedWorkflow.icon)
+            Text(L("onboarding.readSuccessTitle"))
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundStyle(Color.accentColor)
+
+            Label(firstSuccessWorkflow.title, systemImage: firstSuccessWorkflow.icon)
                 .font(.headline)
 
-            Text(selectedWorkflow.prompt)
+            Text(firstSuccessWorkflow.prompt)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(2)
 
+            Label(firstSuccessWorkflow.accessSummary, systemImage: "checkmark.shield")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
             HStack(spacing: 8) {
                 Button(L("onboarding.copyPrompt")) {
-                    AirMcpConstants.copyToClipboard(selectedWorkflow.prompt)
+                    AirMcpConstants.copyToClipboard(firstSuccessWorkflow.prompt)
                 }
                 .controlSize(.small)
+                .disabled(!firstSuccessModulesEnabled)
+                .accessibilityIdentifier("onboarding.copyFirstSuccessPrompt")
+            }
+
+            if !firstSuccessModulesEnabled {
+                Label(L("onboarding.readSuccessNeedsModules"), systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption2)
+                    .foregroundStyle(Color.orange)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(10)
@@ -712,6 +836,125 @@ struct OnboardingView: View {
                 .stroke(Color.accentColor.opacity(0.2), lineWidth: 1)
         )
         .padding(.horizontal, 24)
+    }
+
+    private var governedWriteActions: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(L("onboarding.governedWriteTitle"), systemImage: "checkmark.shield.fill")
+                .font(.headline)
+
+            Text(L("onboarding.governedWriteDesc"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(governedReminderPrompt)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(3)
+
+            HStack(spacing: 8) {
+                Button(L("onboarding.copyGovernedWritePrompt")) {
+                    Task { await copyGovernedReminderPromptIfAllowed() }
+                }
+                .controlSize(.small)
+                .disabled(!governedReminderAvailable)
+                .accessibilityIdentifier("onboarding.copyGovernedWritePrompt")
+
+                Button(L("onboarding.openTrustCenter")) {
+                    openWindow(id: AirMcpConstants.trustCenterWindowID)
+                }
+                .controlSize(.small)
+                .accessibilityIdentifier("onboarding.openTrustCenter")
+            }
+
+            governedWriteDisclosure
+                .font(.caption2)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.secondary.opacity(0.05))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.secondary.opacity(0.15), lineWidth: 1)
+        )
+        .padding(.horizontal, 24)
+    }
+
+    /// Probe the port at the moment of the CTA. ServerManager's displayed
+    /// status is cached, so even `.stopped` is not authority to trust the file
+    /// policy: only a fresh `.unavailable` result makes that future-start
+    /// policy relevant. Every live or ambiguous listener fails closed unless
+    /// it proves the effective app-owned runtime policy and exact scope.
+    private func governedReminderCopyAllowed(for scope: OnboardingRuntimeScope) async -> Bool {
+        let probe = await ServerManager.probeAppOwnedRuntime()
+        guard currentRuntimeScope == scope else { return false }
+
+        if ServerManager.runtimeIsConfirmedUnavailable(probe) {
+            return OnboardingGovernedWritePolicy.allowsReminderExample(
+                remindersEnabled: true,
+                configuredHitlLevel: configManager.hitlLevel,
+                configuredWhitelist: configManager.hitlWhitelist,
+                runtimePolicy: .stopped
+            )
+        }
+
+        guard case .ready(let version, appOwned: true) = probe,
+              let runtimeToken = (try? AppRuntimeToken.loadExisting()) ?? nil,
+              let state = try? await AppRuntimeClient.runtimeState(token: runtimeToken),
+              let expectedOwnerFingerprint = try? AppRuntimeToken.expectedOwnerFingerprint(),
+              ServerManager.authenticatedOwnedRuntimeIdentity(
+                  state: state,
+                  expectedVersion: version,
+                  expectedOwnerFingerprint: expectedOwnerFingerprint
+              ) != nil,
+              currentRuntimeScope == scope,
+              AppRuntimeToken.matchesExisting(runtimeToken),
+              state.disabledModules == scope.disabledModules,
+              state.scopeFingerprint == scope.runtimeFingerprint,
+              state.enabledModules.contains("reminders"),
+              OnboardingGovernedWritePolicy.requiresPerCallApproval(
+                  hitlLevel: state.effectiveHitlLevel,
+                  whitelist: state.effectiveHitlWhitelist
+              )
+        else { return false }
+        return true
+    }
+
+    /// Copying remains observational: the probe helper never starts a runtime,
+    /// creates credentials, or changes a client configuration.
+    private func copyGovernedReminderPromptIfAllowed() async {
+        guard remindersEnabled else { return }
+        let scope = currentRuntimeScope
+        guard await governedReminderCopyAllowed(for: scope),
+              currentRuntimeScope == scope,
+              remindersEnabled
+        else {
+            // Any failed or raced observation invalidates the policy receipt
+            // that made the button appear available.
+            runtimeReceipt = nil
+            return
+        }
+
+        AirMcpConstants.copyToClipboard(governedReminderPrompt)
+    }
+
+    @ViewBuilder
+    private var governedWriteDisclosure: some View {
+        if !remindersEnabled {
+            Label(L("onboarding.governedWriteNeedsReminders"), systemImage: "exclamationmark.triangle.fill")
+                .foregroundStyle(Color.orange)
+        } else if !governedReminderApprovalEnabled {
+            Label(L("onboarding.governedWriteNeedsApproval"), systemImage: "exclamationmark.triangle.fill")
+                .foregroundStyle(Color.orange)
+        } else {
+            Label(L("onboarding.governedWriteCopyDisclosure"), systemImage: "hand.raised.fill")
+                .foregroundStyle(Color.secondary)
+        }
     }
 
     private var firstRunStatusCard: some View {
@@ -1177,7 +1420,9 @@ struct OnboardingView: View {
     }
 
     private func readyMessage(_ receipt: ServerManager.OnboardingRuntimeReceipt) -> String {
-        let ready = L("onboarding.firstRunReadyDesc", receipt.version, selectedWorkflow.title)
+        let ready = firstSuccessModulesEnabled
+            ? L("onboarding.firstRunReadyDesc", receipt.version, firstSuccessWorkflow.title)
+            : L("onboarding.firstRunSelectedScopeReadyDesc", receipt.version, selectedWorkflow.title)
         let unavailable = receipt.unavailableModules.map(\.module).sorted()
         guard !unavailable.isEmpty else { return ready }
         return ready + "\n" + L("onboarding.firstRunUnavailableModules", unavailable.joined(separator: ", "))

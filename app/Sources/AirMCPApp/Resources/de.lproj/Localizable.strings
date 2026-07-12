@@ -21,6 +21,11 @@
 "setup.copyingConfig" = "Claude-Konfiguration wird kopiert ...";
 
 /* Workflows */
+"workflow.todayOverview" = "Heutiger Überblick";
+"workflow.todayOverview.desc" = "Heutige Kalendertermine und überfällige Erinnerungen ansehen, ohne etwas zu ändern.";
+"workflow.todayOverview.prompt" = "Zeige mir die heutigen Kalendertermine und überfälligen Erinnerungen. Ändere nichts.";
+"workflow.todayOverview.safety" = "Schreibgeschützt. Es werden nur Kalender und Erinnerungen gelesen und niemals Daten geschrieben.";
+"workflow.todayOverview.access" = "Liest Kalender und Erinnerungen. Keine Schreibvorgänge.";
 "workflow.dailyBriefing" = "Tagesüberblick";
 "workflow.dailyBriefing.desc" = "Mit Kalender, Erinnerungen, E-Mails und aktuellen Notizen in den Tag starten.";
 "workflow.dailyBriefing.prompt" = "Fasse meinen heutigen Kalender, überfällige Erinnerungen, ungelesene E-Mails und aktuelle Notizen zusammen.";
@@ -109,6 +114,8 @@
 "onboarding.back" = "Zurück";
 "onboarding.next" = "Weiter";
 "onboarding.finish" = "Fertig";
+"onboarding.finishLater" = "Später abschließen";
+"onboarding.finishSetup" = "Einrichtung abschließen";
 "onboarding.saveFailed" = "Konfiguration konnte nicht gespeichert werden";
 "onboarding.stepWelcome" = "Willkommen";
 "onboarding.stepRuntime" = "Laufzeit";
@@ -146,6 +153,16 @@
 "onboarding.connectClient" = "Mit einem KI-Client verbinden";
 "onboarding.connectClientDesc" = "Wähle „Verbinden“, um AirMCP zu einem erkannten MCP-kompatiblen Client hinzuzufügen.";
 "onboarding.copyPrompt" = "Prompt kopieren";
+"onboarding.readSuccessTitle" = "1. Erster Erfolg: vom Mac lesen";
+"onboarding.readSuccessNeedsModules" = "Aktiviere Kalender und Erinnerungen unter App-Zugriff, um diesen schreibgeschützten Prompt zu kopieren.";
+"onboarding.governedWriteTitle" = "2. Eine kontrollierte Änderung testen";
+"onboarding.governedWriteDesc" = "Kopiere nach dem erfolgreichen Lesevorgang diesen Folge-Prompt. Er kann genau eine Erinnerung erstellen; AirMCP verlangt für diesen create_reminder-Aufruf eine separate Genehmigung.";
+"onboarding.governedWritePrompt" = "Wähle aus dem schreibgeschützten Ergebnis oben den dringendsten Eintrag aus. Zeige mir zuerst den genauen Titel und die Fälligkeit der Erinnerung und rufe dann create_reminder genau einmal auf. AirMCP muss meine Genehmigung für diesen Aufruf anfordern. Wird sie abgelehnt oder ist sie nicht verfügbar, beende den Vorgang ohne Änderungen.";
+"onboarding.copyGovernedWritePrompt" = "Prompt für kontrolliertes Schreiben kopieren";
+"onboarding.governedWriteCopyDisclosure" = "Das Kopieren führt den Prompt nicht aus und erteilt keine Genehmigung. Die Erinnerung wird nur erstellt, wenn du diesen einen Aufruf genehmigst.";
+"onboarding.governedWriteNeedsReminders" = "Aktiviere Erinnerungen unter App-Zugriff, bevor du diesen kontrollierten Schreibvorgang testest.";
+"onboarding.governedWriteNeedsApproval" = "Die Genehmigung pro Aufruf ist deaktiviert oder create_reminder ist ausgenommen. Aktiviere die Genehmigung, bevor du diesen kontrollierten Schreibvorgang testest.";
+"onboarding.openTrustCenter" = "Trust Center öffnen";
 "onboarding.noClients" = "Keine unterstützten Clients erkannt. Die manuelle Konfiguration ist später über die Menüpunkte „Konfiguration kopieren“ möglich.";
 "onboarding.installed" = "Installiert";
 "onboarding.notFound" = "Nicht gefunden";
@@ -161,6 +178,7 @@
 "onboarding.firstRunReady" = "Bereit für die erste Ausführung";
 "onboarding.firstRunNotReady" = "Noch nicht bereit für die erste Ausführung";
 "onboarding.firstRunReadyDesc" = "Laufzeit v%@ ist erreichbar. Kopiere den %@-Prompt in deinen Client, um den ersten Workflow auszuführen.";
+"onboarding.firstRunSelectedScopeReadyDesc" = "Laufzeit v%@ ist für den ausgewählten Bereich %@ erreichbar. Aktiviere Kalender und Erinnerungen für den schreibgeschützten ersten Erfolg.";
 "onboarding.firstRunUnavailableModules" = "Auf diesem Mac nicht verfügbar: %@";
 "onboarding.firstRunRuntimeFailed" = "Die lokale Laufzeit ist nicht erreichbar. Lass AirMCP geöffnet und prüfe erneut.";
 "onboarding.firstRunTokenFailed" = "Das Token für die lokale Laufzeit konnte nicht erstellt werden: %@";

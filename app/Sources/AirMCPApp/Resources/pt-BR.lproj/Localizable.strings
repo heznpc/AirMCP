@@ -21,6 +21,11 @@
 "setup.copyingConfig" = "Copiando a configuração do Claude...";
 
 /* Workflows */
+"workflow.todayOverview" = "Visão geral de hoje";
+"workflow.todayOverview.desc" = "Veja o calendário de hoje e os lembretes atrasados sem alterar nada.";
+"workflow.todayOverview.prompt" = "Mostre os eventos do calendário de hoje e os lembretes atrasados. Não altere nada.";
+"workflow.todayOverview.safety" = "Somente leitura. Apenas lê Calendário e Lembretes e nunca grava dados.";
+"workflow.todayOverview.access" = "Lê Calendário e Lembretes. Nenhuma gravação.";
 "workflow.dailyBriefing" = "Resumo diário";
 "workflow.dailyBriefing.desc" = "Comece o dia com o calendário, os lembretes, os e-mails e as notas recentes.";
 "workflow.dailyBriefing.prompt" = "Resuma meu calendário de hoje, os lembretes atrasados, os e-mails não lidos e as notas recentes.";
@@ -109,6 +114,8 @@
 "onboarding.back" = "Voltar";
 "onboarding.next" = "Continuar";
 "onboarding.finish" = "Concluir";
+"onboarding.finishLater" = "Concluir mais tarde";
+"onboarding.finishSetup" = "Concluir configuração";
 "onboarding.saveFailed" = "Não foi possível salvar a configuração";
 "onboarding.stepWelcome" = "Boas-vindas";
 "onboarding.stepRuntime" = "Ambiente";
@@ -146,6 +153,16 @@
 "onboarding.connectClient" = "Conectar a um cliente de IA";
 "onboarding.connectClientDesc" = "Escolha Conectar para adicionar o AirMCP a um cliente compatível com MCP que tenha sido detectado.";
 "onboarding.copyPrompt" = "Copiar prompt";
+"onboarding.readSuccessTitle" = "1. Primeiro sucesso: ler do seu Mac";
+"onboarding.readSuccessNeedsModules" = "Ative Calendário e Lembretes em Acesso a apps para copiar este prompt somente leitura.";
+"onboarding.governedWriteTitle" = "2. Teste uma alteração controlada";
+"onboarding.governedWriteDesc" = "Após a leitura ser concluída, copie este prompt de acompanhamento. Ele pode criar exatamente um lembrete, e o AirMCP exigirá aprovação separada para essa chamada create_reminder.";
+"onboarding.governedWritePrompt" = "Escolha o único item mais urgente no resultado somente leitura acima. Primeiro, mostre o título exato e a data de vencimento do lembrete e depois chame create_reminder exatamente uma vez. O AirMCP deve solicitar minha aprovação para essa chamada. Se ela for negada ou estiver indisponível, pare sem fazer alterações.";
+"onboarding.copyGovernedWritePrompt" = "Copiar prompt de gravação controlada";
+"onboarding.governedWriteCopyDisclosure" = "Copiar não executa este prompt nem concede aprovação. O lembrete só é criado se você aprovar essa única chamada.";
+"onboarding.governedWriteNeedsReminders" = "Ative Lembretes em Acesso a apps antes de testar esta gravação controlada.";
+"onboarding.governedWriteNeedsApproval" = "A aprovação por chamada está desativada ou create_reminder está isento. Reative a aprovação antes de testar esta gravação controlada.";
+"onboarding.openTrustCenter" = "Abrir Central de Confiança";
 "onboarding.noClients" = "Nenhum cliente compatível foi detectado. Você pode configurá-lo manualmente mais tarde pelas opções “Copiar configuração”.";
 "onboarding.installed" = "Instalado";
 "onboarding.notFound" = "Não encontrado";
@@ -161,6 +178,7 @@
 "onboarding.firstRunReady" = "Pronto para a primeira execução";
 "onboarding.firstRunNotReady" = "A primeira execução ainda não está pronta";
 "onboarding.firstRunReadyDesc" = "O ambiente v%@ está acessível. Copie o prompt %@ para o cliente a fim de executar o primeiro fluxo de trabalho.";
+"onboarding.firstRunSelectedScopeReadyDesc" = "O ambiente v%@ está acessível para o escopo %@ selecionado. Ative Calendário e Lembretes para usar o primeiro prompt somente leitura.";
 "onboarding.firstRunUnavailableModules" = "Indisponível neste Mac: %@";
 "onboarding.firstRunRuntimeFailed" = "Não foi possível acessar o ambiente local. Mantenha o AirMCP aberto e verifique novamente.";
 "onboarding.firstRunTokenFailed" = "Não foi possível criar o token do ambiente local: %@";

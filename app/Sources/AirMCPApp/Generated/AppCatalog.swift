@@ -241,6 +241,16 @@ let allModulePackIds = Set(allModulePacks.map(\.id))
 
 let featuredWorkflows: [WorkflowInfo] = [
     WorkflowInfo(
+        id: "today-overview",
+        titleKey: "workflow.todayOverview",
+        descKey: "workflow.todayOverview.desc",
+        promptKey: "workflow.todayOverview.prompt",
+        safetyKey: "workflow.todayOverview.safety",
+        siriKey: nil,
+        icon: "calendar.badge.clock",
+        tools: ["today_events", "list_reminders"]
+    ),
+    WorkflowInfo(
         id: "daily-briefing",
         titleKey: "workflow.dailyBriefing",
         descKey: "workflow.dailyBriefing.desc",
@@ -332,6 +342,17 @@ let onboardingModules: [OnboardingModule] = [
 let onboardingModuleIds = Set(onboardingModules.map(\.id))
 
 let onboardingWorkflows: [OnboardingWorkflow] = [
+    OnboardingWorkflow(
+        id: "today-overview",
+        titleKey: "workflow.todayOverview",
+        descKey: "workflow.todayOverview.desc",
+        promptKey: "workflow.todayOverview.prompt",
+        safetyKey: "workflow.todayOverview.safety",
+        accessKey: "workflow.todayOverview.access",
+        siriKey: nil,
+        icon: "calendar.badge.clock",
+        requiredModules: ["calendar", "reminders"]
+    ),
     OnboardingWorkflow(
         id: "daily-briefing",
         titleKey: "workflow.dailyBriefing",

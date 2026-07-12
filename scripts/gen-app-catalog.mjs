@@ -69,6 +69,7 @@ const PACK_UI = {
 };
 
 const WORKFLOW_ICONS = {
+  "today-overview": "calendar.badge.clock",
   "daily-briefing": "sun.max",
   "inbox-triage": "tray.full",
   "meeting-prep": "person.2.wave.2",

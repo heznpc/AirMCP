@@ -31,10 +31,10 @@ export function runHelp(): void {
     `    ${GREEN}$${RESET} npx airmcp ${BOLD}workflows${RESET}       ${DIM}Show high-value workflow examples${RESET}`,
   );
   console.log(
-    `    ${GREEN}$${RESET} npx airmcp ${BOLD}workflows daily-briefing --prompt${RESET} ${DIM}Print one copyable prompt${RESET}`,
+    `    ${GREEN}$${RESET} npx airmcp ${BOLD}workflows today-overview --prompt${RESET} ${DIM}Print the starter-safe first prompt${RESET}`,
   );
   console.log(
-    `    ${GREEN}$${RESET} npx airmcp ${BOLD}workflows daily-briefing --preview${RESET} ${DIM}Run a read-only local snapshot${RESET}`,
+    `    ${GREEN}$${RESET} npx airmcp ${BOLD}workflows today-overview --preview${RESET} ${DIM}Local diagnostic; bypasses MCP governance and audit${RESET}`,
   );
   console.log(
     `    ${GREEN}$${RESET} npx airmcp ${BOLD}connect${RESET}         ${DIM}Proxy stdio clients to AirMCP.app local HTTP${RESET}`,

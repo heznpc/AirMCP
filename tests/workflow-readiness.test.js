@@ -56,9 +56,25 @@ describe("workflow readiness", () => {
       expect.objectContaining({
         code: "module_disabled",
         module: "mail",
-        command: "npx airmcp init --profile full --yes",
+        command: "npx airmcp init --profile communications-safe --yes",
       }),
     );
+  });
+
+  test("keeps the starter-safe first workflow ready without Mail", () => {
+    const workflow = findWorkflow("today-overview");
+
+    const result = assessWorkflowReadiness(workflow, {
+      enabledModules: ["calendar", "reminders"],
+      registeredTools: ["today_events", "list_reminders"],
+    });
+
+    expect(result).toMatchObject({
+      id: "today-overview",
+      status: "ready",
+      ready: true,
+      issues: [],
+    });
   });
 
   test("labels config-only readiness when tool registration is not checked", () => {

@@ -65,6 +65,20 @@ The wizard selects a profile and stores preferences in
 step whose default is **No**; no Claude, Codex, Cursor, or Windsurf setting is
 read or changed until you opt in.
 
+For Codex, Claude Code, Cursor, Windsurf, and other stdio clients, use the
+direct runtime unless the matching GitHub Release includes a signed
+`AirMCP-<version>.zip`:
+
+```bash
+npx airmcp init --no-clients
+npx airmcp connect-clients --client-runtime direct --dry-run
+npx airmcp connect-clients --client-runtime direct
+```
+
+The app-owned runtime is available only after installing that signed app ZIP
+and explicitly choosing **Start Local Runtime**. Do not configure a client to
+wait for AirMCP.app when the release does not include the app asset.
+
 Non-interactive examples:
 
 ```bash
@@ -85,6 +99,8 @@ npx airmcp doctor
 
 Once connected, ask your MCP client in natural language:
 
+- "Tell me today's calendar events and overdue reminders. Do not change
+  anything."
 - "Brief me on today's calendar, overdue reminders, unread mail, and recent
   notes."
 - "Turn today's meetings into a prep checklist."
@@ -119,8 +135,18 @@ npx airmcp modules enable productivity --install
 npx airmcp --full
 npx airmcp workflows
 npx airmcp workflows --readiness
-npx airmcp workflows daily-briefing --prompt
+npx airmcp workflows today-overview --prompt
 ```
+
+`today-overview` is the starter-safe first workflow: it reads only Calendar
+and Reminders and never writes data. Paste the printed prompt into a connected
+MCP client for a governed first run with client authorization and AirMCP audit
+coverage.
+
+`workflows <id> --preview` is a separate local diagnostic. It reads Apple apps
+directly, bypasses the MCP governance path, and creates no AirMCP audit entry;
+do not use it as the first-success workflow. Broader diagnostics such as
+`daily-briefing --preview` report missing modules before reading live data.
 
 The complete generated tool manifest is in
 [docs/tool-manifest.json](docs/tool-manifest.json).
@@ -158,10 +184,11 @@ HTTP policy details are in
 
 ## Client Setup
 
-The recommended desktop pattern is one local AirMCP runtime, with clients
-connecting to it. A per-install token is created only by an explicit action:
-**Start Local Runtime** in AirMCP.app, or an opted-in app-runtime client
-connection such as `--connect-clients` / `connect-clients`. It is stored at:
+When the matching GitHub Release includes a signed AirMCP.app ZIP, the
+app-owned desktop pattern keeps one local runtime behind every connected
+client. A per-install token is created only by an explicit action: **Start
+Local Runtime** in AirMCP.app, or an opted-in app-runtime client connection
+such as `--connect-clients` / `connect-clients`. It is stored at:
 
 ```text
 ~/Library/Application Support/AirMCP/http-token
@@ -169,12 +196,13 @@ connection such as `--connect-clients` / `connect-clients`. It is stored at:
 
 The macOS Setup window is consent-driven: it appears automatically once and
 resumes its last step when reopened. Merely opening or moving through Setup
-does not start the runtime or edit a client, and first-run **Finish** with no
-runtime saves the selection only. If an app-owned runtime is already running
-and the selection changed, **Finish** may stop and restart that exact owned
-generation so the persisted and effective scopes match. **Start Local Runtime**
-creates the token and opts into automatic startup; each client is registered
-only after its own **Connect** action and a fresh scope/readiness check.
+does not start the runtime or edit a client, and first-run **Finish Later**
+with no runtime saves the selection only. If an app-owned runtime is already
+running and the selection changed, **Finish Setup** may stop and restart that
+exact owned generation so the persisted and effective scopes match. **Start
+Local Runtime** creates the token and opts into automatic startup; each client
+is registered only after its own **Connect** action and a fresh
+scope/readiness check.
 
 Existing Codex registrations can be inspected or disabled without deleting
 their settings:

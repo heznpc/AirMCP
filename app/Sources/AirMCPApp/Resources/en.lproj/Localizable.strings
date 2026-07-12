@@ -49,6 +49,11 @@
 "workflow.copyPrompt" = "Copy Prompt";
 "workflow.copyToolList" = "Copy Tool List";
 "workflow.openShortcutsDoc" = "Open Shortcuts Actions Guide";
+"workflow.todayOverview" = "Today Overview";
+"workflow.todayOverview.desc" = "See today's calendar and overdue reminders without changing anything.";
+"workflow.todayOverview.prompt" = "Tell me today's calendar events and overdue reminders. Do not change anything.";
+"workflow.todayOverview.safety" = "Read-only. It only reads Calendar and Reminders and never writes data.";
+"workflow.todayOverview.access" = "Reads Calendar and Reminders. No writes.";
 "workflow.dailyBriefing" = "Daily Briefing";
 "workflow.dailyBriefing.desc" = "Start the day with calendar, reminders, mail, and recent notes.";
 "workflow.dailyBriefing.prompt" = "Brief me on today's calendar, overdue reminders, unread mail, and recent notes.";
@@ -331,6 +336,8 @@
 "onboarding.back" = "Back";
 "onboarding.next" = "Next";
 "onboarding.finish" = "Finish";
+"onboarding.finishLater" = "Finish Later";
+"onboarding.finishSetup" = "Finish Setup";
 "onboarding.saveFailed" = "Couldn’t Save Configuration";
 "onboarding.stepWelcome" = "Welcome";
 "onboarding.stepRuntime" = "Runtime";
@@ -368,6 +375,16 @@
 "onboarding.connectClient" = "Connect to an AI Client";
 "onboarding.connectClientDesc" = "Choose Connect to add AirMCP to a detected MCP-compatible client.";
 "onboarding.copyPrompt" = "Copy Prompt";
+"onboarding.readSuccessTitle" = "1. First success: read from your Mac";
+"onboarding.readSuccessNeedsModules" = "Enable Calendar and Reminders in App Access to copy this read-only prompt.";
+"onboarding.governedWriteTitle" = "2. Try one governed change";
+"onboarding.governedWriteDesc" = "After the read succeeds, copy this follow-up. It can create exactly one reminder, and AirMCP will require separate approval for that create_reminder call.";
+"onboarding.governedWritePrompt" = "Using the read-only result above, choose the single most urgent item. Show me the exact reminder title and due date, then call create_reminder exactly once. AirMCP must request my approval for that call. If approval is denied or unavailable, stop without making changes.";
+"onboarding.copyGovernedWritePrompt" = "Copy Governed-Write Prompt";
+"onboarding.governedWriteCopyDisclosure" = "Copying does not run this prompt or grant approval. The reminder is created only if you approve that one call.";
+"onboarding.governedWriteNeedsReminders" = "Enable Reminders in App Access before trying this governed write.";
+"onboarding.governedWriteNeedsApproval" = "Per-call approval is off or create_reminder is exempt. Re-enable approval before trying this governed write.";
+"onboarding.openTrustCenter" = "Open Trust Center";
 "onboarding.noClients" = "No supported clients detected. You can configure manually later using the \"Copy Config\" menu items.";
 "onboarding.installed" = "Installed";
 "onboarding.notFound" = "Not found";
@@ -383,6 +400,7 @@
 "onboarding.firstRunReady" = "Ready for first run";
 "onboarding.firstRunNotReady" = "First run not ready";
 "onboarding.firstRunReadyDesc" = "Runtime v%@ is reachable. Copy the %@ prompt into your client to run the first workflow.";
+"onboarding.firstRunSelectedScopeReadyDesc" = "Runtime v%@ is reachable for the selected %@ scope. Enable Calendar and Reminders to use the read-only first-success prompt.";
 "onboarding.firstRunUnavailableModules" = "Unavailable on this Mac: %@";
 "onboarding.firstRunRuntimeFailed" = "The local runtime did not become reachable. Keep AirMCP open, then check again.";
 "onboarding.firstRunTokenFailed" = "Could not create the local runtime token: %@";

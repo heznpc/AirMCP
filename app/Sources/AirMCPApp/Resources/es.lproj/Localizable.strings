@@ -21,6 +21,11 @@
 "setup.copyingConfig" = "Copiando la configuración de Claude...";
 
 /* Workflows */
+"workflow.todayOverview" = "Resumen de hoy";
+"workflow.todayOverview.desc" = "Consulta el calendario de hoy y los recordatorios vencidos sin cambiar nada.";
+"workflow.todayOverview.prompt" = "Dime los eventos del calendario de hoy y los recordatorios vencidos. No cambies nada.";
+"workflow.todayOverview.safety" = "Solo lectura. Únicamente lee Calendario y Recordatorios y nunca escribe datos.";
+"workflow.todayOverview.access" = "Lee Calendario y Recordatorios. No escribe datos.";
 "workflow.dailyBriefing" = "Resumen diario";
 "workflow.dailyBriefing.desc" = "Empieza el día con el calendario, los recordatorios, el correo y las notas recientes.";
 "workflow.dailyBriefing.prompt" = "Resume mi calendario de hoy, los recordatorios vencidos, los correos sin leer y las notas recientes.";
@@ -109,6 +114,8 @@
 "onboarding.back" = "Atrás";
 "onboarding.next" = "Siguiente";
 "onboarding.finish" = "Finalizar";
+"onboarding.finishLater" = "Finalizar más tarde";
+"onboarding.finishSetup" = "Finalizar configuración";
 "onboarding.saveFailed" = "No se pudo guardar la configuración";
 "onboarding.stepWelcome" = "Te damos la bienvenida";
 "onboarding.stepRuntime" = "Entorno de ejecución";
@@ -146,6 +153,16 @@
 "onboarding.connectClient" = "Conectar con un cliente de IA";
 "onboarding.connectClientDesc" = "Selecciona Conectar para añadir AirMCP a un cliente compatible con MCP que se haya detectado.";
 "onboarding.copyPrompt" = "Copiar instrucción";
+"onboarding.readSuccessTitle" = "1. Primer éxito: leer desde tu Mac";
+"onboarding.readSuccessNeedsModules" = "Activa Calendario y Recordatorios en Acceso a apps para copiar esta instrucción de solo lectura.";
+"onboarding.governedWriteTitle" = "2. Prueba un cambio controlado";
+"onboarding.governedWriteDesc" = "Cuando la lectura termine correctamente, copia esta instrucción de seguimiento. Puede crear exactamente un recordatorio y AirMCP exigirá una aprobación independiente para esa llamada a create_reminder.";
+"onboarding.governedWritePrompt" = "Elige el único elemento más urgente del resultado de solo lectura anterior. Muéstrame primero el título y la fecha de vencimiento exactos del recordatorio y después llama a create_reminder exactamente una vez. AirMCP debe solicitar mi aprobación para esa llamada. Si se deniega o no está disponible, detente sin realizar cambios.";
+"onboarding.copyGovernedWritePrompt" = "Copiar instrucción de escritura controlada";
+"onboarding.governedWriteCopyDisclosure" = "Copiar no ejecuta esta instrucción ni concede aprobación. El recordatorio solo se crea si apruebas esa única llamada.";
+"onboarding.governedWriteNeedsReminders" = "Activa Recordatorios en Acceso a apps antes de probar esta escritura controlada.";
+"onboarding.governedWriteNeedsApproval" = "La aprobación por llamada está desactivada o create_reminder está exento. Vuelve a activar la aprobación antes de probar esta escritura controlada.";
+"onboarding.openTrustCenter" = "Abrir Centro de confianza";
 "onboarding.noClients" = "No se ha detectado ningún cliente compatible. Puedes configurarlo manualmente más adelante mediante las opciones «Copiar configuración».";
 "onboarding.installed" = "Instalado";
 "onboarding.notFound" = "No encontrado";
@@ -161,6 +178,7 @@
 "onboarding.firstRunReady" = "Listo para la primera ejecución";
 "onboarding.firstRunNotReady" = "La primera ejecución aún no está lista";
 "onboarding.firstRunReadyDesc" = "El entorno v%@ está disponible. Copia la instrucción de %@ en tu cliente para ejecutar el primer flujo de trabajo.";
+"onboarding.firstRunSelectedScopeReadyDesc" = "El entorno v%@ está disponible para el ámbito %@ seleccionado. Activa Calendario y Recordatorios para usar la primera instrucción de solo lectura.";
 "onboarding.firstRunUnavailableModules" = "No disponible en este Mac: %@";
 "onboarding.firstRunRuntimeFailed" = "No se ha podido acceder al entorno local. Mantén AirMCP abierto y vuelve a comprobarlo.";
 "onboarding.firstRunTokenFailed" = "No se ha podido crear el token del entorno local: %@";

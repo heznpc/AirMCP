@@ -230,6 +230,8 @@ struct AppRuntimeState: Decodable, Sendable, Equatable {
     let scopeFingerprint: String
     let enabledModules: [String]
     let unavailableModules: [AppRuntimeModuleUnavailable]
+    let effectiveHitlLevel: HitlLevel
+    let effectiveHitlWhitelist: [String]
 
     var ownedIdentity: AppOwnedRuntimeIdentity? {
         guard appOwned else { return nil }
@@ -368,7 +370,7 @@ enum AppRuntimeClient {
     }
 
     /// Authenticated process-generation evidence used only by native Setup.
-    /// Public /health deliberately omits the effective module selection.
+    /// Public /health deliberately omits effective module and HITL policy.
     static func runtimeState() async throws -> AppRuntimeState {
         guard let token = try AppRuntimeToken.loadExisting() else {
             throw AppIntentMCPTransportError.missingRuntimeToken

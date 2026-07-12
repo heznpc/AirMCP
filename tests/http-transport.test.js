@@ -613,7 +613,13 @@ describe("startHttpServer live middleware", () => {
       bindAll: true,
       httpToken: "secret",
       allowNetwork: "with-token",
-      config: { disabledModules: new Set(["notes", "mail"]) },
+      config: {
+        disabledModules: new Set(["notes", "mail"]),
+        hitl: {
+          level: "sensitive-only",
+          whitelist: new Set(["search_notes", "create_reminder"]),
+        },
+      },
       pkg: {
         version: "9.9.9-test",
         description: "AirMCP test server",
@@ -769,6 +775,8 @@ describe("startHttpServer live middleware", () => {
         scopeFingerprint: expect.stringMatching(/^[0-9a-f]{64}$/),
         enabledModules: ["calendar", "reminders"],
         unavailableModules: [{ module: "intelligence", reason: "host_unavailable", detail: "requires macOS 26" }],
+        effectiveHitlLevel: "sensitive-only",
+        effectiveHitlWhitelist: ["create_reminder", "search_notes"],
       });
       expect(JSON.stringify(state)).not.toContain("a".repeat(43));
     } finally {

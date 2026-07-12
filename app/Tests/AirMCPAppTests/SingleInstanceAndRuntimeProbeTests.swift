@@ -203,6 +203,31 @@ final class SingleInstanceAndRuntimeProbeTests: XCTestCase {
         )
     }
 
+    func testOnlyFreshUnavailableProbeCanUseFutureStartConfigPolicy() {
+        XCTAssertTrue(ServerManager.runtimeIsConfirmedUnavailable(.unavailable))
+        XCTAssertFalse(
+            ServerManager.runtimeIsConfirmedUnavailable(
+                .ready(version: "2.16.0", appOwned: true)
+            )
+        )
+        XCTAssertFalse(
+            ServerManager.runtimeIsConfirmedUnavailable(
+                .ready(version: "2.16.0", appOwned: false)
+            )
+        )
+        XCTAssertFalse(ServerManager.runtimeIsConfirmedUnavailable(.portOccupied))
+        XCTAssertFalse(
+            ServerManager.runtimeIsConfirmedUnavailable(
+                .versionMismatch(found: "2.15.0", expected: "2.16.0")
+            )
+        )
+        XCTAssertFalse(
+            ServerManager.runtimeIsConfirmedUnavailable(
+                .authenticationFailed(version: "2.16.0")
+            )
+        )
+    }
+
     func testAuthenticatedManualRuntimeRemainsReadyWithoutAppOwnership() throws {
         let data = try JSONSerialization.data(withJSONObject: [
             "status": "ok",
@@ -407,7 +432,9 @@ final class SingleInstanceAndRuntimeProbeTests: XCTestCase {
             disabledModules: [],
             scopeFingerprint: String(repeating: "c", count: 64),
             enabledModules: ["calendar"],
-            unavailableModules: []
+            unavailableModules: [],
+            effectiveHitlLevel: .sensitiveOnly,
+            effectiveHitlWhitelist: []
         )
         XCTAssertEqual(
             ServerManager.authenticatedOwnedRuntimeIdentity(
@@ -442,7 +469,9 @@ final class SingleInstanceAndRuntimeProbeTests: XCTestCase {
                     disabledModules: [],
                     scopeFingerprint: String(repeating: "c", count: 64),
                     enabledModules: ["calendar"],
-                    unavailableModules: []
+                    unavailableModules: [],
+                    effectiveHitlLevel: .sensitiveOnly,
+                    effectiveHitlWhitelist: []
                 ),
                 expectedVersion: "2.16.0",
                 expectedOwnerFingerprint: fingerprint
@@ -459,7 +488,9 @@ final class SingleInstanceAndRuntimeProbeTests: XCTestCase {
                     disabledModules: [],
                     scopeFingerprint: String(repeating: "c", count: 64),
                     enabledModules: ["calendar"],
-                    unavailableModules: []
+                    unavailableModules: [],
+                    effectiveHitlLevel: .sensitiveOnly,
+                    effectiveHitlWhitelist: []
                 ),
                 expectedVersion: "2.16.0",
                 expectedOwnerFingerprint: fingerprint

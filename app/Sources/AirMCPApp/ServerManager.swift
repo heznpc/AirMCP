@@ -64,6 +64,8 @@ final class ServerManager {
         let tokenFingerprint: String
         let enabledModules: [String]
         let unavailableModules: [AppRuntimeModuleUnavailable]
+        let effectiveHitlLevel: HitlLevel
+        let effectiveHitlWhitelist: [String]
     }
 
     enum OnboardingRuntimeActivationResult: Sendable, Equatable {
@@ -592,7 +594,9 @@ final class ServerManager {
                     runtimeFingerprint: scope.runtimeFingerprint,
                     tokenFingerprint: AppRuntimeToken.fingerprint(for: activatedToken),
                     enabledModules: activatedState.enabledModules.sorted(),
-                    unavailableModules: surfaceAssessment?.diagnosedUnavailableModules ?? []
+                    unavailableModules: surfaceAssessment?.diagnosedUnavailableModules ?? [],
+                    effectiveHitlLevel: activatedState.effectiveHitlLevel,
+                    effectiveHitlWhitelist: activatedState.effectiveHitlWhitelist
                 )
             )
         }
@@ -696,7 +700,9 @@ final class ServerManager {
                 runtimeFingerprint: scope.runtimeFingerprint,
                 tokenFingerprint: AppRuntimeToken.fingerprint(for: runtimeToken),
                 enabledModules: state.enabledModules.sorted(),
-                unavailableModules: surfaceAssessment.diagnosedUnavailableModules
+                unavailableModules: surfaceAssessment.diagnosedUnavailableModules,
+                effectiveHitlLevel: state.effectiveHitlLevel,
+                effectiveHitlWhitelist: state.effectiveHitlWhitelist
             )
         )
     }
@@ -1017,6 +1023,15 @@ final class ServerManager {
                 ? .ready(version: version, appOwned: appOwned)
                 : .authenticationFailed(version: version)
         }
+    }
+
+    /// Persisted policy describes a future app-owned start only when a fresh
+    /// probe proves that no process is serving the reserved port. Every live,
+    /// conflicting, mismatched, or authentication-failed result must be
+    /// resolved from authenticated runtime evidence or rejected.
+    nonisolated static func runtimeIsConfirmedUnavailable(_ probe: RuntimeProbeResult) -> Bool {
+        if case .unavailable = probe { return true }
+        return false
     }
 
     nonisolated static func classifyRuntimeTransportFailure(

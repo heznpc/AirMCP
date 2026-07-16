@@ -92,8 +92,8 @@ struct BriefingProvider: TimelineProvider {
             reminders: reminders,
             overdueCount: snapshot.overdueReminderCount,
             tomorrowEvents: [],
-            hasCalendarAccess: true,
-            hasReminderAccess: true
+            hasCalendarAccess: snapshot.calendarAuthorized,
+            hasReminderAccess: snapshot.reminderAuthorized
         )
     }
 

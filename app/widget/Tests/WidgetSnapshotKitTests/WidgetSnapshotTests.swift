@@ -23,8 +23,17 @@ final class WidgetSnapshotTests: XCTestCase {
                 ),
             ],
             eventCount: 3,
-            overdueReminderCount: 1
+            overdueReminderCount: 1,
+            calendarAuthorized: true,
+            reminderAuthorized: false
         )
+    }
+
+    func testAccessFlagsRoundTrip() throws {
+        let store = WidgetSnapshotStore(appGroupID: "group.test")
+        let decoded = try store.decode(try store.encode(sample()))
+        XCTAssertTrue(decoded.calendarAuthorized)
+        XCTAssertFalse(decoded.reminderAuthorized)
     }
 
     func testEncodeDecodeRoundTrip() throws {

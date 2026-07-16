@@ -87,6 +87,10 @@ public struct WidgetSnapshot: Codable, Sendable, Equatable {
     public var reminders: [Reminder]
     public var eventCount: Int
     public var overdueReminderCount: Int
+    /// Access the WRITER (the app) actually had when building this snapshot, so
+    /// the widget shows an honest "grant access" state instead of a false empty.
+    public var calendarAuthorized: Bool
+    public var reminderAuthorized: Bool
 
     public init(
         version: Int = WidgetSnapshot.currentVersion,
@@ -97,7 +101,9 @@ public struct WidgetSnapshot: Codable, Sendable, Equatable {
         events: [Event] = [],
         reminders: [Reminder] = [],
         eventCount: Int,
-        overdueReminderCount: Int
+        overdueReminderCount: Int,
+        calendarAuthorized: Bool = true,
+        reminderAuthorized: Bool = true
     ) {
         self.version = version
         self.generatedAt = generatedAt
@@ -108,6 +114,8 @@ public struct WidgetSnapshot: Codable, Sendable, Equatable {
         self.reminders = reminders
         self.eventCount = eventCount
         self.overdueReminderCount = overdueReminderCount
+        self.calendarAuthorized = calendarAuthorized
+        self.reminderAuthorized = reminderAuthorized
     }
 
     public func isStale(now: Date = Date()) -> Bool {

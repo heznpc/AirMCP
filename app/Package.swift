@@ -10,12 +10,15 @@ let package = Package(
         // RFC 0007 A.2a: App needs AirMCPKit so it can install
         // MCPIntentRouter's host handler at launch.
         .package(path: "../swift"),
+        // Shared display-only snapshot contract the app WRITES for the widget.
+        .package(path: "widget"),
     ],
     targets: [
         .executableTarget(
             name: "AirMCPApp",
             dependencies: [
                 .product(name: "AirMCPKit", package: "swift"),
+                .product(name: "WidgetSnapshotKit", package: "widget"),
             ],
             path: "Sources/AirMCPApp",
             exclude: [

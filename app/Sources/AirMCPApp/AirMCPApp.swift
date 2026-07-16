@@ -194,7 +194,13 @@ final class AirMCPApplicationDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         if isDuplicateLaunch {
             redirectDuplicateLaunch()
+            return
         }
+        // Publish a fresh widget snapshot so the widget renders from the governed
+        // App Group container instead of reading EventKit itself. Best-effort and
+        // no-op when unsigned / no entitlement. (A follow-up drives this off
+        // EventKit change events; launch-time refresh is the first increment.)
+        Task { await WidgetSnapshotWriter().refresh() }
     }
 
     /// Runtime fallback for launches that bypass LaunchServices (for example,

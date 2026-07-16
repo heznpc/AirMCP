@@ -168,6 +168,34 @@ describe('Intelligence tool handlers', () => {
     expect(mockRunSwift).not.toHaveBeenCalled();
   });
 
+  test('ai_agent returns structured output that makes the on-device read boundary explicit', async () => {
+    mockCheckSwiftBridge.mockResolvedValue(null);
+    mockRunSwift.mockResolvedValue({ output: 'Your day looks light.' });
+
+    const result = await server.callTool('ai_agent', { prompt: 'brief my day' });
+    expect(result.isError).toBeUndefined();
+    expect(result.structuredContent).toMatchObject({
+      response: 'Your day looks light.',
+      onDevice: true,
+      subReadsGoverned: false,
+      subReadsPerformed: [],
+    });
+    expect(result.structuredContent.readScope).toEqual(
+      expect.arrayContaining(['today_events', 'list_reminders', 'search_contacts']),
+    );
+    // Output is synthesized from arbitrary Apple data → must be marked untrusted.
+    expect(result._meta['airmcp/untrustedContent']).toBe(true);
+  });
+
+  test('ai_agent surfaces the sub-reads the bridge reports (forward-compat toolCalls)', async () => {
+    mockCheckSwiftBridge.mockResolvedValue(null);
+    mockRunSwift.mockResolvedValue({ output: 'done', toolCalls: ['today_events', 'search_contacts'] });
+
+    const result = await server.callTool('ai_agent', { prompt: 'who am I meeting today' });
+    expect(result.structuredContent.subReadsPerformed).toEqual(['today_events', 'search_contacts']);
+    expect(result.structuredContent.subReadsGoverned).toBe(false);
+  });
+
   test('summarize_text calls swift bridge on success', async () => {
     mockRunSwift.mockResolvedValue({ output: 'Summary of text' });
 

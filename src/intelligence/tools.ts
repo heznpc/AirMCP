@@ -1,7 +1,7 @@
 import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okStructured, okUntrusted, errSwift, errSwiftFor } from "../shared/result.js";
+import { ok, okStructured, okUntrusted, okUntrustedStructured, errSwift, errSwiftFor } from "../shared/result.js";
 import { runSwift, checkSwiftBridge } from "../shared/swift.js";
 import { zFilePath, resolveAndGuard } from "../shared/validate.js";
 import {
@@ -16,6 +16,14 @@ import {
 
 interface TextResult {
   output: string;
+}
+
+interface AgentResult {
+  output: string;
+  /** Read tools the on-device model chose to invoke inside the Swift process.
+   *  Populated by a Foundation Models bridge follow-up; consumed here so the
+   *  sub-reads become visible in the tool result once available. */
+  toolCalls?: string[];
 }
 
 interface StructuredResult {
@@ -564,12 +572,26 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
       description:
         "Run a prompt through Apple's on-device Foundation Models with read-only access to AirMCP data " +
         "(today's events, due reminders, contacts search). The on-device LLM autonomously decides which " +
-        "read tool to call. Requires macOS 26+ with Apple Silicon. Write actions (create/update/delete) " +
-        "are intentionally NOT exposed — the agent's tool calls bypass the Node-side toolRegistry " +
-        "(no HITL, rate-limit, or audit), so writes belong to direct MCP tool calls instead.",
+        "read tool to call. Requires macOS 26+ with Apple Silicon. GOVERNANCE BOUNDARY: the model's read " +
+        "sub-calls run inside the Swift process and do NOT pass through the Node toolRegistry (no per-call " +
+        "HITL, rate-limit, or audit) — the result's `subReadsGoverned:false` makes this explicit. Write " +
+        "actions are intentionally NOT exposed to the model, so writes belong to direct MCP tool calls. " +
+        "The response is treated as untrusted content because it is synthesized from arbitrary Apple data.",
       inputSchema: {
         prompt: z.string().min(1).max(10000).describe("What you want the on-device AI to do with your Apple data"),
         systemInstruction: z.string().max(10000).optional().describe("Optional system instruction for the AI agent"),
+      },
+      outputSchema: {
+        response: z.string(),
+        model: z.string(),
+        onDevice: z.boolean(),
+        readScope: z.array(z.string()).describe("Read surfaces the on-device model may autonomously access"),
+        subReadsGoverned: z
+          .boolean()
+          .describe("False: the model's read sub-calls ran on-device, outside Node HITL/rate-limit/audit"),
+        subReadsPerformed: z
+          .array(z.string())
+          .describe("Read tools the model actually invoked, when the bridge reports them"),
       },
       annotations: {
         readOnlyHint: true,
@@ -582,11 +604,23 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
       const bridgeErr = await checkSwiftBridge();
       if (bridgeErr) return errSwift(`Swift bridge required: ${bridgeErr}`);
       try {
-        const result = await runSwift<TextResult>(
+        const result = await runSwift<AgentResult>(
           "ai-agent",
           JSON.stringify({ text: prompt, tone: systemInstruction }),
         );
-        return ok({ response: result.output, model: "apple-foundation-models", onDevice: true });
+        const subReadsPerformed = Array.isArray(result.toolCalls) ? result.toolCalls : [];
+        // Untrusted: the output is synthesized from arbitrary Apple data (event
+        // titles, note bodies, …) that can carry prompt-injection, so downstream
+        // must not treat it as trusted. The boundary fields make the on-device,
+        // ungoverned nature of the read sub-calls explicit rather than silent.
+        return okUntrustedStructured({
+          response: result.output,
+          model: "apple-foundation-models",
+          onDevice: true,
+          readScope: ["today_events", "list_reminders", "search_contacts"],
+          subReadsGoverned: false,
+          subReadsPerformed,
+        });
       } catch (e) {
         return errSwiftFor("run on-device AI agent", e);
       }

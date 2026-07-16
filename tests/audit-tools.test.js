@@ -22,6 +22,9 @@ jest.unstable_mockModule("../dist/shared/constants.js", () => ({
   AUDIT: {
     FLUSH_INTERVAL: 30000,
     MAX_ENTRY_SIZE: 8192,
+    // Keep in sync with the real AUDIT shape — omitting this made the spool
+    // bound compute Math.max(8192, undefined) = NaN in the module under test.
+    MAX_BUFFER_SIZE: 8 * 1024 * 1024,
     MAX_FILE_SIZE: 10 * 1024 * 1024,
     MAX_ARG_LENGTH: 500,
     MAX_FLUSH_FAILURES: 3,

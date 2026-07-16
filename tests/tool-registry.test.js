@@ -397,6 +397,9 @@ describe("ToolRegistry (mock server)", () => {
       kind: "approval",
       correlationId: approval.correlationId,
       limit: 10,
+      // Hot governed-write barrier: prefix attested by the process anchor,
+      // delta fully verified. Full re-verification stays with audit_summary.
+      integrity: "process",
     });
     const outcome = auditLogMock.mock.calls.find(([entry]) => entry.kind === "tool")?.[0];
     expect(outcome.timestamp.localeCompare(approval.timestamp)).toBeGreaterThanOrEqual(0);

@@ -29,7 +29,19 @@ async function waitUntil(predicate, timeoutMs = 3_000) {
   }
 }
 
-function startWriter(tool, holdLockMs = 0) {
+function findDeadPid(from) {
+  let pid = from;
+  while (true) {
+    try {
+      process.kill(pid, 0);
+      pid++;
+    } catch {
+      return pid;
+    }
+  }
+}
+
+function startWriter(tool, holdLockMs = 0, extraEnv = {}) {
   const source = `
     const audit = await import(${JSON.stringify(auditModuleUrl)});
     audit.auditLog({ timestamp: new Date().toISOString(), tool: ${JSON.stringify(tool)}, status: 'ok' });
@@ -44,6 +56,7 @@ function startWriter(tool, holdLockMs = 0) {
       AIRMCP_AUDIT_HMAC_KEY: hmacKey,
       AIRMCP_AUDIT_LOG: "true",
       AIRMCP_TEST_AUDIT_HOLD_LOCK_MS: String(holdLockMs),
+      ...extraEnv,
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -165,5 +178,83 @@ describe("audit cross-process writer lock", () => {
     expect(rows.map((row) => row.tool)).toEqual(["after_dead_reaper"]);
     expect(existsSync(lockPath)).toBe(false);
     expect(existsSync(reapPath)).toBe(false);
+  }, 10_000);
+
+  test("a merely delayed reaper keeps its gate — contenders never hijack the reap", async () => {
+    // Regression for the stale-unlink race: the old hard-link pin carried no
+    // reaper identity, so a contender would "complete" a reap whose reaper was
+    // alive but slow, acquire the lock, and then the slow reaper's late unlink
+    // destroyed that live lock — two concurrent writers.
+    const deadPid = findDeadPid(process.pid + 100_000);
+    await writeFile(
+      join(workDir, "audit.lock"),
+      JSON.stringify({ pid: deadPid, token: "dead-owner-token", createdAt: Date.now() - 1_000 }) + "\n",
+      { mode: 0o600 },
+    );
+
+    // Child must reap the dead owner; the test hook holds its reap window
+    // open for 1.2s with the identity pin published and the child alive.
+    const child = startWriter("delayed_reaper_child", 0, { AIRMCP_TEST_AUDIT_REAP_HOLD_MS: "1200" });
+    await waitUntil(() => existsSync(join(workDir, "audit.lock.reap")), 5_000);
+
+    const parentFlush = (async () => {
+      audit.auditLog({ timestamp: new Date().toISOString(), tool: "parent_writer", status: "ok" });
+      await audit._testFlush();
+    })();
+
+    // Mid-hold: the pin names a live reaper, so the parent must still be
+    // gated and nothing may have reached disk. (The old protocol had the
+    // parent hijacking the reap within ~10ms.)
+    await new Promise((resolveWait) => setTimeout(resolveWait, 600));
+    expect(existsSync(join(workDir, "audit.jsonl"))).toBe(false);
+
+    await Promise.all([parentFlush, child.done]);
+
+    const rows = (await readFile(join(workDir, "audit.jsonl"), "utf-8")).trimEnd().split("\n").map(JSON.parse);
+    expect(rows).toHaveLength(2);
+    expect(rows.map((row) => row.seq)).toEqual([0, 1]);
+    expect(rows[1]._prev).toBe(rows[0]._hmac);
+    expect(new Set(rows.map((row) => row.tool))).toEqual(new Set(["delayed_reaper_child", "parent_writer"]));
+    expect(existsSync(join(workDir, "audit.lock"))).toBe(false);
+    expect(existsSync(join(workDir, "audit.lock.reap"))).toBe(false);
+
+    audit._testReset();
+    const summary = await audit.summarizeAuditEntries({ since: "2020-01-01T00:00:00Z" });
+    expect(summary.verified).toBe(true);
+    expect(summary.total).toBe(2);
+  }, 15_000);
+
+  test("recovers a crashed reaper's identity-pin residue without waiting for the lock timeout", async () => {
+    const lockPath = join(workDir, "audit.lock");
+    const reapPath = join(workDir, "audit.lock.reap");
+    const deadOwnerPid = findDeadPid(process.pid + 100_000);
+    const deadReaperPid = findDeadPid(deadOwnerPid + 1);
+    await writeFile(
+      lockPath,
+      JSON.stringify({ pid: deadOwnerPid, token: "dead-owner-token", createdAt: Date.now() - 1_000 }) + "\n",
+      { mode: 0o600 },
+    );
+    const lockInfo = await stat(lockPath);
+    await writeFile(
+      reapPath,
+      JSON.stringify({
+        reaperPid: deadReaperPid,
+        reaperToken: "dead-reaper-token",
+        createdAt: Date.now() - 500,
+        target: { dev: lockInfo.dev, ino: lockInfo.ino, ownerToken: "dead-owner-token" },
+      }) + "\n",
+      { mode: 0o600 },
+    );
+
+    const startedAt = Date.now();
+    audit.auditLog({ timestamp: new Date().toISOString(), tool: "after_crashed_identity_reaper", status: "ok" });
+    await audit._testFlush();
+
+    expect(Date.now() - startedAt).toBeLessThan(5_000);
+    const rows = (await readFile(join(workDir, "audit.jsonl"), "utf-8")).trimEnd().split("\n").map(JSON.parse);
+    expect(rows.map((row) => row.tool)).toEqual(["after_crashed_identity_reaper"]);
+    // No lock, pin, or claim residue may survive recovery.
+    const leftovers = (await readdir(workDir)).filter((name) => name.startsWith("audit.lock"));
+    expect(leftovers).toEqual([]);
   }, 10_000);
 });

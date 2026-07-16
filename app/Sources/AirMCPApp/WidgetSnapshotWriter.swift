@@ -29,16 +29,25 @@ struct WidgetSnapshotWriter {
     func refresh(
         privacyMode: WidgetSnapshot.PrivacyMode = .titles,
         runtimeStatus: WidgetSnapshot.RuntimeStatus = .unknown,
+        pendingApprovalCount: Int = 0,
         now: Date = Date()
     ) async {
         guard let url = snapshotStore.containerURL() else { return }
         // Nothing to govern if the app has no access at all — leave the widget
         // to its OS-native fallback (which shows the grant-access prompt).
         guard authorized(for: .event) || authorized(for: .reminder) else { return }
-        let snapshot = await buildSnapshot(now: now, privacyMode: privacyMode, runtimeStatus: runtimeStatus)
+        let snapshot = await buildSnapshot(
+            now: now,
+            privacyMode: privacyMode,
+            runtimeStatus: runtimeStatus,
+            pendingApprovalCount: pendingApprovalCount
+        )
         guard (try? snapshotStore.write(snapshot, to: url)) != nil else { return }
         WidgetCenter.shared.reloadTimelines(ofKind: Self.widgetKind)
+        WidgetCenter.shared.reloadTimelines(ofKind: WidgetSnapshotWriter.trustWidgetKind)
     }
+
+    static let trustWidgetKind = "com.heznpc.AirMCP.TrustStatusWidget"
 
     /// Assemble the snapshot from today's events + active reminders. Titles are
     /// left intact here; `WidgetSnapshotStore.write` redacts them before
@@ -46,7 +55,8 @@ struct WidgetSnapshotWriter {
     func buildSnapshot(
         now: Date,
         privacyMode: WidgetSnapshot.PrivacyMode,
-        runtimeStatus: WidgetSnapshot.RuntimeStatus
+        runtimeStatus: WidgetSnapshot.RuntimeStatus,
+        pendingApprovalCount: Int = 0
     ) async -> WidgetSnapshot {
         let cal = Calendar.current
         let (events, eventTotal) = fetchTodayEvents(cal: cal, now: now)
@@ -61,8 +71,46 @@ struct WidgetSnapshotWriter {
             eventCount: eventTotal,
             overdueReminderCount: overdue,
             calendarAuthorized: authorized(for: .event),
-            reminderAuthorized: authorized(for: .reminder)
+            reminderAuthorized: authorized(for: .reminder),
+            trust: Self.governanceState(pendingApprovalCount: pendingApprovalCount)
         )
+    }
+
+    /// Assemble the governance summary the Trust Status widget shows, read
+    /// self-contained from local config + the emergency-stop file. Counts/flags
+    /// only — never tool names, approval targets, or the audit chain. The
+    /// config dir is injectable so the readers are unit-testable.
+    static func governanceState(
+        pendingApprovalCount: Int,
+        configDir: URL = defaultConfigDir
+    ) -> WidgetSnapshot.TrustSummary {
+        WidgetSnapshot.TrustSummary(
+            hitlLevel: readHitlLevel(configDir: configDir),
+            emergencyStopActive: emergencyStopActive(configDir: configDir),
+            pendingApprovalCount: pendingApprovalCount,
+            integrityVerifiedAt: nil
+        )
+    }
+
+    static var defaultConfigDir: URL {
+        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".config/airmcp", isDirectory: true)
+    }
+
+    static func emergencyStopActive(configDir: URL = defaultConfigDir) -> Bool {
+        FileManager.default.fileExists(atPath: configDir.appendingPathComponent("emergency-stop").path)
+    }
+
+    /// Best-effort read of `hitl.level` from config.json; defaults to the
+    /// documented "sensitive-only" when absent or unparsable.
+    static func readHitlLevel(configDir: URL = defaultConfigDir) -> String {
+        let url = configDir.appendingPathComponent("config.json")
+        guard let data = try? Data(contentsOf: url),
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let hitl = root["hitl"] as? [String: Any],
+              let level = hitl["level"] as? String,
+              !level.isEmpty
+        else { return "sensitive-only" }
+        return level
     }
 
     // MARK: - EventKit

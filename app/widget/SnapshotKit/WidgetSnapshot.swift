@@ -59,6 +59,29 @@ public struct WidgetSnapshot: Codable, Sendable, Equatable {
         }
     }
 
+    /// Governance state for the Trust Status widget. Deliberately counts and
+    /// flags only — NO tool names, NO approval-target content, NO copy of the
+    /// audit chain. `integrityVerifiedAt` is the last time the app verified the
+    /// chain; the widget never re-runs verification itself.
+    public struct TrustSummary: Codable, Sendable, Equatable {
+        public var hitlLevel: String
+        public var emergencyStopActive: Bool
+        public var pendingApprovalCount: Int
+        public var integrityVerifiedAt: Date?
+
+        public init(
+            hitlLevel: String,
+            emergencyStopActive: Bool,
+            pendingApprovalCount: Int,
+            integrityVerifiedAt: Date? = nil
+        ) {
+            self.hitlLevel = hitlLevel
+            self.emergencyStopActive = emergencyStopActive
+            self.pendingApprovalCount = pendingApprovalCount
+            self.integrityVerifiedAt = integrityVerifiedAt
+        }
+    }
+
     /// One reminder, bounded and redactable. `title` is nil in counts-only mode.
     public struct Reminder: Codable, Sendable, Equatable {
         public var title: String?
@@ -91,6 +114,9 @@ public struct WidgetSnapshot: Codable, Sendable, Equatable {
     /// the widget shows an honest "grant access" state instead of a false empty.
     public var calendarAuthorized: Bool
     public var reminderAuthorized: Bool
+    /// Governance state for the Trust Status widget; nil when the app hasn't
+    /// populated it (older snapshot / briefing-only write).
+    public var trust: TrustSummary?
 
     public init(
         version: Int = WidgetSnapshot.currentVersion,
@@ -103,7 +129,8 @@ public struct WidgetSnapshot: Codable, Sendable, Equatable {
         eventCount: Int,
         overdueReminderCount: Int,
         calendarAuthorized: Bool = true,
-        reminderAuthorized: Bool = true
+        reminderAuthorized: Bool = true,
+        trust: TrustSummary? = nil
     ) {
         self.version = version
         self.generatedAt = generatedAt
@@ -116,6 +143,7 @@ public struct WidgetSnapshot: Codable, Sendable, Equatable {
         self.overdueReminderCount = overdueReminderCount
         self.calendarAuthorized = calendarAuthorized
         self.reminderAuthorized = reminderAuthorized
+        self.trust = trust
     }
 
     public func isStale(now: Date = Date()) -> Bool {

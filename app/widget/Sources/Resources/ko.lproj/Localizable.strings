@@ -22,3 +22,13 @@
 "widget.noEventsScheduled" = "예정된 일정 없음";
 "widget.moreEventsCount" = "+%d개 일정 더";
 "widget.grantAccess" = "시스템 설정 > 개인정보 보호에서\n캘린더·미리알림 접근 허용";
+
+/* Widget - Trust Status */
+"trust.running" = "실행 중";
+"trust.stopped" = "중지됨";
+"trust.unknown" = "알 수 없음";
+"trust.runtime" = "런타임";
+"trust.hitl" = "승인 정책";
+"trust.pending" = "대기";
+"trust.emergencyStop" = "비상 정지 활성";
+"trust.noData" = "AirMCP를 열어 상태 게시";

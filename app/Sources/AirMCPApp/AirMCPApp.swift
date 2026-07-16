@@ -304,6 +304,10 @@ final class URLSchemeHandler: NSObject {
         switch url.host {
         case "briefing":
             NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Calendar.app"))
+        case "trust":
+            // From the Trust Status widget — bring the app forward so the user
+            // can open the Trust Center. No tool details are conveyed in the URL.
+            NSApp.activate()
         default:
             NSApp.activate()
         }

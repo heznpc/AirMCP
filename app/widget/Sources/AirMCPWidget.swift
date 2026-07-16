@@ -5,6 +5,7 @@ import WidgetKit
 struct AirMCPWidgetBundle: WidgetBundle {
     var body: some Widget {
         BriefingWidget()
+        TrustStatusWidget()
     }
 }
 

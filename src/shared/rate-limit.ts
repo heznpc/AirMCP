@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { assertTestMode } from "./errors.js";
+import { HOME } from "./constants.js";
 
 /**
  * Agent-safety rate limit + emergency kill switch.
@@ -75,8 +75,7 @@ export const TENANT_CAP = parseIntEnv("AIRMCP_RATE_LIMIT_TENANT_CAP", DEFAULT_TE
 export const HTTP_MAX_REQUESTS_PER_MINUTE = parseIntEnv("AIRMCP_HTTP_MAX_REQUESTS_PER_MINUTE", DEFAULT_HTTP_PER_MINUTE);
 export const HTTP_IP_CAP = parseIntEnv("AIRMCP_HTTP_RATE_IP_CAP", DEFAULT_HTTP_IP_CAP);
 
-const EMERGENCY_STOP_PATH =
-  process.env.AIRMCP_EMERGENCY_STOP_PATH ?? join(homedir(), ".config", "airmcp", "emergency-stop");
+const EMERGENCY_STOP_PATH = process.env.AIRMCP_EMERGENCY_STOP_PATH ?? join(HOME, ".config", "airmcp", "emergency-stop");
 
 /** Stdio / loopback default tenant — single shared bucket for the
  *  non-OAuth path so existing single-user deployments behave identically. */

@@ -2,6 +2,10 @@
 export default {
   testEnvironment: 'node',
   transform: {},
+  // Every suite runs against a disposable HOME (see the helper) so state
+  // paths derived from HOME at import time can never touch the developer's
+  // real ~/.airmcp, ~/.config/airmcp, or ~/.cache/airmcp.
+  setupFiles: ['<rootDir>/tests/helpers/isolate-home.cjs'],
   // Stale git worktrees under `.claude/worktrees/*/` and the generated
   // `build/` bundle (build/mcpb/server/package.json) and the generated
   // self-contained `AirMCP.app` ship their own
@@ -10,8 +14,12 @@ export default {
   // pre-rebase versions of every suite. `testPathIgnorePatterns` only filters
   // discovery; `modulePathIgnorePatterns` is what suppresses haste scanning.
   // Both are needed.
-  testPathIgnorePatterns: ['/node_modules/', '/\\.claude/', '/build/', '/AirMCP\\.app/'],
-  modulePathIgnorePatterns: ['/\\.claude/', '/build/', '/AirMCP\\.app/'],
+  // Anchored to <rootDir> so running jest FROM a worktree checkout (whose
+  // own path contains `/.claude/worktrees/…`) still discovers its tests —
+  // an unanchored `/\.claude/` matched the checkout itself and silently
+  // excluded every suite.
+  testPathIgnorePatterns: ['/node_modules/', '<rootDir>/\\.claude/', '<rootDir>/build/', '/AirMCP\\.app/'],
+  modulePathIgnorePatterns: ['<rootDir>/\\.claude/', '<rootDir>/build/', '/AirMCP\\.app/'],
   collectCoverageFrom: [
     'dist/**/*.js',
     '!dist/cli/**',

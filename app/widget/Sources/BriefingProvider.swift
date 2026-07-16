@@ -1,5 +1,6 @@
 import WidgetKit
 import EventKit
+import WidgetSnapshotKit
 
 private struct UncheckedSendable<T>: @unchecked Sendable {
     let value: T
@@ -38,7 +39,65 @@ struct BriefingProvider: TimelineProvider {
 
     // MARK: - Data fetching
 
+    /// Snapshot-first, EventKit-fallback. The governed path is the app-written
+    /// WidgetSnapshot in the shared App Group; when it is present and fresh the
+    /// widget renders purely from it and performs NO EventKit access of its own.
+    /// The direct EventKit read remains only as an OS-native presentation
+    /// fallback for unsigned/no-App-Group builds or a stale/absent snapshot.
     private static func fetchBriefing() async -> BriefingEntry {
+        if let snapshot = readFreshSnapshot(now: Date()) {
+            return entry(from: snapshot)
+        }
+        return await fetchBriefingFromEventKit()
+    }
+
+    /// Read the app-written snapshot from the shared App Group container, or nil
+    /// when the container is unreachable (unsigned / no entitlement), the file is
+    /// missing/corrupt, or the snapshot is stale.
+    static func readFreshSnapshot(now: Date) -> WidgetSnapshot? {
+        let store = WidgetSnapshotStore(appGroupID: WidgetSnapshotConfig.appGroupID)
+        guard let url = store.containerURL(),
+              let snapshot = try? store.read(from: url),
+              !snapshot.isStale(now: now)
+        else { return nil }
+        return snapshot
+    }
+
+    /// Pure mapping from the governed snapshot to the widget's timeline entry —
+    /// unit tested in WidgetSnapshotKitTests via a mirror in the reader tests.
+    static func entry(from snapshot: WidgetSnapshot) -> BriefingEntry {
+        let events = snapshot.events.map { ev in
+            BriefingEvent(
+                title: ev.title ?? "",
+                startDate: ev.start,
+                endDate: ev.end,
+                isAllDay: ev.isAllDay,
+                location: ev.location ?? "",
+                calendarColorHex: ev.calendarColorHex,
+                calendarName: ""
+            )
+        }
+        let reminders = snapshot.reminders.map { rem in
+            BriefingReminder(
+                title: rem.title ?? "",
+                dueDate: rem.dueDate,
+                isOverdue: rem.isOverdue,
+                listName: "",
+                priority: 0
+            )
+        }
+        return BriefingEntry(
+            date: snapshot.generatedAt,
+            events: events,
+            reminders: reminders,
+            overdueCount: snapshot.overdueReminderCount,
+            tomorrowEvents: [],
+            hasCalendarAccess: true,
+            hasReminderAccess: true
+        )
+    }
+
+    private static func fetchBriefingFromEventKit() async -> BriefingEntry {
         let now = Date()
         let cal = Calendar.current
 

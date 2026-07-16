@@ -12,10 +12,18 @@ final class WidgetSnapshotTests: XCTestCase {
             staleAt: stale,
             privacyMode: privacy,
             runtimeStatus: .running,
+            events: [
+                WidgetSnapshot.Event(
+                    title: "Design Review",
+                    start: Date(timeIntervalSince1970: 1_700_003_600),
+                    end: Date(timeIntervalSince1970: 1_700_007_200),
+                    isAllDay: false,
+                    location: "Room A",
+                    calendarColorHex: "#34C759"
+                ),
+            ],
             eventCount: 3,
-            overdueReminderCount: 1,
-            nextEventTitle: "Design Review",
-            nextEventTime: Date(timeIntervalSince1970: 1_700_003_600)
+            overdueReminderCount: 1
         )
     }
 
@@ -34,23 +42,29 @@ final class WidgetSnapshotTests: XCTestCase {
         XCTAssertTrue(snap.isStale(now: stale))
     }
 
-    func testCountsOnlyModeStripsTitleBeforePersist() throws {
+    func testCountsOnlyModeStripsTitlesBeforePersist() throws {
         let store = WidgetSnapshotStore(appGroupID: "group.test")
         let snap = sample(privacy: .countsOnly)
-        // The writer redacts before persisting, so the encoded bytes carry no title.
+        // The writer redacts before persisting, so the encoded bytes carry no
+        // event title or location.
         let json = String(data: try store.encode(snap), encoding: .utf8)!
         XCTAssertFalse(json.contains("Design Review"), "counts-only snapshot must not encode the event title")
+        XCTAssertFalse(json.contains("Room A"), "counts-only snapshot must not encode the event location")
         let decoded = try store.decode(try store.encode(snap))
-        XCTAssertNil(decoded.nextEventTitle)
-        // Counts survive redaction.
+        XCTAssertNil(decoded.events.first?.title)
+        XCTAssertNil(decoded.events.first?.location)
+        // Counts and the time span survive redaction.
         XCTAssertEqual(decoded.eventCount, 3)
         XCTAssertEqual(decoded.overdueReminderCount, 1)
+        XCTAssertEqual(decoded.events.count, 1)
+        XCTAssertEqual(decoded.events.first?.start, Date(timeIntervalSince1970: 1_700_003_600))
     }
 
     func testTitlesModeKeepsTitle() throws {
         let store = WidgetSnapshotStore(appGroupID: "group.test")
         let decoded = try store.decode(try store.encode(sample(privacy: .titles)))
-        XCTAssertEqual(decoded.nextEventTitle, "Design Review")
+        XCTAssertEqual(decoded.events.first?.title, "Design Review")
+        XCTAssertEqual(decoded.events.first?.location, "Room A")
     }
 
     func testAtomicFileRoundTrip() throws {

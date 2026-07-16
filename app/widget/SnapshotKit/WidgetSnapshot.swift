@@ -31,6 +31,47 @@ public struct WidgetSnapshot: Codable, Sendable, Equatable {
         case stopped
     }
 
+    /// One upcoming event, bounded and redactable. `title`/`location` are nil in
+    /// counts-only privacy mode; the time span is always present so the widget
+    /// can still show "3 events, next at 14:00" without leaking what they are.
+    public struct Event: Codable, Sendable, Equatable {
+        public var title: String?
+        public var start: Date
+        public var end: Date
+        public var isAllDay: Bool
+        public var location: String?
+        public var calendarColorHex: String?
+
+        public init(
+            title: String?,
+            start: Date,
+            end: Date,
+            isAllDay: Bool,
+            location: String? = nil,
+            calendarColorHex: String? = nil
+        ) {
+            self.title = title
+            self.start = start
+            self.end = end
+            self.isAllDay = isAllDay
+            self.location = location
+            self.calendarColorHex = calendarColorHex
+        }
+    }
+
+    /// One reminder, bounded and redactable. `title` is nil in counts-only mode.
+    public struct Reminder: Codable, Sendable, Equatable {
+        public var title: String?
+        public var dueDate: Date?
+        public var isOverdue: Bool
+
+        public init(title: String?, dueDate: Date?, isOverdue: Bool) {
+            self.title = title
+            self.dueDate = dueDate
+            self.isOverdue = isOverdue
+        }
+    }
+
     public var version: Int
     public var generatedAt: Date
     /// After this instant the widget should treat the snapshot as stale and show
@@ -39,12 +80,13 @@ public struct WidgetSnapshot: Codable, Sendable, Equatable {
     public var privacyMode: PrivacyMode
     public var runtimeStatus: RuntimeStatus
 
-    // Minimal briefing summary — counts are always safe to show; the title is
-    // present only in `.titles` privacy mode.
+    // Bounded briefing summary. Counts are always safe to show; per-item
+    // titles/locations obey the privacy mode. `eventCount` is the true total
+    // for the day and may exceed `events.count` when the list is truncated.
+    public var events: [Event]
+    public var reminders: [Reminder]
     public var eventCount: Int
     public var overdueReminderCount: Int
-    public var nextEventTitle: String?
-    public var nextEventTime: Date?
 
     public init(
         version: Int = WidgetSnapshot.currentVersion,
@@ -52,20 +94,20 @@ public struct WidgetSnapshot: Codable, Sendable, Equatable {
         staleAt: Date,
         privacyMode: PrivacyMode,
         runtimeStatus: RuntimeStatus,
+        events: [Event] = [],
+        reminders: [Reminder] = [],
         eventCount: Int,
-        overdueReminderCount: Int,
-        nextEventTitle: String? = nil,
-        nextEventTime: Date? = nil
+        overdueReminderCount: Int
     ) {
         self.version = version
         self.generatedAt = generatedAt
         self.staleAt = staleAt
         self.privacyMode = privacyMode
         self.runtimeStatus = runtimeStatus
+        self.events = events
+        self.reminders = reminders
         self.eventCount = eventCount
         self.overdueReminderCount = overdueReminderCount
-        self.nextEventTitle = nextEventTitle
-        self.nextEventTime = nextEventTime
     }
 
     public func isStale(now: Date = Date()) -> Bool {
@@ -78,13 +120,30 @@ public struct WidgetSnapshot: Codable, Sendable, Equatable {
     public func redactedForPrivacy() -> WidgetSnapshot {
         guard privacyMode == .countsOnly else { return self }
         var copy = self
-        copy.nextEventTitle = nil
+        copy.events = copy.events.map { ev in
+            var e = ev
+            e.title = nil
+            e.location = nil
+            return e
+        }
+        copy.reminders = copy.reminders.map { rem in
+            var r = rem
+            r.title = nil
+            return r
+        }
         return copy
     }
 }
 
 public enum WidgetSnapshotError: Error, Equatable {
     case unsupportedVersion(Int)
+}
+
+public enum WidgetSnapshotConfig {
+    /// App Group shared by the main app (writer) and the widget (reader). Must
+    /// match the `com.apple.security.application-groups` entitlement on BOTH
+    /// signed targets; the release gate checks that agreement.
+    public static let appGroupID = "group.com.heznpc.AirMCP"
 }
 
 /// Reads/writes a `WidgetSnapshot` to a shared App Group container. The

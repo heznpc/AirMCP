@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import {
   MODULE_NAMES,
+  OPT_IN_MODULE_NAMES,
   NPM_PACKAGE_NAME,
   MCP_CLIENTS,
   getCompatibilityEnv,
@@ -214,19 +215,27 @@ export async function runDoctor(): Promise<void> {
   }
   if (isCodexCliAvailable()) {
     anyClientFound = true;
-    const shape = codexAirmcpRuntimeShape();
-    if (shape === "app-owned") {
-      ok("Codex", `${GREEN}connected${RESET} ${DIM}(AirMCP.app runtime)${RESET}`);
-    } else if (shape === "app-owned-disabled" || shape === "direct-disabled") {
-      meh("Codex", "AirMCP is disabled for Codex startup — run: npx airmcp codex enable");
-    } else if (shape === "app-owned-pending-restart") {
-      meh("Codex", `config uses AirMCP.app runtime — restart Codex to reload MCP servers`);
-    } else if (shape === "direct") {
-      meh("Codex", "connected via direct stdio — run: npx airmcp connect-clients");
-    } else if (shape === "missing") {
-      meh("Codex", `found but no airmcp entry`);
-    } else {
-      meh("Codex", `airmcp entry found, runtime shape unknown`);
+    try {
+      const shape = codexAirmcpRuntimeShape();
+      if (shape === "app-owned") {
+        ok("Codex", `${GREEN}connected${RESET} ${DIM}(AirMCP.app runtime)${RESET}`);
+      } else if (shape === "app-owned-disabled" || shape === "direct-disabled") {
+        meh("Codex", "AirMCP is disabled for Codex startup — run: npx airmcp codex enable");
+      } else if (shape === "app-owned-pending-restart") {
+        meh("Codex", `config uses AirMCP.app runtime — restart Codex to reload MCP servers`);
+      } else if (shape === "direct") {
+        meh("Codex", "connected via direct stdio — run: npx airmcp connect-clients");
+      } else if (shape === "missing") {
+        meh("Codex", `found but no airmcp entry`);
+      } else {
+        meh("Codex", `airmcp entry found, runtime shape unknown`);
+      }
+    } catch (e) {
+      // codexAirmcpRuntimeShape() throws CodexConfigPathError when
+      // AIRMCP_CODEX_CONFIG_PATH (or a derived CODEX_HOME path) doesn't name
+      // config.toml. A misconfigured env var shouldn't crash the whole doctor
+      // run — report it as a diagnostic line instead.
+      meh("Codex", e instanceof Error ? e.message : String(e));
     }
   }
   if (!anyClientFound) {
@@ -613,14 +622,24 @@ export async function runDoctor(): Promise<void> {
     const s6 = spinner("Loading module registry (boot smoke)...");
     try {
       const modulesMod = await import("../shared/modules.js");
+      // loadModuleRegistry() with no config argument deliberately imports
+      // every manifest entry — standard modules AND the opt-in ones
+      // (spatial_prep, webhooks, powerautomate) — as a boot smoke test, so it
+      // can catch an import-time bug even in a module the current profile
+      // doesn't enable. The denominator must match that same universe
+      // (MODULE_NAMES + OPT_IN_MODULE_NAMES), not just the standard count,
+      // or the reported total is incoherent (e.g. "32 of 29").
       const registry = await modulesMod.loadModuleRegistry();
       s6.succeed("Module registry loaded");
-      ok("Module registry", `${registry.length} of ${MODULE_NAMES.length} modules loaded successfully`);
-      if (registry.length < MODULE_NAMES.length) {
-        meh(
-          "Module registry",
-          `${MODULE_NAMES.length - registry.length} module(s) failed — see stderr for the failed names`,
-        );
+      const optInLoaded = registry.filter((m) => (OPT_IN_MODULE_NAMES as readonly string[]).includes(m.name)).length;
+      const standardLoaded = registry.length - optInLoaded;
+      const totalTargets = MODULE_NAMES.length + OPT_IN_MODULE_NAMES.length;
+      ok(
+        "Module registry",
+        `${standardLoaded} of ${MODULE_NAMES.length} standard + ${optInLoaded} of ${OPT_IN_MODULE_NAMES.length} opt-in modules loaded successfully`,
+      );
+      if (registry.length < totalTargets) {
+        meh("Module registry", `${totalTargets - registry.length} module(s) failed — see stderr for the failed names`);
       }
     } catch (e) {
       s6.fail("Module registry boot failed");

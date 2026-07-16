@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { existsSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { NPM_PACKAGE_SPECIFIER } from "../shared/config.js";
 import { HOME, IDENTITY } from "../shared/constants.js";
@@ -266,6 +266,27 @@ function atomicReplaceFile(path: string, content: string, mode: number): void {
     renameSync(temporaryPath, path);
   } finally {
     rmSync(temporaryPath, { force: true });
+  }
+}
+
+/**
+ * The app-owned Codex config embeds AIRMCP_HTTP_TOKEN — the sole credential
+ * gating the local HTTP runtime — in `[mcp_servers.airmcp.env]`. Force
+ * owner-only permissions (0600) whenever the config on disk carries that
+ * token, the same convention client-config.ts applies to token-bearing MCP
+ * client configs, so it is not left world-readable (0644, the typical
+ * default for a file the `codex` CLI itself writes) in a shared-home
+ * scenario. Best-effort: a permission-lockdown failure must not mask an
+ * otherwise-successful configure result.
+ */
+function lockDownCodexConfigIfTokenPresent(): void {
+  try {
+    const configPath = requireCodexConfigPath();
+    if (existsSync(configPath) && readFileSync(configPath, "utf8").includes("AIRMCP_HTTP_TOKEN")) {
+      chmodSync(configPath, 0o600);
+    }
+  } catch {
+    /* best-effort; the configure operation itself already succeeded */
   }
 }
 
@@ -628,6 +649,7 @@ export function configureCodexAirmcp(options: ConfigureCodexAirmcpOptions = {}):
         "Codex reports AirMCP from a non-global config; the global AirMCP entry is missing and was not changed",
       );
     }
+    lockDownCodexConfigIfTokenPresent();
     return toggled.changed ? "configured" : "already-configured";
   }
   addOrReplaceCodexMcp(
@@ -648,6 +670,7 @@ export function configureCodexAirmcp(options: ConfigureCodexAirmcpOptions = {}):
     ],
     enabled,
   );
+  lockDownCodexConfigIfTokenPresent();
   return "configured";
 }
 

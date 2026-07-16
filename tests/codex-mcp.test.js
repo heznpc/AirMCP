@@ -574,6 +574,7 @@ describe("codex MCP setup", () => {
   });
 
   test("explicitly disables and re-enables an existing app-owned entry without remove/add", () => {
+    const configPath = process.env.AIRMCP_CODEX_CONFIG_PATH;
     codexGetOutput = [
       "airmcp",
       "  enabled: false",
@@ -583,7 +584,7 @@ describe("codex MCP setup", () => {
       "  env: AIRMCP_HTTP_TOKEN=********",
     ].join("\n");
     writeFileSync(
-      process.env.AIRMCP_CODEX_CONFIG_PATH,
+      configPath,
       [
         "[mcp_servers.airmcp]",
         "enabled = false",
@@ -595,15 +596,21 @@ describe("codex MCP setup", () => {
         "",
       ].join("\n"),
     );
+    // Simulate a config file left at a permissive default (e.g. by the
+    // codex CLI's own umask-based write) to prove the token-bearing
+    // rewrite locks it down rather than merely preserving the prior mode.
+    chmodSync(configPath, 0o644);
 
     expect(configureCodexAirmcp()).toBe("configured");
-    expect(readFileSync(process.env.AIRMCP_CODEX_CONFIG_PATH, "utf8")).toContain("enabled = true");
+    expect(readFileSync(configPath, "utf8")).toContain("enabled = true");
     expect(execFileSync).not.toHaveBeenCalledWith("codex", ["mcp", "remove", "airmcp"], expect.anything());
+    expect(statSync(configPath).mode & 0o777).toBe(0o600);
 
     codexGetOutput = codexGetOutput.replace("enabled: false", "enabled: true");
     expect(configureCodexAirmcp({ enabled: false })).toBe("configured");
-    expect(readFileSync(process.env.AIRMCP_CODEX_CONFIG_PATH, "utf8")).toContain("enabled = false");
+    expect(readFileSync(configPath, "utf8")).toContain("enabled = false");
     expect(execFileSync).not.toHaveBeenCalledWith("codex", ["mcp", "add", "airmcp"], expect.anything());
+    expect(statSync(configPath).mode & 0o777).toBe(0o600);
   });
 
   test("stdio clients use a token-gated proxy command rather than launching another server", () => {

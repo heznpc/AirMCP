@@ -322,13 +322,22 @@ const MAX_RETRY_BACKOFF_MS = 60_000;
  * for an action the user already rejected (approval fatigue), and retrying a
  * hard input error is pointless.
  */
-function isRetryableErrorResponse(response: { structuredContent?: unknown }): boolean {
+function isRetryableErrorResponse(response: { structuredContent?: unknown; _meta?: Record<string, unknown> }): boolean {
   const sc = response.structuredContent;
   if (sc && typeof sc === "object" && "error" in sc) {
     const err = (sc as { error?: unknown }).error;
     if (err && typeof err === "object" && "retryable" in err) {
       return (err as { retryable?: unknown }).retryable === true;
     }
+  }
+  // outputSchema-bearing tools: the registry strips structuredContent from
+  // isError results (a success schema would reject the typed error payload)
+  // and preserves the error envelope in namespaced result metadata instead.
+  // Without this branch, step retry silently stopped working for every
+  // schema-bearing tool — retryable upstream timeouts included.
+  const metaError = response._meta?.["airmcp/error"];
+  if (metaError && typeof metaError === "object" && "retryable" in metaError) {
+    return (metaError as { retryable?: unknown }).retryable === true;
   }
   return false;
 }

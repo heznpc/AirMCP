@@ -11,7 +11,10 @@ describe("MCP registry server metadata", () => {
     expect(serverJson.description.length).toBeLessThanOrEqual(100);
   });
 
-  test("description keeps the stats sync anchor", () => {
-    expect(serverJson.description).toMatch(/\d+ tools across \d+ modules/);
+  test("description leads with discoverable identity and governance", () => {
+    expect(serverJson.description).toMatch(/Apple MCP server/i);
+    expect(serverJson.description).toMatch(/macOS/i);
+    expect(serverJson.description).toMatch(/approval|audit/i);
+    expect(serverJson.description).not.toMatch(/\d+\s+(?:tools?|modules?)/i);
   });
 });

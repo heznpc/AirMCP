@@ -1,7 +1,7 @@
 {
   "name": "airmcp",
   "displayName": "AirMCP",
-  "description": "Approval-gated local action runtime for Apple workspaces with profile-based modules and progressive MCP tool exposure. Production governance built in: HMAC-chained audit log, per-call HITL, OAuth 2.1 + Resource Indicators, scope gate, rate limit, emergency stop file. 296 tools across 32 modules: Calendar, Notes, Mail, Reminders, Contacts, Messages, Music, Finder, Safari, Photos, Maps, Podcasts, Weather, iWork, Google Workspace, Apple Intelligence, UI Automation, Shortcuts, Context Memory. Native Swift bridges into EventKit, HealthKit, PhotoKit, Vision, Foundation Models. macOS local-first, multi-client.",
+  "description": "Apple-native MCP server for macOS and the governed connector layer between AI clients and Apple apps. Profiles and progressive discovery keep the client surface focused; HMAC-chained audit logs, per-call HITL, OAuth 2.1 + Resource Indicators, scope gates, rate limits, and an emergency stop govern actions across Calendar, Notes, Mail, Reminders, Contacts, Messages, Music, Finder, Safari, Photos, Maps, Podcasts, Weather, iWork, Google Workspace, Apple Intelligence, UI Automation, Shortcuts, and Context Memory. Native Swift bridges cover EventKit, HealthKit, PhotoKit, Vision, and Foundation Models. Local-first and multi-client.",
   "version": "2.15.0",
   "author": {
     "name": "heznpc",

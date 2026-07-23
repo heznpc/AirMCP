@@ -6,7 +6,7 @@
         "-y",
         "airmcp"
       ],
-      "description": "Approval-gated local action runtime for Apple workspaces — 296 tools across 32 modules. macOS only.",
+      "description": "Apple-native MCP server for macOS with governed access to Notes, Mail, Calendar, Reminders, Shortcuts, and more.",
       "env": {}
     }
   },

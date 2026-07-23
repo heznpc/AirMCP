@@ -6,7 +6,7 @@ Internal tracking doc for AirMCP's public-registry presence. Update the status c
 
 | Registry                       | Status                                           | Last action                               | Next step                                                                                                                                                                   |
 | ------------------------------ | ------------------------------------------------ | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Anthropic MCP Registry**     | Pending (submitted via Google Form, no response) | 2026-03-28                                | **Resubmit now** with the current description below — new differentiators: `.mcpb` one-click install, OAuth 2.1 + Resource Indicators, profiles, progressive tool exposure, 233 AppIntents |
+| **Anthropic MCP Registry**     | Pending (submitted via Google Form, no response) | 2026-03-28                                | **Resubmit now** with the current description below — lead with Apple MCP server for macOS, governed actions, `.mcpb` one-click install, profiles, and progressive discovery |
 | **Smithery.ai**                | Listed (`airmcp`)                                | Manifest auto-tracked via `smithery.yaml` | Request featured placement — current pitch should be workflow + governance depth, bounded to README-level Apple-native comparisons rather than an unqualified "only" claim     |
 | **Glama**                      | Listed (`AirMCP`)                                | `glama.json` present                      | Verify icon + category render on the live detail page; ask for category "Apple / macOS" pin                                                                                 |
 | **MCP Market (mcpmarket.com)** | Not submitted                                    | —                                         | **Submit this week** — see section below for the pitch (v2.11 headline)                                                                                                     |
@@ -37,35 +37,39 @@ Internal tracking doc for AirMCP's public-registry presence. Update the status c
 
 These numbers belong in every submission blurb — they explain _why now_.
 
-## Manifest files (keep in sync)
+## Manifest files (keep the positioning in sync)
 
-All four auto-sync via `npm run stats:sync` so the counts stay truthful on every merge:
+All four use a count-free, search-oriented description. Aggregate catalog counts
+belong in technical reference sections and must not be copied back into these
+public pitches:
 
 - `server.json` — Anthropic MCP Registry (schema: `static.modelcontextprotocol.io/schemas/2025-12-11`)
 - `mcp.json` — generic MCP client wiring snippet
 - `glama.json` — Glama detail page
 - `smithery.yaml` — Smithery submission
 
-If you touch the tool/module count by hand, re-run `npm run stats:sync` before commit or CI's `stats:check` will fail.
+When capabilities change, update all four descriptions together and run the
+positioning-surface test before commit.
 
 ## Resubmission checklist
 
-When the counts or headline features change, walk this list before you touch any registry UI:
+When headline features change, walk this list before you touch any registry UI:
 
 - [ ] `npm run stats:sync` shows **no** remaining diffs (zero "sync:" lines)
 - [ ] `server.json` `version` matches `package.json` version
 - [ ] `server.json` `description` reflects current headline features (`.mcpb` one-click, OAuth 2.1, profiles, progressive tool exposure, 233 AppIntents, skills, memory, audit, inbound HTTP `allowNetwork`)
 - [ ] `README.md` Features block mirrors the description — catches the case where one was updated without the other
-- [ ] `docs/index.html` hero + `tryit_footer` counts match the registry description
+- [ ] `docs/index.html` title, metadata, hero, and proof points lead with Apple MCP server for macOS + governance, without aggregate catalog counts
 - [ ] `CHANGELOG.md` `[Unreleased]` block names every user-visible change since the last registry ping
 - [ ] `npm run typecheck && npm test` — green before asking a reviewer to crawl the repo
 - [ ] `git tag v<version>` pushed so the registry crawler has a pinned ref to point at
 
 ## Anthropic Registry — resubmission notes
 
-The 2026-03-28 Google Form submission used the v2.7 pitch ("296 tools across 32 modules"). For the resubmission:
+The 2026-03-28 Google Form submission used a count-led catalog pitch. Do not
+reuse it for the resubmission:
 
-- **Headline for current resubmission**: "Approval-gated local action runtime for Apple workspaces — 296 tools across 32 modules with profiles, progressive tool exposure, workflow skills, context memory, queryable audit log, sensitive-action HITL, OAuth 2.1, and inbound HTTP `allowNetwork` policy."
+- **Headline for current resubmission**: "Apple-native MCP server for macOS with governed access to Notes, Mail, Calendar, Reminders, Shortcuts, and more — per-call HITL, HMAC-chained audit logs, profiles, progressive discovery, OAuth 2.1, and declarative network policy."
 - **Security story** (registry reviewers care): HITL approval, rate limit + emergency stop file, `allowNetwork` startup invariant (RFC 0002), PII-scrubbed audit log at `0600`.
 - **Differentiator vs. apple-mcp / shortcuts**: the Skills DSL (`parallel`/`loop`/`on_error`/`retry`/inputs/triggers) + event-bus triggers + governance primitives. Keep this claim bounded: based on README-level/public-surface comparison, not full source audits of every competitor.
 - **Demo asset**: point at `docs/demo.gif` (re-record with `./scripts/record-demo.sh` before the submission).
@@ -74,7 +78,7 @@ The 2026-03-28 Google Form submission used the v2.7 pitch ("296 tools across 32 
 
 Ask after the npm publish lands. Pitch the following concrete wins over the baseline `apple-mcp` listing:
 
-- Broad tool surface plus workflow-first entry points (296 tools, 32 modules, curated workflow catalog)
+- Governed Apple workspace actions plus workflow-first entry points and progressive discovery
 - README-level Apple-native comparison: AirMCP is the only tracked listing that publicly documents the full governance stack together — HMAC audit, sensitive-action HITL, rate limit, inbound HTTP `allowNetwork`, OAuth Resource Indicators
 - Queryable audit log and Skills DSL are concrete differentiators; avoid claiming competitors have zero governance without a fresh source audit
 - Documented inbound HTTP exposure policy (RFC 0002 in-tree)
@@ -85,7 +89,7 @@ The manifest is auto-synced; they shouldn't need any new asset from our side.
 
 One-paragraph pitch for the submission form:
 
-> AirMCP is an Apple-native MCP runtime for governed workflows across the local Apple workspace. It ships 296 tools across 32 modules (Notes, Calendar, Reminders, Contacts, Mail, Messages, Music, Finder, Safari, System, Photos, Shortcuts, Apple Intelligence previews, TV, Screen Capture, Maps, Podcasts, Weather, Pages/Numbers/Keynote, Location, Bluetooth, HealthKit, Speech, Context Memory, Audit, Spatial Prep, Webhooks, Power Automate), plus module profiles, progressive tool exposure, workflow skills, sensitive-action HITL approval, HMAC-chained audit logs, rate limiting, OAuth 2.1 + Resource Indicators, and an inbound HTTP `allowNetwork` policy (RFC 0002). In README-level Apple-native MCP comparisons, this is the full-stack governance surface to beat; re-check competitor READMEs/source before publishing any unqualified "only" claim. Open source (MIT), v2.15+ on npm. iOS sibling with auto-generated AppIntents and an opt-in Foundation Models on-device agent preview (RFC 0007) in active development.
+> AirMCP is an Apple-native MCP server for macOS and the governed connector layer between AI clients and the local Apple workspace. It connects Notes, Calendar, Reminders, Contacts, Mail, Messages, Finder, Safari, Shortcuts, iWork, Google Workspace, Apple Intelligence previews, and more through module profiles, progressive discovery, and workflow-first entry points. Sensitive actions require per-call HITL approval; every call is covered by rate limits and HMAC-chained audit logs. OAuth 2.1 + Resource Indicators and the inbound HTTP `allowNetwork` policy govern remote exposure. In README-level Apple-native MCP comparisons, this is the full-stack governance surface to beat; re-check competitor READMEs/source before publishing any unqualified "only" claim. Open source (MIT), v2.15+ on npm. The iOS sibling and opt-in Foundation Models agent remain previews.
 
 Screenshots to attach:
 

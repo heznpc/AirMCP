@@ -168,18 +168,12 @@ describe("mcpb manifest template — well-formedness", () => {
   });
 });
 
-describe("mcpb manifest template — long_description count tracks the canonical surface", () => {
-  // Guards the "270+ tools" drift class: the install-dialog blurb must track
-  // docs/tool-manifest.json (the generated SSOT), not be hand-set. count-stats
-  // also syncs this file, but pin it in the suite so `npm test` catches drift.
-  const manifestSurface = JSON.parse(readFileSync(join(ROOT, "docs", "tool-manifest.json"), "utf-8"));
-  const canonicalToolCount =
-    typeof manifestSurface.toolCount === "number" ? manifestSurface.toolCount : (manifestSurface.tools?.length ?? 0);
-
-  test("'N tools across' in long_description equals the generated tool count", () => {
+describe("mcpb manifest template — governed discovery position", () => {
+  test("long_description identifies the product without a catalog-size headline", () => {
     const m = render();
-    const match = /(\d+) tools across/.exec(m.long_description);
-    expect(match).not.toBeNull();
-    expect(Number(match[1])).toBe(canonicalToolCount);
+    expect(m.long_description).toMatch(/Apple-native MCP server for macOS/i);
+    expect(m.long_description).toMatch(/governed connector layer/i);
+    expect(m.long_description).toMatch(/per-call HITL/i);
+    expect(m.long_description).not.toMatch(/\d+\s+(?:tools?|modules?)/i);
   });
 });

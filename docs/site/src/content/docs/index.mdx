@@ -1,9 +1,9 @@
 ---
-title: AirMCP Documentation
-description: More than Siri. Open to every agent. Approval-gated local action runtime for Apple workspaces — 32 modules, 296 tools.
+title: AirMCP — Apple MCP Server for macOS
+description: Apple-native MCP server for macOS with governed access to Notes, Mail, Calendar, Reminders, Shortcuts, and more.
 template: splash
 hero:
-  tagline: More than Siri. Open to every agent. Approval-gated local action runtime for Apple workspaces — 32 modules, 296 tools, from Notes to Health.
+  tagline: Governed access to Notes, Mail, Calendar, Reminders, Shortcuts, and more — locally on macOS.
   actions:
     - text: Get Started
       link: /getting-started/installation/
@@ -18,17 +18,17 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 
 ## What is AirMCP?
 
-AirMCP is a [Model Context Protocol](https://modelcontextprotocol.io/) server that exposes the Apple ecosystem to any MCP-compatible AI client. It bridges LLMs like Claude, GPT, and Gemini to native macOS applications through JXA (JavaScript for Automation), a Swift bridge, and direct system APIs — so the AI reads, writes, and acts on top of your Apple data. AirMCP is the connector; the AI is the thinker.
+AirMCP is an Apple-native [Model Context Protocol](https://modelcontextprotocol.io/) server for macOS. It connects Claude, Codex, Cursor, and other MCP clients to native Apple applications through JXA (JavaScript for Automation), a Swift bridge, and direct system APIs. AirMCP is the governed connector and control layer; the client does the reasoning.
 
 <CardGrid stagger>
-  <Card title="32 Modules" icon="puzzle">
-    Notes, Reminders, Calendar, Contacts, Mail, Messages, Music, Finder, Safari, System, Photos, Shortcuts, Intelligence, TV, UI, Screen, Maps, Podcasts, Weather, Pages, Numbers, Keynote, Location, Bluetooth, Google, Speech, Health, memory, audit, and opt-in HTTP workflow modules.
+  <Card title="Governed Actions" icon="setting">
+    Sensitive and destructive actions require per-call approval. Rate limits, an emergency stop, and HMAC-chained audit logs govern the runtime underneath every app integration.
   </Card>
-  <Card title="296 Tools" icon="setting">
-    Read, create, update, and delete across supported apps, with profile-based exposure, task-scoped sessions, and sensitive actions gated by approval.
+  <Card title="Progressive Discovery" icon="magnifier">
+    Profiles and task-scoped sessions expose a focused front door, then let clients discover the Apple actions a workflow actually needs.
   </Card>
-  <Card title="Semantic Search" icon="magnifier">
-    On-device vector embeddings via the Swift bridge (NLContextualEmbedding) or Gemini API. Search notes and reminders by meaning, not just keywords.
+  <Card title="Apple Workspace" icon="puzzle">
+    Work across Notes, Reminders, Calendar, Contacts, Mail, Messages, Finder, Safari, Photos, Shortcuts, iWork, system controls, and more.
   </Card>
   <Card title="Works Everywhere" icon="laptop">
     Compatible with Claude Desktop, Claude Code, Cursor, Windsurf, Cline, and any MCP-compliant client. Supports both stdio and HTTP transports.

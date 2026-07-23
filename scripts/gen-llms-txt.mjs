@@ -182,7 +182,9 @@ export function generateLlmsText() {
   const REPO = "https://github.com/heznpc/AirMCP";
   let llmsTxt = `# AirMCP
 
-> Approval-gated local action runtime for Apple workspaces. ${headlineTools} tools across ${moduleCount} modules.
+> Apple-native MCP server for macOS. AirMCP is the governed connector and control layer MCP clients call — not another agent.
+
+> It mediates Apple workspace actions through progressive exposure, per-call approval, rate limits, and a tamper-evident audit chain.
 
 ## Links
 

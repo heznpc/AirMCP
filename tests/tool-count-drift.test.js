@@ -104,17 +104,11 @@ describe("codegen drift: generated Swift intents vs manifest", () => {
 });
 
 describe("doc drift: README prose vs manifest", () => {
-  test("README advertises the manifest tool count, and the starter is a subset", () => {
-    // Post-reconciliation: the README full-surface headline now EQUALS
-    // manifest.toolCount (registered + dynamic / `skill_*` / MCP-app tools), kept
-    // in sync by `stats:check` (count-stats reads manifest.toolCount → syncs the
-    // docs). Two invariants belong here:
-    //   1. README advertises exactly manifest.toolCount somewhere ("<N> tools").
-    //   2. the FIRST tools number in README is the starter preset (~111); the
-    //      full manifest count must never drop below it (full ≥ starter sanity).
-    const starter = readmeNum(/(\d+)\s+tools\b/); // first hit = the starter "~111 tools"
-    expect(manifest.toolCount).toBeGreaterThanOrEqual(starter);
-    expect(readmeSrc).toMatch(new RegExp(`\\b${manifest.toolCount}\\s+tools\\b`));
+  test("README technical runtime section carries the manifest tool count", () => {
+    const runtimeSection = readmeSrc.split("## Runtime Model")[1]?.split("## Safety Model")[0] ?? "";
+    const runtimeCount = runtimeSection.match(/complete generated catalog currently contains (\d+) tools\b/);
+    expect(runtimeCount).not.toBeNull();
+    expect(Number(runtimeCount[1])).toBe(manifest.toolCount);
   });
 
   test('README "<N> modules" equals the module count in modules.ts', () => {

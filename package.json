@@ -1,11 +1,15 @@
 {
   "name": "airmcp",
   "version": "2.15.0",
-  "description": "Approval-gated local action runtime for Apple workspaces, with profile-based modules, progressive MCP tool exposure, audit logs, HITL approval, and Mac app automation.",
+  "description": "Apple-native MCP server for macOS with governed access to Notes, Mail, Calendar, Reminders, Shortcuts, and more.",
   "keywords": [
     "mcp",
+    "mcp-server",
     "model-context-protocol",
     "apple",
+    "apple-mcp",
+    "mac-mcp",
+    "macos-automation",
     "notes",
     "apple-notes",
     "reminders",

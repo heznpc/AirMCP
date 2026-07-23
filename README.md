@@ -9,14 +9,14 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/heznpc/AirMCP)](https://github.com/heznpc/AirMCP/stargazers)
 
-**Apple-native action runtime for MCP clients.** AirMCP lets Claude, Codex,
-Cursor, Raycast, Siri, Shortcuts, Xcode agents, and other MCP-capable AI clients
-read, organize, and act across your Mac apps through one governed local runtime.
+**Apple MCP server for macOS — a governed local action runtime for AI clients.**
+AirMCP lets Claude, Codex, Cursor, Raycast, Xcode agents, and other MCP clients
+work across Notes, Mail, Calendar, Reminders, Finder, Safari, Shortcuts, and the
+rest of your Apple workspace.
 
-The catalog is broad: 296 tools across 32 modules. The important part is the
-layer underneath: profile-based exposure, task-scoped tool sessions, per-call
-human approval, HMAC-chained audit logs, rate limits, OAuth scopes, and local
-controls for sensitive Apple workspace actions.
+AirMCP is the connector and control layer, not another agent. It mediates Apple
+workspace actions through profiles, progressive exposure, per-call human
+approval, HMAC-chained audit logs, rate limits, OAuth scopes, and local controls.
 
 > Multi-language project page: [heznpc.github.io/AirMCP](https://heznpc.github.io/AirMCP/)
 
@@ -95,6 +95,9 @@ More workflow examples live in [docs/workflows.md](docs/workflows.md).
 
 AirMCP is designed to keep a large local capability surface usable without
 dumping the full catalog into every client context.
+
+The complete generated catalog currently contains 296 tools across 32 modules.
+Profiles and progressive exposure keep clients from loading it all at once.
 
 - **Profiles**: `starter`, `communications-safe`, `productivity`, `full`, or
   `custom`.

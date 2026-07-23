@@ -1,5 +1,5 @@
 name: airmcp
-description: Approval-gated local action runtime for Apple workspaces — 296 tools across 32 modules, profile-based loading, progressive tool exposure, HITL approval, audit logs, and Mac app automation.
+description: Apple-native MCP server for macOS with governed access to Notes, Mail, Calendar, Reminders, Shortcuts, and more.
 homepage: https://github.com/heznpc/AirMCP
 icon: https://raw.githubusercontent.com/heznpc/AirMCP/main/icons/airmcp-icon-256.png
 license: MIT

@@ -83,9 +83,22 @@ tests/                    # Script generator tests
 
 ## Stats
 
-- **296 tools** across 27 modules (+ dynamic shortcut tools at runtime)
+- **296 tools** across **32 modules** (+ dynamic shortcut tools at runtime)
 - **32 prompts** (per-module + cross-module + YAML skills)
-- **8 MCP resources** (Notes, Calendar, Reminders, Music, Mail, System, Context Snapshot)
+- **9 MCP resources** (Notes, Calendar, Reminders, Music, Mail, System, Context Snapshot)
+
+## Public Positioning Contract
+
+- Lead public discovery surfaces with **Apple MCP server for macOS** and the
+  governed connector/control layer: per-call approval, HMAC-chained audit,
+  rate limits, profiles, and progressive discovery.
+- Aggregate tool and module counts are technical catalog metadata, not the
+  product headline. Keep them out of README and website heroes, SEO/social
+  metadata, registry descriptions, package/plugin pitches, and the opening of
+  `llms.txt`.
+- Exact counts may appear in technical reference and configuration sections,
+  where `npm run stats:sync` keeps them current.
+- Tool breadth supports the story; it does not replace the governance story.
 
 ## Module Pattern
 

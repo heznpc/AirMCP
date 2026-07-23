@@ -140,8 +140,8 @@ console.log(
 //   "**229 Shortcuts / Siri AppIntents**" → reconciled with generated file
 //   "**34 prompts + 14 YAML skill built-ins**" → reconciled with src count
 syncFile("README.md", [
-  { pattern: /The catalog is broad: (\d+) tools across/g, value: tools },
-  { pattern: /tools across (\d+) modules/g, value: modules },
+  { pattern: /complete generated catalog currently contains (\d+) tools across \d+ modules/g, value: tools },
+  { pattern: /complete generated catalog currently contains \d+ tools across (\d+) modules/g, value: modules },
   { pattern: /\*\*(\d+) tools\*\*/, value: tools },
   { pattern: /(\d+) modules\)/g, value: modules },
   { pattern: /(\d+) Apple apps/g, value: modules },
@@ -157,9 +157,9 @@ syncFile("README.md", [
 // AGENTS.md
 syncFile(".github/AGENTS.md", [
   { pattern: /\*\*(\d+) tools\*\*/, value: tools },
-  { pattern: /(\d+) modules/, value: modules },
+  { pattern: /tools\*\* across \*\*(\d+) modules\*\*/, value: modules },
   { pattern: /\*\*(\d+) prompts\*\*/, value: prompts },
-  { pattern: /\*\*(\d+) [\w-]*resources\*\*/, value: resources },
+  { pattern: /\*\*(\d+) MCP resources\*\*/, value: resources },
 ]);
 
 // Docs site pages
@@ -180,20 +180,10 @@ for (const page of docsPages) {
   ]);
 }
 
-syncFile("docs/site/src/content/docs/index.mdx", [
-  { pattern: /— (\d+) modules, \d+ tools/g, value: modules },
-  { pattern: /— \d+ modules, (\d+) tools/g, value: tools },
-  { pattern: /<Card title="(\d+) Modules"/, value: modules },
-  { pattern: /<Card title="(\d+) Tools"/, value: tools },
-]);
-
-// MCPB manifest template — the long_description string lives in the user
-// install dialog, so a stale count is highly visible. Guard the tool /
-// module / AppIntent counts so the blurb can't re-drift (e.g. the old
-// "270+ tools" that slipped past this guard before).
+// MCPB manifest template — keep technical configuration and generated
+// AppIntent counts accurate. Aggregate tool/module counts are intentionally
+// absent from the install pitch; they belong in technical reference sections.
 syncFile("mcpb/manifest.template.json", [
-  { pattern: /(\d+) tools across/g, value: tools },
-  { pattern: /across (\d+) modules/g, value: modules },
   { pattern: /(\d+) auto-generated Apple App Intents/g, value: appIntents },
   { pattern: /Load all (\d+) modules on startup/g, value: modules },
 ]);
@@ -205,12 +195,6 @@ syncFile("docs/skills.md", [
 ]);
 syncFile("docs/shortcuts.md", [{ pattern: /(\d+) tools are auto-registered/g, value: tools }]);
 syncFile("docs/REGISTRY_SUBMISSIONS.md", [{ pattern: /(\d+) AppIntents/g, value: appIntents }]);
-syncFile("docs/REGISTRY_SUBMISSIONS.md", [
-  { pattern: /(\d+) tools across/g, value: tools },
-  { pattern: /across (\d+) modules/g, value: modules },
-  { pattern: /\((\d+) tools, \d+ modules/g, value: tools },
-  { pattern: /, (\d+) modules, curated workflow catalog/g, value: modules },
-]);
 syncFile("docs/TERMS_OF_SERVICE.md", [
   { pattern: /(\d+) tools/g, value: tools },
   { pattern: /(\d+) modules/g, value: modules },
@@ -218,70 +202,10 @@ syncFile("docs/TERMS_OF_SERVICE.md", [
 syncFile("docs/environment.md", [{ pattern: /Send all (\d+) tools/g, value: tools }]);
 syncFile("docs/mcpb.md", [{ pattern: /Load all (\d+) modules on startup/g, value: modules }]);
 
-// Landing page — only match aggregate counts, not per-module badges.
-syncFile("docs/index.html", [
-  { pattern: /— (\d+) modules, \d+ tools/g, value: modules },
-  { pattern: /— \d+ modules, (\d+) tools/g, value: tools },
-  { pattern: /(\d+) Apple modules, \d+ tools/g, value: modules },
-  { pattern: /\d+ Apple modules, (\d+) tools/g, value: tools },
-  {
-    pattern:
-      /text-2xl font-bold tracking-tight">(\d+)<\/div>\s*<div class="text-xs opacity-35 mt-1" data-i18n="stat_modules"/,
-    value: modules,
-  },
-  {
-    pattern:
-      /text-2xl font-bold tracking-tight">(\d+)<\/div>\s*<div class="text-xs opacity-35 mt-1" data-i18n="stat_tools"/,
-    value: tools,
-  },
-  {
-    pattern:
-      /text-2xl font-bold tracking-tight">(\d+)<\/div>\s*<div class="text-xs opacity-35 mt-1" data-i18n="stat_prompts"/,
-    value: prompts,
-  },
-  { pattern: /with (\d+) tools across/g, value: tools },
-  { pattern: /across (\d+) modules/g, value: modules },
-  { pattern: /hero_sub">(\d+) tools/g, value: tools },
-  { pattern: /tryit_footer">(\d+) tools/g, value: tools },
-  { pattern: /why_1_title">(\d+) tools/g, value: tools },
-]);
-
-// Registry metadata
-const registryPattern = [
-  { pattern: /(\d+) tools across/g, value: tools, required: true, label: "tool count" },
-  { pattern: /across (\d+) modules/g, value: modules, required: true, label: "module count" },
-];
-syncFile("mcp.json", registryPattern);
-syncFile("glama.json", registryPattern);
-syncFile("smithery.yaml", registryPattern);
-// .claude-plugin/plugin.json description carries the counts on the public
-// marketplace listing page — same drift class as the registry manifests.
-syncFile(".claude-plugin/plugin.json", registryPattern);
-// Anthropic MCP Registry manifest — only the description carries
-// the counts (version/package fields live outside the pattern scope).
-syncFile("server.json", [
-  { pattern: /(\d+) tools across/g, value: tools, required: true, label: "tool count" },
-  { pattern: /across (\d+) modules/g, value: modules, required: true, label: "module count" },
-]);
-
-// Locale files — each uses different words for "modules"
-const localeDir = join(ROOT, "docs", "locales");
-if (existsSync(localeDir)) {
-  const moduleWords = /(\d+)([\s\u00a0]*(?:modules?|개 모듈|モジュール|个模块|個模組|Module|Modulen|m[oó]dulos))/g;
-  const moduleKeyWords = /(\d+)([\s\u00a0]*(?:modules?|개 모듈|モジュール|个模块|個模組|Module|Modulen|m[oó]dulos))/;
-  const toolKeyWords =
-    /(\d+)([\s\u00a0]*(?:tools?|Tools|개 툴|개 도구|ツール|个工具|個工具|Werkzeuge|herramientas|outils|ferramentas))/;
-  for (const f of readdirSync(localeDir).filter((f) => f.endsWith(".json"))) {
-    syncFile(`docs/locales/${f}`, [
-      { pattern: moduleWords, value: modules },
-      { pattern: new RegExp(`"meta_description": "[^"]*?${moduleKeyWords.source}`), value: modules },
-      { pattern: new RegExp(`"meta_description": "[^"]*?${toolKeyWords.source}`), value: tools },
-      { pattern: new RegExp(`"why_1_title": "[^"]*?${moduleKeyWords.source}`), value: modules },
-      { pattern: new RegExp(`"why_1_title": "[^"]*?${toolKeyWords.source}`), value: tools },
-      { pattern: new RegExp(`"tryit_footer": "${toolKeyWords.source}`), value: tools },
-    ]);
-  }
-}
+// Public landing-page, locale, and registry descriptions deliberately carry no
+// aggregate catalog counts. tests/positioning-surface.test.js protects that
+// positioning boundary; this script only synchronizes counts in technical
+// reference and configuration surfaces.
 
 console.log("");
 

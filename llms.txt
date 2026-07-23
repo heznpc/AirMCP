@@ -1,6 +1,8 @@
 # AirMCP
 
-> Approval-gated local action runtime for Apple workspaces. 296 tools across 32 modules.
+> Apple-native MCP server for macOS. AirMCP is the governed connector and control layer MCP clients call — not another agent.
+
+> It mediates Apple workspace actions through progressive exposure, per-call approval, rate limits, and a tamper-evident audit chain.
 
 ## Links
 

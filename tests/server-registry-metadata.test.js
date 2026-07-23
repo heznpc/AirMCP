@@ -12,9 +12,9 @@ describe("MCP registry server metadata", () => {
   });
 
   test("description leads with discoverable identity and governance", () => {
-    expect(serverJson.description).toMatch(/Apple MCP server/i);
+    expect(serverJson.description).toMatch(/MCP runtime for the Apple ecosystem/i);
     expect(serverJson.description).toMatch(/macOS/i);
-    expect(serverJson.description).toMatch(/approval|audit/i);
+    expect(serverJson.description).toMatch(/approval/i);
     expect(serverJson.description).not.toMatch(/\d+\s+(?:tools?|modules?)/i);
   });
 });

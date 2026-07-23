@@ -182,9 +182,11 @@ export function generateLlmsText() {
   const REPO = "https://github.com/heznpc/AirMCP";
   let llmsTxt = `# AirMCP
 
-> Apple-native MCP server for macOS. AirMCP is the governed connector and control layer MCP clients call — not another agent.
+> Governed MCP runtime for the Apple ecosystem. AirMCP is the connector and control layer MCP clients call — not another agent.
 
 > It mediates Apple workspace actions through progressive exposure, per-call approval, rate limits, and a tamper-evident audit chain.
+
+> The macOS runtime is available today. The iOS runtime is in preview; visionOS and watchOS are roadmap targets.
 
 ## Links
 

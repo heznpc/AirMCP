@@ -9,10 +9,10 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/heznpc/AirMCP)](https://github.com/heznpc/AirMCP/stargazers)
 
-**Apple MCP server for macOS — a governed local action runtime for AI clients.**
-AirMCP lets Claude, Codex, Cursor, Raycast, Xcode agents, and other MCP clients
-work across Notes, Mail, Calendar, Reminders, Finder, Safari, Shortcuts, and the
-rest of your Apple workspace.
+**Governed MCP runtime for the Apple ecosystem.** AirMCP lets Claude, Codex,
+Cursor, Raycast, Xcode agents, and other MCP clients work across Notes, Mail,
+Calendar, Reminders, Finder, Safari, Shortcuts, and the rest of your Apple
+workspace. The macOS runtime is available today; the iOS runtime is in preview.
 
 AirMCP is the connector and control layer, not another agent. It mediates Apple
 workspace actions through profiles, progressive exposure, per-call human
@@ -37,6 +37,22 @@ approval, HMAC-chained audit logs, rate limits, OAuth scopes, and local controls
   on-device semantic search, and FoundationModels preview builds.
 - **Dual transport**: stdio for standard MCP clients, HTTP/SSE for shared
   local runtimes, browser clients, registries, and always-on hosts.
+
+## Apple Platform Direction
+
+AirMCP is one governed action layer with platform-specific roles, rather than a
+copy of the full Mac runtime on every device.
+
+| Platform | Status | Role |
+| --- | --- | --- |
+| macOS | Available | Full local MCP runtime and broad Apple app and system integration. |
+| iOS / iPadOS | Preview | Native Calendar, Reminders, Contacts, Health, and Location actions, plus in-process AppIntents. |
+| visionOS | Roadmap | Spatial interaction and native actions, with Mac routing for Mac-only automation. |
+| watchOS | Roadmap | Commands, notifications, and per-call approval through a paired iPhone runtime. |
+
+The shared Swift and AppIntents layers are the portability boundary. Platform
+sandboxing and lifecycle rules still determine which actions run locally and
+which route to a paired Mac or iPhone.
 
 ## Quick Start
 
@@ -251,8 +267,8 @@ Testing guide: [docs/testing.md](docs/testing.md).
 - FoundationModels-backed Apple Intelligence preview requires macOS 26+, Apple
   Silicon, and `AIRMCP_ENABLE_FOUNDATION_MODELS`.
 
-The iOS server is preview, not the shipping surface. macOS is the supported
-runtime.
+The macOS runtime is the current supported release. The iOS runtime is a
+preview; visionOS and watchOS are roadmap targets, not released products.
 
 ## Documentation
 

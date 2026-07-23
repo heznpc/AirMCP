@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**AirMCP v2.15.0** — MCP Server for the Apple Ecosystem on macOS
+**AirMCP v2.15.0** — Governed MCP Runtime for the Apple Ecosystem (macOS release)
 Last updated: 2026-03-28
 
 ## Overview

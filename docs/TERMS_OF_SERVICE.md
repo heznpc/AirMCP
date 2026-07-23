@@ -1,6 +1,6 @@
 # Terms of Service
 
-**AirMCP** — macOS MCP Server for Apple Ecosystem Automation
+**AirMCP** — Governed MCP Runtime for the Apple Ecosystem (macOS release)
 **npm package:** `airmcp`
 **Developer:** heznpc (individual developer)
 **Effective Date:** March 16, 2026

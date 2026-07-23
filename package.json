@@ -1,7 +1,7 @@
 {
   "name": "airmcp",
   "version": "2.15.0",
-  "description": "Apple-native MCP server for macOS with governed access to Notes, Mail, Calendar, Reminders, Shortcuts, and more.",
+  "description": "Governed MCP runtime for the Apple ecosystem, available on macOS for Notes, Mail, Calendar, Reminders, Shortcuts, and more.",
   "keywords": [
     "mcp",
     "mcp-server",

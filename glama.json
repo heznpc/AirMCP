@@ -1,7 +1,7 @@
 {
   "$schema": "https://glama.ai/mcp/schemas/server.json",
   "name": "AirMCP",
-  "description": "Apple-native MCP server for macOS with governed access to Notes, Mail, Calendar, Reminders, Shortcuts, and more.",
+  "description": "Governed MCP runtime for the Apple ecosystem, available on macOS for Notes, Mail, Calendar, Reminders, Shortcuts, and more.",
   "icon": "https://raw.githubusercontent.com/heznpc/AirMCP/main/icons/airmcp-icon-256.png",
   "category": "automation",
   "maintainers": [

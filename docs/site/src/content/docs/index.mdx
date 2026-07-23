@@ -1,9 +1,9 @@
 ---
-title: AirMCP — Apple MCP Server for macOS
-description: Apple-native MCP server for macOS with governed access to Notes, Mail, Calendar, Reminders, Shortcuts, and more.
+title: AirMCP — Governed MCP for the Apple Ecosystem
+description: Governed MCP runtime for the Apple ecosystem, available on macOS with an iOS preview and a path to visionOS and watchOS.
 template: splash
 hero:
-  tagline: Governed access to Notes, Mail, Calendar, Reminders, Shortcuts, and more — locally on macOS.
+  tagline: Governed access to Apple apps. Available on macOS; iOS in preview.
   actions:
     - text: Get Started
       link: /getting-started/installation/
@@ -18,7 +18,7 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 
 ## What is AirMCP?
 
-AirMCP is an Apple-native [Model Context Protocol](https://modelcontextprotocol.io/) server for macOS. It connects Claude, Codex, Cursor, and other MCP clients to native Apple applications through JXA (JavaScript for Automation), a Swift bridge, and direct system APIs. AirMCP is the governed connector and control layer; the client does the reasoning.
+AirMCP is a governed [Model Context Protocol](https://modelcontextprotocol.io/) runtime for the Apple ecosystem. It connects Claude, Codex, Cursor, and other MCP clients to Apple applications through JXA (JavaScript for Automation), a native Swift bridge, AppIntents, and direct system APIs. AirMCP is the connector and control layer; the client does the reasoning.
 
 <CardGrid stagger>
   <Card title="Governed Actions" icon="setting">
@@ -34,6 +34,10 @@ AirMCP is an Apple-native [Model Context Protocol](https://modelcontextprotocol.
     Compatible with Claude Desktop, Claude Code, Cursor, Windsurf, Cline, and any MCP-compliant client. Supports both stdio and HTTP transports.
   </Card>
 </CardGrid>
+
+## Across Apple Platforms
+
+The macOS runtime is available today, and the native iOS/iPadOS runtime is in preview. visionOS is a roadmap target for spatial interaction and native actions, while watchOS is a roadmap companion for commands, notifications, and per-call approvals through a paired iPhone. Mac-only automation routes to a paired Mac runtime.
 
 ## Quick Start
 

@@ -9,11 +9,12 @@ const aggregateCount = /\b\d+\s+(?:tools?|modules?)\b/i;
 const visibleText = (html) => html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ");
 
 describe("public positioning surfaces", () => {
-  test("README discovery copy leads with the governed Apple MCP server, not catalog size", () => {
+  test("README discovery copy leads with the governed Apple ecosystem runtime, not catalog size", () => {
     const intro = read("README.md").split("## What You Get")[0];
 
-    expect(intro).toMatch(/Apple MCP server for macOS/);
-    expect(intro).toMatch(/governed local action runtime/i);
+    expect(intro).toMatch(/Governed MCP runtime for the Apple ecosystem/);
+    expect(intro).toMatch(/macOS runtime is available today/i);
+    expect(intro).toMatch(/iOS runtime is in preview/i);
     expect(intro).toMatch(/Notes.*Mail.*Calendar.*Reminders.*Shortcuts/s);
     expect(intro).not.toMatch(aggregateCount);
   });
@@ -23,15 +24,17 @@ describe("public positioning surfaces", () => {
     const head = page.split("</head>")[0];
     const aboveFold = visibleText(page.split("<!-- Hero -->")[1]?.split("<!-- Modules -->")[0] ?? "");
 
-    expect(head).toMatch(/Apple MCP Server for macOS/);
-    expect(head).toMatch(/Apple-native MCP server for macOS/);
-    expect(head).toMatch(/Notes, Mail, Calendar, Reminders, Shortcuts/);
+    expect(head).toMatch(/Governed MCP for the Apple Ecosystem/);
+    expect(head).toMatch(/available on macOS/i);
+    expect(head).toMatch(/iOS preview/i);
+    expect(head).toMatch(/visionOS and watchOS/i);
     expect(head).not.toMatch(aggregateCount);
 
-    expect(aboveFold).toMatch(/Governed access to your Apple workspace/);
+    expect(aboveFold).toMatch(/Governed MCP for your Apple ecosystem/);
     expect(aboveFold).toMatch(/Claude, Codex, Cursor/);
     expect(aboveFold).toMatch(/Per-call approval/);
     expect(aboveFold).toMatch(/Audit chain/);
+    expect(aboveFold).toMatch(/visionOS and watchOS on the roadmap/);
     expect(aboveFold).not.toMatch(aggregateCount);
   });
 
@@ -41,7 +44,8 @@ describe("public positioning surfaces", () => {
     const packageDescription = packageMetadata.description;
 
     for (const copy of [docsHome, packageDescription]) {
-      expect(copy).toMatch(/Apple(?:-native)? MCP server/i);
+      expect(copy).toMatch(/governed MCP runtime/i);
+      expect(copy).toMatch(/Apple ecosystem/i);
       expect(copy).toMatch(/macOS/i);
       expect(copy).not.toMatch(aggregateCount);
     }
@@ -55,6 +59,8 @@ describe("public positioning surfaces", () => {
       "meta_description",
       "hero_tagline",
       "hero_sub",
+      "platforms_title",
+      "platforms_sub",
       "why_title",
       "why_1_title",
       "why_1_desc",
@@ -73,8 +79,10 @@ describe("public positioning surfaces", () => {
   test("llms summary opens with identity and governance, not catalog size", () => {
     const intro = read("llms.txt").split("## Links")[0];
 
-    expect(intro).toMatch(/Apple-native MCP server for macOS/);
-    expect(intro).toMatch(/governed connector and control layer/);
+    expect(intro).toMatch(/Governed MCP runtime for the Apple ecosystem/);
+    expect(intro).toMatch(/connector and control layer/);
+    expect(intro).toMatch(/iOS runtime is in preview/);
+    expect(intro).toMatch(/visionOS and watchOS are roadmap targets/);
     expect(intro).toMatch(/not another agent/);
     expect(intro).not.toMatch(aggregateCount);
   });

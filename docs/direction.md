@@ -1,7 +1,7 @@
-# AirMCP — macOS용 Apple MCP 서버의 통제 계층
+# AirMCP — Apple 생태계의 통제형 MCP 런타임
 
-> **Apple MCP server for macOS. Governed access to your Apple workspace.**
-> 갱신일: 2026-07-24 (검색 표면과 제품 차별점을 통합. 공개 헤드라인은 카탈로그 숫자가 아니라 Apple MCP server for macOS + 통제 계층을 전면에 둔다.)
+> **Governed MCP runtime for the Apple ecosystem.**
+> 갱신일: 2026-07-24 (macOS는 현재 제공 플랫폼으로 유지하되 제품 정체성은 Apple 생태계 전체의 통제형 런타임으로 확정.)
 
 **비교 원칙 (브랜드):** AirMCP는 다른 named MCP 서비스/프로젝트(LMCP, apple-mcp, iMCP 등)와 직접 비교하지 않는다. capability를 단독 서술한다. "More than Siri"는 캠페인·비교 섹션에서만 쓸 수 있으며 README·랜딩 히어로·SEO·레지스트리의 정체성 문구로 쓰지 않는다.
 
@@ -9,9 +9,9 @@
 
 ## 한 줄 정의
 
-**AirMCP는 macOS용 Apple 네이티브 MCP 서버이자, AI 클라이언트와 Apple 앱 사이의 통제형 연결·제어 계층이다.**
+**AirMCP는 Apple 생태계를 위한 통제형 MCP 런타임이자, AI 클라이언트와 Apple 앱 사이의 연결·제어 계층이다.**
 
-Notes, Mail, Calendar, Reminders, Shortcuts 등 Apple 작업 공간을 하나의 MCP 인터페이스로 열어, 어떤 MCP 클라이언트든 프로필·점진적 검색·호출별 승인·HMAC 감사 체인 아래에서 읽고·쓰고·행동할 수 있게 한다. AirMCP가 기억하거나 계획하는 것이 아니라, 클라이언트가 추론하고 AirMCP가 연결과 통제를 담당한다.
+Notes, Mail, Calendar, Reminders, Shortcuts 등 Apple 작업 공간을 하나의 MCP 인터페이스로 열어, 어떤 MCP 클라이언트든 프로필·점진적 검색·호출별 승인·HMAC 감사 체인 아래에서 읽고·쓰고·행동할 수 있게 한다. macOS 런타임은 현재 제공 중이고 iOS 런타임은 프리뷰다. visionOS와 watchOS는 같은 통제 계층을 각 플랫폼의 역할에 맞게 확장하는 로드맵 대상이다.
 
 ---
 
@@ -37,51 +37,64 @@ Notes, Mail, Calendar, Reminders, Shortcuts 등 Apple 작업 공간을 하나의
 **포지셔닝 (locked, 2026-07-24)**
 
 - **우선 타깃:** 파워 애플 유저 (프로슈머) — 이미 Apple에 데이터를 다 넣어놓은 사람
-- **정체성:** macOS용 Apple 네이티브 MCP 서버이자 AI 클라이언트와 Apple 앱 사이의 통제형 connector/control layer
-- **검색 헤드라인:** `Apple MCP server for macOS.`
-- **핵심 태그라인 (랜딩):** `Governed access to your Apple workspace.`
-- **핵심 태그라인 (README):** `Apple MCP server for macOS — a governed local action runtime for AI clients.`
+- **정체성:** Apple 생태계를 위한 통제형 MCP 런타임이자 AI 클라이언트와 Apple 앱 사이의 connector/control layer
+- **현재 제공 상태:** macOS available, iOS/iPadOS preview, visionOS/watchOS roadmap
+- **검색 헤드라인:** `Governed MCP for the Apple ecosystem.`
+- **핵심 태그라인 (랜딩):** `Governed MCP for your Apple ecosystem.`
+- **핵심 태그라인 (README):** `Governed MCP runtime for the Apple ecosystem.`
+- **플랫폼 원칙:** `for macOS`를 제품명이나 영구 정체성으로 쓰지 않는다. macOS는 설치 요건·현재 가용성·검색 키워드에만 정확하게 남긴다.
 - **숫자 원칙:** 전체 툴·모듈 수는 기술 레퍼런스에서만 정확히 표기한다. README/문서 사이트/랜딩의 히어로, SEO·소셜 메타데이터, 레지스트리·패키지 설명, `llms.txt` 첫 문단에는 두지 않는다.
 - **톤의 성격:** 도구는 도구로 말한다. "AI가 나를 안다"는 인격화는 사용 안 함 — AirMCP는 **노출하고**, 아는 건 AI의 몫.
 
 **Hero 카피 (랜딩, 프로슈머 대면)**
 
 ```
-Apple 작업 공간에 대한 통제된 접근.
-Claude, Codex, Cursor 등 MCP 클라이언트를 메모, Mail, 캘린더,
-미리 알림, 단축어 등에 macOS 로컬로 연결합니다.
+Apple 생태계를 위한 통제형 MCP.
+Claude, Codex, Cursor 등 MCP 클라이언트를 Apple 앱에 연결합니다.
+macOS에서 지금 사용할 수 있으며 iOS는 프리뷰입니다.
 ```
 
 영문:
 
 ```
-Governed access to your Apple workspace.
-Connect Claude, Codex, Cursor, and other MCP clients to Notes, Mail, Calendar,
-Reminders, Shortcuts, and more — locally on macOS.
+Governed MCP for your Apple ecosystem.
+Connect Claude, Codex, Cursor, and other MCP clients to Apple apps.
+Available on macOS, with iOS in preview.
 ```
 
-카테고리 검색어와 실제 제품 역할을 먼저 말하고, 앱 이름으로 사용 범위를 구체화한다. Siri 비교는 하단 `Beyond Siri` 섹션에서만 보조적으로 사용한다.
+Apple MCP라는 카테고리와 실제 제품 역할을 먼저 말하고, 현재 가용성과 앱 이름으로 범위를 구체화한다. Siri 비교는 하단 `Beyond Siri` 섹션에서만 보조적으로 사용한다.
 
 **Hero 카피 (README, 개발자 대면)**
 
 ```
-Apple MCP server for macOS — a governed local action runtime for AI clients.
+Governed MCP runtime for the Apple ecosystem.
 AirMCP is the connector and control layer, not another agent.
 Profiles, progressive discovery, per-call approval, HMAC-chained audit logs,
 rate limits, OAuth scopes, and local controls govern Apple workspace actions.
 ```
 
-`Apple MCP server for macOS`는 검색 가능한 카테고리 이름이고, `governed connector/control layer`는 제품 차별점이다. 둘 중 하나를 버리지 않고 같은 문장 안에서 역할을 분명히 한다.
+`Apple MCP`는 검색 가능한 카테고리이고, `governed connector/control layer`는 제품 차별점이다. `macOS`는 현재 배포 현실을 설명하지만 제품 범위를 규정하지 않는다.
 
 **3-surface 톤 모델 (표면마다 다른 목소리)**
 
 | Surface | 톤 | 누구에게 | 카피 예시 |
 |---------|----|----|----------|
-| 랜딩·소개 (`docs/index.html`) | 프로슈머 메이커 + 애플 미니멀 | Apple 앱에 AI를 연결하려는 파워 유저 | "Apple MCP Server for macOS" + "Governed access to your Apple workspace." + 주요 앱 이름 |
-| GitHub README·개발자 문서 (`docs/site/`) | 건조·정확·런타임 레이어 강조 | MCP 서버를 포크·확장할 개발자 | "Apple MCP server for macOS — a governed local action runtime for AI clients." + connector/control layer + 통제 기능 |
+| 랜딩·소개 (`docs/index.html`) | 프로슈머 메이커 + 애플 미니멀 | Apple 앱에 AI를 연결하려는 파워 유저 | "Governed MCP for your Apple ecosystem." + 현재 플랫폼 상태 + 주요 앱 이름 |
+| GitHub README·개발자 문서 (`docs/site/`) | 건조·정확·런타임 레이어 강조 | MCP 서버를 포크·확장할 개발자 | "Governed MCP runtime for the Apple ecosystem." + connector/control layer + 통제 기능 + 플랫폼 역할 |
 | Skills 가이드·블로그·릴리즈 노트 | 오픈소스 커뮤널 (투명성) | 공통 | 실사용 예시, 로드맵 공개, 기여 초대 |
 
 한 문서가 두 청중을 동시에 설득하려 하지 않는다. 랜딩은 감정, docs는 스펙·레이어, 블로그는 투명성 — 각 표면이 자기 일만 한다.
+
+## 플랫폼 전략
+
+| 플랫폼 | 상태 | 역할 |
+|--------|------|------|
+| macOS | 제공 중 | 전체 로컬 MCP 런타임과 광범위한 Apple 앱·시스템 제어 |
+| iOS / iPadOS | 프리뷰 | Calendar·Reminders·Contacts·Health·Location 네이티브 실행과 AppIntents |
+| visionOS | 로드맵 | 공간형 상호작용과 네이티브 액션, Mac 전용 자동화는 연결된 Mac으로 라우팅 |
+| watchOS | 로드맵 | 명령·알림·호출별 승인, 실행은 페어링된 iPhone 런타임과 분담 |
+
+모든 OS에 macOS 서버를 복제하지 않는다. 공용 Swift·AppIntents·통제 계약을 공유하고, 샌드박스와 백그라운드 수명에 맞춰 실행 위치를 분리한다. 미출시 플랫폼을 지원된 제품처럼 쓰지 않는다.
 
 ---
 

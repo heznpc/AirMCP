@@ -89,9 +89,12 @@ tests/                    # Script generator tests
 
 ## Public Positioning Contract
 
-- Lead public discovery surfaces with **Apple MCP server for macOS** and the
-  governed connector/control layer: per-call approval, HMAC-chained audit,
-  rate limits, profiles, and progressive discovery.
+- Lead public discovery surfaces with **governed MCP runtime for the Apple
+  ecosystem** and the connector/control layer: per-call approval, HMAC-chained
+  audit, rate limits, profiles, and progressive discovery.
+- Treat macOS as the current available runtime, not the permanent product
+  boundary. State iOS as preview and visionOS/watchOS as roadmap targets until
+  their targets are implemented and verified.
 - Aggregate tool and module counts are technical catalog metadata, not the
   product headline. Keep them out of README and website heroes, SEO/social
   metadata, registry descriptions, package/plugin pitches, and the opening of

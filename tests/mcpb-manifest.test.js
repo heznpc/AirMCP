@@ -171,8 +171,10 @@ describe("mcpb manifest template — well-formedness", () => {
 describe("mcpb manifest template — governed discovery position", () => {
   test("long_description identifies the product without a catalog-size headline", () => {
     const m = render();
-    expect(m.long_description).toMatch(/Apple-native MCP server for macOS/i);
-    expect(m.long_description).toMatch(/governed connector layer/i);
+    expect(m.long_description).toMatch(/governed MCP runtime for the Apple ecosystem/i);
+    expect(m.long_description).toMatch(/connector layer/i);
+    expect(m.long_description).toMatch(/This package provides the macOS runtime/i);
+    expect(m.long_description).toMatch(/visionOS and watchOS are roadmap targets/i);
     expect(m.long_description).toMatch(/per-call HITL/i);
     expect(m.long_description).not.toMatch(/\d+\s+(?:tools?|modules?)/i);
   });

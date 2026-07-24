@@ -24,8 +24,12 @@ for (const file of readdirSync(LOCALES).filter(f => f.endsWith(".json") && f !==
     console.error(`${file}: missing ${missing.length} keys: ${missing.join(", ")}`);
     ok = false;
   }
+  // Extra keys are also a parity failure — otherwise removing a key from the
+  // en.json reference makes it "extra" in every other locale and the guard
+  // passes silently (a key dropped from the reference goes undetected).
   if (extra.length) {
-    console.error(`${file}: ${extra.length} extra keys: ${extra.join(", ")}`);
+    console.error(`${file}: ${extra.length} extra keys (not in en.json): ${extra.join(", ")}`);
+    ok = false;
   }
 }
 

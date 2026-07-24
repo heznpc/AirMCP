@@ -59,6 +59,14 @@ export function registerAuditTools(server: McpServer, _config: AirMcpConfig): vo
           .optional()
           .describe("Lower-bound ISO 8601 timestamp. Entries older than this are dropped. Defaults to 7 days ago."),
         tool: z.string().max(120).optional().describe("Filter to a single tool name (exact match)."),
+        actor: z
+          .string()
+          .max(120)
+          .optional()
+          .describe(
+            "Filter by provenance: 'direct' = human/client-driven calls, 'daemon-skill:<name>' = autonomous " +
+              "event-triggered skills, 'hitl-approved' = queued-then-approved. Omit to include all.",
+          ),
         status: z.enum(["ok", "error"]).optional().describe("Filter by status. Omit to include both."),
         correlationId: z.string().max(200).optional().describe("Filter to one correlated tool/approval trace."),
         kind: z.enum(["tool", "approval"]).optional().describe("Filter tool calls or approval decisions."),
@@ -82,9 +90,9 @@ export function registerAuditTools(server: McpServer, _config: AirMcpConfig): vo
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async ({ since, tool, status, correlationId, kind, limit }) => {
+    async ({ since, tool, actor, status, correlationId, kind, limit }) => {
       try {
-        const result = await readAuditEntries({ since, tool, status, correlationId, kind, limit });
+        const result = await readAuditEntries({ since, tool, actor, status, correlationId, kind, limit });
         return okStructured(result);
       } catch (e) {
         return toolError("read audit log", e);
@@ -97,9 +105,10 @@ export function registerAuditTools(server: McpServer, _config: AirMcpConfig): vo
     {
       title: "Audit Summary",
       description:
-        "Aggregate the audit log over a time window — total call count, error rate, and the busiest tools. " +
-        "Useful for weekly reviews and for spotting runaway agents (a sudden top-of-leaderboard `create_*` " +
-        "tool is a red flag).",
+        "Aggregate the audit log over a time window — total call count, error rate, the busiest tools, and a " +
+        "provenance breakdown (`byActor`) of what ran human-driven (`direct`) vs. autonomously " +
+        "(`daemon-skill:<name>`). Useful for weekly reviews and for spotting runaway agents (a sudden " +
+        "top-of-leaderboard `create_*` tool, or daemon activity you didn't authorize, is a red flag).",
       inputSchema: {
         since: z.string().datetime().optional().describe("Lower-bound ISO 8601 timestamp. Defaults to 7 days ago."),
         topN: z.number().int().min(1).max(50).optional().default(10).describe("Top-N busiest tools (default: 10)."),
@@ -113,6 +122,17 @@ export function registerAuditTools(server: McpServer, _config: AirMcpConfig): vo
         topTools: z.array(
           z.object({
             tool: z.string(),
+            count: z.number(),
+            errors: z.number(),
+          }),
+        ),
+        // Provenance breakdown — what ran autonomously vs. human-driven.
+        // `direct` = human/client call; `daemon-skill:<name>` = an event-
+        // triggered skill that fired without a person present. This is the
+        // single highest-value governance query the audit log can answer.
+        byActor: z.array(
+          z.object({
+            actor: z.string(),
             count: z.number(),
             errors: z.number(),
           }),

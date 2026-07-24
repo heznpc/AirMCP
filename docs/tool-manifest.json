@@ -503,6 +503,11 @@
             "type": "string",
             "maxLength": 120
           },
+          "actor": {
+            "description": "Filter by provenance: 'direct' = human/client-driven calls, 'daemon-skill:<name>' = autonomous event-triggered skills, 'hitl-approved' = queued-then-approved. Omit to include all.",
+            "type": "string",
+            "maxLength": 120
+          },
           "status": {
             "description": "Filter by status. Omit to include both.",
             "type": "string",
@@ -687,7 +692,7 @@
     {
       "name": "audit_summary",
       "title": "Audit Summary",
-      "description": "Aggregate the audit log over a time window — total call count, error rate, and the busiest tools. Useful for weekly reviews and for spotting runaway agents (a sudden top-of-leaderboard `create_*` tool is a red flag).",
+      "description": "Aggregate the audit log over a time window — total call count, error rate, the busiest tools, and a provenance breakdown (`byActor`) of what ran human-driven (`direct`) vs. autonomously (`daemon-skill:<name>`). Useful for weekly reviews and for spotting runaway agents (a sudden top-of-leaderboard `create_*` tool, or daemon activity you didn't authorize, is a red flag).",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -749,6 +754,29 @@
               "additionalProperties": false
             }
           },
+          "byActor": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "actor": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "number"
+                },
+                "errors": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "actor",
+                "count",
+                "errors"
+              ],
+              "additionalProperties": false
+            }
+          },
           "verified": {
             "type": "boolean"
           },
@@ -790,6 +818,7 @@
           "errorRate",
           "scannedFiles",
           "topTools",
+          "byActor",
           "verified",
           "auditDisabled"
         ],

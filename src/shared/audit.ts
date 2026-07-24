@@ -1422,6 +1422,10 @@ export interface ReadAuditOptions {
   status?: "ok" | "error";
   /** Filter to one trace/run. */
   correlationId?: string;
+  /** Filter by provenance actor (exact match). Human/direct calls omit the
+   *  actor field — pass "direct" to select those. Autonomous daemon skills use
+   *  `daemon-skill:<name>`; queued-then-approved calls use `hitl-approved`. */
+  actor?: string;
   /** Filter by event kind. Legacy rows normalize to `tool`. */
   kind?: AuditEventKind;
   /** Cap on returned entries. Most recent first. */
@@ -1703,6 +1707,7 @@ function filterAuditEntries(
     if (opts.tool && entry.tool !== opts.tool) return false;
     if (opts.status && entry.status !== opts.status) return false;
     if (opts.correlationId && entry.correlationId !== opts.correlationId) return false;
+    if (opts.actor && (entry.actor ?? "direct") !== opts.actor) return false;
     if (opts.kind && (entry.kind ?? "tool") !== opts.kind) return false;
     return true;
   });
@@ -1751,6 +1756,12 @@ export interface AuditSummary {
   errors: number;
   errorRate: number;
   topTools: Array<{ tool: string; count: number; errors: number }>;
+  /** Provenance breakdown: what ran under whose authority. `direct` = a
+   *  human/client-driven call (no actor stamp); `daemon-skill:<name>` = an
+   *  autonomous event-triggered skill; `hitl-approved` = a queued call that
+   *  later cleared approval. Answers "what did the always-on daemon do
+   *  without me?" — impossible to ask before this was surfaced. */
+  byActor: Array<{ actor: string; count: number; errors: number }>;
   scannedFiles: number;
   /** True only for an intact HMAC chain. Unsigned legacy rows remain
    * unverified and never contribute to this trusted aggregate. */
@@ -1776,6 +1787,7 @@ export async function summarizeAuditEntries(opts: { since?: string; topN?: numbe
     limit: 10_000,
   });
   const byTool = new Map<string, { count: number; errors: number }>();
+  const byActor = new Map<string, { count: number; errors: number }>();
   let errors = 0;
   for (const e of page.entries) {
     if (e.status === "error") errors++;
@@ -1783,11 +1795,22 @@ export async function summarizeAuditEntries(opts: { since?: string; topN?: numbe
     cur.count++;
     if (e.status === "error") cur.errors++;
     byTool.set(e.tool, cur);
+    // Missing actor stamp = a direct human/client call.
+    const actor = e.actor ?? "direct";
+    const act = byActor.get(actor) ?? { count: 0, errors: 0 };
+    act.count++;
+    if (e.status === "error") act.errors++;
+    byActor.set(actor, act);
   }
   const topTools = [...byTool.entries()]
     .map(([tool, v]) => ({ tool, count: v.count, errors: v.errors }))
     .sort((a, b) => b.count - a.count)
     .slice(0, topN);
+  // Actors are few (direct + a handful of daemon skills), so return all —
+  // truncating the provenance breakdown would hide autonomous activity.
+  const actorBreakdown = [...byActor.entries()]
+    .map(([actor, v]) => ({ actor, count: v.count, errors: v.errors }))
+    .sort((a, b) => b.count - a.count);
   const total = page.entries.length;
   return {
     since: sinceIso,
@@ -1795,6 +1818,7 @@ export async function summarizeAuditEntries(opts: { since?: string; topN?: numbe
     errors,
     errorRate: total > 0 ? Number((errors / total).toFixed(4)) : 0,
     topTools,
+    byActor: actorBreakdown,
     scannedFiles: chainResult.scannedFiles,
     verified: chainResult.verified,
     verifiedFirstBreak: chainResult.firstBreak,

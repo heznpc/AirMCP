@@ -198,7 +198,7 @@
     "darwin"
   ],
   "overrides": {
-    "hono": "^4.12.25",
+    "hono": "^4.12.31",
     "@hono/node-server": "^1.19.13"
   },
   "lint-staged": {

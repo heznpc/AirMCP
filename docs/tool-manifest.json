@@ -9544,7 +9544,7 @@
     {
       "name": "proactive_context",
       "title": "Proactive Context",
-      "description": "Get contextually relevant tool and workflow suggestions based on time of day, day of week, and your usage patterns. Like Siri Suggestions but for MCP — tells you what you probably want to do right now.",
+      "description": "Return tool/workflow candidates ranked by a deterministic heuristic over the current time of day, day of week, and this install's tallied usage counts. No model and no inference — it surfaces likely-relevant tools from recorded history; it does not decide, learn, or act.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -13568,7 +13568,7 @@
     {
       "name": "suggest_next_tools",
       "title": "Suggest Next Tools",
-      "description": "Based on your usage patterns, suggest which tools typically follow a given tool. Learns from how you use AirMCP over time. Returns frequently-used tool sequences.",
+      "description": "Rank the tools that most often followed a given tool in this install's local call history. A deterministic frequency count over recorded tool-sequence pairs — no model, no learning, just tallied usage counts.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",

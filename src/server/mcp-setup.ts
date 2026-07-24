@@ -26,7 +26,7 @@ import { isCompactMode } from "../shared/tool-filter.js";
 import { resolveHarnessAdapter } from "../shared/task-adapters.js";
 import { assessWorkflowsReadiness } from "../shared/workflows.js";
 import type { BannerInfo } from "../shared/banner.js";
-import { SERVER_ICON, WEBSITE_URL } from "../shared/icons.js";
+import { SERVER_ICON, SERVER_INSTRUCTIONS, WEBSITE_URL } from "../shared/icons.js";
 import { withAddonInstallStatus } from "../shared/addon-operations.js";
 import { buildMissingPackInstallHints, registerFrontDoorTools } from "./front-door-tools.js";
 import { registerToolSessionTools } from "./tool-session-tools.js";
@@ -45,13 +45,18 @@ export async function createServer(
   const { config, hitlClient, osVersion, pkg } = options;
   const harness = resolveHarnessAdapter(config);
 
-  const server = new SdkMcpServer({
-    name: NPM_PACKAGE_NAME,
-    version: pkg.version,
-    description: pkg.description,
-    websiteUrl: WEBSITE_URL,
-    icons: [SERVER_ICON],
-  });
+  const server = new SdkMcpServer(
+    {
+      name: NPM_PACKAGE_NAME,
+      version: pkg.version,
+      description: pkg.description,
+      websiteUrl: WEBSITE_URL,
+      icons: [SERVER_ICON],
+    },
+    // instructions land in InitializeResult.instructions — the only channel that
+    // states AirMCP's "governed runtime, not an agent" identity into client context.
+    { instructions: SERVER_INSTRUCTIONS },
+  );
   // Cast to lightweight McpServer for module registration (avoids heavy generic inference)
   const lServer = server as unknown as LightMcpServer;
 

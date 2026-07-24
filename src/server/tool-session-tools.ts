@@ -269,8 +269,8 @@ export function registerToolSessionTools(server: McpServer, options: RegisterToo
       {
         title: "Suggest Next Tools",
         description:
-          "Based on your usage patterns, suggest which tools typically follow a given tool. " +
-          "Learns from how you use AirMCP over time. Returns frequently-used tool sequences.",
+          "Rank the tools that most often followed a given tool in this install's local call history. " +
+          "A deterministic frequency count over recorded tool-sequence pairs — no model, no learning, just tallied usage counts.",
         inputSchema: {
           after: z.string().min(1).max(500).describe("Tool name to get suggestions for — e.g. 'today_events'"),
           limit: z.number().min(1).max(20).optional().describe("Max suggestions (default 5)"),
@@ -312,8 +312,9 @@ export function registerToolSessionTools(server: McpServer, options: RegisterToo
       {
         title: "Proactive Context",
         description:
-          "Get contextually relevant tool and workflow suggestions based on time of day, day of week, and your usage patterns. " +
-          "Like Siri Suggestions but for MCP — tells you what you probably want to do right now.",
+          "Return tool/workflow candidates ranked by a deterministic heuristic over the current time of day, day of week, " +
+          "and this install's tallied usage counts. No model and no inference — it surfaces likely-relevant tools from " +
+          "recorded history; it does not decide, learn, or act.",
         inputSchema: {},
         outputSchema: {
           timeContext: z.object({

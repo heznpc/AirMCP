@@ -3,7 +3,7 @@
 // Source: docs/tool-manifest.json
 // Generator: scripts/gen-swift-intents.mjs
 // RFC 0007 Phase A.2b.2 + A.4.1 — 233 auto-selected read-only
-// tools (84 with typed drift-guards + Interactive Snippet
+// tools (85 with typed drift-guards + Interactive Snippet
 // SwiftUI views) + 8 AppShortcutsProvider entries.
 // Run `npm run gen:intents` to refresh after tool metadata changes.
 // CI guards against drift via `npm run gen:intents:check`.
@@ -23,6 +23,16 @@ import AppIntents
 import Foundation
 
 // MARK: - Typed output structs
+
+// Output type for: ai_agent
+public struct MCPAiAgentOutput: Codable, Sendable {
+    public let response: String
+    public let model: String
+    public let onDevice: Bool
+    public let readScope: [String]
+    public let subReadsGoverned: Bool
+    public let subReadsPerformed: [String]
+}
 
 // Output type for: ai_plan_metrics
 public struct MCPAiPlanMetricsOutput: Codable, Sendable {
@@ -50,6 +60,11 @@ public struct MCPAuditSummaryOutput: Codable, Sendable {
         public let count: Double
         public let errors: Double
     }
+    public struct ByactorItem: Codable, Sendable {
+        public let actor: String
+        public let count: Double
+        public let errors: Double
+    }
     public struct Verifiedfirstbreak: Codable, Sendable {
         public let file: String
         public let lineIndex: Double
@@ -62,6 +77,7 @@ public struct MCPAuditSummaryOutput: Codable, Sendable {
     public let errorRate: Double
     public let scannedFiles: Double
     public let topTools: [ToptoolsItem]
+    public let byActor: [ByactorItem]
     public let verified: Bool
     public let verifiedFirstBreak: Verifiedfirstbreak?
     public let auditDisabled: Bool
@@ -76,6 +92,7 @@ public struct MCPDescribeToolOutput: Codable, Sendable {
     public let exposed: Bool
     public let readOnly: Bool?
     public let destructive: Bool?
+    public let sensitive: Bool?
 }
 
 // Output type for: discover_tools
@@ -1556,7 +1573,7 @@ public struct AddToPlaylistIntent: AppIntent {
 // Tool: ai_agent
 public struct AiAgentIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "On-Device AI Agent (read-only)"
-    nonisolated(unsafe) public static var description = IntentDescription("Run a prompt through Apple's on-device Foundation Models with read-only access to AirMCP data (today's events, due reminders, contacts search). The on-device LLM autonomously decides which read tool to call. Requires macOS 26+ with Apple Silicon. Write actions (create/update/delete) are intentionally NOT exposed — the agent's tool calls bypass the Node-side toolRegistry (no HITL, rate-limit, or audit), so writes belong to direct MCP tool calls instead.")
+    nonisolated(unsafe) public static var description = IntentDescription("Run a prompt through Apple's on-device Foundation Models with read-only access to AirMCP data (today's events, due reminders, contacts search). The on-device LLM autonomously decides which read tool to call. Requires macOS 26+ with Apple Silicon. GOVERNANCE BOUNDARY: the model's read sub-calls run inside the Swift process and do NOT pass through the Node toolRegistry (no per-call HITL, rate-limit, or audit) — the result's `subReadsGoverned:false` makes this explicit. Write actions are intentionally NOT exposed to the model, so writes belong to direct MCP tool calls. The response is treated as untrusted content because it is synthesized from arbitrary Apple data.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -1576,6 +1593,16 @@ public struct AiAgentIntent: AppIntent {
             tool: "ai_agent",
             args: args
         )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "ai_agent", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPAiAgentOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPAiAgentSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -1680,6 +1707,9 @@ public struct AuditLogIntent: AppIntent {
     @Parameter(title: "Filter to a single tool name (exact match).")
     public var tool: String?
 
+    @Parameter(title: "Filter by provenance: 'direct' = human/client-driven calls, 'daemon-skill:<name>")
+    public var actor: String?
+
     @Parameter(title: "Filter by status. Omit to include both.")
     public var status: AuditLogStatusOption?
 
@@ -1697,6 +1727,7 @@ public struct AuditLogIntent: AppIntent {
         var args: [String: any Sendable] = [:]
         if let v = since { args["since"] = ISO8601DateFormatter().string(from: v) }
         if let v = tool { args["tool"] = v }
+        if let v = actor { args["actor"] = v }
         if let v = status { args["status"] = v.rawValue }
         if let v = correlationId { args["correlationId"] = v }
         if let v = kind { args["kind"] = v.rawValue }
@@ -1712,7 +1743,7 @@ public struct AuditLogIntent: AppIntent {
 // Tool: audit_summary
 public struct AuditSummaryIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Audit Summary"
-    nonisolated(unsafe) public static var description = IntentDescription("Aggregate the audit log over a time window — total call count, error rate, and the busiest tools. Useful for weekly reviews and for spotting runaway agents (a sudden top-of-leaderboard `create_*` tool is a red flag).")
+    nonisolated(unsafe) public static var description = IntentDescription("Aggregate the audit log over a time window — total call count, error rate, the busiest tools, and a provenance breakdown (`byActor`) of what ran human-driven (`direct`) vs. autonomously (`daemon-skill:<name>`). Useful for weekly reviews and for spotting runaway agents (a sudden top-of-leaderboard `create_*` tool, or daemon activity you didn't authorize, is a red flag).")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -5818,7 +5849,7 @@ public struct PreventSleepIntent: AppIntent {
 // Tool: proactive_context
 public struct ProactiveContextIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Proactive Context"
-    nonisolated(unsafe) public static var description = IntentDescription("Get contextually relevant tool and workflow suggestions based on time of day, day of week, and your usage patterns. Like Siri Suggestions but for MCP — tells you what you probably want to do right now.")
+    nonisolated(unsafe) public static var description = IntentDescription("Return tool/workflow candidates ranked by a deterministic heuristic over the current time of day, day of week, and this install's tallied usage counts. No model and no inference — it surfaces likely-relevant tools from recorded history; it does not decide, learn, or act.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -7494,7 +7525,7 @@ public struct SpotlightSyncIntent: AppIntent {
 // Tool: suggest_next_tools
 public struct SuggestNextToolsIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Suggest Next Tools"
-    nonisolated(unsafe) public static var description = IntentDescription("Based on your usage patterns, suggest which tools typically follow a given tool. Learns from how you use AirMCP over time. Returns frequently-used tool sequences.")
+    nonisolated(unsafe) public static var description = IntentDescription("Rank the tools that most often followed a given tool in this install's local call history. A deterministic frequency count over recorded tool-sequence pairs — no model, no learning, just tallied usage counts.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -8237,6 +8268,60 @@ fileprivate func _mkReadChatIntent_chatId(chatId: String) -> ReadChatIntent {
     return intent
 }
 
+// Snippet view for: ai_agent  (shape: scalar)
+@available(macOS 26, iOS 26, *)
+public struct MCPAiAgentSnippetView: View {
+    public let data: MCPAiAgentOutput
+    public init(data: MCPAiAgentOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text("Response")
+                Spacer()
+                Text(data.response)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Model")
+                Spacer()
+                Text(data.model)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("On Device")
+                Spacer()
+                Text((data.onDevice ? "Yes" : "No"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Read Scope")
+                Spacer()
+                Text(String(describing: data.readScope))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Sub Reads Governed")
+                Spacer()
+                Text((data.subReadsGoverned ? "Yes" : "No"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Sub Reads Performed")
+                Spacer()
+                Text(String(describing: data.subReadsPerformed))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+        }
+        .padding()
+    }
+}
+
 // Snippet view for: ai_plan_metrics  (shape: list-object)
 @available(macOS 26, iOS 26, *)
 public struct MCPAiPlanMetricsSnippetView: View {
@@ -8254,17 +8339,82 @@ public struct MCPAiPlanMetricsSnippetView: View {
     }
 }
 
-// Snippet view for: audit_summary  (shape: list-object)
+// Snippet view for: audit_summary  (shape: scalar)
 @available(macOS 26, iOS 26, *)
 public struct MCPAuditSummarySnippetView: View {
     public let data: MCPAuditSummaryOutput
     public init(data: MCPAuditSummaryOutput) { self.data = data }
     public var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            ForEach(Array(data.topTools.enumerated()), id: \.offset) { _, row in
-                Text(row.tool)
-                    .font(.body)
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text("Since")
+                Spacer()
+                Text(data.since)
                     .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Total")
+                Spacer()
+                Text(data.total.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Errors")
+                Spacer()
+                Text(data.errors.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Error Rate")
+                Spacer()
+                Text(data.errorRate.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Scanned Files")
+                Spacer()
+                Text(data.scannedFiles.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Top Tools")
+                Spacer()
+                Text(String(describing: data.topTools))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("By Actor")
+                Spacer()
+                Text(String(describing: data.byActor))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Verified")
+                Spacer()
+                Text((data.verified ? "Yes" : "No"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Verified First Break")
+                Spacer()
+                Text(String(describing: data.verifiedFirstBreak))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Audit Disabled")
+                Spacer()
+                Text((data.auditDisabled ? "Yes" : "No"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
             }
         }
         .padding()
@@ -8324,6 +8474,13 @@ public struct MCPDescribeToolSnippetView: View {
                 Text("Destructive")
                 Spacer()
                 Text((data.destructive.map { $0 ? "Yes" : "No" } ?? "—"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Sensitive")
+                Spacer()
+                Text((data.sensitive.map { $0 ? "Yes" : "No" } ?? "—"))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }

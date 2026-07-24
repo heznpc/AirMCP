@@ -72,7 +72,7 @@ reuse it for the resubmission:
 - **Headline for current resubmission**: "Governed MCP runtime for the Apple ecosystem, available on macOS for Notes, Mail, Calendar, Reminders, Shortcuts, and more — with per-call HITL, HMAC-chained audit logs, profiles, progressive discovery, OAuth 2.1, and declarative network policy."
 - **Security story** (registry reviewers care): HITL approval, rate limit + emergency stop file, `allowNetwork` startup invariant (RFC 0002), PII-scrubbed audit log at `0600`.
 - **Differentiator vs. apple-mcp / shortcuts**: the Skills DSL (`parallel`/`loop`/`on_error`/`retry`/inputs/triggers) + event-bus triggers + governance primitives. Keep this claim bounded: based on README-level/public-surface comparison, not full source audits of every competitor.
-- **Demo asset**: point at `docs/demo.gif` (re-record with `./scripts/record-demo.sh` before the submission).
+- **Demo asset**: `docs/demo.gif` tells the governance story — identity asserted at initialize, the live `airmcp://trust` `governed:true` verdict, a zero-side-effect `preview_action` on a destructive tool, and the tamper-evident audit with `byActor` provenance. Every frame is real server output from `scripts/demo/governed-flow.mjs` (run it standalone to preview). Re-record the GIF with `./scripts/record-demo.sh` (needs `brew install vhs ffmpeg`) before the submission; the `.gif` is generated, never hand-edited.
 
 ## Smithery — featured placement
 

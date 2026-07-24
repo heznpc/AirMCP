@@ -179,6 +179,13 @@ Current generated surfaces: 233 App Intent action types, 84 Interactive Snippet 
 AirMCP treats local app access as a governed action layer, not a blind shell for
 agents.
 
+The claim is verifiable, not marketing: read the first-party `airmcp://trust`
+resource for a live `governed` verdict composed from the tamper-evident audit
+chain, the active HITL level, the rate-limit / emergency-stop state, and the
+audit key grade — available before any tool access is widened. Preview any
+destructive call with `preview_action` to see exactly what it would record and
+whether it would be gated, without running it.
+
 - **Per-call human approval** for destructive and sensitive actions at the
   default `sensitive-only` HITL level.
 - **HMAC-chained audit log** at `~/.airmcp/audit.jsonl`, with tamper detection

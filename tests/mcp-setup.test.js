@@ -253,6 +253,7 @@ jest.unstable_mockModule('../dist/shared/config.js', () => ({
 jest.unstable_mockModule('../dist/shared/icons.js', () => ({
   SERVER_ICON: { src: 'data:image/png;base64,', sizes: '512x512', mimeType: 'image/png' },
   WEBSITE_URL: 'https://example.test',
+  SERVER_INSTRUCTIONS: 'Test governed-runtime identity string.',
 }));
 
 const { createServer } = await import('../dist/server/mcp-setup.js');

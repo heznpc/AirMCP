@@ -24,8 +24,8 @@
 
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import os from "node:os";
 import crypto from "node:crypto";
+import { HOME } from "../../shared/constants.js";
 
 export interface HitlQueueEntry {
   /** Stable opaque ID for resolve / archive tracking. */
@@ -50,8 +50,8 @@ export interface HitlQueueEntry {
   status: "pending" | "approved" | "rejected" | "expired";
 }
 
-export const DEFAULT_QUEUE_PATH = path.join(os.homedir(), ".config", "airmcp", "hitl-queue.jsonl");
-export const DEFAULT_ARCHIVE_PATH = path.join(os.homedir(), ".config", "airmcp", "hitl-queue-archive.jsonl");
+export const DEFAULT_QUEUE_PATH = path.join(HOME, ".config", "airmcp", "hitl-queue.jsonl");
+export const DEFAULT_ARCHIVE_PATH = path.join(HOME, ".config", "airmcp", "hitl-queue-archive.jsonl");
 export const MAX_ENTRIES = 10_000;
 
 /** Append a fresh pending entry. Generates `id` + `enqueuedAt` + `status: "pending"`. */

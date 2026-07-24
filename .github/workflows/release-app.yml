@@ -131,6 +131,17 @@ jobs:
       # explicitly set by the signed lane.
       AIRMCP_REQUIRE_WIDGET: "1"
     steps:
+      # The verifier script must exist on this fresh runner before it can
+      # re-query anything — without this checkout the job failed on its first
+      # step, every time. Checkout reads no Apple secret, so the gate's
+      # "no secret use before the API-verified environment check" contract
+      # holds; the tag/SHA agreement is validated again after the conditional
+      # signed checkout below.
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: refs/tags/${{ needs.resolve-release.outputs.tag }}
+          fetch-depth: 0
+
       # Re-query immediately after the environment gate too. This closes the
       # interval between source resolution and approval without reading any
       # Apple secret in the check itself.

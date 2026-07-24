@@ -1210,6 +1210,48 @@ describe('executeSkill – retry', () => {
     expect(mockCallTool).toHaveBeenCalledTimes(2);
   });
 
+  test('retryable isError from an outputSchema-bearing tool (envelope in _meta) is retried', async () => {
+    // Regression: the registry strips structuredContent from isError results
+    // of schema-bearing tools and moves the error envelope to
+    // _meta["airmcp/error"]. Retry detection must read that shape too, or
+    // step retry silently stops working for every schema-bearing tool.
+    mockCallTool
+      .mockResolvedValueOnce({
+        content: [{ type: 'text', text: 'still starting' }],
+        isError: true,
+        _meta: { 'airmcp/error': { message: 'still starting', category: 'upstream_timeout', retryable: true } },
+      })
+      .mockResolvedValueOnce(okResponse({ ready: true }));
+
+    const skill = {
+      name: 'retry-schema-iserror',
+      steps: [{ id: 'boot', tool: 'service_ping', args: {}, retry: 1, retry_backoff_ms: 0 }],
+    };
+    const result = await executeSkill(fakeServer, skill);
+
+    expect(result.success).toBe(true);
+    expect(mockCallTool).toHaveBeenCalledTimes(2);
+  });
+
+  test('non-retryable schema-tool error in _meta is NOT retried', async () => {
+    mockCallTool
+      .mockResolvedValueOnce({
+        content: [{ type: 'text', text: 'denied by user' }],
+        isError: true,
+        _meta: { 'airmcp/error': { message: 'denied by user', category: 'permission_denied', retryable: false } },
+      })
+      .mockResolvedValueOnce(okResponse({ ready: true }));
+
+    const skill = {
+      name: 'retry-schema-denied',
+      steps: [{ id: 'send', tool: 'messages_send', args: {}, retry: 5, retry_backoff_ms: 0 }],
+    };
+    const result = await executeSkill(fakeServer, skill);
+
+    expect(result.success).toBe(false);
+    expect(mockCallTool).toHaveBeenCalledTimes(1);
+  });
+
   test('non-retryable isError (HITL denial) is NOT retried — no re-prompt', async () => {
     // Regression: a HITL denial (permission_denied, retryable:false) must be
     // returned immediately, not re-invoked, so the approval dialog is not

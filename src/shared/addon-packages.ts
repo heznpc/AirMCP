@@ -1,11 +1,11 @@
 import { createRequire } from "node:module";
-import { homedir } from "node:os";
 import { join, resolve } from "node:path";
+import { HOME } from "./constants.js";
 
 export const ADDON_INSTALL_PREFIX_ENV = "AIRMCP_ADDON_INSTALL_PREFIX";
 
 export function getDefaultAddonInstallPrefix(): string {
-  return join(homedir(), ".airmcp", "addons");
+  return join(HOME, ".airmcp", "addons");
 }
 
 export function getAddonInstallPrefix(explicitPrefix?: string): string {

@@ -161,6 +161,13 @@ async function sealApprovalAuditEvent(event: PendingApprovalAuditEvent): Promise
       kind: "approval",
       ...(correlationId ? { correlationId } : {}),
       limit: 10,
+      // Process-trust integrity: the flush inside readAuditEntries verified
+      // the delta on top of a chain head this process already attested under
+      // the writer lock. Recomputing every historical row's HMAC per approval
+      // was O(history) with the lock held and added no durable guarantee — an
+      // in-place edit of old bytes stays detected by every full verification
+      // (audit_summary, Trust Center, restart), which this barrier is not.
+      integrity: "process",
     });
     if (event.decision !== "approved") return;
     const decisionIsSealed = snapshot.entries.some(

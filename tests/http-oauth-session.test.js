@@ -30,6 +30,7 @@ jest.unstable_mockModule("../dist/shared/config.js", () => ({
 }));
 
 jest.unstable_mockModule("../dist/shared/constants.js", () => ({
+  HOME: process.env.HOME ?? "",
   LIMITS: { HTTP_SESSIONS: 10 },
   TIMEOUT: { SESSION_IDLE: 300_000, SESSION_CLEANUP: 60_000, KILL_GRACE: 5_000 },
 }));

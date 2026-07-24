@@ -16,8 +16,8 @@
 
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import os from "node:os";
 import crypto from "node:crypto";
+import { HOME } from "../../shared/constants.js";
 
 export interface SchedulerState {
   /** ISO-8601 timestamp of last successful fire, keyed by skill name. */
@@ -32,7 +32,7 @@ export interface SchedulerState {
   version: 1;
 }
 
-export const DEFAULT_STATE_PATH = path.join(os.homedir(), ".config", "airmcp", "scheduler-state.json");
+export const DEFAULT_STATE_PATH = path.join(HOME, ".config", "airmcp", "scheduler-state.json");
 
 const EMPTY_STATE: SchedulerState = { lastFire: {}, version: 1 };
 

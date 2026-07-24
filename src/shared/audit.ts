@@ -185,9 +185,12 @@ const CHECKPOINT_DOMAIN = "airmcp-audit-checkpoint-v1";
  * `link(2)` is the ownership primitive: each contender creates a unique file
  * and atomically hard-links it to `audit.lock`. This is the same dot-locking
  * protocol used by long-lived Unix mailbox tooling and works on both macOS
- * and Linux without a native addon. A second hard-link (`audit.lock.reap`)
- * serializes stale-owner recovery so a newly-acquired lock can never be
- * deleted by a competing reaper.
+ * and Linux without a native addon. Stale-owner recovery is serialized by an
+ * exclusively-created pin file (`audit.lock.reap`) that records the REAPER's
+ * own identity plus the exact dead-owner inode it validated: while the pin
+ * exists no contender installs a new lock, and because the pin names its
+ * creator, contenders can tell a merely-delayed reaper (leave its gate alone)
+ * from a crashed one (recover its residue).
  */
 const AUDIT_LOCK_PATH = join(PATHS.VECTOR_STORE, "audit.lock");
 const AUDIT_LOCK_REAP_PATH = join(PATHS.VECTOR_STORE, "audit.lock.reap");
@@ -208,6 +211,36 @@ interface ObservedCheckpointFloor {
 /** Process-local freshness floor. It strengthens a live runtime but is not an
  * external monotonic anchor and is reset on process restart. */
 let observedCheckpointFloor: ObservedCheckpointFloor | null = null;
+
+interface ChainTrust {
+  seq: number;
+  hmac: string;
+}
+
+/** Process-local chain trust: the (seq, hmac) head this process has already
+ * fully verified — or itself sealed — under the writer lock. Scans invoked
+ * with this anchor skip recomputing per-line HMACs for rows at or below it;
+ * every structural check (prev linkage, seq continuity, checkpoint
+ * consistency, and the anchor row's exact hmac) still runs, so truncation,
+ * splices, reorders, and checkpoint rollback stay fail-closed. What the skip
+ * gives up is re-detecting an in-place BODY edit of an already-verified row
+ * on every append — that class remains caught by every full verification
+ * (audit_summary, readAuditEntries' default mode, process restart). Without
+ * the anchor, every 30s flush and every HITL approval barrier re-HMAC'd the
+ * entire history across all rotated files while holding the cross-process
+ * writer lock — O(history) CPU per governed write. */
+let verifiedChainTrust: ChainTrust | null = null;
+
+function observeChainTrust(seq: number, hmac: string): void {
+  if (seq < 0) return;
+  if (!verifiedChainTrust || seq > verifiedChainTrust.seq) {
+    verifiedChainTrust = { seq, hmac };
+  }
+}
+
+function clearChainTrust(): void {
+  verifiedChainTrust = null;
+}
 
 function checkpointMac(seq: number, hmac: string): string {
   return computeHmac(CHECKPOINT_DOMAIN, `${seq}:${hmac}`);
@@ -360,6 +393,9 @@ let flushing = false;
 let consecutiveFlushFailures = 0;
 let auditDisabled = false;
 let auditDisabledSince = 0;
+/** Set on a partial/ambiguous append. Unlike disk-full, this state requires
+ * chain inspection, so recovery never auto-lifts it (restart required). */
+let auditUnsafeAppendObserved = false;
 
 /** Backoff before re-attempting after auditDisabled trips. Disk-full
  *  is the primary trigger and typically clears after the user frees
@@ -369,7 +405,7 @@ const AUDIT_RECOVERY_INTERVAL_MS = 5 * 60_000;
 
 function maybeAttemptRecovery(): void {
   if (!auditDisabled) return;
-  if (auditSpoolOverflowed) return;
+  if (auditSpoolOverflowed || auditUnsafeAppendObserved) return;
   const now = Date.now();
   if (now - auditDisabledSince < AUDIT_RECOVERY_INTERVAL_MS) return;
   log.info("audit: recovery window elapsed — re-enabling and retrying flush");
@@ -397,9 +433,9 @@ async function pathExists(path: string): Promise<boolean> {
   }
 }
 
-async function readLockOwner(path: string): Promise<AuditLockOwner | null> {
+function parseLockOwner(raw: string): AuditLockOwner | null {
   try {
-    const parsed = JSON.parse((await readFile(path, "utf-8")).trim()) as Partial<AuditLockOwner>;
+    const parsed = JSON.parse(raw.trim()) as Partial<AuditLockOwner>;
     if (
       typeof parsed.pid === "number" &&
       Number.isInteger(parsed.pid) &&
@@ -417,6 +453,14 @@ async function readLockOwner(path: string): Promise<AuditLockOwner | null> {
   return null;
 }
 
+async function readLockOwner(path: string): Promise<AuditLockOwner | null> {
+  try {
+    return parseLockOwner(await readFile(path, "utf-8"));
+  } catch {
+    return null;
+  }
+}
+
 function processIsAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
@@ -427,9 +471,68 @@ function processIsAlive(pid: number): boolean {
   }
 }
 
-/** Reap one dead dot-lock owner. The fixed `.reap` hard-link is itself an
- * atomic mutex; contenders refuse ownership while it exists. That closes the
- * classic stale-unlink race where a reaper deletes a replacement lock. */
+interface AuditReapPin {
+  reaperPid: number;
+  reaperToken: string;
+  createdAt: number;
+  target: { dev: number; ino: number; ownerToken: string };
+}
+
+function parseReapPin(raw: string): AuditReapPin | null {
+  try {
+    const parsed = JSON.parse(raw.trim()) as Partial<AuditReapPin>;
+    const target = parsed.target as Partial<AuditReapPin["target"]> | undefined;
+    if (
+      typeof parsed.reaperPid === "number" &&
+      Number.isInteger(parsed.reaperPid) &&
+      parsed.reaperPid > 0 &&
+      typeof parsed.reaperToken === "string" &&
+      parsed.reaperToken.length > 0 &&
+      typeof parsed.createdAt === "number" &&
+      Number.isFinite(parsed.createdAt) &&
+      typeof target?.dev === "number" &&
+      typeof target?.ino === "number" &&
+      typeof target?.ownerToken === "string" &&
+      target.ownerToken.length > 0
+    ) {
+      return parsed as AuditReapPin;
+    }
+  } catch {
+    // Unrecognizable pins are classified by the caller.
+  }
+  return null;
+}
+
+/** Deterministic reap-window hook used only by the regression tests. */
+async function holdAuditReapForTest(): Promise<void> {
+  if (process.env.NODE_ENV !== "test") return;
+  const ms = Number(process.env.AIRMCP_TEST_AUDIT_REAP_HOLD_MS ?? "0");
+  if (Number.isFinite(ms) && ms > 0 && ms <= 5_000) await sleep(ms);
+}
+
+/** Remove the reap pin only while it still carries this reaper's token. A pin
+ * that changed hands (crash recovery re-claimed the name) is someone else's
+ * gate and must be left standing. */
+async function removeOwnReapPin(reaperToken: string): Promise<void> {
+  let raw: string;
+  try {
+    raw = await readFile(AUDIT_LOCK_REAP_PATH, "utf-8");
+  } catch {
+    return;
+  }
+  const current = parseReapPin(raw);
+  if (current && current.reaperToken !== reaperToken) return;
+  await unlink(AUDIT_LOCK_REAP_PATH).catch(() => {});
+}
+
+/** Reap one dead dot-lock owner. The `.reap` pin is an exclusively-created
+ * file carrying this reaper's identity and the exact dead-owner inode it
+ * validated. While the pin exists no contender installs a new lock and no
+ * competing reaper acts, so the public name cannot be rebound to a live lock
+ * between the re-validation and the unlink. (The previous hard-link scheme
+ * recorded no reaper identity, so contenders "completed" reaps whose reaper
+ * was merely delayed — and that reaper's late unlink then destroyed a freshly
+ * acquired live lock, yielding two concurrent audit writers.) */
 async function tryReapStaleAuditLock(): Promise<boolean> {
   const observed = await readLockOwner(AUDIT_LOCK_PATH);
   if (observed) {
@@ -441,62 +544,132 @@ async function tryReapStaleAuditLock(): Promise<boolean> {
     return !(await pathExists(AUDIT_LOCK_PATH));
   }
 
+  let lockInfo: Awaited<ReturnType<typeof lstat>>;
   try {
-    await link(AUDIT_LOCK_PATH, AUDIT_LOCK_REAP_PATH);
+    lockInfo = await lstat(AUDIT_LOCK_PATH);
   } catch (err) {
-    if (isFsError(err, "ENOENT") || isFsError(err, "EEXIST")) return false;
+    if (isFsError(err, "ENOENT")) return false;
+    throw err;
+  }
+
+  const pin: AuditReapPin = {
+    reaperPid: process.pid,
+    reaperToken: randomUUID(),
+    createdAt: Date.now(),
+    target: { dev: lockInfo.dev, ino: lockInfo.ino, ownerToken: observed.token },
+  };
+  try {
+    await writeFile(AUDIT_LOCK_REAP_PATH, `${JSON.stringify(pin)}\n`, { encoding: "utf-8", mode: 0o600, flag: "wx" });
+  } catch (err) {
+    if (isFsError(err, "EEXIST") || isFsError(err, "ENOENT")) return false;
     throw err;
   }
 
   try {
-    // The reaper link pins the exact inode. Validate that the public lock still
-    // names that inode and that a shaped owner did not come back to life.
-    const [lockInfo, reapInfo] = await Promise.all([lstat(AUDIT_LOCK_PATH), lstat(AUDIT_LOCK_REAP_PATH)]);
-    if (lockInfo.dev !== reapInfo.dev || lockInfo.ino !== reapInfo.ino) return false;
-    const current = await readLockOwner(AUDIT_LOCK_REAP_PATH);
-    if (observed && current?.token !== observed.token) return false;
-    if (current && processIsAlive(current.pid)) return false;
+    await holdAuditReapForTest();
+    // Re-validate under the pin: the public lock must still be the exact
+    // inode whose owner we observed dead.
+    const current = await lstat(AUDIT_LOCK_PATH);
+    if (current.dev !== pin.target.dev || current.ino !== pin.target.ino) return false;
+    const owner = await readLockOwner(AUDIT_LOCK_PATH);
+    if (owner?.token !== pin.target.ownerToken) return false;
+    if (processIsAlive(owner.pid)) return false;
     await unlink(AUDIT_LOCK_PATH);
     return true;
   } catch (err) {
     if (isFsError(err, "ENOENT")) return false;
     throw err;
   } finally {
-    await unlink(AUDIT_LOCK_REAP_PATH).catch(() => {});
+    await removeOwnReapPin(pin.reaperToken);
   }
 }
 
-/** Complete the exact crash residue left when a reaper dies after publishing
- * `audit.lock.reap` but before removing both hard links. Helping is safe even
- * when the original reaper is merely delayed: both names must still identify
- * the same dead-owner inode, and unlinking either pathname is idempotent. */
+/** Recover the residue of a reaper that CRASHED after publishing the pin. A
+ * live reaper — however delayed — keeps the gate closed: helping is legal
+ * only once the pin's recorded reaper PID is provably dead. The claim is an
+ * atomic rename to a unique junk name so at most one contender performs the
+ * completion; the junk file gates nothing and is deleted afterwards. */
 async function tryCompleteOrphanedAuditReap(): Promise<boolean> {
-  let lockInfo: Awaited<ReturnType<typeof lstat>>;
-  let reapInfo: Awaited<ReturnType<typeof lstat>>;
+  let pinRaw: string;
   try {
-    [lockInfo, reapInfo] = await Promise.all([lstat(AUDIT_LOCK_PATH), lstat(AUDIT_LOCK_REAP_PATH)]);
+    pinRaw = await readFile(AUDIT_LOCK_REAP_PATH, "utf-8");
   } catch (err) {
-    if (!isFsError(err, "ENOENT")) throw err;
-    // The destructive half already completed. The remaining reaper pin has no
-    // public lock to protect and can be removed by any contender.
-    if (!(await pathExists(AUDIT_LOCK_PATH))) {
-      await unlink(AUDIT_LOCK_REAP_PATH).catch(() => {});
-      return true;
-    }
+    if (isFsError(err, "ENOENT")) return true;
+    throw err;
+  }
+
+  const pin = parseReapPin(pinRaw);
+  const legacyOwner = pin ? null : parseLockOwner(pinRaw);
+  if (pin) {
+    // PID reuse lands here too: a reused reaper PID reads as alive, the gate
+    // stays closed, and the acquire timeout surfaces the fault to an operator
+    // instead of this contender guessing at a destructive removal.
+    if (processIsAlive(pin.reaperPid)) return false;
+  } else if (legacyOwner) {
+    // Pre-identity-pin residue (≤ v2.16.0: the pin was a hard link of the
+    // lock itself, so its content is the dead LOCK OWNER's record).
+    if (processIsAlive(legacyOwner.pid)) return false;
+  } else {
+    // Unrecognizable pin — external damage, not crash residue. Fail closed.
     return false;
   }
 
-  if (lockInfo.dev !== reapInfo.dev || lockInfo.ino !== reapInfo.ino) return false;
-  const owner = await readLockOwner(AUDIT_LOCK_REAP_PATH);
-  if (!owner || processIsAlive(owner.pid)) return false;
+  const claimPath = join(AUDIT_DIR, `audit.lock.reap.claim.${process.pid}.${randomUUID()}`);
+  try {
+    await rename(AUDIT_LOCK_REAP_PATH, claimPath);
+  } catch (err) {
+    if (isFsError(err, "ENOENT")) return false; // another contender claimed it first
+    throw err;
+  }
 
   try {
-    await unlink(AUDIT_LOCK_PATH);
-  } catch (err) {
-    if (!isFsError(err, "ENOENT")) throw err;
+    // The rename is blind: in a tight race it can capture a DIFFERENT pin
+    // installed after our read. Give a live reaper its gate back untouched.
+    const claimedRaw = await readFile(claimPath, "utf-8");
+    if (claimedRaw !== pinRaw) {
+      const claimedPin = parseReapPin(claimedRaw);
+      if (claimedPin && processIsAlive(claimedPin.reaperPid)) {
+        await rename(claimPath, AUDIT_LOCK_REAP_PATH).catch(() => {});
+        return false;
+      }
+    }
+
+    // Finish the destructive half only when the public lock still IS the
+    // exact dead inode the crashed actor recorded. Any mismatch means
+    // reality moved on; clear the residue and let a fresh reap re-derive it.
+    let lockInfo: Awaited<ReturnType<typeof lstat>> | null = null;
+    try {
+      lockInfo = await lstat(AUDIT_LOCK_PATH);
+    } catch (err) {
+      if (!isFsError(err, "ENOENT")) throw err;
+    }
+    if (lockInfo) {
+      let matches = false;
+      let deadOwner: AuditLockOwner | null = null;
+      if (pin) {
+        const owner = await readLockOwner(AUDIT_LOCK_PATH);
+        matches =
+          lockInfo.dev === pin.target.dev && lockInfo.ino === pin.target.ino && owner?.token === pin.target.ownerToken;
+        deadOwner = owner;
+      } else {
+        // Legacy pin: a hard link of the lock — the claimed file must still
+        // name the same inode as the public lock.
+        const claimInfo = await lstat(claimPath);
+        matches = lockInfo.dev === claimInfo.dev && lockInfo.ino === claimInfo.ino;
+        deadOwner = legacyOwner;
+      }
+      if (matches && deadOwner && !processIsAlive(deadOwner.pid)) {
+        try {
+          await unlink(AUDIT_LOCK_PATH);
+        } catch (err) {
+          if (!isFsError(err, "ENOENT")) throw err;
+        }
+      }
+    }
+    return true;
+  } finally {
+    await unlink(claimPath).catch(() => {});
   }
-  await unlink(AUDIT_LOCK_REAP_PATH).catch(() => {});
-  return true;
 }
 
 async function acquireAuditWriteLock(): Promise<() => Promise<void>> {
@@ -524,6 +697,23 @@ async function acquireAuditWriteLock(): Promise<() => Promise<void>> {
           // it before waiting; do not let an ambiguous half-acquisition strand
           // a live-PID lock that no caller can release.
           await unlink(AUDIT_LOCK_PATH);
+          installedByThisAttempt = false;
+          await sleep(AUDIT_LOCK_RETRY_MS);
+          continue;
+        }
+        // Residual-race backstop: back off only when the public name provably
+        // carries a DIFFERENT owner's record. An unreadable or malformed read
+        // (permission probes, transient I/O) keeps the pre-backstop behavior —
+        // the link(2) success above is the ownership proof. Never unlink on
+        // mismatch: a rebound name is someone else's live lock.
+        let rawInstalled: string | null = null;
+        try {
+          rawInstalled = await readFile(AUDIT_LOCK_PATH, "utf-8");
+        } catch {
+          rawInstalled = null;
+        }
+        const installedOwner = rawInstalled === null ? null : parseLockOwner(rawInstalled);
+        if (installedOwner && installedOwner.token !== owner.token) {
           installedByThisAttempt = false;
           await sleep(AUDIT_LOCK_RETRY_MS);
           continue;
@@ -611,6 +801,10 @@ function disableAuditAfterUnsafeAppend(err: unknown, detail: string): void {
   consecutiveFlushFailures = AUDIT.MAX_FLUSH_FAILURES;
   auditDisabled = true;
   auditDisabledSince = Date.now();
+  // Match the logged contract: an ambiguous partial append means the chain
+  // needs inspection, so the revocation must NOT auto-lift after the 5-minute
+  // disk-recovery window — a restart after repair is the only way back.
+  auditUnsafeAppendObserved = true;
   if (flushTimer) {
     clearTimeout(flushTimer);
     flushTimer = null;
@@ -618,7 +812,7 @@ function disableAuditAfterUnsafeAppend(err: unknown, detail: string): void {
   log.error("audit: append outcome was partial or ambiguous — dropping the in-flight batch and failing closed", {
     detail,
     err: errToCtx(err),
-    note: "inspect/repair the audit chain before governed writes can resume",
+    note: "inspect/repair the audit chain and restart AirMCP before governed writes can resume",
   });
 }
 
@@ -703,10 +897,18 @@ async function flushOneBatch(): Promise<boolean> {
     releaseLock = await acquireAuditWriteLock();
 
     // Never trust an in-memory tail in a multi-process runtime. Replay the
-    // complete signed chain and checkpoint while holding the writer lock. A
-    // truncation, forged/missing checkpoint, malformed row, or fork makes the
-    // batch fail closed and leaves the older checkpoint untouched.
-    let disk = await scanAuditChain();
+    // signed chain and checkpoint while holding the writer lock — rows this
+    // process already verified are attested by the chain-trust anchor, the
+    // rest is verified in full. A truncation, forged/missing checkpoint,
+    // malformed row, or fork makes the batch fail closed and leaves the older
+    // checkpoint untouched.
+    let disk = await scanAuditChain(verifiedChainTrust);
+    if (!disk.appendable && verifiedChainTrust) {
+      // Stale process trust must not turn a repairable state into a hard
+      // failure — re-derive the truth from a full scan before failing closed.
+      clearChainTrust();
+      disk = await scanAuditChain();
+    }
     if (!disk.appendable) {
       const detail = disk.firstBreak
         ? `${disk.firstBreak.file}:${disk.firstBreak.lineIndex} ${disk.firstBreak.reason}`
@@ -720,6 +922,7 @@ async function flushOneBatch(): Promise<boolean> {
       // This also handles older mixed files where a genesis-rooted signed
       // chain was appended after legacy rows: signed bytes stay unchanged.
       await quarantineUnsignedLegacyPrefix();
+      clearChainTrust();
       disk = await scanAuditChain();
       if (!disk.appendable || !disk.verified || disk.legacyEntries.length > 0) {
         const detail = disk.firstBreak
@@ -803,6 +1006,9 @@ async function flushOneBatch(): Promise<boolean> {
       );
       return false;
     }
+    // The rows just sealed were verified by construction on top of a chain
+    // this scan attested — later scans may anchor here.
+    observeChainTrust(candidateSeq, candidateHmac);
     warnHostKeyOnce();
   } catch (err) {
     if (!appended) {
@@ -1021,7 +1227,12 @@ async function quarantineUnsignedLegacyPrefix(): Promise<void> {
           mode: 0o600,
           flag: "wx",
         });
+        // Same durability barrier as writeCheckpoint: seal the rewritten bytes
+        // and the directory entry before the old name disappears, so a crash
+        // in this window cannot leave an empty or partial active file.
+        await syncPath(tempPath);
         await rename(tempPath, sourcePath);
+        await syncAuditDirectory();
       } finally {
         await unlink(tempPath).catch(() => {});
       }
@@ -1146,8 +1357,10 @@ export function _testReset(): string[] {
   auditDisabled = false;
   auditDisabledSince = 0;
   auditSpoolOverflowed = false;
+  auditUnsafeAppendObserved = false;
   warnedHostKey = false;
   observedCheckpointFloor = null;
+  verifiedChainTrust = null;
   return snapshot;
 }
 
@@ -1213,6 +1426,13 @@ export interface ReadAuditOptions {
   kind?: AuditEventKind;
   /** Cap on returned entries. Most recent first. */
   limit?: number;
+  /** Chain-verification depth. `"full"` (default) recomputes every row's
+   *  HMAC — the mode audit_summary and Trust Center rely on. `"process"`
+   *  additionally trusts rows this process already verified under the writer
+   *  lock (see `verifiedChainTrust`): structural checks still run, but an
+   *  in-place body edit of an old row is only caught by the next full
+   *  verification. Reserved for hot governed-write barriers. */
+  integrity?: "full" | "process";
 }
 
 export interface ReadAuditResult {
@@ -1304,7 +1524,7 @@ function normalizeAuditEntry(entry: AuditEntry): AuditHistoryEntry {
 }
 
 /** Replay and decode the log in a single oldest→newest pass. */
-async function scanAuditChain(): Promise<AuditChainScanResult> {
+async function scanAuditChain(trust: ChainTrust | null = null): Promise<AuditChainScanResult> {
   const entries: AuditEntry[] = [];
   const legacyEntries: AuditEntry[] = [];
   const seenFiles = new Set<string>();
@@ -1369,13 +1589,24 @@ async function scanAuditChain(): Promise<AuditChainScanResult> {
     const expectedPrev = chainStarted ? prev : HMAC_GENESIS;
     if (prevField !== expectedPrev) return broken(file, lineIndex, "prev_mismatch");
 
-    // Verify the literal bytes sealed by the writer. Reconstructing from the
-    // parsed object would normalize duplicate keys, escape spellings, and
-    // whitespace, allowing a raw JSONL edit to keep `verified: true`.
-    const signedBody = exactSignedBody(line, prevField, hmacField);
-    if (!signedBody) return broken(file, lineIndex, "malformed");
-    const expected = computeHmac(prevField, signedBody);
-    if (expected !== hmacField) return broken(file, lineIndex, "hmac_mismatch");
+    const rawSeq = entry.seq;
+    const trustCovers =
+      trust !== null && typeof rawSeq === "number" && Number.isInteger(rawSeq) && rawSeq >= 0 && rawSeq <= trust.seq;
+    if (trustCovers) {
+      // This process already verified these exact rows under the writer lock;
+      // skip only the HMAC recomputation. The anchor row must still carry the
+      // exact hmac we recorded — any splice or history replacement breaks
+      // either this comparison or the structural checks around it.
+      if (rawSeq === trust.seq && hmacField !== trust.hmac) return broken(file, lineIndex, "hmac_mismatch");
+    } else {
+      // Verify the literal bytes sealed by the writer. Reconstructing from the
+      // parsed object would normalize duplicate keys, escape spellings, and
+      // whitespace, allowing a raw JSONL edit to keep `verified: true`.
+      const signedBody = exactSignedBody(line, prevField, hmacField);
+      if (!signedBody) return broken(file, lineIndex, "malformed");
+      const expected = computeHmac(prevField, signedBody);
+      if (expected !== hmacField) return broken(file, lineIndex, "hmac_mismatch");
+    }
 
     const decoded = asAuditEntry(entry);
     if (!decoded) return broken(file, lineIndex, "malformed");
@@ -1480,10 +1711,10 @@ function filterAuditEntries(
   return { entries: normalized, total: matched.length, returned: normalized.length };
 }
 
-async function scanAuditChainLocked(): Promise<AuditChainScanResult> {
+async function scanAuditChainLocked(trust: ChainTrust | null = null): Promise<AuditChainScanResult> {
   const release = await acquireAuditWriteLock();
   try {
-    return await scanAuditChain();
+    return await scanAuditChain(trust);
   } finally {
     await release();
   }
@@ -1495,7 +1726,7 @@ async function scanAuditChainLocked(): Promise<AuditChainScanResult> {
  * are never mixed into a signed-era result. */
 export async function readAuditEntries(opts: ReadAuditOptions = {}): Promise<ReadAuditResult> {
   await flushBuffer();
-  const scan = await scanAuditChainLocked();
+  const scan = await scanAuditChainLocked(opts.integrity === "process" ? verifiedChainTrust : null);
   // A successfully parsed unsigned prefix remains inspectable for legacy
   // diagnostics, including the prefix before plain malformed JSON. Once any
   // row claims to be signed, however, a failure before chain start must hide

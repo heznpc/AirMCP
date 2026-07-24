@@ -26,7 +26,7 @@ AirMCP has no maintainer-operated analytics, advertising, crash-reporting, or ma
 Under GDPR Article 6, AirMCP relies on the following legal bases:
 
 - **Legitimate interest (Art. 6(1)(f)):** Local automation operations (reading/writing Apple app data, on-device AI processing, local file operations) are performed based on the user's legitimate interest in automating their own macOS workflows. All such processing occurs entirely on the user's machine.
-- **Consent (Art. 6(1)(a)):** External API calls to Google Gemini, OpenStreetMap Nominatim, Open-Meteo, Google Workspace, custom webhook destinations, or Power Automate are made only after the owner configures or invokes those paths. Consent can be withdrawn by removing the related credentials/configuration and not invoking those tools.
+- **Consent (Art. 6(1)(a)):** External API calls to Google Gemini, OpenStreetMap Nominatim, Open-Meteo, Google Workspace, or Power Automate Cloud Flows are made only after the owner configures or invokes those paths. The inbound webhook listener is likewise active only after the owner explicitly starts it (`webhook_listen_start`). Consent can be withdrawn by removing the related credentials/configuration, stopping the listener, and not invoking those tools.
 
 ## How Your Data Is Handled
 
@@ -48,10 +48,10 @@ AirMCP connects to external services in the following cases:
 | **Geocoding** | Open-Meteo Geocoding (`geocoding-api.open-meteo.com`) | Place names/addresses | When maps tools search for locations |
 | **Reverse geocoding** | OpenStreetMap Nominatim (`nominatim.openstreetmap.org`) | GPS coordinates | When maps tools resolve coordinates to addresses |
 | **Google Workspace** | Google APIs (via `gws` CLI) | Gmail, Drive, Sheets, Calendar, Docs data | When Google Workspace tools are used (requires separate Google auth) |
-| **Outbound webhook** | Owner-selected HTTPS destination | URL, headers, and JSON payload supplied to `webhook_send` | Only when the outbound webhook tool is explicitly invoked and network policy allows the destination |
-| **Power Automate** | Owner-configured Microsoft flow URL | JSON payload supplied to `powerautomate_trigger` | Only when the Power Automate tool is explicitly invoked and network policy allows the destination |
+| **Inbound webhook listener** | External caller reachable at the bound host:port (`127.0.0.1` by default) | The verified POST body is turned into an internal `webhook_received` event; no payload is sent by AirMCP to any external destination | Only while the listener is running — started via `webhook_listen_start`, stopped via `webhook_listen_stop` |
+| **Power Automate (Cloud Flow trigger)** | Owner-configured Microsoft Power Automate Cloud Flow HTTP trigger URL | JSON payload supplied to `cloudflow_trigger` | Only when `cloudflow_trigger` is explicitly invoked and network policy allows the destination |
 
-AirMCP itself sends no data to an AirMCP-operated backend. Data can still leave the Mac through a connected MCP client or when you use any external-service path listed above.
+AirMCP itself sends no data to an AirMCP-operated backend. Data can still leave the Mac through a connected MCP client or when you use any of the outbound paths listed above. The inbound webhook listener is the exception: it does not send data anywhere — it only receives POSTs a caller sends to it, and (if configured to bind beyond loopback) exposes a local port to accept them.
 
 ### Local Data Storage
 
@@ -86,7 +86,7 @@ AirMCP does not operate any server-side data storage. All retention is local to 
 | `~/.airmcp/profile.json` (local usage profile) | Retained until reset or deletion | Delete the file or disable local usage tracking |
 | macOS Spotlight entries | Retained until the user clears them | Use the `spotlight_clear` or `semantic_clear` tool |
 
-For data sent to external APIs or owner-selected webhook/Power Automate destinations, AirMCP does not control the retention period. Refer to each destination's privacy and retention policy.
+For data sent to external APIs or an owner-configured Power Automate Cloud Flow destination, AirMCP does not control the retention period; refer to each destination's privacy and retention policy. Data received by the inbound webhook listener is not persisted by AirMCP beyond turning it into a `webhook_received` event — retention of the original data is controlled by whichever caller sent it and by any skill that acts on the event.
 
 ## Apple Intelligence / Foundation Models
 
@@ -146,7 +146,7 @@ Under the GDPR, you have the following rights regarding your personal data:
 
 **For locally-stored data:** Because AirMCP runs entirely on your machine, you have full filesystem access to all data it stores. You can inspect, modify, export, or delete `vectors.json`, `config.json`, and Spotlight entries at any time without needing to contact anyone.
 
-**For data sent to external APIs:** If you have exercised Gemini, Nominatim, Open-Meteo, Google Workspace, webhook, or Power Automate tools, refer to the respective destination's privacy policy to exercise your data subject rights with it:
+**For data sent to external APIs:** If you have exercised Gemini, Nominatim, Open-Meteo, Google Workspace, or Power Automate tools, refer to the respective destination's privacy policy to exercise your data subject rights with it. For the inbound webhook listener, AirMCP is not the sender of that data — the external caller that POSTed to your listener controls it; contact that caller directly.
 
 - Google Gemini: [Google Privacy Policy](https://policies.google.com/privacy)
 - OpenStreetMap Nominatim: [OSMF Privacy Policy](https://wiki.osmfoundation.org/wiki/Privacy_Policy)
@@ -160,7 +160,8 @@ AirMCP processes data locally on your Mac by default. When external APIs are use
 - **OpenStreetMap Nominatim:** Requests are sent to OSM servers based in the European Union.
 - **Open-Meteo:** Servers are based in the European Union.
 - **Google Workspace (via `gws` CLI):** Data is transferred to Google servers. Refer to Google's data processing terms.
-- **Custom webhooks / Power Automate:** Data is transferred to the destination configured by the owner; its location and safeguards depend on that destination.
+- **Power Automate:** Data is transferred to the Cloud Flow destination configured by the owner; its location and safeguards depend on that destination.
+- **Inbound webhook listener:** No outbound international transfer occurs — the listener only receives data a caller sends to it, and (if bound to a non-loopback interface) accepts connections from that caller's network.
 
 AirMCP itself performs no international transfer to an AirMCP-operated service. Transfers may still be made by the connected MCP client or an external destination selected by the owner.
 

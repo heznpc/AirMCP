@@ -27,7 +27,7 @@ afterAll(async () => {
 });
 
 const { auditLog, _testReset, _testFlush } = await import('../dist/shared/audit.js');
-const { buildTrustAttestation } = await import('../dist/shared/resources.js');
+const { buildTrustAttestation, deriveAssurance } = await import('../dist/shared/resources.js');
 const { SERVER_INSTRUCTIONS } = await import('../dist/shared/icons.js');
 
 const AUDIT_PATH = join(workDir, 'audit.jsonl');
@@ -71,6 +71,12 @@ describe('airmcp://trust attestation', () => {
     expect(typeof t.posture).toBe('string');
     expect(t.posture).toMatch(/audit verified/);
     expect(typeof t.checkedAt).toBe('string');
+
+    // This suite sets an operator HMAC key at module load, so the honest
+    // assurance grade must be the strongest tier — distinct from the weaker
+    // host-fallback grade that the same `governed:true` boolean would mask.
+    expect(t.audit.keyGrade).toBe('operator-key');
+    expect(t.assurance).toBe('operator-attested');
   });
 
   test('tampered chain → governed:false, verified:false, break located', async () => {
@@ -95,5 +101,31 @@ describe('airmcp://trust attestation', () => {
     expect(t.approval.level).toBe('sensitive-only');
     expect(t.approval.whitelistSize).toBe(0);
     expect(t.governed).toBe(true);
+  });
+});
+
+describe('deriveAssurance — honest, key-grade-aware verdict', () => {
+  // The whole point of `assurance`: a host-fallback key must NOT read the same
+  // as an operator key, even though both leave `governed:true`. A one-line
+  // trust readout that keyed on `governed` would over-trust the host key; this
+  // pure function is the honest grade such surfaces must read instead.
+  test('verified + not halted + operator key → operator-attested (strongest)', () => {
+    expect(deriveAssurance(true, false, 'operator-key')).toBe('operator-attested');
+  });
+
+  test('verified + not halted + host-fallback key → tamper-evident (honest downgrade, NOT operator-attested)', () => {
+    const a = deriveAssurance(true, false, 'host-fallback');
+    expect(a).toBe('tamper-evident');
+    expect(a).not.toBe('operator-attested');
+  });
+
+  test('verified but audit halted → audit-halted regardless of key grade', () => {
+    expect(deriveAssurance(true, true, 'operator-key')).toBe('audit-halted');
+    expect(deriveAssurance(true, true, 'host-fallback')).toBe('audit-halted');
+  });
+
+  test('chain broken → tampered regardless of key grade or halt', () => {
+    expect(deriveAssurance(false, false, 'operator-key')).toBe('tampered');
+    expect(deriveAssurance(false, true, 'host-fallback')).toBe('tampered');
   });
 });

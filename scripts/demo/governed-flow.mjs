@@ -31,7 +31,17 @@ const bold = (s) => `\x1b[1m${s}\x1b[0m`;
 const green = (s) => `\x1b[32m${s}\x1b[0m`;
 const cyan = (s) => `\x1b[36m${s}\x1b[0m`;
 const yellow = (s) => `\x1b[33m${s}\x1b[0m`;
+const red = (s) => `\x1b[31m${s}\x1b[0m`;
 const line = (label, value) => console.log(`  ${dim(label.padEnd(22))} ${value}`);
+
+// Honest, key-grade-aware colouring: `governed:true` alone hides whether the
+// chain is backed by an operator key or a re-derivable host-fallback key.
+const paintAssurance = (a) =>
+  a === "operator-attested"
+    ? green(a)
+    : a === "tamper-evident"
+      ? yellow(a + dim(" (host-fallback key — set AIRMCP_AUDIT_HMAC_KEY for non-repudiation)"))
+      : red(a);
 
 const auditDir = mkdtempSync(join(tmpdir(), "airmcp-demo-"));
 const child = spawn("node", [DIST], {
@@ -84,6 +94,7 @@ try {
   const trust = JSON.parse((await rpc(2, "resources/read", { uri: "airmcp://trust" })).result.contents[0].text);
   console.log("\n" + cyan("→ read airmcp://trust") + dim("  — the live, falsifiable verdict:"));
   line("governed", trust.governed ? green("true") : yellow("false"));
+  line("assurance", paintAssurance(trust.assurance));
   line("audit verified", trust.audit.verified ? green("true") : yellow("false"));
   line("approval level", trust.approval.level);
   line("emergency stop", trust.rateLimit.emergencyStop ? yellow("engaged") : "off");

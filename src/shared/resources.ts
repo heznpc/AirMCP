@@ -185,8 +185,10 @@ export function registerResources(server: McpServer, config?: AirMcpConfig): voi
       {
         description:
           "Live governance/trust attestation: whole-chain audit verification (tamper-evident), HITL approval level, " +
-          "rate-limit budget + emergency-stop state, and audit key grade — composed into one `governed` verdict. " +
-          "First-party server attestation; read it to verify the 'governed runtime, not an agent' claim before widening tool access.",
+          "rate-limit budget + emergency-stop state, and audit key grade. The `governed` boolean is true whenever the " +
+          "chain verifies and is not halted; the honest key-grade-aware verdict is `assurance` (operator-attested vs " +
+          "tamper-evident) — any one-line trust readout must use `assurance`, not bare `governed`. First-party server " +
+          "attestation; read it to verify the 'governed runtime, not an agent' claim before widening tool access.",
         mimeType: "application/json",
       },
       // First-party server state — explicitly non-sensitive so the resource
@@ -376,10 +378,45 @@ export interface TrustAttestation {
    * cannot be attested.
    */
   governed: boolean;
+  /**
+   * Honest single-field assurance grade that — unlike `governed` — DOES factor
+   * in the key grade. `governed` stays true under a host-derived fallback key
+   * (the record is still tamper-evident), so a consumer that keys only on the
+   * boolean would over-trust a host key as cryptographic non-repudiation. Any
+   * surface that reports a one-line verdict (verify CLI, demo, badge) must read
+   * `assurance`, never bare `governed`. See {@link deriveAssurance}.
+   */
+  assurance: Assurance;
   /** One-line human-readable posture summary. */
   posture: string;
   /** ISO timestamp of this attestation (no caching — freshness is the feature). */
   checkedAt: string;
+}
+
+/**
+ * The honest, key-grade-aware assurance tier for an attestation.
+ * - `operator-attested` — chain verifies, not halted, external operator key: strongest, non-repudiable.
+ * - `tamper-evident`    — chain verifies, not halted, host-fallback key: still trustworthy as a record,
+ *                          but an attacker with shell access can re-derive the key. NOT non-repudiation.
+ * - `audit-halted`      — chain verifies but logging is currently halted (disk/permission/flush failure).
+ * - `tampered`          — chain integrity broke.
+ */
+export type Assurance = "operator-attested" | "tamper-evident" | "audit-halted" | "tampered";
+
+/**
+ * Pure derivation of the assurance tier from the three governance inputs. Kept
+ * separate from {@link buildTrustAttestation} so it is exhaustively unit-testable
+ * without module-load env gymnastics (the host-fallback branch depends on an
+ * env var read at import time).
+ */
+export function deriveAssurance(
+  verified: boolean,
+  auditDisabled: boolean,
+  keyGrade: "operator-key" | "host-fallback",
+): Assurance {
+  if (!verified) return "tampered";
+  if (auditDisabled) return "audit-halted";
+  return keyGrade === "operator-key" ? "operator-attested" : "tamper-evident";
 }
 
 /**
@@ -396,6 +433,7 @@ export async function buildTrustAttestation(config?: AirMcpConfig): Promise<Trus
   const whitelistSize = config?.hitl?.whitelist?.size ?? 0;
 
   const governed = summary.verified && !summary.auditDisabled;
+  const assurance = deriveAssurance(summary.verified, summary.auditDisabled, keyGrade);
 
   const posture = [
     governed ? "governed" : summary.verified ? "audit halted" : "TAMPER DETECTED",
@@ -424,6 +462,7 @@ export async function buildTrustAttestation(config?: AirMcpConfig): Promise<Trus
       emergencyStopPath: rate.emergencyStopPath,
     },
     governed,
+    assurance,
     posture,
     checkedAt: new Date().toISOString(),
   };

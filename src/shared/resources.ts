@@ -11,6 +11,9 @@ import { LIMITS } from "./constants.js";
 import { resourceCache } from "./cache.js";
 import { getMemoryStore } from "../memory/instance.js";
 import { UNTRUSTED_CONTENT_META } from "./untrusted.js";
+import { summarizeAuditEntries, getAuditKeyGrade } from "./audit.js";
+import { getRateLimitStatus } from "./rate-limit.js";
+import { SERVER_INSTRUCTIONS } from "./icons.js";
 // Memory reads are cheap (JSON file + in-memory cache) — resolved at
 // call site (not at module load) so the singleton is shared with the
 // memory_* tools and remains substitutable in tests via _resetMemoryStore.
@@ -161,6 +164,37 @@ async function fetchUpcomingEvents(): Promise<unknown[]> {
 export function registerResources(server: McpServer, config?: AirMcpConfig): void {
   const enabled = (mod: string) => !config || isModuleEnabled(config, mod);
 
+  // ── Trust attestation (first-party, ALWAYS listed) ──
+  //
+  // Registered unconditionally — no module gate, no progressive-exposure
+  // front door — because the whole point is that a cautious client can read
+  // the governance posture BEFORE it decides to widen tool access. It composes
+  // the live tamper-evident audit verdict, HITL approval level, rate-limit +
+  // emergency-stop state, and audit key grade into one `governed` verdict, and
+  // mirrors the identity string sent in SERVER_INSTRUCTIONS so the claim and
+  // its proof live at one URI. Returned as plain first-party JSON — NOT wrapped
+  // in UNTRUSTED_CONTENT_META, which is reserved for Apple-app user data.
+  server.registerResource(
+    "trust-attestation",
+    "airmcp://trust",
+    {
+      description:
+        "Live governance/trust attestation: whole-chain audit verification (tamper-evident), HITL approval level, " +
+        "rate-limit budget + emergency-stop state, and audit key grade — composed into one `governed` verdict. " +
+        "First-party server attestation; read it to verify the 'governed runtime, not an agent' claim before widening tool access.",
+      mimeType: "application/json",
+    },
+    async (uri) => ({
+      contents: [
+        {
+          uri: uri.href,
+          mimeType: "application/json" as const,
+          text: JSON.stringify(await buildTrustAttestation(config), null, 2),
+        },
+      ],
+    }),
+  );
+
   // ── Notes ──
   if (enabled("notes")) {
     jsonResource(server, "recent-notes", "notes://recent", "10 most recently modified Apple Notes", () =>
@@ -291,6 +325,93 @@ interface RecentNote {
   folder: string;
   modificationDate: string;
   preview: string;
+}
+
+// ── Trust attestation builder — composes live governance posture ──
+
+export interface TrustAttestation {
+  /** Verbatim SERVER_INSTRUCTIONS — the identity claim this read makes falsifiable. */
+  identity: string;
+  audit: {
+    /** Whole-chain HMAC verification from genesis (windowless). */
+    verified: boolean;
+    /** Audit logging currently halted (disk-full / permission / repeated flush failures). */
+    auditDisabled: boolean;
+    /** First integrity break when `verified` is false; null when the chain verifies. */
+    firstBreak: { file: string; lineIndex: number; reason: string } | null;
+    /** `operator-key` (external secret) vs `host-fallback` (tamper-evident only). */
+    keyGrade: "operator-key" | "host-fallback";
+  };
+  /** Human-in-the-loop approval posture. */
+  approval: { level: string; whitelistSize: number };
+  /** Rate-limit budget and the emergency-stop kill switch. */
+  rateLimit: {
+    enabled: boolean;
+    globalRemaining: number;
+    destructiveRemaining: number;
+    emergencyStop: boolean;
+    emergencyStopPath: string;
+  };
+  /**
+   * Rolled-up verdict. True when the audit trail verifies and is not halted.
+   * A weak (host-fallback) key and an engaged emergency stop are surfaced in
+   * `posture` as caveats/lockdown — they do NOT flip `governed` false, because
+   * the record is still trustworthy (weak key) / the runtime is still governing
+   * (locked down). Only tampering or a halted audit trail means governance
+   * cannot be attested.
+   */
+  governed: boolean;
+  /** One-line human-readable posture summary. */
+  posture: string;
+  /** ISO timestamp of this attestation (no caching — freshness is the feature). */
+  checkedAt: string;
+}
+
+/**
+ * Compose AirMCP's live governance posture into one attestation. All inputs
+ * are already computed in-process — nothing here re-implements verification;
+ * it reuses `summarizeAuditEntries` (whose HMAC-chain replay is windowless),
+ * `getRateLimitStatus`, `getAuditKeyGrade`, and the configured HITL level.
+ */
+export async function buildTrustAttestation(config?: AirMcpConfig): Promise<TrustAttestation> {
+  const summary = await summarizeAuditEntries();
+  const rate = getRateLimitStatus();
+  const keyGrade = getAuditKeyGrade();
+  const level = config?.hitl?.level ?? "sensitive-only";
+  const whitelistSize = config?.hitl?.whitelist?.size ?? 0;
+
+  const governed = summary.verified && !summary.auditDisabled;
+
+  const posture = [
+    governed ? "governed" : summary.verified ? "audit halted" : "TAMPER DETECTED",
+    `audit ${summary.verified ? "verified" : "BROKEN"}`,
+    `approval: ${level}`,
+    `emergency-stop: ${rate.emergencyStop ? "engaged" : "off"}`,
+    keyGrade === "operator-key" ? null : "host-fallback key",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return {
+    identity: SERVER_INSTRUCTIONS,
+    audit: {
+      verified: summary.verified,
+      auditDisabled: summary.auditDisabled,
+      firstBreak: summary.verifiedFirstBreak ?? null,
+      keyGrade,
+    },
+    approval: { level, whitelistSize },
+    rateLimit: {
+      enabled: rate.enabled,
+      globalRemaining: rate.globalRemaining,
+      destructiveRemaining: rate.destructiveRemaining,
+      emergencyStop: rate.emergencyStop,
+      emergencyStopPath: rate.emergencyStopPath,
+    },
+    governed,
+    posture,
+    checkedAt: new Date().toISOString(),
+  };
 }
 
 // ── Context snapshot builder — parallel fetch across all enabled apps ──

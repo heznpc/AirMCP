@@ -69,6 +69,20 @@ const AUDIT_HMAC_KEY: Buffer = AUDIT_USING_HOST_KEY
   : Buffer.from(process.env.AIRMCP_AUDIT_HMAC_KEY as string, "utf-8");
 let warnedHostKey = false;
 
+/**
+ * Machine-readable trust grade of the audit HMAC key.
+ * `operator-key`  — AIRMCP_AUDIT_HMAC_KEY is set: tamper-evident with an
+ *                   external secret (cross-machine verifiable, non-repudiation).
+ * `host-fallback` — no key set: chain uses a host-derived key, so it is
+ *                   tamper-EVIDENT only (an attacker with shell access can
+ *                   re-derive it). Previously this only ever surfaced as a
+ *                   one-time stderr warning; the trust attestation exposes it
+ *                   so a consumer can weigh the audit verdict accordingly.
+ */
+export function getAuditKeyGrade(): "operator-key" | "host-fallback" {
+  return AUDIT_USING_HOST_KEY ? "host-fallback" : "operator-key";
+}
+
 const HMAC_GENESIS = "0".repeat(64);
 
 function computeHmac(prev: string, body: string): string {

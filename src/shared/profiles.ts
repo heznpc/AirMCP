@@ -124,6 +124,7 @@ export const FRONT_DOOR_TOOLS = [
   "describe_tool",
   "run_tool",
   "get_workflow",
+  "preview_action",
 ] as const;
 
 export const PROGRESSIVE_EXPOSED_TOOLS = [

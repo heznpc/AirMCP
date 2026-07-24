@@ -29,6 +29,7 @@ jest.unstable_mockModule("../dist/shared/banner.js", () => ({
 }));
 jest.unstable_mockModule("../dist/shared/audit.js", () => ({
   auditLog: jest.fn(),
+  sanitizeArgs: jest.fn((a) => a),
 }));
 jest.unstable_mockModule("../dist/server/mcp-setup.js", () => ({
   createServer: jest.fn(async () => ({

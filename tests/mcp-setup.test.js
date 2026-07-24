@@ -132,6 +132,8 @@ jest.unstable_mockModule('../dist/shared/hitl-guard.js', () => ({
   installHitlGuard: jest.fn((server, _client, _config) => {
     hitlInstallCalls.push({ at: Date.now(), serverPresent: !!server });
   }),
+  // front-door-tools (registered by createServer) imports this for preview_action.
+  shouldRequireApproval: jest.fn(() => false),
 }));
 jest.unstable_mockModule('../dist/shared/hitl.js', () => ({
   HitlClient: jest.fn(),

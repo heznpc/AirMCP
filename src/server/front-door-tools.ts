@@ -17,6 +17,9 @@ import {
   type ModulePackName,
 } from "../shared/module-packs.js";
 import type { ToolRegistry } from "../shared/tool-registry.js";
+import { shouldRequireApproval } from "../shared/hitl-guard.js";
+import { requiredScopeFor } from "../shared/oauth-scope.js";
+import { getRateLimitStatus } from "../shared/rate-limit.js";
 import { toolSessions } from "../shared/tool-sessions.js";
 import { WORKFLOWS, findWorkflow, summarizeWorkflowsReadiness, type WorkflowReadiness } from "../shared/workflows.js";
 import type { HarnessAdapterPolicy } from "../shared/task-adapters.js";
@@ -450,6 +453,93 @@ export function registerFrontDoorTools(server: McpServer, options: RegisterFront
         toolExposure: config.toolExposure,
         workflows,
         summary: summarizeWorkflowsReadiness(workflows),
+      });
+    },
+  );
+
+  server.registerTool(
+    "preview_action",
+    {
+      title: "Preview Action",
+      description:
+        "Dry-run governance preview of a tool call WITHOUT executing it. Validates the args against the tool's real " +
+        "input schema, reports its risk annotations, whether it would require per-call human approval at the current " +
+        "HITL level, its required OAuth scope, the exact PII-scrubbed record the audit log would write, and the live " +
+        "rate-limit / emergency-stop posture. The target handler is never invoked — zero side effect. Use it to see " +
+        "what a destructive call would record and whether it would be gated, before committing to run it.",
+      inputSchema: {
+        tool: z.string().min(1).max(120).describe("Tool name to preview, for example delete_reminder or move_note."),
+        args: z
+          .record(z.string(), z.unknown())
+          .optional()
+          .describe("Arguments you would pass. Validated against the tool's real input schema; never executed."),
+      },
+      outputSchema: {
+        tool: z.string(),
+        exists: z.boolean(),
+        exposed: z.boolean().optional(),
+        annotations: z
+          .object({ destructive: z.boolean(), readOnly: z.boolean(), sensitive: z.boolean() })
+          .optional(),
+        argsValid: z.boolean().optional(),
+        validationError: z.string().optional(),
+        wouldRequireApproval: z.boolean().optional(),
+        hitlLevel: z.string(),
+        requiredScope: z.string().optional(),
+        auditPreview: z
+          .object({
+            tool: z.string(),
+            status: z.string(),
+            actor: z.string(),
+            args: z.record(z.string(), z.unknown()),
+          })
+          .optional(),
+        rateLimit: z.object({
+          emergencyStop: z.boolean(),
+          globalRemaining: z.number(),
+          destructiveRemaining: z.number(),
+        }),
+        sideEffect: z.string(),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ tool, args }) => {
+      const preview = toolRegistry.previewCall(tool, (args ?? {}) as Record<string, unknown>);
+      const rate = getRateLimitStatus();
+      const rateLimit = {
+        emergencyStop: rate.emergencyStop,
+        globalRemaining: rate.globalRemaining,
+        destructiveRemaining: rate.destructiveRemaining,
+      };
+      if (!preview.exists || !preview.annotations) {
+        return okStructured({
+          tool,
+          exists: false,
+          hitlLevel: config.hitl.level,
+          rateLimit,
+          sideEffect: "none — unknown tool, handler not invoked",
+        });
+      }
+      const ann = preview.annotations;
+      const wouldRequireApproval = shouldRequireApproval(
+        config.hitl.level,
+        { destructiveHint: ann.destructive, readOnlyHint: ann.readOnly, sensitiveHint: ann.sensitive },
+        config.hitl.whitelist,
+        tool,
+      );
+      return okStructured({
+        tool,
+        exists: true,
+        exposed: preview.exposed,
+        annotations: ann,
+        argsValid: preview.argsValid,
+        ...(preview.validationError ? { validationError: preview.validationError } : {}),
+        wouldRequireApproval,
+        hitlLevel: config.hitl.level,
+        requiredScope: requiredScopeFor({ toolName: tool, isReadOnly: ann.readOnly, isDestructive: ann.destructive }),
+        auditPreview: { tool, status: "would-run", actor: "caller", args: preview.auditArgs ?? {} },
+        rateLimit,
+        sideEffect: "none — handler not invoked",
       });
     },
   );

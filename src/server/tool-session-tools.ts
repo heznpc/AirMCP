@@ -132,6 +132,7 @@ export function registerToolSessionTools(server: McpServer, options: RegisterToo
         exposed: z.boolean(),
         readOnly: z.boolean().optional(),
         destructive: z.boolean().optional(),
+        sensitive: z.boolean().optional(),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },

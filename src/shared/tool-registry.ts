@@ -16,7 +16,7 @@
 
 import type { McpServer, AnyFn } from "./mcp.js";
 import { usageTracker } from "./usage-tracker.js";
-import { auditLog, readAuditEntries } from "./audit.js";
+import { auditLog, readAuditEntries, sanitizeArgs } from "./audit.js";
 import { compactDescription } from "./tool-filter.js";
 import { withResultSizeHint } from "./result.js";
 import { log } from "./logger.js";
@@ -221,6 +221,11 @@ interface RegisteredToolEntry {
    *  by the OAuth scope gate to map tools onto mcp:read / mcp:write /
    *  mcp:destructive per RFC 0005 §3.4 without re-parsing opts. */
   readOnly?: boolean;
+  /** Captured from `annotations.sensitiveHint` at registration time. The HITL
+   *  guard reads this to gate sensitive-but-read-only tools (get_clipboard,
+   *  capture_screen, health_*) at `sensitive-only`+; persisting it lets a
+   *  pre-hoc preview compute the same approval verdict without re-parsing opts. */
+  sensitive?: boolean;
 }
 
 export interface ToolInfo {
@@ -235,6 +240,19 @@ export interface ToolDetails extends ToolInfo {
   exposed: boolean;
   destructive?: boolean;
   readOnly?: boolean;
+  sensitive?: boolean;
+}
+
+/** Result of a side-effect-free `previewCall` — the pre-hoc twin of an audit
+ *  entry. The tool handler is never invoked. */
+export interface ToolCallPreview {
+  exists: boolean;
+  exposed?: boolean;
+  annotations?: { destructive: boolean; readOnly: boolean; sensitive: boolean };
+  argsValid?: boolean;
+  validationError?: string;
+  /** The exact PII-scrubbed args an audit entry would record for this call. */
+  auditArgs?: Record<string, unknown>;
 }
 
 export interface OutputSchemaToolInfo {
@@ -349,7 +367,38 @@ export class ToolRegistry {
       exposed: entry.exposed,
       ...(entry.destructive !== undefined ? { destructive: entry.destructive } : {}),
       ...(entry.readOnly !== undefined ? { readOnly: entry.readOnly } : {}),
+      ...(entry.sensitive !== undefined ? { sensitive: entry.sensitive } : {}),
     };
+  }
+
+  /**
+   * Side-effect-free preview of a tool call: the pre-hoc twin of `callTool`.
+   * Validates args against the tool's real input schema and returns the exact
+   * PII-scrubbed args an audit entry would record — WITHOUT ever invoking the
+   * handler. Zero side effect is structural: the handler is never called.
+   */
+  previewCall(name: string, args: Record<string, unknown>): ToolCallPreview {
+    const entry = this.tools.get(name);
+    if (!entry) return { exists: false };
+    const annotations = {
+      destructive: entry.destructive === true,
+      readOnly: entry.readOnly === true,
+      sensitive: entry.sensitive === true,
+    };
+    const auditArgs = sanitizeArgs(args);
+    try {
+      validateToolArgs(name, entry.inputSchema, args);
+      return { exists: true, exposed: entry.exposed, annotations, argsValid: true, auditArgs };
+    } catch (e) {
+      return {
+        exists: true,
+        exposed: entry.exposed,
+        annotations,
+        argsValid: false,
+        validationError: e instanceof Error ? e.message : String(e),
+        auditArgs,
+      };
+    }
   }
 
   private getDescriptionLower(entry: RegisteredToolEntry): string | undefined {
@@ -686,8 +735,9 @@ export class ToolRegistry {
       }
       const result = exposed ? (origRegisterTool as AnyFn)(name, ...rest) : undefined;
       // Store the full description lazily for describe_tool / search scoring.
-      const annotations = (config as { annotations?: { destructiveHint?: boolean; readOnlyHint?: boolean } })
-        .annotations;
+      const annotations = (
+        config as { annotations?: { destructiveHint?: boolean; readOnlyHint?: boolean; sensitiveHint?: boolean } }
+      ).annotations;
       tools.set(name, {
         handler: wrapped,
         generation,
@@ -701,6 +751,7 @@ export class ToolRegistry {
         titleLower: title?.toLowerCase(),
         destructive: annotations?.destructiveHint === true,
         readOnly: annotations?.readOnlyHint === true,
+        sensitive: annotations?.sensitiveHint === true,
       });
       return result;
     }) as typeof server.registerTool;

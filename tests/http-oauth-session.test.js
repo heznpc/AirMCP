@@ -36,7 +36,7 @@ jest.unstable_mockModule("../dist/shared/constants.js", () => ({
 }));
 
 jest.unstable_mockModule("../dist/shared/banner.js", () => ({ printBanner: jest.fn() }));
-jest.unstable_mockModule("../dist/shared/audit.js", () => ({ auditLog: jest.fn() }));
+jest.unstable_mockModule("../dist/shared/audit.js", () => ({ auditLog: jest.fn(), sanitizeArgs: jest.fn((a) => a) }));
 jest.unstable_mockModule("../dist/server/shutdown.js", () => ({
   registerShutdownHook: jest.fn(),
   unregisterShutdownHook: jest.fn(),

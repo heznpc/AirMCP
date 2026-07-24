@@ -133,7 +133,7 @@ More workflow examples live in [docs/workflows.md](docs/workflows.md).
 AirMCP is designed to keep a large local capability surface usable without
 dumping the full catalog into every client context.
 
-The complete generated catalog currently contains 296 tools across 32 modules.
+The complete generated catalog currently contains 297 tools across 32 modules.
 Profiles and progressive exposure keep clients from loading it all at once.
 
 - **Profiles**: `starter`, `communications-safe`, `productivity`, `full`, or

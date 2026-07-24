@@ -1,13 +1,13 @@
 {
   "generatedAt": "STABLE_PLACEHOLDER",
   "protocolVersion": "2025-11-25",
-  "toolCount": 296,
+  "toolCount": 297,
   "eligibleCount": 290,
-  "ineligibleCount": 6,
+  "ineligibleCount": 7,
   "ineligibleByReason": {
     "object-param:recurrence": 2,
     "object-param:schema": 1,
-    "object-param:args": 2,
+    "object-param:args": 3,
     "object-param:params": 1
   },
   "tools": [
@@ -244,7 +244,7 @@
     {
       "name": "ai_agent",
       "title": "On-Device AI Agent (read-only)",
-      "description": "Run a prompt through Apple's on-device Foundation Models with read-only access to AirMCP data (today's events, due reminders, contacts search). The on-device LLM autonomously decides which read tool to call. Requires macOS 26+ with Apple Silicon. Write actions (create/update/delete) are intentionally NOT exposed — the agent's tool calls bypass the Node-side toolRegistry (no HITL, rate-limit, or audit), so writes belong to direct MCP tool calls instead.",
+      "description": "Run a prompt through Apple's on-device Foundation Models with read-only access to AirMCP data (today's events, due reminders, contacts search). The on-device LLM autonomously decides which read tool to call. Requires macOS 26+ with Apple Silicon. GOVERNANCE BOUNDARY: the model's read sub-calls run inside the Swift process and do NOT pass through the Node toolRegistry (no per-call HITL, rate-limit, or audit) — the result's `subReadsGoverned:false` makes this explicit. Write actions are intentionally NOT exposed to the model, so writes belong to direct MCP tool calls. The response is treated as untrusted content because it is synthesized from arbitrary Apple data.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -265,7 +265,48 @@
           "prompt"
         ]
       },
-      "outputSchema": null,
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "response": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "onDevice": {
+            "type": "boolean"
+          },
+          "readScope": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Read surfaces the on-device model may autonomously access"
+          },
+          "subReadsGoverned": {
+            "type": "boolean",
+            "description": "False: the model's read sub-calls ran on-device, outside Node HITL/rate-limit/audit"
+          },
+          "subReadsPerformed": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Read tools the model actually invoked, when the bridge reports them"
+          }
+        },
+        "required": [
+          "response",
+          "model",
+          "onDevice",
+          "readScope",
+          "subReadsGoverned",
+          "subReadsPerformed"
+        ],
+        "additionalProperties": false
+      },
       "annotations": {
         "readOnlyHint": true,
         "destructiveHint": false,
@@ -2046,6 +2087,9 @@
             "type": "boolean"
           },
           "destructive": {
+            "type": "boolean"
+          },
+          "sensitive": {
             "type": "boolean"
           }
         },
@@ -9635,6 +9679,152 @@
       },
       "appIntentEligible": true,
       "ineligibleReason": null
+    },
+    {
+      "name": "preview_action",
+      "title": "Preview Action",
+      "description": "Dry-run governance preview of a tool call WITHOUT executing it. Validates the args against the tool's real input schema, reports its risk annotations, whether it would require per-call human approval at the current HITL level, its required OAuth scope, the exact PII-scrubbed record the audit log would write, and the live rate-limit / emergency-stop posture. The target handler is never invoked — zero side effect. Use it to see what a destructive call would record and whether it would be gated, before committing to run it.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "tool": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "description": "Tool name to preview, for example delete_reminder or move_note."
+          },
+          "args": {
+            "description": "Arguments you would pass. Validated against the tool's real input schema; never executed.",
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "tool"
+        ]
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "tool": {
+            "type": "string"
+          },
+          "exists": {
+            "type": "boolean"
+          },
+          "exposed": {
+            "type": "boolean"
+          },
+          "annotations": {
+            "type": "object",
+            "properties": {
+              "destructive": {
+                "type": "boolean"
+              },
+              "readOnly": {
+                "type": "boolean"
+              },
+              "sensitive": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "destructive",
+              "readOnly",
+              "sensitive"
+            ],
+            "additionalProperties": false
+          },
+          "argsValid": {
+            "type": "boolean"
+          },
+          "validationError": {
+            "type": "string"
+          },
+          "wouldRequireApproval": {
+            "type": "boolean"
+          },
+          "hitlLevel": {
+            "type": "string"
+          },
+          "requiredScope": {
+            "type": "string"
+          },
+          "auditPreview": {
+            "type": "object",
+            "properties": {
+              "tool": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "actor": {
+                "type": "string"
+              },
+              "args": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              }
+            },
+            "required": [
+              "tool",
+              "status",
+              "actor",
+              "args"
+            ],
+            "additionalProperties": false
+          },
+          "rateLimit": {
+            "type": "object",
+            "properties": {
+              "emergencyStop": {
+                "type": "boolean"
+              },
+              "globalRemaining": {
+                "type": "number"
+              },
+              "destructiveRemaining": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "emergencyStop",
+              "globalRemaining",
+              "destructiveRemaining"
+            ],
+            "additionalProperties": false
+          },
+          "sideEffect": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "tool",
+          "exists",
+          "hitlLevel",
+          "rateLimit",
+          "sideEffect"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "sensitiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "appIntentEligible": false,
+      "ineligibleReason": "object-param:args"
     },
     {
       "name": "proactive_context",

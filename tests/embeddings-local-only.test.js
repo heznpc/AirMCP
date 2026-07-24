@@ -27,6 +27,7 @@ jest.unstable_mockModule('../dist/shared/audit.js', () => ({
   auditLog: (entry) => {
     auditCalls.push(entry);
   },
+  sanitizeArgs: (a) => a,
 }));
 
 // Control the Swift bridge presence and embed failures.

@@ -72,7 +72,7 @@ describe('module pack manifest', () => {
       if (pack.name === 'core') {
         expect(pack.packageName).toBe('airmcp');
       } else {
-        expect(pack.packageName).toMatch(/^@heznpc\/airmcp-/);
+        expect(pack.packageName).toMatch(/^@heznpc\/airmcp-[a-z0-9-]+$/);
       }
     }
   });
@@ -268,7 +268,10 @@ describe('loadModuleRegistry() — debug filtering', () => {
 
       expect(registry.some((mod) => mod.name === 'pages')).toBe(false);
       expect(errors.some((line) => line.includes('required add-on package module failed to load'))).toBe(true);
-      expect(getMissingAddonPackageModules()).toContain('pages');
+      const missingAddonModules = getMissingAddonPackageModules();
+      if (!missingAddonModules.includes('pages')) {
+        throw new Error(`pages was not classified as a missing add-on package:\n${errors.join('\n')}`);
+      }
     } finally {
       console.error = origError;
     }

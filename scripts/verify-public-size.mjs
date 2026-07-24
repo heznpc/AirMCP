@@ -17,8 +17,11 @@ const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
 const args = process.argv.slice(2);
 
 const DEFAULT_SOURCE_MAX = 10 * 1024 * 1024;
-const DEFAULT_NPM_TARBALL_MAX = 1 * 1024 * 1024;
-const DEFAULT_NPM_UNPACKED_MAX = 5 * 1024 * 1024;
+// Universal root measured at roughly 0.25 MiB packed / 1.1 MiB unpacked in
+// v2.16. Keep enough headroom for normal catalog growth without allowing a
+// silent return to multi-megabyte generated payloads.
+const DEFAULT_NPM_TARBALL_MAX = 0.5 * 1024 * 1024;
+const DEFAULT_NPM_UNPACKED_MAX = 2 * 1024 * 1024;
 
 function bytesFromMiB(value) {
   return Math.round(Number.parseFloat(value) * 1024 * 1024);
@@ -118,13 +121,6 @@ function verifyNpmPack() {
     encoding: "utf8",
     maxBuffer: 128 * 1024 * 1024,
   });
-  const restore = spawnSync(process.execPath, ["scripts/slim-root-package.mjs", "--restore"], {
-    cwd: ROOT,
-    encoding: "utf8",
-  });
-  if (restore.status !== 0) {
-    fail("failed to restore universal dist after npm pack dry-run", restore.stderr || restore.stdout);
-  }
   if (result.status !== 0) {
     fail("command failed: npm pack --dry-run --json", result.stderr || result.stdout);
   }
@@ -134,6 +130,20 @@ function verifyNpmPack() {
   }
   assertMax(`npm tarball ${pack.filename}`, pack.size, NPM_TARBALL_MAX);
   assertMax("npm unpacked size", pack.unpackedSize, NPM_UNPACKED_MAX);
+
+  const filePaths = new Set((pack.files ?? []).map((file) => file.path));
+  const universalCanaries = [
+    "dist/notes/tools.js",
+    "dist/mail/tools.js",
+    "dist/pages/tools.js",
+    "dist/safari/tools.js",
+    "dist/photos/tools.js",
+    "dist/google/tools.js",
+    "dist/health/tools.js",
+  ];
+  const missing = universalCanaries.filter((path) => !filePaths.has(path));
+  if (missing.length) fail(`universal npm package is missing module entrypoints: ${missing.join(", ")}`);
+  console.log(`ok: universal npm package contains ${universalCanaries.length} cross-pack module canaries`);
 }
 
 verifyTrackedPaths();

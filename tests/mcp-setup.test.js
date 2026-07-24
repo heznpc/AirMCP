@@ -140,24 +140,26 @@ jest.unstable_mockModule('../dist/shared/hitl.js', () => ({
 // tool-registry — instrumented to record installation order vs module calls.
 const toolRegistryEvents = [];
 let toolRegistryInstalled = false;
+const mockedToolRegistry = {
+  installOn: jest.fn((_server) => {
+    toolRegistryInstalled = true;
+    toolRegistryEvents.push({ kind: 'install', t: Date.now() });
+  }),
+  configureExposure: jest.fn(),
+  pruneStaleRegistrations: jest.fn(),
+  getToolCount: () => 0,
+  getExposedToolCount: () => 0,
+  getExposedToolNames: () => [],
+  getPromptCount: () => 0,
+  getToolNames: () => [],
+  searchTools: () => [],
+  callTool: jest.fn(),
+  reset: jest.fn(),
+};
 jest.unstable_mockModule('../dist/shared/tool-registry.js', () => ({
   ToolInputValidationError: class ToolInputValidationError extends Error {},
-  toolRegistry: {
-    installOn: jest.fn((_server) => {
-      toolRegistryInstalled = true;
-      toolRegistryEvents.push({ kind: 'install', t: Date.now() });
-    }),
-    configureExposure: jest.fn(),
-    pruneStaleRegistrations: jest.fn(),
-    getToolCount: () => 0,
-    getExposedToolCount: () => 0,
-    getExposedToolNames: () => [],
-    getPromptCount: () => 0,
-    getToolNames: () => [],
-    searchTools: () => [],
-    callTool: jest.fn(),
-    reset: jest.fn(),
-  },
+  toolRegistry: mockedToolRegistry,
+  createToolRegistry: jest.fn(() => mockedToolRegistry),
 }));
 
 // tool-search — discover_tools handler hits this.
@@ -374,6 +376,10 @@ describe('createServer — module isolation on failure', () => {
     // bannerInfo categorization is correct.
     expect(result.bannerInfo.modulesEnabled).toEqual(['working_one', 'working_two']);
     expect(result.bannerInfo.modulesDisabled).toEqual(['broken_middle']);
+    expect(result.runtimeModuleState).toEqual({
+      enabledModules: ['working_one', 'working_two'],
+      unavailableModules: [{ module: 'broken_middle', reason: 'registration_failed' }],
+    });
 
     // The failure was surfaced to stderr (not silently swallowed).
     const failureLog = stderr.find((m) => m.includes('broken_middle') && m.includes('synthetic failure'));
@@ -456,6 +462,21 @@ describe('createServer — compatibility bucket categorization', () => {
     // mod_broken lands in modulesBroken (with reason), never registered.
     expect(result.bannerInfo.modulesEnabled).not.toContain('mod_broken');
     expect(result.bannerInfo.modulesBroken.some((s) => s.startsWith('mod_broken'))).toBe(true);
+    expect(result.runtimeModuleState).toEqual({
+      enabledModules: ['mod_clean', 'mod_deprecated'],
+      unavailableModules: [
+        {
+          module: 'mod_broken',
+          reason: 'known_broken',
+          detail: 'mod_broken is known-broken on macOS 26',
+        },
+        {
+          module: 'mod_unsupported',
+          reason: 'host_unavailable',
+          detail: 'mod_unsupported requires macOS 27+ (detected 26)',
+        },
+      ],
+    });
 
     // Bucket totals are mutually exclusive — every fixture module is in
     // exactly one bucket (modulo deprecated which is in both enabled +
@@ -576,7 +597,7 @@ describe('createServer — module add-on install hints', () => {
         expect.objectContaining({ code: 'tool_not_registered', tool: 'today_events' }),
       ]),
     );
-    expect(status.structuredContent.workflowReadiness).toMatchObject({ total: 6, blocked: 6 });
+    expect(status.structuredContent.workflowReadiness).toMatchObject({ total: 7, blocked: 7 });
   });
 
   test('profile_status and list_module_packs expose on-demand install commands for missing packs', async () => {
@@ -607,8 +628,9 @@ describe('createServer — module add-on install hints', () => {
 
     const origError = console.error;
     console.error = () => {};
+    let result;
     try {
-      await createServer(mkOptions({ pkg: { ...mkPkg(), version: '2.15.0' } }));
+      result = await createServer(mkOptions({ pkg: { ...mkPkg(), version: '2.15.0' } }));
     } finally {
       console.error = origError;
     }
@@ -630,6 +652,13 @@ describe('createServer — module add-on install hints', () => {
       },
     ]);
     expect(status.structuredContent.modulesMissingAddonPackages).toEqual([]);
+    expect(result.runtimeModuleState).toEqual({
+      enabledModules: ['notes'],
+      unavailableModules: [
+        { module: 'numbers', reason: 'module_pack' },
+        { module: 'pages', reason: 'module_pack' },
+      ],
+    });
     expect(packs.structuredContent.packs.find((pack) => pack.name === 'productivity')).toMatchObject({
       installSpec: '@heznpc/airmcp-productivity@2.15.0',
       installCommand: 'npx airmcp modules enable productivity --install',
@@ -666,8 +695,9 @@ describe('createServer — module add-on install hints', () => {
 
     const origError = console.error;
     console.error = () => {};
+    let result;
     try {
-      await createServer(mkOptions({ pkg: { ...mkPkg(), version: '2.15.0' } }));
+      result = await createServer(mkOptions({ pkg: { ...mkPkg(), version: '2.15.0' } }));
     } finally {
       console.error = origError;
     }
@@ -677,6 +707,10 @@ describe('createServer — module add-on install hints', () => {
 
     expect(status.structuredContent.modulesMissingPacks).toEqual([]);
     expect(status.structuredContent.modulesMissingAddonPackages).toEqual(['pages']);
+    expect(result.runtimeModuleState).toEqual({
+      enabledModules: ['notes'],
+      unavailableModules: [{ module: 'pages', reason: 'addon_package' }],
+    });
     expect(status.structuredContent.missingPackInstallHints).toEqual([
       {
         pack: 'productivity',

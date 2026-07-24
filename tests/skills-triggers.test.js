@@ -144,6 +144,39 @@ describe('startTriggerListener and event dispatch', () => {
     expect(mockEventBus.listenerCount('event')).toBeGreaterThanOrEqual(1);
   });
 
+  test('reset + restart replaces the listener instead of duplicating event execution', async () => {
+    const firstRegistry = { id: 'first-registry' };
+    const secondRegistry = { id: 'second-registry' };
+    const skill = makeSkill({
+      name: 'session-replacement',
+      trigger: { event: 'calendar_changed', debounce_ms: 0 },
+    });
+
+    registerTrigger(skill);
+    startTriggerListener({ id: 'first-server' }, firstRegistry);
+    expect(mockEventBus.listenerCount('event')).toBe(1);
+
+    resetTriggers();
+    registerTrigger(skill);
+    startTriggerListener({ id: 'second-server' }, secondRegistry);
+    expect(mockEventBus.listenerCount('event')).toBe(1);
+
+    mockEventBus.emit('event', {
+      type: 'calendar_changed',
+      data: {},
+      timestamp: new Date().toISOString(),
+    });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(mockExecuteSkill).toHaveBeenCalledTimes(1);
+    expect(mockExecuteSkill).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'second-server' }),
+      skill,
+      {},
+      secondRegistry,
+    );
+  });
+
   test('dispatches skill execution when matching event fires', async () => {
     const skill = makeSkill({
       name: 'dispatch-test',
@@ -162,7 +195,7 @@ describe('startTriggerListener and event dispatch', () => {
     // executeSkill is called async (fire-and-forget), give it a tick
     await new Promise((r) => setTimeout(r, 10));
 
-    expect(mockExecuteSkill).toHaveBeenCalledWith(fakeServer, skill);
+    expect(mockExecuteSkill).toHaveBeenCalledWith(fakeServer, skill, {}, expect.anything());
   });
 
   test('does not dispatch for non-matching event type', async () => {

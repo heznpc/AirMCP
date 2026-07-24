@@ -8,19 +8,18 @@
  *   - audit.jsonl missing → readFile catches → `lastHmac` stays at
  *     HMAC_GENESIS
  *   - next flush seals new entries with `_prev = HMAC_GENESIS`
- *   - verifyAuditChain walks files in lex order; reaches the rotated
+ *   - the audit-chain scanner walks files in lex order; reaches the rotated
  *     file's tail (hmac=X), then reads the new audit.jsonl whose first
  *     line has `_prev = HMAC_GENESIS ≠ X` → reports `verified: false`
  *
  * That single false-positive corrodes the strongest trust signal in
- * the codebase. The fix: when `audit.jsonl` yields no chain head, fall
- * back to the most recent rotated file (newest-first by embedded
- * timestamp) so the in-memory `lastHmac` resumes correctly.
+ * the codebase. The writer now replays every log file oldest→newest under
+ * its cross-process lock, so the recovered tail naturally comes from the
+ * newest rotated file when `audit.jsonl` is absent.
  *
  * Strategy: build a tmpdir-rooted audit directory with one rotated file
- * containing a valid chained entry, NO audit.jsonl, then call the
- * exported `_testResumeChainHead()` and assert the recovered `lastHmac`
- * matches the rotated file's tail.
+ * containing a valid chained entry, NO audit.jsonl, then drive a real flush
+ * and assert the new row links to the rotated file's tail.
  *
  * We use `_testReset()` to clear module state between cases.
  */
@@ -116,6 +115,27 @@ describe('audit chain resume across rotation', () => {
     // If the fallback walked oldest-first or read all rotated files in
     // the wrong order, this would assert against `a`.
     expect(firstNewLine._prev).toBe(b);
+  });
+
+  test('orders historical and collision-safe rotation filenames by embedded timestamp', async () => {
+    const { sealed: oldLine, hmac: oldHmac } = seal(HMAC_GENESIS, {
+      timestamp: 'O1', tool: 'legacy_rotation_name', status: 'ok',
+    });
+    const { sealed: newLine, hmac: newHmac } = seal(oldHmac, {
+      timestamp: 'N1', tool: 'collision_safe_rotation_name', status: 'ok',
+    });
+    await writeFile(join(workDir, 'audit.1700000000111.jsonl'), `${oldLine}\n`, 'utf-8');
+    await writeFile(
+      join(workDir, 'audit.1700000000222.0.11111111-1111-4111-8111-111111111111.jsonl'),
+      `${newLine}\n`,
+      'utf-8',
+    );
+
+    auditLog({ timestamp: 'NEW', tool: 'fresh_after_mixed_names', status: 'ok' });
+    await _testFlush();
+
+    const firstNewLine = JSON.parse((await readFile(join(workDir, 'audit.jsonl'), 'utf-8')).trim());
+    expect(firstNewLine._prev).toBe(newHmac);
   });
 
   test('starts from genesis when neither audit.jsonl nor rotated files exist', async () => {

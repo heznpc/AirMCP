@@ -14,7 +14,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { cleanBootEnv } from "./lib/clean-boot-env.mjs";
-import { firstText, parseStructuredResult, startMcp } from "./lib/mcp-stdio-client.mjs";
+import { firstText, MCP_PROTOCOL_VERSION, parseStructuredResult, startMcp } from "./lib/mcp-stdio-client.mjs";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const ENTRY = join(ROOT, "dist", "index.js");
@@ -223,7 +223,7 @@ function bootCase(testCase) {
         const initResp = await client.request(
           "initialize",
           {
-            protocolVersion: "2025-06-18",
+            protocolVersion: MCP_PROTOCOL_VERSION,
             capabilities: {},
             clientInfo: { name: "airmcp-profile-verify", version: "0.0.0" },
           },

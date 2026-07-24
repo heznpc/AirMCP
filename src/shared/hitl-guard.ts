@@ -1,11 +1,96 @@
 import type { McpServer } from "./mcp.js";
 import type { AirMcpConfig, HitlLevel } from "./config.js";
-import type { HitlClient } from "./hitl.js";
-import { errPermission } from "./result.js";
+import type { HitlApprovalDecision, HitlClient } from "./hitl.js";
+import { errPermission, toolErr } from "./result.js";
 import { traceApproval } from "./telemetry.js";
+import { getRequestContext, runWithRequestContext, type RequestContext } from "./request-context.js";
+import { randomUUID } from "node:crypto";
+import {
+  getResourceGovernance,
+  isResourceTemplateRegistration,
+  resourceAuditName,
+  resourceRequestMetadata,
+} from "./resource-governance.js";
 
 /** Sentinel: elicitation offered no channel for this call — caller falls back. */
 const NOT_HANDLED = Symbol("hitl-elicitation-not-handled");
+
+export interface PendingApprovalAuditEvent {
+  /** Cryptographically random per-decision identity. Correlation IDs group a
+   * workflow; they are deliberately not authority for one specific call. */
+  approvalId: string;
+  timestamp: string;
+  tool: string;
+  decision: HitlApprovalDecision;
+  channel: "elicitation" | "socket" | "unavailable";
+  correlationId?: string;
+  actor?: string;
+}
+
+type ApprovalAuditSink = (event: PendingApprovalAuditEvent) => void | Promise<void>;
+
+interface ApprovalRequestContext extends RequestContext {
+  __airmcpApprovalAuditEvents?: PendingApprovalAuditEvent[];
+  __airmcpApprovalAuditSink?: ApprovalAuditSink;
+}
+
+function normalizeApprovalDecision(value: unknown): HitlApprovalDecision {
+  switch (value) {
+    case "approved":
+    case "denied":
+    case "timed_out":
+    case "unavailable":
+      return value;
+    default:
+      return "unavailable";
+  }
+}
+
+async function recordApprovalDecision(
+  tool: string,
+  decision: PendingApprovalAuditEvent["decision"],
+  channel: PendingApprovalAuditEvent["channel"],
+): Promise<void> {
+  const context = getRequestContext() as ApprovalRequestContext | undefined;
+  if (!context) return;
+  const event: PendingApprovalAuditEvent = {
+    approvalId: randomUUID(),
+    timestamp: new Date().toISOString(),
+    tool,
+    decision,
+    channel,
+    ...(context.correlationId ? { correlationId: context.correlationId } : {}),
+    ...(context.actor ? { actor: context.actor } : {}),
+  };
+  if (context.__airmcpApprovalAuditSink) {
+    await context.__airmcpApprovalAuditSink(event);
+    return;
+  }
+  const events = context.__airmcpApprovalAuditEvents ?? [];
+  events.push(event);
+  context.__airmcpApprovalAuditEvents = events;
+}
+
+/** Run a guarded handler with the registry-owned durable audit sink. The HITL
+ * wrapper awaits this sink before invoking an approved callback, so the
+ * approval row is sealed before any mutation can begin. */
+export function runWithApprovalAuditSink<T>(sink: ApprovalAuditSink, fn: () => T): T {
+  const context = getRequestContext() as ApprovalRequestContext | undefined;
+  const nextContext = {
+    ...(context ?? {}),
+    __airmcpApprovalAuditSink: sink,
+  } as ApprovalRequestContext;
+  return runWithRequestContext(nextContext, fn);
+}
+
+/** Consume decisions queued when HITL wrapped the registry rather than the
+ * registry wrapping HITL. Sharing and splicing the array keeps nested request
+ * contexts from replaying the same event. */
+export function consumeApprovalAuditEvents(): PendingApprovalAuditEvent[] {
+  const context = getRequestContext() as ApprovalRequestContext | undefined;
+  if (!context?.__airmcpApprovalAuditEvents?.length) return [];
+  return context.__airmcpApprovalAuditEvents.splice(0);
+}
 
 interface ToolAnnotations {
   readOnlyHint?: boolean;
@@ -155,8 +240,8 @@ async function tryElicitApproval(
 }
 
 /**
- * Monkey-patches server.registerTool so every subsequent registration
- * goes through HITL approval when the policy requires it.
+ * Monkey-patches server.registerTool and classified server.registerResource
+ * callbacks so both surfaces use the same per-call approval policy.
  *
  * Channel order (gated-call approval is preserved in every path — only the
  * channel that answers differs by what is actually available):
@@ -203,6 +288,7 @@ export function installHitlGuard(server: McpServer, hitlClient: HitlClient, conf
         if (telemetryEnabled) {
           traceApproval(name, elicitResult ? "approved" : "denied", "elicitation", { destructive, managed });
         }
+        await recordApprovalDecision(name, elicitResult ? "approved" : "denied", "elicitation");
         if (!elicitResult) {
           return errPermission(`Action denied: "${name}" was rejected via MCP elicitation.`);
         }
@@ -224,6 +310,7 @@ export function installHitlGuard(server: McpServer, hitlClient: HitlClient, conf
         if (telemetryEnabled) {
           traceApproval(name, "denied", "unavailable", { destructive, managed });
         }
+        await recordApprovalDecision(name, "unavailable", "unavailable");
         return errPermission(
           `Action denied: "${name}" requires approval for this call, but no approval channel is available. ` +
             `Start the AirMCP menubar app, use an MCP client that supports elicitation, ` +
@@ -233,20 +320,62 @@ export function installHitlGuard(server: McpServer, hitlClient: HitlClient, conf
 
       // Socket-based HITL (managed client with the app reachable, or fallback
       // for non-managed clients without elicitation support).
-      const approved = await hitlClient.requestApproval(
-        name,
-        toolArgs,
-        destructive,
-        annotations.openWorldHint ?? false,
-        sensitive,
-      );
-      if (telemetryEnabled) {
-        traceApproval(name, approved ? "approved" : "denied", "socket", { destructive, managed });
-      }
-      if (!approved) {
+      if (!(await hitlClient.isReachable())) {
+        if (telemetryEnabled) {
+          traceApproval(name, "denied", "unavailable", { destructive, managed });
+        }
+        await recordApprovalDecision(name, "unavailable", "unavailable");
         return errPermission(
-          `Action denied: "${name}" requires user approval. The user denied or did not respond in time.`,
+          `Action denied: "${name}" requires approval for this call, but the AirMCP approval socket is unavailable. ` +
+            `Start the AirMCP menubar app or use an MCP client that supports elicitation.`,
         );
+      }
+      const decisionClient = hitlClient as unknown as {
+        requestApprovalDecision?: (
+          tool: string,
+          args: Record<string, unknown>,
+          destructive: boolean,
+          openWorld: boolean,
+          sensitive?: boolean,
+        ) => Promise<HitlApprovalDecision>;
+      };
+      const rawDecision =
+        typeof decisionClient.requestApprovalDecision === "function"
+          ? await decisionClient.requestApprovalDecision.call(
+              hitlClient,
+              name,
+              toolArgs,
+              destructive,
+              annotations.openWorldHint ?? false,
+              sensitive,
+            )
+          : (await hitlClient.requestApproval(
+                name,
+                toolArgs,
+                destructive,
+                annotations.openWorldHint ?? false,
+                sensitive,
+              ))
+            ? "approved"
+            : "denied";
+      const decision = normalizeApprovalDecision(rawDecision);
+      if (telemetryEnabled) {
+        traceApproval(name, decision, "socket", { destructive, managed });
+      }
+      await recordApprovalDecision(name, decision, "socket");
+      if (decision === "timed_out") {
+        return toolErr("hitl_timeout", `Action denied: approval for "${name}" timed out before a decision.`);
+      }
+      if (decision === "unavailable") {
+        return errPermission(
+          `Action denied: the AirMCP approval socket became unavailable before "${name}" received a decision.`,
+        );
+      }
+      if (decision === "denied") {
+        return errPermission(`Action denied: "${name}" requires user approval. The user denied this call.`);
+      }
+      if (decision !== "approved") {
+        return errPermission(`Action denied: "${name}" did not receive a valid approval decision.`);
       }
       return (callback as (...a: unknown[]) => unknown)(...args);
     };
@@ -254,4 +383,145 @@ export function installHitlGuard(server: McpServer, hitlClient: HitlClient, conf
     return original(name, toolConfig as Parameters<typeof original>[1], wrapped as Parameters<typeof original>[2]);
   };
   server.registerTool = patched as typeof server.registerTool;
+
+  // Resource callbacks have a different wire contract from tool callbacks:
+  // returning `errPermission()` would be interpreted as a malformed
+  // ReadResourceResult. Denials therefore throw a categorized JSON-RPC error,
+  // while approved callbacks retain their native `{ contents: [...] }` shape.
+  if (typeof server.registerResource === "function") {
+    const originalResource = server.registerResource.bind(server);
+    const resourceDeny = (category: "permission_denied" | "hitl_timeout", message: string): never => {
+      throw new Error(`[${category}] ${message}`);
+    };
+    const wrapResource = (
+      governedName: string,
+      annotations: ToolAnnotations,
+      callback: (...args: unknown[]) => unknown,
+      isTemplate: boolean,
+    ) => {
+      const telemetryEnabled = process.env.AIRMCP_TELEMETRY === "true";
+      return async (...args: unknown[]) => {
+        const requestArgs = resourceRequestMetadata(args, isTemplate);
+        const sensitive = annotations.sensitiveHint === true;
+        const managed = isManagedClient(server);
+
+        const viaElicitation = async (): Promise<unknown> => {
+          const result = await tryElicitApproval(server, governedName, requestArgs, false, sensitive);
+          if (result === undefined) return NOT_HANDLED;
+          if (telemetryEnabled) {
+            traceApproval(governedName, result ? "approved" : "denied", "elicitation", {
+              destructive: false,
+              managed,
+            });
+          }
+          await recordApprovalDecision(governedName, result ? "approved" : "denied", "elicitation");
+          if (!result) {
+            return resourceDeny(
+              "permission_denied",
+              `Action denied: "${governedName}" was rejected via MCP elicitation.`,
+            );
+          }
+          return callback(...args);
+        };
+
+        if (!managed) {
+          const handled = await viaElicitation();
+          if (handled !== NOT_HANDLED) return handled;
+        } else if (!(await hitlClient.isReachable())) {
+          const handled = await viaElicitation();
+          if (handled !== NOT_HANDLED) return handled;
+          if (telemetryEnabled) {
+            traceApproval(governedName, "denied", "unavailable", { destructive: false, managed });
+          }
+          await recordApprovalDecision(governedName, "unavailable", "unavailable");
+          return resourceDeny(
+            "permission_denied",
+            `Action denied: "${governedName}" requires approval, but no approval channel is available. ` +
+              `Start the AirMCP menubar app or use an MCP client that supports elicitation.`,
+          );
+        }
+
+        if (!(await hitlClient.isReachable())) {
+          if (telemetryEnabled) {
+            traceApproval(governedName, "denied", "unavailable", { destructive: false, managed });
+          }
+          await recordApprovalDecision(governedName, "unavailable", "unavailable");
+          return resourceDeny(
+            "permission_denied",
+            `Action denied: "${governedName}" requires approval, but the AirMCP approval socket is unavailable.`,
+          );
+        }
+
+        const decisionClient = hitlClient as unknown as {
+          requestApprovalDecision?: (
+            tool: string,
+            requestArgs: Record<string, unknown>,
+            destructive: boolean,
+            openWorld: boolean,
+            sensitive?: boolean,
+          ) => Promise<HitlApprovalDecision>;
+        };
+        const rawDecision =
+          typeof decisionClient.requestApprovalDecision === "function"
+            ? await decisionClient.requestApprovalDecision.call(
+                hitlClient,
+                governedName,
+                requestArgs,
+                false,
+                false,
+                sensitive,
+              )
+            : (await hitlClient.requestApproval(governedName, requestArgs, false, false, sensitive))
+              ? "approved"
+              : "denied";
+        const decision = normalizeApprovalDecision(rawDecision);
+        if (telemetryEnabled) {
+          traceApproval(governedName, decision, "socket", { destructive: false, managed });
+        }
+        await recordApprovalDecision(governedName, decision, "socket");
+        if (decision === "timed_out") {
+          return resourceDeny(
+            "hitl_timeout",
+            `Action denied: approval for "${governedName}" timed out before a decision.`,
+          );
+        }
+        if (decision === "unavailable") {
+          return resourceDeny(
+            "permission_denied",
+            `Action denied: the approval channel became unavailable before "${governedName}" received a decision.`,
+          );
+        }
+        if (decision === "denied") {
+          return resourceDeny(
+            "permission_denied",
+            `Action denied: "${governedName}" requires user approval. The user denied this call.`,
+          );
+        }
+        if (decision !== "approved") {
+          return resourceDeny(
+            "permission_denied",
+            `Action denied: "${governedName}" did not receive a valid approval decision.`,
+          );
+        }
+        return callback(...args);
+      };
+    };
+
+    server.registerResource = ((name: string, ...rest: unknown[]) => {
+      const callback = rest[rest.length - 1];
+      if (typeof callback !== "function") {
+        return (originalResource as (...args: unknown[]) => unknown)(name, ...rest);
+      }
+      const resourceCallback = callback as (...args: unknown[]) => unknown;
+      const resourceConfig = rest.length >= 3 ? rest[rest.length - 2] : undefined;
+      const annotations = getResourceGovernance(resourceConfig);
+      const governedName = resourceAuditName(name);
+      if (!shouldRequireApproval(config.hitl.level, annotations, config.hitl.whitelist, governedName)) {
+        return (originalResource as (...args: unknown[]) => unknown)(name, ...rest);
+      }
+      const isTemplate = isResourceTemplateRegistration(rest[0]);
+      rest[rest.length - 1] = wrapResource(governedName, annotations, resourceCallback, isTemplate);
+      return (originalResource as (...args: unknown[]) => unknown)(name, ...rest);
+    }) as typeof server.registerResource;
+  }
 }

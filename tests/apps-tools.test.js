@@ -17,9 +17,10 @@ jest.unstable_mockModule('../dist/shared/jxa.js', () => ({ runJxa: mockRunJxa })
 
 // Capture the handlers the ext-apps SDK would register so we can invoke them.
 const appTools = new Map();
+const appResources = new Map();
 jest.unstable_mockModule('@modelcontextprotocol/ext-apps/server', () => ({
   registerAppTool: (_server, name, _def, handler) => appTools.set(name, handler),
-  registerAppResource: () => {},
+  registerAppResource: (_server, name, _uri, _def, handler) => appResources.set(name, handler),
   RESOURCE_MIME_TYPE: 'text/html+skybridge',
 }));
 
@@ -72,5 +73,16 @@ describe('Apps tools — untrusted egress fencing', () => {
     const result = await appTools.get('music_player')({});
     expectFenced(result, attack);
     expect(result.structuredContent.title).toBe(attack);
+  });
+
+  test('interactive resources bundle the MCP Apps client with an empty network CSP', async () => {
+    expect(appResources.size).toBe(3);
+    for (const handler of appResources.values()) {
+      const resource = (await handler()).contents[0];
+      expect(resource.text).toContain('globalThis.__AirMCPAppsApp=');
+      expect(resource.text).not.toContain('https://esm.sh');
+      expect(resource.text).not.toMatch(/import\s*\{\s*App\s*\}\s*from/);
+      expect(resource._meta.ui.csp).toEqual({ connectDomains: [], resourceDomains: [] });
+    }
   });
 });

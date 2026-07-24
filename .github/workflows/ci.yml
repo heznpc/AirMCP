@@ -197,6 +197,9 @@ jobs:
       - name: Swift — Build AirMCP menu bar app
         run: cd app && swift build
 
+      - name: Swift — Test AirMCP menu bar app
+        run: cd app && swift test
+
       - name: Swift — Test AirMCPKit
         run: cd swift && swift test
 

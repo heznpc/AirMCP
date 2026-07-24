@@ -22,7 +22,13 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { cleanBootEnv } from "./lib/clean-boot-env.mjs";
-import { expectNoWireError, firstText, parseStructuredResult, startMcp } from "./lib/mcp-stdio-client.mjs";
+import {
+  expectNoWireError,
+  firstText,
+  MCP_PROTOCOL_VERSION,
+  parseStructuredResult,
+  startMcp,
+} from "./lib/mcp-stdio-client.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const TIMEOUT_MS = Number(process.env.ADDON_INSTALL_VERIFY_TIMEOUT_MS ?? 45_000);
@@ -37,6 +43,12 @@ const PACK_ASSERTIONS = {
     describeTool: "numbers_set_cell",
     validationTool: "numbers_set_cell",
   },
+};
+
+const OPT_IN_PACK_ASSERTIONS = {
+  spatial: { enableEnv: "AIRMCP_ENABLE_SPATIAL_PREP", canaryTool: "list_vr_assets" },
+  webhooks: { enableEnv: "AIRMCP_ENABLE_WEBHOOKS", canaryTool: "webhook_listen_status" },
+  powerautomate: { enableEnv: "AIRMCP_ENABLE_POWERAUTOMATE", canaryTool: "cloudflow_trigger" },
 };
 
 let profileModulesByName = null;
@@ -120,10 +132,27 @@ async function getExpectedPackModules(packNames, packManifest, profile) {
     ...new Set(
       packNames.flatMap((packName) => {
         const pack = packManifest.find((candidate) => candidate.name === packName);
-        return (pack?.modules ?? []).filter((moduleName) => profileModules.has(moduleName));
+        const isExplicitOptIn = packName in OPT_IN_PACK_ASSERTIONS;
+        return (pack?.modules ?? []).filter((moduleName) => isExplicitOptIn || profileModules.has(moduleName));
       }),
     ),
   ];
+}
+
+function optInEnvironment(packNames) {
+  return Object.fromEntries(
+    packNames.flatMap((packName) => {
+      const assertion = OPT_IN_PACK_ASSERTIONS[packName];
+      return assertion ? [[assertion.enableEnv, "true"]] : [];
+    }),
+  );
+}
+
+function expectedCanaryTools(packNames) {
+  return packNames.flatMap((packName) => {
+    const assertion = OPT_IN_PACK_ASSERTIONS[packName];
+    return assertion ? [assertion.canaryTool] : [];
+  });
 }
 
 function getPackPackageName(packManifest, packName) {
@@ -133,11 +162,7 @@ function getPackPackageName(packManifest, packName) {
 function getAddonLoadFailureLines(stderr) {
   return stderr
     .split(/\r?\n/)
-    .filter(
-      (line) =>
-        line.includes("required add-on package module failed to load") ||
-        line.includes("Cannot find package '@heznpc/airmcp-"),
-    );
+    .filter((line) => line.includes("required add-on package module failed to load"));
 }
 
 function hasAddonLoadFailureForModule(stderr, moduleName) {
@@ -171,6 +196,7 @@ async function verifyInstalledRuntime({ work, entry, packNames, packManifest }) 
     AIRMCP_AUDIT_LOG: "false",
     AIRMCP_USAGE_TRACKING: "false",
     AIRMCP_PROACTIVE_CONTEXT: "false",
+    ...optInEnvironment(packNames),
   };
 
   const client = startMcp({ entry, cwd: work, env, timeoutMs: TIMEOUT_MS });
@@ -182,7 +208,7 @@ async function verifyInstalledRuntime({ work, entry, packNames, packManifest }) 
     const initResp = await client.request(
       "initialize",
       {
-        protocolVersion: "2025-06-18",
+        protocolVersion: MCP_PROTOCOL_VERSION,
         capabilities: {},
         clientInfo: { name: "airmcp-addon-install-verify", version: "0.0.0" },
       },
@@ -195,6 +221,11 @@ async function verifyInstalledRuntime({ work, entry, packNames, packManifest }) 
     const tools = listResp.result?.tools;
     if (!Array.isArray(tools) || tools.length < 10) {
       throw new Error(`tools/list malformed or too small: ${JSON.stringify(listResp)}`);
+    }
+    const toolNames = new Set(tools.map((tool) => tool.name));
+    const missingCanaries = expectedCanaryTools(packNames).filter((toolName) => !toolNames.has(toolName));
+    if (missingCanaries.length) {
+      throw new Error(`installed opt-in add-on canary tools are missing: ${missingCanaries.join(", ")}`);
     }
 
     const statusResp = await client.request("tools/call", { name: "profile_status", arguments: {} }, 3);
@@ -288,7 +319,7 @@ async function verifyInstalledRuntime({ work, entry, packNames, packManifest }) 
     };
   } catch (error) {
     const stderr = client.stderr();
-    if (/required add-on package module failed to load|Cannot find package '@heznpc\/airmcp-/.test(stderr)) {
+    if (stderr.includes("required add-on package module failed to load")) {
       throw new Error(
         `${error instanceof Error ? error.message : String(error)}\n--- stderr ---\n${stderr.slice(-4000)}`,
       );
@@ -315,6 +346,7 @@ async function verifyBundledFallbackRefused({ work, entry, packNames, packManife
     AIRMCP_AUDIT_LOG: "false",
     AIRMCP_USAGE_TRACKING: "false",
     AIRMCP_PROACTIVE_CONTEXT: "false",
+    ...optInEnvironment(packNames),
   };
 
   const client = startMcp({ entry, cwd: work, env, timeoutMs: TIMEOUT_MS });
@@ -326,7 +358,7 @@ async function verifyBundledFallbackRefused({ work, entry, packNames, packManife
     const initResp = await client.request(
       "initialize",
       {
-        protocolVersion: "2025-06-18",
+        protocolVersion: MCP_PROTOCOL_VERSION,
         capabilities: {},
         clientInfo: { name: "airmcp-addon-negative-verify", version: "0.0.0" },
       },
@@ -373,7 +405,7 @@ async function verifyBundledFallbackRefused({ work, entry, packNames, packManife
     return { tools: tools.length, registered: status.toolsRegistered, modulesEnabled: status.modulesEnabled };
   } catch (error) {
     const stderr = client.stderr();
-    if (/required add-on package module failed to load|Cannot find package '@heznpc\/airmcp-/.test(stderr)) {
+    if (stderr.includes("required add-on package module failed to load")) {
       throw new Error(
         `${error instanceof Error ? error.message : String(error)}\n--- stderr ---\n${stderr.slice(-4000)}`,
       );

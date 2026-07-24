@@ -5,6 +5,7 @@ import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import { cleanBootEnv } from "../scripts/lib/clean-boot-env.mjs";
 import { probeAppRuntimeMcp } from "../dist/cli/app-runtime-probe.js";
+import { shouldAutoLaunchApp } from "../dist/cli/connect.js";
 
 const DIST = fileURLToPath(new URL("../dist/index.js", import.meta.url));
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
@@ -152,6 +153,15 @@ afterEach(async () => {
 });
 
 describe("airmcp connect", () => {
+  test("auto-launch is scoped to the app-owned default loopback endpoint", () => {
+    if (process.platform === "darwin") {
+      expect(shouldAutoLaunchApp("http://127.0.0.1:3847/mcp")).toBe(true);
+      expect(shouldAutoLaunchApp("http://localhost:3847/mcp")).toBe(true);
+    }
+    expect(shouldAutoLaunchApp("http://127.0.0.1:9999/mcp")).toBe(false);
+    expect(shouldAutoLaunchApp("https://example.com/mcp")).toBe(false);
+  });
+
   test("app runtime probe performs initialize and tools/list over token-gated HTTP", async () => {
     const port = await getFreePort();
     const token = "test-runtime-token";

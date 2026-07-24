@@ -7,7 +7,7 @@
 # Required environment (set in GitHub Actions secrets for the CD workflow):
 #   APPLE_DEVELOPER_ID          — Developer ID Application certificate
 #                                 common name, e.g. "Developer ID Application:
-#                                 Jane Doe (A1B2C3D4E5)"
+#                                 Heznpc (TEAMID)"
 #   APPLE_ID                    — Apple ID email for notarytool
 #   APPLE_ID_PASSWORD           — app-specific password
 #                                 (appleid.apple.com → sign-in and security)
@@ -39,7 +39,7 @@ APP_BUNDLE="${APP_BUNDLE_PATH:-$PROJECT_DIR/AirMCP.app}"
 
 # ── Preconditions ────────────────────────────────────────────────────
 if [ ! -d "$APP_BUNDLE" ]; then
-  echo "notarize-app: $APP_BUNDLE not found — run scripts/bundle-app.sh first" >&2
+  echo "notarize-app: app bundle not found — run scripts/bundle-app.sh first" >&2
   exit 1
 fi
 
@@ -57,12 +57,18 @@ if [ "${SKIP_NOTARIZATION:-}" != "1" ]; then
   need_var APPLE_TEAM_ID
 fi
 
+# The certificate subject is public in every distributed binary. Refuse to
+# sign before both the configured identity and the installed certificate prove
+# that all human-readable subject fields use the Heznpc public identity.
+AIRMCP_SIGNING_KEYCHAIN="${AIRMCP_SIGNING_KEYCHAIN:-}" \
+  bash "$SCRIPT_DIR/verify-signing-identity.sh"
+
 # ── Codesign with Developer ID (replaces the ad-hoc sign) ────────────
 # --deep signs embedded plugins/frameworks too (AirMCP.app carries
 # AirMCPWidget.appex). --options=runtime enables hardened runtime,
 # which notarytool requires. --timestamp embeds a trusted timestamp
 # (notarization rejects un-timestamped signatures).
-echo "notarize-app: codesigning with $APPLE_DEVELOPER_ID …"
+echo "notarize-app: codesigning with the verified Heznpc Developer ID …"
 
 # Each embedded .appex carries its own entitlements (e.g. an app-group so the
 # widget can read the host app's shared container). `codesign --remove-signature`
@@ -74,31 +80,56 @@ echo "notarize-app: codesigning with $APPLE_DEVELOPER_ID …"
 # subshells, keyed by a hash of the appex path.)
 ENT_DIR="$(mktemp -d)"
 trap 'rm -rf "$ENT_DIR"' EXIT
-find "$APP_BUNDLE" -name "*.appex" -print0 | while IFS= read -r -d '' appex; do
+find "$APP_BUNDLE" -name "*.appex" -print0 2>/dev/null | while IFS= read -r -d '' appex; do
   ent_file="$ENT_DIR/$(printf '%s' "$appex" | shasum -a 256 | cut -d' ' -f1).plist"
   if codesign -d --entitlements - --xml "$appex" > "$ent_file" 2>/dev/null && plutil -lint "$ent_file" >/dev/null 2>&1; then
-    echo "  preserved entitlements: $appex"
+    echo "  preserved entitlements for embedded extension"
   else
     rm -f "$ent_file" # no (valid) entitlements present — re-sign without
   fi
   codesign --remove-signature "$appex" 2>/dev/null || true
 done
+
+# The self-contained app embeds executable Node and Swift bridge binaries.
+# They are nested code and must receive the same Developer ID + hardened
+# runtime treatment before the outer bundle is signed.
+for nested in \
+  "$APP_BUNDLE/Contents/Resources/airmcp/runtime/bin/node" \
+  "$APP_BUNDLE/Contents/Resources/airmcp/bin/AirMcpBridge"; do
+  if [ ! -x "$nested" ]; then
+    echo "notarize-app: required embedded executable missing" >&2
+    exit 1
+  fi
+  echo "  signing embedded executable"
+  if ! codesign --force --options=runtime --timestamp \
+    --sign "$APPLE_DEVELOPER_ID" \
+    "$nested" >/dev/null 2>&1; then
+    echo "notarize-app: embedded executable signing failed" >&2
+    exit 1
+  fi
+done
 codesign --remove-signature "$APP_BUNDLE" 2>/dev/null || true
 
 # Sign embedded extensions first (innermost-out), re-applying the entitlements
 # preserved above so the widget keeps its app-group / capabilities.
-find "$APP_BUNDLE" -name "*.appex" -print0 | while IFS= read -r -d '' appex; do
-  echo "  signing $appex"
+find "$APP_BUNDLE" -name "*.appex" -print0 2>/dev/null | while IFS= read -r -d '' appex; do
+  echo "  signing embedded extension"
   ent_file="$ENT_DIR/$(printf '%s' "$appex" | shasum -a 256 | cut -d' ' -f1).plist"
   if [ -f "$ent_file" ]; then
     codesign --force --options=runtime --timestamp \
       --entitlements "$ent_file" \
       --sign "$APPLE_DEVELOPER_ID" \
-      "$appex"
+      "$appex" >/dev/null 2>&1 || {
+        echo "notarize-app: extension signing failed" >&2
+        exit 1
+      }
   else
     codesign --force --options=runtime --timestamp \
       --sign "$APPLE_DEVELOPER_ID" \
-      "$appex"
+      "$appex" >/dev/null 2>&1 || {
+        echo "notarize-app: extension signing failed" >&2
+        exit 1
+      }
   fi
 done
 
@@ -107,13 +138,16 @@ done
 # them WITHOUT entitlements, silently undoing that preservation. The
 # `codesign --verify --deep --strict` below still validates the whole tree, so
 # any nested code that genuinely went unsigned is caught loudly, not shipped.
-codesign --force --options=runtime --timestamp \
+if ! codesign --force --options=runtime --timestamp \
   --sign "$APPLE_DEVELOPER_ID" \
-  "$APP_BUNDLE"
+  "$APP_BUNDLE" >/dev/null 2>&1; then
+  echo "notarize-app: outer bundle signing failed" >&2
+  exit 1
+fi
 
 # ── Verify signature before submitting to Apple ─────────────────────
 echo "notarize-app: verifying signature …"
-codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE" || {
+codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE" >/dev/null 2>&1 || {
   echo "notarize-app: codesign verification failed — refusing to submit" >&2
   exit 1
 }
@@ -126,43 +160,81 @@ fi
 # ── Notarize via notarytool ─────────────────────────────────────────
 # notarytool needs a .zip or .dmg, not an .app directory directly.
 ZIP_PATH="$PROJECT_DIR/AirMCP-notarize.zip"
-echo "notarize-app: zipping $APP_BUNDLE → $ZIP_PATH"
+echo "notarize-app: preparing notarization archive"
 rm -f "$ZIP_PATH"
-ditto -c -k --keepParent "$APP_BUNDLE" "$ZIP_PATH"
+if ! ditto -c -k --keepParent "$APP_BUNDLE" "$ZIP_PATH" >/dev/null 2>&1; then
+  echo "notarize-app: notarization archive creation failed" >&2
+  exit 1
+fi
 
 echo "notarize-app: submitting to Apple (this takes 2-10 minutes) …"
+set +e
 SUBMIT_OUTPUT="$(
   xcrun notarytool submit "$ZIP_PATH" \
     --apple-id "$APPLE_ID" \
     --password "$APPLE_ID_PASSWORD" \
     --team-id "$APPLE_TEAM_ID" \
-    --wait 2>&1
+    --wait \
+    --output-format json 2>&1
 )"
-echo "$SUBMIT_OUTPUT"
+SUBMIT_EXIT=$?
+set -e
 
-# notarytool --wait prints "status: Accepted" on success. Anything else
-# (Rejected / Invalid) is a hard fail; we surface the log URL so a
-# human can read the rejection reasons.
-if ! echo "$SUBMIT_OUTPUT" | grep -q "status: Accepted"; then
-  echo "notarize-app: notarization failed — see log URL above" >&2
-  SUBMISSION_ID="$(echo "$SUBMIT_OUTPUT" | awk '/id:/{print $2; exit}')"
-  if [ -n "$SUBMISSION_ID" ]; then
-    echo "notarize-app: fetching detailed log for submission $SUBMISSION_ID …" >&2
-    xcrun notarytool log "$SUBMISSION_ID" \
-      --apple-id "$APPLE_ID" \
-      --password "$APPLE_ID_PASSWORD" \
-      --team-id "$APPLE_TEAM_ID" >&2 || true
+NOTARY_STATUS="$(printf '%s' "$SUBMIT_OUTPUT" | node -e '
+  let input = "";
+  process.stdin.on("data", chunk => { input += chunk; });
+  process.stdin.on("end", () => {
+    try { process.stdout.write(String(JSON.parse(input).status ?? "")); } catch {}
+  });
+')"
+SUBMISSION_ID="$(printf '%s' "$SUBMIT_OUTPUT" | node -e '
+  let input = "";
+  process.stdin.on("data", chunk => { input += chunk; });
+  process.stdin.on("end", () => {
+    try { process.stdout.write(String(JSON.parse(input).id ?? "")); } catch {}
+  });
+')"
+
+# notarytool --wait reports `Accepted` on success. Anything else is a hard
+# failure. Fetch the private issue log only to emit sanitized code and
+# AirMCP.app-relative coordinates; never print its URL, submission ID, account,
+# team, certificate subject, or raw messages into the public Actions log.
+if [ "$SUBMIT_EXIT" -ne 0 ] || [ "$NOTARY_STATUS" != "Accepted" ]; then
+  echo "notarize-app: notarization failed; raw account, certificate, and submission metadata is suppressed" >&2
+  if [[ "$SUBMISSION_ID" =~ ^[0-9A-Fa-f-]{36}$ ]]; then
+    set +e
+    NOTARY_LOG="$(
+      xcrun notarytool log "$SUBMISSION_ID" \
+        --apple-id "$APPLE_ID" \
+        --password "$APPLE_ID_PASSWORD" \
+        --team-id "$APPLE_TEAM_ID" \
+        --output-format json 2>/dev/null
+    )"
+    LOG_EXIT=$?
+    set -e
+    if [ "$LOG_EXIT" -eq 0 ]; then
+      printf '%s' "$NOTARY_LOG" | node "$SCRIPT_DIR/sanitize-notary-log.mjs" || true
+    fi
   fi
   exit 2
 fi
+echo "notarize-app: notarization accepted"
 
 # ── Staple the ticket onto the .app so Gatekeeper works offline ─────
 # Without stapling, first-launch requires an internet connection to
 # fetch the notarization verdict from Apple. Stapling embeds the
 # verdict so the app opens on a fresh Mac with no network.
 echo "notarize-app: stapling notarization ticket …"
-xcrun stapler staple "$APP_BUNDLE"
-xcrun stapler validate "$APP_BUNDLE"
+if ! xcrun stapler staple "$APP_BUNDLE" >/dev/null 2>&1; then
+  echo "notarize-app: ticket stapling failed" >&2
+  exit 1
+fi
+if ! xcrun stapler validate "$APP_BUNDLE" >/dev/null 2>&1; then
+  echo "notarize-app: stapled ticket validation failed" >&2
+  exit 1
+fi
 
 rm -f "$ZIP_PATH"
-echo "notarize-app: ✓ $APP_BUNDLE signed, notarized, and stapled"
+echo "notarize-app: running final signed-artifact verification …"
+APP_BUNDLE_PATH="$APP_BUNDLE" bash "$SCRIPT_DIR/verify-signed-app.sh"
+echo "notarize-app: ✓ artifact signed, notarized, stapled, and runtime-verified"

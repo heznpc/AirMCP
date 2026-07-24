@@ -23,12 +23,7 @@
 // http-transport.ts so this module stays free of Express / MCP SDK
 // dependencies — tests can load it without mocking either.
 type AllowNetwork =
-  | "loopback-only"
-  | "with-token"
-  | "with-token+origin"
-  | "with-oauth"
-  | "with-oauth+origin"
-  | "unauthenticated";
+  "loopback-only" | "with-token" | "with-token+origin" | "with-oauth" | "with-oauth+origin" | "unauthenticated";
 
 export interface ServerCardInput {
   /** npm package name, used as the card's primary identifier. */
@@ -129,13 +124,6 @@ export function buildOAuthProtectedResourceCard(audience: string, issuer: string
     bearer_methods_supported: ["header"],
     resource_signing_alg_values_supported: ["RS256", "ES256"],
     scopes_supported: [...SCOPES_SUPPORTED],
-    // SEP-985 alignment with RFC 9728 §2: clients can negotiate DPoP
-    // sender-constrained tokens. AirMCP does not currently bind tokens
-    // to a DPoP proof — `dpop_bound_access_tokens_required: false`
-    // declares this honestly so a future SEP can flip the flag without
-    // renegotiating the discovery contract.
-    dpop_signing_alg_values_supported: ["ES256", "RS256"],
-    dpop_bound_access_tokens_required: false,
     // RFC 9728 §2 standard fields. Operators with a privacy policy / docs
     // can override via env (AIRMCP_OAUTH_RESOURCE_DOCS,
     // AIRMCP_OAUTH_RESOURCE_POLICY); the discovery card omits the field
@@ -147,5 +135,33 @@ export function buildOAuthProtectedResourceCard(audience: string, issuer: string
       ? { resource_policy_uri: process.env.AIRMCP_OAUTH_RESOURCE_POLICY }
       : {}),
     ...(process.env.AIRMCP_OAUTH_RESOURCE_TOS ? { resource_tos_uri: process.env.AIRMCP_OAUTH_RESOURCE_TOS } : {}),
+  };
+}
+
+export interface OAuthAuthorizationServerMetadataInput {
+  issuer: string;
+  authorizationEndpoint: string;
+  tokenEndpoint: string;
+  /** Exact operator-configured RFC 8414 capability. Public PKCE clients use
+   *  `none`; confidential deployments must explicitly advertise their real
+   *  method(s) instead of inheriting that default. */
+  tokenEndpointAuthMethodsSupported: string[];
+}
+
+/** RFC 8414 authorization-server metadata for co-hosted or reverse-proxied
+ *  deployments. Endpoint values are operator configuration: AirMCP does not
+ *  implement an authorization server or synthesize OAuth endpoints. */
+export function buildOAuthAuthorizationServerMetadata(
+  input: OAuthAuthorizationServerMetadataInput,
+): Record<string, unknown> {
+  return {
+    issuer: input.issuer,
+    authorization_endpoint: input.authorizationEndpoint,
+    token_endpoint: input.tokenEndpoint,
+    token_endpoint_auth_methods_supported: [...input.tokenEndpointAuthMethodsSupported],
+    response_types_supported: ["code"],
+    grant_types_supported: ["authorization_code"],
+    code_challenge_methods_supported: ["S256"],
+    scopes_supported: [...SCOPES_SUPPORTED],
   };
 }

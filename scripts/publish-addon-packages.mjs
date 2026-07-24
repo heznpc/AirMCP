@@ -11,6 +11,12 @@ import { existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  assertPublishedIdentity,
+  inspectLocalPackage,
+  queryPublishedIdentity,
+  waitForPublishedIdentity,
+} from "./lib/publish-identity.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const MANIFEST_PATH = join(ROOT, "build", "addons", "manifest.json");
@@ -165,19 +171,47 @@ function verifyPackageDirFallback(pack) {
   return join(ROOT, "build", "addons", packageDirName(pack.packageName), "package");
 }
 
-function isVersionPublished(packageName, version) {
-  const result = runCaptured("npm", ["view", `${packageName}@${version}`, "version"]);
-  return result.status === 0 && result.stdout.trim() === version;
+function expectedReleaseGitHead() {
+  const explicit = (process.env.AIRMCP_RELEASE_SHA ?? "").trim();
+  if (explicit) {
+    if (!/^[0-9a-f]{40}$/i.test(explicit)) fail("AIRMCP_RELEASE_SHA must be a full Git commit SHA");
+    return explicit;
+  }
+  const result = runCaptured("git", ["rev-parse", "HEAD"]);
+  if (result.status !== 0 || !/^[0-9a-f]{40}$/i.test(result.stdout.trim())) {
+    fail("could not resolve the expected release Git SHA");
+  }
+  return result.stdout.trim();
 }
 
-function publishPackage({ packageRoot, pack, args, version }) {
+function verifyRegistryIdentity(local, expectedGitHead, { retryAfterPublish = false } = {}) {
+  if (retryAfterPublish) {
+    waitForPublishedIdentity({ local, expectedGitHead, timeoutMs: 60_000 });
+    return true;
+  }
+  const published = queryPublishedIdentity(local.name, local.version);
+  if (!published) return false;
+  assertPublishedIdentity({ local, published, expectedGitHead });
+  return true;
+}
+
+function publishPackage({ packageRoot, pack, args, version, expectedGitHead }) {
   const npmArgs = ["publish", "--access", args.access, "--tag", args.tag];
   if (!args.publish) npmArgs.push("--dry-run");
   if (args.publish && args.provenance) npmArgs.push("--provenance");
 
-  if (isVersionPublished(pack.packageName, version)) {
-    console.log(`[addons:publish] skip ${pack.packageName}@${version} — already published`);
-    return;
+  const local = inspectLocalPackage(packageRoot);
+  if (local.name !== pack.packageName || local.version !== version) {
+    fail(`${pack.name} local tarball identity does not match the staged manifest`);
+  }
+
+  try {
+    if (verifyRegistryIdentity(local, expectedGitHead)) {
+      console.log(`[addons:publish] skip ${pack.packageName}@${version} — registry SRI and gitHead match`);
+      return;
+    }
+  } catch (error) {
+    fail(error instanceof Error ? error.message : String(error));
   }
 
   console.log(`[addons:publish] ${args.publish ? "publish" : "dry-run"} ${pack.packageName}`);
@@ -185,13 +219,27 @@ function publishPackage({ packageRoot, pack, args, version }) {
   if (result.status === 0) {
     if (result.stdout) process.stdout.write(result.stdout);
     if (result.stderr) process.stderr.write(result.stderr);
+    if (args.publish) {
+      try {
+        verifyRegistryIdentity(local, expectedGitHead, { retryAfterPublish: true });
+      } catch (error) {
+        fail(error instanceof Error ? error.message : String(error));
+      }
+    }
     return;
   }
 
   const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
   if (output.includes(`previously published versions: ${version}`)) {
-    console.log(`[addons:publish] skip ${pack.packageName}@${version} — already published`);
-    return;
+    try {
+      if (verifyRegistryIdentity(local, expectedGitHead, { retryAfterPublish: true })) {
+        console.log(`[addons:publish] skip ${pack.packageName}@${version} — registry SRI and gitHead match`);
+        return;
+      }
+    } catch (error) {
+      fail(error instanceof Error ? error.message : String(error));
+    }
+    fail(`${pack.packageName}@${version} became occupied but its registry identity is unavailable`);
   }
   if (result.stdout) process.stdout.write(result.stdout);
   if (result.stderr) process.stderr.write(result.stderr);
@@ -210,6 +258,7 @@ function main() {
 
   const manifest = loadManifest();
   const selected = selectPackages(manifest, args.packs);
+  const expectedGitHead = expectedReleaseGitHead();
   if (!selected.length) fail("no add-on packages selected");
 
   if (!args.skipVerify) {
@@ -227,7 +276,7 @@ function main() {
   for (const pack of selected) {
     let packageRoot = verifyStagedPackage(manifest, pack);
     if (!existsSync(packageRoot)) packageRoot = verifyPackageDirFallback(pack);
-    publishPackage({ packageRoot, pack, args, version: manifest.version });
+    publishPackage({ packageRoot, pack, args, version: manifest.version, expectedGitHead });
   }
 
   console.log(`ok: ${args.publish ? "published" : "dry-run checked"} ${selected.length} add-on package(s)`);

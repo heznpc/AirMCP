@@ -13,7 +13,12 @@ import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, write
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { expectNoWireError, parseStructuredResult, startMcp } from "./lib/mcp-stdio-client.mjs";
+import {
+  expectNoWireError,
+  MCP_PROTOCOL_VERSION,
+  parseStructuredResult,
+  startMcp,
+} from "./lib/mcp-stdio-client.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const BUILD_DIR = join(ROOT, "build", "addons");
@@ -193,7 +198,7 @@ async function bootForStatus({ entry, work, env, packName, expectInstalled }) {
     const initResp = await client.request(
       "initialize",
       {
-        protocolVersion: "2025-06-18",
+        protocolVersion: MCP_PROTOCOL_VERSION,
         capabilities: {},
         clientInfo: { name: "airmcp-first-user-addon-drill", version: "0.0.0" },
       },

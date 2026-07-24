@@ -9,6 +9,7 @@ jest.unstable_mockModule('../dist/shared/jxa.js', () => ({
 const { resourceCache } = await import('../dist/shared/cache.js');
 const { MODULE_NAMES } = await import('../dist/shared/config.js');
 const { buildSnapshot, registerResources } = await import('../dist/shared/resources.js');
+const { getResourceGovernance } = await import('../dist/shared/resource-governance.js');
 const { UNTRUSTED_CONTENT_META } = await import('../dist/shared/untrusted.js');
 
 function createResourceServer() {
@@ -188,6 +189,8 @@ describe('registerResources untrusted metadata', () => {
     ]);
 
     const resource = server.resources.get('recent-notes');
+    expect(getResourceGovernance(resource.config)).toMatchObject({ sensitiveHint: true, readOnlyHint: true });
+    expect(resource.config._meta).toBeUndefined();
     const result = await resource.callback(new URL('notes://recent'));
 
     expect(result._meta).toEqual(expect.objectContaining(UNTRUSTED_CONTENT_META));
@@ -200,6 +203,8 @@ describe('registerResources untrusted metadata', () => {
     registerResources(server, configWithEnabledModules([]));
 
     const resource = server.resources.get('context-snapshot-depth');
+    expect(getResourceGovernance(resource.config)).toMatchObject({ sensitiveHint: true, readOnlyHint: true });
+    expect(resource.config._meta).toBeUndefined();
     const result = await resource.callback(new URL('context://snapshot/full'), { depth: 'full' });
     const parsed = JSON.parse(result.contents[0].text);
 

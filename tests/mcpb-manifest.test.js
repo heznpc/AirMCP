@@ -15,10 +15,12 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const template = readFileSync(join(ROOT, "mcpb", "manifest.template.json"), "utf-8");
 
 function render(version = "9.9.9", description = "Test description") {
-  const rendered = template
-    .replaceAll("{{VERSION}}", version)
-    .replaceAll("{{DESCRIPTION}}", description.replace(/"/g, '\\"'));
-  return JSON.parse(rendered);
+  const manifest = JSON.parse(template);
+  expect(manifest.version).toBe("{{VERSION}}");
+  expect(manifest.description).toBe("{{DESCRIPTION}}");
+  manifest.version = version;
+  manifest.description = description;
+  return manifest;
 }
 
 describe("mcpb manifest template — MCPB v0.3 required fields", () => {
@@ -40,8 +42,11 @@ describe("mcpb manifest template — MCPB v0.3 required fields", () => {
     expect(render("2.11.0-rc.1").version).toBe("2.11.0-rc.1");
   });
 
-  test("description substituted from {{DESCRIPTION}} with quote-escape", () => {
+  test("description is assigned without hand-escaped JSON fragments", () => {
     expect(render("1.0.0", 'Say "hi"').description).toBe('Say "hi"');
+    const description = 'Windows path C:\\AirMCP\nsecond line\t"quoted"';
+    const rendered = render("1.0.0", description);
+    expect(JSON.parse(JSON.stringify(rendered)).description).toBe(description);
   });
 
   test("author.name is required and non-empty", () => {
@@ -144,7 +149,7 @@ describe("mcpb manifest template — tools_generated / prompts_generated", () =>
 
 describe("mcpb manifest template — well-formedness", () => {
   test("renders to valid JSON with no leftover template placeholders", () => {
-    const rendered = template.replaceAll("{{VERSION}}", "1.0.0").replaceAll("{{DESCRIPTION}}", "test");
+    const rendered = JSON.stringify(render("1.0.0", "test"));
     expect(rendered).not.toContain("{{");
     expect(() => JSON.parse(rendered)).not.toThrow();
   });

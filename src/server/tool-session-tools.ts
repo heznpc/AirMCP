@@ -3,7 +3,7 @@ import type { McpServer } from "../shared/mcp.js";
 import { errInvalidInput, errNotFound, errUpstream, okStructured } from "../shared/result.js";
 import type { AirMcpConfig } from "../shared/config.js";
 import type { HarnessAdapterPolicy } from "../shared/task-adapters.js";
-import { ToolInputValidationError, toolRegistry } from "../shared/tool-registry.js";
+import { ToolInputValidationError, type ToolRegistry } from "../shared/tool-registry.js";
 import { TOOL_SESSION_CONTROL_TOOLS, toolSessions } from "../shared/tool-sessions.js";
 import { isToolSearchIndexed, semanticToolSearch } from "../shared/tool-search.js";
 import { usageTracker } from "../shared/usage-tracker.js";
@@ -12,10 +12,11 @@ import { generateProactiveContext } from "../shared/proactive.js";
 export interface RegisterToolSessionToolsOptions {
   config: AirMcpConfig;
   harness: HarnessAdapterPolicy;
+  toolRegistry: ToolRegistry;
 }
 
 export function registerToolSessionTools(server: McpServer, options: RegisterToolSessionToolsOptions): void {
-  const { config, harness } = options;
+  const { config, harness, toolRegistry } = options;
 
   server.registerTool(
     "start_tool_session",
@@ -226,12 +227,12 @@ export function registerToolSessionTools(server: McpServer, options: RegisterToo
         descriptionMode: harness.discoveryDescriptionMode,
       });
 
-      if (substringResults.length >= 3 || !isToolSearchIndexed()) {
+      if (substringResults.length >= 3 || !isToolSearchIndexed(toolRegistry)) {
         const result = { query, matches: substringResults, total: substringResults.length, method: "keyword" };
         return okStructured(result);
       }
 
-      const semanticResults = (await semanticToolSearch(query, maxResults)).filter(
+      const semanticResults = (await semanticToolSearch(query, maxResults, undefined, toolRegistry)).filter(
         (result) => !allowedToolNames || allowedToolNames.has(result.name),
       );
 

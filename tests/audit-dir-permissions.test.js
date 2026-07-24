@@ -11,23 +11,33 @@
 import { describe, test, expect, beforeEach, jest } from "@jest/globals";
 
 const appendFile = jest.fn();
+const link = jest.fn();
+const lstat = jest.fn();
 const mkdir = jest.fn();
+const open = jest.fn();
+const rm = jest.fn();
 const stat = jest.fn();
 const chmod = jest.fn();
 const rename = jest.fn();
 const readFile = jest.fn();
 const readdir = jest.fn();
 const writeFile = jest.fn();
+const unlink = jest.fn();
 
 jest.unstable_mockModule("node:fs/promises", () => ({
   appendFile,
+  link,
+  lstat,
   mkdir,
+  open,
+  rm,
   stat,
   chmod,
   rename,
   readFile,
   readdir,
   writeFile,
+  unlink,
 }));
 
 const { auditLog, _testReset, _testFlush } = await import("../dist/shared/audit.js");
@@ -35,22 +45,32 @@ const { auditLog, _testReset, _testFlush } = await import("../dist/shared/audit.
 beforeEach(() => {
   _testReset();
   appendFile.mockReset();
+  link.mockReset();
+  lstat.mockReset();
   mkdir.mockReset();
+  open.mockReset();
+  rm.mockReset();
   stat.mockReset();
   chmod.mockReset();
   rename.mockReset();
   readFile.mockReset();
   readdir.mockReset();
   writeFile.mockReset();
+  unlink.mockReset();
 
   appendFile.mockResolvedValue(undefined);
+  link.mockResolvedValue(undefined);
+  lstat.mockRejectedValue(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
   mkdir.mockResolvedValue(undefined);
+  open.mockImplementation(() => Promise.resolve({ sync: jest.fn(async () => {}), close: jest.fn(async () => {}) }));
+  rm.mockResolvedValue(undefined);
   stat.mockRejectedValue(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
   chmod.mockResolvedValue(undefined);
   rename.mockResolvedValue(undefined);
   readFile.mockRejectedValue(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
-  readdir.mockRejectedValue(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
+  readdir.mockResolvedValue([]);
   writeFile.mockResolvedValue(undefined);
+  unlink.mockResolvedValue(undefined);
 });
 
 describe("audit directory permissions", () => {
@@ -64,5 +84,6 @@ describe("audit directory permissions", () => {
     );
     expect(dirCall).toBeDefined();
     expect(dirCall[1].mode).toBe(0o700);
+    expect(chmod).toHaveBeenCalledWith(expect.any(String), 0o700);
   });
 });

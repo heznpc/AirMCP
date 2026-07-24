@@ -4,37 +4,86 @@ import AppKit
 // MARK: - Localization Helper
 
 func L(_ key: String) -> String {
-    NSLocalizedString(key, bundle: .module, comment: "")
+    let localized = Bundle.module.localizedString(forKey: key, value: nil, table: nil)
+    if localized != key { return localized }
+
+    guard let path = Bundle.module.path(forResource: "en", ofType: "lproj"),
+          let englishBundle = Bundle(path: path)
+    else { return key }
+    return englishBundle.localizedString(forKey: key, value: key, table: nil)
 }
 
 func L(_ key: String, _ args: CVarArg...) -> String {
-    String(format: NSLocalizedString(key, bundle: .module, comment: ""), arguments: args)
+    String(format: L(key), arguments: args)
 }
 
 // MARK: - Shared Constants
 
 enum AirMcpConstants {
     static let npmPackageName = "airmcp"
-    static let npmPackageVersion = "2.15.0"
+    static let npmPackageVersion = "2.16.0"
     static var npmPackageSpecifier: String {
         ProcessInfo.processInfo.environment["AIRMCP_NPM_PACKAGE_SPECIFIER"]
             ?? "\(npmPackageName)@\(npmPackageVersion)"
     }
-    static let mcpProtocolVersion = "2025-03-26"
+    static let mcpProtocolVersion = "2025-11-25"
     static let appOwnedHttpPort = 3847
     static let appOwnedHttpURL = "http://127.0.0.1:\(appOwnedHttpPort)/mcp"
     static let appOwnedHealthURL = "http://127.0.0.1:\(appOwnedHttpPort)/health"
+    static let appOwnedRuntimeStateURL = "http://127.0.0.1:\(appOwnedHttpPort)/app/runtime-state"
     static let keyAutoStart = "autoStartServer"
     static let keyOnboardingCompleted = "onboardingCompleted"
+    static let keyOnboardingPresented = "onboardingPresented"
+    static let keyOnboardingStep = "onboardingCurrentStep"
+    static let keyOnboardingDraft = "onboardingDraft"
     static let envForceAppRuntime = "AIRMCP_FORCE_APP_RUNTIME"
+    static let envShowOnboarding = "AIRMCP_SHOW_ONBOARDING"
+    static let trustCenterWindowID = "trust-center"
+
+    private static var bundledRuntimeRoot: URL? {
+        Bundle.main.resourceURL?.appendingPathComponent("airmcp", isDirectory: true)
+    }
+
+    static var bundledNodePath: String? {
+        guard let path = bundledRuntimeRoot?.appendingPathComponent("runtime/bin/node").path,
+              FileManager.default.isExecutableFile(atPath: path)
+        else { return nil }
+        return path
+    }
+
+    static var bundledServerEntryPath: String? {
+        guard let path = bundledRuntimeRoot?.appendingPathComponent("server/dist/index.js").path,
+              FileManager.default.fileExists(atPath: path)
+        else { return nil }
+        return path
+    }
+
+    static var bundledBridgePath: String? {
+        guard let path = bundledRuntimeRoot?.appendingPathComponent("bin/AirMcpBridge").path,
+              FileManager.default.isExecutableFile(atPath: path)
+        else { return nil }
+        return path
+    }
+
+    static var bundledServerRuntime: (node: String, entry: String)? {
+        guard let node = bundledNodePath, let entry = bundledServerEntryPath else { return nil }
+        return (node, entry)
+    }
+
+    static var appOwnedProxyCommand: String {
+        bundledServerRuntime?.node ?? "npx"
+    }
 
     static var appOwnedProxyArgs: [String] {
-        ["-y", npmPackageSpecifier, "connect", "--url", appOwnedHttpURL]
+        if let runtime = bundledServerRuntime {
+            return [runtime.entry, "connect", "--url", appOwnedHttpURL]
+        }
+        return ["-y", npmPackageSpecifier, "connect", "--url", appOwnedHttpURL]
     }
 
     static func appOwnedProxyEntry(token: String) -> [String: Any] {
         [
-            "command": "npx",
+            "command": appOwnedProxyCommand,
             "args": appOwnedProxyArgs,
             "env": [
                 "AIRMCP_HTTP_TOKEN": token,
@@ -48,27 +97,27 @@ enum AirMcpConstants {
 
     static func claudeDesktopConfig() -> String {
         let token = tokenForConfig()
-        return """
-        {
-          "mcpServers": {
-            "airmcp": {
-              "command": "npx",
-              "args": ["-y", "\(npmPackageSpecifier)", "connect", "--url", "\(appOwnedHttpURL)"],
-              "env": {
-                "AIRMCP_HTTP_TOKEN": "\(token)"
-              }
-            }
-          }
-        }
-        """
+        let object: [String: Any] = ["mcpServers": ["airmcp": appOwnedProxyEntry(token: token)]]
+        guard let data = try? JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys])
+        else { return "{}" }
+        return String(data: data, encoding: .utf8) ?? "{}"
     }
 
     static func claudeCodeConfig() -> String {
-        "claude mcp add --env AIRMCP_HTTP_TOKEN=\(tokenForConfig()) airmcp -- npx -y \(npmPackageSpecifier) connect --url \(appOwnedHttpURL)"
+        commandLine(client: "claude")
     }
 
     static func codexConfig() -> String {
-        "codex mcp add --env AIRMCP_HTTP_TOKEN=\(tokenForConfig()) airmcp -- npx -y \(npmPackageSpecifier) connect --url \(appOwnedHttpURL)"
+        commandLine(client: "codex")
+    }
+
+    private static func commandLine(client: String) -> String {
+        let command = ([appOwnedProxyCommand] + appOwnedProxyArgs).map(shellQuoted).joined(separator: " ")
+        return "\(client) mcp add --env \(shellQuoted("AIRMCP_HTTP_TOKEN=\(tokenForConfig())")) airmcp -- \(command)"
+    }
+
+    private static func shellQuoted(_ value: String) -> String {
+        "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 
     static func copyToClipboard(_ text: String) {
@@ -92,6 +141,7 @@ private func disabledModuleCount(disabledModules: [String]) -> Int {
 // MARK: - Menu Content
 
 struct MenuContent: View {
+    @Environment(\.openWindow) private var openWindow
     let serverManager: ServerManager
     let permissionManager: PermissionManager
     let configManager: ConfigManager
@@ -100,6 +150,7 @@ struct MenuContent: View {
     let logManager: LogManager
     let updateManager: UpdateManager
     let addonManager: AddonManager
+    let onShowOnboarding: () -> Void
 
     var body: some View {
         Group {
@@ -159,26 +210,44 @@ struct MenuContent: View {
             serverManager.checkStatus()
         }
         .keyboardShortcut("r")
+
+        Button(L("menu.trustCenter")) {
+            openWindow(id: AirMcpConstants.trustCenterWindowID)
+        }
     }
 
     @ViewBuilder
     private var serverControlButton: some View {
-        switch serverManager.status {
-        case .running:
+        // Ownership wins over the last health probe. If the app's child is
+        // still alive but HTTP/auth readiness has degraded, the user must keep
+        // a working Stop control instead of seeing a Start action that the
+        // live-process guard will reject.
+        if serverManager.canStopRuntime {
             Button {
                 serverManager.stopServer()
             } label: {
                 Label(L("menu.stopServer"), systemImage: "stop.circle")
             }
-        case .stopped, .error:
-            Button {
-                serverManager.startServer()
-            } label: {
-                Label(L("menu.startServer"), systemImage: "play.circle")
-            }
-        case .checking:
-            Button(L("menu.checking")) {}
+        } else {
+            switch serverManager.status {
+            case .running:
+                // Authenticated manual runtimes are visible and usable, but
+                // their process lifecycle belongs to whoever launched them.
+                Button {} label: {
+                    Label(L("menu.stopServer"), systemImage: "stop.circle")
+                }
                 .disabled(true)
+            case .stopped, .error:
+                Button {
+                    requestApprovalNotificationsForExplicitRuntimeStart()
+                    serverManager.startServer()
+                } label: {
+                    Label(L("menu.startServer"), systemImage: "play.circle")
+                }
+            case .checking:
+                Button(L("menu.checking")) {}
+                    .disabled(true)
+            }
         }
     }
 
@@ -258,7 +327,8 @@ struct MenuContent: View {
             Button {
                 setupManager.runSetup(
                     permissionManager: permissionManager,
-                    serverManager: serverManager
+                    serverManager: serverManager,
+                    hitlLevel: configManager.hitlLevel
                 )
             } label: {
                 Label(L("menu.getStarted"), systemImage: "sparkles")
@@ -275,6 +345,14 @@ struct MenuContent: View {
             } else if case .failed = setupManager.state {
                 Label(label, systemImage: "exclamationmark.triangle")
                     .foregroundStyle(.red)
+                Button(L("onboarding.firstRunCheckAgain")) {
+                    setupManager.reset()
+                    setupManager.runSetup(
+                        permissionManager: permissionManager,
+                        serverManager: serverManager,
+                        hitlLevel: configManager.hitlLevel
+                    )
+                }
                 Divider()
             } else {
                 Label(label, systemImage: "progress.indicator")
@@ -282,6 +360,14 @@ struct MenuContent: View {
                 Divider()
             }
         }
+    }
+
+    private func requestApprovalNotificationsForExplicitRuntimeStart() {
+        guard RuntimeStartConsentPolicy.shouldRequestApprovalNotifications(
+            hitlLevel: configManager.hitlLevel,
+            userInitiated: true
+        ) else { return }
+        HitlManager.requestNotificationPermission()
     }
 
     // MARK: 3 - Workflows
@@ -309,12 +395,6 @@ struct MenuContent: View {
 
                     Button(L("workflow.copyPrompt")) {
                         AirMcpConstants.copyToClipboard(workflow.prompt)
-                    }
-
-                    if let siriPhrase = workflow.siriPhrase {
-                        Button(L("workflow.copySiriPhrase")) {
-                            AirMcpConstants.copyToClipboard("Hey Siri, \(siriPhrase)")
-                        }
                     }
 
                     Button(L("workflow.copyToolList")) {
@@ -575,6 +655,17 @@ struct MenuContent: View {
                 set: { serverManager.autoStartEnabled = $0 }
             ))
 
+            Toggle(L("settings.launchAtLogin"), isOn: Binding(
+                get: { serverManager.launchAtLoginEnabled },
+                set: { serverManager.setLaunchAtLogin($0) }
+            ))
+
+            if let error = serverManager.launchAtLoginError {
+                Text(L("settings.launchAtLoginFailed", error))
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+
             Divider()
 
             // Permissions
@@ -676,6 +767,10 @@ struct MenuContent: View {
 
     @ViewBuilder
     private var configSection: some View {
+        Button(L("menu.openSetup")) {
+            onShowOnboarding()
+        }
+
         Button(permissionManager.isRunning ? L("menu.settingUp") : L("menu.setupPermissions")) {
             permissionManager.runSetup()
         }

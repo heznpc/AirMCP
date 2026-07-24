@@ -14,6 +14,7 @@ import { UNTRUSTED_CONTENT_META } from "./untrusted.js";
 import { summarizeAuditEntries, getAuditKeyGrade } from "./audit.js";
 import { getRateLimitStatus } from "./rate-limit.js";
 import { SERVER_INSTRUCTIONS } from "./icons.js";
+import { withResourceGovernance } from "./resource-governance.js";
 // Memory reads are cheap (JSON file + in-memory cache) — resolved at
 // call site (not at module load) so the singleton is shared with the
 // memory_* tools and remains substitutable in tests via _resetMemoryStore.
@@ -55,8 +56,11 @@ function jsonResource(
   description: string,
   fetcher: () => Promise<unknown>,
 ): void {
-  server.registerResource(name, uri, { description, mimeType: "application/json" }, async (resourceUri) =>
-    untrustedJsonResourceResult(resourceUri.href, JSON.stringify(await fetcher(), null, 2)),
+  server.registerResource(
+    name,
+    uri,
+    withResourceGovernance({ description, mimeType: "application/json" }, { sensitiveHint: true }),
+    async (resourceUri) => untrustedJsonResourceResult(resourceUri.href, JSON.stringify(await fetcher(), null, 2)),
   );
 }
 
@@ -177,13 +181,18 @@ export function registerResources(server: McpServer, config?: AirMcpConfig): voi
   server.registerResource(
     "trust-attestation",
     "airmcp://trust",
-    {
-      description:
-        "Live governance/trust attestation: whole-chain audit verification (tamper-evident), HITL approval level, " +
-        "rate-limit budget + emergency-stop state, and audit key grade — composed into one `governed` verdict. " +
-        "First-party server attestation; read it to verify the 'governed runtime, not an agent' claim before widening tool access.",
-      mimeType: "application/json",
-    },
+    withResourceGovernance(
+      {
+        description:
+          "Live governance/trust attestation: whole-chain audit verification (tamper-evident), HITL approval level, " +
+          "rate-limit budget + emergency-stop state, and audit key grade — composed into one `governed` verdict. " +
+          "First-party server attestation; read it to verify the 'governed runtime, not an agent' claim before widening tool access.",
+        mimeType: "application/json",
+      },
+      // First-party server state — explicitly non-sensitive so the resource
+      // governance layer classifies it deliberately rather than by default.
+      { sensitiveHint: false },
+    ),
     async (uri) => ({
       contents: [
         {
@@ -204,7 +213,10 @@ export function registerResources(server: McpServer, config?: AirMcpConfig): voi
     server.registerResource(
       "recent-notes-count",
       new ResourceTemplate("notes://recent/{count}", { list: undefined }),
-      { description: "Recently modified Apple Notes (max 50)", mimeType: "application/json" },
+      withResourceGovernance(
+        { description: "Recently modified Apple Notes (max 50)", mimeType: "application/json" },
+        { sensitiveHint: true },
+      ),
       async (uri, variables) => {
         const raw = Array.isArray(variables.count) ? variables.count[0] : variables.count;
         const count = Math.max(1, Math.min(Number(raw) || 10, 50));
@@ -300,11 +312,14 @@ export function registerResources(server: McpServer, config?: AirMcpConfig): voi
   server.registerResource(
     "context-snapshot-depth",
     new ResourceTemplate("context://snapshot/{depth}", { list: undefined }),
-    {
-      description:
-        "Unified context snapshot with configurable depth: brief (~500 tokens), standard (~2-4k), full (~5k+).",
-      mimeType: "application/json",
-    },
+    withResourceGovernance(
+      {
+        description:
+          "Unified context snapshot with configurable depth: brief (~500 tokens), standard (~2-4k), full (~5k+).",
+        mimeType: "application/json",
+      },
+      { sensitiveHint: true },
+    ),
     async (uri, variables) => {
       const raw = (Array.isArray(variables.depth) ? variables.depth[0] : variables.depth) as string;
       const dc = (DEPTH[raw] ?? DEPTH.standard)!;

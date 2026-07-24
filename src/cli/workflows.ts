@@ -7,6 +7,7 @@ import { getModulePackPlan } from "../shared/modules.js";
 import { getMissingAddonPackageModules } from "../shared/module-loader.js";
 import {
   WORKFLOWS,
+  assessWorkflowReadiness,
   assessWorkflowsReadiness,
   summarizeWorkflowsReadiness,
   type Workflow,
@@ -14,7 +15,7 @@ import {
 
 export { WORKFLOWS };
 
-const DAILY_BRIEFING_PREVIEW_MODULES = new Set(["calendar", "reminders", "mail", "notes"]);
+const READ_ONLY_PREVIEW_WORKFLOW_IDS = new Set(["today-overview", "daily-briefing"]);
 const KNOWN_FLAGS = new Set([
   "--json",
   "--prompt",
@@ -70,20 +71,57 @@ function printWorkflowField(workflow: Workflow, args: string[]): boolean {
   return false;
 }
 
-async function printReadOnlyPreview(workflow: Workflow): Promise<void> {
-  if (workflow.id !== "daily-briefing") {
-    console.error(`Read-only preview is currently available only for "daily-briefing".`);
+async function printLocalDiagnosticPreview(workflow: Workflow): Promise<void> {
+  if (!READ_ONLY_PREVIEW_WORKFLOW_IDS.has(workflow.id)) {
+    console.error(`Local diagnostic preview is available for "today-overview" and "daily-briefing".`);
     process.exitCode = 1;
     return;
   }
 
-  const { buildSnapshot } = await import("../shared/resources.js");
-  const snapshot = await buildSnapshot((moduleName) => DAILY_BRIEFING_PREVIEW_MODULES.has(moduleName), "brief");
+  const config = parseConfig();
+  const packPlan = getModulePackPlan(config);
+  const readiness = assessWorkflowReadiness(workflow, {
+    enabledModules: workflow.requiredModules.filter((moduleName) => isModuleEnabled(config, moduleName)),
+    modulesMissingPacks: packPlan.modulesMissingPacks,
+    modulesMissingAddonPackages: getMissingAddonPackageModules(),
+    allowSendMail: config.allowSendMail,
+    allowSendMessages: config.allowSendMessages,
+  });
 
-  console.log(`AirMCP read-only preview: ${workflow.title}`);
-  console.log(`Reads: ${Array.from(DAILY_BRIEFING_PREVIEW_MODULES).join(", ")}`);
+  if (!readiness.ready) {
+    console.error(
+      `Cannot run the local diagnostic preview for "${workflow.id}" with the active "${config.profile}" profile.`,
+    );
+    for (const issue of readiness.issues) {
+      const target = issue.module ?? issue.tool ?? issue.pack ?? issue.code;
+      console.error(`- ${target}: ${issue.message}`);
+      if (issue.command) console.error(`  Try: ${issue.command}`);
+    }
+    console.error(`Run "npx airmcp workflows ${workflow.id} --readiness" for the complete readiness report.`);
+    process.exitCode = 1;
+    return;
+  }
+
+  console.log(`AirMCP local diagnostic preview: ${workflow.title}`);
+  console.log(`Governance: bypassed — this is not an MCP call and creates no AirMCP audit entry`);
+  console.log(`Reads: ${workflow.requiredModules.join(", ")}`);
   console.log(`Writes: none`);
+  console.log(`Governed run: print --prompt and paste it into a connected MCP client`);
   console.log("");
+
+  let snapshot: string;
+  if (workflow.id === "today-overview") {
+    const { collectTodayOverviewDiagnostic } = await import("../shared/workflow-diagnostics.js");
+    snapshot = JSON.stringify(await collectTodayOverviewDiagnostic(), null, 2);
+  } else {
+    const previewModules = new Set(workflow.requiredModules);
+    const { buildSnapshot } = await import("../shared/resources.js");
+    snapshot = await buildSnapshot(
+      (moduleName) => previewModules.has(moduleName) && isModuleEnabled(config, moduleName),
+      "brief",
+    );
+  }
+
   console.log(snapshot);
 }
 
@@ -157,11 +195,11 @@ export async function runWorkflows(args = process.argv.slice(3)): Promise<void> 
 
   if (hasFlag(args, "--preview")) {
     if (!workflow) {
-      console.error(`Choose a workflow id, for example: npx airmcp workflows daily-briefing --preview`);
+      console.error(`Choose a workflow id, for example: npx airmcp workflows today-overview --preview`);
       process.exitCode = 1;
       return;
     }
-    await printReadOnlyPreview(workflow);
+    await printLocalDiagnosticPreview(workflow);
     return;
   }
 
@@ -204,7 +242,7 @@ export async function runWorkflows(args = process.argv.slice(3)): Promise<void> 
     `  ${DIM}Tip: run ${BOLD}npx airmcp workflows --json${RESET}${DIM} to reuse this catalog in docs or apps.${RESET}`,
   );
   console.log(
-    `  ${DIM}Tip: run ${BOLD}npx airmcp workflows daily-briefing --prompt${RESET}${DIM} to print one copyable prompt.${RESET}`,
+    `  ${DIM}Tip: run ${BOLD}npx airmcp workflows today-overview --prompt${RESET}${DIM} to print the starter-safe first prompt.${RESET}`,
   );
   console.log(
     `  ${DIM}Tip: run ${BOLD}npx airmcp workflows --readiness${RESET}${DIM} to check profile/add-on readiness before launching a workflow.${RESET}`,

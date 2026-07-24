@@ -144,9 +144,9 @@ describe("doc honesty: default surface vs full count, and the optional Swift bri
 });
 
 describe("doc drift: README prose vs generated Swift artifact", () => {
-  test('README "<N> Shortcuts / Siri AppIntents" equals generated `: AppIntent` structs', () => {
+  test('README "<N> App Intent action types" equals generated `: AppIntent` structs', () => {
     const generated = (swiftSrc.match(/:\s*AppIntent\b/g) ?? []).length;
-    expect(readmeNum(/(\d+)\s+Shortcuts\b/)).toBe(generated);
+    expect(readmeNum(/(\d+)\s+App Intent action types\b/)).toBe(generated);
   });
 
   test('README "<N> Interactive Snippet views" equals generated SnippetView structs', () => {

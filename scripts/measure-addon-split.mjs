@@ -32,7 +32,12 @@ import { dirname, join, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { cleanBootEnv } from "./lib/clean-boot-env.mjs";
-import { expectNoWireError, parseStructuredResult, startMcp } from "./lib/mcp-stdio-client.mjs";
+import {
+  expectNoWireError,
+  MCP_PROTOCOL_VERSION,
+  parseStructuredResult,
+  startMcp,
+} from "./lib/mcp-stdio-client.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const BUILD_DIR = join(ROOT, "build", "addons");
@@ -197,11 +202,7 @@ async function getExpectedPackModules(packNames, packManifest, profile) {
 function getAddonLoadFailureLines(stderr) {
   return stderr
     .split(/\r?\n/)
-    .filter(
-      (line) =>
-        line.includes("required add-on package module failed to load") ||
-        line.includes("Cannot find package '@heznpc/airmcp-"),
-    );
+    .filter((line) => line.includes("required add-on package module failed to load"));
 }
 
 async function bootAndMeasure({ entry, work, profile, packNames, addonMode, expectedModules, forbiddenModules }) {
@@ -228,7 +229,7 @@ async function bootAndMeasure({ entry, work, profile, packNames, addonMode, expe
     const initResp = await client.request(
       "initialize",
       {
-        protocolVersion: "2025-06-18",
+        protocolVersion: MCP_PROTOCOL_VERSION,
         capabilities: {},
         clientInfo: { name: "airmcp-addon-split-measure", version: "0.0.0" },
       },

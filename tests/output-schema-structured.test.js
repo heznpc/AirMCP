@@ -4,11 +4,23 @@
  * MCP SDK rejects responses where outputSchema is present but structuredContent is missing.
  * This was the root cause of GitHub issue #28 (output validation errors).
  */
-import { describe, test, expect, beforeAll, beforeEach, jest } from '@jest/globals';
+import { describe, test, expect, beforeAll, beforeEach, afterAll, jest } from '@jest/globals';
 import { z } from 'zod';
 import { setupPlatformMocks } from './helpers/mock-runtime.js';
 import { createMockServer } from './helpers/mock-server.js';
 import { createMockConfig } from './helpers/mock-config.js';
+
+// This suite intentionally dispatches every schema-bearing handler in one
+// process; rate limiting is covered separately and would cap the inventory at
+// 60 calls before the contract loop finishes.
+const ORIGINAL_RUNTIME_ENV = {
+  rateLimit: process.env.AIRMCP_RATE_LIMIT,
+  auditLog: process.env.AIRMCP_AUDIT_LOG,
+  usageTracking: process.env.AIRMCP_USAGE_TRACKING,
+};
+process.env.AIRMCP_RATE_LIMIT = 'false';
+process.env.AIRMCP_AUDIT_LOG = 'false';
+process.env.AIRMCP_USAGE_TRACKING = 'false';
 
 // ── Platform mocks (must precede all dynamic imports) ────────────────
 
@@ -39,6 +51,7 @@ const { registerWeatherTools } = await import('../dist/weather/tools.js');
 const { registerPhotosTools } = await import('../dist/photos/tools.js');
 const { registerNumbersTools } = await import('../dist/numbers/tools.js');
 const { fetchCurrentWeather } = await import('../dist/weather/api.js');
+const { createToolRegistry } = await import('../dist/shared/tool-registry.js');
 
 // ── Per-tool args and mock responses ────────────────────────────────
 
@@ -490,9 +503,12 @@ const TOOL_FIXTURES = {
 
 describe('outputSchema → structuredContent contract', () => {
   let server;
+  let registry;
 
   beforeAll(() => {
     server = createMockServer();
+    registry = createToolRegistry();
+    registry.installOn(server);
     const config = createMockConfig();
     registerNoteTools(server, config);
     registerReminderTools(server, config);
@@ -518,13 +534,23 @@ describe('outputSchema → structuredContent contract', () => {
     mockCheckSwiftBridge.mockReset();
   });
 
+  afterAll(() => {
+    for (const [key, value] of [
+      ['AIRMCP_RATE_LIMIT', ORIGINAL_RUNTIME_ENV.rateLimit],
+      ['AIRMCP_AUDIT_LOG', ORIGINAL_RUNTIME_ENV.auditLog],
+      ['AIRMCP_USAGE_TRACKING', ORIGINAL_RUNTIME_ENV.usageTracking],
+    ]) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  });
+
   // ── Exhaustive coverage: every tool with outputSchema must have a fixture ──
 
   test('every tool with outputSchema is covered by a fixture', () => {
-    const toolsWithSchema = [];
-    for (const [name, { opts }] of server._tools) {
-      if (opts.outputSchema) toolsWithSchema.push(name);
-    }
+    // Inventory comes from registrations intercepted at runtime. This avoids
+    // a second hand-maintained list drifting away from the SDK dispatch map.
+    const toolsWithSchema = registry.getOutputSchemaTools().map(({ name }) => name);
     const covered = Object.keys(TOOL_FIXTURES);
     const missing = toolsWithSchema.filter((t) => !covered.includes(t));
     expect(missing).toEqual([]);

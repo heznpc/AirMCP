@@ -23,6 +23,7 @@ if (
   _sub === "workflows" ||
   _sub === "connect" ||
   _sub === "connect-clients" ||
+  _sub === "codex" ||
   _sub === "--help" ||
   _sub === "-h" ||
   _sub === "help"
@@ -45,6 +46,9 @@ if (
   } else if (_sub === "connect-clients") {
     const mod = await import("./cli/connect-clients.js");
     mod.runConnectClients();
+  } else if (_sub === "codex") {
+    const mod = await import("./cli/codex.js");
+    mod.runCodex();
   } else {
     const mod = await import("./cli/help.js");
     mod.runHelp();
@@ -66,6 +70,7 @@ import { IDENTITY } from "./shared/constants.js";
 import { initializeServer } from "./server/init.js";
 import { createServer } from "./server/mcp-setup.js";
 import { startHttpServer } from "./server/http-transport.js";
+import { wireStdioShutdown } from "./server/stdio-shutdown.js";
 
 const ctx = initializeServer();
 
@@ -92,12 +97,13 @@ async function main() {
   } else {
     const { server, bannerInfo } = await createServer(ctx);
     const transport = new StdioServerTransport();
+    wireStdioShutdown(transport, process.stdin, ctx.shutdown);
     await server.connect(transport);
     await printBanner(bannerInfo);
   }
 }
 
-main().catch((error) => {
+main().catch(async (error) => {
   console.error("Fatal error:", error);
-  process.exit(1);
+  await ctx.shutdown(1);
 });

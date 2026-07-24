@@ -6,6 +6,7 @@ import { loadAllSkills, mergeSkills, watchUserSkills } from "./loader.js";
 import { registerSkills } from "./register.js";
 import { registerTrigger, resetTriggers, startTriggerListener } from "./triggers.js";
 import { log } from "../shared/logger.js";
+import { toolRegistry, type ToolRegistry } from "../shared/tool-registry.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // Resolves to dist/skills/builtins/ — works in repo checkout, npm cache, and git worktrees
@@ -21,7 +22,10 @@ export interface SkillEngineCounts {
   userCount: number;
 }
 
-export async function registerSkillEngine(server: McpServer): Promise<SkillEngineCounts> {
+export async function registerSkillEngine(
+  server: McpServer,
+  registry: ToolRegistry = toolRegistry,
+): Promise<SkillEngineCounts> {
   const { builtins, user } = loadAllSkills(BUILTINS_DIR);
   const merged = mergeSkills(builtins, user);
 
@@ -30,7 +34,7 @@ export async function registerSkillEngine(server: McpServer): Promise<SkillEngin
     return { builtinCount: 0, userCount: 0 };
   }
 
-  registerSkills(server, merged);
+  registerSkills(server, merged, registry);
 
   // Register event triggers for skills that have them. Reset bindings first
   // because this function is called per createServer (HTTP pre-warm + per-
@@ -39,7 +43,7 @@ export async function registerSkillEngine(server: McpServer): Promise<SkillEngin
   for (const skill of merged) {
     registerTrigger(skill);
   }
-  startTriggerListener(server);
+  startTriggerListener(server, registry);
 
   // Watch user skills directory for changes — only once per process
   if (!skillsWatcher) {

@@ -5,9 +5,9 @@ description: All 32 AirMCP modules with tool counts and capabilities.
 
 AirMCP ships 32 modules that cover the Apple workspace. Each module registers a set of MCP tools that AI assistants can call. The full manifest contains 296 tools, while the default starter/progressive runtime exposes a smaller front door.
 
-Module packs are the DLC-like activation boundary above modules. `npx airmcp modules enable productivity` or `AIRMCP_MODULE_PACKS=core,productivity` keeps core workspace tools and iWork active while reporting unavailable profile modules through `profile_status.modulesMissingPacks`. Add `--install` to install the matching companion npm add-on into the user-level add-on prefix before activating it. npm and MCPB releases ship as a slim root; non-core module entrypoints live in physical add-on packages staged by `npm run addons:build`. Add-on names omit `pack-*` naming, for example `@heznpc/airmcp-productivity`.
+Module packs are the activation boundary above modules. `npx airmcp modules enable productivity` or `AIRMCP_MODULE_PACKS=core,productivity` keeps core workspace tools and iWork active while reporting unavailable profile modules through `profile_status.modulesMissingPacks`. npm and MCPB releases are universal and already contain every standard JavaScript module; profiles and progressive exposure narrow the active context without making users assemble the product from packages. Scoped add-ons such as `@heznpc/airmcp-productivity` remain optional compatibility artifacts for `external-only` deployments.
 
-The release gate treats this as a user journey, not just packaging metadata: `addons:first-user-drill` verifies the missing-pack prompt, local add-on install, activation, and external-only boot, while `addons:kill-test` holds the physical split if size evidence or the first-user path fails.
+The release gate boots clean-installed npm and MCPB artifacts in `full/full` mode and proves representative cross-pack tools are present. Separate add-on drills continue to test the optional `external-only` compatibility path without blocking the universal install.
 
 ## Module Table
 

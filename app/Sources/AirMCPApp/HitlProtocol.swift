@@ -1,8 +1,16 @@
 import Foundation
 import UserNotifications
 
+enum HitlResponseReason: String, Equatable, Sendable {
+    case approved
+    case denied
+    case timedOut = "timed_out"
+    case unavailable
+}
+
 struct HitlApprovalRequestPayload: Equatable, Sendable {
     let id: String
+    let correlationId: String?
     let tool: String
     let args: [String: String]
     let destructive: Bool
@@ -36,8 +44,17 @@ enum HitlProtocol {
             }
         }
 
+        let correlationId: String? = {
+            guard let value = json["correlationId"] as? String,
+                  !value.isEmpty,
+                  value.utf8.count <= 128
+            else { return nil }
+            return value
+        }()
+
         return HitlApprovalRequestPayload(
             id: id,
+            correlationId: correlationId,
             tool: tool,
             args: argsDict,
             destructive: json["destructive"] as? Bool ?? false,
@@ -47,11 +64,20 @@ enum HitlProtocol {
         )
     }
 
-    static func responsePayload(id: String, approved: Bool) -> Data? {
+    static func responsePayload(
+        id: String,
+        approved: Bool,
+        reason: HitlResponseReason? = nil
+    ) -> Data? {
+        let resolvedReason = reason ?? (approved ? .approved : .denied)
+        guard (approved && resolvedReason == .approved)
+                || (!approved && resolvedReason != .approved)
+        else { return nil }
         let responseDict: [String: Any] = [
             "id": id,
             "type": "hitl_response",
             "approved": approved,
+            "reason": resolvedReason.rawValue,
         ]
 
         guard let jsonData = try? JSONSerialization.data(withJSONObject: responseDict),
@@ -65,13 +91,17 @@ enum HitlProtocol {
     }
 
     static func approvalDecision(for actionIdentifier: String) -> Bool {
+        responseReason(for: actionIdentifier) == .approved
+    }
+
+    static func responseReason(for actionIdentifier: String) -> HitlResponseReason {
         switch actionIdentifier {
         case "APPROVE":
-            return true
+            return .approved
         case "DENY", UNNotificationDismissActionIdentifier:
-            return false
+            return .denied
         default:
-            return false
+            return .denied
         }
     }
 }

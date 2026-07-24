@@ -26,11 +26,43 @@ describe("AirMCP.app ConfigManager defaults", () => {
   test("preserves module pack activation written by the CLI", () => {
     expect(source).toMatch(/var modulePacks:\s*\[String\]\?/);
     expect(source).toMatch(/decodeIfPresent\(\[String\]\.self,\s*forKey:\s*\.modulePacks\)/);
-    expect(source).toContain('func setModulePack(_ pack: String, enabled: Bool)');
+    expect(source).toContain("func setModulePack(_ pack: String, enabled: Bool)");
     expect(source).toContain('"core"');
   });
 
   test("module toggles switch the JSON config to custom profile", () => {
     expect(source).toMatch(/var disabledModules:[\s\S]*config\.profile\s*=\s*"custom"/);
+  });
+
+  test("preserves Node-owned and future JSON keys on save", () => {
+    expect(source).toContain("private var rawConfig: [String: Any] = [:]");
+    expect(source).toContain("mergeKnownFields(into: rawConfig)");
+    expect(source).toContain('var hitlObject = merged["hitl"] as? [String: Any] ?? [:]');
+  });
+
+  test("validates and backs up before an atomic config replacement", () => {
+    expect(source).toContain('configFile.appendingPathExtension("backup")');
+    expect(source).toContain("JSONSerialization.jsonObject(with: data)");
+    expect(source).toContain("data.write(to: configFile, options: .atomic)");
+    expect(source).toContain("var lastPersistenceError: String?");
+  });
+
+  test("never overwrites an owner config after a failed load", () => {
+    expect(source).toContain("private var persistenceBlockedByLoadError = false");
+    expect(source).toContain("persistenceBlockedByLoadError = true");
+    expect(source).toContain("guard !persistenceBlockedByLoadError else { return }");
+  });
+
+  test("honors the shared config-path override for isolated app validation", () => {
+    expect(source).toContain('environment["AIRMCP_CONFIG_PATH"]');
+    expect(source).toContain("configFile.deletingLastPathComponent()");
+  });
+
+  test("scope activation uses a reversible read-back-verified transaction", () => {
+    expect(source).toContain("func beginOnboardingRuntimeScopeTransaction(");
+    expect(source).toContain("func rollbackOnboardingRuntimeScope(");
+    expect(source).toContain("func isOnboardingRuntimeScopePersisted(");
+    expect(source).toContain('config.onboardingWorkflow = scope.workflowID');
+    expect(source).toContain("persisted.disabledModules == scope.disabledModules");
   });
 });

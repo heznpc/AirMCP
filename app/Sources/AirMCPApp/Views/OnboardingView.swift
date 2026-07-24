@@ -17,47 +17,273 @@ private struct MCPClient: Identifiable {
     var detected: Bool
 }
 
+/// Resolve the persistent runtime-start preference at the end of one explicit
+/// Setup activation attempt. A failed attempt must be observational with
+/// respect to an existing preference, while an authenticated ready receipt is
+/// the only outcome that can record a new opt-in.
+enum OnboardingAutoStartConsentPolicy {
+    static func resolvedValue(previouslyEnabled: Bool, activationReady: Bool) -> Bool {
+        previouslyEnabled || activationReady
+    }
+}
+
+/// The guided write example is offered only when its one tool call is covered
+/// by the current per-call approval policy. Setup never changes HITL settings
+/// or a user's whitelist just to make the example available.
+enum OnboardingGovernedWritePolicy {
+    private static let reminderTool = "create_reminder"
+
+    enum RuntimePolicyState: Equatable {
+        /// The app has confirmed that no runtime is serving the app-owned port,
+        /// so the persisted config is the policy a future start will load.
+        case stopped
+        /// Policy decoded from the authenticated app-owned runtime-state
+        /// endpoint. This is authoritative while that runtime is running.
+        case running(hitlLevel: HitlLevel, whitelist: [String])
+        /// Checking, conflicting, or running without authenticated policy
+        /// evidence. Never fall back to config in this state.
+        case unavailable
+    }
+
+    static func requiresPerCallApproval(hitlLevel: HitlLevel, whitelist: [String]) -> Bool {
+        guard !whitelist.contains(reminderTool) else { return false }
+        return switch hitlLevel {
+        case .sensitiveOnly, .allWrites, .all: true
+        case .off, .destructiveOnly: false
+        }
+    }
+
+    static func allowsReminderExample(
+        remindersEnabled: Bool,
+        configuredHitlLevel: HitlLevel,
+        configuredWhitelist: [String],
+        runtimePolicy: RuntimePolicyState
+    ) -> Bool {
+        guard remindersEnabled else { return false }
+        return switch runtimePolicy {
+        case .stopped:
+            requiresPerCallApproval(
+                hitlLevel: configuredHitlLevel,
+                whitelist: configuredWhitelist
+            )
+        case .running(let hitlLevel, let whitelist):
+            requiresPerCallApproval(hitlLevel: hitlLevel, whitelist: whitelist)
+        case .unavailable:
+            false
+        }
+    }
+}
+
+/// A successful activation receipt is only a point-in-time observation: the
+/// child can exit before Setup records auto-start consent. Commit that consent
+/// first, ask ServerManager to recover a known-stopped runtime, then require a
+/// fresh authenticated receipt. If the lightweight recovery races with process
+/// termination, the full activation transaction is the final fallback.
+@MainActor
+enum OnboardingRuntimeReadyBarrier {
+    static func stabilize(
+        commitAutoStart: () -> Void,
+        requestAutoStart: () -> Void,
+        scopeIsCurrent: () -> Bool,
+        validate: () async -> ServerManager.OnboardingRuntimeActivationResult,
+        recover: () async -> ServerManager.OnboardingRuntimeActivationResult
+    ) async -> ServerManager.OnboardingRuntimeActivationResult? {
+        commitAutoStart()
+        requestAutoStart()
+
+        let validation = await validate()
+        guard scopeIsCurrent() else { return nil }
+        if case .failed = validation {
+            let recovered = await recover()
+            guard scopeIsCurrent() else { return nil }
+            return recovered
+        }
+        return validation
+    }
+}
+
 // MARK: - Onboarding View
 
 struct OnboardingView: View {
+    static let preferredContentSize = NSSize(width: 640, height: 520)
+
+    @Environment(\.openWindow) private var openWindow
+
     let configManager: ConfigManager
     let serverManager: ServerManager
     let onComplete: () -> Void
 
-    @State private var currentStep = 0
+    @State private var currentStep: Int
     @State private var nodeAvailable = false
     @State private var nodeChecking = true
-    @State private var selectedWorkflowID = "daily-briefing"
-    @State private var disabledModules: Set<String> = onboardingModuleIds.subtracting(
-        onboardingWorkflows.first?.requiredModules ?? []
-    )
+    @State private var selectedWorkflowID: String
+    @State private var disabledModules: Set<String>
+    @State private var unmanagedDisabledModules: Set<String>
+    @State private var appliedScopeFingerprint: String?
+    @State private var runtimeReceipt: ServerManager.OnboardingRuntimeReceipt?
     @State private var mcpClients: [MCPClient] = []
-    @State private var patchingClient: String?
+    @State private var patchingClients: Set<String> = []
     @State private var patchResults: [String: Bool] = [:]
     @State private var firstRunChecking = false
     @State private var firstRunReady = false
     @State private var firstRunMessage = L("onboarding.firstRunWaiting")
+    @State private var completionError: String?
 
     private let totalSteps = 6
+
+    init(
+        configManager: ConfigManager,
+        serverManager: ServerManager,
+        onComplete: @escaping () -> Void
+    ) {
+        self.configManager = configManager
+        self.serverManager = serverManager
+        self.onComplete = onComplete
+
+        let defaults = UserDefaults.standard
+        let firstWorkflow = onboardingWorkflows[0]
+        let onboardingCompleted = defaults.bool(forKey: AirMcpConstants.keyOnboardingCompleted)
+        let fallback = OnboardingDraftStore.fallbackState(
+            onboardingCompleted: onboardingCompleted,
+            configuredDisabledModules: configManager.disabledModules,
+            defaultWorkflowID: firstWorkflow.id,
+            defaultDisabledModules: onboardingModuleIds.subtracting(firstWorkflow.requiredModules),
+            validModuleIDs: onboardingModuleIds
+        )
+        // A completed Setup has no resumable draft: reopening is an editor and
+        // must reflect the currently persisted module selection. Only an
+        // incomplete first run restores its workflow/module draft.
+        let draft = onboardingCompleted
+            ? fallback
+            : OnboardingDraftStore.load(
+                defaults: defaults,
+                validWorkflowIDs: Set(onboardingWorkflows.map(\.id)),
+                validModuleIDs: onboardingModuleIds,
+                fallback: fallback
+            )
+        _currentStep = State(
+            initialValue: min(
+                max(defaults.integer(forKey: AirMcpConstants.keyOnboardingStep), 0),
+                5
+            )
+        )
+        _selectedWorkflowID = State(initialValue: draft.workflowID)
+        _disabledModules = State(initialValue: draft.disabledModules)
+        _appliedScopeFingerprint = State(initialValue: draft.appliedScopeFingerprint)
+        _runtimeReceipt = State(initialValue: nil)
+        _unmanagedDisabledModules = State(
+            initialValue: OnboardingDraftStore.unmanagedDisabledModules(
+                onboardingCompleted: onboardingCompleted,
+                configuredDisabledModules: configManager.disabledModules,
+                managedModuleIDs: onboardingModuleIds,
+                allModuleIDs: Set(allModules.map(\.id))
+            )
+        )
+    }
+
+    private var currentStepTitle: String {
+        let titles = [
+            L("onboarding.stepWelcome"),
+            L("onboarding.stepRuntime"),
+            L("onboarding.stepWorkflow"),
+            L("onboarding.stepAccess"),
+            L("onboarding.stepPermissions"),
+            L("onboarding.stepConnect"),
+        ]
+        return titles[currentStep]
+    }
 
     private var selectedWorkflow: OnboardingWorkflow {
         onboardingWorkflows.first { $0.id == selectedWorkflowID } ?? onboardingWorkflows[0]
     }
 
+    /// The first success is intentionally invariant. A selected workflow may
+    /// configure a broader or different scope, but a write-capable workflow
+    /// prompt must never be presented as the read-only first run.
+    private var firstSuccessWorkflow: OnboardingWorkflow {
+        guard let workflow = onboardingWorkflows.first(where: { $0.id == "today-overview" }) else {
+            preconditionFailure("The generated onboarding catalog must contain today-overview.")
+        }
+        return workflow
+    }
+
+    private var currentRuntimeScope: OnboardingRuntimeScope {
+        OnboardingRuntimeScope(
+            workflowID: selectedWorkflowID,
+            disabledModules: disabledModules.union(unmanagedDisabledModules)
+        )
+    }
+
+    private var remindersEnabled: Bool {
+        !currentRuntimeScope.disabledModules.contains("reminders")
+    }
+
+    private var firstSuccessModulesEnabled: Bool {
+        firstSuccessWorkflow.requiredModules.isDisjoint(with: currentRuntimeScope.disabledModules)
+    }
+
+    private var governedReminderPrompt: String {
+        L("onboarding.governedWritePrompt")
+    }
+
+    private var governedRuntimePolicy: OnboardingGovernedWritePolicy.RuntimePolicyState {
+        switch serverManager.status {
+        case .stopped:
+            return .stopped
+        case .running:
+            guard let runtimeReceipt else { return .unavailable }
+            return .running(
+                hitlLevel: runtimeReceipt.effectiveHitlLevel,
+                whitelist: runtimeReceipt.effectiveHitlWhitelist
+            )
+        case .checking, .error:
+            return .unavailable
+        }
+    }
+
+    private var governedReminderApprovalEnabled: Bool {
+        OnboardingGovernedWritePolicy.allowsReminderExample(
+            remindersEnabled: true,
+            configuredHitlLevel: configManager.hitlLevel,
+            configuredWhitelist: configManager.hitlWhitelist,
+            runtimePolicy: governedRuntimePolicy
+        )
+    }
+
+    private var governedReminderAvailable: Bool {
+        OnboardingGovernedWritePolicy.allowsReminderExample(
+            remindersEnabled: remindersEnabled,
+            configuredHitlLevel: configManager.hitlLevel,
+            configuredWhitelist: configManager.hitlWhitelist,
+            runtimePolicy: governedRuntimePolicy
+        )
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            // Progress dots
-            HStack(spacing: 8) {
-                ForEach(0..<totalSteps, id: \.self) { step in
-                    Circle()
-                        .fill(step == currentStep ? Color.accentColor : Color.secondary.opacity(0.3))
-                        .frame(width: 8, height: 8)
-                }
-            }
-            .padding(.top, 20)
-            .padding(.bottom, 16)
+            VStack(spacing: 10) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(currentStepTitle)
+                        .font(.headline)
 
-            // Step content
+                    Spacer()
+
+                    Text(L("onboarding.progress", currentStep + 1, totalSteps))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+
+                ProgressView(value: Double(currentStep + 1), total: Double(totalSteps))
+                    .progressViewStyle(.linear)
+                    .controlSize(.small)
+                    .tint(Color.accentColor)
+            }
+            .padding(.horizontal, 22)
+            .padding(.vertical, 14)
+
+            Divider()
+
             Group {
                 switch currentStep {
                 case 0: welcomeStep
@@ -71,13 +297,15 @@ struct OnboardingView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            // Navigation buttons
+            Divider()
+
             HStack {
                 if currentStep > 0 {
                     Button(L("onboarding.back")) {
-                        withAnimation { currentStep -= 1 }
+                        setCurrentStep(currentStep - 1)
                     }
                     .keyboardShortcut(.cancelAction)
+                    .disabled(firstRunChecking || !patchingClients.isEmpty)
                 }
 
                 Spacer()
@@ -87,57 +315,132 @@ struct OnboardingView: View {
                         advanceStep()
                     }
                     .keyboardShortcut(.defaultAction)
-                    .disabled(currentStep == 1 && !nodeAvailable)
+                    .disabled(
+                        (currentStep == 1 && !nodeAvailable)
+                            || firstRunChecking
+                            || !patchingClients.isEmpty
+                    )
                 } else {
-                    Button(L("onboarding.finish")) {
-                        saveAndComplete()
+                    Button(firstRunReady ? L("onboarding.finishSetup") : L("onboarding.finishLater")) {
+                        Task { await saveAndComplete() }
                     }
                     .keyboardShortcut(.defaultAction)
-                    .disabled(!firstRunReady)
+                    .disabled(firstRunChecking || !patchingClients.isEmpty)
                 }
             }
-            .padding(20)
+            .padding(.horizontal, 20)
+            .frame(height: 58)
         }
-        .frame(width: 540, height: 540)
+        .frame(
+            width: Self.preferredContentSize.width,
+            height: Self.preferredContentSize.height
+        )
+        .background(Color(nsColor: .windowBackgroundColor))
+        .alert(
+            L("onboarding.saveFailed"),
+            isPresented: Binding(
+                get: { completionError != nil },
+                set: { if !$0 { completionError = nil } }
+            )
+        ) {
+            Button(L("trust.ok")) { completionError = nil }
+        } message: {
+            Text(completionError ?? "")
+        }
     }
 
     // MARK: - Step 1: Welcome
 
     private var welcomeStep: some View {
-        VStack(spacing: 16) {
-            Spacer()
+        VStack(alignment: .leading, spacing: 22) {
+            HStack(alignment: .center, spacing: 18) {
+                appIcon(size: 64)
 
-            if let iconURL = Bundle.module.url(forResource: "AppIcon@2x", withExtension: "png", subdirectory: "Resources"),
-               let nsImage = NSImage(contentsOf: iconURL) {
-                Image(nsImage: nsImage)
-                    .resizable()
-                    .frame(width: 72, height: 72)
+                VStack(alignment: .leading, spacing: 7) {
+                    Text(L("onboarding.welcome"))
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+
+                    Text(L("onboarding.welcomeDesc"))
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
 
-            Text(L("onboarding.welcome"))
-                .font(.title)
-                .fontWeight(.bold)
+            VStack(spacing: 0) {
+                welcomeFeatureRow(
+                    icon: "macbook.and.iphone",
+                    title: L("onboarding.welcomeLocalTitle"),
+                    detail: L("onboarding.welcomeLocalDesc")
+                )
+                Divider().padding(.leading, 42)
+                welcomeFeatureRow(
+                    icon: "checkmark.shield",
+                    title: L("onboarding.welcomeControlTitle"),
+                    detail: L("onboarding.welcomeControlDesc")
+                )
+                Divider().padding(.leading, 42)
+                welcomeFeatureRow(
+                    icon: "point.3.connected.trianglepath.dotted",
+                    title: L("onboarding.welcomeClientTitle"),
+                    detail: L("onboarding.welcomeClientDesc")
+                )
+            }
+            .padding(.horizontal, 14)
+            .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
 
-            Text(L("onboarding.welcomeDesc"))
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: 400)
-
-            Text(L("onboarding.welcomeTime"))
+            Label(L("onboarding.welcomeTime"), systemImage: "clock")
                 .font(.callout)
-                .foregroundStyle(.tertiary)
-
-            Spacer()
+                .foregroundStyle(.secondary)
         }
-        .padding(.horizontal, 32)
+        .frame(maxWidth: 540)
+        .padding(.horizontal, 36)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+    }
+
+    @ViewBuilder
+    private func appIcon(size: CGFloat) -> some View {
+        if let iconURL = Bundle.module.url(forResource: "AppIcon@2x", withExtension: "png"),
+           let nsImage = NSImage(contentsOf: iconURL) {
+            Image(nsImage: nsImage)
+                .resizable()
+                .interpolation(.high)
+                .frame(width: size, height: size)
+        } else {
+            Image(systemName: "a.square.fill")
+                .resizable()
+                .scaledToFit()
+                .foregroundStyle(Color.accentColor)
+                .frame(width: size, height: size)
+        }
+    }
+
+    private func welcomeFeatureRow(icon: String, title: String, detail: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .foregroundStyle(Color.accentColor)
+                .frame(width: 28, height: 28)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.callout)
+                    .fontWeight(.semibold)
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 10)
     }
 
     // MARK: - Step 2: Node.js Check
 
     private var nodeCheckStep: some View {
         VStack(spacing: 16) {
-            Spacer()
-
             Image(systemName: "shippingbox")
                 .font(.system(size: 44))
                 .foregroundStyle(Color.accentColor)
@@ -173,10 +476,9 @@ struct OnboardingView: View {
                     Task { await checkNode() }
                 }
             }
-
-            Spacer()
         }
         .padding(.horizontal, 32)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         .task { await checkNode() }
     }
 
@@ -238,7 +540,7 @@ struct OnboardingView: View {
 
                 Label(workflow.accessSummary, systemImage: "checkmark.shield")
                     .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
                     .lineLimit(2)
             }
             .frame(minHeight: 108, alignment: .top)
@@ -256,8 +558,12 @@ struct OnboardingView: View {
     }
 
     private func applyWorkflowPreset(_ workflow: OnboardingWorkflow) {
+        guard !firstRunChecking, patchingClients.isEmpty else { return }
+        let nextDisabledModules = onboardingModuleIds.subtracting(workflow.requiredModules)
+        guard selectedWorkflowID != workflow.id || disabledModules != nextDisabledModules else { return }
         selectedWorkflowID = workflow.id
-        disabledModules = onboardingModuleIds.subtracting(workflow.requiredModules)
+        disabledModules = nextDisabledModules
+        scopeSelectionDidChange()
     }
 
     // MARK: - Step 4: Module Selection
@@ -276,7 +582,7 @@ struct OnboardingView: View {
 
             Text(L("onboarding.workflowPresetHint", selectedWorkflow.title))
                 .font(.caption)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 420)
 
@@ -292,13 +598,22 @@ struct OnboardingView: View {
 
             HStack(spacing: 16) {
                 Button(L("onboarding.enableAll")) {
+                    guard !firstRunChecking, patchingClients.isEmpty else { return }
+                    guard !disabledModules.isEmpty else { return }
                     disabledModules.removeAll()
+                    scopeSelectionDidChange()
                 }
                 .font(.caption)
+                .disabled(firstRunChecking || !patchingClients.isEmpty)
                 Button(L("onboarding.disableAll")) {
-                    disabledModules = Set(onboardingModules.map(\.id))
+                    guard !firstRunChecking, patchingClients.isEmpty else { return }
+                    let allDisabled = Set(onboardingModules.map(\.id))
+                    guard disabledModules != allDisabled else { return }
+                    disabledModules = allDisabled
+                    scopeSelectionDidChange()
                 }
                 .font(.caption)
+                .disabled(firstRunChecking || !patchingClients.isEmpty)
             }
         }
         .padding(.horizontal, 24)
@@ -309,11 +624,13 @@ struct OnboardingView: View {
         let isEnabled = !disabledModules.contains(module.id)
 
         Button {
+            guard !firstRunChecking, patchingClients.isEmpty else { return }
             if isEnabled {
                 disabledModules.insert(module.id)
             } else {
                 disabledModules.remove(module.id)
             }
+            scopeSelectionDidChange()
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: module.icon)
@@ -346,14 +663,13 @@ struct OnboardingView: View {
             )
         }
         .buttonStyle(.plain)
+        .disabled(firstRunChecking || !patchingClients.isEmpty)
     }
 
     // MARK: - Step 5: Permissions
 
     private var permissionStep: some View {
         VStack(spacing: 16) {
-            Spacer()
-
             Image(systemName: "lock.shield")
                 .font(.system(size: 44))
                 .foregroundStyle(Color.accentColor)
@@ -396,11 +712,10 @@ struct OnboardingView: View {
 
             Text(L("onboarding.permRuntimeHint"))
                 .font(.caption)
-                .foregroundStyle(.tertiary)
-
-            Spacer()
+                .foregroundStyle(.secondary)
         }
         .padding(.horizontal, 24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
     }
 
     @ViewBuilder
@@ -422,77 +737,92 @@ struct OnboardingView: View {
     // MARK: - Step 6: Client Detection
 
     private var clientDetectionStep: some View {
-        VStack(spacing: 16) {
-            Spacer()
+        ScrollView {
+            VStack(spacing: 14) {
+                Image(systemName: "app.connected.to.app.below.fill")
+                    .font(.system(size: 38))
+                    .foregroundStyle(Color.accentColor)
 
-            Image(systemName: "app.connected.to.app.below.fill")
-                .font(.system(size: 44))
-                .foregroundStyle(Color.accentColor)
+                Text(L("onboarding.connectClient"))
+                    .font(.title2)
+                    .fontWeight(.semibold)
 
-            Text(L("onboarding.connectClient"))
-                .font(.title2)
-                .fontWeight(.semibold)
+                Text(L("onboarding.connectClientDesc"))
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: 460)
 
-            Text(L("onboarding.connectClientDesc"))
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: 400)
+                firstSuccessActions
 
-            selectedWorkflowActions
+                governedWriteActions
 
-            firstRunStatusCard
+                firstRunStatusCard
 
-            VStack(spacing: 8) {
-                ForEach($mcpClients) { $client in
-                    clientRow(client: client)
+                if !firstRunReady {
+                    Label(L("onboarding.clientNeedsRuntime"), systemImage: "lock.fill")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 24)
+                }
+
+                VStack(spacing: 8) {
+                    ForEach($mcpClients) { $client in
+                        clientRow(client: client)
+                    }
+                }
+                .padding(.horizontal, 24)
+
+                if mcpClients.allSatisfy({ !$0.detected }) {
+                    Text(L("onboarding.noClients"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: 420)
                 }
             }
-            .padding(.horizontal, 24)
-
-            if mcpClients.allSatisfy({ !$0.detected }) {
-                Text(L("onboarding.noClients"))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 380)
-            }
-
-            Spacer()
+            .padding(.vertical, 18)
         }
         .padding(.horizontal, 24)
         .task {
             detectClients()
-            await prepareFirstRun()
+            await checkFirstRunReadiness()
         }
     }
 
-    private var selectedWorkflowActions: some View {
+    private var firstSuccessActions: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label(selectedWorkflow.title, systemImage: selectedWorkflow.icon)
+            Text(L("onboarding.readSuccessTitle"))
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundStyle(Color.accentColor)
+
+            Label(firstSuccessWorkflow.title, systemImage: firstSuccessWorkflow.icon)
                 .font(.headline)
 
-            Text(selectedWorkflow.prompt)
+            Text(firstSuccessWorkflow.prompt)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(2)
 
+            Label(firstSuccessWorkflow.accessSummary, systemImage: "checkmark.shield")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
             HStack(spacing: 8) {
                 Button(L("onboarding.copyPrompt")) {
-                    AirMcpConstants.copyToClipboard(selectedWorkflow.prompt)
+                    AirMcpConstants.copyToClipboard(firstSuccessWorkflow.prompt)
                 }
                 .controlSize(.small)
+                .disabled(!firstSuccessModulesEnabled)
+                .accessibilityIdentifier("onboarding.copyFirstSuccessPrompt")
+            }
 
-                Button(L("onboarding.copyCodexPrompt")) {
-                    AirMcpConstants.copyToClipboard(selectedWorkflow.prompt)
-                }
-                .controlSize(.small)
-
-                if let siriPhrase = selectedWorkflow.siriPhrase {
-                    Button(L("onboarding.copySiriPhrase")) {
-                        AirMcpConstants.copyToClipboard("Hey Siri, \(siriPhrase)")
-                    }
-                    .controlSize(.small)
-                }
+            if !firstSuccessModulesEnabled {
+                Label(L("onboarding.readSuccessNeedsModules"), systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption2)
+                    .foregroundStyle(Color.orange)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(10)
@@ -506,6 +836,125 @@ struct OnboardingView: View {
                 .stroke(Color.accentColor.opacity(0.2), lineWidth: 1)
         )
         .padding(.horizontal, 24)
+    }
+
+    private var governedWriteActions: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(L("onboarding.governedWriteTitle"), systemImage: "checkmark.shield.fill")
+                .font(.headline)
+
+            Text(L("onboarding.governedWriteDesc"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(governedReminderPrompt)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(3)
+
+            HStack(spacing: 8) {
+                Button(L("onboarding.copyGovernedWritePrompt")) {
+                    Task { await copyGovernedReminderPromptIfAllowed() }
+                }
+                .controlSize(.small)
+                .disabled(!governedReminderAvailable)
+                .accessibilityIdentifier("onboarding.copyGovernedWritePrompt")
+
+                Button(L("onboarding.openTrustCenter")) {
+                    openWindow(id: AirMcpConstants.trustCenterWindowID)
+                }
+                .controlSize(.small)
+                .accessibilityIdentifier("onboarding.openTrustCenter")
+            }
+
+            governedWriteDisclosure
+                .font(.caption2)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.secondary.opacity(0.05))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.secondary.opacity(0.15), lineWidth: 1)
+        )
+        .padding(.horizontal, 24)
+    }
+
+    /// Probe the port at the moment of the CTA. ServerManager's displayed
+    /// status is cached, so even `.stopped` is not authority to trust the file
+    /// policy: only a fresh `.unavailable` result makes that future-start
+    /// policy relevant. Every live or ambiguous listener fails closed unless
+    /// it proves the effective app-owned runtime policy and exact scope.
+    private func governedReminderCopyAllowed(for scope: OnboardingRuntimeScope) async -> Bool {
+        let probe = await ServerManager.probeAppOwnedRuntime()
+        guard currentRuntimeScope == scope else { return false }
+
+        if ServerManager.runtimeIsConfirmedUnavailable(probe) {
+            return OnboardingGovernedWritePolicy.allowsReminderExample(
+                remindersEnabled: true,
+                configuredHitlLevel: configManager.hitlLevel,
+                configuredWhitelist: configManager.hitlWhitelist,
+                runtimePolicy: .stopped
+            )
+        }
+
+        guard case .ready(let version, appOwned: true) = probe,
+              let runtimeToken = (try? AppRuntimeToken.loadExisting()) ?? nil,
+              let state = try? await AppRuntimeClient.runtimeState(token: runtimeToken),
+              let expectedOwnerFingerprint = try? AppRuntimeToken.expectedOwnerFingerprint(),
+              ServerManager.authenticatedOwnedRuntimeIdentity(
+                  state: state,
+                  expectedVersion: version,
+                  expectedOwnerFingerprint: expectedOwnerFingerprint
+              ) != nil,
+              currentRuntimeScope == scope,
+              AppRuntimeToken.matchesExisting(runtimeToken),
+              state.disabledModules == scope.disabledModules,
+              state.scopeFingerprint == scope.runtimeFingerprint,
+              state.enabledModules.contains("reminders"),
+              OnboardingGovernedWritePolicy.requiresPerCallApproval(
+                  hitlLevel: state.effectiveHitlLevel,
+                  whitelist: state.effectiveHitlWhitelist
+              )
+        else { return false }
+        return true
+    }
+
+    /// Copying remains observational: the probe helper never starts a runtime,
+    /// creates credentials, or changes a client configuration.
+    private func copyGovernedReminderPromptIfAllowed() async {
+        guard remindersEnabled else { return }
+        let scope = currentRuntimeScope
+        guard await governedReminderCopyAllowed(for: scope),
+              currentRuntimeScope == scope,
+              remindersEnabled
+        else {
+            // Any failed or raced observation invalidates the policy receipt
+            // that made the button appear available.
+            runtimeReceipt = nil
+            return
+        }
+
+        AirMcpConstants.copyToClipboard(governedReminderPrompt)
+    }
+
+    @ViewBuilder
+    private var governedWriteDisclosure: some View {
+        if !remindersEnabled {
+            Label(L("onboarding.governedWriteNeedsReminders"), systemImage: "exclamationmark.triangle.fill")
+                .foregroundStyle(Color.orange)
+        } else if !governedReminderApprovalEnabled {
+            Label(L("onboarding.governedWriteNeedsApproval"), systemImage: "exclamationmark.triangle.fill")
+                .foregroundStyle(Color.orange)
+        } else {
+            Label(L("onboarding.governedWriteCopyDisclosure"), systemImage: "hand.raised.fill")
+                .foregroundStyle(Color.secondary)
+        }
     }
 
     private var firstRunStatusCard: some View {
@@ -532,8 +981,14 @@ struct OnboardingView: View {
 
             Spacer()
 
-            Button(L("onboarding.firstRunCheckAgain")) {
-                Task { await prepareFirstRun(force: true) }
+            Button(firstRunReady ? L("onboarding.firstRunCheckAgain") : L("onboarding.startRuntime")) {
+                Task {
+                    if firstRunReady {
+                        await checkFirstRunReadiness()
+                    } else {
+                        await startFirstRunRuntime()
+                    }
+                }
             }
             .controlSize(.small)
             .disabled(firstRunChecking)
@@ -553,12 +1008,19 @@ struct OnboardingView: View {
             Image(systemName: client.icon)
                 .frame(width: 24)
                 .foregroundStyle(client.detected ? Color.accentColor : Color.secondary)
-            VStack(alignment: .leading) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(client.name)
                     .fontWeight(.medium)
                 Text(client.detected ? L("onboarding.installed") : L("onboarding.notFound"))
                     .font(.caption)
                     .foregroundStyle(client.detected ? .green : .secondary)
+                if client.id == "codex" && client.detected {
+                    Text(L("onboarding.codexStartupDisclosure"))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("onboarding.codexStartupDisclosure")
+                }
             }
 
             Spacer()
@@ -568,14 +1030,16 @@ struct OnboardingView: View {
                     Label(result ? L("onboarding.patched") : L("onboarding.failed"), systemImage: result ? "checkmark.circle.fill" : "xmark.circle")
                         .foregroundStyle(result ? .green : .red)
                         .font(.caption)
-                } else if patchingClient == client.id {
+                } else if patchingClients.contains(client.id) {
                     ProgressView()
                         .controlSize(.small)
                 } else {
-                    Button(L("onboarding.autoPatch")) {
+                    Button(client.id == "codex" ? L("onboarding.enableInCodex") : L("onboarding.autoPatch")) {
                         patchClient(client)
                     }
                     .controlSize(.small)
+                    .disabled(!firstRunReady || firstRunChecking || !patchingClients.isEmpty)
+                    .help(firstRunReady ? "" : L("onboarding.clientNeedsRuntime"))
                 }
             }
         }
@@ -589,10 +1053,43 @@ struct OnboardingView: View {
     // MARK: - Logic
 
     private func advanceStep() {
-        withAnimation { currentStep += 1 }
+        guard !firstRunChecking, patchingClients.isEmpty else { return }
+        setCurrentStep(currentStep + 1)
+    }
+
+    private func setCurrentStep(_ step: Int) {
+        guard !firstRunChecking, patchingClients.isEmpty else { return }
+        currentStep = min(max(step, 0), totalSteps - 1)
+        UserDefaults.standard.set(currentStep, forKey: AirMcpConstants.keyOnboardingStep)
+    }
+
+    private func persistOnboardingDraft() {
+        OnboardingDraftStore.save(
+            OnboardingDraftState(
+                workflowID: selectedWorkflowID,
+                disabledModules: disabledModules,
+                appliedScopeFingerprint: appliedScopeFingerprint
+            )
+        )
+    }
+
+    private func scopeSelectionDidChange() {
+        guard !firstRunChecking, patchingClients.isEmpty else { return }
+        appliedScopeFingerprint = nil
+        runtimeReceipt = nil
+        firstRunReady = false
+        firstRunMessage = L("onboarding.firstRunScopeChanged")
+        patchResults.removeAll()
+        persistOnboardingDraft()
+        serverManager.noteOnboardingScopeChanged()
     }
 
     private func checkNode() async {
+        if AirMcpConstants.bundledServerRuntime != nil {
+            nodeChecking = false
+            nodeAvailable = true
+            return
+        }
         let found = await Task.detached {
             Self.nodeExists()
         }.value
@@ -658,163 +1155,613 @@ struct OnboardingView: View {
     }
 
     private func patchClient(_ client: MCPClient) {
-        patchingClient = client.id
+        // Client configuration writes are transactional but share the local
+        // runtime token. Keep the consent action single-flight across rows.
+        let scope = currentRuntimeScope
+        let capturedStep = currentStep
+        guard patchingClients.isEmpty,
+              firstRunReady,
+              capturedStep == totalSteps - 1,
+              appliedScopeFingerprint == scope.draftFingerprint,
+              let authorizedReceipt = runtimeReceipt,
+              authorizedReceipt.draftFingerprint == scope.draftFingerprint,
+              authorizedReceipt.runtimeFingerprint == scope.runtimeFingerprint,
+              let runtimeToken = (try? AppRuntimeToken.loadExisting()) ?? nil,
+              authorizedReceipt.tokenFingerprint == AppRuntimeToken.fingerprint(for: runtimeToken),
+              configManager.isOnboardingRuntimeScopePersisted(scope)
+        else { return }
+        patchingClients.insert(client.id)
         Task {
+            let validation = await serverManager.validateOnboardingRuntime(
+                for: scope,
+                authorizedDraftFingerprint: scope.draftFingerprint,
+                runtimeToken: runtimeToken,
+                configManager: configManager
+            )
+            guard runtimeReceipt == authorizedReceipt,
+                  case .ready(let receipt) = validation
+            else {
+                firstRunReady = false
+                runtimeReceipt = nil
+                if case .manualRuntime = validation {
+                    firstRunMessage = L("onboarding.firstRunManualRuntime")
+                } else {
+                    firstRunMessage = L("onboarding.firstRunScopeChanged")
+                }
+                patchingClients.remove(client.id)
+                return
+            }
+            runtimeReceipt = receipt
+            guard clientPatchAuthorizationIsCurrent(
+                clientID: client.id,
+                capturedStep: capturedStep,
+                scope: scope,
+                receipt: receipt,
+                runtimeToken: runtimeToken
+            ) else {
+                firstRunReady = false
+                runtimeReceipt = nil
+                firstRunMessage = L("onboarding.firstRunScopeChanged")
+                patchingClients.remove(client.id)
+                return
+            }
             let success = await Task.detached {
                 switch client.kind {
                 case .jsonConfig:
-                    return Self.patchConfig(at: client.configPath)
+                    return Self.patchConfig(at: client.configPath, token: runtimeToken)
                 case .codexCli:
-                    return Self.patchCodexConfig()
+                    return Self.patchCodexConfig(token: runtimeToken)
                 }
             }.value
-            patchResults[client.id] = success
-            patchingClient = nil
-            await prepareFirstRun(force: true)
+            let authorizationStillCurrent = clientPatchAuthorizationIsCurrent(
+                clientID: client.id,
+                capturedStep: capturedStep,
+                scope: scope,
+                receipt: receipt,
+                runtimeToken: runtimeToken
+            )
+            patchResults[client.id] = success && authorizationStillCurrent
+            patchingClients.remove(client.id)
+            guard success, authorizationStillCurrent else {
+                firstRunReady = false
+                runtimeReceipt = nil
+                firstRunMessage = L("onboarding.firstRunScopeChanged")
+                return
+            }
+            await checkFirstRunReadiness()
         }
     }
 
-    private func prepareFirstRun(force: Bool = false) async {
-        if firstRunChecking && !force { return }
+    private func clientPatchAuthorizationIsCurrent(
+        clientID: String,
+        capturedStep: Int,
+        scope: OnboardingRuntimeScope,
+        receipt: ServerManager.OnboardingRuntimeReceipt,
+        runtimeToken: String
+    ) -> Bool {
+        currentStep == capturedStep
+            && capturedStep == totalSteps - 1
+            && patchingClients == [clientID]
+            && currentRuntimeScope == scope
+            && appliedScopeFingerprint == scope.draftFingerprint
+            && runtimeReceipt == receipt
+            && receipt.draftFingerprint == scope.draftFingerprint
+            && receipt.runtimeFingerprint == scope.runtimeFingerprint
+            && receipt.tokenFingerprint == AppRuntimeToken.fingerprint(for: runtimeToken)
+            && scope.assessRuntimeSurface(
+                enabledModules: receipt.enabledModules,
+                unavailableModules: receipt.unavailableModules
+            ).isAcceptable
+            && configManager.isOnboardingRuntimeScopePersisted(scope)
+            && AppRuntimeToken.matchesExisting(runtimeToken)
+    }
+
+    /// Readiness checks are observational. Entering the final onboarding step
+    /// must not create credentials, enable auto-start, or launch a process.
+    private func checkFirstRunReadiness() async {
+        if firstRunChecking { return }
+        firstRunChecking = true
+        firstRunReady = false
+
+        let scope = currentRuntimeScope
+        guard serverManager.autoStartEnabled,
+              let appliedScopeFingerprint,
+              appliedScopeFingerprint == scope.draftFingerprint,
+              let runtimeToken = (try? AppRuntimeToken.loadExisting()) ?? nil,
+              configManager.isOnboardingRuntimeScopePersisted(scope)
+        else {
+            firstRunChecking = false
+            firstRunMessage = appliedScopeFingerprint == nil
+                ? L("onboarding.firstRunWaiting")
+                : L("onboarding.firstRunScopeChanged")
+            return
+        }
+
+        let validation = await serverManager.validateOnboardingRuntime(
+            for: scope,
+            authorizedDraftFingerprint: appliedScopeFingerprint,
+            runtimeToken: runtimeToken,
+            configManager: configManager
+        )
+        guard currentRuntimeScope == scope,
+              self.appliedScopeFingerprint == appliedScopeFingerprint
+        else {
+            firstRunChecking = false
+            firstRunMessage = L("onboarding.firstRunScopeChanged")
+            return
+        }
+        if case .ready(let receipt) = validation {
+            runtimeReceipt = receipt
+            firstRunReady = true
+            firstRunChecking = false
+            firstRunMessage = readyMessage(receipt)
+            return
+        }
+
+        runtimeReceipt = nil
+        firstRunChecking = false
+        if case .manualRuntime = validation {
+            firstRunMessage = L("onboarding.firstRunManualRuntime")
+        } else {
+            firstRunMessage = L("onboarding.firstRunRuntimeFailed")
+        }
+    }
+
+    /// This is the sole onboarding action allowed to create the local token,
+    /// opt into automatic startup, and launch the app-owned runtime.
+    private func startFirstRunRuntime() async {
+        if firstRunChecking { return }
+        let previousAutoStartEnabled = serverManager.autoStartEnabled
+        var activationReady = false
+        defer {
+            serverManager.autoStartEnabled = OnboardingAutoStartConsentPolicy.resolvedValue(
+                previouslyEnabled: previousAutoStartEnabled,
+                activationReady: activationReady
+            )
+            firstRunChecking = false
+        }
         firstRunChecking = true
         firstRunReady = false
         firstRunMessage = L("onboarding.firstRunStarting")
 
+        // This button is the first explicit runtime consent in Setup. Keep
+        // notification authorization coupled to that action rather than app
+        // launch or passive readiness checks.
+        if RuntimeStartConsentPolicy.shouldRequestApprovalNotifications(
+            hitlLevel: configManager.hitlLevel,
+            userInitiated: true
+        ) {
+            HitlManager.requestNotificationPermission()
+        }
+
         do {
             _ = try AppRuntimeToken.ensure()
         } catch {
-            firstRunChecking = false
             firstRunMessage = L("onboarding.firstRunTokenFailed", error.localizedDescription)
             return
         }
 
-        serverManager.autoStartEnabled = true
-        if serverManager.status != .running {
-            serverManager.startServer()
+        let scope = currentRuntimeScope
+        runtimeReceipt = nil
+        let result = await serverManager.activateOnboardingRuntime(
+            for: scope,
+            configManager: configManager
+        )
+        guard currentRuntimeScope == scope else {
+            firstRunReady = false
+            firstRunMessage = L("onboarding.firstRunScopeChanged")
+            return
         }
-
-        for _ in 0..<24 {
-            if let version = await Self.runtimeHealthVersion() {
-                firstRunReady = true
-                firstRunChecking = false
-                firstRunMessage = L("onboarding.firstRunReadyDesc", version, selectedWorkflow.title)
+        switch result {
+        case .ready:
+            let runtimeToken = (try? AppRuntimeToken.loadExisting()) ?? nil
+            let stabilized = await OnboardingRuntimeReadyBarrier.stabilize(
+                commitAutoStart: {
+                    // Temporary restart authority only. The deferred consent
+                    // transaction restores the previous preference unless the
+                    // final authenticated barrier also returns `.ready`.
+                    serverManager.autoStartEnabled = true
+                },
+                requestAutoStart: {
+                    serverManager.autoStartIfNeeded()
+                },
+                scopeIsCurrent: {
+                    currentRuntimeScope == scope
+                },
+                validate: {
+                    guard let runtimeToken else {
+                        return .failed("The app runtime token disappeared after activation.")
+                    }
+                    return await serverManager.validateOnboardingRuntime(
+                        for: scope,
+                        authorizedDraftFingerprint: scope.draftFingerprint,
+                        runtimeToken: runtimeToken,
+                        configManager: configManager
+                    )
+                },
+                recover: {
+                    await serverManager.activateOnboardingRuntime(
+                        for: scope,
+                        configManager: configManager
+                    )
+                }
+            )
+            guard let stabilized else {
+                firstRunReady = false
+                firstRunMessage = L("onboarding.firstRunScopeChanged")
                 return
             }
-            try? await Task.sleep(nanoseconds: 500_000_000)
+            switch stabilized {
+            case .ready(let receipt):
+                activationReady = true
+                runtimeReceipt = receipt
+                appliedScopeFingerprint = scope.draftFingerprint
+                persistOnboardingDraft()
+                firstRunReady = true
+                firstRunMessage = readyMessage(receipt)
+            case .manualRuntime:
+                appliedScopeFingerprint = nil
+                persistOnboardingDraft()
+                firstRunReady = false
+                firstRunMessage = L("onboarding.firstRunManualRuntime")
+            case .failed(let message):
+                firstRunReady = false
+                firstRunMessage = L("onboarding.firstRunConfigFailed", message)
+            }
+        case .manualRuntime:
+            appliedScopeFingerprint = nil
+            persistOnboardingDraft()
+            firstRunReady = false
+            firstRunMessage = L("onboarding.firstRunManualRuntime")
+        case .failed(let message):
+            firstRunReady = false
+            firstRunMessage = L("onboarding.firstRunConfigFailed", message)
         }
-
-        firstRunChecking = false
-        firstRunMessage = L("onboarding.firstRunRuntimeFailed")
     }
 
-    private nonisolated static func runtimeHealthVersion() async -> String? {
-        guard let url = URL(string: AirMcpConstants.appOwnedHealthURL) else { return nil }
-        var request = URLRequest(url: url)
-        request.timeoutInterval = 1.0
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard (response as? HTTPURLResponse)?.statusCode == 200,
-                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  (json["status"] as? String) == "ok"
-            else { return nil }
-            return (json["version"] as? String) ?? "unknown"
-        } catch {
-            return nil
-        }
+    private func readyMessage(_ receipt: ServerManager.OnboardingRuntimeReceipt) -> String {
+        let ready = firstSuccessModulesEnabled
+            ? L("onboarding.firstRunReadyDesc", receipt.version, firstSuccessWorkflow.title)
+            : L("onboarding.firstRunSelectedScopeReadyDesc", receipt.version, selectedWorkflow.title)
+        let unavailable = receipt.unavailableModules.map(\.module).sorted()
+        guard !unavailable.isEmpty else { return ready }
+        return ready + "\n" + L("onboarding.firstRunUnavailableModules", unavailable.joined(separator: ", "))
     }
 
-    private nonisolated static func patchCodexConfig() -> Bool {
+    private nonisolated static func patchCodexConfig(token: String) -> Bool {
         guard let codex = NodeEnvironment.findExecutable(named: "codex") else {
             return false
         }
-        guard let token = try? AppRuntimeToken.ensure() else {
-            return false
-        }
 
-        _ = runProcess(codex, arguments: ["mcp", "remove", "airmcp"])
-        return runProcess(
-            codex,
-            arguments: [
-                "mcp",
-                "add",
-                "--env",
-                "AIRMCP_HTTP_TOKEN=\(token)",
-                "airmcp",
-                "--",
-                "npx",
-                "-y",
-                AirMcpConstants.npmPackageSpecifier,
-                "connect",
-                "--url",
-                AirMcpConstants.appOwnedHttpURL,
-            ]
+        return CodexOnboardingConfigurator.configure(
+            codex: codex,
+            homeDirectory: FileManager.default.homeDirectoryForCurrentUser,
+            token: token,
+            proxyCommand: AirMcpConstants.appOwnedProxyCommand,
+            proxyArguments: AirMcpConstants.appOwnedProxyArgs,
+            tokenStillCurrent: { AppRuntimeToken.matchesExisting(token) }
         )
     }
 
-    private nonisolated static func runProcess(_ executable: String, arguments: [String]) -> Bool {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: executable)
-        process.arguments = arguments
-        process.environment = NodeEnvironment.buildEnv()
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-            return process.terminationStatus == 0
-        } catch {
-            return false
-        }
-    }
-
-    private nonisolated static func patchConfig(at path: String) -> Bool {
+    nonisolated static func patchConfig(
+        at path: String,
+        token: String,
+        tokenValidator: (() -> Bool)? = nil
+    ) -> Bool {
         let fm = FileManager.default
+        let tokenIsCurrent = tokenValidator ?? { AppRuntimeToken.matchesExisting(token) }
 
         // Ensure directory exists
         let dir = (path as NSString).deletingLastPathComponent
         try? fm.createDirectory(atPath: dir, withIntermediateDirectories: true)
 
-        // Read existing config or start fresh
+        // Read existing config or start fresh. A malformed existing file is
+        // never replaced with an empty object.
         var config: [String: Any]
-        if let data = fm.contents(atPath: path),
-           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        {
+        if fm.fileExists(atPath: path) {
+            guard let data = fm.contents(atPath: path),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            else { return false }
             config = json
         } else {
             config = [:]
         }
 
-        // Build the token-gated app-owned runtime entry
-        guard let token = try? AppRuntimeToken.ensure() else {
-            return false
-        }
+        // The caller authenticated runtime-state with this exact existing
+        // token. Never call ensure() here: replacement/deletion must fail the
+        // transaction instead of silently writing a different credential.
+        guard tokenIsCurrent() else { return false }
         let airmcpEntry = AirMcpConstants.appOwnedProxyEntry(token: token)
 
         // Merge into mcpServers
+        if config["mcpServers"] != nil && !(config["mcpServers"] is [String: Any]) {
+            return false
+        }
         var servers = config["mcpServers"] as? [String: Any] ?? [:]
         servers["airmcp"] = airmcpEntry
         config["mcpServers"] = servers
 
-        // Write back
+        // Write back. The proxy entry contains the local bearer token, so the
+        // destination and backup must never be created world-readable.
         do {
             let data = try JSONSerialization.data(
                 withJSONObject: config,
                 options: [.prettyPrinted, .sortedKeys]
             )
-            try data.write(to: URL(fileURLWithPath: path), options: .atomic)
+            guard (try JSONSerialization.jsonObject(with: data)) is [String: Any] else {
+                return false
+            }
+            let backupPath = path + ".airmcp-backup"
+            let originalData = fm.contents(atPath: path)
+            let originalPermissions = ((try? fm.attributesOfItem(atPath: path)[.posixPermissions]) as? NSNumber)?.intValue
+            let originalBackupData = fm.contents(atPath: backupPath)
+            let originalBackupPermissions = ((try? fm.attributesOfItem(atPath: backupPath)[.posixPermissions]) as? NSNumber)?.intValue
+
+            func restoreSnapshot(_ snapshot: Data?, at destination: String, permissions: Int?) {
+                if let snapshot {
+                    try? installFileAtomically(snapshot, at: destination, permissions: permissions ?? 0o600)
+                } else {
+                    try? fm.removeItem(atPath: destination)
+                }
+            }
+
+            func rollbackClientFiles() {
+                restoreSnapshot(originalData, at: path, permissions: originalPermissions)
+                restoreSnapshot(originalBackupData, at: backupPath, permissions: originalBackupPermissions)
+            }
+
+            guard tokenIsCurrent() else { return false }
+
+            if let originalData {
+                try installFileAtomically(originalData, at: backupPath, permissions: 0o600)
+            }
+
+            guard tokenIsCurrent() else {
+                rollbackClientFiles()
+                return false
+            }
+
+            do {
+                try installFileAtomically(data, at: path, permissions: 0o600)
+            } catch {
+                // Keep the operation transactional: a failed permission or
+                // replacement step must not leave a partially patched config.
+                rollbackClientFiles()
+                return false
+            }
+            guard tokenIsCurrent() else {
+                rollbackClientFiles()
+                return false
+            }
             return true
         } catch {
             return false
         }
     }
 
-    private func saveAndComplete() {
-        // Save module selection
-        configManager.disabledModules = Array(disabledModules)
+    private nonisolated static func installFileAtomically(
+        _ data: Data,
+        at path: String,
+        permissions: Int
+    ) throws {
+        let fm = FileManager.default
+        let destination = URL(fileURLWithPath: path)
+        let temporary = destination.deletingLastPathComponent().appendingPathComponent(
+            ".\(destination.lastPathComponent).airmcp-\(UUID().uuidString).tmp"
+        )
+        let attributes: [FileAttributeKey: Any] = [
+            .posixPermissions: NSNumber(value: permissions),
+        ]
+
+        guard fm.createFile(atPath: temporary.path, contents: data, attributes: attributes) else {
+            throw NSError(
+                domain: "AirMCPOnboardingConfig",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Failed to create an owner-only client config."]
+            )
+        }
+        defer { try? fm.removeItem(at: temporary) }
+        try fm.setAttributes(attributes, ofItemAtPath: temporary.path)
+
+        if fm.fileExists(atPath: path) {
+            _ = try fm.replaceItemAt(destination, withItemAt: temporary)
+        } else {
+            try fm.moveItem(at: temporary, to: destination)
+        }
+        try fm.setAttributes(attributes, ofItemAtPath: path)
+    }
+
+    private func saveAndComplete() async {
+        guard !firstRunChecking else { return }
+        firstRunChecking = true
+        defer { firstRunChecking = false }
+
+        let scope = currentRuntimeScope
+        var exactRuntimeRequiredAtCompletion = false
+        let initialProbe = await ServerManager.probeAppOwnedRuntime()
+        guard currentRuntimeScope == scope else {
+            completionError = L("onboarding.firstRunScopeChanged")
+            return
+        }
+
+        switch initialProbe {
+        case .ready(_, appOwned: false):
+            completionError = L("onboarding.firstRunManualRuntime")
+            return
+        case .ready(let version, appOwned: true):
+            guard let runtimeToken = (try? AppRuntimeToken.loadExisting()) ?? nil,
+                  let state = try? await AppRuntimeClient.runtimeState(token: runtimeToken),
+                  let expectedOwnerFingerprint = try? AppRuntimeToken.expectedOwnerFingerprint(),
+                  ServerManager.authenticatedOwnedRuntimeIdentity(
+                      state: state,
+                      expectedVersion: version,
+                      expectedOwnerFingerprint: expectedOwnerFingerprint
+                  ) != nil
+            else {
+                completionError = L("onboarding.firstRunRuntimeFailed")
+                return
+            }
+            let surfaceAssessment = scope.assessRuntimeSurface(
+                enabledModules: state.enabledModules,
+                unavailableModules: state.unavailableModules
+            )
+            let runtimeMatches = AppRuntimeToken.matchesExisting(runtimeToken)
+                && state.disabledModules == scope.disabledModules
+                && state.scopeFingerprint == scope.runtimeFingerprint
+                && surfaceAssessment.isAcceptable
+
+            if !runtimeMatches {
+                let result = await serverManager.activateOnboardingRuntime(
+                    for: scope,
+                    configManager: configManager
+                )
+                guard currentRuntimeScope == scope else {
+                    completionError = L("onboarding.firstRunScopeChanged")
+                    return
+                }
+                switch result {
+                case .ready(let receipt):
+                    runtimeReceipt = receipt
+                    appliedScopeFingerprint = scope.draftFingerprint
+                    persistOnboardingDraft()
+                    exactRuntimeRequiredAtCompletion = true
+                case .manualRuntime:
+                    completionError = L("onboarding.firstRunManualRuntime")
+                    return
+                case .failed(let message):
+                    completionError = L("onboarding.firstRunConfigFailed", message)
+                    return
+                }
+            } else if !configManager.isOnboardingRuntimeScopePersisted(scope) {
+                guard let transaction = configManager.beginOnboardingRuntimeScopeTransaction(scope) else {
+                    completionError = configManager.lastPersistenceError
+                        ?? L("onboarding.firstRunConfigFailed", "unknown")
+                    return
+                }
+                guard currentRuntimeScope == scope else {
+                    _ = configManager.rollbackOnboardingRuntimeScope(transaction)
+                    completionError = L("onboarding.firstRunScopeChanged")
+                    return
+                }
+            }
+            exactRuntimeRequiredAtCompletion = true
+        case .unavailable:
+            if serverManager.canStopRuntime {
+                let result = await serverManager.activateOnboardingRuntime(
+                    for: scope,
+                    configManager: configManager
+                )
+                switch result {
+                case .ready(let receipt):
+                    runtimeReceipt = receipt
+                    appliedScopeFingerprint = scope.draftFingerprint
+                    persistOnboardingDraft()
+                    exactRuntimeRequiredAtCompletion = true
+                    break
+                case .manualRuntime:
+                    completionError = L("onboarding.firstRunManualRuntime")
+                    return
+                case .failed(let message):
+                    completionError = L("onboarding.firstRunConfigFailed", message)
+                    return
+                }
+                break
+            }
+            // Finishing first-run Setup is not runtime consent. Persist and
+            // verify the selection, but do not create a token or start Node.
+            guard let transaction = configManager.beginOnboardingRuntimeScopeTransaction(scope) else {
+                completionError = configManager.lastPersistenceError
+                    ?? L("onboarding.firstRunConfigFailed", "unknown")
+                return
+            }
+            guard currentRuntimeScope == scope else {
+                _ = configManager.rollbackOnboardingRuntimeScope(transaction)
+                completionError = L("onboarding.firstRunScopeChanged")
+                return
+            }
+
+            // Close the probe→save race. If a process appeared, accept only an
+            // exact scope; otherwise restore and require an explicit retry.
+            let postSaveProbe = await ServerManager.probeAppOwnedRuntime()
+            if case .ready(_, appOwned: false) = postSaveProbe {
+                _ = configManager.rollbackOnboardingRuntimeScope(transaction)
+                completionError = L("onboarding.firstRunManualRuntime")
+                return
+            } else if case .ready(let version, appOwned: true) = postSaveProbe {
+                guard let runtimeToken = (try? AppRuntimeToken.loadExisting()) ?? nil,
+                      case .ready(let receipt) = await serverManager.validateOnboardingRuntime(
+                          for: scope,
+                          authorizedDraftFingerprint: scope.draftFingerprint,
+                          runtimeToken: runtimeToken,
+                          configManager: configManager
+                      ),
+                      receipt.version == version
+                else {
+                    _ = configManager.rollbackOnboardingRuntimeScope(transaction)
+                    completionError = L("onboarding.firstRunManualRuntime")
+                    return
+                }
+                runtimeReceipt = receipt
+                exactRuntimeRequiredAtCompletion = true
+            } else if postSaveProbe != .unavailable {
+                _ = configManager.rollbackOnboardingRuntimeScope(transaction)
+                completionError = L("onboarding.firstRunRuntimeFailed")
+                return
+            }
+        case .portOccupied, .versionMismatch, .authenticationFailed:
+            completionError = serverManager.statusLabel
+            return
+        }
+
+        guard currentRuntimeScope == scope,
+              configManager.isOnboardingRuntimeScopePersisted(scope)
+        else {
+            completionError = configManager.lastPersistenceError
+                ?? L("onboarding.firstRunConfigFailed", "verification failed")
+            return
+        }
+
+        // Final completion barrier. The scope captured before any await must
+        // still be current and byte-for-byte persisted. A consented runtime is
+        // re-authenticated against that exact scope/surface; the no-consent path
+        // proves the runtime is still absent immediately before setting the flag.
+        if exactRuntimeRequiredAtCompletion {
+            guard let runtimeToken = (try? AppRuntimeToken.loadExisting()) ?? nil,
+                  case .ready(let finalReceipt) = await serverManager.validateOnboardingRuntime(
+                      for: scope,
+                      authorizedDraftFingerprint: scope.draftFingerprint,
+                      runtimeToken: runtimeToken,
+                      configManager: configManager
+                  ),
+                  currentRuntimeScope == scope,
+                  configManager.isOnboardingRuntimeScopePersisted(scope),
+                  finalReceipt.draftFingerprint == scope.draftFingerprint,
+                  finalReceipt.runtimeFingerprint == scope.runtimeFingerprint,
+                  finalReceipt.tokenFingerprint == AppRuntimeToken.fingerprint(for: runtimeToken)
+            else {
+                completionError = L("onboarding.firstRunRuntimeFailed")
+                return
+            }
+            runtimeReceipt = finalReceipt
+        } else {
+            let finalProbe = await ServerManager.probeAppOwnedRuntime()
+            guard currentRuntimeScope == scope,
+                  configManager.isOnboardingRuntimeScopePersisted(scope),
+                  finalProbe == .unavailable
+            else {
+                if case .ready(_, appOwned: false) = finalProbe {
+                    completionError = L("onboarding.firstRunManualRuntime")
+                } else {
+                    completionError = L("onboarding.firstRunRuntimeFailed")
+                }
+                return
+            }
+        }
 
         // Mark onboarding complete
         UserDefaults.standard.set(true, forKey: AirMcpConstants.keyOnboardingCompleted)
+        UserDefaults.standard.removeObject(forKey: AirMcpConstants.keyOnboardingStep)
+        OnboardingDraftStore.clear()
 
         onComplete()
 

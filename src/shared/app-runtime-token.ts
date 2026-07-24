@@ -3,7 +3,8 @@ import { dirname, join } from "node:path";
 import { randomBytes } from "node:crypto";
 import { HOME } from "./constants.js";
 
-export const APP_RUNTIME_TOKEN_PATH = join(HOME, "Library", "Application Support", "AirMCP", "http-token");
+export const APP_RUNTIME_TOKEN_PATH =
+  process.env.AIRMCP_APP_RUNTIME_TOKEN_PATH || join(HOME, "Library", "Application Support", "AirMCP", "http-token");
 
 function createToken(): string {
   return randomBytes(32).toString("base64url");

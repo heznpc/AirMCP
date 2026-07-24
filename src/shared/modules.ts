@@ -158,7 +158,7 @@ const cacheByKey = new Map<string, ModuleRegistration[]>();
 export async function loadModuleRegistry(config?: AirMcpConfig): Promise<ModuleRegistration[]> {
   const whitelist = getDebugWhitelist();
   const targets = getTargetManifestEntries(config, whitelist);
-  const cacheKey = `${process.env.AIRMCP_ADDON_PACKAGE_MODE ?? "prefer-installed"}|${targets.map((m) => m.name).join(",")}`;
+  const cacheKey = `${process.env.AIRMCP_ADDON_PACKAGE_MODE ?? "bundled"}|${targets.map((m) => m.name).join(",")}`;
   if (cacheByKey.has(cacheKey)) return cacheByKey.get(cacheKey)!;
   clearMissingAddonPackageModules();
 

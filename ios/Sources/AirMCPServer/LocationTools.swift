@@ -48,7 +48,7 @@ public struct GetCurrentLocationTool: MCPTool {
 // MARK: - Location Permission
 
 public struct LocationPermissionTool: MCPTool {
-    public static let name = "location_permission"
+    public static let name = "get_location_permission"
     public static let description = "Check the current location authorization status."
     nonisolated(unsafe) public static let inputSchema: [String: Any] = [
         "type": "object",

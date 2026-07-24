@@ -54,19 +54,6 @@ export const BREAKER = {
 } as const;
 
 // ══════════════════════════════════════════════════════════════════════
-// EXTERNAL CDN DEPENDENCIES — pin versions here, change in one place
-// ══════════════════════════════════════════════════════════════════════
-
-export const EXT_APPS = {
-  /**
-   * CDN URL for the @modelcontextprotocol/ext-apps client library used by
-   * MCP Apps HTML templates. Keep version aligned with the npm dependency
-   * declared in package.json (currently 1.5.0).
-   */
-  CDN_URL: envStr("AIRMCP_EXT_APPS_CDN", "https://esm.sh/@modelcontextprotocol/ext-apps@1.5.0"),
-} as const;
-
-// ══════════════════════════════════════════════════════════════════════
 // MODEL NAMES — change here when models are upgraded
 // ══════════════════════════════════════════════════════════════════════
 
@@ -195,7 +182,7 @@ export const LIMITS = {
 
 export const IDENTITY = {
   /** User-Agent for HTTP requests to external APIs */
-  USER_AGENT: envStr("AIRMCP_USER_AGENT", "AirMCP/2.15 (https://github.com/heznpc/AirMCP)"),
+  USER_AGENT: envStr("AIRMCP_USER_AGENT", "AirMCP/2.16 (https://github.com/heznpc/AirMCP)"),
   /** Default HTTP server port */
   HTTP_PORT: envInt("AIRMCP_HTTP_PORT", 3847),
 } as const;
@@ -209,14 +196,14 @@ export const PATHS = {
   CONFIG_DIR: join(HOME, ".config", "airmcp"),
   /** User config file */
   CONFIG: resolveTilde(envStr("AIRMCP_CONFIG_PATH", "~/.config/airmcp/config.json")),
-  /** HITL socket */
-  HITL_SOCKET: join(HOME, ".config", "airmcp", "hitl.sock"),
+  /** HITL socket (env override keeps acceptance/dev harnesses isolated) */
+  HITL_SOCKET: resolveTilde(envStr("AIRMCP_HITL_SOCKET_PATH", join(HOME, ".config", "airmcp", "hitl.sock"))),
   /** Vector store directory (env: AIRMCP_VECTOR_STORE_DIR — primarily for tests) */
   VECTOR_STORE: resolveTilde(envStr("AIRMCP_VECTOR_STORE_DIR", join(HOME, ".airmcp"))),
   /** Context-memory index directory (facts / entities / episodes). */
   MEMORY_DIR: join(HOME, ".cache", "airmcp"),
-  /** Context-memory JSON store. */
-  MEMORY_STORE: join(HOME, ".cache", "airmcp", "memory.json"),
+  /** Context-memory JSON store (env override is primarily for isolated validation). */
+  MEMORY_STORE: resolveTilde(envStr("AIRMCP_MEMORY_STORE_PATH", join(HOME, ".cache", "airmcp", "memory.json"))),
   /** Usage profile (env: AIRMCP_USAGE_PROFILE_PATH — primarily for tests) */
   USAGE_PROFILE: resolveTilde(envStr("AIRMCP_USAGE_PROFILE_PATH", join(HOME, ".airmcp", "profile.json"))),
   /** Temp directory for screenshots, recordings, intermediate exports */
@@ -234,6 +221,8 @@ export const AUDIT = {
   MAX_ARG_LENGTH: 500,
   /** Max size of a single audit entry (JSON line) before placeholder substitution */
   MAX_ENTRY_SIZE: 10_000,
+  /** Hard in-memory audit spool bound while disk persistence is unavailable */
+  MAX_BUFFER_SIZE: envInt("AIRMCP_AUDIT_MAX_BUFFER_BYTES", 8 * 1024 * 1024),
   /** Max audit log file size before rotation */
   MAX_FILE_SIZE: 10 * 1024 * 1024,
   /** Max consecutive flush failures before disabling audit */

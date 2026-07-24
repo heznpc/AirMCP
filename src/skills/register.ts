@@ -3,7 +3,7 @@ import type { SkillDefinition, SkillInput } from "./types.js";
 import { executeSkill } from "./executor.js";
 import { userPrompt } from "../shared/prompt.js";
 import { ok, okUntrusted, errUpstream } from "../shared/result.js";
-import { toolRegistry } from "../shared/tool-registry.js";
+import { toolRegistry, type ToolRegistry } from "../shared/tool-registry.js";
 import { z } from "zod";
 import { log } from "../shared/logger.js";
 
@@ -146,7 +146,7 @@ function registerAsPrompt(server: McpServer, skill: SkillDefinition): void {
   server.prompt(skill.name, skill.description, () => userPrompt(skill.description, generatePromptText(skill)));
 }
 
-function registerAsTool(server: McpServer, skill: SkillDefinition): void {
+function registerAsTool(server: McpServer, skill: SkillDefinition, registry: ToolRegistry): void {
   const inputSchema = skill.inputs ? buildSkillInputSchema(skill.inputs) : {};
   server.registerTool(
     `skill_${skill.name}`,
@@ -158,7 +158,7 @@ function registerAsTool(server: McpServer, skill: SkillDefinition): void {
     },
     async (args: Record<string, unknown> = {}) => {
       try {
-        const result = await executeSkill(server, skill, args);
+        const result = await executeSkill(server, skill, args, registry);
         if (!result.success) {
           const failedStep = result.steps.find((s) => s.status === "error");
           return errUpstream(`Skill "${skill.name}" failed at step "${failedStep?.id}": ${failedStep?.error}`);
@@ -187,17 +187,18 @@ function registerAsTool(server: McpServer, skill: SkillDefinition): void {
  * crashing on startup (see v2.8.0 "Prompt weekly-review is already
  * registered" incident).
  */
-function isPromptNameTaken(name: string): boolean {
-  return toolRegistry.getPromptNames().includes(name);
+function isPromptNameTaken(name: string, registry: ToolRegistry): boolean {
+  return registry.getPromptNames().includes(name);
 }
 
-function isToolNameTaken(name: string): boolean {
-  return toolRegistry.getToolNames().includes(name);
+function isToolNameTaken(name: string, registry: ToolRegistry): boolean {
+  return registry.getToolNames().includes(name);
 }
 
 export function registerSkills(
   server: McpServer,
   skills: SkillDefinition[],
+  registry: ToolRegistry = toolRegistry,
 ): { prompts: number; tools: number; skipped: number } {
   let prompts = 0;
   let tools = 0;
@@ -205,7 +206,7 @@ export function registerSkills(
   for (const skill of skills) {
     switch (skill.expose_as) {
       case "prompt": {
-        if (isPromptNameTaken(skill.name)) {
+        if (isPromptNameTaken(skill.name, registry)) {
           log.warn("skill collides with an already-registered prompt — skipping", {
             skill: skill.name,
             remedy: "rename the skill in its YAML",
@@ -219,7 +220,7 @@ export function registerSkills(
       }
       case "tool": {
         const toolName = `skill_${skill.name}`;
-        if (isToolNameTaken(toolName)) {
+        if (isToolNameTaken(toolName, registry)) {
           log.warn("skill collides with an already-registered tool — skipping", {
             skill: skill.name,
             toolName,
@@ -228,7 +229,7 @@ export function registerSkills(
           skipped++;
           break;
         }
-        registerAsTool(server, skill);
+        registerAsTool(server, skill, registry);
         tools++;
         break;
       }

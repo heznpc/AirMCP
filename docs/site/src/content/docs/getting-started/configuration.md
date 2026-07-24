@@ -65,7 +65,7 @@ The default config file location is `~/.config/airmcp/config.json`. You can over
 | `AIRMCP_PROFILE=starter` | Select a module profile: `starter`, `communications-safe`, `productivity`, `full`, or `custom` |
 | `AIRMCP_TOOL_EXPOSURE=progressive` | Keep `tools/list` thin; use `profile` or `full` to expose more tools |
 | `AIRMCP_MODULE_PACKS=core,productivity` | Activate selected DLC-like module packs |
-| `AIRMCP_ADDON_PACKAGE_MODE=prefer-installed` | Try installed physical add-on packages before bundled fallback |
+| `AIRMCP_ADDON_PACKAGE_MODE=bundled` | Default: use the universal root. Set `prefer-installed` for compatibility packages or `external-only` to require them. |
 | `AIRMCP_ADDON_INSTALL_PREFIX` | Override the default `~/.airmcp/addons` companion add-on install prefix |
 | `AIRMCP_REQUIRE_TOOL_SESSION=true` | Require task-scoped sessions before hidden `run_tool` dispatch |
 | `AIRMCP_HARNESS_ADAPTER=strict` | Select a task harness policy explicitly |

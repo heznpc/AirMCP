@@ -15,6 +15,10 @@ import { AsyncLocalStorage } from "node:async_hooks";
 export interface OAuthClaims {
   /** JWT `sub` claim — the authenticated principal. */
   subject: string;
+  /** Stable OAuth client identity. RFC 9068 access tokens use `client_id`;
+   *  OIDC-oriented issuers may expose the equivalent authorized party as
+   *  `azp`. Used with `sub` to bind Streamable HTTP sessions. */
+  clientId?: string;
   /** Parsed `scope` string split on whitespace per RFC 6749 §3.3. */
   scopes: string[];
   /** Raw decoded JWT payload for downstream consumers that need more

@@ -4,7 +4,7 @@
 // Generator: scripts/gen-swift-intents.mjs
 // RFC 0007 Phase A.2b.2 + A.4.1 — 233 auto-selected read-only
 // tools (84 with typed drift-guards + Interactive Snippet
-// SwiftUI views) + 9 AppShortcutsProvider entries.
+// SwiftUI views) + 8 AppShortcutsProvider entries.
 // Run `npm run gen:intents` to refresh after tool metadata changes.
 // CI guards against drift via `npm run gen:intents:check`.
 //
@@ -1253,6 +1253,16 @@ public enum AuditLogStatusOption: String, AppEnum {
 }
 
 @available(iOS 16, macOS 13, *)
+public enum AuditLogKindOption: String, AppEnum {
+    case tool, approval
+    nonisolated(unsafe) public static var typeDisplayRepresentation: TypeDisplayRepresentation = "Filter tool calls or approval decisions."
+    nonisolated(unsafe) public static var caseDisplayRepresentations: [Self: DisplayRepresentation] = [
+        .tool: "Tool",
+        .approval: "Approval"
+    ]
+}
+
+@available(iOS 16, macOS 13, *)
 public enum GetDirectionsTransporttypeOption: String, AppEnum {
     case driving, walking, transit
     nonisolated(unsafe) public static var typeDisplayRepresentation: TypeDisplayRepresentation = "Mode of transport (default: driving)"
@@ -1673,6 +1683,12 @@ public struct AuditLogIntent: AppIntent {
     @Parameter(title: "Filter by status. Omit to include both.")
     public var status: AuditLogStatusOption?
 
+    @Parameter(title: "Filter to one correlated tool/approval trace.")
+    public var correlationId: String?
+
+    @Parameter(title: "Filter tool calls or approval decisions.")
+    public var kind: AuditLogKindOption?
+
     @Parameter(title: "Max entries to return (default: 100, max: 1000).", default: 100, inclusiveRange: (1, 1000))
     public var limit: Int
 
@@ -1682,6 +1698,8 @@ public struct AuditLogIntent: AppIntent {
         if let v = since { args["since"] = ISO8601DateFormatter().string(from: v) }
         if let v = tool { args["tool"] = v }
         if let v = status { args["status"] = v.rawValue }
+        if let v = correlationId { args["correlationId"] = v }
+        if let v = kind { args["kind"] = v.rawValue }
         args["limit"] = limit
         let result = try await MCPIntentRouter.shared.call(
             tool: "audit_log",
@@ -8088,80 +8106,46 @@ public struct WorkflowReadinessIntent: AppIntent {
     }
 }
 
-// MARK: - AppShortcutsProvider
+// MARK: - iOS AppShortcutsProvider
 
-#if AIRMCP_ENABLE_FOUNDATION_MODELS && canImport(FoundationModels) && compiler(>=6.3)
-@available(macOS 26, iOS 26, *)
-public struct AirMCPAskShortcut: AppShortcutsProvider {
-    @AppShortcutsBuilder public static var appShortcuts: [AppShortcut] {
-        AppShortcut(
-            intent: AskAirMCPIntent(),
-            phrases: [
-                "Ask \(.applicationName)",
-                "Ask \(.applicationName) about my day",
-            ],
-            shortTitle: "Ask AirMCP",
-            systemImageName: "brain.head.profile"
-        )
-    }
-}
-#endif
-
+#if os(iOS)
 public struct AirMCPGeneratedShortcuts: AppShortcutsProvider {
     @AppShortcutsBuilder public static var appShortcuts: [AppShortcut] {
         AppShortcut(
-            intent: SummarizeContextIntent(),
+            intent: GetLocationPermissionIntent(),
             phrases: [
-                "Daily Briefing in \(.applicationName)",
-                "brief my day with \(.applicationName)",
+                "Get Location Permission in \(.applicationName)",
+                "get location permission with \(.applicationName)",
             ],
-            shortTitle: "Daily Briefing",
-            systemImageName: "sun.max"
+            shortTitle: "Get Location Permission",
+            systemImageName: "app.connected.to.app.below.fill"
         )
         AppShortcut(
-            intent: TimelineTodayIntent(),
+            intent: ListCalendarsIntent(),
             phrases: [
-                "Today Timeline in \(.applicationName)",
-                "show my day with \(.applicationName)",
+                "List Calendars in \(.applicationName)",
+                "list calendars with \(.applicationName)",
             ],
-            shortTitle: "Today Timeline",
-            systemImageName: "calendar"
+            shortTitle: "List Calendars",
+            systemImageName: "calendar.badge.plus"
         )
         AppShortcut(
-            intent: SkillInboxTriageIntent(),
+            intent: ListContactsIntent(),
             phrases: [
-                "Inbox Triage in \(.applicationName)",
-                "triage my inbox with \(.applicationName)",
+                "List Contacts in \(.applicationName)",
+                "list contacts with \(.applicationName)",
             ],
-            shortTitle: "Inbox Triage",
-            systemImageName: "tray.full"
+            shortTitle: "List Contacts",
+            systemImageName: "person.crop.circle"
         )
         AppShortcut(
-            intent: SkillProjectDigestIntent(),
+            intent: ListReminderListsIntent(),
             phrases: [
-                "Project Digest in \(.applicationName)",
-                "summarize my project with \(.applicationName)",
+                "List Reminder Lists in \(.applicationName)",
+                "list reminder lists with \(.applicationName)",
             ],
-            shortTitle: "Project Digest",
-            systemImageName: "folder"
-        )
-        AppShortcut(
-            intent: TodayEventsIntent(),
-            phrases: [
-                "Today's Events in \(.applicationName)",
-                "today events with \(.applicationName)",
-            ],
-            shortTitle: "Today's Events",
-            systemImageName: "calendar"
-        )
-        AppShortcut(
-            intent: SearchNotesIntent(),
-            phrases: [
-                "Search Notes in \(.applicationName)",
-                "search notes with \(.applicationName)",
-            ],
-            shortTitle: "Search Notes",
-            systemImageName: "note.text"
+            shortTitle: "List Reminder Lists",
+            systemImageName: "checklist"
         )
         AppShortcut(
             intent: ListRemindersIntent(),
@@ -8182,16 +8166,27 @@ public struct AirMCPGeneratedShortcuts: AppShortcutsProvider {
             systemImageName: "person.crop.circle"
         )
         AppShortcut(
-            intent: GetCurrentWeatherIntent(),
+            intent: SearchRemindersIntent(),
             phrases: [
-                "Get Current Weather in \(.applicationName)",
-                "get current weather with \(.applicationName)",
+                "Search Reminders in \(.applicationName)",
+                "search reminders with \(.applicationName)",
             ],
-            shortTitle: "Get Current Weather",
-            systemImageName: "cloud.sun"
+            shortTitle: "Search Reminders",
+            systemImageName: "checklist"
+        )
+        AppShortcut(
+            intent: TodayEventsIntent(),
+            phrases: [
+                "Today's Events in \(.applicationName)",
+                "today events with \(.applicationName)",
+            ],
+            shortTitle: "Today's Events",
+            systemImageName: "calendar"
         )
     }
 }
+#endif // os(iOS)
+
 
 #endif
 

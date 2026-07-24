@@ -220,11 +220,11 @@ describe("generated Swift dialogs (integration with AIRMCP_APPINTENTS_DESTRUCTIV
     expect(slice).not.toMatch(/requestConfirmation\(/);
   });
 
-  test("FoundationModels AppShortcut is behind the explicit preview compile flag", () => {
-    expect(generated).toContain(
-      "#if AIRMCP_ENABLE_FOUNDATION_MODELS && canImport(FoundationModels) && compiler(>=6.3)",
-    );
-    expect(generated).toContain("public struct AirMCPAskShortcut: AppShortcutsProvider");
+  test("AppShortcutsProvider is iOS-only and excludes the optional Foundation Models action", () => {
+    expect(generated).toContain("// MARK: - iOS AppShortcutsProvider\n\n#if os(iOS)");
+    expect(generated).toContain("public struct AirMCPGeneratedShortcuts: AppShortcutsProvider");
+    expect(generated).not.toContain("public struct AirMCPAskShortcut: AppShortcutsProvider");
+    expect(generated).toContain("#endif // os(iOS)");
     expect(generated).not.toContain("if #available(macOS 26, iOS 26, *) {\n            AppShortcut(");
   });
 

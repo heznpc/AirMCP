@@ -1,5 +1,7 @@
-import { describe, test, expect, beforeEach, jest } from '@jest/globals';
-import { installHitlGuard } from '../dist/shared/hitl-guard.js';
+import { describe, test, expect, beforeEach, jest } from "@jest/globals";
+import { runWithRequestContext } from "../dist/shared/request-context.js";
+
+import { installHitlGuard, consumeApprovalAuditEvents, runWithApprovalAuditSink } from "../dist/shared/hitl-guard.js";
 
 /**
  * Creates a minimal mock McpServer whose registerTool captures registrations.
@@ -12,18 +14,19 @@ import { installHitlGuard } from '../dist/shared/hitl-guard.js';
  *     can verify whether elicitation was attempted (managed clients skip it).
  */
 function makeMockServer(opts = {}) {
-  const { clientName, withElicitation = false } = typeof opts === 'string'
-    ? { clientName: opts } // backward compat: makeMockServer('claude-ai')
-    : opts;
+  const { clientName, withElicitation = false } =
+    typeof opts === "string"
+      ? { clientName: opts } // backward compat: makeMockServer('claude-ai')
+      : opts;
   const registrations = [];
   const elicitCalls = [];
   const inner = {
-    ...(clientName ? { getClientVersion: () => ({ name: clientName, version: '1.0.0' }) } : {}),
+    ...(clientName ? { getClientVersion: () => ({ name: clientName, version: "1.0.0" }) } : {}),
     ...(withElicitation
       ? {
           elicitInput: jest.fn(async (req) => {
             elicitCalls.push(req);
-            return { action: 'accept', content: { approve: true } };
+            return { action: "accept", content: { approve: true } };
           }),
         }
       : {}),
@@ -48,7 +51,7 @@ function makeConfig(level, whitelist = []) {
       level,
       whitelist: new Set(whitelist),
       timeout: 30000,
-      socketPath: '/tmp/fake.sock',
+      socketPath: "/tmp/fake.sock",
     },
   };
 }
@@ -68,28 +71,222 @@ function makeMockHitlClient(autoApprove = true, reachable = true) {
   };
 }
 
+function makeDecisionHitlClient(decision, reachable = true) {
+  const calls = [];
+  return {
+    calls,
+    isReachable: () => Promise.resolve(reachable),
+    requestApprovalDecision(tool, args, destructive, openWorld, sensitive = false) {
+      calls.push({ tool, args, destructive, openWorld, sensitive });
+      return Promise.resolve(decision);
+    },
+    requestApproval() {
+      throw new Error("boolean compatibility API should not be used when decision API exists");
+    },
+    dispose() {},
+  };
+}
+
 // ---------- basic export tests ----------
 
-describe('installHitlGuard export', () => {
-  test('is a function', () => {
-    expect(typeof installHitlGuard).toBe('function');
+describe("installHitlGuard export", () => {
+  test("is a function", () => {
+    expect(typeof installHitlGuard).toBe("function");
+  });
+});
+
+describe("approval audit events", () => {
+  test("assigns a distinct cryptographic UUID to every approval decision", async () => {
+    const { server, registrations } = makeMockServer();
+    installHitlGuard(server, makeMockHitlClient(true, true), makeConfig("all"));
+    server.registerTool("repeat_write", { annotations: { readOnlyHint: false } }, () => "ran");
+
+    const events = await runWithRequestContext({ correlationId: "same-workflow" }, async () => {
+      await registrations[0].callback({});
+      await registrations[0].callback({});
+      return consumeApprovalAuditEvents();
+    });
+
+    expect(events).toHaveLength(2);
+    expect(events[0].approvalId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(events[1].approvalId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(events[0].approvalId).not.toBe(events[1].approvalId);
+    expect(events[0].correlationId).toBe(events[1].correlationId);
+  });
+
+  test("records an elicitation approval as a separate approval event", async () => {
+    const { server, registrations } = makeMockServer({ withElicitation: true });
+    installHitlGuard(server, makeMockHitlClient(), makeConfig("all"));
+    server.registerTool("write_note", { annotations: { readOnlyHint: false } }, () => "ran");
+
+    const events = await runWithRequestContext({}, async () => {
+      await registrations[0].callback({ title: "private title" });
+      return consumeApprovalAuditEvents();
+    });
+
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        approvalId: expect.any(String),
+        timestamp: expect.any(String),
+        tool: "write_note",
+        decision: "approved",
+        channel: "elicitation",
+      }),
+    );
+    expect(JSON.stringify(events)).not.toContain("private title");
+  });
+
+  test("records socket denial without duplicating tool arguments", async () => {
+    const { server, registrations } = makeMockServer();
+    installHitlGuard(server, makeMockHitlClient(false, true), makeConfig("all"));
+    server.registerTool("delete_note", { annotations: { destructiveHint: true } }, () => "never");
+
+    const events = await runWithRequestContext({}, async () => {
+      await registrations[0].callback({ id: "private-id" });
+      return consumeApprovalAuditEvents();
+    });
+
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        timestamp: expect.any(String),
+        tool: "delete_note",
+        decision: "denied",
+        channel: "socket",
+      }),
+    );
+    expect(JSON.stringify(events)).not.toContain("private-id");
+  });
+
+  test("records unavailable when neither socket nor elicitation can answer", async () => {
+    const { server, registrations } = makeMockServer({ clientName: "claude-code" });
+    installHitlGuard(server, makeMockHitlClient(true, false), makeConfig("all"));
+    server.registerTool("create_reminder", { annotations: { sensitiveHint: true } }, () => "never");
+
+    const events = await runWithRequestContext({}, async () => {
+      await registrations[0].callback({});
+      return consumeApprovalAuditEvents();
+    });
+
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        timestamp: expect.any(String),
+        tool: "create_reminder",
+        decision: "unavailable",
+        channel: "unavailable",
+      }),
+    );
+  });
+
+  test("records socket timeout distinctly and returns hitl_timeout without running the handler", async () => {
+    const { server, registrations } = makeMockServer();
+    installHitlGuard(server, makeDecisionHitlClient("timed_out"), makeConfig("all"));
+    const handler = jest.fn(() => "never");
+    server.registerTool("slow_write", { annotations: { readOnlyHint: false } }, handler);
+
+    const { result, events } = await runWithRequestContext({}, async () => {
+      const result = await registrations[0].callback({});
+      return { result, events: consumeApprovalAuditEvents() };
+    });
+
+    expect(handler).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      isError: true,
+      structuredContent: { error: { category: "hitl_timeout" } },
+    });
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        tool: "slow_write",
+        decision: "timed_out",
+        channel: "socket",
+      }),
+    );
+  });
+
+  test.each(["unavailable", "unexpected_runtime_value"])(
+    "fails closed and records unavailable for socket decision %s",
+    async (decision) => {
+      const { server, registrations } = makeMockServer();
+      installHitlGuard(server, makeDecisionHitlClient(decision), makeConfig("all"));
+      const handler = jest.fn(() => "never");
+      server.registerTool("uncertain_write", { annotations: { readOnlyHint: false } }, handler);
+
+      const { result, events } = await runWithRequestContext({}, async () => {
+        const result = await registrations[0].callback({});
+        return { result, events: consumeApprovalAuditEvents() };
+      });
+
+      expect(handler).not.toHaveBeenCalled();
+      expect(result).toMatchObject({ isError: true });
+      expect(events).toContainEqual(
+        expect.objectContaining({
+          tool: "uncertain_write",
+          decision: "unavailable",
+          channel: "socket",
+        }),
+      );
+    },
+  );
+
+  test("awaits the approval audit sink before invoking an approved callback", async () => {
+    const { server, registrations } = makeMockServer();
+    installHitlGuard(server, makeMockHitlClient(true, true), makeConfig("all"));
+
+    let mutated = false;
+    server.registerTool("governed_write", { annotations: { readOnlyHint: false } }, () => {
+      mutated = true;
+      return "ran";
+    });
+
+    let releaseSink;
+    let signalSinkStarted;
+    const sinkStarted = new Promise((resolve) => {
+      signalSinkStarted = resolve;
+    });
+    const sinkBarrier = new Promise((resolve) => {
+      releaseSink = resolve;
+    });
+    const sink = jest.fn(async () => {
+      signalSinkStarted();
+      await sinkBarrier;
+    });
+
+    const call = runWithRequestContext({ correlationId: "governed-run-1", actor: "hitl-approved" }, () =>
+      runWithApprovalAuditSink(sink, () => registrations[0].callback({})),
+    );
+
+    await sinkStarted;
+    expect(mutated).toBe(false);
+    expect(sink).toHaveBeenCalledWith(
+      expect.objectContaining({
+        timestamp: expect.any(String),
+        tool: "governed_write",
+        decision: "approved",
+        channel: "socket",
+        correlationId: "governed-run-1",
+        actor: "hitl-approved",
+      }),
+    );
+
+    releaseSink();
+    await expect(call).resolves.toBe("ran");
+    expect(mutated).toBe(true);
   });
 });
 
 // ---------- level: "off" ----------
 
 describe('level "off"', () => {
-  test('never wraps any tool', () => {
+  test("never wraps any tool", () => {
     const { server, registrations } = makeMockServer();
     const hitl = makeMockHitlClient();
-    const config = makeConfig('off');
+    const config = makeConfig("off");
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'original';
-    server.registerTool('destructive_tool', { annotations: { destructiveHint: true, readOnlyHint: false } }, original);
-    server.registerTool('write_tool', { annotations: { readOnlyHint: false } }, original);
-    server.registerTool('read_tool', { annotations: { readOnlyHint: true } }, original);
+    const original = () => "original";
+    server.registerTool("destructive_tool", { annotations: { destructiveHint: true, readOnlyHint: false } }, original);
+    server.registerTool("write_tool", { annotations: { readOnlyHint: false } }, original);
+    server.registerTool("read_tool", { annotations: { readOnlyHint: true } }, original);
 
     // With "off", callbacks should be the original (no wrapping)
     for (const reg of registrations) {
@@ -101,31 +298,31 @@ describe('level "off"', () => {
 // ---------- level: "destructive-only" ----------
 
 describe('level "destructive-only"', () => {
-  test('wraps tools with destructiveHint=true', () => {
+  test("wraps tools with destructiveHint=true", () => {
     const { server, registrations } = makeMockServer();
     const hitl = makeMockHitlClient();
-    const config = makeConfig('destructive-only');
+    const config = makeConfig("destructive-only");
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'original';
-    server.registerTool('dangerous', { annotations: { destructiveHint: true } }, original);
+    const original = () => "original";
+    server.registerTool("dangerous", { annotations: { destructiveHint: true } }, original);
 
     expect(registrations).toHaveLength(1);
     expect(registrations[0].callback).not.toBe(original);
   });
 
-  test('does NOT wrap tools without destructiveHint', () => {
+  test("does NOT wrap tools without destructiveHint", () => {
     const { server, registrations } = makeMockServer();
     const hitl = makeMockHitlClient();
-    const config = makeConfig('destructive-only');
+    const config = makeConfig("destructive-only");
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'original';
-    server.registerTool('safe_write', { annotations: { readOnlyHint: false } }, original);
-    server.registerTool('reader', { annotations: { readOnlyHint: true } }, original);
-    server.registerTool('no_annotations', {}, original);
+    const original = () => "original";
+    server.registerTool("safe_write", { annotations: { readOnlyHint: false } }, original);
+    server.registerTool("reader", { annotations: { readOnlyHint: true } }, original);
+    server.registerTool("no_annotations", {}, original);
 
     for (const reg of registrations) {
       expect(reg.callback).toBe(original);
@@ -136,58 +333,58 @@ describe('level "destructive-only"', () => {
 // ---------- level: "sensitive-only" ----------
 
 describe('level "sensitive-only"', () => {
-  test('wraps destructive and sensitive tools', () => {
+  test("wraps destructive and sensitive tools", () => {
     const { server, registrations } = makeMockServer();
     const hitl = makeMockHitlClient();
-    const config = makeConfig('sensitive-only');
+    const config = makeConfig("sensitive-only");
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'original';
-    server.registerTool('dangerous', { annotations: { destructiveHint: true } }, original);
-    server.registerTool('persisting_create', { annotations: { sensitiveHint: true, readOnlyHint: false } }, original);
+    const original = () => "original";
+    server.registerTool("dangerous", { annotations: { destructiveHint: true } }, original);
+    server.registerTool("persisting_create", { annotations: { sensitiveHint: true, readOnlyHint: false } }, original);
 
     expect(registrations).toHaveLength(2);
     expect(registrations[0].callback).not.toBe(original);
     expect(registrations[1].callback).not.toBe(original);
   });
 
-  test('does NOT wrap generic non-sensitive writes or read-only tools', () => {
+  test("does NOT wrap generic non-sensitive writes or read-only tools", () => {
     const { server, registrations } = makeMockServer();
     const hitl = makeMockHitlClient();
-    const config = makeConfig('sensitive-only');
+    const config = makeConfig("sensitive-only");
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'original';
-    server.registerTool('safe_write', { annotations: { readOnlyHint: false } }, original);
-    server.registerTool('reader', { annotations: { readOnlyHint: true } }, original);
+    const original = () => "original";
+    server.registerTool("safe_write", { annotations: { readOnlyHint: false } }, original);
+    server.registerTool("reader", { annotations: { readOnlyHint: true } }, original);
 
     for (const reg of registrations) {
       expect(reg.callback).toBe(original);
     }
   });
 
-  test('sensitive approval is requested without marking the call destructive', async () => {
+  test("sensitive approval is requested without marking the call destructive", async () => {
     const { server, registrations } = makeMockServer();
     const hitl = makeMockHitlClient(true);
-    const config = makeConfig('sensitive-only');
+    const config = makeConfig("sensitive-only");
 
     installHitlGuard(server, hitl, config);
 
     server.registerTool(
-      'create_reminder',
+      "create_reminder",
       { annotations: { readOnlyHint: false, destructiveHint: false, sensitiveHint: true, openWorldHint: false } },
-      () => 'created',
+      () => "created",
     );
 
-    const result = await registrations[0].callback({ title: 'Follow up' });
+    const result = await registrations[0].callback({ title: "Follow up" });
 
-    expect(result).toBe('created');
+    expect(result).toBe("created");
     expect(hitl.calls).toEqual([
       {
-        tool: 'create_reminder',
-        args: { title: 'Follow up' },
+        tool: "create_reminder",
+        args: { title: "Follow up" },
         destructive: false,
         openWorld: false,
         sensitive: true,
@@ -199,41 +396,41 @@ describe('level "sensitive-only"', () => {
 // ---------- level: "all-writes" ----------
 
 describe('level "all-writes"', () => {
-  test('wraps tools with readOnlyHint=false', () => {
+  test("wraps tools with readOnlyHint=false", () => {
     const { server, registrations } = makeMockServer();
     const hitl = makeMockHitlClient();
-    const config = makeConfig('all-writes');
+    const config = makeConfig("all-writes");
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'original';
-    server.registerTool('writer', { annotations: { readOnlyHint: false } }, original);
+    const original = () => "original";
+    server.registerTool("writer", { annotations: { readOnlyHint: false } }, original);
 
     expect(registrations[0].callback).not.toBe(original);
   });
 
-  test('does NOT wrap read-only tools', () => {
+  test("does NOT wrap read-only tools", () => {
     const { server, registrations } = makeMockServer();
     const hitl = makeMockHitlClient();
-    const config = makeConfig('all-writes');
+    const config = makeConfig("all-writes");
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'original';
-    server.registerTool('reader', { annotations: { readOnlyHint: true } }, original);
+    const original = () => "original";
+    server.registerTool("reader", { annotations: { readOnlyHint: true } }, original);
 
     expect(registrations[0].callback).toBe(original);
   });
 
-  test('does NOT wrap tools with no annotations (readOnlyHint defaults to undefined, not false)', () => {
+  test("does NOT wrap tools with no annotations (readOnlyHint defaults to undefined, not false)", () => {
     const { server, registrations } = makeMockServer();
     const hitl = makeMockHitlClient();
-    const config = makeConfig('all-writes');
+    const config = makeConfig("all-writes");
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'original';
-    server.registerTool('ambiguous', {}, original);
+    const original = () => "original";
+    server.registerTool("ambiguous", {}, original);
 
     // readOnlyHint is undefined, and `undefined === false` is false → no wrap
     expect(registrations[0].callback).toBe(original);
@@ -243,17 +440,17 @@ describe('level "all-writes"', () => {
 // ---------- level: "all" ----------
 
 describe('level "all"', () => {
-  test('wraps every tool regardless of annotations', () => {
+  test("wraps every tool regardless of annotations", () => {
     const { server, registrations } = makeMockServer();
     const hitl = makeMockHitlClient();
-    const config = makeConfig('all');
+    const config = makeConfig("all");
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'original';
-    server.registerTool('read', { annotations: { readOnlyHint: true } }, original);
-    server.registerTool('write', { annotations: { readOnlyHint: false } }, original);
-    server.registerTool('bare', {}, original);
+    const original = () => "original";
+    server.registerTool("read", { annotations: { readOnlyHint: true } }, original);
+    server.registerTool("write", { annotations: { readOnlyHint: false } }, original);
+    server.registerTool("bare", {}, original);
 
     for (const reg of registrations) {
       expect(reg.callback).not.toBe(original);
@@ -263,29 +460,29 @@ describe('level "all"', () => {
 
 // ---------- whitelist ----------
 
-describe('whitelist', () => {
+describe("whitelist", () => {
   test('whitelisted tool is never wrapped even at level "all"', () => {
     const { server, registrations } = makeMockServer();
     const hitl = makeMockHitlClient();
-    const config = makeConfig('all', ['trusted_tool']);
+    const config = makeConfig("all", ["trusted_tool"]);
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'original';
-    server.registerTool('trusted_tool', { annotations: { destructiveHint: true } }, original);
+    const original = () => "original";
+    server.registerTool("trusted_tool", { annotations: { destructiveHint: true } }, original);
 
     expect(registrations[0].callback).toBe(original);
   });
 
-  test('non-whitelisted tool is still wrapped', () => {
+  test("non-whitelisted tool is still wrapped", () => {
     const { server, registrations } = makeMockServer();
     const hitl = makeMockHitlClient();
-    const config = makeConfig('all', ['trusted_tool']);
+    const config = makeConfig("all", ["trusted_tool"]);
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'original';
-    server.registerTool('untrusted_tool', {}, original);
+    const original = () => "original";
+    server.registerTool("untrusted_tool", {}, original);
 
     expect(registrations[0].callback).not.toBe(original);
   });
@@ -293,62 +490,59 @@ describe('whitelist', () => {
 
 // ---------- managed client detection (prefix match) ----------
 
-describe('managed client detection', () => {
-  test.each([
-    'claude-ai',
-    'Claude Code',
-    'claude-code',
-    'claude-managed-agent',
-    'Claude-Platform',
-  ])('"%s" is managed → skips elicitation, uses socket HITL', async (clientName) => {
+describe("managed client detection", () => {
+  test.each(["claude-ai", "Claude Code", "claude-code", "claude-managed-agent", "Claude-Platform"])(
+    '"%s" is managed → skips elicitation, uses socket HITL',
+    async (clientName) => {
+      const { server, registrations, elicitCalls } = makeMockServer({
+        clientName,
+        withElicitation: true,
+      });
+      const hitl = makeMockHitlClient(true);
+      const config = makeConfig("all");
+
+      installHitlGuard(server, hitl, config);
+
+      const original = () => "result";
+      server.registerTool("test_tool", { annotations: { destructiveHint: true } }, original);
+      const result = await registrations[0].callback({ key: "val" });
+
+      expect(elicitCalls).toHaveLength(0); // elicitation skipped
+      expect(hitl.calls).toHaveLength(1); // socket HITL used
+      expect(result).toBe("result");
+    },
+  );
+
+  test("non-Claude client with elicitation support uses elicitation (not managed)", async () => {
     const { server, registrations, elicitCalls } = makeMockServer({
-      clientName,
+      clientName: "cursor",
       withElicitation: true,
     });
     const hitl = makeMockHitlClient(true);
-    const config = makeConfig('all');
+    const config = makeConfig("all");
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'result';
-    server.registerTool('test_tool', { annotations: { destructiveHint: true } }, original);
-    const result = await registrations[0].callback({ key: 'val' });
-
-    expect(elicitCalls).toHaveLength(0); // elicitation skipped
-    expect(hitl.calls).toHaveLength(1);  // socket HITL used
-    expect(result).toBe('result');
-  });
-
-  test('non-Claude client with elicitation support uses elicitation (not managed)', async () => {
-    const { server, registrations, elicitCalls } = makeMockServer({
-      clientName: 'cursor',
-      withElicitation: true,
-    });
-    const hitl = makeMockHitlClient(true);
-    const config = makeConfig('all');
-
-    installHitlGuard(server, hitl, config);
-
-    const original = () => 'result';
-    server.registerTool('test_tool', {}, original);
+    const original = () => "result";
+    server.registerTool("test_tool", {}, original);
     const result = await registrations[0].callback({});
 
     expect(elicitCalls).toHaveLength(1); // elicitation attempted
-    expect(hitl.calls).toHaveLength(0);  // socket HITL not needed
-    expect(result).toBe('result');
+    expect(hitl.calls).toHaveLength(0); // socket HITL not needed
+    expect(result).toBe("result");
   });
 
-  test('server without getClientVersion is not treated as managed', async () => {
+  test("server without getClientVersion is not treated as managed", async () => {
     const { server, registrations, elicitCalls } = makeMockServer({
       withElicitation: true,
     });
     const hitl = makeMockHitlClient(true);
-    const config = makeConfig('all');
+    const config = makeConfig("all");
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'ok';
-    server.registerTool('test_tool', {}, original);
+    const original = () => "ok";
+    server.registerTool("test_tool", {}, original);
     await registrations[0].callback({});
 
     expect(elicitCalls).toHaveLength(1); // not managed → elicitation attempted
@@ -358,144 +552,153 @@ describe('managed client detection', () => {
 
 // ---------- managed client headless fallback (RFC 0008 Phase 1.5) ----------
 
-describe('managed client headless fallback', () => {
-  test('managed + socket unreachable + elicitation support → elicitation approves, tool runs', async () => {
+describe("managed client headless fallback", () => {
+  test("managed + socket unreachable + elicitation support → elicitation approves, tool runs", async () => {
     const { server, registrations, elicitCalls } = makeMockServer({
-      clientName: 'claude-code',
+      clientName: "claude-code",
       withElicitation: true,
     });
     const hitl = makeMockHitlClient(true, /* reachable */ false);
-    const config = makeConfig('all');
+    const config = makeConfig("all");
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'ran';
-    server.registerTool('headless_tool', { annotations: { destructiveHint: true } }, original);
+    const original = () => "ran";
+    server.registerTool("headless_tool", { annotations: { destructiveHint: true } }, original);
     const result = await registrations[0].callback({ id: 1 });
 
     expect(elicitCalls).toHaveLength(1); // elicitation used as the fallback channel
-    expect(hitl.calls).toHaveLength(0);  // the unreachable socket is never asked
-    expect(result).toBe('ran');
+    expect(hitl.calls).toHaveLength(0); // the unreachable socket is never asked
+    expect(result).toBe("ran");
   });
 
-  test('managed + socket unreachable + elicitation denial blocks the tool', async () => {
+  test("managed + socket unreachable + elicitation denial blocks the tool", async () => {
     const registrations = [];
     const server = {
       registerTool(name, toolConfig, callback) {
         registrations.push({ name, toolConfig, callback });
       },
       server: {
-        getClientVersion: () => ({ name: 'claude-desktop', version: '1.0' }),
-        elicitInput: jest.fn(async () => ({ action: 'reject', content: {} })),
+        getClientVersion: () => ({ name: "claude-desktop", version: "1.0" }),
+        elicitInput: jest.fn(async () => ({ action: "reject", content: {} })),
       },
     };
     const hitl = makeMockHitlClient(true, false);
-    const config = makeConfig('all');
+    const config = makeConfig("all");
 
     installHitlGuard(server, hitl, config);
 
     let ran = false;
-    server.registerTool('headless_denied', { annotations: { destructiveHint: true } }, () => { ran = true; });
+    server.registerTool("headless_denied", { annotations: { destructiveHint: true } }, () => {
+      ran = true;
+    });
     const result = await registrations[0].callback({});
 
     expect(ran).toBe(false);
-    expect(result).toHaveProperty('isError', true);
+    expect(result).toHaveProperty("isError", true);
     expect(hitl.calls).toHaveLength(0);
   });
 
-  test('managed + socket unreachable + no elicitation → actionable deny, tool never runs', async () => {
-    const { server, registrations } = makeMockServer({ clientName: 'claude-cowork' }); // no elicitInput
+  test("managed + socket unreachable + no elicitation → actionable deny, tool never runs", async () => {
+    const { server, registrations } = makeMockServer({ clientName: "claude-cowork" }); // no elicitInput
     const hitl = makeMockHitlClient(true, false);
-    const config = makeConfig('all');
+    const config = makeConfig("all");
 
     installHitlGuard(server, hitl, config);
 
     let ran = false;
-    server.registerTool('no_channel_tool', { annotations: { destructiveHint: true } }, () => { ran = true; });
+    server.registerTool("no_channel_tool", { annotations: { destructiveHint: true } }, () => {
+      ran = true;
+    });
     const result = await registrations[0].callback({});
 
     expect(ran).toBe(false);
-    expect(result).toHaveProperty('isError', true);
-    expect(result.content[0].text).toContain('no approval channel');
-    expect(result.content[0].text).toContain('menubar');
+    expect(result).toHaveProperty("isError", true);
+    expect(result.content[0].text).toContain("no approval channel");
+    expect(result.content[0].text).toContain("menubar");
     expect(hitl.calls).toHaveLength(0); // the doomed socket is not asked
   });
 
-  test('managed + socket reachable keeps using the socket (no double prompt)', async () => {
+  test("managed + socket reachable keeps using the socket (no double prompt)", async () => {
     const { server, registrations, elicitCalls } = makeMockServer({
-      clientName: 'claude-code',
+      clientName: "claude-code",
       withElicitation: true,
     });
     const hitl = makeMockHitlClient(true, true);
-    const config = makeConfig('all');
+    const config = makeConfig("all");
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'socket_ok';
-    server.registerTool('app_running_tool', { annotations: { destructiveHint: true } }, original);
+    const original = () => "socket_ok";
+    server.registerTool("app_running_tool", { annotations: { destructiveHint: true } }, original);
     const result = await registrations[0].callback({});
 
     expect(elicitCalls).toHaveLength(0); // elicitation still skipped — app is the approver
     expect(hitl.calls).toHaveLength(1);
-    expect(result).toBe('socket_ok');
+    expect(result).toBe("socket_ok");
   });
 });
 
 // ---------- wrapped callback behaviour ----------
 
-describe('wrapped callback behaviour', () => {
-  test('calls hitlClient.requestApproval and forwards to original on approve', async () => {
+describe("wrapped callback behaviour", () => {
+  test("calls hitlClient.requestApproval and forwards to original on approve", async () => {
     const { server, registrations } = makeMockServer();
     const hitl = makeMockHitlClient(true);
-    const config = makeConfig('all');
+    const config = makeConfig("all");
 
     installHitlGuard(server, hitl, config);
 
     let called = false;
-    const original = () => { called = true; return 'result'; };
-    server.registerTool('my_tool', { annotations: { destructiveHint: true, openWorldHint: true } }, original);
+    const original = () => {
+      called = true;
+      return "result";
+    };
+    server.registerTool("my_tool", { annotations: { destructiveHint: true, openWorldHint: true } }, original);
 
     const wrapped = registrations[0].callback;
-    const result = await wrapped({ foo: 'bar' });
+    const result = await wrapped({ foo: "bar" });
 
     expect(hitl.calls).toHaveLength(1);
-    expect(hitl.calls[0].tool).toBe('my_tool');
-    expect(hitl.calls[0].args).toEqual({ foo: 'bar' });
+    expect(hitl.calls[0].tool).toBe("my_tool");
+    expect(hitl.calls[0].args).toEqual({ foo: "bar" });
     expect(hitl.calls[0].destructive).toBe(true);
     expect(hitl.calls[0].openWorld).toBe(true);
     expect(called).toBe(true);
-    expect(result).toBe('result');
+    expect(result).toBe("result");
   });
 
-  test('returns error when approval is denied', async () => {
+  test("returns error when approval is denied", async () => {
     const { server, registrations } = makeMockServer();
     const hitl = makeMockHitlClient(false);
-    const config = makeConfig('all');
+    const config = makeConfig("all");
 
     installHitlGuard(server, hitl, config);
 
     let called = false;
-    const original = () => { called = true; };
-    server.registerTool('blocked_tool', {}, original);
+    const original = () => {
+      called = true;
+    };
+    server.registerTool("blocked_tool", {}, original);
 
     const wrapped = registrations[0].callback;
     const result = await wrapped({});
 
     expect(called).toBe(false);
-    expect(result).toHaveProperty('isError', true);
-    expect(result.content[0].text).toContain('blocked_tool');
-    expect(result.content[0].text).toContain('denied');
+    expect(result).toHaveProperty("isError", true);
+    expect(result.content[0].text).toContain("blocked_tool");
+    expect(result.content[0].text).toContain("denied");
   });
 
-  test('defaults destructiveHint and openWorldHint to false when annotations are absent', async () => {
+  test("defaults destructiveHint and openWorldHint to false when annotations are absent", async () => {
     const { server, registrations } = makeMockServer();
     const hitl = makeMockHitlClient(true);
-    const config = makeConfig('all');
+    const config = makeConfig("all");
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'ok';
-    server.registerTool('bare_tool', {}, original);
+    const original = () => "ok";
+    server.registerTool("bare_tool", {}, original);
 
     await registrations[0].callback({});
 
@@ -503,15 +706,15 @@ describe('wrapped callback behaviour', () => {
     expect(hitl.calls[0].openWorld).toBe(false);
   });
 
-  test('wrapped callback defaults toolArgs to {} when called with no arguments', async () => {
+  test("wrapped callback defaults toolArgs to {} when called with no arguments", async () => {
     const { server, registrations } = makeMockServer();
     const hitl = makeMockHitlClient(true);
-    const config = makeConfig('all');
+    const config = makeConfig("all");
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'ok';
-    server.registerTool('no_args_tool', {}, original);
+    const original = () => "ok";
+    server.registerTool("no_args_tool", {}, original);
 
     // Call with no arguments at all
     await registrations[0].callback();
@@ -522,8 +725,8 @@ describe('wrapped callback behaviour', () => {
 
 // ---------- isManagedClient edge cases ----------
 
-describe('isManagedClient edge cases', () => {
-  test('handles server.server.getClientVersion throwing an error', async () => {
+describe("isManagedClient edge cases", () => {
+  test("handles server.server.getClientVersion throwing an error", async () => {
     const registrations = [];
     const server = {
       registerTool(name, toolConfig, callback) {
@@ -531,27 +734,27 @@ describe('isManagedClient edge cases', () => {
       },
       server: {
         getClientVersion() {
-          throw new Error('getClientVersion exploded');
+          throw new Error("getClientVersion exploded");
         },
       },
     };
     const hitl = makeMockHitlClient(true);
-    const config = makeConfig('all');
+    const config = makeConfig("all");
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'result';
-    server.registerTool('test_tool', {}, original);
+    const original = () => "result";
+    server.registerTool("test_tool", {}, original);
 
     // Should not throw — isManagedClient catches and returns false
     // This means elicitation would be attempted (not managed), but since
     // elicitInput is not defined, it falls back to socket HITL
     const result = await registrations[0].callback({});
-    expect(result).toBe('result');
+    expect(result).toBe("result");
     expect(hitl.calls).toHaveLength(1);
   });
 
-  test('handles server.server being null', async () => {
+  test("handles server.server being null", async () => {
     const registrations = [];
     const server = {
       registerTool(name, toolConfig, callback) {
@@ -560,38 +763,38 @@ describe('isManagedClient edge cases', () => {
       server: null,
     };
     const hitl = makeMockHitlClient(true);
-    const config = makeConfig('all');
+    const config = makeConfig("all");
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'result';
-    server.registerTool('test_tool', {}, original);
+    const original = () => "result";
+    server.registerTool("test_tool", {}, original);
 
     const result = await registrations[0].callback({});
-    expect(result).toBe('result');
+    expect(result).toBe("result");
     expect(hitl.calls).toHaveLength(1);
   });
 
-  test('getClientVersion returning object without name is not managed', async () => {
+  test("getClientVersion returning object without name is not managed", async () => {
     const registrations = [];
     const server = {
       registerTool(name, toolConfig, callback) {
         registrations.push({ name, toolConfig, callback });
       },
       server: {
-        getClientVersion: () => ({ version: '1.0' }),
+        getClientVersion: () => ({ version: "1.0" }),
       },
     };
     const hitl = makeMockHitlClient(true);
-    const config = makeConfig('all');
+    const config = makeConfig("all");
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'result';
-    server.registerTool('test_tool', {}, original);
+    const original = () => "result";
+    server.registerTool("test_tool", {}, original);
 
     const result = await registrations[0].callback({});
-    expect(result).toBe('result');
+    expect(result).toBe("result");
     // Not managed, so elicitation attempted first, but no elicitInput → falls to socket
     expect(hitl.calls).toHaveLength(1);
   });
@@ -599,7 +802,7 @@ describe('isManagedClient edge cases', () => {
 
 // ---------- AIRMCP_MANAGED_CLIENTS env var ----------
 
-describe('AIRMCP_MANAGED_CLIENTS env var', () => {
+describe("AIRMCP_MANAGED_CLIENTS env var", () => {
   const origEnv = process.env.AIRMCP_MANAGED_CLIENTS;
 
   afterEach(() => {
@@ -610,12 +813,12 @@ describe('AIRMCP_MANAGED_CLIENTS env var', () => {
     }
   });
 
-  test('recognizes custom managed clients from env var', async () => {
-    process.env.AIRMCP_MANAGED_CLIENTS = 'CustomClient, AnotherClient';
+  test("recognizes custom managed clients from env var", async () => {
+    process.env.AIRMCP_MANAGED_CLIENTS = "CustomClient, AnotherClient";
 
     // Force re-evaluation of the module to pick up the env change
     // We use a fresh import to clear the cached set
-    const freshModule = await import('../dist/shared/hitl-guard.js?t=' + Date.now());
+    const freshModule = await import("../dist/shared/hitl-guard.js?t=" + Date.now());
 
     const registrations = [];
     const elicitCalls = [];
@@ -624,20 +827,20 @@ describe('AIRMCP_MANAGED_CLIENTS env var', () => {
         registrations.push({ name, toolConfig, callback });
       },
       server: {
-        getClientVersion: () => ({ name: 'customclient', version: '1.0' }),
+        getClientVersion: () => ({ name: "customclient", version: "1.0" }),
         elicitInput: jest.fn(async (req) => {
           elicitCalls.push(req);
-          return { action: 'accept', content: { approve: true } };
+          return { action: "accept", content: { approve: true } };
         }),
       },
     };
     const hitl = makeMockHitlClient(true);
-    const config = makeConfig('all');
+    const config = makeConfig("all");
 
     freshModule.installHitlGuard(server, hitl, config);
 
-    const original = () => 'result';
-    server.registerTool('test_tool', {}, original);
+    const original = () => "result";
+    server.registerTool("test_tool", {}, original);
     await registrations[0].callback({});
 
     // customclient is in AIRMCP_MANAGED_CLIENTS so it IS managed → skip elicitation
@@ -651,8 +854,8 @@ describe('AIRMCP_MANAGED_CLIENTS env var', () => {
 
 // ---------- elicitation paths ----------
 
-describe('elicitation paths', () => {
-  test('elicitation rejection returns denial error', async () => {
+describe("elicitation paths", () => {
+  test("elicitation rejection returns denial error", async () => {
     const elicitCalls = [];
     const registrations = [];
     const server = {
@@ -660,88 +863,88 @@ describe('elicitation paths', () => {
         registrations.push({ name, toolConfig, callback });
       },
       server: {
-        getClientVersion: () => ({ name: 'cursor', version: '1.0' }),
+        getClientVersion: () => ({ name: "cursor", version: "1.0" }),
         elicitInput: jest.fn(async () => {
           elicitCalls.push(true);
           // User declines — action is 'reject'
-          return { action: 'reject', content: {} };
+          return { action: "reject", content: {} };
         }),
       },
     };
     const hitl = makeMockHitlClient(true);
-    const config = makeConfig('all');
+    const config = makeConfig("all");
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'should not run';
-    server.registerTool('elicit_deny_tool', { annotations: { destructiveHint: true } }, original);
+    const original = () => "should not run";
+    server.registerTool("elicit_deny_tool", { annotations: { destructiveHint: true } }, original);
 
     const result = await registrations[0].callback({});
 
     expect(elicitCalls).toHaveLength(1);
     expect(hitl.calls).toHaveLength(0); // socket HITL not used
-    expect(result).toHaveProperty('isError', true);
-    expect(result.content[0].text).toContain('elicit_deny_tool');
-    expect(result.content[0].text).toContain('denied');
+    expect(result).toHaveProperty("isError", true);
+    expect(result.content[0].text).toContain("elicit_deny_tool");
+    expect(result.content[0].text).toContain("denied");
   });
 
-  test('elicitation returning approve=false returns denial error', async () => {
+  test("elicitation returning approve=false returns denial error", async () => {
     const registrations = [];
     const server = {
       registerTool(name, toolConfig, callback) {
         registrations.push({ name, toolConfig, callback });
       },
       server: {
-        getClientVersion: () => ({ name: 'some-client', version: '1.0' }),
+        getClientVersion: () => ({ name: "some-client", version: "1.0" }),
         elicitInput: jest.fn(async () => {
-          return { action: 'accept', content: { approve: false } };
+          return { action: "accept", content: { approve: false } };
         }),
       },
     };
     const hitl = makeMockHitlClient(true);
-    const config = makeConfig('all');
+    const config = makeConfig("all");
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'should not run';
-    server.registerTool('test_tool', {}, original);
+    const original = () => "should not run";
+    server.registerTool("test_tool", {}, original);
 
     const result = await registrations[0].callback({});
 
-    expect(result).toHaveProperty('isError', true);
+    expect(result).toHaveProperty("isError", true);
     expect(hitl.calls).toHaveLength(0);
   });
 
-  test('elicitation throwing falls back to socket HITL', async () => {
+  test("elicitation throwing falls back to socket HITL", async () => {
     const registrations = [];
     const server = {
       registerTool(name, toolConfig, callback) {
         registrations.push({ name, toolConfig, callback });
       },
       server: {
-        getClientVersion: () => ({ name: 'some-client', version: '1.0' }),
+        getClientVersion: () => ({ name: "some-client", version: "1.0" }),
         elicitInput: jest.fn(async () => {
-          throw new Error('elicitation not supported');
+          throw new Error("elicitation not supported");
         }),
       },
     };
     const hitl = makeMockHitlClient(true);
-    const config = makeConfig('all');
+    const config = makeConfig("all");
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'result';
-    server.registerTool('fallback_tool', {}, original);
+    const original = () => "result";
+    server.registerTool("fallback_tool", {}, original);
 
     const result = await registrations[0].callback({});
 
     // Elicitation threw → tryElicitApproval returns undefined → falls back to socket
     expect(hitl.calls).toHaveLength(1);
-    expect(hitl.calls[0].tool).toBe('fallback_tool');
-    expect(result).toBe('result');
+    expect(hitl.calls[0].tool).toBe("fallback_tool");
+    expect(result).toBe("result");
   });
 
-  test('elicitation with destructiveHint uses destructive label', async () => {
+  test("elicitation with destructiveHint uses destructive label", async () => {
     const elicitMessages = [];
     const registrations = [];
     const server = {
@@ -749,27 +952,27 @@ describe('elicitation paths', () => {
         registrations.push({ name, toolConfig, callback });
       },
       server: {
-        getClientVersion: () => ({ name: 'cursor', version: '1.0' }),
+        getClientVersion: () => ({ name: "cursor", version: "1.0" }),
         elicitInput: jest.fn(async (req) => {
           elicitMessages.push(req.message);
-          return { action: 'accept', content: { approve: true } };
+          return { action: "accept", content: { approve: true } };
         }),
       },
     };
     const hitl = makeMockHitlClient(true);
-    const config = makeConfig('all');
+    const config = makeConfig("all");
 
     installHitlGuard(server, hitl, config);
 
     // Register a destructive tool
-    server.registerTool('delete_all', { annotations: { destructiveHint: true } }, () => 'ok');
-    await registrations[0].callback({ target: 'everything' });
+    server.registerTool("delete_all", { annotations: { destructiveHint: true } }, () => "ok");
+    await registrations[0].callback({ target: "everything" });
 
-    expect(elicitMessages[0]).toContain('Destructive');
-    expect(elicitMessages[0]).toContain('delete_all');
+    expect(elicitMessages[0]).toContain("Destructive");
+    expect(elicitMessages[0]).toContain("delete_all");
   });
 
-  test('elicitation with non-destructive tool uses approve label', async () => {
+  test("elicitation with non-destructive tool uses approve label", async () => {
     const elicitMessages = [];
     const registrations = [];
     const server = {
@@ -777,27 +980,27 @@ describe('elicitation paths', () => {
         registrations.push({ name, toolConfig, callback });
       },
       server: {
-        getClientVersion: () => ({ name: 'cursor', version: '1.0' }),
+        getClientVersion: () => ({ name: "cursor", version: "1.0" }),
         elicitInput: jest.fn(async (req) => {
           elicitMessages.push(req.message);
-          return { action: 'accept', content: { approve: true } };
+          return { action: "accept", content: { approve: true } };
         }),
       },
     };
     const hitl = makeMockHitlClient(true);
-    const config = makeConfig('all');
+    const config = makeConfig("all");
 
     installHitlGuard(server, hitl, config);
 
     // Register a non-destructive tool
-    server.registerTool('safe_tool', { annotations: { readOnlyHint: false } }, () => 'ok');
+    server.registerTool("safe_tool", { annotations: { readOnlyHint: false } }, () => "ok");
     await registrations[0].callback({});
 
-    expect(elicitMessages[0]).toContain('Approve');
-    expect(elicitMessages[0]).not.toContain('Destructive');
+    expect(elicitMessages[0]).toContain("Approve");
+    expect(elicitMessages[0]).not.toContain("Destructive");
   });
 
-  test('elicitation with sensitiveHint uses sensitive label', async () => {
+  test("elicitation with sensitiveHint uses sensitive label", async () => {
     const elicitMessages = [];
     const registrations = [];
     const server = {
@@ -805,38 +1008,38 @@ describe('elicitation paths', () => {
         registrations.push({ name, toolConfig, callback });
       },
       server: {
-        getClientVersion: () => ({ name: 'cursor', version: '1.0' }),
+        getClientVersion: () => ({ name: "cursor", version: "1.0" }),
         elicitInput: jest.fn(async (req) => {
           elicitMessages.push(req.message);
-          return { action: 'accept', content: { approve: true } };
+          return { action: "accept", content: { approve: true } };
         }),
       },
     };
     const hitl = makeMockHitlClient(true);
-    const config = makeConfig('sensitive-only');
+    const config = makeConfig("sensitive-only");
 
     installHitlGuard(server, hitl, config);
 
     server.registerTool(
-      'create_reminder',
+      "create_reminder",
       { annotations: { readOnlyHint: false, destructiveHint: false, sensitiveHint: true } },
-      () => 'ok',
+      () => "ok",
     );
-    await registrations[0].callback({ title: 'Follow up' });
+    await registrations[0].callback({ title: "Follow up" });
 
-    expect(elicitMessages[0]).toContain('Sensitive');
-    expect(elicitMessages[0]).toContain('create_reminder');
-    expect(elicitMessages[0]).not.toContain('Destructive');
+    expect(elicitMessages[0]).toContain("Sensitive");
+    expect(elicitMessages[0]).toContain("create_reminder");
+    expect(elicitMessages[0]).not.toContain("Destructive");
   });
 });
 
 // ---------- telemetry ----------
 
-describe('telemetry tracing', () => {
+describe("telemetry tracing", () => {
   const origTelemetry = process.env.AIRMCP_TELEMETRY;
 
   beforeEach(() => {
-    process.env.AIRMCP_TELEMETRY = 'true';
+    process.env.AIRMCP_TELEMETRY = "true";
   });
 
   afterEach(() => {
@@ -847,124 +1050,124 @@ describe('telemetry tracing', () => {
     }
   });
 
-  test('traces elicitation approval when telemetry enabled', async () => {
+  test("traces elicitation approval when telemetry enabled", async () => {
     const registrations = [];
     const server = {
       registerTool(name, toolConfig, callback) {
         registrations.push({ name, toolConfig, callback });
       },
       server: {
-        getClientVersion: () => ({ name: 'cursor', version: '1.0' }),
+        getClientVersion: () => ({ name: "cursor", version: "1.0" }),
         elicitInput: jest.fn(async () => {
-          return { action: 'accept', content: { approve: true } };
+          return { action: "accept", content: { approve: true } };
         }),
       },
     };
     const hitl = makeMockHitlClient(true);
-    const config = makeConfig('all');
+    const config = makeConfig("all");
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'result';
-    server.registerTool('traced_tool', { annotations: { destructiveHint: true } }, original);
+    const original = () => "result";
+    server.registerTool("traced_tool", { annotations: { destructiveHint: true } }, original);
 
     // Should not throw even with telemetry enabled
     const result = await registrations[0].callback({ a: 1 });
-    expect(result).toBe('result');
+    expect(result).toBe("result");
     expect(hitl.calls).toHaveLength(0); // used elicitation
   });
 
-  test('traces elicitation denial when telemetry enabled', async () => {
+  test("traces elicitation denial when telemetry enabled", async () => {
     const registrations = [];
     const server = {
       registerTool(name, toolConfig, callback) {
         registrations.push({ name, toolConfig, callback });
       },
       server: {
-        getClientVersion: () => ({ name: 'cursor', version: '1.0' }),
+        getClientVersion: () => ({ name: "cursor", version: "1.0" }),
         elicitInput: jest.fn(async () => {
-          return { action: 'reject', content: {} };
+          return { action: "reject", content: {} };
         }),
       },
     };
     const hitl = makeMockHitlClient(true);
-    const config = makeConfig('all');
+    const config = makeConfig("all");
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'should not run';
-    server.registerTool('denied_tool', {}, original);
+    const original = () => "should not run";
+    server.registerTool("denied_tool", {}, original);
 
     const result = await registrations[0].callback({});
-    expect(result).toHaveProperty('isError', true);
+    expect(result).toHaveProperty("isError", true);
   });
 
-  test('traces socket approval when telemetry enabled', async () => {
+  test("traces socket approval when telemetry enabled", async () => {
     // No elicitation support → falls back to socket
     const { server, registrations } = makeMockServer();
     const hitl = makeMockHitlClient(true);
-    const config = makeConfig('all');
+    const config = makeConfig("all");
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'result';
-    server.registerTool('socket_traced', {}, original);
+    const original = () => "result";
+    server.registerTool("socket_traced", {}, original);
 
     const result = await registrations[0].callback({});
-    expect(result).toBe('result');
+    expect(result).toBe("result");
     expect(hitl.calls).toHaveLength(1);
   });
 
-  test('traces socket denial when telemetry enabled', async () => {
+  test("traces socket denial when telemetry enabled", async () => {
     const { server, registrations } = makeMockServer();
     const hitl = makeMockHitlClient(false);
-    const config = makeConfig('all');
+    const config = makeConfig("all");
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'should not run';
-    server.registerTool('denied_socket', {}, original);
+    const original = () => "should not run";
+    server.registerTool("denied_socket", {}, original);
 
     const result = await registrations[0].callback({});
-    expect(result).toHaveProperty('isError', true);
+    expect(result).toHaveProperty("isError", true);
     expect(hitl.calls).toHaveLength(1);
   });
 
-  test('traces elicitation via socket path for managed client', async () => {
+  test("traces elicitation via socket path for managed client", async () => {
     // Managed client skips elicitation, falls back to socket with telemetry
     const { server, registrations, elicitCalls } = makeMockServer({
-      clientName: 'claude-code',
+      clientName: "claude-code",
       withElicitation: true,
     });
     const hitl = makeMockHitlClient(true);
-    const config = makeConfig('all');
+    const config = makeConfig("all");
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'traced_result';
-    server.registerTool('managed_traced', { annotations: { destructiveHint: true } }, original);
+    const original = () => "traced_result";
+    server.registerTool("managed_traced", { annotations: { destructiveHint: true } }, original);
 
-    const result = await registrations[0].callback({ key: 'val' });
-    expect(result).toBe('traced_result');
+    const result = await registrations[0].callback({ key: "val" });
+    expect(result).toBe("traced_result");
     expect(elicitCalls).toHaveLength(0);
     expect(hitl.calls).toHaveLength(1);
   });
 
-  test('traces socket denial for managed client when telemetry enabled', async () => {
+  test("traces socket denial for managed client when telemetry enabled", async () => {
     const { server, registrations, elicitCalls } = makeMockServer({
-      clientName: 'claude-desktop',
+      clientName: "claude-desktop",
       withElicitation: true,
     });
     const hitl = makeMockHitlClient(false);
-    const config = makeConfig('all');
+    const config = makeConfig("all");
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'should not run';
-    server.registerTool('managed_denied', {}, original);
+    const original = () => "should not run";
+    server.registerTool("managed_denied", {}, original);
 
     const result = await registrations[0].callback({});
-    expect(result).toHaveProperty('isError', true);
+    expect(result).toHaveProperty("isError", true);
     expect(elicitCalls).toHaveLength(0);
     expect(hitl.calls).toHaveLength(1);
   });
@@ -972,7 +1175,7 @@ describe('telemetry tracing', () => {
 
 // ---------- telemetry disabled ----------
 
-describe('telemetry disabled (default)', () => {
+describe("telemetry disabled (default)", () => {
   const origTelemetry = process.env.AIRMCP_TELEMETRY;
 
   beforeEach(() => {
@@ -987,92 +1190,92 @@ describe('telemetry disabled (default)', () => {
     }
   });
 
-  test('socket approval works without telemetry', async () => {
+  test("socket approval works without telemetry", async () => {
     const { server, registrations } = makeMockServer();
     const hitl = makeMockHitlClient(true);
-    const config = makeConfig('all');
+    const config = makeConfig("all");
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'no_telemetry_result';
-    server.registerTool('no_telem', {}, original);
+    const original = () => "no_telemetry_result";
+    server.registerTool("no_telem", {}, original);
 
     const result = await registrations[0].callback({});
-    expect(result).toBe('no_telemetry_result');
+    expect(result).toBe("no_telemetry_result");
     expect(hitl.calls).toHaveLength(1);
   });
 
-  test('socket denial works without telemetry', async () => {
+  test("socket denial works without telemetry", async () => {
     const { server, registrations } = makeMockServer();
     const hitl = makeMockHitlClient(false);
-    const config = makeConfig('all');
+    const config = makeConfig("all");
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'should not run';
-    server.registerTool('no_telem_deny', {}, original);
+    const original = () => "should not run";
+    server.registerTool("no_telem_deny", {}, original);
 
     const result = await registrations[0].callback({});
-    expect(result).toHaveProperty('isError', true);
+    expect(result).toHaveProperty("isError", true);
   });
 
-  test('elicitation approval works without telemetry', async () => {
+  test("elicitation approval works without telemetry", async () => {
     const registrations = [];
     const server = {
       registerTool(name, toolConfig, callback) {
         registrations.push({ name, toolConfig, callback });
       },
       server: {
-        getClientVersion: () => ({ name: 'cursor', version: '1.0' }),
+        getClientVersion: () => ({ name: "cursor", version: "1.0" }),
         elicitInput: jest.fn(async () => {
-          return { action: 'accept', content: { approve: true } };
+          return { action: "accept", content: { approve: true } };
         }),
       },
     };
     const hitl = makeMockHitlClient(true);
-    const config = makeConfig('all');
+    const config = makeConfig("all");
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'elicit_no_telem';
-    server.registerTool('elicit_tool', {}, original);
+    const original = () => "elicit_no_telem";
+    server.registerTool("elicit_tool", {}, original);
 
     const result = await registrations[0].callback({});
-    expect(result).toBe('elicit_no_telem');
+    expect(result).toBe("elicit_no_telem");
     expect(hitl.calls).toHaveLength(0);
   });
 
-  test('elicitation denial works without telemetry', async () => {
+  test("elicitation denial works without telemetry", async () => {
     const registrations = [];
     const server = {
       registerTool(name, toolConfig, callback) {
         registrations.push({ name, toolConfig, callback });
       },
       server: {
-        getClientVersion: () => ({ name: 'cursor', version: '1.0' }),
+        getClientVersion: () => ({ name: "cursor", version: "1.0" }),
         elicitInput: jest.fn(async () => {
-          return { action: 'reject', content: {} };
+          return { action: "reject", content: {} };
         }),
       },
     };
     const hitl = makeMockHitlClient(true);
-    const config = makeConfig('all');
+    const config = makeConfig("all");
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'should not run';
-    server.registerTool('elicit_deny', { annotations: { destructiveHint: true } }, original);
+    const original = () => "should not run";
+    server.registerTool("elicit_deny", { annotations: { destructiveHint: true } }, original);
 
     const result = await registrations[0].callback({});
-    expect(result).toHaveProperty('isError', true);
+    expect(result).toHaveProperty("isError", true);
     expect(hitl.calls).toHaveLength(0);
   });
 });
 
 // ---------- elicitation edge cases ----------
 
-describe('elicitation edge cases', () => {
-  test('server without elicitInput falls back to socket', async () => {
+describe("elicitation edge cases", () => {
+  test("server without elicitInput falls back to socket", async () => {
     // Server has inner object but no elicitInput method
     const registrations = [];
     const server = {
@@ -1080,25 +1283,25 @@ describe('elicitation edge cases', () => {
         registrations.push({ name, toolConfig, callback });
       },
       server: {
-        getClientVersion: () => ({ name: 'custom-client', version: '1.0' }),
+        getClientVersion: () => ({ name: "custom-client", version: "1.0" }),
         // no elicitInput defined
       },
     };
     const hitl = makeMockHitlClient(true);
-    const config = makeConfig('all');
+    const config = makeConfig("all");
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'socket_fallback';
-    server.registerTool('no_elicit_tool', {}, original);
+    const original = () => "socket_fallback";
+    server.registerTool("no_elicit_tool", {}, original);
 
-    const result = await registrations[0].callback({ arg: 'val' });
-    expect(result).toBe('socket_fallback');
+    const result = await registrations[0].callback({ arg: "val" });
+    expect(result).toBe("socket_fallback");
     expect(hitl.calls).toHaveLength(1);
-    expect(hitl.calls[0].tool).toBe('no_elicit_tool');
+    expect(hitl.calls[0].tool).toBe("no_elicit_tool");
   });
 
-  test('elicitation with large args truncates summary to 500 chars', async () => {
+  test("elicitation with large args truncates summary to 500 chars", async () => {
     const elicitMessages = [];
     const registrations = [];
     const server = {
@@ -1106,31 +1309,31 @@ describe('elicitation edge cases', () => {
         registrations.push({ name, toolConfig, callback });
       },
       server: {
-        getClientVersion: () => ({ name: 'cursor', version: '1.0' }),
+        getClientVersion: () => ({ name: "cursor", version: "1.0" }),
         elicitInput: jest.fn(async (req) => {
           elicitMessages.push(req.message);
-          return { action: 'accept', content: { approve: true } };
+          return { action: "accept", content: { approve: true } };
         }),
       },
     };
     const hitl = makeMockHitlClient(true);
-    const config = makeConfig('all');
+    const config = makeConfig("all");
 
     installHitlGuard(server, hitl, config);
 
     // Create args that produce a JSON string much longer than 500 chars
-    const bigArgs = { data: 'x'.repeat(1000) };
-    const original = () => 'ok';
-    server.registerTool('big_args_tool', {}, original);
+    const bigArgs = { data: "x".repeat(1000) };
+    const original = () => "ok";
+    server.registerTool("big_args_tool", {}, original);
 
     await registrations[0].callback(bigArgs);
 
     // The message should contain the truncated args summary
-    const argsInMessage = elicitMessages[0].split('\n\n')[1]?.replace('Arguments:\n', '');
+    const argsInMessage = elicitMessages[0].split("\n\n")[1]?.replace("Arguments:\n", "");
     expect(argsInMessage.length).toBeLessThanOrEqual(500);
   });
 
-  test('server.server being undefined falls back to socket', async () => {
+  test("server.server being undefined falls back to socket", async () => {
     const registrations = [];
     const server = {
       registerTool(name, toolConfig, callback) {
@@ -1139,61 +1342,65 @@ describe('elicitation edge cases', () => {
       // no server.server property at all
     };
     const hitl = makeMockHitlClient(true);
-    const config = makeConfig('all');
+    const config = makeConfig("all");
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'result';
-    server.registerTool('test_tool', {}, original);
+    const original = () => "result";
+    server.registerTool("test_tool", {}, original);
 
     const result = await registrations[0].callback({});
-    expect(result).toBe('result');
+    expect(result).toBe("result");
     expect(hitl.calls).toHaveLength(1);
   });
 });
 
 // ---------- shouldRequireApproval edge cases ----------
 
-describe('shouldRequireApproval edge cases', () => {
-  test('destructive-only with destructiveHint=false does not wrap', () => {
+describe("shouldRequireApproval edge cases", () => {
+  test("destructive-only with destructiveHint=false does not wrap", () => {
     const { server, registrations } = makeMockServer();
     const hitl = makeMockHitlClient();
-    const config = makeConfig('destructive-only');
+    const config = makeConfig("destructive-only");
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'original';
-    server.registerTool('explicit_safe', { annotations: { destructiveHint: false } }, original);
+    const original = () => "original";
+    server.registerTool("explicit_safe", { annotations: { destructiveHint: false } }, original);
 
     expect(registrations[0].callback).toBe(original);
   });
 
-  test('all-writes with readOnlyHint=false and destructiveHint=true wraps', () => {
+  test("all-writes with readOnlyHint=false and destructiveHint=true wraps", () => {
     const { server, registrations } = makeMockServer();
     const hitl = makeMockHitlClient();
-    const config = makeConfig('all-writes');
+    const config = makeConfig("all-writes");
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'original';
-    server.registerTool('destructive_write', {
-      annotations: { readOnlyHint: false, destructiveHint: true }
-    }, original);
+    const original = () => "original";
+    server.registerTool(
+      "destructive_write",
+      {
+        annotations: { readOnlyHint: false, destructiveHint: true },
+      },
+      original,
+    );
 
     expect(registrations[0].callback).not.toBe(original);
   });
 
-  test('multiple tools registered: each evaluated independently', () => {
+  test("multiple tools registered: each evaluated independently", () => {
     const { server, registrations } = makeMockServer();
     const hitl = makeMockHitlClient();
-    const config = makeConfig('destructive-only', ['whitelisted']);
+    const config = makeConfig("destructive-only", ["whitelisted"]);
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'original';
-    server.registerTool('destructive', { annotations: { destructiveHint: true } }, original);
-    server.registerTool('whitelisted', { annotations: { destructiveHint: true } }, original);
-    server.registerTool('safe', { annotations: { readOnlyHint: true } }, original);
+    const original = () => "original";
+    server.registerTool("destructive", { annotations: { destructiveHint: true } }, original);
+    server.registerTool("whitelisted", { annotations: { destructiveHint: true } }, original);
+    server.registerTool("safe", { annotations: { readOnlyHint: true } }, original);
 
     // destructive: wrapped
     expect(registrations[0].callback).not.toBe(original);
@@ -1206,23 +1413,23 @@ describe('shouldRequireApproval edge cases', () => {
 
 // ---------- wrapped callback argument forwarding ----------
 
-describe('wrapped callback argument forwarding', () => {
-  test('forwards all arguments to original callback', async () => {
+describe("wrapped callback argument forwarding", () => {
+  test("forwards all arguments to original callback", async () => {
     const { server, registrations } = makeMockServer();
     const hitl = makeMockHitlClient(true);
-    const config = makeConfig('all');
+    const config = makeConfig("all");
 
     installHitlGuard(server, hitl, config);
 
     let receivedArgs;
     const original = (...args) => {
       receivedArgs = args;
-      return 'result';
+      return "result";
     };
-    server.registerTool('multi_arg_tool', {}, original);
+    server.registerTool("multi_arg_tool", {}, original);
 
-    const arg1 = { key: 'val' };
-    const arg2 = { extra: 'context' };
+    const arg1 = { key: "val" };
+    const arg2 = { extra: "context" };
     await registrations[0].callback(arg1, arg2);
 
     expect(receivedArgs).toHaveLength(2);
@@ -1230,33 +1437,37 @@ describe('wrapped callback argument forwarding', () => {
     expect(receivedArgs[1]).toBe(arg2);
   });
 
-  test('passes openWorldHint annotation through to hitlClient', async () => {
+  test("passes openWorldHint annotation through to hitlClient", async () => {
     const { server, registrations } = makeMockServer();
     const hitl = makeMockHitlClient(true);
-    const config = makeConfig('all');
+    const config = makeConfig("all");
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'ok';
-    server.registerTool('open_world_tool', {
-      annotations: { openWorldHint: true, readOnlyHint: false }
-    }, original);
+    const original = () => "ok";
+    server.registerTool(
+      "open_world_tool",
+      {
+        annotations: { openWorldHint: true, readOnlyHint: false },
+      },
+      original,
+    );
 
-    await registrations[0].callback({ query: 'hello' });
+    await registrations[0].callback({ query: "hello" });
 
     expect(hitl.calls[0].openWorld).toBe(true);
     expect(hitl.calls[0].destructive).toBe(false);
   });
 
-  test('defaults openWorldHint to false when not in annotations', async () => {
+  test("defaults openWorldHint to false when not in annotations", async () => {
     const { server, registrations } = makeMockServer();
     const hitl = makeMockHitlClient(true);
-    const config = makeConfig('all');
+    const config = makeConfig("all");
 
     installHitlGuard(server, hitl, config);
 
-    const original = () => 'ok';
-    server.registerTool('no_open_world', { annotations: {} }, original);
+    const original = () => "ok";
+    server.registerTool("no_open_world", { annotations: {} }, original);
 
     await registrations[0].callback({});
 
@@ -1266,7 +1477,7 @@ describe('wrapped callback argument forwarding', () => {
 
 // ---------- isManagedClient: AIRMCP_MANAGED_CLIENTS edge cases ----------
 
-describe('AIRMCP_MANAGED_CLIENTS edge cases', () => {
+describe("AIRMCP_MANAGED_CLIENTS edge cases", () => {
   const origEnv = process.env.AIRMCP_MANAGED_CLIENTS;
 
   afterEach(() => {
@@ -1277,10 +1488,10 @@ describe('AIRMCP_MANAGED_CLIENTS edge cases', () => {
     }
   });
 
-  test('empty AIRMCP_MANAGED_CLIENTS does not make any client managed', async () => {
-    process.env.AIRMCP_MANAGED_CLIENTS = '';
+  test("empty AIRMCP_MANAGED_CLIENTS does not make any client managed", async () => {
+    process.env.AIRMCP_MANAGED_CLIENTS = "";
 
-    const freshModule = await import('../dist/shared/hitl-guard.js?e=' + Date.now());
+    const freshModule = await import("../dist/shared/hitl-guard.js?e=" + Date.now());
 
     const registrations = [];
     const elicitCalls = [];
@@ -1289,30 +1500,30 @@ describe('AIRMCP_MANAGED_CLIENTS edge cases', () => {
         registrations.push({ name, toolConfig, callback });
       },
       server: {
-        getClientVersion: () => ({ name: 'random-client', version: '1.0' }),
+        getClientVersion: () => ({ name: "random-client", version: "1.0" }),
         elicitInput: jest.fn(async () => {
           elicitCalls.push(true);
-          return { action: 'accept', content: { approve: true } };
+          return { action: "accept", content: { approve: true } };
         }),
       },
     };
     const hitl = makeMockHitlClient(true);
-    const config = makeConfig('all');
+    const config = makeConfig("all");
 
     freshModule.installHitlGuard(server, hitl, config);
 
-    const original = () => 'ok';
-    server.registerTool('test_tool', {}, original);
+    const original = () => "ok";
+    server.registerTool("test_tool", {}, original);
     await registrations[0].callback({});
 
     // Not managed, so elicitation should be attempted
     expect(elicitCalls).toHaveLength(1);
   });
 
-  test('AIRMCP_MANAGED_CLIENTS with whitespace-only entries does not crash', async () => {
-    process.env.AIRMCP_MANAGED_CLIENTS = ' , , , ';
+  test("AIRMCP_MANAGED_CLIENTS with whitespace-only entries does not crash", async () => {
+    process.env.AIRMCP_MANAGED_CLIENTS = " , , , ";
 
-    const freshModule = await import('../dist/shared/hitl-guard.js?w=' + Date.now());
+    const freshModule = await import("../dist/shared/hitl-guard.js?w=" + Date.now());
 
     const registrations = [];
     const server = {
@@ -1320,22 +1531,22 @@ describe('AIRMCP_MANAGED_CLIENTS edge cases', () => {
         registrations.push({ name, toolConfig, callback });
       },
       server: {
-        getClientVersion: () => ({ name: 'cursor', version: '1.0' }),
+        getClientVersion: () => ({ name: "cursor", version: "1.0" }),
         elicitInput: jest.fn(async () => {
-          return { action: 'accept', content: { approve: true } };
+          return { action: "accept", content: { approve: true } };
         }),
       },
     };
     const hitl = makeMockHitlClient(true);
-    const config = makeConfig('all');
+    const config = makeConfig("all");
 
     freshModule.installHitlGuard(server, hitl, config);
 
-    const original = () => 'ok';
-    server.registerTool('test_tool', {}, original);
+    const original = () => "ok";
+    server.registerTool("test_tool", {}, original);
 
     // Should not throw
     const result = await registrations[0].callback({});
-    expect(result).toBe('ok');
+    expect(result).toBe("ok");
   });
 });

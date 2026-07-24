@@ -1,5 +1,10 @@
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
+import { LATEST_PROTOCOL_VERSION } from "@modelcontextprotocol/sdk/types.js";
+
+/** Stable protocol version exported by the pinned MCP SDK. Production wire
+ *  probes import this instead of carrying independent date literals. */
+export const MCP_PROTOCOL_VERSION = LATEST_PROTOCOL_VERSION;
 
 export function parseStructuredResult(callResp) {
   const result = callResp.result;

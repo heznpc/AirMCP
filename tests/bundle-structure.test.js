@@ -1,4 +1,4 @@
-import { chmodSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -12,10 +12,47 @@ function makeBundle({ bundleId = "com.example.TestApp", executable = "TestApp", 
   const bundle = join(temp, `${executable}.app`);
   const contents = join(bundle, "Contents");
   const macos = join(contents, "MacOS");
+  const runtimeRoot = join(contents, "Resources", "airmcp");
+  const localizationBundle = join(contents, "Resources", "AirMCPApp_AirMCPApp.bundle");
+  const runtimeBin = join(runtimeRoot, "runtime", "bin");
+  const serverDist = join(runtimeRoot, "server", "dist");
+  const bridgeBin = join(runtimeRoot, "bin");
   mkdirSync(macos, { recursive: true });
+  mkdirSync(runtimeBin, { recursive: true });
+  mkdirSync(serverDist, { recursive: true });
+  mkdirSync(bridgeBin, { recursive: true });
+  for (const locale of ["de", "en", "es", "fr", "ja", "ko", "pt-BR", "zh-Hans", "zh-Hant"]) {
+    const localeDir = join(localizationBundle, `${locale}.lproj`);
+    mkdirSync(localeDir, { recursive: true });
+    writeFileSync(join(localeDir, "Localizable.strings"), '"onboarding.windowTitle" = "AirMCP";\n');
+  }
+  const nativeSource = join(temp, "fixture-runtime.c");
+  const bundledNode = join(runtimeBin, "node");
+  writeFileSync(
+    nativeSource,
+    `#include <stdio.h>
+#include <string.h>
+int main(int argc, char **argv) {
+  for (int i = 1; i < argc; i++) {
+    if (strcmp(argv[i], "-p") == 0) { puts("20"); return 0; }
+    if (strcmp(argv[i], "--version") == 0) { puts("1.0.0"); return 0; }
+  }
+  return 0;
+}
+`,
+  );
+  const compileResult = spawnSync("cc", [nativeSource, "-o", bundledNode], { encoding: "utf8" });
+  expect(compileResult.status).toBe(0);
   const binary = join(macos, executable);
-  writeFileSync(binary, "#!/bin/sh\nexit 0\n");
+  copyFileSync(bundledNode, binary);
   chmodSync(binary, 0o755);
+  const bundledBridge = join(bridgeBin, "AirMcpBridge");
+  copyFileSync(bundledNode, bundledBridge);
+  chmodSync(bundledBridge, 0o755);
+  writeFileSync(
+    join(serverDist, "index.js"),
+    'if (process.argv.includes("--version")) process.stdout.write("1.0.0\\n");\n',
+  );
   writeFileSync(
     join(contents, "Info.plist"),
     `<?xml version="1.0" encoding="UTF-8"?>
@@ -28,20 +65,48 @@ function makeBundle({ bundleId = "com.example.TestApp", executable = "TestApp", 
   <string>${executable}</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
+  <key>CFBundleDevelopmentRegion</key>
+  <string>en</string>
+  <key>CFBundleAllowMixedLocalizations</key>
+  <true/>
+  <key>LSMultipleInstancesProhibited</key>
+  <true/>
+  <key>CFBundleLocalizations</key>
+  <array>
+    <string>de</string>
+    <string>en</string>
+    <string>es</string>
+    <string>fr</string>
+    <string>ja</string>
+    <string>ko</string>
+    <string>pt-BR</string>
+    <string>zh-Hans</string>
+    <string>zh-Hant</string>
+  </array>
+  <key>CFBundleShortVersionString</key>
+  <string>1.0.0</string>
+  <key>CFBundleVersion</key>
+  <string>1</string>
 </dict>
 </plist>
 `,
   );
   if (signed) {
-    const signedResult = spawnSync("codesign", ["--force", "--sign", "-", bundle], { encoding: "utf8" });
-    expect(signedResult.stderr).toBe("");
+    for (const nested of [bundledNode, bundledBridge, binary]) {
+      const nestedResult = spawnSync("codesign", ["--force", "--sign", "-", nested], { encoding: "utf8" });
+      expect(nestedResult.status).toBe(0);
+    }
+    const signedResult = spawnSync("codesign", ["--force", "--deep", "--sign", "-", bundle], { encoding: "utf8" });
     expect(signedResult.status).toBe(0);
   }
   return { temp, bundle, binary, executable, bundleId };
 }
 
-function verifyBundle(bundle, bundleId, executable) {
-  return spawnSync("bash", [verifier, bundle, bundleId, executable], { encoding: "utf8" });
+function verifyBundle(bundle, bundleId, executable, env = {}) {
+  return spawnSync("bash", [verifier, bundle, bundleId, executable], {
+    encoding: "utf8",
+    env: { ...process.env, ...env },
+  });
 }
 
 describe("macOS bundle structure verifier", () => {
@@ -83,6 +148,38 @@ describe("macOS bundle structure verifier", () => {
       rmSync(missingExecutable.temp, { recursive: true, force: true });
       rmSync(wrongBundleId.temp, { recursive: true, force: true });
       rmSync(unsigned.temp, { recursive: true, force: true });
+    }
+  });
+
+  test("rejects a stale localization left by an incremental SwiftPM build", () => {
+    if (process.platform !== "darwin") return;
+    const fixture = makeBundle();
+    try {
+      const staleLocale = join(fixture.bundle, "Contents", "Resources", "AirMCPApp_AirMCPApp.bundle", "pt.lproj");
+      mkdirSync(staleLocale, { recursive: true });
+      writeFileSync(join(staleLocale, "Localizable.strings"), '"onboarding.windowTitle" = "AirMCP";\n');
+      const result = verifyBundle(fixture.bundle, fixture.bundleId, fixture.executable);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("packaged localization is not declared");
+    } finally {
+      rmSync(fixture.temp, { recursive: true, force: true });
+    }
+  });
+
+  test("requires the widget when building a signed distribution", () => {
+    if (process.platform !== "darwin") return;
+    const fixture = makeBundle();
+    try {
+      const optional = verifyBundle(fixture.bundle, fixture.bundleId, fixture.executable);
+      expect(optional.status).toBe(0);
+
+      const required = verifyBundle(fixture.bundle, fixture.bundleId, fixture.executable, {
+        AIRMCP_REQUIRE_WIDGET: "1",
+      });
+      expect(required.status).toBe(1);
+      expect(required.stderr).toContain("requires a complete AirMCPWidget.appex");
+    } finally {
+      rmSync(fixture.temp, { recursive: true, force: true });
     }
   });
 });

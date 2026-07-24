@@ -5,6 +5,7 @@
 - **Created**: 2026-04-23
 - **Target**: v2.13.0 (Phase A — shipped ahead of target) · Apple-API-dependent (Phase B)
 - **Amendment history**:
+  - 2026-07-10 — Corrected the platform boundary: macOS supports App Intent actions in Shortcuts but not the `AppShortcutsProvider` App Shortcuts surface. Generated providers are now compiled under `#if os(iOS)`; macOS Siri-phrase UI/copy was removed. The iOS provider now matches the exact eight-tool read-only preview contract, and `AskAirMCPIntent` remains an opt-in action rather than a second provider.
   - 2026-04-23 — §R2 updated with confirmed `requestConfirmation(actionName:snippetIntent:)` API; §3.7 Interactive Snippets renderer added; rollout split into A.2a/A.2b/A.3 to match landed PRs #101-#103 and Interactive Snippets availability.
   - 2026-04-23 (afternoon) — Axis 6 `AskAirMCPIntent` lands ahead of schedule: natural-language FoundationModels agent on iOS 26+/macOS 26+ (originally gated by `#if canImport(FoundationModels) && compiler(>=6.3)`). Rollout row "Ax.6" added.
   - 2026-06-17 — `AskAirMCPIntent` moved behind explicit `AIRMCP_ENABLE_FOUNDATION_MODELS` compile-time opt-in while the bridge still used Foundation Models macro-backed argument types. The default `AirMCPGeneratedShortcuts` provider now ships nine workflow/read shortcuts; `Ask AirMCP` is a separate preview provider in opt-in builds.
@@ -19,7 +20,7 @@
 
 Three independent signals make this the highest-leverage Apple-system-surface axis for 2026:
 
-1. **Apple's first-party WWDC26 material splits the surfaces**: consumer/Siri integration is App Intents/App Schemas, while public MCP support appears in the developer/agent layer through Xcode. AirMCP needs both: MCP HTTP/stdio for external agents, App Intents/App Schemas for Siri, Shortcuts, Spotlight, and Apple Intelligence.
+1. **Apple's first-party material splits the surfaces**: MCP remains the external agent transport; App Intents provide Apple-system actions. iOS additionally supports App Shortcuts/Siri phrases, while macOS supports App Intent actions in the Shortcuts app but not `AppShortcutsProvider`.
 2. **The reference competitor ([supermemoryai/apple-mcp](https://github.com/supermemoryai/apple-mcp)) was archived on 2026-01-01** with 3.1k stars and macOS-only coverage. The "Apple-native MCP" reference slot is open.
 3. **AirMCP has 270+ tools registered in Node / TypeScript** but only 4 hand-written App Intents ([app/Sources/AirMCPApp/AppIntents.swift](../../app/Sources/AirMCPApp/AppIntents.swift)). Hand-porting is not an option — we need a build-time adapter that turns tool metadata into Swift `@AppIntent` declarations automatically.
 
@@ -39,7 +40,7 @@ Waiting for a consumer "system MCP" API is not a blocker for App Intents because
 
 - Auto-implementing tool **bodies** in Swift. The tool body still executes in Node (macOS) or via AirMCPKit Swift services (iOS Phase 3, tracked separately).
 - Replacing the Hummingbird HTTP server. Dual transport stays unless Apple publishes a consumer MCP transport.
-- Solving HITL or elicitation in AppIntents (deferred — see §5).
+- Replacing AirMCP's core per-call HITL authority with an AppIntent-wide or batched approval. Phase A.3 ships an AppIntent confirmation UI for each destructive invocation; socket/elicitation HITL remains the authority for non-AppIntent paths (see §5).
 
 ## 3. Proposed Design — Phase A (buildable today)
 
@@ -122,15 +123,23 @@ Tools using `z.array(z.object(...))` or `z.record()` in input are **marked `appI
 
 `MCPIntentRouter.shared.call(tool:args:)` resolves per platform:
 
-- **macOS (embedded Node)**: execFile `airmcp` (the npm binary) with a one-shot stdio JSON-RPC `tools/call`, parses response
+- **macOS (embedded Node)**: prefer the signed app-owned token-gated HTTP runtime; cold invocations can use the same bundled server over one-shot stdio JSON-RPC
 - **iOS (AirMCPKit)**: in-process call into `AirMCPServer` (already built in `ios/Sources/AirMCPServer/`) via direct `MCPServer.callTool()` — no IPC
 - **macOS (future Swift-native)**: same as iOS when AirMCPKit eventually implements the tool server-side
 
 `MCPIntentRouter` lives in `swift/Sources/AirMCPKit/IntentBridge/Router.swift`. A single 150-line file. Platform selection is compile-time (`#if os(iOS)` / `#if os(macOS)`).
 
-### 3.5 App Shortcuts registration
+### 3.5 iOS-only App Shortcuts registration
 
-`AppShortcutsProvider` (Apple API) auto-registers every generated `AppIntent` into Shortcuts / Siri / Spotlight. Codegen emits:
+Apple's [App Shortcuts platform considerations](https://developer.apple.com/design/human-interface-guidelines/app-shortcuts#Platform-considerations)
+explicitly state that App Shortcuts are not supported in macOS, while actions
+created with App Intents are supported for user-built shortcuts. This product
+support boundary is narrower than SDK symbol availability: the
+`AppShortcutsProvider` protocol can be present in a macOS SDK without the App
+Shortcuts feature being supported there.
+
+Codegen therefore emits the provider inside `#if os(iOS)`; macOS compiles the
+generated `AppIntent` action types without a provider:
 
 ```swift
 struct AirMCPShortcuts: AppShortcutsProvider {
@@ -142,7 +151,12 @@ struct AirMCPShortcuts: AppShortcutsProvider {
 }
 ```
 
-Apple caps `AppShortcutsProvider` at **10 entries** per app historically. AirMCP now reserves the default provider for nine workflow/read shortcuts generated from `APP_SHORTCUTS_TOP`; the optional `Ask AirMCP` provider is compiled separately behind `AIRMCP_ENABLE_FOUNDATION_MODELS`. The other ~231 stay as `AppIntent`s (discoverable in Shortcuts but not shown as first-class suggestions).
+Apple caps the iOS `AppShortcutsProvider` at **10 entries** per app. AirMCP's
+single provider contains the exact eight read-only tools allowed by
+`IOSPreviewContract`; the generator and iOS server tests compare those two
+contracts. `AskAirMCPIntent` remains an opt-in Foundation Models action and is
+not advertised as a second provider entry. On macOS, generated intents remain
+Shortcuts actions and no Siri-first phrase provider is registered.
 
 ### 3.6 Existing hand-written intents
 
@@ -212,10 +226,16 @@ Phase B is schema enrichment, not a hidden MCP transport.
 - **Risk**: Zod `.union()` / `.discriminatedUnion()` / recursive schemas don't map cleanly to Swift `Codable`
 - **Mitigation**: Fall back to `String` (raw JSON) return value for those tools. Annotate the intent with a disclaimer. ~5% of tools affected.
 
-### R7. 10-tool cap on `AppShortcutsProvider` selection
+### R7. Exact 8-tool iOS `AppShortcutsProvider` preview contract
 
-- **Open**: Do we pick top-N by usage, or let the user configure via AirMCP app UI?
-- **Current default**: fixed workflow-first shortcuts from `APP_SHORTCUTS_TOP`, currently nine default entries so the optional FoundationModels `Ask AirMCP` provider can occupy the remaining platform slot in opt-in builds. A future AirMCP app UI can let users choose their own pinned shortcuts.
+- **Resolved current contract**: `APP_SHORTCUTS_TOP` contains the exact eight
+  read-only tools in `IOSPreviewContract`. Generator and iOS runtime tests fail
+  if those lists drift.
+- `AskAirMCPIntent` remains an opt-in action only. It is not a second
+  `AppShortcutsProvider` and does not consume a provider entry.
+- A future configurable top-N surface requires a separate contract change that
+  preserves the iOS executable allowlist; generated source presence alone is
+  never sufficient to advertise a shortcut.
 
 ## 6. Rollout
 

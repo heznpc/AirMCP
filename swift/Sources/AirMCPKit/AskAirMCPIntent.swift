@@ -16,10 +16,11 @@
 //   conformances in FoundationModelsBridge.swift call AirMCPKit services
 //   directly, which keeps the on-device guarantee simple to prove.
 //
-// Siri phrase registration happens in the AirMCPGeneratedShortcuts
-// provider (gen-swift-intents.mjs pins this intent as the first entry).
+// This remains an opt-in App Intent action. It is deliberately not advertised
+// by the iOS AppShortcutsProvider while the preview runtime is restricted to
+// its exact eight-tool read-only catalog.
 
-#if AIRMCP_ENABLE_FOUNDATION_MODELS && canImport(AppIntents) && canImport(FoundationModels) && compiler(>=6.3)
+#if AIRMCP_ENABLE_FOUNDATION_MODELS && canImport(AppIntents) && canImport(FoundationModels) && compiler(>=6.2)
 import AppIntents
 import Foundation
 import FoundationModels

@@ -4,7 +4,7 @@
 
 import Foundation
 
-#if canImport(FoundationModels) && compiler(>=6.3)
+#if AIRMCP_ENABLE_FOUNDATION_MODELS && canImport(FoundationModels) && compiler(>=6.2)
 import FoundationModels
 
 // MARK: - Error types

@@ -4,9 +4,9 @@
  *
  * Runs every entry in GOLDEN_PLANS against the on-device Foundation Model
  * (via the Swift bridge), scores each plan with the eval harness, and prints
- * an aggregate report. Meant for local / nightly runs — requires macOS 26+
- * with Apple Silicon and a Swift bridge built with:
- *   cd swift && swift build -c release -Xswiftc -DAIRMCP_ENABLE_FOUNDATION_MODELS
+ * an aggregate report. It first classifies `ai-status`, then runs one cheap
+ * structured-generation smoke before starting the sweep. Meant for local /
+ * nightly runs — prepare the opt-in bridge with `npm run swift-build:fm`.
  *
  * Usage:
  *   node scripts/eval-plans.mjs            # full sweep
@@ -15,7 +15,8 @@
  *
  * Exit code:
  *   0  if average score ≥ threshold (default 70)
- *   1  if below threshold or the Swift bridge is unavailable
+ *   1  if the smoke or quality threshold fails
+ *   2  if the environment/build preflight is blocked
  */
 
 import {
@@ -26,6 +27,7 @@ import {
   scorePlan,
 } from "../dist/intelligence/plan-eval.js";
 import { runSwift, checkSwiftBridge } from "../dist/shared/swift.js";
+import { inspectFoundationModels } from "./lib/foundation-models-status.mjs";
 
 const args = process.argv.slice(2);
 const limitArg = args.indexOf("--limit");
@@ -33,18 +35,83 @@ const limit = limitArg >= 0 ? parseInt(args[limitArg + 1] ?? "0", 10) : GOLDEN_P
 const asJson = args.includes("--json");
 const threshold = parseInt(process.env.PLAN_EVAL_THRESHOLD ?? "70", 10);
 
-async function main() {
-  const bridgeErr = await checkSwiftBridge();
-  if (bridgeErr) {
-    console.error(`Swift bridge unavailable: ${bridgeErr}`);
-    console.error(
-      "Build the FoundationModels preview bridge on macOS 26+ Apple Silicon: cd swift && swift build -c release -Xswiftc -DAIRMCP_ENABLE_FOUNDATION_MODELS",
-    );
-    process.exit(1);
+function emitBlocked(phase, detail, exitCode) {
+  const report = {
+    status: "blocked",
+    phase,
+    classification: detail.classification,
+    message: detail.message,
+    action: detail.action ?? null,
+    total: 0,
+    passing: 0,
+    avgScore: null,
+    threshold,
+    results: [],
+  };
+
+  if (asJson) {
+    console.log(JSON.stringify(report, null, 2));
+  } else {
+    console.error(`Plan eval blocked during ${phase}: ${detail.classification}`);
+    console.error(detail.message);
+    if (detail.action) console.error(`Next: ${detail.action}`);
   }
+  process.exit(exitCode);
+}
+
+async function runSmoke() {
+  try {
+    const result = await runSwift(
+      "generate-structured",
+      JSON.stringify({
+        prompt: 'Return exactly one JSON object with the string field "status" set to "ok".',
+        schema: {
+          status: { type: "string", description: 'Must be the literal string "ok".' },
+        },
+        systemInstruction: "This is a readiness smoke test. Respond with valid JSON only.",
+      }),
+    );
+    const normalized = result.output
+      .trim()
+      .replace(/^```(?:json)?\s*/i, "")
+      .replace(/\s*```$/, "");
+    const parsed = JSON.parse(normalized);
+    if (parsed?.status !== "ok") {
+      throw new Error(`unexpected structured response: ${result.output?.slice?.(0, 300) ?? "<empty>"}`);
+    }
+    return { ok: true, command: "generate-structured" };
+  } catch (error) {
+    return {
+      ok: false,
+      command: "generate-structured",
+      classification: "smoke_failed",
+      message: error instanceof Error ? error.message : String(error),
+      action: "Run npm run ai-status, then rebuild with npm run swift-build:fm if the status is not ready.",
+    };
+  }
+}
+
+async function main() {
+  const preflight = await inspectFoundationModels({ checkSwiftBridge, runSwift });
+  if (!preflight.ready) emitBlocked("preflight", preflight, 2);
+
+  const smoke = await runSmoke();
+  if (!smoke.ok) emitBlocked("smoke", smoke, 1);
 
   const results = [];
   const cases = GOLDEN_PLANS.slice(0, limit);
+
+  if (cases.length === 0) {
+    emitBlocked(
+      "arguments",
+      {
+        classification: "empty_sweep",
+        message: "No plan cases were selected. Use --limit with an integer greater than zero.",
+        action: "Rerun without --limit, or pass --limit 1 or greater.",
+      },
+      1,
+    );
+  }
 
   for (const [i, g] of cases.entries()) {
     const prompt = buildPlanPrompt(g.goal, g.context, DEFAULT_PLAN_TOOLS);
@@ -69,9 +136,7 @@ async function main() {
 
     if (!asJson) {
       const badge = score.total >= threshold ? "PASS" : "FAIL";
-      console.log(
-        `[${i + 1}/${cases.length}] ${badge} ${score.total.toString().padStart(3)}  ${g.name}`,
-      );
+      console.log(`[${i + 1}/${cases.length}] ${badge} ${score.total.toString().padStart(3)}  ${g.name}`);
       if (error) console.log(`    error: ${error}`);
       else if (score.validation.issues.length > 0) {
         console.log(`    issues: ${score.validation.issues.slice(0, 3).join(" | ")}`);
@@ -86,6 +151,12 @@ async function main() {
     console.log(
       JSON.stringify(
         {
+          status: "complete",
+          preflight: {
+            classification: preflight.classification,
+            message: preflight.message,
+          },
+          smoke,
           total: results.length,
           passing,
           avgScore: avg,
@@ -106,6 +177,7 @@ async function main() {
     );
   } else {
     console.log("");
+    console.log(`Preflight: ${preflight.classification}; smoke: ${smoke.command} ok`);
     console.log(`Average score: ${avg}/100   Passing (≥${threshold}): ${passing}/${results.length}`);
   }
 

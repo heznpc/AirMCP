@@ -68,6 +68,7 @@
  */
 import { spawn } from "child_process";
 import { writeFileSync } from "fs";
+import { hasExactHostname } from "./lib/url-host.mjs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 
@@ -516,7 +517,7 @@ const CRUD_MODULES = [
           }
           // Find the example.com tab
           for (const t of tabs) {
-            if ((t.url || "").includes("example.com")) {
+            if (hasExactHostname(t.url, "example.com")) {
               ctx.set("tabIndex", t.tabIndex ?? t.index ?? 0);
               ctx.set("winIndex", t.windowIndex ?? 0);
               return true;

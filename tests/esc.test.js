@@ -267,6 +267,12 @@ describe('escJxaShell (two-layer: shell + JXA)', () => {
     expect(result).not.toMatch(/(?<!\\)\$/);
   });
 
+  test('escapes adjacent metacharacters without reprocessing generated backslashes', () => {
+    const input = '\\"`$\'\n\r\u2028\u2029';
+    const expected = '\\\\\\\\' + '\\\\\\"' + '\\\\`' + '\\\\$' + "\\'" + '\\n\\r\\u2028\\u2029';
+    expect(escJxaShell(input)).toBe(expected);
+  });
+
   test('strips control characters (consistent with esc/escAS)', () => {
     expect(escJxaShell('a\x01b\x08c')).toBe('abc');
     expect(escJxaShell('\x0e\x1f')).toBe('');

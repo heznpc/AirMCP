@@ -1,108 +1,133 @@
 ---
 title: Installation
-description: How to install and set up AirMCP on your Mac.
+description: Choose the AirMCP install path that matches your MCP client and the assets available in the current release.
 ---
 
-## Prerequisites
+## Choose your client first
 
-- **macOS** (AirMCP uses JXA and Apple frameworks -- it only runs on macOS)
-- **Node.js 20+** (LTS recommended)
-- **An MCP client** such as Claude Desktop, Claude Code, Cursor, or Windsurf
+AirMCP has two complete public install paths today. Choose the one that matches
+the client you already use:
 
-## Quick Install
+| Client | Use this path | What you need |
+|---|---|---|
+| **Claude Desktop** | Install the `.mcpb` desktop extension | `airmcp-<version>.mcpb` from [GitHub Releases](https://github.com/heznpc/AirMCP/releases) |
+| **Codex, Claude Code, Cursor, Windsurf, and other stdio clients** | Connect the npm runtime directly over stdio | macOS and Node.js 20+ |
 
-The recommended desktop runtime is AirMCP.app: start the menubar app once, then connect Claude, Codex, Cursor, Windsurf, or another MCP client to the app-owned loopback server. The CLI wizard configures detected clients for that shape:
+AirMCP.app is a third, app-owned runtime path. Use it only when the release you
+are installing actually lists a signed `AirMCP-<version>.zip` asset. If that ZIP
+is absent, there is no public app to start; use `.mcpb` or direct stdio instead.
+
+## Claude Desktop: install the `.mcpb`
+
+1. Open [GitHub Releases](https://github.com/heznpc/AirMCP/releases).
+2. Download `airmcp-<version>.mcpb` from the release you want to install.
+3. Open Claude Desktop.
+4. Drag the `.mcpb` into Claude Desktop, or choose **Settings → Extensions → Install from file…**.
+5. Keep the starter profile for the first run, then install the extension.
+
+No npm command, AirMCP.app download, or JSON edit is required for this path.
+See the [MCPB guide](https://github.com/heznpc/AirMCP/blob/main/docs/mcpb.md)
+for configuration fields and troubleshooting.
+
+## Other MCP clients: use direct stdio
+
+Direct stdio is the current fallback when a release has no signed AirMCP.app
+ZIP. First create the local AirMCP configuration without touching any client:
 
 ```bash
-npx airmcp init
+npx airmcp init --no-clients
 ```
 
-This will:
+Then preview and apply direct stdio entries for the clients AirMCP detects:
 
-1. Ask which modules you want to enable (or choose "all")
-2. Detect installed MCP clients (Claude Desktop, Claude Code, Cursor, Windsurf)
-3. Write an AirMCP.app-owned runtime entry to each client's config file
-4. Create `~/.config/airmcp/config.json` with your module selection
+```bash
+npx airmcp connect-clients --client-runtime direct --dry-run
+npx airmcp connect-clients --client-runtime direct
+```
 
-## Manual Setup
+Restart the configured client after applying the change. The resulting MCP
+entry starts `npx -y airmcp` directly; it does not expect AirMCP.app or the
+loopback server at `127.0.0.1:3847` to be running.
 
-If you prefer manual configuration, start AirMCP.app first. It owns the local Apple permissions and starts a token-gated runtime on `http://127.0.0.1:3847/mcp`. Stdio-only clients use `npx -y airmcp connect` as a proxy into that runtime with `AIRMCP_HTTP_TOKEN` set. The app and setup wizard generate the per-install token at `~/Library/Application Support/AirMCP/http-token`.
+For a non-interactive starter setup, use:
 
-### Claude Desktop
+```bash
+npx airmcp init --profile starter --yes
+npx airmcp connect-clients --client-runtime direct
+```
 
-Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
+The commands above make client registration a separate, explicit step across
+released CLI versions: `--no-clients` prevents the setup wizard from writing
+an app-owned entry, and `connect-clients --client-runtime direct` applies the
+fallback only after you choose it.
+
+## Manual direct-stdio configuration
+
+Clients that accept an MCP server JSON object can use the same direct entry:
 
 ```json
 {
   "mcpServers": {
     "airmcp": {
       "command": "npx",
-      "args": ["-y", "airmcp", "connect", "--url", "http://127.0.0.1:3847/mcp"],
-      "env": {
-        "AIRMCP_HTTP_TOKEN": "<token>"
-      }
+      "args": ["-y", "airmcp"]
     }
   }
 }
 ```
 
-### Claude Code
+### Codex
 
-Edit `~/.claude/mcp.json`:
+AirMCP never needs to be active in Codex unless you choose it. Inspect or
+disable an existing persistent entry without deleting its other settings:
 
-```json
-{
-  "mcpServers": {
-    "airmcp": {
-      "command": "npx",
-      "args": ["-y", "airmcp", "connect", "--url", "http://127.0.0.1:3847/mcp"],
-      "env": {
-        "AIRMCP_HTTP_TOKEN": "<token>"
-      }
-    }
-  }
-}
+```bash
+npx airmcp codex status
+npx airmcp codex disable
 ```
 
-### Cursor
+Add a direct stdio entry explicitly with:
 
-Edit `~/.cursor/mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "airmcp": {
-      "command": "npx",
-      "args": ["-y", "airmcp", "connect", "--url", "http://127.0.0.1:3847/mcp"],
-      "env": {
-        "AIRMCP_HTTP_TOKEN": "<token>"
-      }
-    }
-  }
-}
+```bash
+codex mcp add airmcp -- npx -y airmcp
 ```
 
-### Windsurf
+Use `npx airmcp codex enable` only when an AirMCP entry already exists and you
+want Codex to connect at startup. These `npx airmcp codex` commands resolve the
+persistent user config used by their child Codex CLI in this order:
+`AIRMCP_CODEX_CONFIG_PATH`, `$CODEX_HOME/config.toml`, then
+`~/.codex/config.toml`. The explicit override is resolved against the invoking
+working directory and must be named `config.toml`. Project-local overrides are
+reported but never edited.
 
-Edit `~/.codeium/windsurf/mcp_config.json`:
+## AirMCP.app: only when the release includes it
 
-```json
-{
-  "mcpServers": {
-    "airmcp": {
-      "command": "npx",
-      "args": ["-y", "airmcp", "connect", "--url", "http://127.0.0.1:3847/mcp"],
-      "env": {
-        "AIRMCP_HTTP_TOKEN": "<token>"
-      }
-    }
-  }
-}
-```
+When [GitHub Releases](https://github.com/heznpc/AirMCP/releases) lists a signed
+`AirMCP-<version>.zip` alongside the `.mcpb`, you can use the app-owned runtime:
+
+1. Download and extract that ZIP, then open AirMCP.app.
+2. Complete Setup and explicitly choose **Start Local Runtime**.
+3. Run `npx airmcp connect-clients --dry-run`, review the detected changes, and
+   then run `npx airmcp connect-clients`.
+4. Restart the configured MCP clients.
+
+Starting the local runtime creates the owner-only token at
+`~/Library/Application Support/AirMCP/http-token` and starts the loopback
+runtime at `http://127.0.0.1:3847/mcp`. Merely opening AirMCP.app or finishing
+Setup does neither. Stdio-only clients use `npx -y airmcp connect` as a proxy
+into that runtime with `AIRMCP_HTTP_TOKEN` set.
+
+The app-owned path centralizes runtime state, approvals, and Trust Center
+history. Do not configure this path from an older npm release unless the
+matching signed app ZIP is available and running; otherwise clients will fail
+their MCP startup handshake.
 
 ## Enable All Modules
 
-By default, AirMCP enables a starter set of modules when no config file exists. In the app-owned runtime, use the onboarding module picker or rerun the setup wizard and choose all modules:
+By default, AirMCP enables a starter set of modules when no config file exists.
+For direct stdio, rerun the setup wizard to change the selection. When a signed
+AirMCP.app release is installed, you can instead use its onboarding module
+picker.
 
 ```bash
 npx airmcp init
@@ -118,7 +143,10 @@ Or edit `~/.config/airmcp/config.json` directly:
 
 ## macOS Permissions
 
-AirMCP uses JXA (JavaScript for Automation) to control macOS apps. In the recommended app-owned runtime, macOS permission prompts should be associated with AirMCP.app rather than every individual AI client. Direct `npx -y airmcp` launches remain useful for development, but the launching terminal or MCP client owns those prompts.
+AirMCP uses JXA (JavaScript for Automation) to control macOS apps. With direct
+stdio, the launching terminal or MCP client owns the macOS permission prompts.
+When the signed app-owned runtime is installed and running, those prompts
+should instead be associated with AirMCP.app.
 
 To check permissions, run:
 
@@ -130,7 +158,13 @@ The `doctor` command verifies Node.js version, macOS version, permissions, clien
 
 ## Verifying Installation
 
-After setup, restart your MCP client and ask your AI assistant to list your notes or check the weather. If it responds with real data from your Mac, AirMCP is working.
+After setup, restart your MCP client and begin with a read-only request:
+
+> Tell me today's calendar events and overdue reminders. Do not change anything.
+
+If the assistant returns real data from your Mac, the client and AirMCP runtime
+are connected. A later write request should remain a separate, explicitly
+approved call.
 
 You can also run the server directly to verify:
 
@@ -138,7 +172,8 @@ You can also run the server directly to verify:
 npx airmcp
 ```
 
-This starts the MCP server in stdio mode. You should see the AirMCP banner with the list of enabled modules and tool count.
+This starts the MCP server in stdio mode. You should see the AirMCP banner with
+the list of enabled modules and tool count.
 
 ## HTTP Mode
 

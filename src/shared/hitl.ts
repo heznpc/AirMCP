@@ -2,6 +2,7 @@ import { createConnection, Socket } from "node:net";
 import { randomUUID } from "node:crypto";
 import type { HitlConfig } from "./config.js";
 import { log } from "./logger.js";
+import { getCorrelationId } from "./request-context.js";
 
 interface HitlRequest {
   id: string;
@@ -12,17 +13,21 @@ interface HitlRequest {
   destructive: boolean;
   sensitive: boolean;
   openWorld: boolean;
+  correlationId?: string;
 }
 
 interface HitlResponse {
   id: string;
   type: "hitl_response";
-  approved: boolean;
+  approved: unknown;
+  reason?: unknown;
 }
+
+export type HitlApprovalDecision = "approved" | "denied" | "timed_out" | "unavailable";
 
 export class HitlClient {
   private socket: Socket | null = null;
-  private pending = new Map<string, { resolve: (approved: boolean) => void }>();
+  private pending = new Map<string, { resolve: (decision: HitlApprovalDecision) => void }>();
   private buffer = "";
   private connecting = false;
   private connectPromise: Promise<void> | null = null;
@@ -52,14 +57,28 @@ export class HitlClient {
     openWorld: boolean,
     sensitive = false,
   ): Promise<boolean> {
+    return (await this.requestApprovalDecision(tool, args, destructive, openWorld, sensitive)) === "approved";
+  }
+
+  /** Structured decision API for governed callers that must distinguish an
+   * explicit human denial from a timeout or a failed approval channel. The
+   * boolean requestApproval() adapter remains the compatibility surface. */
+  async requestApprovalDecision(
+    tool: string,
+    args: Record<string, unknown>,
+    destructive: boolean,
+    openWorld: boolean,
+    sensitive = false,
+  ): Promise<HitlApprovalDecision> {
     try {
       await this.ensureConnected();
     } catch {
-      log.warn("hitl: socket unreachable — denying", { socket: this.config.socketPath, tool });
-      return false;
+      log.warn("hitl: socket unreachable — approval unavailable", { socket: this.config.socketPath, tool });
+      return "unavailable";
     }
 
     const id = randomUUID();
+    const correlationId = getCorrelationId();
     const request: HitlRequest = {
       id,
       type: "hitl_request",
@@ -68,19 +87,20 @@ export class HitlClient {
       destructive,
       sensitive,
       openWorld,
+      ...(correlationId ? { correlationId } : {}),
     };
 
-    return new Promise<boolean>((resolve) => {
+    return new Promise<HitlApprovalDecision>((resolve) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);
-        log.warn("hitl: timeout waiting for approval — denying", { tool });
-        resolve(false);
+        log.warn("hitl: timeout waiting for approval", { tool });
+        resolve("timed_out");
       }, this.config.timeout * 1000);
 
       this.pending.set(id, {
-        resolve: (approved: boolean) => {
+        resolve: (decision: HitlApprovalDecision) => {
           clearTimeout(timer);
-          resolve(approved);
+          resolve(decision);
         },
       });
 
@@ -89,8 +109,8 @@ export class HitlClient {
       } catch {
         clearTimeout(timer);
         this.pending.delete(id);
-        log.warn("hitl: failed to send request — denying", { tool });
-        resolve(false);
+        log.warn("hitl: failed to send request — approval unavailable", { tool });
+        resolve("unavailable");
       }
     });
   }
@@ -165,7 +185,7 @@ export class HitlClient {
           const entry = this.pending.get(msg.id);
           if (entry) {
             this.pending.delete(msg.id);
-            entry.resolve(msg.approved);
+            entry.resolve(HitlClient.decisionFromResponse(msg));
           }
         }
       } catch {
@@ -174,10 +194,25 @@ export class HitlClient {
     }
   }
 
+  private static decisionFromResponse(response: HitlResponse): HitlApprovalDecision {
+    if (response.approved === true) {
+      // Legacy peers omit reason. A contradictory reason is malformed and
+      // therefore unavailable rather than authority to mutate.
+      return response.reason === undefined || response.reason === "approved" ? "approved" : "unavailable";
+    }
+    if (response.approved !== false) return "unavailable";
+    // Legacy false-without-reason was an explicit denial, so keep that wire
+    // compatibility while recognizing the richer protocol from current apps.
+    if (response.reason === undefined || response.reason === "denied") return "denied";
+    if (response.reason === "timed_out") return "timed_out";
+    if (response.reason === "unavailable") return "unavailable";
+    return "unavailable";
+  }
+
   private denyAllPending(reason: string): void {
     for (const [id, entry] of this.pending) {
-      log.warn("hitl: denying pending request", { reason, id });
-      entry.resolve(false);
+      log.warn("hitl: approval became unavailable for pending request", { reason, id });
+      entry.resolve("unavailable");
     }
     this.pending.clear();
   }

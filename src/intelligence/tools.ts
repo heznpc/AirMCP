@@ -1,7 +1,7 @@
 import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
 import type { AirMcpConfig } from "../shared/config.js";
-import { ok, okUntrusted, errSwift, errSwiftFor } from "../shared/result.js";
+import { ok, okStructured, okUntrusted, errSwift, errSwiftFor } from "../shared/result.js";
 import { runSwift, checkSwiftBridge } from "../shared/swift.js";
 import { zFilePath, resolveAndGuard } from "../shared/validate.js";
 import {
@@ -508,7 +508,7 @@ export function registerIntelligenceTools(server: McpServer, _config: AirMcpConf
           sampled > 0 ? +(results.reduce((sum, r) => sum + r.score.parts.expectedCoverage, 0) / sampled).toFixed(2) : 0;
         const leakedForbiddenTotal = results.reduce((sum, r) => sum + r.score.leakedForbidden.length, 0);
 
-        return ok({
+        return okStructured({
           sampled,
           averageScore,
           parseRate,

@@ -8,6 +8,7 @@ import { describe, test, expect, beforeEach, afterEach } from "@jest/globals";
 import {
   buildServerCard,
   buildOAuthProtectedResourceCard,
+  buildOAuthAuthorizationServerMetadata,
   SCHEMA_VERSION,
   SCOPES_SUPPORTED,
 } from "../dist/server/well-known-card.js";
@@ -88,9 +89,7 @@ describe("buildServerCard — icons", () => {
       ...baseInput(),
       icon: { src: "data:image/svg+xml;base64,abc", mimeType: "image/svg+xml", sizes: ["any"] },
     });
-    expect(card.icons).toEqual([
-      { src: "data:image/svg+xml;base64,abc", mimeType: "image/svg+xml", sizes: ["any"] },
-    ]);
+    expect(card.icons).toEqual([{ src: "data:image/svg+xml;base64,abc", mimeType: "image/svg+xml", sizes: ["any"] }]);
   });
 });
 
@@ -220,14 +219,10 @@ describe("buildServerCard — OAuth authorization block (RFC 0005 Step 1)", () =
   });
 });
 
-describe("buildOAuthProtectedResourceCard (RFC 9728 / SEP-985)", () => {
+describe("buildOAuthProtectedResourceCard (RFC 9728)", () => {
   // Wipe optional env knobs so the default-shape assertions don't see
   // accidental values from a dev shell.
-  const ENV_KEYS = [
-    "AIRMCP_OAUTH_RESOURCE_DOCS",
-    "AIRMCP_OAUTH_RESOURCE_POLICY",
-    "AIRMCP_OAUTH_RESOURCE_TOS",
-  ];
+  const ENV_KEYS = ["AIRMCP_OAUTH_RESOURCE_DOCS", "AIRMCP_OAUTH_RESOURCE_POLICY", "AIRMCP_OAUTH_RESOURCE_TOS"];
   const originals = {};
   beforeEach(() => {
     for (const k of ENV_KEYS) {
@@ -242,19 +237,14 @@ describe("buildOAuthProtectedResourceCard (RFC 9728 / SEP-985)", () => {
     }
   });
 
-  test("emits the SEP-985 baseline shape", () => {
-    const card = buildOAuthProtectedResourceCard(
-      "https://airmcp.local/mcp",
-      "https://auth.example.com/realms/airmcp",
-    );
+  test("emits the RFC 9728 baseline shape", () => {
+    const card = buildOAuthProtectedResourceCard("https://airmcp.local/mcp", "https://auth.example.com/realms/airmcp");
     expect(card).toEqual({
       resource: "https://airmcp.local/mcp",
       authorization_servers: ["https://auth.example.com/realms/airmcp"],
       bearer_methods_supported: ["header"],
       resource_signing_alg_values_supported: ["RS256", "ES256"],
       scopes_supported: [...SCOPES_SUPPORTED],
-      dpop_signing_alg_values_supported: ["ES256", "RS256"],
-      dpop_bound_access_tokens_required: false,
     });
   });
 
@@ -267,10 +257,10 @@ describe("buildOAuthProtectedResourceCard (RFC 9728 / SEP-985)", () => {
     expect(card.resource_signing_alg_values_supported).not.toContain("none");
   });
 
-  test("DPoP advertised but not enforced (honest current state)", () => {
+  test("does not advertise DPoP without proof validation", () => {
     const card = buildOAuthProtectedResourceCard("https://a/mcp", "https://b");
-    expect(card.dpop_signing_alg_values_supported).toEqual(["ES256", "RS256"]);
-    expect(card.dpop_bound_access_tokens_required).toBe(false);
+    expect(card.dpop_signing_alg_values_supported).toBeUndefined();
+    expect(card.dpop_bound_access_tokens_required).toBeUndefined();
   });
 
   test("resource_documentation / policy / tos env knobs surface when set", () => {
@@ -288,5 +278,27 @@ describe("buildOAuthProtectedResourceCard (RFC 9728 / SEP-985)", () => {
     expect(card.resource_documentation).toBeUndefined();
     expect(card.resource_policy_uri).toBeUndefined();
     expect(card.resource_tos_uri).toBeUndefined();
+  });
+});
+
+describe("buildOAuthAuthorizationServerMetadata (RFC 8414)", () => {
+  test("publishes configured authorization-code + PKCE endpoints and scopes", () => {
+    expect(
+      buildOAuthAuthorizationServerMetadata({
+        issuer: "https://auth.example/realms/airmcp",
+        authorizationEndpoint: "https://auth.example/realms/airmcp/authorize",
+        tokenEndpoint: "https://auth.example/realms/airmcp/token",
+        tokenEndpointAuthMethodsSupported: ["none"],
+      }),
+    ).toEqual({
+      issuer: "https://auth.example/realms/airmcp",
+      authorization_endpoint: "https://auth.example/realms/airmcp/authorize",
+      token_endpoint: "https://auth.example/realms/airmcp/token",
+      token_endpoint_auth_methods_supported: ["none"],
+      response_types_supported: ["code"],
+      grant_types_supported: ["authorization_code"],
+      code_challenge_methods_supported: ["S256"],
+      scopes_supported: [...SCOPES_SUPPORTED],
+    });
   });
 });

@@ -19,6 +19,7 @@ import { spawn } from "child_process";
 import { writeFileSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
+import { hasExactHostname } from "./lib/url-host.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
@@ -615,7 +616,7 @@ const ORCHESTRATION = [
         args: {},
         save: (r, ctx) => {
           const tabs = Array.isArray(r) ? r : [];
-          const tab = tabs.find((t) => (t.url || "").includes("example.com"));
+          const tab = tabs.find((t) => hasExactHostname(t.url, "example.com"));
           if (tab) {
             ctx.winIdx = tab.windowIndex ?? 0;
             ctx.tabIdx = tab.tabIndex ?? 0;

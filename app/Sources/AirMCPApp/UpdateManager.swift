@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 
 @MainActor
 @Observable
@@ -7,10 +8,11 @@ final class UpdateManager {
     var availableVersion: String?
     var isUpdating = false
     var updateError: String?
+    private var releasePageURL: URL?
 
     private var timer: Timer?
     private static let checkInterval: TimeInterval = 3600 // 1 hour
-    private let currentVersion = "2.15.0"
+    private let currentVersion = "2.16.0"
 
     var currentVersionString: String { currentVersion }
 
@@ -35,12 +37,14 @@ final class UpdateManager {
 
     func checkForUpdate() {
         Task {
-            let latest = await Self.fetchLatestVersion()
-            guard let latest else { return }
-            if Self.isNewer(latest, than: currentVersion) {
-                availableVersion = latest
+            let release = await Self.fetchLatestSignedAppRelease()
+            guard let release else { return }
+            if Self.isNewer(release.version, than: currentVersion) {
+                availableVersion = release.version
+                releasePageURL = release.pageURL
             } else {
                 availableVersion = nil
+                releasePageURL = nil
             }
         }
     }
@@ -48,94 +52,54 @@ final class UpdateManager {
     // MARK: - Update
 
     func performUpdate() {
-        // Pin to the exact version resolved during the update check so the install
-        // can't be redirected to a newer/compromised `@latest` between check and
-        // install (TOCTOU). No availableVersion → nothing to install.
-        guard !isUpdating, let target = availableVersion else { return }
-        isUpdating = true
-        updateError = nil
-
-        Task {
-            let success = await Self.runNpmInstall(version: target)
-            if success {
-                availableVersion = nil
-            } else {
-                updateError =
-                    "Update failed. Run manually: npm install -g \(AirMcpConstants.npmPackageName)@\(target) --ignore-scripts"
-            }
-            isUpdating = false
+        // Updating a self-contained, signed app is an app-bundle operation.
+        // A global package mutation cannot change the compiled runtime pin or the
+        // signed bundle, so the app opens the exact signed GitHub release and
+        // never reports a global npm update as an app update.
+        guard let releasePageURL else {
+            updateError = L("update.signedReleaseUnavailable")
+            return
         }
+        updateError = nil
+        NSWorkspace.shared.open(releasePageURL)
     }
 
     // MARK: - Static Helpers (nonisolated)
 
-    private nonisolated static func fetchLatestVersion() async -> String? {
-        await withCheckedContinuation { continuation in
-            DispatchQueue.global().async {
-                guard let npmPath = NodeEnvironment.findExecutable(named: "npm") else {
-                    continuation.resume(returning: nil)
-                    return
-                }
+    private struct AppRelease: Sendable {
+        let version: String
+        let pageURL: URL
+    }
 
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: npmPath)
-                process.arguments = ["view", AirMcpConstants.npmPackageName, "version"]
-                process.environment = NodeEnvironment.buildEnv()
+    private struct GitHubRelease: Decodable {
+        struct Asset: Decodable { let name: String }
+        let tagName: String
+        let htmlURL: URL
+        let assets: [Asset]
 
-                let pipe = Pipe()
-                process.standardOutput = pipe
-                process.standardError = FileHandle.nullDevice
-
-                do {
-                    try process.run()
-                    process.waitUntilExit()
-                    if process.terminationStatus == 0 {
-                        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                        let version = String(data: data, encoding: .utf8)?
-                            .trimmingCharacters(in: .whitespacesAndNewlines)
-                        continuation.resume(returning: version)
-                    } else {
-                        continuation.resume(returning: nil)
-                    }
-                } catch {
-                    continuation.resume(returning: nil)
-                }
-            }
+        enum CodingKeys: String, CodingKey {
+            case tagName = "tag_name"
+            case htmlURL = "html_url"
+            case assets
         }
     }
 
-    private nonisolated static func runNpmInstall(version: String) async -> Bool {
-        await withCheckedContinuation { continuation in
-            DispatchQueue.global().async {
-                guard let npmPath = NodeEnvironment.findExecutable(named: "npm") else {
-                    continuation.resume(returning: false)
-                    return
-                }
-
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: npmPath)
-                // Pinned exact version + `--ignore-scripts`: a notarized app must not
-                // auto-execute an unpinned `@latest`, nor run arbitrary npm lifecycle
-                // (pre/post-install) scripts at update time. airmcp ships a prebuilt
-                // `dist/` bin and declares no (pre|post)install script, so skipping
-                // lifecycle scripts is safe and does not break the global install.
-                process.arguments = [
-                    "install", "-g",
-                    "\(AirMcpConstants.npmPackageName)@\(version)",
-                    "--ignore-scripts",
-                ]
-                process.environment = NodeEnvironment.buildEnv()
-                process.standardOutput = FileHandle.nullDevice
-                process.standardError = FileHandle.nullDevice
-
-                do {
-                    try process.run()
-                    process.waitUntilExit()
-                    continuation.resume(returning: process.terminationStatus == 0)
-                } catch {
-                    continuation.resume(returning: false)
-                }
-            }
+    private nonisolated static func fetchLatestSignedAppRelease() async -> AppRelease? {
+        guard let url = URL(string: "https://api.github.com/repos/heznpc/AirMCP/releases/latest") else { return nil }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 10
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.setValue("AirMCP/\(AirMcpConstants.npmPackageVersion)", forHTTPHeaderField: "User-Agent")
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+            let release = try JSONDecoder().decode(GitHubRelease.self, from: data)
+            let version = release.tagName.trimmingCharacters(in: CharacterSet(charactersIn: "v"))
+            let expectedAsset = "AirMCP-\(version).zip"
+            guard release.assets.contains(where: { $0.name == expectedAsset }) else { return nil }
+            return AppRelease(version: version, pageURL: release.htmlURL)
+        } catch {
+            return nil
         }
     }
 

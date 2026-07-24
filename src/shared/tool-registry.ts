@@ -16,17 +16,27 @@
 
 import type { McpServer, AnyFn } from "./mcp.js";
 import { usageTracker } from "./usage-tracker.js";
-import { auditLog } from "./audit.js";
+import { auditLog, readAuditEntries } from "./audit.js";
 import { compactDescription } from "./tool-filter.js";
 import { withResultSizeHint } from "./result.js";
 import { log } from "./logger.js";
 import { traceToolCall } from "./telemetry.js";
 import { assertTestMode } from "./errors.js";
 import { checkRateLimit } from "./rate-limit.js";
-import { getOAuthClaims, getRequestContext, runWithRequestContext, getActor } from "./request-context.js";
+import {
+  getOAuthClaims,
+  getRequestContext,
+  runWithRequestContext,
+  getActor,
+  getCorrelationId,
+} from "./request-context.js";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { evaluateScopeGate } from "./oauth-scope.js";
+import { isErrorCategory, parseCategoryPrefix } from "./error-categories.js";
+import { consumeApprovalAuditEvents, runWithApprovalAuditSink, type PendingApprovalAuditEvent } from "./hitl-guard.js";
+import { isResourceTemplateRegistration, resourceAuditName, resourceRequestMetadata } from "./resource-governance.js";
+import { runGovernedActivity } from "./governed-activity.js";
 
 /** Threshold in characters above which we auto-attach a result size hint. */
 const SIZE_HINT_THRESHOLD = 10_000;
@@ -44,10 +54,151 @@ function autoSizeHint(result: unknown): unknown {
   return withResultSizeHint(r as Parameters<typeof withResultSizeHint>[0], totalChars * 2);
 }
 
+function isReturnedToolError(result: unknown): boolean {
+  return !!result && typeof result === "object" && (result as { isError?: unknown }).isError === true;
+}
+
+interface SafeReturnedToolError {
+  category?: string;
+  retryable?: boolean;
+  retryAfterMs?: number;
+  correlationId?: string;
+}
+
+/** Extract only stable, non-sensitive error metadata. Human messages, causes,
+ * hints, structured payloads, and tool args never enter this envelope. */
+function safeReturnedToolError(result: unknown): SafeReturnedToolError {
+  if (!isReturnedToolError(result)) return {};
+  const value = result as {
+    structuredContent?: unknown;
+    content?: Array<{ type?: unknown; text?: unknown }>;
+  };
+  const structured =
+    value.structuredContent && typeof value.structuredContent === "object"
+      ? (value.structuredContent as { error?: unknown })
+      : undefined;
+  const error =
+    structured?.error && typeof structured.error === "object"
+      ? (structured.error as Record<string, unknown>)
+      : undefined;
+  const firstText = value.content?.find((item) => item?.type === "text" && typeof item.text === "string")?.text;
+  const typedCategory = error?.category;
+  const category = isErrorCategory(typedCategory)
+    ? typedCategory
+    : typeof firstText === "string"
+      ? parseCategoryPrefix(firstText)?.category
+      : undefined;
+  const retryAfterMs = error?.retryAfterMs;
+  const correlationId = typeof error?.correlationId === "string" ? error.correlationId : getCorrelationId();
+  return {
+    ...(category ? { category } : {}),
+    ...(typeof error?.retryable === "boolean" ? { retryable: error.retryable } : {}),
+    ...(typeof retryAfterMs === "number" && Number.isFinite(retryAfterMs) && retryAfterMs >= 0 ? { retryAfterMs } : {}),
+    ...(correlationId ? { correlationId } : {}),
+  };
+}
+
+/** Success output schemas describe only successful structuredContent. The MCP
+ * client validates any structuredContent it receives against that schema,
+ * including isError results, so typed error payloads would become a JSON-RPC
+ * -32602 instead of the intended tool denial. For schema-bearing tools only,
+ * remove the incompatible payload and preserve a minimal safe envelope in
+ * namespaced result metadata. Tools without outputSchema keep their existing
+ * structuredContent error contract. */
+function normalizeOutputSchemaToolError(result: unknown, error: SafeReturnedToolError): unknown {
+  if (!isReturnedToolError(result)) return result;
+  const { structuredContent: _structured, _meta: existingMeta, ...rest } = result as Record<string, unknown>;
+  void _structured;
+  const safeExistingMeta =
+    existingMeta && typeof existingMeta === "object" && !Array.isArray(existingMeta)
+      ? (existingMeta as Record<string, unknown>)
+      : {};
+  const mergedMeta = {
+    ...safeExistingMeta,
+    ...(Object.keys(error).length > 0 ? { "airmcp/error": error } : {}),
+  };
+  return {
+    ...rest,
+    ...(Object.keys(mergedMeta).length > 0 ? { _meta: mergedMeta } : {}),
+  };
+}
+
+function thrownErrorCategory(error: unknown): string | undefined {
+  if (!(error instanceof Error)) return undefined;
+  return parseCategoryPrefix(error.message)?.category;
+}
+
+async function sealApprovalAuditEvent(event: PendingApprovalAuditEvent): Promise<void> {
+  if (process.env.AIRMCP_AUDIT_LOG === "false") {
+    // Disabling general audit emission is an operator-supported diagnostic
+    // mode, but it cannot turn an approved HITL callback into an ungoverned
+    // mutation. Negative decisions already fail at the guard and may preserve
+    // their normal permission result without a durable row.
+    if (event.decision === "approved") {
+      throw new Error(`[internal_error] Approval audit is disabled; "${event.tool}" was not executed.`);
+    }
+    return;
+  }
+  const correlationId = event.correlationId ?? getCorrelationId();
+  auditLog({
+    approvalId: event.approvalId,
+    timestamp: event.timestamp,
+    kind: "approval",
+    tool: event.tool,
+    status: event.decision === "approved" ? "ok" : "error",
+    actor: event.actor ?? getActor(),
+    correlationId,
+    approvalDecision: event.decision,
+    approvalChannel: event.channel,
+  });
+  // readAuditEntries seals the pending buffer into the HMAC chain before it
+  // scans. Awaiting that barrier is intentional: an approved callback must
+  // not reach its mutation until the decision is durable and queryable.
+  try {
+    const snapshot = await readAuditEntries({
+      since: event.timestamp,
+      tool: event.tool,
+      kind: "approval",
+      ...(correlationId ? { correlationId } : {}),
+      limit: 10,
+    });
+    if (event.decision !== "approved") return;
+    const decisionIsSealed = snapshot.entries.some(
+      (entry) =>
+        entry.approvalId === event.approvalId &&
+        entry.timestamp === event.timestamp &&
+        entry.kind === "approval" &&
+        entry.tool === event.tool &&
+        entry.correlationId === correlationId &&
+        entry.approvalDecision === event.decision &&
+        entry.approvalChannel === event.channel,
+    );
+    if (!snapshot.verified || snapshot.auditDisabled || !decisionIsSealed) {
+      throw new Error("approval audit verification failed");
+    }
+  } catch {
+    // A positive decision is not authority to mutate until the exact event is
+    // present in the verified chain. Negative/unavailable decisions already
+    // fail closed at the HITL guard, so preserve their permission-error result
+    // even if the audit device is unhealthy.
+    if (event.decision === "approved") {
+      throw new Error(`[internal_error] Approval audit could not be verified; "${event.tool}" was not executed.`);
+    }
+  }
+}
+
+async function sealPendingApprovalAuditEvents(): Promise<void> {
+  const events = consumeApprovalAuditEvents();
+  for (const event of events) {
+    await sealApprovalAuditEvent(event);
+  }
+}
+
 interface RegisteredToolEntry {
   handler: AnyFn;
   generation: number;
   inputSchema?: unknown;
+  outputSchema?: unknown;
   enabled: boolean;
   exposed: boolean;
   title?: string;
@@ -79,6 +230,11 @@ export interface ToolDetails extends ToolInfo {
   readOnly?: boolean;
 }
 
+export interface OutputSchemaToolInfo {
+  name: string;
+  outputSchema: unknown;
+}
+
 export interface ToolExposurePolicy {
   mode: "full" | "profile" | "progressive";
   exposedToolNames?: Set<string>;
@@ -96,7 +252,7 @@ export class ToolInputValidationError extends Error {
   }
 }
 
-class ToolRegistry {
+export class ToolRegistry {
   private tools = new Map<string, RegisteredToolEntry>();
   private prompts = new Map<string, RegisteredPromptEntry>();
   private exposurePolicy: ToolExposurePolicy = { mode: "full" };
@@ -123,6 +279,17 @@ class ToolRegistry {
 
   getExposureMode(): ToolExposurePolicy["mode"] {
     return this.exposurePolicy.mode;
+  }
+
+  /** Registered tools that declare an SDK output schema. Used by contract
+   *  tests and diagnostics to derive the inventory from real registration
+   *  calls instead of maintaining a parallel hand-written tool list. */
+  getOutputSchemaTools(): OutputSchemaToolInfo[] {
+    const out: OutputSchemaToolInfo[] = [];
+    for (const [name, entry] of this.tools) {
+      if (entry.outputSchema !== undefined) out.push({ name, outputSchema: entry.outputSchema });
+    }
+    return out;
   }
 
   configureExposure(policy: ToolExposurePolicy): void {
@@ -260,8 +427,8 @@ class ToolRegistry {
 
   /**
    * Install interception on the server so every `server.tool()`,
-   * `server.registerTool()`, `server.prompt()`, and `server.registerPrompt()`
-   * call automatically tracks the registration in this registry.
+   * `server.registerTool()`, `server.registerResource()`, `server.prompt()`,
+   * and `server.registerPrompt()` call automatically traverses core policy.
    *
    * Must be called once per server, before any module registrations.
    * Call this BEFORE `installHitlGuard` — the HITL guard will then become
@@ -283,6 +450,7 @@ class ToolRegistry {
     this.registrationGeneration += 1;
     const generation = this.registrationGeneration;
     this.interceptToolRegistration(server, generation);
+    this.interceptResourceRegistration(server);
     this.interceptPromptRegistration(server, generation);
   }
 
@@ -350,114 +518,137 @@ class ToolRegistry {
 
     const wrapHandler = (name: string, handler: AnyFn): AnyFn => {
       return (async (...args: unknown[]) => {
-        if (process.env.AIRMCP_USAGE_TRACKING !== "false") usageTracker.record(name);
+        return runGovernedActivity(async () => {
+          if (process.env.AIRMCP_USAGE_TRACKING !== "false") usageTracker.record(name);
 
-        const entry = tools.get(name);
+          const entry = tools.get(name);
 
-        // Stamp a correlation ID on the active context (or open one if
-        // the call came in over stdio with no upstream middleware) so
-        // every audit / telemetry / error line for this tool call shares
-        // an identifier. Honors any ID already set by a transport
-        // middleware so external tracing systems can drive it.
-        const existing = getRequestContext();
-        if (!existing?.correlationId) {
-          const ctx = { ...(existing ?? {}), correlationId: randomUUID() };
-          return runWithRequestContext(ctx, () => runWrapped());
-        }
-        return runWrapped();
+          // Stamp a correlation ID on the active context (or open one if
+          // the call came in over stdio with no upstream middleware) so
+          // every audit / telemetry / error line for this tool call shares
+          // an identifier. Honors any ID already set by a transport
+          // middleware so external tracing systems can drive it.
+          const existing = getRequestContext();
+          if (!existing?.correlationId) {
+            const ctx = { ...(existing ?? {}), correlationId: randomUUID() };
+            return runWithRequestContext(ctx, () => runWrapped());
+          }
+          return runWrapped();
 
-        async function runWrapped(): Promise<unknown> {
-          // OAuth scope gate (RFC 0005 §3.4 — Step 2). Runs BEFORE the
-          // rate-limit bucket so a token missing `mcp:destructive` can't
-          // burn the destructive bucket's budget just to hit a 403.
-          // Absence of claims means we're on a non-OAuth path (stdio,
-          // loopback, legacy Bearer) — skip the gate entirely.
-          const claims = getOAuthClaims();
-          if (claims) {
-            const decision = evaluateScopeGate({
-              toolName: name,
-              isReadOnly: entry?.readOnly === true,
-              isDestructive: entry?.destructive === true,
-              callerScopes: claims.scopes,
-            });
-            if (!decision.allowed) {
-              const msg = `[forbidden] scope ${decision.missing} required for tool "${name}"`;
+          async function runWrapped(): Promise<unknown> {
+            // OAuth scope gate (RFC 0005 §3.4 — Step 2). Runs BEFORE the
+            // rate-limit bucket so a token missing `mcp:destructive` can't
+            // burn the destructive bucket's budget just to hit a 403.
+            // Absence of claims means we're on a non-OAuth path (stdio,
+            // loopback, legacy Bearer) — skip the gate entirely.
+            const claims = getOAuthClaims();
+            if (claims) {
+              const decision = evaluateScopeGate({
+                toolName: name,
+                isReadOnly: entry?.readOnly === true,
+                isDestructive: entry?.destructive === true,
+                callerScopes: claims.scopes,
+              });
+              if (!decision.allowed) {
+                const msg = `[forbidden] scope ${decision.missing} required for tool "${name}"`;
+                if (process.env.AIRMCP_AUDIT_LOG !== "false") {
+                  auditLog({
+                    timestamp: new Date().toISOString(),
+                    kind: "tool",
+                    tool: name,
+                    args: args[0] as Record<string, unknown>,
+                    status: "error",
+                    actor: getActor(),
+                    errorCategory: "permission_denied",
+                    gate: "oauth_scope",
+                  });
+                }
+                throw new Error(msg);
+              }
+            }
+
+            // Rate-limit + emergency-stop gate. Runs before the call reaches
+            // the handler so a runaway agent burning through the bucket can
+            // never touch the filesystem/APIs on the denied call. Denials
+            // throw so the error is captured by audit and surfaces to the
+            // caller with the same shape as any other failure.
+            // Tenant isolation: when OAuth claims are present (HTTP transport),
+            // the bucket is keyed on the JWT subject so one tenant's runaway
+            // agent can't exhaust budget for everyone else. Stdio / loopback
+            // share the default tenant.
+            const gate = checkRateLimit(entry?.destructive === true, claims?.subject);
+            if (!gate.allowed) {
+              const msg = `[rate_limited] ${gate.reason ?? "Rate limit exceeded"}${
+                gate.retryAfterMs ? ` (retry in ~${Math.ceil(gate.retryAfterMs / 1000)}s)` : ""
+              }`;
               if (process.env.AIRMCP_AUDIT_LOG !== "false") {
                 auditLog({
                   timestamp: new Date().toISOString(),
+                  kind: "tool",
                   tool: name,
                   args: args[0] as Record<string, unknown>,
                   status: "error",
                   actor: getActor(),
+                  errorCategory: "rate_limited",
+                  gate: gate.gate ?? "rate_limit",
                 });
               }
               throw new Error(msg);
             }
-          }
 
-          // Rate-limit + emergency-stop gate. Runs before the call reaches
-          // the handler so a runaway agent burning through the bucket can
-          // never touch the filesystem/APIs on the denied call. Denials
-          // throw so the error is captured by audit and surfaces to the
-          // caller with the same shape as any other failure.
-          // Tenant isolation: when OAuth claims are present (HTTP transport),
-          // the bucket is keyed on the JWT subject so one tenant's runaway
-          // agent can't exhaust budget for everyone else. Stdio / loopback
-          // share the default tenant.
-          const gate = checkRateLimit(entry?.destructive === true, claims?.subject);
-          if (!gate.allowed) {
-            const msg = `[rate_limited] ${gate.reason ?? "Rate limit exceeded"}${
-              gate.retryAfterMs ? ` (retry in ~${Math.ceil(gate.retryAfterMs / 1000)}s)` : ""
-            }`;
-            if (process.env.AIRMCP_AUDIT_LOG !== "false") {
-              auditLog({
-                timestamp: new Date().toISOString(),
-                tool: name,
-                args: args[0] as Record<string, unknown>,
-                status: "error",
-                actor: getActor(),
-              });
-            }
-            throw new Error(msg);
-          }
-
-          const execute = async () => {
-            const start = Date.now();
-            try {
-              let result = await handler(...args);
-              if (process.env.AIRMCP_AUDIT_LOG !== "false") {
-                auditLog({
-                  timestamp: new Date(start).toISOString(),
-                  tool: name,
-                  args: args[0] as Record<string, unknown>,
-                  status: "ok",
-                  durationMs: Date.now() - start,
-                  actor: getActor(),
-                });
+            const execute = async () => {
+              const start = Date.now();
+              try {
+                // HITL normally runs inside this registry wrapper and seals its
+                // decision through the sink. The pending-event drain covers the
+                // inverse wrapper order and still runs before the callback.
+                await sealPendingApprovalAuditEvents();
+                let result = await runWithApprovalAuditSink(sealApprovalAuditEvent, () => handler(...args));
+                const returnedError = isReturnedToolError(result);
+                const safeError = safeReturnedToolError(result);
+                const errorCategory = safeError.category;
+                if (process.env.AIRMCP_AUDIT_LOG !== "false") {
+                  auditLog({
+                    timestamp: new Date().toISOString(),
+                    kind: "tool",
+                    tool: name,
+                    args: args[0] as Record<string, unknown>,
+                    status: returnedError ? "error" : "ok",
+                    durationMs: Date.now() - start,
+                    actor: getActor(),
+                    ...(errorCategory ? { errorCategory } : {}),
+                  });
+                }
+                if (returnedError && entry?.outputSchema !== undefined) {
+                  result = normalizeOutputSchemaToolError(result, safeError);
+                }
+                result = autoSizeHint(result);
+                return result;
+              } catch (e) {
+                const errorCategory = thrownErrorCategory(e);
+                if (process.env.AIRMCP_AUDIT_LOG !== "false") {
+                  auditLog({
+                    timestamp: new Date().toISOString(),
+                    kind: "tool",
+                    tool: name,
+                    args: args[0] as Record<string, unknown>,
+                    status: "error",
+                    durationMs: Date.now() - start,
+                    actor: getActor(),
+                    ...(errorCategory ? { errorCategory } : {}),
+                  });
+                }
+                throw e;
               }
-              result = autoSizeHint(result);
-              return result;
-            } catch (e) {
-              if (process.env.AIRMCP_AUDIT_LOG !== "false") {
-                auditLog({
-                  timestamp: new Date(start).toISOString(),
-                  tool: name,
-                  args: args[0] as Record<string, unknown>,
-                  status: "error",
-                  durationMs: Date.now() - start,
-                  actor: getActor(),
-                });
-              }
-              throw e;
-            }
-          };
+            };
 
-          if (process.env.AIRMCP_TELEMETRY === "true") {
-            const toolArgs = args[0] as Record<string, unknown> | undefined;
-            return traceToolCall(name, toolArgs ? Object.keys(toolArgs).length : 0, execute);
+            if (process.env.AIRMCP_TELEMETRY === "true") {
+              const toolArgs = args[0] as Record<string, unknown> | undefined;
+              return traceToolCall(name, toolArgs ? Object.keys(toolArgs).length : 0, execute);
+            }
+            return execute();
           }
-          return execute();
-        }
+        });
       }) as AnyFn;
     };
 
@@ -480,6 +671,7 @@ class ToolRegistry {
       const title = config.title as string | undefined;
       const fullDescription = config.description as string | undefined;
       const inputSchema = config.inputSchema;
+      const outputSchema = config.outputSchema;
       const exposed = shouldExposeTool(name);
       // Compact mode: shorten descriptions sent to clients via SDK
       if (exposed && fullDescription) {
@@ -493,6 +685,7 @@ class ToolRegistry {
         handler: wrapped,
         generation,
         inputSchema,
+        outputSchema,
         enabled: true,
         exposed,
         title,
@@ -532,6 +725,117 @@ class ToolRegistry {
       });
       return result;
     }) as typeof server.tool;
+  }
+
+  /** Route MCP resource reads through the same scope, rate, HITL audit sink,
+   * and outcome audit boundary as tool calls. Resource contents are never
+   * included in audit args; only URI/template variables are recorded. */
+  private interceptResourceRegistration(server: McpServer): void {
+    if (typeof server.registerResource !== "function") return;
+    const origRegisterResource = server.registerResource.bind(server);
+
+    const wrapHandler = (name: string, handler: AnyFn, isTemplate: boolean): AnyFn => {
+      const activityName = resourceAuditName(name);
+      return (async (...args: unknown[]) => {
+        return runGovernedActivity(async () => {
+          const existing = getRequestContext();
+          if (!existing?.correlationId) {
+            return runWithRequestContext({ ...(existing ?? {}), correlationId: randomUUID() }, () => runWrapped());
+          }
+          return runWrapped();
+
+          async function runWrapped(): Promise<unknown> {
+            const requestMetadata = resourceRequestMetadata(args, isTemplate);
+            const claims = getOAuthClaims();
+            if (claims) {
+              const decision = evaluateScopeGate({
+                toolName: activityName,
+                isReadOnly: true,
+                isDestructive: false,
+                callerScopes: claims.scopes,
+              });
+              if (!decision.allowed) {
+                if (process.env.AIRMCP_AUDIT_LOG !== "false") {
+                  auditLog({
+                    timestamp: new Date().toISOString(),
+                    kind: "tool",
+                    tool: activityName,
+                    args: requestMetadata,
+                    status: "error",
+                    actor: getActor(),
+                    errorCategory: "permission_denied",
+                    gate: "oauth_scope",
+                  });
+                }
+                throw new Error(`[forbidden] scope ${decision.missing} required for resource "${name}"`);
+              }
+            }
+
+            const gate = checkRateLimit(false, claims?.subject);
+            if (!gate.allowed) {
+              if (process.env.AIRMCP_AUDIT_LOG !== "false") {
+                auditLog({
+                  timestamp: new Date().toISOString(),
+                  kind: "tool",
+                  tool: activityName,
+                  args: requestMetadata,
+                  status: "error",
+                  actor: getActor(),
+                  errorCategory: "rate_limited",
+                  gate: gate.gate ?? "rate_limit",
+                });
+              }
+              throw new Error(
+                `[rate_limited] ${gate.reason ?? "Rate limit exceeded"}${
+                  gate.retryAfterMs ? ` (retry in ~${Math.ceil(gate.retryAfterMs / 1000)}s)` : ""
+                }`,
+              );
+            }
+
+            const start = Date.now();
+            try {
+              await sealPendingApprovalAuditEvents();
+              const result = await runWithApprovalAuditSink(sealApprovalAuditEvent, () => handler(...args));
+              if (process.env.AIRMCP_AUDIT_LOG !== "false") {
+                auditLog({
+                  timestamp: new Date().toISOString(),
+                  kind: "tool",
+                  tool: activityName,
+                  args: requestMetadata,
+                  status: "ok",
+                  durationMs: Date.now() - start,
+                  actor: getActor(),
+                });
+              }
+              return result;
+            } catch (error) {
+              if (process.env.AIRMCP_AUDIT_LOG !== "false") {
+                const errorCategory = thrownErrorCategory(error);
+                auditLog({
+                  timestamp: new Date().toISOString(),
+                  kind: "tool",
+                  tool: activityName,
+                  args: requestMetadata,
+                  status: "error",
+                  durationMs: Date.now() - start,
+                  actor: getActor(),
+                  ...(errorCategory ? { errorCategory } : {}),
+                });
+              }
+              throw error;
+            }
+          }
+        });
+      }) as AnyFn;
+    };
+
+    server.registerResource = ((name: string, ...rest: unknown[]) => {
+      const callback = this.validateCallback("registerResource", "Resource", name, rest, origRegisterResource as AnyFn);
+      if (!callback) return;
+      const isTemplate = isResourceTemplateRegistration(rest[0]);
+      rest[rest.length - 1] = wrapHandler(name, callback, isTemplate);
+      return (origRegisterResource as AnyFn)(name, ...rest);
+    }) as typeof server.registerResource;
   }
 
   private interceptPromptRegistration(server: McpServer, generation: number): void {
@@ -608,3 +912,15 @@ function validateToolArgs(name: string, inputSchema: unknown, args: Record<strin
 
 /** Singleton registry instance — shared across the process. */
 export const toolRegistry = new ToolRegistry();
+
+/** Create an isolated executable registry for one MCP server instance.
+ *
+ * HTTP transport creates one McpServer per session. Sharing executable
+ * handlers between those servers lets a later session overwrite an earlier
+ * session's callback (including its HITL elicitation channel). Runtime server
+ * construction must therefore use this factory and close all in-process
+ * dispatch over the returned registry. The exported singleton remains for
+ * backwards-compatible direct registration and unit-test use. */
+export function createToolRegistry(): ToolRegistry {
+  return new ToolRegistry();
+}

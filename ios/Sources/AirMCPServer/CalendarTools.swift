@@ -14,7 +14,7 @@ private func decodeInput<T: Decodable>(_ type: T.Type, from arguments: [String: 
 // MARK: - ListCalendarsTool
 
 public struct ListCalendarsTool: MCPTool {
-    public static let name = "calendar_list"
+    public static let name = "list_calendars"
     public static let description = "List all calendars available on the device"
     nonisolated(unsafe) public static let inputSchema: [String: Any] = [
         "type": "object",
@@ -35,7 +35,7 @@ public struct ListCalendarsTool: MCPTool {
 // MARK: - TodayEventsTool
 
 public struct TodayEventsTool: MCPTool {
-    public static let name = "calendar_today"
+    public static let name = "today_events"
     public static let description = "List all events scheduled for today"
     nonisolated(unsafe) public static let inputSchema: [String: Any] = [
         "type": "object",

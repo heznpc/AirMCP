@@ -1,6 +1,6 @@
 # RFC 0005 — OAuth 2.1 + Resource Indicators (MCP 2025-06-18 spec)
 
-- **Status**: Accepted — Steps 1 (discovery, [#138](https://github.com/heznpc/AirMCP/pull/138)) + 2 (JWT verifier + scope gate, [#139](https://github.com/heznpc/AirMCP/pull/139)) shipped in v2.11.0. Step 3 (browser PKCE guide — see [`docs/oauth-browser-pkce.md`](../oauth-browser-pkce.md)) documented. Steps 4-5 (`AIRMCP_HTTP_TOKEN` deprecation + removal) target v2.13.0 / v3.0.0.
+- **Status**: Accepted — Steps 1 (discovery, [#138](https://github.com/heznpc/AirMCP/pull/138)) + 2 (JWT verifier + scope gate, [#139](https://github.com/heznpc/AirMCP/pull/139)) shipped in v2.11.0. Step 3 (browser PKCE guide — see [`docs/oauth-browser-pkce.md`](../oauth-browser-pkce.md)) is documented. The former Steps 4-5 static-token deprecation/removal plan is rescinded: token and OAuth policies now serve different deployment boundaries, and the app-owned loopback runtime relies on a per-install token.
 - **Author**: heznpc + Claude
 - **Created**: 2026-04-23
 - **Target**: v2.11.0
@@ -10,7 +10,7 @@
 
 ## 1. Motivation
 
-AirMCP의 HTTP 모드는 현재 **Bearer 토큰 단일 계층** 인증을 제공한다. `AIRMCP_HTTP_TOKEN`을 환경 변수로 설정하면 서버가 `Authorization: Bearer <token>`을 SHA-256 + `timingSafeEqual`로 검증한다 ([src/server/http-transport.ts:255-277](../../src/server/http-transport.ts:255)). 이는 v2.7.0부터 안정적으로 운영 중이고, RFC 0002에서 정책화(`with-token`, `with-token+origin`)까지 강화되어 있다.
+이 RFC를 제안할 당시 AirMCP의 HTTP 모드는 **정적 Bearer 토큰 단일 계층** 인증만 제공했다. 현재는 `AIRMCP_ALLOW_NETWORK`의 명시적 정책에 따라 `with-token*`에서는 `AIRMCP_HTTP_TOKEN`을 상수 시간 비교로 검증하고, `with-oauth*`에서는 issuer·audience·서명·scope를 검증한다. 두 경로는 한 요청에서 자동 폴백하지 않는다.
 
 그러나 **2025-06-18 MCP 사양 개정**은 인증 축을 OAuth 2.1 + Resource Indicators (RFC 8707)로 옮겼다:
 
@@ -22,7 +22,7 @@ AirMCP의 HTTP 모드는 현재 **Bearer 토큰 단일 계층** 인증을 제공
 ### 현 상태의 실질적 한계
 - Bearer 토큰은 **기기 단위** 비밀로, 실수로 로그/Git·공유 터미널에 노출되면 회수 불가(수동 재발급 필요).
 - 토큰 **만료(TTL)** 가 없다. 한 번 발급되면 영구.
-- `.well-known/mcp.json`은 `authorization: { type: "bearer" }`만 선언 ([mcp-setup.ts 관련 로직](../../src/server/mcp-setup.ts)). OAuth flow 메타데이터 부재.
+- 당시 `.well-known/mcp.json`은 `authorization: { type: "bearer" }`만 선언했다. 현재는 활성 정책에 맞춰 Bearer 또는 OAuth discovery를 게시하고, `with-oauth*`에서는 RFC 9728 protected-resource metadata도 제공한다.
 
 ---
 
@@ -30,7 +30,7 @@ AirMCP의 HTTP 모드는 현재 **Bearer 토큰 단일 계층** 인증을 제공
 
 1. MCP 2025-06-18 사양의 **OAuth 2.1 클라이언트·리소스 서버 역할**을 AirMCP가 수행 가능하게.
 2. **RFC 8707 Resource Indicators**를 받아들여 토큰 audience를 검증.
-3. 기존 Bearer 모드는 **하위 호환**으로 유지(레거시 `AIRMCP_HTTP_TOKEN` 구성은 v3.0까지 동작).
+3. 정적 Bearer와 OAuth를 **서로 다른 명시적 정책**으로 유지한다. 앱 소유 loopback 런타임과 단일 사용자 배포는 token을, 외부 다중 사용자 배포는 OAuth를 선택한다.
 4. `.well-known/oauth-protected-resource` 엔드포인트 추가로 **자동 탐색** 지원.
 5. 로컬·개인 사용자는 설정 복잡도가 늘지 않도록 디폴트는 기존과 동일(loopback + optional token).
 
@@ -51,7 +51,7 @@ AirMCP의 HTTP 모드는 현재 **Bearer 토큰 단일 계층** 인증을 제공
 ```ts
 export type NetworkPolicy =
   | "loopback-only"
-  | "with-token"                 // legacy Bearer (현행)
+  | "with-token"                 // static Bearer token
   | "with-token+origin"
   | "with-oauth"                 // NEW — OAuth 2.1 + RI
   | "with-oauth+origin"          // NEW — OAuth + CORS allow-list
@@ -78,11 +78,13 @@ claims = { sub, scope, exp, iat, resource?, ... }
     ↓
 req.oauth = { subject, scopes, raw }
     ↓
-미들웨어: destructive 도구 호출 시 scope 체크 (선택)
+미들웨어: 모든 도구·resource 요청에 필요한 scope를 강제
 ```
 
-- JWKS는 `${issuer}/.well-known/jwks.json`에서 **프로세스 시작 시 1회 fetch + 캐시 + 10분 주기 백그라운드 갱신**. kid 회전 대응.
-- Resource Indicators 검증: `aud` claim이 `AIRMCP_OAUTH_AUDIENCE`를 **포함**하지 않으면 401. 토큰에 `resource` claim이 있다면 그 값도 audience와 매칭해야 통과(spec draft가 `aud`·`resource` 둘 다 언급하므로 둘 중 하나라도 매치되면 통과하도록 폴백).
+`sub`와 `exp`는 선택 필드가 아니다. Resource server는 서명·issuer·audience가 맞더라도 둘 중 하나가 없는 JWT를 거부한다. 특히 `exp` 없는 토큰을 무기한 access token으로 취급하지 않는다.
+
+- JWKS 위치는 issuer의 RFC 8414 metadata `jwks_uri`에서 발견한다. 경로가 있는 issuer는 RFC 8414 path-insertion 위치를 먼저 조회하고, 404일 때 Keycloak 호환 OIDC discovery 위치로 폴백한다. Metadata의 `issuer`는 설정값과 정확히 일치해야 하며 metadata/JWKS URL은 HTTPS여야 한다. `jose`의 10분 키 캐시로 `kid` 회전에 대응한다. Metadata를 제공하지 못하는 AS는 시작 시 검증되는 `AIRMCP_OAUTH_JWKS_URI` HTTPS override를 사용할 수 있다.
+- Resource Indicators 검증: `aud` claim이 `AIRMCP_OAUTH_AUDIENCE`를 **포함**하지 않으면 401. `resource` claim은 진단용 raw claims에 보존하지만 `aud` 검증을 대체하지 않는다.
 
 ### 3.3 발견(discovery) 엔드포인트
 
@@ -107,21 +109,23 @@ req.oauth = { subject, scopes, raw }
   }
   ```
 
-### 3.4 scope 설계 (제안, v2.11 bake-in 대상 아님)
+### 3.4 scope 설계 (구현됨)
 
 | scope | 허용 도구 |
 |---|---|
-| `mcp:read` | `readOnlyHint: true`인 모든 도구 |
+| `mcp:read` | `readOnlyHint: true`인 모든 도구와 모든 MCP `resources/*` 요청 |
 | `mcp:write` | `readOnlyHint: false` + `destructiveHint: false` |
 | `mcp:destructive` | `destructiveHint: true` (기본 HITL 경로와 AND) |
 | `mcp:admin` | `audit_*`, `memory_forget`, `setup_permissions` 등 메타 |
 
-구현 1단계에서는 **scope 강제는 하지 않고 payload에 실어두기만**. 2단계에서 `tool-registry.ts`의 pre-handler gate에 scope 체크 삽입.
+`resources/*`의 scope 판정과 live callback 거버넌스는 별도 층이다. 모든 resource 프로토콜 요청은 먼저 `mcp:read`를 요구한다. 실제 `registerResource` read callback은 추가로 core rate limit과 `resource:<name>` HMAC outcome audit를 통과하며, 민감 분류된 built-in Apple-data resource(clipboard/context snapshot 포함)는 기본 `sensitive-only` 정책에서 호출마다 HITL 승인을 요구한다. 승인된 read는 해당 호출의 random `approvalId`가 감사 체인에서 검증되기 전에는 데이터를 읽지 않는다. 이 민감 분류는 서버의 private side channel에만 유지되고 `resources/list`의 `_meta`로 노출되지 않는다.
+
+Step 2부터 `tool-registry.ts`의 pre-handler gate가 이 매핑을 강제한다. OAuth claims가 없는 stdio·loopback·정적 Bearer 경로에는 OAuth scope gate를 적용하지 않으며, destructive 호출에는 `mcp:destructive`와 호출별 HITL 승인이 모두 필요하다.
 
 ### 3.5 하위 호환성
 
-- `AIRMCP_HTTP_TOKEN`이 설정된 상태에서 `AIRMCP_OAUTH_ISSUER`도 설정되면 **둘 다 받아들임** (토큰이 JWT 시그니처 파싱 성공하면 OAuth 경로, 실패하면 Bearer 경로). 이중 경로는 v3.0까지만 유지.
-- 모든 새 플래그·env var는 기본 off. 기존 deployments는 변경 없이 동작.
+- `AIRMCP_ALLOW_NETWORK=with-token*`은 정적 Bearer만, `with-oauth*`는 JWT OAuth만 받아들인다. 동시에 설정된 credential을 자동 판별하거나 실패 시 다른 인증 경로로 폴백하지 않는다.
+- 기본 정책은 `loopback-only`다. 기존 배포는 정책을 명시적으로 바꾸지 않는 한 외부 인터페이스에 바인딩되지 않는다.
 
 ---
 
@@ -152,11 +156,10 @@ req.oauth = { subject, scopes, raw }
 
 | 단계 | 내용 | 버전 |
 |---|---|---|
-| 1 | `NetworkPolicy` enum 확장, `validateNetworkPolicy` 가드, `.well-known/oauth-protected-resource` 엔드포인트, `jose` 의존성, JWKS 캐시, 검증 미들웨어. **scope 강제 없음**. | v2.11.0 |
-| 2 | `tool-registry.ts` pre-handler에 scope 체크 삽입. `mcp:destructive` 없이 destructive 호출 시 403. | v2.12.0 |
-| 3 | 브라우저 MCP 클라이언트 대상 PKCE 플로우 가이드 문서 업데이트. | v2.12.0 |
-| 4 | `AIRMCP_HTTP_TOKEN` 경로 deprecation warning. | v2.13.0 |
-| 5 | `AIRMCP_HTTP_TOKEN` 제거. OAuth만 지원. | v3.0.0 |
+| 1 | `NetworkPolicy` enum 확장, `validateNetworkPolicy` 가드, `.well-known/oauth-protected-resource` 엔드포인트, `jose` 의존성, JWKS 캐시, 검증 미들웨어. | v2.11.0 (완료) |
+| 2 | `tool-registry.ts` pre-handler에 scope 체크 삽입. `mcp:destructive` 없이 destructive 호출 시 403. | v2.11.0 (완료) |
+| 3 | 브라우저 MCP 클라이언트 대상 PKCE 플로우 가이드 문서 업데이트. | 완료 |
+| 4 | 정적 token과 OAuth를 상호 배타적인 정책으로 유지하고, app-owned loopback runtime에는 token을 사용. | 계속 지원 |
 
 ---
 
@@ -164,7 +167,7 @@ req.oauth = { subject, scopes, raw }
 
 - `doctor`의 HTTP policy 섹션이 OAuth 모드에서 `issuer`·`audience`·JWKS 최신 kid 요약을 출력.
 - `with-oauth` 모드에서 유효 JWT로 `list_tools` 호출 가능, 만료·잘못된 `aud`·잘못된 `iss` 토큰은 각각 401.
-- `with-token` (레거시) 경로 테스트 91개 전원 green 유지.
+- `with-token` 정적 Bearer 경로와 `with-oauth` JWT 경로의 인증·거부 계약 테스트 유지.
 - `npm audit --omit=dev` 0건 유지 (`jose` 포함).
 - E2E 테스트: Keycloak devcontainer 기동 → 클라이언트가 authorization code + PKCE로 토큰 획득 → AirMCP에 제시 → 툴 호출 성공 1종.
 

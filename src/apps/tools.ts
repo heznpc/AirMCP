@@ -2,18 +2,28 @@
 
 import type { McpServer } from "../shared/mcp.js";
 import { z } from "zod";
+import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { registerAppTool, registerAppResource, RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
 import { runJxa } from "../shared/jxa.js";
 import { wrapUntrustedText, UNTRUSTED_CONTENT_META } from "../shared/untrusted.js";
-import { EXT_APPS } from "../shared/constants.js";
 import { listEventsScript, todayEventsScript } from "../calendar/scripts.js";
 import { nowPlayingScript } from "../music/scripts.js";
 import { listRemindersScript } from "../reminders/scripts.js";
 
-// Derived once at module load — keeps the CSP origin in sync with the import URL.
-// If the CDN constant changes (e.g. local mirror), both the <script> import and
-// the CSP allowlist update together instead of drifting apart.
-const EXT_APPS_ORIGIN = new URL(EXT_APPS.CDN_URL).origin;
+// MCP Apps must render offline and without expanding the iframe CSP to a CDN.
+// `app-with-deps` is already a production dependency; inline its browser bundle
+// into each resource and replace the ESM export tail with one private binding.
+const require = createRequire(import.meta.url);
+const extAppsBundle = readFileSync(require.resolve("@modelcontextprotocol/ext-apps/app-with-deps"), "utf8");
+const appExport = /([A-Za-z_$][\w$]*) as App(?=[,}])/.exec(extAppsBundle)?.[1];
+const exportStart = extAppsBundle.lastIndexOf("export{");
+if (!appExport || exportStart < 0) {
+  throw new Error("Unable to prepare the bundled MCP Apps client");
+}
+const EXT_APPS_CLIENT_SOURCE = (
+  extAppsBundle.slice(0, exportStart) + `globalThis.__AirMCPAppsApp=${appExport};`
+).replaceAll("</script", "<\\/script");
 
 const CALENDAR_WEEK_HTML = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -33,7 +43,8 @@ body{font-family:var(--font-sans,system-ui,-apple-system,sans-serif);background:
 <div class="header" id="hdr">Calendar</div>
 <div id="content"><div class="loading">Loading events\u2026</div></div>
 <script type="module">
-import{App}from"${EXT_APPS.CDN_URL}";
+${EXT_APPS_CLIENT_SOURCE}
+const App=globalThis.__AirMCPAppsApp;
 const app=new App({name:"AirMCP Calendar",version:"1.0.0"});
 app.onhostcontextchanged=ctx=>{
   if(ctx.styles?.variables)Object.entries(ctx.styles.variables).forEach(([k,v])=>document.documentElement.style.setProperty(k,v));
@@ -89,7 +100,8 @@ body{font-family:var(--font-sans,system-ui,-apple-system,sans-serif);background:
 <div class="header" id="hdr"><span>Timeline</span><span class="sub" id="sub"></span></div>
 <div id="content"><div class="loading">Loading timeline\u2026</div></div>
 <script type="module">
-import{App}from"${EXT_APPS.CDN_URL}";
+${EXT_APPS_CLIENT_SOURCE}
+const App=globalThis.__AirMCPAppsApp;
 const app=new App({name:"AirMCP Timeline",version:"1.0.0"});
 app.onhostcontextchanged=ctx=>{
   if(ctx.styles?.variables)Object.entries(ctx.styles.variables).forEach(([k,v])=>document.documentElement.style.setProperty(k,v));
@@ -160,7 +172,8 @@ body{font-family:var(--font-sans,system-ui,-apple-system,sans-serif);background:
 </style></head><body>
 <div class="player" id="p"><div class="stopped">No track playing</div></div>
 <script type="module">
-import{App}from"${EXT_APPS.CDN_URL}";
+${EXT_APPS_CLIENT_SOURCE}
+const App=globalThis.__AirMCPAppsApp;
 const app=new App({name:"AirMCP Music",version:"1.0.0"});
 app.onhostcontextchanged=ctx=>{
   if(ctx.styles?.variables)Object.entries(ctx.styles.variables).forEach(([k,v])=>document.documentElement.style.setProperty(k,v));
@@ -252,7 +265,7 @@ export function registerApps(server: McpServer, opts: { calendar: boolean; music
             uri: "ui://airmcp/calendar-week",
             mimeType: RESOURCE_MIME_TYPE,
             text: CALENDAR_WEEK_HTML,
-            _meta: { ui: { csp: { resourceDomains: [EXT_APPS_ORIGIN] } } },
+            _meta: { ui: { csp: { connectDomains: [], resourceDomains: [] } } },
           },
         ],
       }),
@@ -304,7 +317,7 @@ export function registerApps(server: McpServer, opts: { calendar: boolean; music
             uri: "ui://airmcp/music-player",
             mimeType: RESOURCE_MIME_TYPE,
             text: MUSIC_PLAYER_HTML,
-            _meta: { ui: { csp: { resourceDomains: [EXT_APPS_ORIGIN] } } },
+            _meta: { ui: { csp: { connectDomains: [], resourceDomains: [] } } },
           },
         ],
       }),
@@ -377,7 +390,7 @@ export function registerApps(server: McpServer, opts: { calendar: boolean; music
             uri: "ui://airmcp/timeline-today",
             mimeType: RESOURCE_MIME_TYPE,
             text: TIMELINE_HTML,
-            _meta: { ui: { csp: { resourceDomains: [EXT_APPS_ORIGIN] } } },
+            _meta: { ui: { csp: { connectDomains: [], resourceDomains: [] } } },
           },
         ],
       }),

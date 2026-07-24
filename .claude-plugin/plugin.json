@@ -2,7 +2,7 @@
   "name": "airmcp",
   "displayName": "AirMCP",
   "description": "Governed MCP runtime for the Apple ecosystem and the connector layer between AI clients and Apple apps. The macOS runtime is available today and the iOS runtime is in preview, with visionOS and watchOS as roadmap targets. Profiles and progressive discovery keep the client surface focused; HMAC-chained audit logs, per-call HITL, OAuth 2.1 + Resource Indicators, scope gates, rate limits, and an emergency stop govern actions across Calendar, Notes, Mail, Reminders, Contacts, Messages, Music, Finder, Safari, Photos, Maps, Podcasts, Weather, iWork, Google Workspace, Apple Intelligence, UI Automation, Shortcuts, and Context Memory. Native Swift bridges cover EventKit, HealthKit, PhotoKit, Vision, and Foundation Models. Local-first and multi-client.",
-  "version": "2.15.0",
+  "version": "2.16.0",
   "author": {
     "name": "heznpc",
     "url": "https://github.com/heznpc"

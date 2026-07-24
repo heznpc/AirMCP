@@ -16,6 +16,7 @@ const ROOT = dirname(fileURLToPath(new URL("../package.json", import.meta.url)))
 const OUT_DIR = join(ROOT, "build", "release-preflight");
 const args = new Set(process.argv.slice(2));
 const INCLUDE_APP = args.has("--app");
+const REQUIRE_WIDGET = process.env.AIRMCP_REQUIRE_WIDGET === "1";
 const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
 const version = pkg.version;
 
@@ -96,23 +97,18 @@ function verifyNpmDryRun() {
   if (!filePaths.includes("dist/index.js")) {
     fail("npm dry-run is missing dist/index.js");
   }
-  if (!filePaths.includes("dist/.airmcp-slim-root.json")) {
-    fail("npm dry-run is missing dist/.airmcp-slim-root.json; root package is not the slim publish surface");
-  }
   const stagedManifest = JSON.parse(readFileSync(join(ROOT, "build", "addons", "manifest.json"), "utf8"));
-  const leakedEntrypoints = [];
+  const missingEntrypoints = [];
   for (const addonPack of stagedManifest.packages ?? []) {
     for (const moduleName of addonPack.modules ?? []) {
-      for (const fileName of ["tools.js", "prompts.js"]) {
-        const entry = `dist/${moduleName}/${fileName}`;
-        if (filePaths.includes(entry)) leakedEntrypoints.push(entry);
-      }
+      const entry = `dist/${moduleName}/tools.js`;
+      if (!filePaths.includes(entry)) missingEntrypoints.push(entry);
     }
   }
-  if (leakedEntrypoints.length) {
-    fail(`npm dry-run includes non-core module entrypoints that belong in add-ons: ${leakedEntrypoints.join(", ")}`);
+  if (missingEntrypoints.length) {
+    fail(`universal npm dry-run is missing module entrypoints: ${missingEntrypoints.join(", ")}`);
   }
-  console.log(`ok: npm dry-run: ${pack.filename}, ${filePaths.length} files, slim root publish surface`);
+  console.log(`ok: npm dry-run: ${pack.filename}, ${filePaths.length} files, universal publish surface`);
 }
 
 function verifyMcpb(path) {
@@ -123,7 +119,6 @@ function verifyMcpb(path) {
     "icon.png",
     "server/package.json",
     "server/dist/index.js",
-    "server/dist/.airmcp-slim-root.json",
   ];
   const missing = required.filter((entry) => !entries.includes(entry));
   if (missing.length) fail(`.mcpb is missing required entries: ${missing.join(", ")}`);
@@ -141,17 +136,15 @@ function verifyMcpb(path) {
   );
   if (forbidden.length) fail(`.mcpb includes forbidden paths: ${forbidden.join(", ")}`);
   const stagedManifest = JSON.parse(readFileSync(join(ROOT, "build", "addons", "manifest.json"), "utf8"));
-  const leakedEntrypoints = [];
+  const missingEntrypoints = [];
   for (const addonPack of stagedManifest.packages ?? []) {
     for (const moduleName of addonPack.modules ?? []) {
-      for (const fileName of ["tools.js", "prompts.js"]) {
-        const entry = `server/dist/${moduleName}/${fileName}`;
-        if (entries.includes(entry)) leakedEntrypoints.push(entry);
-      }
+      const entry = `server/dist/${moduleName}/tools.js`;
+      if (!entries.includes(entry)) missingEntrypoints.push(entry);
     }
   }
-  if (leakedEntrypoints.length) {
-    fail(`.mcpb includes non-core module entrypoints that belong in add-ons: ${leakedEntrypoints.join(", ")}`);
+  if (missingEntrypoints.length) {
+    fail(`universal .mcpb is missing module entrypoints: ${missingEntrypoints.join(", ")}`);
   }
 
   const manifest = readZipJson(path, "manifest.json");
@@ -166,7 +159,11 @@ function verifyMcpb(path) {
 
 function buildAppArchive() {
   run("bash", ["scripts/bundle-app.sh", "bundle"], {
-    env: { ...process.env, AIRMCP_SKIP_WIDGET: "1" },
+    env: {
+      ...process.env,
+      AIRMCP_REQUIRE_WIDGET: REQUIRE_WIDGET ? "1" : "0",
+      AIRMCP_SKIP_WIDGET: REQUIRE_WIDGET ? "0" : "1",
+    },
   });
   const appPath = join(ROOT, "AirMCP.app");
   assertFile(join(appPath, "Contents", "MacOS", "AirMCP"), "AirMCP.app executable");
@@ -187,27 +184,27 @@ run("npm", ["run", "harness:check"]);
 run("npm", ["run", "addons:check"]);
 run("npm", ["run", "size:check"]);
 run("npm", ["run", "addons:verify-install", "--", "--all"]);
-run("npm", ["run", "addons:measure-split", "--", "--no-build", "--require-size-win"]);
-const splitMeasurementPath = join(ROOT, "build", "addons", "split-measurement.json");
-assertFile(splitMeasurementPath, "add-on split measurement");
-copyFileSync(splitMeasurementPath, join(OUT_DIR, "addon-split-measurement.json"));
-run("npm", ["run", "addons:first-user-drill", "--", "--no-build"]);
-const firstUserDrillPath = join(ROOT, "build", "addons", "first-user-addon-drill.json");
-assertFile(firstUserDrillPath, "first-user add-on drill");
-copyFileSync(firstUserDrillPath, join(OUT_DIR, "first-user-addon-drill.json"));
-run("npm", ["run", "addons:kill-test", "--", "--no-build"]);
-const modularKillTestPath = join(ROOT, "build", "addons", "modular-distribution-kill-test.json");
-assertFile(modularKillTestPath, "modular distribution kill-test");
-copyFileSync(modularKillTestPath, join(OUT_DIR, "modular-distribution-kill-test.json"));
 run("npm", ["run", "verify:package"]);
 verifyNpmDryRun();
 run("npm", ["run", "build:mcpb"]);
+run("npm", ["run", "verify:mcpb"]);
 
 const mcpbPath = join(ROOT, "build", "mcpb", `airmcp-${version}.mcpb`);
 verifyMcpb(mcpbPath);
 copyFileSync(mcpbPath, join(OUT_DIR, `airmcp-${version}.mcpb`));
 
 if (INCLUDE_APP) {
+  // Exercise the shipping, self-contained app through the real MCP transport
+  // before archiving it: authenticated read, approved and denied writes,
+  // emergency stop, and HMAC audit verification. This is deliberately part of
+  // the app preflight rather than a source-wiring-only test.
+  run("npm", ["run", "app:verify:governed"], {
+    env: {
+      ...process.env,
+      AIRMCP_REQUIRE_WIDGET: REQUIRE_WIDGET ? "1" : "0",
+      AIRMCP_SKIP_WIDGET: REQUIRE_WIDGET ? "0" : "1",
+    },
+  });
   buildAppArchive();
 } else {
   console.log("release-preflight: skipping app bundle archive (pass --app to include it)");

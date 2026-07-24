@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import Network
 import UserNotifications
@@ -10,6 +11,7 @@ final class HitlManager {
 
     struct ApprovalRequest: Identifiable, Sendable {
         let id: String
+        let correlationId: String?
         let tool: String
         let args: [String: String]
         let destructive: Bool
@@ -20,8 +22,10 @@ final class HitlManager {
 
     struct ApprovalRecord: Identifiable, Sendable {
         let id: String
+        let correlationId: String?
         let tool: String
         let approved: Bool
+        let reason: HitlResponseReason
         let timestamp: Date
     }
 
@@ -45,13 +49,22 @@ final class HitlManager {
     private var pendingConnections: [String: NWConnection] = [:]
     private(set) var pendingTools: [String: String] = [:]  // id -> tool name
     private var receiveBuffers: [ObjectIdentifier: Data] = [:]
+    private var ownedSocketIdentity: SocketFileIdentity?
     /// Max un-terminated bytes buffered per connection before the peer is
     /// dropped — prevents a newline-less stream from exhausting the app's memory.
     private static let maxReceiveBufferBytes = 64 * 1024
 
-    private let socketPath: String = {
-        NSHomeDirectory() + "/.config/airmcp/hitl.sock"
-    }()
+    private struct SocketFileIdentity: Equatable {
+        let device: UInt64
+        let inode: UInt64
+    }
+
+    private struct SocketPathConfiguration {
+        let path: String?
+        let isOverride: Bool
+    }
+
+    private let socketPathConfiguration = HitlManager.configuredSocketPath()
 
     var timeoutSeconds: Int = 30
 
@@ -59,23 +72,44 @@ final class HitlManager {
 
     func startListening() {
         guard listener == nil else { return }
+        guard let socketPath = socketPathConfiguration.path else {
+            state = .idle
+            return
+        }
 
-        // Ensure config directory exists, then restrict ONLY the airmcp leaf to
-        // owner-only (0700). The HITL socket has no peer authentication (NWListener
-        // over a Unix socket can't cheaply read the peer's uid), so 0700 stops
-        // OTHER local users on a shared Mac from connecting and forging approval
-        // prompts. Note: the 0700 is applied via setAttributes on the leaf only —
-        // NOT passed to createDirectory, which would also tighten intermediates
-        // like the shared ~/.config that other tools expect at 0755.
+        // Tighten only a directory AirMCP owns: the default leaf, or an override
+        // leaf created by this call. An existing arbitrary override parent (for
+        // example /tmp) must never have its permissions rewritten.
         let configDir = (socketPath as NSString).deletingLastPathComponent
-        try? FileManager.default.createDirectory(
-            atPath: configDir,
-            withIntermediateDirectories: true
-        )
-        try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: configDir)
+        var isDirectory: ObjCBool = false
+        let parentExisted = FileManager.default.fileExists(atPath: configDir, isDirectory: &isDirectory)
+        guard !parentExisted || isDirectory.boolValue else {
+            state = .idle
+            return
+        }
 
-        // Remove stale socket file
-        removeSocketFile()
+        do {
+            if !parentExisted {
+                try FileManager.default.createDirectory(
+                    atPath: configDir,
+                    withIntermediateDirectories: true
+                )
+            }
+            if !socketPathConfiguration.isOverride || !parentExisted {
+                try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: configDir)
+            }
+        } catch {
+            state = .idle
+            return
+        }
+
+        // A regular file/symlink is never unlinked. An existing live socket
+        // belongs to another listener and is left intact. Only a socket inode
+        // that fails a connect probe and remains unchanged is treated as stale.
+        guard Self.prepareSocketPathForBind(socketPath) else {
+            state = .idle
+            return
+        }
 
         do {
             let params = NWParameters()
@@ -105,11 +139,17 @@ final class HitlManager {
     }
 
     func stopListening() {
+        let ownedIdentity = ownedSocketIdentity
+        ownedSocketIdentity = nil
+        let notificationIds = pendingRequests.map(\.id)
+
         for timer in pendingTimers.values {
             timer.cancel()
         }
         pendingTimers.removeAll()
         pendingConnections.removeAll()
+        pendingRequests.removeAll()
+        pendingTools.removeAll()
 
         for connection in connections {
             connection.cancel()
@@ -120,7 +160,12 @@ final class HitlManager {
         listener?.cancel()
         listener = nil
 
-        removeSocketFile()
+        if let socketPath = socketPathConfiguration.path,
+           let ownedIdentity
+        {
+            Self.removeSocketFile(at: socketPath, ifIdentityMatches: ownedIdentity)
+        }
+        Self.removeNotifications(withIdentifiers: notificationIds)
         state = .idle
     }
 
@@ -129,9 +174,19 @@ final class HitlManager {
     private func handleListenerState(_ newState: NWListener.State) {
         switch newState {
         case .ready:
+            guard let socketPath = socketPathConfiguration.path,
+                  let identity = Self.socketFileIdentity(at: socketPath)
+            else {
+                listener?.cancel()
+                state = .idle
+                return
+            }
+            ownedSocketIdentity = identity
             // Tighten the socket file to owner-only (defense in depth alongside
             // the 0700 dir); NWListener creates it at default perms when it binds.
-            try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: socketPath)
+            if Self.socketFileIdentity(at: socketPath) == identity {
+                try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: socketPath)
+            }
             state = connections.isEmpty ? .listening : .connected
         case .failed, .cancelled:
             stopListening()
@@ -168,6 +223,19 @@ final class HitlManager {
         let connId = ObjectIdentifier(connection)
         receiveBuffers.removeValue(forKey: connId)
         connections.removeAll { $0 === connection }
+        let orphanedRequests = pendingRequests.filter { request in
+            guard let pendingConnection = pendingConnections[request.id] else { return false }
+            return pendingConnection === connection
+        }
+        for request in orphanedRequests {
+            pendingTimers[request.id]?.cancel()
+            pendingTimers.removeValue(forKey: request.id)
+            pendingConnections.removeValue(forKey: request.id)
+            pendingTools.removeValue(forKey: request.id)
+            pendingRequests.removeAll { $0.id == request.id }
+            recordRecentRequest(request, approved: false, reason: .unavailable)
+        }
+        Self.removeNotifications(withIdentifiers: orphanedRequests.map(\.id))
         state = connections.isEmpty ? .listening : .connected
     }
 
@@ -228,6 +296,7 @@ final class HitlManager {
         guard let parsed = HitlProtocol.parseApprovalRequest(from: data, timestamp: timestamp) else { return nil }
         return ApprovalRequest(
             id: parsed.id,
+            correlationId: parsed.correlationId,
             tool: parsed.tool,
             args: parsed.args,
             destructive: parsed.destructive,
@@ -252,7 +321,12 @@ final class HitlManager {
         let timeout = DispatchWorkItem { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self, self.pendingTimers[request.id] != nil else { return }
-                self.respond(id: request.id, approved: false, tool: request.tool)
+                self.respond(
+                    id: request.id,
+                    approved: false,
+                    tool: request.tool,
+                    reason: .timedOut
+                )
             }
         }
         pendingTimers[request.id] = timeout
@@ -262,23 +336,45 @@ final class HitlManager {
         )
     }
 
-    func respond(id: String, approved: Bool, tool: String) {
+    func respond(
+        id: String,
+        approved: Bool,
+        tool _: String,
+        reason: HitlResponseReason? = nil
+    ) {
+        guard let request = pendingRequests.first(where: { $0.id == id }) else {
+            // A delivered notification can be acted on after timeout. It is
+            // stale and must never create a second, misleading approval record.
+            Self.removeNotifications(withIdentifiers: [id])
+            return
+        }
+        let responseReason = reason ?? (approved ? .approved : .denied)
         // Cancel the timeout timer
         pendingTimers[id]?.cancel()
         pendingTimers.removeValue(forKey: id)
         pendingTools.removeValue(forKey: id)
         pendingRequests.removeAll { $0.id == id }
+        Self.removeNotifications(withIdentifiers: [id])
 
         // Send the response over the socket
         if let connection = pendingConnections.removeValue(forKey: id) {
-            sendResponse(id: id, approved: approved, on: connection)
+            sendResponse(id: id, approved: approved, reason: responseReason, on: connection)
         }
 
-        // Record for UI
+        recordRecentRequest(request, approved: approved, reason: responseReason)
+    }
+
+    private func recordRecentRequest(
+        _ request: ApprovalRequest,
+        approved: Bool,
+        reason: HitlResponseReason
+    ) {
         let record = ApprovalRecord(
-            id: id,
-            tool: tool,
+            id: request.id,
+            correlationId: request.correlationId,
+            tool: request.tool,
             approved: approved,
+            reason: reason,
             timestamp: Date()
         )
         recentRequests.insert(record, at: 0)
@@ -287,12 +383,21 @@ final class HitlManager {
 
     // MARK: - Send Response
 
-    static func responsePayload(id: String, approved: Bool) -> Data? {
-        HitlProtocol.responsePayload(id: id, approved: approved)
+    static func responsePayload(
+        id: String,
+        approved: Bool,
+        reason: HitlResponseReason? = nil
+    ) -> Data? {
+        HitlProtocol.responsePayload(id: id, approved: approved, reason: reason)
     }
 
-    private func sendResponse(id: String, approved: Bool, on connection: NWConnection) {
-        guard let payloadData = Self.responsePayload(id: id, approved: approved) else { return }
+    private func sendResponse(
+        id: String,
+        approved: Bool,
+        reason: HitlResponseReason,
+        on connection: NWConnection
+    ) {
+        guard let payloadData = Self.responsePayload(id: id, approved: approved, reason: reason) else { return }
 
         connection.send(
             content: payloadData,
@@ -312,13 +417,6 @@ final class HitlManager {
             content.title = L("hitl.toolConfirmation")
         }
         content.body = L("hitl.toolPrefix", request.tool)
-        if !request.args.isEmpty {
-            let argsPreview = request.args
-                .map { "\($0.key): \($0.value)" }
-                .prefix(3)
-                .joined(separator: ", ")
-            content.body += "\n\(argsPreview)"
-        }
         content.sound = .default
         content.categoryIdentifier = "HITL_APPROVAL"
         content.userInfo = ["tool": request.tool]
@@ -342,7 +440,7 @@ final class HitlManager {
                 NSLog("[AirMCP] Notification permission error: \(error.localizedDescription)")
             }
             if !granted {
-                NSLog("[AirMCP] Notification permission denied — HITL approval requests will auto-deny on timeout")
+                NSLog("[AirMCP] Notification permission denied — HITL approval requests will time out")
             }
         }
     }
@@ -351,7 +449,7 @@ final class HitlManager {
         let approve = UNNotificationAction(
             identifier: "APPROVE",
             title: L("hitl.approve"),
-            options: []
+            options: [.authenticationRequired]
         )
         let deny = UNNotificationAction(
             identifier: "DENY",
@@ -369,7 +467,107 @@ final class HitlManager {
 
     // MARK: - Helpers
 
-    private func removeSocketFile() {
-        try? FileManager.default.removeItem(atPath: socketPath)
+    static func normalizedSocketPath(
+        override rawOverride: String?,
+        homeDirectory: String = NSHomeDirectory()
+    ) -> String? {
+        let trimmed = rawOverride?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let candidate: String
+        if let trimmed, !trimmed.isEmpty {
+            candidate = trimmed
+        } else {
+            candidate = (homeDirectory as NSString).appendingPathComponent(".config/airmcp/hitl.sock")
+        }
+        let expanded: String
+        if candidate == "~" {
+            expanded = homeDirectory
+        } else if candidate.hasPrefix("~/") {
+            expanded = (homeDirectory as NSString).appendingPathComponent(String(candidate.dropFirst(2)))
+        } else {
+            expanded = candidate
+        }
+        guard expanded.hasPrefix("/") else { return nil }
+        return URL(fileURLWithPath: expanded).standardizedFileURL.path
+    }
+
+    private static func configuredSocketPath() -> SocketPathConfiguration {
+        let rawOverride = ProcessInfo.processInfo.environment["AIRMCP_HITL_SOCKET_PATH"]
+        let trimmed = rawOverride?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return SocketPathConfiguration(
+            path: normalizedSocketPath(override: rawOverride),
+            isOverride: trimmed?.isEmpty == false
+        )
+    }
+
+    private static func fileStatus(at path: String) -> stat? {
+        var info = stat()
+        guard Darwin.lstat(path, &info) == 0 else { return nil }
+        return info
+    }
+
+    private static func socketFileIdentity(at path: String) -> SocketFileIdentity? {
+        guard let info = fileStatus(at: path),
+              (info.st_mode & S_IFMT) == S_IFSOCK
+        else { return nil }
+        return SocketFileIdentity(device: UInt64(info.st_dev), inode: UInt64(info.st_ino))
+    }
+
+    private static func isSocketReachable(at path: String) -> Bool {
+        let descriptor = Darwin.socket(AF_UNIX, SOCK_STREAM, 0)
+        guard descriptor >= 0 else { return false }
+        defer { Darwin.close(descriptor) }
+
+        var address = sockaddr_un()
+        address.sun_family = sa_family_t(AF_UNIX)
+        let pathBytes = Array(path.utf8CString)
+        let capacity = MemoryLayout.size(ofValue: address.sun_path)
+        guard pathBytes.count <= capacity else { return false }
+        withUnsafeMutablePointer(to: &address.sun_path.0) { destination in
+            pathBytes.withUnsafeBufferPointer { source in
+                destination.update(from: source.baseAddress!, count: pathBytes.count)
+            }
+        }
+        address.sun_len = UInt8(MemoryLayout<sockaddr_un>.size)
+        return withUnsafePointer(to: &address) { pointer in
+            pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) { socketAddress in
+                Darwin.connect(
+                    descriptor,
+                    socketAddress,
+                    socklen_t(MemoryLayout<sockaddr_un>.size)
+                ) == 0
+            }
+        }
+    }
+
+    private static func prepareSocketPathForBind(_ path: String) -> Bool {
+        guard let status = fileStatus(at: path) else {
+            return errno == ENOENT
+        }
+        guard (status.st_mode & S_IFMT) == S_IFSOCK else {
+            return false
+        }
+        let identity = SocketFileIdentity(device: UInt64(status.st_dev), inode: UInt64(status.st_ino))
+        if isSocketReachable(at: path) {
+            return false
+        }
+        guard socketFileIdentity(at: path) == identity else {
+            return false
+        }
+        return Darwin.unlink(path) == 0
+    }
+
+    private static func removeSocketFile(
+        at path: String,
+        ifIdentityMatches expected: SocketFileIdentity
+    ) {
+        guard socketFileIdentity(at: path) == expected else { return }
+        _ = Darwin.unlink(path)
+    }
+
+    private static func removeNotifications(withIdentifiers identifiers: [String]) {
+        guard !identifiers.isEmpty else { return }
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: identifiers)
+        center.removeDeliveredNotifications(withIdentifiers: identifiers)
     }
 }

@@ -5,6 +5,7 @@ const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url),
 const firstUserDrill = readFileSync(new URL("../scripts/first-user-addon-drill.mjs", import.meta.url), "utf8");
 const killTest = readFileSync(new URL("../scripts/modular-distribution-kill-test.mjs", import.meta.url), "utf8");
 const preflight = readFileSync(new URL("../scripts/release-preflight.mjs", import.meta.url), "utf8");
+const installVerifier = readFileSync(new URL("../scripts/verify-addon-install.mjs", import.meta.url), "utf8");
 
 describe("add-on first-user drills and modular kill-test", () => {
   test("package scripts expose local first-user and kill-test gates", () => {
@@ -30,10 +31,24 @@ describe("add-on first-user drills and modular kill-test", () => {
     expect(killTest).toContain("installed-addon-load-bearing");
   });
 
-  test("release preflight copies first-user and kill-test artifacts", () => {
-    expect(preflight).toContain('run("npm", ["run", "addons:first-user-drill"');
-    expect(preflight).toContain('run("npm", ["run", "addons:kill-test"');
-    expect(preflight).toContain("first-user-addon-drill.json");
-    expect(preflight).toContain("modular-distribution-kill-test.json");
+  test("release preflight treats split drills as diagnostics, not universal-release blockers", () => {
+    expect(preflight).toContain('run("npm", ["run", "addons:verify-install"');
+    expect(preflight).not.toContain('run("npm", ["run", "addons:first-user-drill"');
+    expect(preflight).not.toContain('run("npm", ["run", "addons:kill-test"');
+    expect(preflight).toContain('run("npm", ["run", "verify:package"');
+    expect(preflight).toContain('run("npm", ["run", "verify:mcpb"');
+  });
+
+  test("--all activates and wire-checks installed opt-in compatibility packages", () => {
+    for (const [enableEnv, canary] of [
+      ["AIRMCP_ENABLE_SPATIAL_PREP", "list_vr_assets"],
+      ["AIRMCP_ENABLE_WEBHOOKS", "webhook_listen_status"],
+      ["AIRMCP_ENABLE_POWERAUTOMATE", "cloudflow_trigger"],
+    ]) {
+      expect(installVerifier).toContain(enableEnv);
+      expect(installVerifier).toContain(canary);
+    }
+    expect(installVerifier).toContain("...optInEnvironment(packNames)");
+    expect(installVerifier).toContain("installed opt-in add-on canary tools are missing");
   });
 });

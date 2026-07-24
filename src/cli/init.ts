@@ -3,7 +3,7 @@
  *
  * 1. Choose modules (toggle-style with presets + recommendations)
  * 2. Write ~/.config/airmcp/config.json
- * 3. Auto-detect and patch MCP client configs (Claude Desktop, Cursor, Windsurf, etc.)
+ * 3. Ask before patching MCP client configs (Claude Desktop, Cursor, Windsurf, etc.)
  */
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
@@ -247,6 +247,41 @@ const I18N: Record<string, Record<LangCode, string>> = {
     de: "N\u00E4chste Schritte",
     pt: "Pr\u00F3ximos passos",
   },
+  connect_clients_prompt: {
+    en: "Connect AirMCP to detected MCP clients? This writes persistent client settings; clients may start AirMCP when they launch.",
+    ko: "AirMCP\uB97C \uAC10\uC9C0\uB41C MCP \uD074\uB77C\uC774\uC5B8\uD2B8\uC5D0 \uC5F0\uACB0\uD560\uAE4C\uC694? \uC601\uAD6C \uD074\uB77C\uC774\uC5B8\uD2B8 \uC124\uC815\uC744 \uAE30\uB85D\uD558\uBA70, \uD074\uB77C\uC774\uC5B8\uD2B8 \uC2DC\uC791 \uC2DC AirMCP\uAC00 \uC2E4\uD589\uB420 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
+    ja: "AirMCP\u3092\u691C\u51FA\u3055\u308C\u305FMCP\u30AF\u30E9\u30A4\u30A2\u30F3\u30C8\u306B\u63A5\u7D9A\u3057\u307E\u3059\u304B\uFF1F\u6C38\u7D9A\u7684\u306A\u30AF\u30E9\u30A4\u30A2\u30F3\u30C8\u8A2D\u5B9A\u304C\u66F8\u304D\u8FBC\u307E\u308C\u3001\u8D77\u52D5\u6642\u306BAirMCP\u304C\u8D77\u52D5\u3059\u308B\u5834\u5408\u304C\u3042\u308A\u307E\u3059\u3002",
+    "zh-CN":
+      "\u5C06 AirMCP \u8FDE\u63A5\u5230\u68C0\u6D4B\u5230\u7684 MCP \u5BA2\u6237\u7AEF\u5417\uFF1F\u8FD9\u4F1A\u5199\u5165\u6301\u4E45\u5BA2\u6237\u7AEF\u8BBE\u7F6E\uFF0C\u5BA2\u6237\u7AEF\u542F\u52A8\u65F6\u53EF\u80FD\u4F1A\u542F\u52A8 AirMCP\u3002",
+    "zh-TW":
+      "\u5C07 AirMCP \u9023\u63A5\u5230\u5075\u6E2C\u5230\u7684 MCP \u7528\u6236\u7AEF\u55CE\uFF1F\u9019\u6703\u5BEB\u5165\u6301\u7E8C\u6027\u7528\u6236\u7AEF\u8A2D\u5B9A\uFF0C\u7528\u6236\u7AEF\u555F\u52D5\u6642\u53EF\u80FD\u6703\u555F\u52D5 AirMCP\u3002",
+    es: "\u00BFConectar AirMCP a los clientes MCP detectados? Esto escribe una configuraci\u00F3n persistente y puede iniciar AirMCP al abrir el cliente.",
+    fr: "Connecter AirMCP aux clients MCP d\u00E9tect\u00E9s ? Cela enregistre une configuration persistante et peut lancer AirMCP au d\u00E9marrage du client.",
+    de: "AirMCP mit erkannten MCP-Clients verbinden? Dies schreibt dauerhafte Client-Einstellungen; beim Client-Start kann AirMCP gestartet werden.",
+    pt: "Conectar o AirMCP aos clientes MCP detectados? Isso grava configura\u00E7\u00F5es persistentes e pode iniciar o AirMCP ao abrir o cliente.",
+  },
+  connect_clients_no: {
+    en: "No \u2014 leave all MCP client settings unchanged",
+    ko: "\uC544\uB2C8\uC694 \u2014 MCP \uD074\uB77C\uC774\uC5B8\uD2B8 \uC124\uC815\uC744 \uBCC0\uACBD\uD558\uC9C0 \uC54A\uC74C",
+    ja: "\u3044\u3044\u3048 \u2014 MCP\u30AF\u30E9\u30A4\u30A2\u30F3\u30C8\u8A2D\u5B9A\u3092\u5909\u66F4\u3057\u306A\u3044",
+    "zh-CN": "\u5426 \u2014 \u4E0D\u66F4\u6539\u4EFB\u4F55 MCP \u5BA2\u6237\u7AEF\u8BBE\u7F6E",
+    "zh-TW": "\u5426 \u2014 \u4E0D\u8B8A\u66F4\u4EFB\u4F55 MCP \u7528\u6236\u7AEF\u8A2D\u5B9A",
+    es: "No \u2014 no cambiar la configuraci\u00F3n de clientes MCP",
+    fr: "Non \u2014 ne modifier aucun r\u00E9glage de client MCP",
+    de: "Nein \u2014 MCP-Client-Einstellungen unver\u00E4ndert lassen",
+    pt: "N\u00E3o \u2014 n\u00E3o alterar as configura\u00E7\u00F5es dos clientes MCP",
+  },
+  connect_clients_yes: {
+    en: "Yes \u2014 configure detected MCP clients",
+    ko: "\uC608 \u2014 \uAC10\uC9C0\uB41C MCP \uD074\uB77C\uC774\uC5B8\uD2B8 \uC124\uC815",
+    ja: "\u306F\u3044 \u2014 \u691C\u51FA\u3055\u308C\u305FMCP\u30AF\u30E9\u30A4\u30A2\u30F3\u30C8\u3092\u8A2D\u5B9A",
+    "zh-CN": "\u662F \u2014 \u914D\u7F6E\u68C0\u6D4B\u5230\u7684 MCP \u5BA2\u6237\u7AEF",
+    "zh-TW": "\u662F \u2014 \u8A2D\u5B9A\u5075\u6E2C\u5230\u7684 MCP \u7528\u6236\u7AEF",
+    es: "S\u00ED \u2014 configurar los clientes MCP detectados",
+    fr: "Oui \u2014 configurer les clients MCP d\u00E9tect\u00E9s",
+    de: "Ja \u2014 erkannte MCP-Clients konfigurieren",
+    pt: "Sim \u2014 configurar os clientes MCP detectados",
+  },
   try_asking: {
     en: "Try asking your AI:",
     ko: "AI\uC5D0\uAC8C \uBB3C\uC5B4\uBCF4\uC138\uC694:",
@@ -340,12 +375,14 @@ function parseInitArgs(): {
   yes: boolean;
   profile: AirMcpProfileName | null;
   noClients: boolean;
+  connectClients: boolean;
   clientRuntime: ClientRuntimeMode;
 } {
   const args = process.argv.slice(3);
   let profile: AirMcpProfileName | null = null;
   let yes = false;
   let noClients = false;
+  let connectClients = false;
   let clientRuntime: ClientRuntimeMode = "app";
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -353,6 +390,8 @@ function parseInitArgs(): {
       yes = true;
     } else if (arg === "--no-clients") {
       noClients = true;
+    } else if (arg === "--connect-clients") {
+      connectClients = true;
     } else if (arg === "--profile") {
       profile = normalizeProfileName(args[i + 1]) ?? null;
       i++;
@@ -367,7 +406,7 @@ function parseInitArgs(): {
       clientRuntime = "direct";
     }
   }
-  return { yes, profile, noClients, clientRuntime };
+  return { yes, profile, noClients, connectClients, clientRuntime };
 }
 
 function inferProfile(enabled: Set<string>): AirMcpProfileName | "custom" {
@@ -454,14 +493,20 @@ export async function runInit(): Promise<void> {
       console.error(`[AirMCP] Failed to write config: ${formatError(err)}`);
       process.exit(1);
     }
-    const clientResults = initArgs.noClients
-      ? []
-      : configureMcpClients({ includeSkipped: false, runtimeMode: initArgs.clientRuntime });
+    const shouldConnectClients = initArgs.connectClients && !initArgs.noClients;
+    const clientResults = shouldConnectClients
+      ? configureMcpClients({ includeSkipped: false, runtimeMode: initArgs.clientRuntime })
+      : [];
     const patchedClients = clientResults.filter((result) => result.status !== "failed").length;
     console.log(
-      `[AirMCP] profile=${String(configPayload.profile)}, toolExposure=${configPayload.toolExposure}, modules=${enabled.size}, clients=${patchedClients}`,
+      `[AirMCP] profile=${String(configPayload.profile)}, toolExposure=${configPayload.toolExposure}, modules=${enabled.size}, clients=${shouldConnectClients ? patchedClients : "skipped"}`,
     );
     console.log(`[AirMCP] wrote ${PATHS.CONFIG}`);
+    if (!shouldConnectClients) {
+      console.log(
+        "[AirMCP] client registration skipped; no MCP client config was changed. Run `npx airmcp connect-clients` when you want to connect them.",
+      );
+    }
     return;
   }
 
@@ -474,8 +519,10 @@ export async function runInit(): Promise<void> {
         "    npx airmcp init --profile communications-safe --yes\n" +
         "    npx airmcp init --profile productivity --yes\n" +
         "    npx airmcp init --profile full --yes\n" +
-        "  Add --client-runtime direct to write direct stdio client entries.\n" +
-        "  Add --no-clients to write config.json without patching MCP clients.",
+        "  Client registration is skipped by default.\n" +
+        "  Add --connect-clients to explicitly patch detected MCP clients.\n" +
+        "  Add --client-runtime direct with --connect-clients to write direct stdio entries.\n" +
+        "  Add --no-clients to suppress the interactive client-registration question.",
     );
     process.exit(1);
   }
@@ -585,9 +632,23 @@ export async function runInit(): Promise<void> {
   }
   console.log(` ${GREEN}\u2713${RESET} ${PATHS.CONFIG}`);
 
-  // --- Step 3: Auto-detect and patch MCP client configs ---
-  const airmcpEntry = initArgs.clientRuntime === "direct" ? directStdioEntry() : stdioProxyEntry();
-  const clientResults = configureMcpClients({ includeSkipped: false, runtimeMode: initArgs.clientRuntime });
+  // --- Step 5: Ask before detecting or patching MCP client configs ---
+  let shouldConnectClients = false;
+  if (!initArgs.noClients) {
+    const clientConsent = await selectOne(
+      t("connect_clients_prompt", lang),
+      [
+        { label: t("connect_clients_no", lang), value: "no", hint: "default" },
+        { label: t("connect_clients_yes", lang), value: "yes" },
+      ],
+      0,
+    );
+    shouldConnectClients = clientConsent === "yes";
+  }
+
+  const clientResults = shouldConnectClients
+    ? configureMcpClients({ includeSkipped: false, runtimeMode: initArgs.clientRuntime })
+    : [];
   const detectedClients = clientResults.map((result) => result.name);
   let patchedClients = 0;
 
@@ -603,7 +664,11 @@ export async function runInit(): Promise<void> {
     patchedClients++;
   }
 
-  if (detectedClients.length === 0) {
+  if (!shouldConnectClients) {
+    console.log(`  ${DIM}Client registration skipped; no MCP client config was changed.${RESET}`);
+    console.log(`  ${DIM}Run ${BOLD}npx airmcp connect-clients${RESET}${DIM} when you want to connect them.${RESET}`);
+  } else if (detectedClients.length === 0) {
+    const airmcpEntry = initArgs.clientRuntime === "direct" ? directStdioEntry() : stdioProxyEntry();
     console.log(`  ${YELLOW}\u26A0${RESET} No MCP clients detected.`);
     console.log("");
     console.log("  Add this to your MCP client config manually:");
@@ -617,10 +682,13 @@ export async function runInit(): Promise<void> {
 
   // --- Done ---
   console.log("");
+  const clientSummary = shouldConnectClients
+    ? `${patchedClients} client(s) configured.`
+    : "client registration skipped; no MCP client settings changed.";
   console.log(
-    `  ${GREEN}\u2713${RESET} ${t("setup_complete", lang)} ${BOLD}${enabled.size} modules${RESET}, profile: ${BOLD}${String(configPayload.profile)}${RESET}, safety: ${BOLD}${hitlLevel}${RESET}, ${patchedClients} client(s) configured.`,
+    `  ${GREEN}\u2713${RESET} ${t("setup_complete", lang)} ${BOLD}${enabled.size} modules${RESET}, profile: ${BOLD}${String(configPayload.profile)}${RESET}, safety: ${BOLD}${hitlLevel}${RESET}, ${clientSummary}`,
   );
-  if (detectedClients.length > 0) {
+  if (shouldConnectClients && detectedClients.length > 0) {
     if (initArgs.clientRuntime === "direct") {
       console.log(`  ${DIM}Restart ${detectedClients.join(", ")} to connect via direct stdio.${RESET}`);
     } else {

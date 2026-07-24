@@ -2,12 +2,19 @@ import { describe, test, expect, jest, beforeEach, afterEach } from "@jest/globa
 import { existsSync, readFileSync } from "node:fs";
 
 const mockBuildSnapshot = jest.fn();
+const mockCollectTodayOverviewDiagnostic = jest.fn();
 jest.unstable_mockModule("../dist/shared/resources.js", () => ({
   buildSnapshot: mockBuildSnapshot,
+}));
+jest.unstable_mockModule("../dist/shared/workflow-diagnostics.js", () => ({
+  collectTodayOverviewDiagnostic: mockCollectTodayOverviewDiagnostic,
 }));
 
 const { WORKFLOWS, runWorkflows } = await import("../dist/cli/workflows.js");
 const { MODULE_NAMES, MODULE_PACK_MANIFEST, STARTER_MODULES } = await import("../dist/shared/config.js");
+const { PATHS } = await import("../dist/shared/constants.js");
+const originalAirMcpProfile = process.env.AIRMCP_PROFILE;
+const originalConfigPath = PATHS.CONFIG;
 
 describe("cli workflows command", () => {
   let logSpy;
@@ -15,6 +22,8 @@ describe("cli workflows command", () => {
 
   beforeEach(() => {
     mockBuildSnapshot.mockReset();
+    mockCollectTodayOverviewDiagnostic.mockReset();
+    PATHS.CONFIG = "/tmp/__airmcp_cli_workflows_test_nonexistent_config__.json";
     logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
     errSpy = jest.spyOn(console, "error").mockImplementation(() => {});
   });
@@ -23,6 +32,9 @@ describe("cli workflows command", () => {
     logSpy.mockRestore();
     errSpy.mockRestore();
     process.exitCode = undefined;
+    if (originalAirMcpProfile === undefined) delete process.env.AIRMCP_PROFILE;
+    else process.env.AIRMCP_PROFILE = originalAirMcpProfile;
+    PATHS.CONFIG = originalConfigPath;
   });
 
   test("prints curated workflow names and prompts", async () => {
@@ -43,6 +55,7 @@ describe("cli workflows command", () => {
     const parsed = JSON.parse(logSpy.mock.calls[0][0]);
     expect(parsed.workflows).toHaveLength(WORKFLOWS.length);
     expect(parsed.workflows.map((w) => w.id)).toEqual([
+      "today-overview",
       "daily-briefing",
       "inbox-triage",
       "meeting-prep",
@@ -53,11 +66,11 @@ describe("cli workflows command", () => {
   });
 
   test("prints one copyable workflow prompt", async () => {
-    await runWorkflows(["daily-briefing", "--prompt"]);
+    await runWorkflows(["today-overview", "--prompt"]);
 
     expect(logSpy).toHaveBeenCalledTimes(1);
     expect(logSpy.mock.calls[0][0]).toBe(
-      "Brief me on today's calendar, overdue reminders, unread mail, and recent notes.",
+      "Tell me today's calendar events and overdue reminders. Do not change anything.",
     );
   });
 
@@ -105,7 +118,8 @@ describe("cli workflows command", () => {
     expect(parsed.workflows[0].id).toBe("daily-briefing");
   });
 
-  test("runs a real read-only daily briefing preview path", async () => {
+  test("labels the daily briefing preview as a direct-local diagnostic outside MCP governance", async () => {
+    process.env.AIRMCP_PROFILE = "communications-safe";
     mockBuildSnapshot.mockResolvedValue('{"timestamp":"2026-06-17T00:00:00.000Z","depth":"brief","calendar":{}}');
 
     await runWorkflows(["daily-briefing", "--preview"]);
@@ -119,9 +133,50 @@ describe("cli workflows command", () => {
     expect(enabled("weather")).toBe(false);
 
     const output = logSpy.mock.calls.map((call) => call.join(" ")).join("\n");
-    expect(output).toContain("AirMCP read-only preview: Daily Briefing");
+    expect(output).toContain("AirMCP local diagnostic preview: Daily Briefing");
+    expect(output).toContain("Governance: bypassed");
+    expect(output).toContain("creates no AirMCP audit entry");
+    expect(output).toContain("paste it into a connected MCP client");
     expect(output).toContain("Writes: none");
     expect(output).toContain('"depth":"brief"');
+  });
+
+  test("uses the dedicated bounded today overview diagnostic collector", async () => {
+    process.env.AIRMCP_PROFILE = "starter";
+    mockCollectTodayOverviewDiagnostic.mockResolvedValue({
+      timestamp: "2026-06-17T00:00:00.000Z",
+      workflowId: "today-overview",
+      calendar: { returned: 0, events: [] },
+      reminders: { returned: 0, overdue: [] },
+    });
+
+    await runWorkflows(["today-overview", "--preview"]);
+
+    expect(process.exitCode).toBeUndefined();
+    expect(mockCollectTodayOverviewDiagnostic).toHaveBeenCalledTimes(1);
+    expect(mockBuildSnapshot).not.toHaveBeenCalled();
+
+    const output = logSpy.mock.calls.map((call) => call.join(" ")).join("\n");
+    expect(output).toContain("AirMCP local diagnostic preview: Today Overview");
+    expect(output).toContain("Governance: bypassed");
+    expect(output).toContain("Reads: calendar, reminders");
+    expect(output).toContain("Writes: none");
+    expect(output).toContain('"overdue": []');
+  });
+
+  test("blocks daily briefing preview before accessing disabled Mail", async () => {
+    process.env.AIRMCP_PROFILE = "starter";
+
+    await runWorkflows(["daily-briefing", "--preview"]);
+
+    expect(process.exitCode).toBe(1);
+    expect(mockBuildSnapshot).not.toHaveBeenCalled();
+    const error = errSpy.mock.calls.map((call) => call.join(" ")).join("\n");
+    expect(error).toContain('Cannot run the local diagnostic preview for "daily-briefing"');
+    expect(error).toContain('active "starter" profile');
+    expect(error).toContain('module "mail"');
+    expect(error).toContain("npx airmcp init --profile communications-safe --yes");
+    expect(error).toContain("workflows daily-briefing --readiness");
   });
 
   test("unknown flags fail instead of falling through to the catalog", async () => {
@@ -252,26 +307,39 @@ describe("cli workflows command", () => {
       new URL("../app/Sources/AirMCPApp/Views/OnboardingView.swift", import.meta.url),
       "utf8",
     );
+    const codexConfigurator = readFileSync(
+      new URL("../app/Sources/AirMCPApp/CodexOnboardingConfigurator.swift", import.meta.url),
+      "utf8",
+    );
 
     expect(onboarding).toContain('id: "codex"');
     expect(onboarding).toContain('NodeEnvironment.findExecutable(named: "codex")');
-    expect(onboarding).toContain('"mcp", "remove", "airmcp"');
-    expect(onboarding).toContain('"mcp",');
-    expect(onboarding).toContain('"add",');
-    expect(onboarding).toContain('"--env"');
-    expect(onboarding).toContain('"AIRMCP_HTTP_TOKEN=\\(token)"');
-    expect(onboarding).toContain('"connect"');
+    expect(onboarding).toContain("CodexOnboardingConfigurator.configure(");
+    expect(codexConfigurator).toContain('["mcp", "get", "airmcp", "--json"]');
+    expect(codexConfigurator).toContain('["mcp", "remove", "airmcp"]');
+    expect(codexConfigurator).toContain('var addArguments = ["mcp", "add"]');
+    expect(codexConfigurator).toContain('replacementEnvironment["AIRMCP_HTTP_TOKEN"] = token');
+    expect(codexConfigurator).toContain("ConfigSnapshot.capture(at: configURL)");
+    expect(codexConfigurator).toContain("snapshot.containsAirMCPServerEntry");
+    expect(codexConfigurator).toContain("snapshot.restore(at: configURL)");
+    expect(codexConfigurator).toContain("process.currentDirectoryURL = currentDirectory");
+    expect(codexConfigurator).toContain('environment.removeValue(forKey: "CODEX_HOME")');
+    expect(onboarding).toContain("AirMcpConstants.appOwnedProxyArgs");
     expect(onboarding).toContain("AirMcpConstants.appOwnedProxyEntry(token: token)");
+    expect(onboarding).toContain('path + ".airmcp-backup"');
+    expect(onboarding).toContain("A malformed existing file is");
   });
 
-  test("onboarding final step can copy the selected workflow prompt", () => {
+  test("onboarding final step keeps the first success read-only", () => {
     const onboarding = readFileSync(
       new URL("../app/Sources/AirMCPApp/Views/OnboardingView.swift", import.meta.url),
       "utf8",
     );
 
-    expect(onboarding).toContain("selectedWorkflowActions");
-    expect(onboarding).toContain("AirMcpConstants.copyToClipboard(selectedWorkflow.prompt)");
-    expect(onboarding).toContain('AirMcpConstants.copyToClipboard("Hey Siri, \\(siriPhrase)")');
+    expect(onboarding).toContain("firstSuccessActions");
+    expect(onboarding).toContain('onboardingWorkflows.first(where: { $0.id == "today-overview" })');
+    expect(onboarding).toContain("AirMcpConstants.copyToClipboard(firstSuccessWorkflow.prompt)");
+    expect(onboarding).not.toContain("AirMcpConstants.copyToClipboard(selectedWorkflow.prompt)");
+    expect(onboarding).not.toContain('AirMcpConstants.copyToClipboard("Hey Siri, \\(siriPhrase)")');
   });
 });

@@ -24,9 +24,9 @@ Notes, Mail, Calendar, Reminders, Shortcuts 등 Apple 작업 공간을 하나의
 
 ## 무엇이 기본 경험인가
 
-1. **설치가 한 줄.** `npx airmcp init` → Claude Desktop/Code/Cursor/Windsurf가 자동으로 연결된다.
+1. **설치가 한 줄이고 연결은 명시적이다.** `npx airmcp init`은 로컬 설정만 만들고, 사용자가 동의한 클라이언트만 이후에 연결한다.
 2. **쓰는 만큼 다음 수를 더 잘 추천한다.** 사용 패턴이 축적되면 `proactive_context`와 `suggest_next_tools`가 다음 단계를 제안한다. 학습이 아니라 빈도·순서쌍 기반 추천.
-3. **시키는 대로만 움직인다.** destructive 작업은 HITL로 승인을 받고, 모든 호출이 감사 로그에 남는다.
+3. **시키는 대로만 움직인다.** destructive 작업은 호출마다 HITL 승인을 받고, 기본 거버넌스 경로의 호출 결과는 HMAC 체인 감사 로그에 남는다. 감사 저장소가 권한을 증명하지 못하면 승인 기반 mutation은 실패한다.
 4. **스킬로 굳는다.** 반복하는 흐름은 YAML로 저장해 트리거(시간·이벤트·호출)로 자동 실행.
 5. **애플 AI를 그대로 쓴다.** Foundation Models·Vision OCR·NLContextualEmbedding·Speech — 온디바이스 우선.
 
@@ -98,7 +98,7 @@ rate limits, OAuth scopes, and local controls govern Apple workspace actions.
 
 ---
 
-## 현재 상태 (2026-07-08, v2.15.0)
+## 현재 상태 (2026-07-11, v2.16.0 준비)
 
 | 지표 | 값 |
 |------|-----|
@@ -109,15 +109,15 @@ rate limits, OAuth scopes, and local controls govern Apple workspace actions.
 | 빌트인 Skills | 14 (YAML DSL, parallel/loop/조건/이벤트 트리거, on_error 지원) |
 | AppIntents | 233 |
 | 런타임 프로필 | starter, communications-safe, productivity, full + progressive/profile/full tool exposure |
-| AppEnum | 17 자동 생성 |
+| AppEnum | 14 자동 생성 |
 | Apple 네이티브 통합 | EventKit, Contacts, HealthKit, NLContextualEmbedding, Foundation Models, Vision OCR, Core Spotlight, ImagePlayground, Speech |
 | On-device AI | 요약·재작성·교정·구조화 출력·분류·대화·이미지 생성·문서 OCR·계획 생성·자율 에이전트 |
 | 보안·관측 | HITL 듀얼채널, 감사 로그 JSONL + HMAC chain + correlation id, OpenTelemetry, 프로토타입 오염 방어, circuit breaker, RFC 0001 error 카테고리 (PERMISSION/INVALID_INPUT/NOT_FOUND/UPSTREAM/SWIFT/DEPRECATED), rate limit + emergency-stop kill switch |
 | Transport | stdio, HTTP(+bearer), OAuth 2.1 + PKCE + Resource Indicators (RFC 0005 Step 1+2 ✅) + SEP-985/RFC 9728 정합 |
 | 디스커버리 | `.well-known/mcp.json` 세션리스 + active advertised tools/modules/license/homepage/schema_version 필드 |
 | 패키징 | npm (`airmcp`), `.mcpb` Desktop Extensions 번들 |
-| 자동 등록 | Claude Desktop, Claude Code, Cursor, Windsurf |
-| 테스트 | 107 파일 / ~1,755 케이스 / 커버리지 ≥46% 게이트 |
+| 클라이언트 연결 | 명시적 opt-in (Claude Desktop, Claude Code, Codex, Cursor, Windsurf) |
+| 검증 | 계약 기반 Jest·Swift·실제 npm/MCPB/app 산출물 게이트 |
 
 ¹ podcasts 모듈은 macOS 26+에서 `brokenOn: [26]` 게이트로 등록 스킵 (Apple이 Podcasts JXA 딕셔너리 제거). v3.0.0에서 드랍 예정.
 
@@ -155,7 +155,7 @@ rate limits, OAuth scopes, and local controls govern Apple workspace actions.
 
 ## 로드맵 (v2.12 → v3.0)
 
-세부 권고 근거는 [`docs/archive/2026-04-19-advancement-recommendations.md`](archive/2026-04-19-advancement-recommendations.md) 참조 (역사 자료, Phase A/B 4/4 출하 완료, Phase C 1/4+1 진행 중). 아래는 *현재 시점에서 열린 항목만*.
+세부 권고 근거는 [`docs/archive/2026-04-19-advancement-recommendations.md`](archive/2026-04-19-advancement-recommendations.md) 참조 (역사 자료, Phase A/B 4/4 출하 완료, Phase C 1/4+1 진행 중). 아래는 출하 기록과 현재 열린 항목을 상태별로 정리한다.
 
 ### ✅ 이미 출하 (v0.3 → v2.12 사이에 닫힌 것)
 
@@ -174,14 +174,14 @@ rate limits, OAuth scopes, and local controls govern Apple workspace actions.
 - iOS companion 골격 1954 LOC (`ios/Sources/AirMCPServer` + `AirMCPiOS`)
 - `npx airmcp doctor --deep` 진단 (v2.12 PR #198)
 - README runtime layer reframe (v2.12 PR #216, WWDC 6/8 overhang 대응)
-- outputSchema Wave 1-7 출하 (24% coverage, system 19 + music 14 + shortcuts 8 = 41 untyped 잔여)
+- outputSchema Wave 1-7 출하 — handler의 `structuredContent` 런타임 계약을 테스트로 검증하며, 남은 집중 계약 대상은 system 19 + music 14 + shortcuts 8 = 41개
 
-### v2.13~v2.15 — WWDC 6/8 직전~직후 (5/12 → 7/15)
+### v2.13–v2.15 — WWDC 6/8 직전–직후 (5/12 → 7/15)
 
-- **RFC 0011 §5 quadrant 선택 + execute** — 6/8 키노트 후 30분 안에. 48h 윈도. 시나리오 매트릭스는 `docs/rfc/0011-post-wwdc-2026.md` §5 (uncommitted draft +111 line).
-- **mcp-setup.ts 통합 테스트 3종** (WWDC 전 반드시) — `tests/mcp-setup.test.js` 작성 중 (untracked, QUALITY_DIAGNOSIS MEDIUM-1)
+- **RFC 0011 §5 quadrant 선택 + execute** — 2026-06-09에 Q2로 판정·해결. 결정과 후속 방향은 tracked 문서 `docs/rfc/0011-post-wwdc-2026.md`에 기록.
+- **mcp-setup.ts 통합 테스트** — tracked `tests/mcp-setup.test.js`가 module isolation, compatibility routing, registry/HITL 순서와 profile/install 계약을 검증.
 - **RFC 0012 daemon mode Phase 2** — Phase 1 prep 완료. 다음: event loop 배선 + hitl queue 활성화 + launchd plist 자동 설치
-- **RFC 0009 Phase 1 batch 2/3** — `scripts/smoke/numbers-rfc0009-batch{2,3}.mjs` 작성됨 (untracked), 14 queued tools 본 구현
+- **RFC 0009 Phase 1 batch 2/3** — 실제 Numbers 검증용 `scripts/smoke/numbers-rfc0009-batch{2,3}.mjs`는 tracked 상태. 대응 queued tool 구현은 별도 백로그.
 - **outputSchema Wave 8 focused** — system 19 + music 14 + shortcuts 8 untyped 중 read/idempotent만 추려 ~15-20
 - **macOS 26.5 GA (5/15±1주) 호환성 매트릭스 검증** — CI runner 추가
 - **iWork 신규 모듈 또는 깊이 확장** — 6/8 발표 의존
@@ -199,7 +199,7 @@ rate limits, OAuth scopes, and local controls govern Apple workspace actions.
 - **MCP Apps 확장** — Photo Memory / Health Dashboard / Workflow Result
 - **HomeKit Phase 0** (6/8에 Apple system MCP 발표 시 *재평가*)
 - **Translate / Voice Memos / Books / Stocks** 신규 모듈
-- **HITL batch + trust-learning + dry-run**
+- **HITL 승인 inbox/triage + trust 설명 + dry-run** — 승인 판단과 권한은 계속 호출별로 유지
 - **CloudKit private DB 벡터 싱크**
 - **iOS companion MVP 출하** (Reminders + Calendar)
 - Anthropic 공식 MCP Registry 정식 등재
@@ -210,5 +210,5 @@ rate limits, OAuth scopes, and local controls govern Apple workspace actions.
 
 - [`docs/archive/2026-04-19-advancement-recommendations.md`](archive/2026-04-19-advancement-recommendations.md) — 본 방향성 작성 시 참조한 고도화 권고 (Phase A/B 4/4 출하 완료, Phase C 1/4 + 1 진행).
 - [`QUALITY_DIAGNOSIS_2026-04-17.md`](../QUALITY_DIAGNOSIS_2026-04-17.md) — 진행 progress tracker (§0 갱신 5/12 기준 HIGH 4/4 + MEDIUM 4/5 해결).
-- [`docs/rfc/0011-post-wwdc-2026.md`](rfc/0011-post-wwdc-2026.md) — WWDC 시나리오 매트릭스 (uncommitted +111 line draft).
-- [`TODO.md`](../TODO.md) — 현재 P0/P1/P2/P3 작업 목록 (v2.12.0 동기화 완료).
+- [`docs/rfc/0011-post-wwdc-2026.md`](rfc/0011-post-wwdc-2026.md) — WWDC 이후 플랫폼 방향 판정 기록.
+- [GitHub Issues](https://github.com/heznpc/AirMCP/issues) · [`docs/rfc/`](rfc/) — 현재 실행 백로그와 설계 결정.

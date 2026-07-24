@@ -2,7 +2,7 @@
 
 Anthropic's [MCPB](https://github.com/modelcontextprotocol/mcpb) (MCP Bundle, also called "Desktop Extensions") packages an MCP server as a single drag-and-drop file. No `npm`, no editing `claude_desktop_config.json`, no shell.
 
-AirMCP ships a `.mcpb` bundle with every release.
+AirMCP ships a universal `.mcpb` bundle with every release. It contains every standard JavaScript module; runtime profiles decide what loads, so no companion add-on package is required for the full catalog.
 
 ## Install
 
@@ -56,13 +56,13 @@ The build script (`scripts/build-mcpb.mjs`) runs `npm install --omit=dev --ignor
 npm run build:mcpb:check
 ```
 
-Validates `mcpb/manifest.template.json` substitutes + conforms to MCPB v0.3 shape. CI runs this on every push (see `.github/workflows/ci.yml`).
+Builds the exact self-contained bundle, validates `mcpb/manifest.template.json` substitutions and MCPB v0.3 shape, extracts the archive, and boots its embedded server in `full/full` mode while checking representative cross-pack tools. CI runs this on every push (see `.github/workflows/ci.yml`).
 
 ## Troubleshooting
 
 ### "Extension failed to load — invalid manifest"
 
-Run `npm run build:mcpb:check` against the repo commit the bundle was built from. Mismatched Node `engines` between `package.json` and the manifest's `compatibility.runtimes.node` is the most common culprit. Post-install, `tests/mcpb-manifest.test.js` guards against this regression.
+Run `npm run build:mcpb:check` against the repo commit the bundle was built from. Mismatched Node `engines` between `package.json` and the manifest's `compatibility.runtimes.node` is the most common culprit. Manifest-shape tests and the extracted-artifact full-profile smoke guard both structure and runtime completeness.
 
 ### "Tool X isn't visible in Claude"
 

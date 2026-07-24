@@ -20,7 +20,7 @@ import { resolveModuleCompatibility } from "../shared/compatibility.js";
 import { registerDynamicShortcutTools } from "../shortcuts/tools.js";
 import { HitlClient } from "../shared/hitl.js";
 import { installHitlGuard } from "../shared/hitl-guard.js";
-import { toolRegistry } from "../shared/tool-registry.js";
+import { createToolRegistry, type ToolRegistry } from "../shared/tool-registry.js";
 import { indexToolDescriptions } from "../shared/tool-search.js";
 import { isCompactMode } from "../shared/tool-filter.js";
 import { resolveHarnessAdapter } from "../shared/task-adapters.js";
@@ -39,9 +39,24 @@ export interface CreateServerOptions {
   pkg: { version: string; description?: string; license?: string; homepage?: string };
 }
 
-export async function createServer(
-  options: CreateServerOptions,
-): Promise<{ server: SdkMcpServer; bannerInfo: BannerInfo; cleanupEventListeners: () => void }> {
+export interface RuntimeModuleUnavailable {
+  module: string;
+  reason: "module_pack" | "addon_package" | "host_unavailable" | "known_broken" | "registration_failed";
+  detail?: string;
+}
+
+export interface RuntimeModuleState {
+  enabledModules: string[];
+  unavailableModules: RuntimeModuleUnavailable[];
+}
+
+export async function createServer(options: CreateServerOptions): Promise<{
+  server: SdkMcpServer;
+  toolRegistry: ToolRegistry;
+  bannerInfo: BannerInfo;
+  runtimeModuleState: RuntimeModuleState;
+  cleanupEventListeners: () => void;
+}> {
   const { config, hitlClient, osVersion, pkg } = options;
   const harness = resolveHarnessAdapter(config);
 
@@ -59,6 +74,7 @@ export async function createServer(
   );
   // Cast to lightweight McpServer for module registration (avoids heavy generic inference)
   const lServer = server as unknown as LightMcpServer;
+  const toolRegistry = createToolRegistry();
 
   // Install tool/prompt registry FIRST so its interception runs as the
   // innermost wrapper. The HITL guard then re-patches registerTool, becoming
@@ -114,6 +130,13 @@ export async function createServer(
   const osBlocked: string[] = [];
   const deprecated: string[] = [];
   const broken: string[] = [];
+  const unavailableModules = new Map<string, RuntimeModuleUnavailable>();
+  for (const module of modulesMissingPacks) {
+    unavailableModules.set(module, { module, reason: "module_pack" });
+  }
+  for (const module of missingAddonPackageModules) {
+    unavailableModules.set(module, { module, reason: "addon_package" });
+  }
   let shortcutsEnabled = false;
   for (const mod of MODULE_REGISTRY) {
     // Synthesise a manifest when the module only has the legacy field set.
@@ -123,10 +146,20 @@ export async function createServer(
 
     if (decision.decision === "skip-unsupported") {
       osBlocked.push(`${mod.name} (${decision.reason})`);
+      unavailableModules.set(mod.name, {
+        module: mod.name,
+        reason: "host_unavailable",
+        detail: decision.reason,
+      });
       continue;
     }
     if (decision.decision === "skip-broken") {
       broken.push(`${mod.name} (${decision.reason})`);
+      unavailableModules.set(mod.name, {
+        module: mod.name,
+        reason: "known_broken",
+        detail: decision.reason,
+      });
       continue;
     }
 
@@ -141,6 +174,10 @@ export async function createServer(
     } catch (e) {
       log.error("failed to register module", { module: mod.name, err: errToCtx(e) });
       disabled.push(mod.name);
+      unavailableModules.set(mod.name, {
+        module: mod.name,
+        reason: "registration_failed",
+      });
       continue;
     }
     enabled.push(mod.name);
@@ -163,7 +200,7 @@ export async function createServer(
   registerResources(lServer, config);
   registerSetupTools(lServer, config);
 
-  const skillCounts = await registerSkillEngine(lServer);
+  const skillCounts = await registerSkillEngine(lServer, toolRegistry);
 
   registerApps(lServer, {
     calendar: enabled.includes("calendar"),
@@ -184,6 +221,7 @@ export async function createServer(
     });
 
   registerFrontDoorTools(lServer, {
+    toolRegistry,
     config,
     harness,
     version: pkg.version,
@@ -197,15 +235,16 @@ export async function createServer(
     missingPackInstallHints,
     buildWorkflowReadiness,
   });
-  registerToolSessionTools(lServer, { config, harness });
+  registerToolSessionTools(lServer, { config, harness, toolRegistry });
   const cleanupEventListeners = registerEventTools(lServer, {
+    toolRegistry,
     notifyResourceListChanged: () => server.sendResourceListChanged(),
   });
 
   toolRegistry.pruneStaleRegistrations();
 
   if (config.features.semanticToolSearch) {
-    indexToolDescriptions().catch((e) => {
+    indexToolDescriptions(toolRegistry).catch((e) => {
       log.error("semantic tool index failed", { err: errToCtx(e) });
     });
   }
@@ -234,5 +273,14 @@ export async function createServer(
     compactTools: isCompactMode(),
   };
 
-  return { server, bannerInfo, cleanupEventListeners };
+  return {
+    server,
+    toolRegistry,
+    bannerInfo,
+    runtimeModuleState: {
+      enabledModules: [...enabled].sort(),
+      unavailableModules: [...unavailableModules.values()].sort((a, b) => a.module.localeCompare(b.module)),
+    },
+    cleanupEventListeners,
+  };
 }

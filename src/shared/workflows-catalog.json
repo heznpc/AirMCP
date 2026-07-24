@@ -1,5 +1,15 @@
 [
   {
+    "id": "today-overview",
+    "title": "Today Overview",
+    "bestFor": "See today's calendar and overdue reminders without changing anything.",
+    "prompt": "Tell me today's calendar events and overdue reminders. Do not change anything.",
+    "tools": ["today_events", "list_reminders"],
+    "requiredModules": ["calendar", "reminders"],
+    "implementation": "prompt-recipe",
+    "safety": "Read-only. It only reads Calendar and Reminders and never writes data."
+  },
+  {
     "id": "daily-briefing",
     "title": "Daily Briefing",
     "bestFor": "Start the day with calendar, reminders, mail, and recent notes.",

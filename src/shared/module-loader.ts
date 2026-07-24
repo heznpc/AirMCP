@@ -2,7 +2,7 @@ import type { ModuleRegistration } from "./registry.js";
 import type { ModuleManifestEntry } from "./modules.js";
 import { pathToFileURL } from "node:url";
 import { resolveAddonPackageImport } from "./addon-packages.js";
-import { getModuleAddonImportSpec, getModulePackNameForModule } from "./module-packs.js";
+import { getModuleAddonImportSpec, getModulePackNameForModule, getModulePackPackageName } from "./module-packs.js";
 import { log, errToCtx } from "./logger.js";
 
 type AddonPackageMode = "prefer-installed" | "bundled" | "external-only";
@@ -10,16 +10,20 @@ type AddonPackageMode = "prefer-installed" | "bundled" | "external-only";
 const missingAddonPackageModules = new Set<string>();
 
 function getAddonPackageMode(): AddonPackageMode {
-  const raw = (process.env.AIRMCP_ADDON_PACKAGE_MODE ?? "prefer-installed").trim().toLowerCase();
+  const raw = (process.env.AIRMCP_ADDON_PACKAGE_MODE ?? "bundled").trim().toLowerCase();
   if (raw === "bundled" || raw === "external-only" || raw === "prefer-installed") return raw;
-  return "prefer-installed";
+  return "bundled";
 }
 
-function isOptionalPackageMiss(error: unknown): boolean {
+export function isOptionalAddonPackageMiss(error: unknown, expectedPackageName: string | null): boolean {
+  if (!expectedPackageName) return false;
   const code = (error as { code?: unknown }).code;
-  if (code === "ERR_MODULE_NOT_FOUND" || code === "MODULE_NOT_FOUND") return true;
+  if (code !== undefined && code !== "ERR_MODULE_NOT_FOUND" && code !== "MODULE_NOT_FOUND") return false;
   const message = error instanceof Error ? error.message : String(error);
-  return message.includes("Cannot find package '@heznpc/airmcp-");
+  const missingPackage = /Cannot find package ['"]([^'"]+)['"]/.exec(message)?.[1];
+  if (missingPackage) return missingPackage === expectedPackageName;
+  const missingModule = /Cannot find module ['"]([^'"]+)['"]/.exec(message)?.[1];
+  return missingModule === expectedPackageName || missingModule?.startsWith(`${expectedPackageName}/`) === true;
 }
 
 export function clearMissingAddonPackageModules(): void {
@@ -58,6 +62,8 @@ async function importModuleFile(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<Record<string, any> | null> {
   const externalSpec = getModuleAddonImportSpec(def.name, kind);
+  const packName = getModulePackNameForModule(def.name);
+  const externalPackageName = packName ? getModulePackPackageName(packName) : null;
   let externalPackageMissing = false;
 
   if (externalSpec && mode !== "bundled") {
@@ -89,7 +95,7 @@ async function importModuleFile(
         }
       }
       if (mode === "external-only") {
-        if (isOptionalPackageMiss(error)) rememberMissingAddonPackageModule(def.name);
+        if (isOptionalAddonPackageMiss(error, externalPackageName)) rememberMissingAddonPackageModule(def.name);
         log.error("required add-on package module failed to load", {
           module: def.name,
           kind,
@@ -98,7 +104,7 @@ async function importModuleFile(
         });
         return null;
       }
-      if (!isOptionalPackageMiss(error)) {
+      if (!isOptionalAddonPackageMiss(error, externalPackageName)) {
         log.warn("installed add-on package failed; falling back to bundled module", {
           module: def.name,
           kind,

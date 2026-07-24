@@ -4,14 +4,14 @@ import { readFileSync } from "node:fs";
 const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
 const expectedSpecifier = `airmcp@${pkg.version}`;
 
-const menuContent = readFileSync(
-  new URL("../app/Sources/AirMCPApp/Views/MenuContent.swift", import.meta.url),
-  "utf8",
-);
+const menuContent = readFileSync(new URL("../app/Sources/AirMCPApp/Views/MenuContent.swift", import.meta.url), "utf8");
 const serverManager = readFileSync(new URL("../app/Sources/AirMCPApp/ServerManager.swift", import.meta.url), "utf8");
 const app = readFileSync(new URL("../app/Sources/AirMCPApp/AirMCPApp.swift", import.meta.url), "utf8");
 const appIntents = readFileSync(new URL("../app/Sources/AirMCPApp/AppIntents.swift", import.meta.url), "utf8");
-const onboarding = readFileSync(new URL("../app/Sources/AirMCPApp/Views/OnboardingView.swift", import.meta.url), "utf8");
+const onboarding = readFileSync(
+  new URL("../app/Sources/AirMCPApp/Views/OnboardingView.swift", import.meta.url),
+  "utf8",
+);
 const config = readFileSync(new URL("../src/shared/config.ts", import.meta.url), "utf8");
 
 describe("app-owned runtime npm package pin", () => {
@@ -26,7 +26,8 @@ describe("app-owned runtime npm package pin", () => {
   test("app runtime, AppIntents, and onboarding use the pinned specifier", () => {
     expect(serverManager).toContain("AirMcpConstants.npmPackageSpecifier");
     expect(appIntents).toContain("AirMcpConstants.npmPackageSpecifier");
-    expect(onboarding).toContain("AirMcpConstants.npmPackageSpecifier");
+    expect(onboarding).toContain("AirMcpConstants.appOwnedProxyCommand");
+    expect(onboarding).toContain("AirMcpConstants.appOwnedProxyArgs");
   });
 
   test("AppIntents prefer the token-gated app-owned HTTP runtime before stdio fallback", () => {
@@ -42,8 +43,30 @@ describe("app-owned runtime npm package pin", () => {
     expect(appIntents).toContain('trimmed.hasPrefix("data:")');
     expect(appIntents).toContain("allowsEmptyResponse: true");
     expect(appIntents).toContain("case toolCallUncertain(Error)");
-    expect(appIntents).toContain("case .toolCallUncertain = transportError");
-    expect(appIntents).toContain("timeoutInterval: 30");
+    expect(appIntents).toContain("timeoutInterval: 135");
+    expect(appIntents).toContain("case .toolCallUncertain, .rpcError, .missingToolText:");
+    expect((appIntents.match(/result\["isError"\] as\? Bool == true/g) ?? []).length).toBeGreaterThanOrEqual(2);
+    expect(appIntents).toContain("static func probe() async -> Bool");
+    expect(appIntents).toContain('"method": "tools/list"');
+    expect(serverManager).toContain("await AppRuntimeClient.probe()");
+    expect(serverManager).toContain("static func authenticatedRuntimeVersionAtAppEndpoint() async -> String?");
+    expect(serverManager).toContain("expectedVersion: String = AirMcpConstants.npmPackageVersion");
+    expect(serverManager).toContain("guard version == expectedVersion else");
+  });
+
+  test("supports a persistent app-owned runtime through the system login item", () => {
+    expect(serverManager).toContain("import ServiceManagement");
+    expect(serverManager).toContain("SMAppService.mainApp.register()");
+    expect(serverManager).toContain("SMAppService.mainApp.unregister()");
+    expect(menuContent).toContain('L("settings.launchAtLogin")');
+  });
+
+  test("normal AppKit termination signals the owned runtime child", () => {
+    expect(app).toContain("@NSApplicationDelegateAdaptor(AirMCPApplicationDelegate.self)");
+    expect(app).toContain("serverManager?.prepareForApplicationTermination()");
+    expect(serverManager).toContain("func prepareForApplicationTermination()");
+    expect(serverManager).toContain("managedProcess?.terminationHandler = nil");
+    expect(serverManager).toContain("if self.isShuttingDown");
   });
 
   test("TypeScript app-owned proxy helper uses the same pinned package specifier", () => {
@@ -58,7 +81,7 @@ describe("app-owned runtime npm package pin", () => {
   test("bundle verification forces and validates the app-owned runtime contract", () => {
     const bundleScript = readFileSync(new URL("../scripts/bundle-app.sh", import.meta.url), "utf8");
     expect(menuContent).toContain('static let envForceAppRuntime = "AIRMCP_FORCE_APP_RUNTIME"');
-    expect(app).toContain("ProcessInfo.processInfo.environment[AirMcpConstants.envForceAppRuntime] == \"1\"");
+    expect(app).toContain('ProcessInfo.processInfo.environment[AirMcpConstants.envForceAppRuntime] == "1"');
     expect(app).toContain("serverManager.startServer()");
     expect(bundleScript).toContain("export AIRMCP_FORCE_APP_RUNTIME=1");
     expect(bundleScript).toContain("verify_app_owned_runtime");

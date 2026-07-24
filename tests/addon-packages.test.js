@@ -14,6 +14,10 @@ describe("add-on package staging", () => {
 
     const manifestPath = join(process.cwd(), "build", "addons", "manifest.json");
     const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+    for (const pack of manifest.packages) {
+      expect(pack.packageName).toMatch(/^@heznpc\/airmcp-[a-z0-9-]+$/);
+    }
+
     const productivity = manifest.packages.find((pack) => pack.name === "productivity");
     expect(productivity.packageName).toBe("@heznpc/airmcp-productivity");
 

@@ -2,7 +2,14 @@ import { afterEach, describe, expect, test } from "@jest/globals";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { expectNoWireError, firstText, parseStructuredResult, startMcp } from "../scripts/lib/mcp-stdio-client.mjs";
+import { LATEST_PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSIONS } from "@modelcontextprotocol/sdk/types.js";
+import {
+  expectNoWireError,
+  firstText,
+  MCP_PROTOCOL_VERSION,
+  parseStructuredResult,
+  startMcp,
+} from "../scripts/lib/mcp-stdio-client.mjs";
 
 let tempDirs = [];
 
@@ -20,6 +27,12 @@ afterEach(() => {
 });
 
 describe("mcp stdio client helper", () => {
+  test("production probes use the pinned SDK's latest supported stable revision", () => {
+    expect(MCP_PROTOCOL_VERSION).toBe("2025-11-25");
+    expect(MCP_PROTOCOL_VERSION).toBe(LATEST_PROTOCOL_VERSION);
+    expect(SUPPORTED_PROTOCOL_VERSIONS).toContain(MCP_PROTOCOL_VERSION);
+  });
+
   test("exchanges JSON-RPC requests and parses MCP tool results", async () => {
     const { dir, entry } = makeChild(`
       import { createInterface } from "node:readline";

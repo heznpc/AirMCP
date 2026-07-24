@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { getModulePackNameForModule } from "./module-packs.js";
+import { PRESET_PROFILE_NAMES, getProfileModules } from "./profiles.js";
 
 export interface Workflow {
   id: string;
@@ -66,8 +67,16 @@ function installCommandForPack(pack: string): string {
   return `npx airmcp modules enable ${pack} --install`;
 }
 
-function enableProfileCommand(): string {
-  return "npx airmcp init --profile full --yes";
+function enableProfileCommand(workflow: Workflow): string {
+  const requiredModules = new Set(workflow.requiredModules);
+  const profile = PRESET_PROFILE_NAMES.map((name) => {
+    const modules = getProfileModules(name);
+    return { name, modules, moduleSet: new Set<string>(modules) };
+  })
+    .filter(({ moduleSet }) => Array.from(requiredModules).every((moduleName) => moduleSet.has(moduleName)))
+    .sort((a, b) => a.modules.length - b.modules.length)[0]?.name;
+
+  return `npx airmcp init --profile ${profile ?? "full"} --yes`;
 }
 
 function issueKey(issue: WorkflowReadinessIssue): string {
@@ -145,7 +154,7 @@ export function assessWorkflowReadiness(workflow: Workflow, context: WorkflowRea
         code: "module_disabled",
         severity: "blocker",
         module: moduleName,
-        command: enableProfileCommand(),
+        command: enableProfileCommand(workflow),
         message: `Enable module "${moduleName}" for this workflow by switching to a profile that includes it.`,
       });
     }

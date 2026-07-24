@@ -4,7 +4,7 @@
 // Reads docs/tool-manifest.json and writes
 // swift/Sources/AirMCPKit/Generated/MCPIntents.swift: Codable output
 // structs for every codable-safe tool + one `AppIntent` struct per
-// selected tool + a single `AppShortcutsProvider` (Apple's 10-entry cap).
+// selected tool + an iOS-only `AppShortcutsProvider` (Apple's 10-entry cap).
 //
 // Scope now (A.2b.2):
 //   • Selection: automatic. Every tool that is eligible, read-only, and
@@ -20,8 +20,8 @@
 //     accepts `_IntentValue`-conforming types (plain Codable needs an
 //     AppEntity wrapper, deferred). Axis 4 consumes these structs to
 //     render Interactive Snippets.
-//   • Top-N AppShortcutsProvider hand-picked (usage-tracker data isn't
-//     available at codegen time yet).
+//   • Top-N AppShortcutsProvider hand-picked for iOS. macOS exposes the
+//     generated AppIntent actions in Shortcuts, but not App Shortcuts.
 //
 // Router is live as of PR #103 (A.2a). Generated perform() calls hit
 // MCPIntentRouter.shared which the host (app/AirMCPApp or
@@ -134,56 +134,23 @@ const SKIP_NAMES = new Set([
 // destructive tools filtered out of codegen entirely.
 const INCLUDE_DESTRUCTIVE = /^(1|true|yes|on)$/i.test(process.env.AIRMCP_APPINTENTS_DESTRUCTIVE ?? "");
 
-// Top-N selection for AppShortcutsProvider (Apple caps the provider at
-// 10 entries per app). A.2b.1 uses a hand-picked subset instead of
-// usage-tracker-derived data because the tracker runs on the user's
-// laptop and isn't available at codegen time. A future pass can read a
-// checked-in top-N hint file that's refreshed nightly from usage data.
-//
-// AskAirMCPIntent (natural-language agent, axis 6) is pinned as the
-// first entry on iOS 26+/macOS 26+ — it's the most prominent surface
-// AirMCP has on those OS versions. The codegen emits the rest of the
-// 10-slot cap from APP_SHORTCUTS_TOP, so a max of 9 tool-based entries
-// co-exist with it. The hand-written intent lives in
-// swift/Sources/AirMCPKit/AskAirMCPIntent.swift.
+// The iOS AppShortcutsProvider must match the exact read-only preview
+// catalog registered by `ios/Sources/AirMCPServer/PreviewTools.swift`.
+// Keeping the list explicit prevents the OS from suggesting a phrase that
+// the in-process iOS router will reject. Apple caps providers at 10 entries;
+// the current preview intentionally uses eight.
 const APP_SHORTCUTS_TOP = [
-  "summarize_context",
-  "timeline_today",
-  "skill_inbox-triage",
-  "skill_project-digest",
-  "today_events",
-  "search_notes",
+  "get_location_permission",
+  "list_calendars",
+  "list_contacts",
+  "list_reminder_lists",
   "list_reminders",
   "search_contacts",
-  "get_current_weather",
+  "search_reminders",
+  "today_events",
 ];
 
-const APP_SHORTCUT_LABELS = {
-  summarize_context: {
-    shortTitle: "Daily Briefing",
-    phraseTitle: "Daily Briefing",
-    phraseName: "brief my day",
-    systemImageName: "sun.max",
-  },
-  timeline_today: {
-    shortTitle: "Today Timeline",
-    phraseTitle: "Today Timeline",
-    phraseName: "show my day",
-    systemImageName: "calendar",
-  },
-  "skill_inbox-triage": {
-    shortTitle: "Inbox Triage",
-    phraseTitle: "Inbox Triage",
-    phraseName: "triage my inbox",
-    systemImageName: "tray.full",
-  },
-  "skill_project-digest": {
-    shortTitle: "Project Digest",
-    phraseTitle: "Project Digest",
-    phraseName: "summarize my project",
-    systemImageName: "folder",
-  },
-};
+const APP_SHORTCUT_LABELS = {};
 
 // ── Load manifest ────────────────────────────────────────────────────
 let manifest;
@@ -209,7 +176,7 @@ const picked = manifest.tools
   .sort((a, b) => a.name.localeCompare(b.name));
 const pickedSet = new Set(picked);
 
-// Validate the AppShortcutsProvider top list — all names must be in the
+// Validate the iOS AppShortcutsProvider top list — all names must be in the
 // picked set, else Swift compilation fails with "cannot find type".
 const appShortcutsPicks = [];
 for (const name of APP_SHORTCUTS_TOP) {
@@ -451,32 +418,7 @@ function generateAppShortcuts() {
         )`;
   });
 
-  // AskAirMCPIntent is the natural-language agent entry (axis 6 /
-  // FoundationModelsBridge). It is emitted as a separate provider instead
-  // of a runtime `if #available` inside AppShortcutsBuilder: Swift 6.3
-  // treats that runtime branch as an array in builder context and fails
-  // with "cannot pass array of type '[AppShortcut]' as variadic arguments".
-  // The provider-level @available gate keeps older SDKs compileable.
-  const askShortcutProvider = `#if AIRMCP_ENABLE_FOUNDATION_MODELS && canImport(FoundationModels) && compiler(>=6.3)
-@available(macOS 26, iOS 26, *)
-public struct AirMCPAskShortcut: AppShortcutsProvider {
-    @AppShortcutsBuilder public static var appShortcuts: [AppShortcut] {
-        AppShortcut(
-            intent: AskAirMCPIntent(),
-            phrases: [
-                "Ask \\(.applicationName)",
-                "Ask \\(.applicationName) about my day",
-            ],
-            shortTitle: "Ask AirMCP",
-            systemImageName: "brain.head.profile"
-        )
-    }
-}
-#endif`;
-
-  return `${askShortcutProvider}
-
-public struct AirMCPGeneratedShortcuts: AppShortcutsProvider {
+  return `public struct AirMCPGeneratedShortcuts: AppShortcutsProvider {
     @AppShortcutsBuilder public static var appShortcuts: [AppShortcut] {
 ${toolEntries.join("\n")}
     }
@@ -759,7 +701,8 @@ import Foundation
 
 const appEnumsHeader = "\n\n// MARK: - AppEnum types\n\n";
 const intentsHeader = "\n\n// MARK: - AppIntents\n\n";
-const shortcutsHeader = "\n\n// MARK: - AppShortcutsProvider\n\n";
+const shortcutsHeader = "\n\n// MARK: - iOS AppShortcutsProvider\n\n#if os(iOS)\n";
+const shortcutsFooter = "\n#endif // os(iOS)\n";
 const snippetsHeader = `
 
 #endif
@@ -787,6 +730,7 @@ const source =
   intents +
   shortcutsHeader +
   appShortcuts +
+  shortcutsFooter +
   snippetsHeader +
   (followUpFactories.length > 0 ? followUpFactories.join("\n\n") + "\n\n" : "") +
   snippetViews.join("\n\n") +

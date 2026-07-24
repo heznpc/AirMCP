@@ -25,12 +25,30 @@ jobs:
     runs-on: macos-latest
     environment: npm
     permissions:
+      actions: write
       contents: write
       id-token: write
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
           fetch-tags: true
+
+      - name: Verify release source
+        env:
+          RELEASE_REF: ${{ github.ref }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          if [ "$RELEASE_REF" != "refs/heads/main" ]; then
+            echo "::error::Publishing is allowed only from refs/heads/main, got $RELEASE_REF"
+            exit 1
+          fi
+          CHECKED_OUT_SHA="$(git rev-parse HEAD)"
+          if [ "$CHECKED_OUT_SHA" != "$RELEASE_SHA" ]; then
+            echo "::error::Checked-out commit $CHECKED_OUT_SHA does not match workflow commit $RELEASE_SHA"
+            exit 1
+          fi
 
       - name: Extract package info
         id: pkg
@@ -53,6 +71,9 @@ jobs:
           node-version: 22
           cache: 'npm'
           registry-url: 'https://registry.npmjs.org'
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 
       - name: Select npm auth mode
         id: npm-auth
@@ -88,37 +109,57 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Release preflight
-        run: npm run release:preflight
+      # Keep governed app acceptance in this lane so a broken app cannot be
+      # published around by an otherwise healthy npm/.mcpb build.
+      - name: Release preflight (governed app gate)
+        run: npm run release:preflight -- --app
+
+      # npm versions are immutable. Refuse to create even the first registry
+      # artifact unless the downstream signed lane is protected by review,
+      # no-admin-bypass, and a matching tag-only deployment policy. Query this
+      # immediately before registry inspection/publish so a protection change
+      # during the longer governed preflight also fails closed.
+      - name: Verify signed release environment protection
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: v${{ steps.pkg.outputs.version }}
+        run: node scripts/verify-release-environment.mjs --repo="${{ github.repository }}" --tag="$RELEASE_TAG"
+
+      # An interrupted earlier attempt may already have published part of this
+      # immutable version. Resume only when the registry tarball SRI and
+      # npm gitHead prove it is byte-for-byte the artifact from github.sha.
+      - name: Inspect root registry identity
+        id: root-identity
+        env:
+          AIRMCP_RELEASE_SHA: ${{ github.sha }}
+        run: node scripts/verify-publish-identity.mjs --allow-missing
 
       - name: Publish root with provenance
-        if: steps.npm-auth.outputs.mode == 'trusted-publishing'
-        run: |
-          if npm view "${{ steps.pkg.outputs.name }}@${{ steps.pkg.outputs.version }}" version >/dev/null 2>&1; then
-            echo "${{ steps.pkg.outputs.name }}@${{ steps.pkg.outputs.version }} is already published; skipping root publish."
-          else
-            npm publish --provenance --access public
-          fi
+        if: steps.npm-auth.outputs.mode == 'trusted-publishing' && steps.root-identity.outputs.published != 'true'
+        run: npm publish --provenance --access public
 
       - name: Publish root with provenance (token fallback)
-        if: steps.npm-auth.outputs.mode == 'token'
+        if: steps.npm-auth.outputs.mode == 'token' && steps.root-identity.outputs.published != 'true'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          if npm view "${{ steps.pkg.outputs.name }}@${{ steps.pkg.outputs.version }}" version >/dev/null 2>&1; then
-            echo "${{ steps.pkg.outputs.name }}@${{ steps.pkg.outputs.version }} is already published; skipping root publish."
-          else
-            npm publish --provenance --access public
-          fi
+        run: npm publish --provenance --access public
+
+      - name: Verify root registry identity
+        env:
+          AIRMCP_RELEASE_SHA: ${{ github.sha }}
+        run: node scripts/verify-publish-identity.mjs --retry-seconds=60
 
       - name: Publish add-ons with provenance
         if: steps.npm-auth.outputs.mode == 'trusted-publishing'
+        env:
+          AIRMCP_RELEASE_SHA: ${{ github.sha }}
         run: |
           npm run addons:publish -- --publish --all --no-build --skip-verify
 
       - name: Publish add-ons with provenance (token fallback)
         if: steps.npm-auth.outputs.mode == 'token'
         env:
+          AIRMCP_RELEASE_SHA: ${{ github.sha }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           npm run addons:publish -- --publish --all --no-build --skip-verify
@@ -127,12 +168,26 @@ jobs:
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v2.5.0
         with:
           tag_name: v${{ steps.pkg.outputs.version }}
+          target_commitish: ${{ github.sha }}
           name: v${{ steps.pkg.outputs.version }}
           generate_release_notes: true
           files: build/release-preflight/airmcp-${{ steps.pkg.outputs.version }}.mcpb
           fail_on_unmatched_files: true
 
+      # Events created with GITHUB_TOKEN do not recursively trigger tag-push
+      # workflows. Dispatch the signed lane explicitly and let that workflow
+      # re-check the immutable tag, package, bundle, and signing environment.
+      - name: Dispatch signed app release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: v${{ steps.pkg.outputs.version }}
+        run: |
+          gh workflow run release-app.yml \
+            --ref "$RELEASE_TAG" \
+            --field tag="$RELEASE_TAG" \
+            --field require_signing=false
+
       - name: Verify public release state
         env:
           GH_TOKEN: ${{ github.token }}
-        run: npm run release:verify
+        run: npm run release:verify -- --expected-sha=${{ github.sha }}

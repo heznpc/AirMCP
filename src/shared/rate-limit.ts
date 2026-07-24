@@ -43,7 +43,8 @@ import { assertTestMode } from "./errors.js";
  *   drop stale buckets.
  *
  * Env overrides:
- *   AIRMCP_RATE_LIMIT=false                — disable entirely
+ *   AIRMCP_RATE_LIMIT=false                — disable rate buckets only;
+ *                                             emergency stop remains active
  *   AIRMCP_MAX_TOOL_CALLS_PER_MINUTE=<n>   — global bucket (default 60)
  *   AIRMCP_MAX_DESTRUCTIVE_PER_HOUR=<n>    — destructive bucket (default 10)
  *   AIRMCP_RATE_LIMIT_TENANT_CAP=<n>       — max tracked tenants (default 256)
@@ -93,6 +94,11 @@ interface Bucket {
 interface TenantBuckets {
   global: Bucket;
   destructive: Bucket;
+  /** Successful destructive-call timestamps within the rolling one-hour
+   *  window. The token bucket still smooths bursts, while this history is the
+   *  hard ceiling that prevents gradual refill from admitting more than the
+   *  advertised maximum in any hour. */
+  destructiveHistory: number[];
   /** Wall-clock of the last checkRateLimit hit. Powers LRU eviction
    *  when the tracked-tenant count exceeds TENANT_CAP. */
   lastSeen: number;
@@ -111,6 +117,7 @@ function makeTenantBuckets(): TenantBuckets {
   return {
     global: makeBucket(MAX_GLOBAL_PER_MINUTE, 60_000),
     destructive: makeBucket(MAX_DESTRUCTIVE_PER_HOUR, 60 * 60_000),
+    destructiveHistory: [],
     lastSeen: Date.now(),
   };
 }
@@ -166,6 +173,8 @@ function msUntilNextToken(bucket: Bucket): number {
 
 export interface RateLimitCheckResult {
   allowed: boolean;
+  /** Machine-readable denial source for audit/Trust Center evidence. */
+  gate?: "emergency_stop" | "rate_limit";
   /** Populated only when allowed=false. Human-readable reason. */
   reason?: string;
   /** Populated only when allowed=false. Suggested retry-after in ms. */
@@ -182,30 +191,47 @@ export interface RateLimitCheckResult {
  *  `sub` claim for HTTP requests; omit (or pass undefined) for stdio /
  *  loopback paths to share the default tenant. */
 export function checkRateLimit(destructive: boolean, tenantKey?: string): RateLimitCheckResult {
-  if (!RATE_LIMIT_ENABLED) return { allowed: true };
-
+  // Emergency stop is an independent panic control, not a rate-limit
+  // feature. Operators must be able to disable token buckets without also
+  // disabling the destructive-call kill switch.
   if (destructive && isEmergencyStopActive()) {
     return {
       allowed: false,
+      gate: "emergency_stop",
       reason: `Emergency stop engaged (${EMERGENCY_STOP_PATH} exists). All destructive tools are blocked until the file is removed.`,
       retryAfterMs: 60_000,
     };
   }
 
+  if (!RATE_LIMIT_ENABLED) return { allowed: true };
+
   const buckets = getOrCreateTenant(tenantKey ?? DEFAULT_TENANT_KEY);
+  const now = Date.now();
+  if (destructive) pruneDestructiveHistory(buckets, now);
 
   // Pre-check both buckets so we don't take a token from one and then
   // reject at the other. Deny side-effects must be atomic.
   if (!canTake(buckets.global)) {
     return {
       allowed: false,
+      gate: "rate_limit",
       reason: `Global tool-call budget exhausted (max ${MAX_GLOBAL_PER_MINUTE} / minute).`,
       retryAfterMs: msUntilNextToken(buckets.global),
+    };
+  }
+  if (destructive && buckets.destructiveHistory.length >= MAX_DESTRUCTIVE_PER_HOUR) {
+    const oldest = buckets.destructiveHistory[0]!;
+    return {
+      allowed: false,
+      gate: "rate_limit",
+      reason: `Destructive-call budget exhausted (hard ceiling ${MAX_DESTRUCTIVE_PER_HOUR} in any rolling hour). Review AirMCP audit log to confirm no runaway agent.`,
+      retryAfterMs: Math.max(1, oldest + 60 * 60_000 - now),
     };
   }
   if (destructive && !canTake(buckets.destructive)) {
     return {
       allowed: false,
+      gate: "rate_limit",
       reason: `Destructive-call budget exhausted (max ${MAX_DESTRUCTIVE_PER_HOUR} / hour). Review AirMCP audit log to confirm no runaway agent.`,
       retryAfterMs: msUntilNextToken(buckets.destructive),
     };
@@ -213,8 +239,20 @@ export function checkRateLimit(destructive: boolean, tenantKey?: string): RateLi
 
   // Commit side-effects atomically after all pre-checks pass.
   refillAndTake(buckets.global);
-  if (destructive) refillAndTake(buckets.destructive);
+  if (destructive) {
+    refillAndTake(buckets.destructive);
+    buckets.destructiveHistory.push(now);
+  }
   return { allowed: true };
+}
+
+function pruneDestructiveHistory(buckets: TenantBuckets, now: number): void {
+  const cutoff = now - 60 * 60_000;
+  let firstLive = 0;
+  while (firstLive < buckets.destructiveHistory.length && buckets.destructiveHistory[firstLive]! <= cutoff) {
+    firstLive++;
+  }
+  if (firstLive > 0) buckets.destructiveHistory.splice(0, firstLive);
 }
 
 /** Peek without consuming. Lets us pre-check both buckets and only
@@ -226,18 +264,19 @@ function canTake(bucket: Bucket): boolean {
   return projectedTokens >= 1;
 }
 
-let emergencyProbeCache: { checkedAt: number; active: boolean } | null = null;
+let emergencyProbeCache: { checkedAt: number; active: true } | null = null;
 const EMERGENCY_PROBE_TTL_MS = 1000;
 
-/** Is the emergency stop file present? Cached for 1s so we don't hit
- *  the fs on every single tool call during an agent burst. */
+/** Is the emergency stop file present? Positive results are cached for 1s so
+ *  an engaged stop stays cheap during an agent burst. Absence is never cached:
+ *  creating the stop file must block the very next destructive call. */
 export function isEmergencyStopActive(): boolean {
   const now = Date.now();
   if (emergencyProbeCache && now - emergencyProbeCache.checkedAt < EMERGENCY_PROBE_TTL_MS) {
-    return emergencyProbeCache.active;
+    return true;
   }
   const active = existsSync(EMERGENCY_STOP_PATH);
-  emergencyProbeCache = { checkedAt: now, active };
+  emergencyProbeCache = active ? { checkedAt: now, active: true } : null;
   return active;
 }
 
@@ -271,8 +310,8 @@ export interface IpRateLimitResult {
 
 /** Token-bucket consume for HTTP requests. Returns response-header-
  *  friendly metadata (limit / remaining / retry-after) plus the
- *  allow/deny verdict. Disabled by AIRMCP_RATE_LIMIT=false (matches
- *  tool-call gate so a single switch turns everything off). */
+ *  allow/deny verdict. Disabled by AIRMCP_RATE_LIMIT=false together with
+ *  the tool-call buckets; the emergency-stop panic control remains active. */
 export function checkIpRateLimit(ip: string): IpRateLimitResult {
   if (!RATE_LIMIT_ENABLED) {
     return { allowed: true, remaining: HTTP_MAX_REQUESTS_PER_MINUTE, limit: HTTP_MAX_REQUESTS_PER_MINUTE };
@@ -352,12 +391,18 @@ export function getRateLimitStatus(tenantKey?: string): {
 } {
   const key = tenantKey ?? DEFAULT_TENANT_KEY;
   const buckets = tenants.get(key);
+  if (buckets) pruneDestructiveHistory(buckets, Date.now());
   return {
     enabled: RATE_LIMIT_ENABLED,
     tenantKey: key,
     trackedTenants: tenants.size,
     globalRemaining: buckets ? Math.floor(buckets.global.tokens) : MAX_GLOBAL_PER_MINUTE,
-    destructiveRemaining: buckets ? Math.floor(buckets.destructive.tokens) : MAX_DESTRUCTIVE_PER_HOUR,
+    destructiveRemaining: buckets
+      ? Math.min(
+          Math.floor(buckets.destructive.tokens),
+          Math.max(0, MAX_DESTRUCTIVE_PER_HOUR - buckets.destructiveHistory.length),
+        )
+      : MAX_DESTRUCTIVE_PER_HOUR,
     emergencyStop: isEmergencyStopActive(),
     emergencyStopPath: EMERGENCY_STOP_PATH,
   };

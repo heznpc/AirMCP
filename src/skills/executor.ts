@@ -1,6 +1,6 @@
 import type { McpServer } from "../shared/mcp.js";
 import type { SkillDefinition, SkillResult, SkillStep, StepResult } from "./types.js";
-import { toolRegistry } from "../shared/tool-registry.js";
+import { toolRegistry, type ToolRegistry } from "../shared/tool-registry.js";
 import { UNTRUSTED_END_MARKER, UNTRUSTED_START_MARKER, wrapUntrustedText } from "../shared/untrusted.js";
 
 const SINGLE_TEMPLATE_RE = /^\{\{([^}]+)\}\}$/;
@@ -300,13 +300,14 @@ async function callTool(
   _server: McpServer,
   toolName: string,
   args: Record<string, unknown>,
+  registry: ToolRegistry,
 ): Promise<{
   content: Array<{ type: string; text: string }>;
   isError?: boolean;
   structuredContent?: unknown;
   _meta?: Record<string, unknown>;
 }> {
-  return toolRegistry.callTool(toolName, args);
+  return registry.callTool(toolName, args);
 }
 
 const DEFAULT_RETRY_BACKOFF_MS = 1000;
@@ -353,6 +354,7 @@ async function callToolWithRetry(
   toolName: string,
   args: Record<string, unknown>,
   step: SkillStep,
+  registry: ToolRegistry,
 ): Promise<{
   content: Array<{ type: string; text: string }>;
   isError?: boolean;
@@ -364,7 +366,7 @@ async function callToolWithRetry(
   let lastError: unknown;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      const response = await callTool(server, toolName, args);
+      const response = await callTool(server, toolName, args, registry);
       if (response.isError && attempt < maxRetries && isRetryableErrorResponse(response)) {
         // Tool reported a *retryable* error as a non-thrown response. Retry
         // with backoff; if we're out of retries, fall through and return the
@@ -443,6 +445,7 @@ async function executeOneStep(
   server: McpServer,
   step: SkillStep,
   results: Map<string, unknown>,
+  registry: ToolRegistry,
 ): Promise<{ stepResult: StepResult; data: unknown; templateData: unknown; untrusted: boolean }> {
   if (step.only_if && !evaluateCondition(step.only_if, results)) {
     return { stepResult: { id: step.id, status: "skipped" }, data: null, templateData: null, untrusted: false };
@@ -486,7 +489,7 @@ async function executeOneStep(
       loopScope.set("_index", idx);
       const resolvedArgs = (step.args ? resolveTemplates(step.args, loopScope) : {}) as Record<string, unknown>;
       try {
-        const response = await callToolWithRetry(server, step.tool, resolvedArgs, step);
+        const response = await callToolWithRetry(server, step.tool, resolvedArgs, step, registry);
         const parsed = parseToolResponse(response);
         loopResults.push(parsed.data);
         loopTemplateResults.push(parsed.templateData);
@@ -529,7 +532,7 @@ async function executeOneStep(
 
   const resolvedArgs = (step.args ? resolveTemplates(step.args, results) : {}) as Record<string, unknown>;
   try {
-    const response = await callToolWithRetry(server, step.tool, resolvedArgs, step);
+    const response = await callToolWithRetry(server, step.tool, resolvedArgs, step, registry);
     const parsed = parseToolResponse(response);
     return {
       stepResult: { id: step.id, status: "ok", data: parsed.data },
@@ -547,6 +550,7 @@ export async function executeSkill(
   server: McpServer,
   skill: SkillDefinition,
   inputs: Record<string, unknown> = {},
+  registry: ToolRegistry = toolRegistry,
 ): Promise<SkillResult> {
   const results = new Map<string, unknown>();
   // Seed declared inputs into the template scope so steps can reference
@@ -584,7 +588,7 @@ export async function executeSkill(
         i++;
       }
 
-      const settled = await Promise.allSettled(group.map((s) => executeOneStep(server, s, results)));
+      const settled = await Promise.allSettled(group.map((s) => executeOneStep(server, s, results, registry)));
 
       let sawAbort = false;
       let sawSkipRemaining = false;
@@ -623,7 +627,7 @@ export async function executeSkill(
       continue;
     }
 
-    const result = await executeOneStep(server, step, results);
+    const result = await executeOneStep(server, step, results, registry);
     stepResults.push(result.stepResult);
     sawUntrusted = sawUntrusted || result.untrusted;
 

@@ -14,7 +14,7 @@ private func decodeInput<T: Decodable>(_ type: T.Type, from arguments: [String: 
 // MARK: - ListReminderListsTool
 
 public struct ListReminderListsTool: MCPTool {
-    public static let name = "reminders_list_lists"
+    public static let name = "list_reminder_lists"
     public static let description = "List all reminder lists with their reminder counts"
     nonisolated(unsafe) public static let inputSchema: [String: Any] = [
         "type": "object",
@@ -35,7 +35,7 @@ public struct ListReminderListsTool: MCPTool {
 // MARK: - ListRemindersTool
 
 public struct ListRemindersTool: MCPTool {
-    public static let name = "reminders_list"
+    public static let name = "list_reminders"
     public static let description = "List reminders, optionally filtered by list name and completion status"
     nonisolated(unsafe) public static let inputSchema: [String: Any] = [
         "type": "object",
@@ -74,7 +74,7 @@ public struct ListRemindersTool: MCPTool {
 // MARK: - SearchRemindersTool
 
 public struct SearchRemindersTool: MCPTool {
-    public static let name = "reminders_search"
+    public static let name = "search_reminders"
     public static let description = "Search reminders by text query across title and notes"
     nonisolated(unsafe) public static let inputSchema: [String: Any] = [
         "type": "object",

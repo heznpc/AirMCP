@@ -44,11 +44,11 @@ final class JSONRPCRequestTests: XCTestCase {
 
     func testParseWithParams() throws {
         let json = """
-        {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "calendar_list", "arguments": {}}}
+        {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "list_calendars", "arguments": {}}}
         """
         let request = try JSONDecoder().decode(JSONRPCRequest.self, from: Data(json.utf8))
         XCTAssertNotNil(request.params)
-        XCTAssertEqual(request.params?["name"]?.value as? String, "calendar_list")
+        XCTAssertEqual(request.params?["name"]?.value as? String, "list_calendars")
     }
 }
 
@@ -172,6 +172,37 @@ final class MCPToolResultTests: XCTestCase {
 
 final class MCPServerDispatchTests: XCTestCase {
 
+    func testIOSPreviewCatalogIsExactAndReadOnly() async throws {
+        let server = MCPServer()
+        await registerIOSPreviewTools(on: server)
+
+        let request = try decodeRequest("""
+        {"jsonrpc": "2.0", "id": 1, "method": "tools/list"}
+        """)
+        let response = await server.handle(request)
+        let data = try JSONEncoder().encode(response)
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let result = json?["result"] as? [String: Any]
+        let tools = try XCTUnwrap(result?["tools"] as? [[String: Any]])
+        let names = Set(tools.compactMap { $0["name"] as? String })
+
+        XCTAssertEqual(names, IOSPreviewContract.toolNames)
+        XCTAssertEqual(names.count, 8)
+        for tool in tools {
+            let annotations = try XCTUnwrap(tool["annotations"] as? [String: Any])
+            XCTAssertEqual(annotations["readOnlyHint"] as? Bool, true)
+            XCTAssertEqual(annotations["destructiveHint"] as? Bool, false)
+        }
+    }
+
+    func testIOSPreviewRejectsWriteToolAtRegistration() async {
+        let server = MCPServer()
+        let accepted = await server.registerTool(PreviewWriteTool())
+        XCTAssertFalse(accepted)
+        let count = await server.toolCount
+        XCTAssertEqual(count, 0)
+    }
+
     func testInitializeResponse() async throws {
         let server = MCPServer(name: "test-server", version: "0.1.0")
         let request = try decodeRequest("""
@@ -233,5 +264,17 @@ final class MCPServerDispatchTests: XCTestCase {
 
     private func decodeRequest(_ json: String) throws -> JSONRPCRequest {
         try JSONDecoder().decode(JSONRPCRequest.self, from: Data(json.utf8))
+    }
+}
+
+private struct PreviewWriteTool: MCPTool {
+    static let name = "preview_write_probe"
+    static let description = "Test-only write probe"
+    nonisolated(unsafe) static let inputSchema: [String: Any] = [:]
+    static let readOnly = false
+    static let destructive = false
+
+    func execute(arguments: [String: Any]) async throws -> MCPToolResult {
+        .ok("should never run")
     }
 }

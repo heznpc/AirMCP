@@ -14,7 +14,7 @@ private func decodeInput<T: Decodable>(_ type: T.Type, from arguments: [String: 
 // MARK: - List Contacts
 
 public struct ListContactsTool: MCPTool {
-    public static let name = "contacts_list"
+    public static let name = "list_contacts"
     public static let description = "List contacts with pagination (limit/offset)."
     nonisolated(unsafe) public static let inputSchema: [String: Any] = [
         "type": "object",
@@ -42,7 +42,7 @@ public struct ListContactsTool: MCPTool {
 // MARK: - Search Contacts
 
 public struct SearchContactsTool: MCPTool {
-    public static let name = "contacts_search"
+    public static let name = "search_contacts"
     public static let description = "Search contacts by name, organization, email, or phone."
     nonisolated(unsafe) public static let inputSchema: [String: Any] = [
         "type": "object",

@@ -22,3 +22,13 @@
 "widget.noEventsScheduled" = "No events scheduled";
 "widget.moreEventsCount" = "+%d more events";
 "widget.grantAccess" = "Grant Calendar & Reminders access\nin System Settings > Privacy";
+
+/* Widget - Trust Status */
+"trust.running" = "Running";
+"trust.stopped" = "Stopped";
+"trust.unknown" = "Unknown";
+"trust.runtime" = "Runtime";
+"trust.hitl" = "Approval";
+"trust.pending" = "Pending";
+"trust.emergencyStop" = "Emergency stop active";
+"trust.noData" = "Open AirMCP to publish status";

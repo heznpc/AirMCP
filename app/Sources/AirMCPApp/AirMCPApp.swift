@@ -194,7 +194,13 @@ final class AirMCPApplicationDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         if isDuplicateLaunch {
             redirectDuplicateLaunch()
+            return
         }
+        // Publish a fresh widget snapshot so the widget renders from the governed
+        // App Group container instead of reading EventKit itself. Best-effort and
+        // no-op when unsigned / no entitlement. (A follow-up drives this off
+        // EventKit change events; launch-time refresh is the first increment.)
+        Task { await WidgetSnapshotWriter().refresh() }
     }
 
     /// Runtime fallback for launches that bypass LaunchServices (for example,
@@ -298,6 +304,10 @@ final class URLSchemeHandler: NSObject {
         switch url.host {
         case "briefing":
             NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Calendar.app"))
+        case "trust":
+            // From the Trust Status widget — bring the app forward so the user
+            // can open the Trust Center. No tool details are conveyed in the URL.
+            NSApp.activate()
         default:
             NSApp.activate()
         }

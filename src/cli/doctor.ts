@@ -363,6 +363,21 @@ export async function runDoctor(): Promise<void> {
     console.log(parts.join(""));
   }
 
+  // OS permissions required by ENABLED modules (RFC 0004 requiresPermissions).
+  // Previously this manifest field was inert — declared but never surfaced — so
+  // a user only discovered a module needed Accessibility / HealthKit when a call
+  // failed with an opaque OS error. List them up front instead.
+  const permModules = MODULE_MANIFEST.filter(
+    (m) => enabledMods.includes(m.name) && (m.compatibility?.requiresPermissions?.length ?? 0) > 0,
+  ).map((m) => ({ name: m.name, perms: m.compatibility!.requiresPermissions! }));
+  if (permModules.length > 0) {
+    const allPerms = [...new Set(permModules.flatMap((m) => m.perms))].sort();
+    meh("OS permissions needed", allPerms.join(", "));
+    for (const m of permModules) {
+      console.log(`    ${DIM}${m.name} → ${m.perms.join(", ")}${RESET}`);
+    }
+  }
+
   console.log(heading("Module add-ons"));
   const packSelection = resolveModulePackSelection(process.env.AIRMCP_MODULE_PACKS ?? fileConfig?.modulePacks);
   const packStatuses = getModulePackStatuses(runtimeConfig?.modulePacks ?? packSelection.packs);

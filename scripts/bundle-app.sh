@@ -243,6 +243,10 @@ elif [ -f "$WIDGET_DIR/Package.swift" ]; then
     fi
 
     # Sign the widget extension (required for WidgetKit).
+    # app-group lets the widget READ the host app's shared WidgetSnapshot
+    # container. Must match the main app's app-group below and
+    # WidgetSnapshotConfig.appGroupID in Swift. calendars/reminders stay for the
+    # OS-native EventKit fallback path when no fresh snapshot is present.
     codesign --force --sign "$SIGN_IDENTITY" --entitlements /dev/stdin "$APPEX_DIR/../" <<'ENTITLEMENTS_EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -250,6 +254,10 @@ elif [ -f "$WIDGET_DIR/Package.swift" ]; then
 <dict>
 	<key>com.apple.security.app-sandbox</key>
 	<false/>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.heznpc.AirMCP</string>
+	</array>
 	<key>com.apple.security.personal-information.calendars</key>
 	<true/>
 	<key>com.apple.security.personal-information.reminders</key>
@@ -307,7 +315,23 @@ if [ "$AIRMCP_EMBED_RUNTIME" = "1" ]; then
 fi
 
 # Sign the main app after embedding extensions and runtime executables.
-codesign --force --sign "$SIGN_IDENTITY" "$BUNDLE_DIR"
+# The app-group entitlement must match the widget's above so the app can WRITE
+# the shared WidgetSnapshot container the widget reads. (Developer ID, so no
+# sandbox; the group works cross-target under the same team.)
+codesign --force --sign "$SIGN_IDENTITY" --entitlements /dev/stdin "$BUNDLE_DIR" <<'APP_ENTITLEMENTS_EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.app-sandbox</key>
+	<false/>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.heznpc.AirMCP</string>
+	</array>
+</dict>
+</plist>
+APP_ENTITLEMENTS_EOF
 "$SCRIPT_DIR/verify-bundle-structure.sh" "$BUNDLE_DIR" "$BUNDLE_ID" "$APP_EXECUTABLE"
 if [ -x "$LSREGISTER" ]; then
   "$LSREGISTER" -f "$BUNDLE_DIR" 2>/dev/null || true

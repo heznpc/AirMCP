@@ -24,6 +24,7 @@ import {
   stdioProxyEntry,
 } from "./codex-mcp.js";
 import { configureMcpClients, type ClientRuntimeMode } from "./client-config.js";
+import { ensureOperatorKeyFile } from "../shared/identity-key.js";
 import { LOGO_LINES, typeLine, sleep, writeOut } from "../shared/banner.js";
 import { isPlainObject } from "../shared/validate.js";
 import { formatError } from "../shared/errors.js";
@@ -213,6 +214,74 @@ const I18N: Record<string, Record<LangCode, string>> = {
     fr: "num\u00E9ro / all / starter / prod / Entr\u00E9e sauver",
     de: "Nummer / all / starter / prod / Enter speichern",
     pt: "n\u00FAmero / all / starter / prod / Enter salvar",
+  },
+  audit_key_created: {
+    en: "Audit key generated (0600):",
+    ko: "감사 키 생성됨 (0600):",
+    ja: "監査キーを生成しました (0600):",
+    "zh-CN": "已生成审计密钥 (0600)：",
+    "zh-TW": "已產生稽核金鑰 (0600)：",
+    es: "Clave de auditoría generada (0600):",
+    fr: "Clé d'audit générée (0600) :",
+    de: "Audit-Schlüssel erzeugt (0600):",
+    pt: "Chave de auditoria gerada (0600):",
+  },
+  audit_key_exists: {
+    en: "Audit key present:",
+    ko: "감사 키 이미 있음:",
+    ja: "監査キーは既に存在します:",
+    "zh-CN": "审计密钥已存在：",
+    "zh-TW": "稽核金鑰已存在：",
+    es: "Clave de auditoría existente:",
+    fr: "Clé d'audit déjà présente :",
+    de: "Audit-Schlüssel vorhanden:",
+    pt: "Chave de auditoria já existe:",
+  },
+  audit_key_env: {
+    en: "Audit key: AIRMCP_AUDIT_HMAC_KEY (environment)",
+    ko: "감사 키: AIRMCP_AUDIT_HMAC_KEY (환경 변수)",
+    ja: "監査キー: AIRMCP_AUDIT_HMAC_KEY（環境変数）",
+    "zh-CN": "审计密钥：AIRMCP_AUDIT_HMAC_KEY（环境变量）",
+    "zh-TW": "稽核金鑰：AIRMCP_AUDIT_HMAC_KEY（環境變數）",
+    es: "Clave de auditoría: AIRMCP_AUDIT_HMAC_KEY (entorno)",
+    fr: "Clé d'audit : AIRMCP_AUDIT_HMAC_KEY (environnement)",
+    de: "Audit-Schlüssel: AIRMCP_AUDIT_HMAC_KEY (Umgebung)",
+    pt: "Chave de auditoria: AIRMCP_AUDIT_HMAC_KEY (ambiente)",
+  },
+  audit_key_blocked: {
+    en: "Audit key not generated — an existing audit chain is sealed with the host-derived key. Archive <store>/audit*.jsonl + audit.checkpoint first, then rerun init:",
+    ko: "감사 키 미생성 — 기존 감사 체인이 호스트 유래 키로 봉인되어 있습니다. <store>/audit*.jsonl + audit.checkpoint를 먼저 보관 이동한 뒤 init을 다시 실행하세요:",
+    ja: "監査キー未生成 — 既存の監査チェーンがホスト由来キーで封印されています。先に <store>/audit*.jsonl と audit.checkpoint を退避してから init を再実行してください:",
+    "zh-CN":
+      "未生成审计密钥 — 现有审计链已用主机派生密钥封存。请先归档 <store>/audit*.jsonl 与 audit.checkpoint，然后重新运行 init：",
+    "zh-TW":
+      "未產生稽核金鑰 — 現有稽核鏈已以主機衍生金鑰封存。請先歸檔 <store>/audit*.jsonl 與 audit.checkpoint，再重新執行 init：",
+    es: "Clave de auditoría no generada — una cadena de auditoría existente está sellada con la clave derivada del host. Archive primero <store>/audit*.jsonl + audit.checkpoint y vuelva a ejecutar init:",
+    fr: "Clé d'audit non générée — une chaîne d'audit existante est scellée avec la clé dérivée de l'hôte. Archivez d'abord <store>/audit*.jsonl + audit.checkpoint, puis relancez init :",
+    de: "Audit-Schlüssel nicht erzeugt — eine bestehende Audit-Kette ist mit dem Host-abgeleiteten Schlüssel versiegelt. Archivieren Sie zuerst <store>/audit*.jsonl + audit.checkpoint und führen Sie init erneut aus:",
+    pt: "Chave de auditoria não gerada — uma cadeia de auditoria existente está selada com a chave derivada do host. Arquive primeiro <store>/audit*.jsonl + audit.checkpoint e execute init novamente:",
+  },
+  audit_key_invalid: {
+    en: "Audit key file invalid — host-derived fallback in use:",
+    ko: "감사 키 파일이 유효하지 않음 — 호스트 유래 폴백 사용 중:",
+    ja: "監査キーファイルが無効です — ホスト由来のフォールバックを使用中:",
+    "zh-CN": "审计密钥文件无效 — 正在使用主机派生回退：",
+    "zh-TW": "稽核金鑰檔案無效 — 正在使用主機衍生後備：",
+    es: "Archivo de clave de auditoría no válido — usando el respaldo derivado del host:",
+    fr: "Fichier de clé d'audit invalide — repli dérivé de l'hôte utilisé :",
+    de: "Audit-Schlüsseldatei ungültig — Host-abgeleiteter Fallback aktiv:",
+    pt: "Arquivo de chave de auditoria inválido — usando o fallback derivado do host:",
+  },
+  audit_key_failed: {
+    en: "Could not prepare audit key:",
+    ko: "감사 키를 준비하지 못함:",
+    ja: "監査キーを準備できませんでした:",
+    "zh-CN": "无法准备审计密钥：",
+    "zh-TW": "無法準備稽核金鑰：",
+    es: "No se pudo preparar la clave de auditoría:",
+    fr: "Impossible de préparer la clé d'audit :",
+    de: "Audit-Schlüssel konnte nicht vorbereitet werden:",
+    pt: "Não foi possível preparar a chave de auditoria:",
   },
   writing_config: {
     en: "Writing config...",
@@ -502,6 +571,23 @@ export async function runInit(): Promise<void> {
       `[AirMCP] profile=${String(configPayload.profile)}, toolExposure=${configPayload.toolExposure}, modules=${enabled.size}, clients=${shouldConnectClients ? patchedClients : "skipped"}`,
     );
     console.log(`[AirMCP] wrote ${PATHS.CONFIG}`);
+    try {
+      const keyState = ensureOperatorKeyFile();
+      if (keyState.source === "env") {
+        console.log("[AirMCP] audit key: AIRMCP_AUDIT_HMAC_KEY (environment)");
+      } else if (keyState.source === "keyfile") {
+        console.log(`[AirMCP] audit key ${keyState.created ? "generated" : "present"} (0600): ${keyState.path}`);
+      } else if (keyState.blockedByExistingChain) {
+        console.log(
+          "[AirMCP] audit key not generated — an existing audit chain is sealed with the host-derived key. " +
+            `Archive the audit*.jsonl + audit.checkpoint files next to ${keyState.path} first, then rerun init.`,
+        );
+      } else {
+        console.log(`[AirMCP] audit key file invalid — host-derived fallback in use: ${keyState.path}`);
+      }
+    } catch (err) {
+      console.warn(`[AirMCP] could not prepare audit key: ${formatError(err)}`);
+    }
     if (!shouldConnectClients) {
       console.log(
         "[AirMCP] client registration skipped; no MCP client config was changed. Run `npx airmcp connect-clients` when you want to connect them.",
@@ -631,6 +717,24 @@ export async function runInit(): Promise<void> {
     process.exit(1);
   }
   console.log(` ${GREEN}\u2713${RESET} ${PATHS.CONFIG}`);
+
+  // --- Step 4b: operator audit key \u2014 honest default (non-derivable, 0600) ---
+  try {
+    const keyState = ensureOperatorKeyFile();
+    if (keyState.source === "env") {
+      console.log(`  ${GREEN}\u2713${RESET} ${t("audit_key_env", lang)}`);
+    } else if (keyState.source === "keyfile") {
+      console.log(
+        `  ${GREEN}\u2713${RESET} ${t(keyState.created ? "audit_key_created" : "audit_key_exists", lang)} ${DIM}${keyState.path}${RESET}`,
+      );
+    } else if (keyState.blockedByExistingChain) {
+      console.log(`  ${YELLOW}\u26a0${RESET} ${t("audit_key_blocked", lang)} ${DIM}${keyState.path}${RESET}`);
+    } else {
+      console.log(`  ${YELLOW}\u26a0${RESET} ${t("audit_key_invalid", lang)} ${DIM}${keyState.path}${RESET}`);
+    }
+  } catch (err) {
+    console.log(`  ${YELLOW}\u26a0${RESET} ${t("audit_key_failed", lang)} ${formatError(err)}`);
+  }
 
   // --- Step 5: Ask before detecting or patching MCP client configs ---
   let shouldConnectClients = false;

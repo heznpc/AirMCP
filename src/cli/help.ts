@@ -25,6 +25,9 @@ export function runHelp(): void {
   );
   console.log(`    ${GREEN}$${RESET} npx airmcp ${BOLD}doctor${RESET}          ${DIM}Diagnose installation${RESET}`);
   console.log(
+    `    ${GREEN}$${RESET} npx airmcp ${BOLD}verify${RESET}          ${DIM}Verify the local audit chain; honest key-grade-aware assurance verdict${RESET}`,
+  );
+  console.log(
     `    ${GREEN}$${RESET} npx airmcp ${BOLD}modules${RESET}         ${DIM}Inspect, install, or edit module add-ons${RESET}`,
   );
   console.log(

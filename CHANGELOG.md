@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Governance
+- **Honest `assurance` verdict on `airmcp://trust`** — `governed` stays true under a host-derived fallback key (the record is still tamper-evident), so a consumer keying only on the boolean over-trusts a re-derivable key as non-repudiation. A new top-level `assurance` tier (`operator-attested` / `tamper-evident` / `audit-halted` / `tampered`) factors the key grade in, and the resource description plus the governed-flow demo now direct any one-line trust readout at `assurance`, never bare `governed`.
+- **Operator audit key by default** — audit-chain key resolution is now `AIRMCP_AUDIT_HMAC_KEY` env > `<store>/audit-hmac.key` key file > host-derived fallback, resolved once at module load. `npx airmcp init` generates the key file (random 32 bytes, 0600, never clobbering an existing file) so a fresh install is non-derivable without env plumbing; the attestation exposes the backing variant as `audit.keySource` (`env` / `keyfile` / `host-derived`). Generation refuses over an already-sealed chain — rows HMAC'd under the old key would otherwise scan as a false `tampered` + fail-closed audit — and instead prints the explicit archive-then-rerun migration path. Key files that drift group/other-readable are tightened back to 0600 on load, and an unreadable (non-ENOENT) key file warns instead of silently downgrading.
+- **`npx airmcp verify`** — one-screen honest trust readout for the real local audit store: leads with the key-grade-aware `assurance` verdict, locates the first chain break on tampering, prints the exact key-upgrade path (with the re-key caveat), and exits non-zero for scripting: `tampered` (1) / `audit-halted` (2) / could-not-verify (3, operational errors deliberately distinct from tamper). `npx airmcp doctor` gains the same check as an "Audit trust" section.
+
 ## [2.16.0] - 2026-07-24
 
 ### Governance

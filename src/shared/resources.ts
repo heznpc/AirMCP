@@ -11,7 +11,7 @@ import { LIMITS } from "./constants.js";
 import { resourceCache } from "./cache.js";
 import { getMemoryStore } from "../memory/instance.js";
 import { UNTRUSTED_CONTENT_META } from "./untrusted.js";
-import { summarizeAuditEntries, getAuditKeyGrade } from "./audit.js";
+import { summarizeAuditEntries, getAuditKeyGrade, getAuditKeySource } from "./audit.js";
 import { getRateLimitStatus } from "./rate-limit.js";
 import { SERVER_INSTRUCTIONS } from "./icons.js";
 import { withResourceGovernance } from "./resource-governance.js";
@@ -358,6 +358,10 @@ export interface TrustAttestation {
     firstBreak: { file: string; lineIndex: number; reason: string } | null;
     /** `operator-key` (external secret) vs `host-fallback` (tamper-evident only). */
     keyGrade: "operator-key" | "host-fallback";
+    /** Which variant backs the grade: `env` (strongest, secret outside the
+     *  store), `keyfile` (init-generated, same-user readable), or
+     *  `host-derived` (the fallback). */
+    keySource: "env" | "keyfile" | "host-derived";
   };
   /** Human-in-the-loop approval posture. */
   approval: { level: string; whitelistSize: number };
@@ -452,6 +456,7 @@ export async function buildTrustAttestation(config?: AirMcpConfig): Promise<Trus
       auditDisabled: summary.auditDisabled,
       firstBreak: summary.verifiedFirstBreak ?? null,
       keyGrade,
+      keySource: getAuditKeySource(),
     },
     approval: { level, whitelistSize },
     rateLimit: {

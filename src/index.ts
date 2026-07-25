@@ -19,6 +19,7 @@ if (_sub === "--version" || _sub === "-v" || _sub === "-V") {
 if (
   _sub === "init" ||
   _sub === "doctor" ||
+  _sub === "verify" ||
   _sub === "modules" ||
   _sub === "workflows" ||
   _sub === "connect" ||
@@ -34,6 +35,10 @@ if (
   } else if (_sub === "doctor") {
     const mod = await import("./cli/doctor.js");
     await mod.runDoctor();
+  } else if (_sub === "verify") {
+    const mod = await import("./cli/verify.js");
+    const code = await mod.runVerify();
+    if (code !== 0) process.exitCode = code;
   } else if (_sub === "modules") {
     const mod = await import("./cli/modules.js");
     await mod.runModules();

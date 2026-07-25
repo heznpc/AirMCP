@@ -510,6 +510,58 @@ export async function runDoctor(): Promise<void> {
     meh("HTTP policy resolver unavailable", e instanceof Error ? e.message : String(e));
   }
 
+  // ── Audit trust ────────────────────────────────────────────────────
+  //
+  // Same composition the airmcp://trust resource serves, against the real
+  // local store. The one-line verdict doctor reports is the key-grade-aware
+  // `assurance` tier — never the bare `governed` boolean, which stays true
+  // under a re-derivable host-fallback key.
+  console.log(heading("Audit trust"));
+  try {
+    const { buildTrustAttestation } = await import("../shared/resources.js");
+    const { parseConfig } = await import("../shared/config.js");
+    let cfg;
+    try {
+      cfg = parseConfig();
+    } catch {
+      cfg = undefined;
+    }
+    const s4 = spinner("Verifying audit chain...");
+    let trust;
+    try {
+      trust = await buildTrustAttestation(cfg);
+      s4.succeed("Audit chain checked");
+    } catch (err) {
+      s4.fail("Audit chain check failed");
+      throw err; // outer catch renders the non-fatal meh line
+    }
+
+    if (trust.assurance === "operator-attested") {
+      ok("Assurance", "operator-attested — chain verified with an operator key");
+    } else if (trust.assurance === "tamper-evident") {
+      meh(
+        "Assurance",
+        "tamper-evident — chain verified, but the key is host-derived (re-derivable by any local shell). " +
+          "Archive the existing audit*.jsonl + audit.checkpoint, then `npx airmcp init` generates an operator key " +
+          "(a key change does not re-sign existing rows).",
+      );
+    } else if (trust.assurance === "audit-halted") {
+      bad("Assurance", "audit-halted — logging stopped (disk/permission/flush failure)");
+    } else {
+      bad(
+        "Assurance",
+        `tampered — chain broken at ${trust.audit.firstBreak?.file ?? "?"}:${trust.audit.firstBreak?.lineIndex ?? "?"} (${trust.audit.firstBreak?.reason ?? "unknown"})`,
+      );
+    }
+    // A host-derived key source must not read as a green check when the
+    // assurance line above just flagged it as the degradation.
+    if (trust.audit.keySource === "host-derived") meh("Key source", "host-derived");
+    else ok("Key source", trust.audit.keySource);
+  } catch (e) {
+    // Non-fatal: this section is diagnostic, don't sink the whole doctor run.
+    meh("Audit trust unavailable", e instanceof Error ? e.message : String(e));
+  }
+
   // ── Permissions ────────────────────────────────────────────────────
   if (platform === "darwin" && enabledMods.length > 0) {
     console.log(heading("Permissions"));

@@ -76,6 +76,7 @@ describe('airmcp://trust attestation', () => {
     // assurance grade must be the strongest tier — distinct from the weaker
     // host-fallback grade that the same `governed:true` boolean would mask.
     expect(t.audit.keyGrade).toBe('operator-key');
+    expect(t.audit.keySource).toBe('env');
     expect(t.assurance).toBe('operator-attested');
   });
 

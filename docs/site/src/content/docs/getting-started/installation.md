@@ -100,6 +100,43 @@ persistent user config used by their child Codex CLI in this order:
 working directory and must be named `config.toml`. Project-local overrides are
 reported but never edited.
 
+### Xcode coding agents (Xcode 26.3+)
+
+Xcode 26.3 ships built-in coding agents (Claude and Codex variants) that accept
+additional MCP servers through their own configuration directories under
+`~/Library/Developer/Xcode/CodingAssistant/`. These mirror the standard client
+configs but are kept separate from your regular Claude Code or Codex setup, so
+AirMCP must be added there explicitly.
+
+For the Claude agent, add the standard AirMCP stdio entry to the `mcpServers`
+object in `~/Library/Developer/Xcode/CodingAssistant/ClaudeAgentConfig/.claude.json`:
+
+```json
+{
+  "mcpServers": {
+    "airmcp": {
+      "command": "npx",
+      "args": ["-y", "airmcp"]
+    }
+  }
+}
+```
+
+For the Codex agent, add the same entry to the `config.toml` under
+`~/Library/Developer/Xcode/CodingAssistant/codex/` using the
+[Codex form shown above](#codex).
+
+Two caveats:
+
+- Per-call HITL approval prompts are answered through the AirMCP menubar app or
+  an elicitation-capable client. If neither is reachable from the Xcode agent
+  session, gated calls are denied with an actionable message rather than
+  silently approved — read-only tools keep working either way.
+- This is the reverse direction from Xcode's own MCP server (`xcrun mcpbridge`),
+  which exposes Xcode's build/test tools *to* external agents. The two compose:
+  an agent can drive Xcode through `mcpbridge` while using AirMCP for the
+  governed Apple-app side (Notes, Calendar, Reminders, Shortcuts, and the rest).
+
 ## AirMCP.app: only when the release includes it
 
 When [GitHub Releases](https://github.com/heznpc/AirMCP/releases) lists a signed

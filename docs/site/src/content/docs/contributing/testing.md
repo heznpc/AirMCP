@@ -21,7 +21,7 @@ Or use the npm script (which sets the flag automatically):
 npm test
 ```
 
-Note: `npm test` runs `npm run pretest` first, which compiles TypeScript via `tsc`. If you only changed test files and `dist/` is up to date, you can skip the build step by running Jest directly.
+Note: `npm test` runs the `pretest` hook first, which calls `npm run build`. If you only changed test files and `dist/` is up to date, you can skip the build step by running Jest directly.
 
 ### Run a single test file
 
@@ -32,7 +32,7 @@ NODE_OPTIONS="--experimental-vm-modules" npx jest tests/scripts.test.js
 ### Run tests matching a pattern
 
 ```bash
-NODE_OPTIONS="--experimental-vm-modules" npx jest --testPathPattern="calendar"
+NODE_OPTIONS="--experimental-vm-modules" npx jest --testPathPatterns="calendar"
 ```
 
 ### Watch mode
@@ -207,16 +207,24 @@ npm run build
 
 **TypeScript compilation OOM (`JavaScript heap out of memory`)**
 
-This is a known issue caused by `zod@3.25+`. AirMCP pins zod to `~3.24.0` to avoid it. If you see OOM during `tsc`, check that your `node_modules/zod` version is 3.24.x:
+AirMCP currently uses Zod 4 from the committed lockfile. If you see OOM during `tsc`, first check that your installed dependencies match the lockfile:
 
 ```bash
 node -e "console.log(require('zod/package.json').version)"
+node -e "console.log(require('typescript/package.json').version)"
 ```
 
-If it is 3.25+, remove `node_modules` and reinstall:
+If they do not match, remove `node_modules` and reinstall:
 
 ```bash
 rm -rf node_modules && npm install
+```
+
+If the versions are current but the local machine still runs out of memory, retry the failing command with a larger heap:
+
+```bash
+NODE_OPTIONS="--max-old-space-size=8192" npm run typecheck
+NODE_OPTIONS="--max-old-space-size=8192" npm run build
 ```
 
 ### Common QA test issues
@@ -442,17 +450,17 @@ If the pre-commit hook fails, fix the lint/type errors before committing.
 
 ### `tsc` runs out of memory (OOM)
 
-Known issue with `zod@3.25+` and TypeScript. AirMCP pins `zod` to `~3.24.0`. If you see:
+AirMCP currently uses Zod 4 from the committed lockfile. If TypeScript runs out of memory and you see:
 
 ```
 FATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory
 ```
 
-Check your zod version and reinstall if needed:
+Check your installed Zod and TypeScript versions, then reinstall if they do not match `package-lock.json`:
 
 ```bash
 node -e "console.log(require('zod/package.json').version)"
-# If 3.25+:
+node -e "console.log(require('typescript/package.json').version)"
 rm -rf node_modules && npm install
 ```
 

@@ -33,8 +33,8 @@ npm test
 # Equivalent manual command
 node --experimental-vm-modules node_modules/.bin/jest
 
-# Run a specific test file
-npx jest --testPathPattern='config'
+# Run a specific test file or path pattern
+npx jest --testPathPatterns='config'
 
 # Run tests matching a describe/test name
 npx jest -t 'esc() injection prevention'
@@ -124,8 +124,8 @@ export default {
     '!dist/cli/**',
     '!dist/skills/builtins/**',
   ],
-  coverageThresholds: {
-    global: { statements: 30, branches: 20, functions: 25, lines: 30 },
+  coverageThreshold: {
+    global: { statements: 46, branches: 40, functions: 42, lines: 46 },
   },
 };
 ```
@@ -264,7 +264,7 @@ cd swift && swift build --target AirMCPKit
 The `tests/swift.test.js` test checks whether `checkSwiftBridge()` correctly detects the binary:
 
 ```bash
-npx jest --testPathPattern='swift'
+npx jest --testPathPatterns='swift'
 ```
 
 ---
@@ -312,8 +312,8 @@ Also check:
 | `Cannot find module '../dist/...'` | Missing build | Run `npm run build` before `npm test` |
 | `Error: Not authorized to send Apple events` | Missing Automation permission | System Settings > Privacy & Security > Automation |
 | `execution error: Application isn't running` | Target app not open | Open the app (Notes, Calendar, etc.) |
-| `ENOMEM` / `JavaScript heap out of memory` during `tsc` | Zod 3.25+ type explosion | Pin zod to `~3.24.0` (already pinned), or use `NODE_OPTIONS="--max-old-space-size=8192"` |
-| `zod` TypeScript errors after `npm update` | Zod 3.25 breaking changes | Run `npm install zod@~3.24.0` to repin |
+| `ENOMEM` / `JavaScript heap out of memory` during `tsc` | TypeScript/Zod type resolution pressure or a stale install | Confirm installed versions match `package-lock.json`, then use `NODE_OPTIONS="--max-old-space-size=8192"` if needed |
+| `zod` TypeScript errors after `npm update` | Dependency drift from the committed lockfile | Run `npm install` to restore the lockfile versions |
 | `SyntaxError: Unexpected token` in JXA | Unescaped user input | Use `esc()` for strings, `escJxaShell()` for shell args in JXA |
 | `CRUD test data remains after failure` | Cleanup step failed | Search for `[AirMCP-QA]` in the relevant app, delete manually |
 | `License check failed` in CI | GPL dependency added | Remove the dependency or find an MIT/Apache alternative |
@@ -321,7 +321,14 @@ Also check:
 
 ### tsc Out-of-Memory
 
-Known issue with Zod >= 3.25 causing TypeScript type resolution to consume excessive memory. The project pins `zod` to `~3.24.0`. If you still encounter OOM:
+AirMCP currently uses Zod 4 from the committed lockfile. If TypeScript still runs out of memory during local validation, first confirm your install matches the lockfile:
+
+```bash
+node -e "console.log(require('zod/package.json').version)"
+node -e "console.log(require('typescript/package.json').version)"
+```
+
+If the versions are current but the local machine still runs out of memory:
 
 ```bash
 NODE_OPTIONS="--max-old-space-size=8192" npm run typecheck

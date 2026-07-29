@@ -14,6 +14,25 @@ function readDocs() {
   }));
 }
 
+function extractNamedTestFiles(text) {
+  const namedTestFiles = new Set(text.match(/tests\/[\w/-]+\.test\.js/g) ?? []);
+  const testsTreeBlocks = (text.match(/```[\s\S]*?```/g) ?? []).filter((block) => /^tests\/\s*$/m.test(block));
+
+  for (const block of testsTreeBlocks) {
+    const bareTestFiles = block.match(/(?:^|\s|[├└]──\s*)([\w/-]+\.test\.js)\b/gm) ?? [];
+
+    for (const bareTestFile of bareTestFiles) {
+      const normalized = bareTestFile.match(/([\w/-]+\.test\.js)\b/)?.[1];
+
+      if (normalized) {
+        namedTestFiles.add(`tests/${normalized}`);
+      }
+    }
+  }
+
+  return [...namedTestFiles].sort();
+}
+
 describe("testing documentation", () => {
   test("uses current Jest and Zod guidance", () => {
     for (const { text } of readDocs()) {
@@ -25,9 +44,29 @@ describe("testing documentation", () => {
     }
   });
 
+  test("extracts explicit paths and bare tests tree entries", () => {
+    expect(
+      extractNamedTestFiles(`
+Run one file with tests/scripts.test.js.
+
+\`\`\`
+tests/
+  swift.test.js
+├── calendar-scripts.test.js
+└── nested/example.test.js
+\`\`\`
+`),
+    ).toEqual([
+      "tests/calendar-scripts.test.js",
+      "tests/nested/example.test.js",
+      "tests/scripts.test.js",
+      "tests/swift.test.js",
+    ]);
+  });
+
   test("only names test files that exist", () => {
     for (const { path, text } of readDocs()) {
-      const namedTestFiles = new Set(text.match(/tests\/[\w/-]+\.test\.js/g) ?? []);
+      const namedTestFiles = extractNamedTestFiles(text);
 
       for (const namedTestFile of namedTestFiles) {
         expect({

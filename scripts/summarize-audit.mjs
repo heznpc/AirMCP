@@ -2,10 +2,10 @@
 /**
  * summarize-audit — RFC 0003 Phase 1 helper.
  *
- * Runs `npm audit --json --audit-level=moderate` (non-fatal) and prints a
+ * Runs `npm audit --json --audit-level=moderate --omit=dev` (non-fatal) and prints a
  * compact summary of moderate+ advisories. This is an *advisory* step: it
  * never exits non-zero. The hard gate is still the `npm audit
- * --audit-level=high` step in ci.yml. Once we've driven moderate findings
+ * --audit-level=high --omit=dev` step in ci.yml. Once we've driven moderate findings
  * to zero and had stable behaviour for a release, RFC 0003 Phase 2 swaps
  * the hard threshold to `moderate` and retires this advisory.
  *
@@ -25,7 +25,7 @@ const LEVELS = ["info", "low", "moderate", "high", "critical"];
 const BLOCKING_LEVEL = "high";
 
 function main() {
-  const res = spawnSync("npm", ["audit", "--json", "--audit-level=moderate"], {
+  const res = spawnSync("npm", ["audit", "--json", "--audit-level=moderate", "--omit=dev"], {
     encoding: "utf8",
     maxBuffer: 16 * 1024 * 1024,
   });
@@ -47,8 +47,7 @@ function main() {
   // npm v7+ format: metadata.vulnerabilities is { info, low, moderate, high, critical, total }
   const counts = parsed?.metadata?.vulnerabilities ?? {};
   const total = counts.total ?? 0;
-  const moderateOrAbove =
-    (counts.moderate ?? 0) + (counts.high ?? 0) + (counts.critical ?? 0);
+  const moderateOrAbove = (counts.moderate ?? 0) + (counts.high ?? 0) + (counts.critical ?? 0);
 
   console.log("── summarize-audit — RFC 0003 Phase 1 ──");
   console.log("Counts:");
@@ -61,7 +60,7 @@ function main() {
 
   if (moderateOrAbove === 0) {
     console.log("No moderate+ advisories detected.");
-    console.log("Hard gate: `npm audit --audit-level=high` (still blocking).");
+    console.log("Hard gate: `npm audit --audit-level=high --omit=dev` (still blocking).");
     return;
   }
 
@@ -87,8 +86,8 @@ function main() {
   }
 
   console.log("");
-  console.log(`Hard gate: \`npm audit --audit-level=${BLOCKING_LEVEL}\` (still blocking).`);
-  console.log("This advisory step is non-fatal. See docs/rfc/0003-npm-audit-policy.md for the upgrade plan.");
+  console.log(`Hard gate: \`npm audit --audit-level=${BLOCKING_LEVEL} --omit=dev\` (still blocking).`);
+  console.log("This advisory step is non-fatal. See docs/rfc/0003-ci-audit-stepwise.md for the upgrade plan.");
 }
 
 try {

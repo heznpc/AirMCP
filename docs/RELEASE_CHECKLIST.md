@@ -49,8 +49,8 @@ Breaking을 포함한 minor/patch는 **금지**. 직전 메이저에 묶어 둘 
 - [ ] `outputSchema` 추가·변경이 있다면 Zod `.safeParse` 테스트가 성공 응답과 에러 응답 모두에 대해 도는지 확인
 
 ### 1.4 취약점
-- [ ] `npm audit` — high 이상 0건 확인
-- [ ] `npm audit --audit-level=moderate` — moderate 건수 기록 (RFC 0003 단계 따라 blocking 여부 판단)
+- [ ] `npm audit --omit=dev` — production high 이상 0건 확인
+- [ ] `npm audit --audit-level=moderate --omit=dev` — production moderate 건수 기록 (RFC 0003 단계 따라 blocking 여부 판단)
 - [ ] 새로 도입된 의존성이 있다면 라이선스 감사 통과
 
 ### 1.5 iOS App Store submission gate
@@ -285,7 +285,7 @@ npm run addons:first-user-drill
 npm run addons:kill-test
 
 # 취약점
-npm audit --audit-level=moderate
+npm audit --audit-level=moderate --omit=dev
 
 # 릴리스 (tag는 CD가 검증된 github.sha에 생성)
 git push origin main

@@ -10,7 +10,7 @@
 
 ## 1. Motivation
 
-현재 `ci.yml`은 `npm audit --audit-level=high`만 blocking으로 걸어 둔다(검증: ci.yml에서 해당 단계 확인). 이 설정은 두 가지 문제가 있다.
+현재 `ci.yml`은 production 의존성에 대해 `npm audit --audit-level=high --omit=dev`를 blocking으로 걸어 둔다(검증: ci.yml에서 해당 단계 확인). 개발 도구 advisory는 Dependabot과 별도 업데이트로 추적하되, 사용자가 설치하는 runtime dependency가 CI의 hard gate 대상이다. 이 설정에는 두 가지 후속 과제가 있다.
 
 1. **Moderate 등급 취약점이 누적된다.** QUALITY_DIAGNOSIS 단계에서 Hono(`@hono/node-server` 계열) 전이 의존성의 moderate 등급 advisory가 `package-lock.json`에 존재함을 확인했다(검증: `grep -c '"hono"' package-lock.json` = 2). 직접 의존성이 아니므로 `npm audit fix`가 자동 해결하지 못하고, 빌드·CI는 초록불로 유지된다. "알고 있지만 치우지 않는 부채"가 쌓이는 구조.
 2. **취약점 발견 → 조치까지의 SLA가 없다.** 지금까지는 릴리스 노트에 보안 픽스가 함께 들어가는 사후 대응 패턴이지만, "48시간 안에 patch를 낸다" 같은 **명시된 약속**이 없다. 사용자·엔터프라이즈 도입 측에서는 이 약속이 도입 결정의 기준.
@@ -25,7 +25,7 @@
 
 | Phase | 기간 | CI 동작 | 실패 정책 |
 |---|---|---|---|
-| **Phase 0 (현재)** | — | `npm audit --audit-level=high`만 blocking | moderate는 무시 |
+| **Phase 0** | — | production `npm audit --audit-level=high --omit=dev`만 blocking | moderate는 무시 |
 | **Phase 1** | v2.8.0 | moderate는 **advisory** (별도 step, continue-on-error) + 매주 요약 | high blocking 유지 |
 | **Phase 2** | v2.8.x (Phase 1 클린 2주 유지 후) | moderate **blocking** | 신규 moderate → PR 머지 차단 |
 | **Phase 3** | v2.8.x | Socket·Snyk·OSV-Scanner 중 택1 병행 도입 | 겹치는 advisory로 커버리지 확장 |

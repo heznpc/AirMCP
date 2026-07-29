@@ -68,7 +68,7 @@ jobs:
         run: npx license-checker --failOn "GPL-2.0;GPL-3.0;AGPL-3.0"
 
       - name: Security audit
-        run: npm audit --audit-level=high
+        run: npm audit --audit-level=high --omit=dev
 
       # RFC 0003 Phase 1 — non-fatal advisory: surface moderate+ findings
       # in CI logs so reviewers can prioritise upgrades before we ratchet

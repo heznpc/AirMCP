@@ -165,7 +165,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/ext-apps": "1.7.4",
-    "@modelcontextprotocol/sdk": "1.29.0",
+    "@modelcontextprotocol/sdk": "1.30.0",
     "express": "5.2.1",
     "jose": "6.2.3",
     "yaml": "2.9.0",
@@ -199,7 +199,7 @@
   ],
   "overrides": {
     "hono": "^4.12.25",
-    "@hono/node-server": "^1.19.13"
+    "@hono/node-server": "^2.0.5"
   },
   "lint-staged": {
     "src/**/*.ts": [

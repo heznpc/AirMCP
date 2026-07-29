@@ -342,7 +342,7 @@ CI runs on every push and PR to `main` via GitHub Actions (`macos-latest`, Node.
 4. **Setup Node.js 22** -- with npm cache
 5. **Install dependencies** -- `npm ci`
 6. **Check licenses** -- fails on GPL-2.0, GPL-3.0, AGPL-3.0
-7. **Security audit** -- `npm audit --audit-level=high`
+7. **Security audit** -- `npm audit --audit-level=high --omit=dev`
 8. **Lint** -- `npm run lint`
 9. **Build** -- `npm run build`
 10. **Test** -- `npm test` (Jest with `--experimental-vm-modules`)
@@ -364,7 +364,7 @@ node scripts/check-i18n.mjs
 npx license-checker --failOn "GPL-2.0;GPL-3.0;AGPL-3.0"
 
 # Security audit
-npm audit --audit-level=high
+npm audit --audit-level=high --omit=dev
 ```
 
 ---

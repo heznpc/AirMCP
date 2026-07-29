@@ -18,6 +18,12 @@ AirMCP is the connector and control layer, not another agent. It mediates Apple
 workspace actions through profiles, progressive exposure, per-call human
 approval, HMAC-chained audit logs, rate limits, OAuth scopes, and local controls.
 
+<p align="center">
+  <a href="docs/demo.gif"><img src="docs/demo.gif" alt="Real AirMCP governance flow: live trust assurance, zero-side-effect destructive preview, and verified audit chain" width="900"></a>
+</p>
+
+<p align="center"><strong>Preview the action. Inspect live trust. Verify the audit chain.</strong><br>The recording is generated from a real local MCP round-trip by <code>scripts/demo/governed-flow.mjs</code>.</p>
+
 > Multi-language project page: [heznpc.github.io/AirMCP](https://heznpc.github.io/AirMCP/)
 
 ## What You Get

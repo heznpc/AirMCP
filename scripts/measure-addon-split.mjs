@@ -38,7 +38,7 @@ import {
   parseStructuredResult,
   startMcp,
 } from "./lib/mcp-stdio-client.mjs";
-import { extractJsonArray } from "./lib/npm-json.mjs";
+import { parseNpmPackList } from "./lib/npm-json.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const BUILD_DIR = join(ROOT, "build", "addons");
@@ -137,8 +137,7 @@ function npmPack(cwd, options = {}) {
   const output = sh("npm", args, { cwd });
   let parsed;
   try {
-    const jsonText = extractJsonArray(output);
-    parsed = JSON.parse(jsonText);
+    parsed = parseNpmPackList(output);
   } catch (error) {
     fail(`npm pack output was not JSON in ${cwd}: ${error instanceof Error ? error.message : String(error)}`);
   }

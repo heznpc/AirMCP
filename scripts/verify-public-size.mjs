@@ -11,7 +11,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { extractJsonArray } from "./lib/npm-json.mjs";
+import { parseNpmPackList } from "./lib/npm-json.mjs";
 
 const ROOT = dirname(fileURLToPath(new URL("../package.json", import.meta.url)));
 const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
@@ -78,7 +78,7 @@ function assertMax(label, actual, max) {
 
 function parseNpmPackJson(output) {
   try {
-    const [pack] = JSON.parse(extractJsonArray(output));
+    const [pack] = parseNpmPackList(output) ?? [];
     if (!pack) fail("npm pack dry-run returned no package metadata");
     return pack;
   } catch (error) {

@@ -11,7 +11,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync } f
 import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { extractJsonArray } from "./lib/npm-json.mjs";
+import { parseNpmPackList } from "./lib/npm-json.mjs";
 
 const ROOT = dirname(fileURLToPath(new URL("../package.json", import.meta.url)));
 const OUT_DIR = join(ROOT, "build", "release-preflight");
@@ -73,8 +73,7 @@ function verifyNpmDryRun() {
   const output = run("npm", ["pack", "--dry-run", "--json"], { capture: true });
   let pack;
   try {
-    const jsonText = extractJsonArray(output);
-    [pack] = JSON.parse(jsonText);
+    [pack] = parseNpmPackList(output) ?? [];
   } catch (error) {
     fail(`npm pack --dry-run --json did not return parseable JSON: ${error.message}`);
   }

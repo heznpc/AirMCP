@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.16.1] - 2026-07-30
+
+### Fixed
+
+- Classify Apple TCC permission denials as `permission_denied` (with the
+  System Settings recovery hint) instead of generic `jxa_error`/`swift_error`
+  in every module catch path.
+- `profile_status` now reports config-disabled modules in `modulesDisabled`
+  instead of always returning an empty list.
+- Release tooling parses `npm pack --json` / `npm view --json` across npm
+  10–12 output formats; CD pins npm 12 for trusted publishing.
+
+### Added
+
+- Universal runtime error-contract harness invoking every module tool with
+  synthesized arguments under executor permission failure.
+- Doctor ↔ runtime consistency contract (shared resolver, `doctor` CLI, and a
+  real stdio boot must agree on profile and module set).
+- Xcode 26.3 coding-agent connection guide in the docs site.
+
+### Release note
+
+- npm `2.16.0` was published from the same lineage during the trusted-publishing
+  rollout but has no GitHub Release; `2.16.1` is the canonical release for this
+  cycle.
+
 ## [2.16.0] - 2026-07-29
 
 ### Governance

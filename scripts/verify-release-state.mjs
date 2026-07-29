@@ -81,7 +81,9 @@ function parseJson(label, text) {
 function npmJson(argsForNpm, label) {
   const result = run("npm", argsForNpm);
   if (result.status !== 0) fail(`${label} failed`, result.stderr || result.stdout);
-  return parseJson(label, result.stdout);
+  const parsed = parseJson(label, result.stdout);
+  // npm 12 wraps `npm view --json` results in a single-element array.
+  return Array.isArray(parsed) && parsed.length === 1 ? parsed[0] : parsed;
 }
 
 async function loadAddonPackages() {

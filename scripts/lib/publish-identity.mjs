@@ -61,10 +61,12 @@ function parsePublishedJson(output, label) {
   } catch (error) {
     throw new Error(`${label} metadata was not JSON: ${error instanceof Error ? error.message : String(error)}`);
   }
+  // npm 12 wraps `npm view --json` results in a single-element array.
+  const entry = Array.isArray(parsed) ? parsed[0] : parsed;
   return {
-    version: parsed?.version,
-    integrity: parsed?.["dist.integrity"] ?? parsed?.dist?.integrity,
-    gitHead: parsed?.gitHead,
+    version: entry?.version,
+    integrity: entry?.["dist.integrity"] ?? entry?.dist?.integrity,
+    gitHead: entry?.gitHead,
   };
 }
 

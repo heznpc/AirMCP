@@ -13,7 +13,13 @@ import { registerSetupTools } from "../shared/setup.js";
 import { registerSkillEngine } from "../skills/index.js";
 import { log, errToCtx } from "../shared/logger.js";
 import { registerApps } from "../apps/tools.js";
-import { getCompatibilityEnv, isModuleEnabled, NPM_PACKAGE_NAME, type AirMcpConfig } from "../shared/config.js";
+import {
+  getCompatibilityEnv,
+  isModuleEnabled,
+  MODULE_NAMES,
+  NPM_PACKAGE_NAME,
+  type AirMcpConfig,
+} from "../shared/config.js";
 import { getModulePackPlan, loadModuleRegistry, setModuleRegistry } from "../shared/modules.js";
 import { getMissingAddonPackageModules } from "../shared/module-loader.js";
 import { resolveModuleCompatibility } from "../shared/compatibility.js";
@@ -126,7 +132,10 @@ export async function createServer(options: CreateServerOptions): Promise<{
   // modules that haven't been annotated yet.
   const compatEnv = getCompatibilityEnv();
   const enabled: string[] = [];
-  const disabled: string[] = [];
+  // loadModuleRegistry() filters config-disabled modules before import, so the
+  // registration loop below never sees them — seed the disabled list from the
+  // config directly or profile_status reports modulesDisabled: [] forever.
+  const disabled: string[] = MODULE_NAMES.filter((name) => !isModuleEnabled(config, name));
   const osBlocked: string[] = [];
   const deprecated: string[] = [];
   const broken: string[] = [];
@@ -164,7 +173,7 @@ export async function createServer(options: CreateServerOptions): Promise<{
     }
 
     if (!isModuleEnabled(config, mod.name)) {
-      disabled.push(mod.name);
+      if (!disabled.includes(mod.name)) disabled.push(mod.name);
       continue;
     }
 

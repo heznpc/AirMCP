@@ -251,6 +251,7 @@ jest.unstable_mockModule('../dist/shared/config.js', () => ({
   getOsVersion: jest.fn(() => 26),
   getCompatibilityEnv: jest.fn(() => ({ osVersion: 26, hardware: [], permissions: [] })),
   isModuleEnabled: jest.fn(() => true),
+  MODULE_NAMES: ['notes', 'calendar', 'finder'],
 }));
 
 // icons module — pure data, no I/O, but stub to keep tests independent

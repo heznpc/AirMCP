@@ -75,6 +75,15 @@ jobs:
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 
+      # npm trusted publishing (OIDC → registry token exchange) requires
+      # npm >= 11.5.1; the npm bundled with Node 22 is 10.x, which signs
+      # provenance but sends the registry PUT unauthenticated (surfaces as
+      # E404 on an OIDC-only package).
+      - name: Upgrade npm for trusted publishing
+        run: |
+          npm install -g npm@latest
+          npm --version
+
       - name: Select npm auth mode
         id: npm-auth
         env:

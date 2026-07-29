@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.16.1] - 2026-07-30
+## [2.16.2] - 2026-07-30
 
 ### Fixed
 
@@ -29,9 +29,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Release note
 
-- npm `2.16.0` was published from the same lineage during the trusted-publishing
-  rollout but has no GitHub Release; `2.16.1` is the canonical release for this
-  cycle.
+- npm `2.16.0` and `2.16.1` were published from the same lineage during the
+  trusted-publishing rollout but have no GitHub Release or add-on packages;
+  `2.16.2` is the canonical release for this cycle.
 
 ## [2.16.0] - 2026-07-29
 

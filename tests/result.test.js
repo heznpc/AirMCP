@@ -122,3 +122,36 @@ describe('toolError', () => {
     expect(result.structuredContent.error.retryable).toBe(false);
   });
 });
+
+describe('errJxa / errSwift permission sniffing', () => {
+  test('errJxaFor reclassifies TCC denials as permission_denied with recovery hint', async () => {
+    const { errJxaFor } = await import('../dist/shared/result.js');
+    const result = errJxaFor(
+      'list events',
+      new Error(
+        'Not authorized to send Apple events. (-1743) Permission denied — grant Automation access in System Settings > Privacy & Security > Automation.',
+      ),
+    );
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent.error.category).toBe('permission_denied');
+    expect(result.structuredContent.error.cause).toEqual(expect.objectContaining({ origin: 'jxa' }));
+    expect(result.content[0].text).toContain('System Settings');
+  });
+
+  test('errSwiftFor reclassifies TCC denials as permission_denied', async () => {
+    const { errSwiftFor } = await import('../dist/shared/result.js');
+    const result = errSwiftFor('query photos', new Error('Photos access not authorized'));
+    expect(result.structuredContent.error.category).toBe('permission_denied');
+    expect(result.structuredContent.error.cause).toEqual(expect.objectContaining({ origin: 'swift' }));
+  });
+
+  test('non-permission failures keep the jxa_error / swift_error taxonomy', async () => {
+    const { errJxaFor, errSwiftFor } = await import('../dist/shared/result.js');
+    expect(errJxaFor('list events', new Error('AppleEvent timed out (-1712)')).structuredContent.error.category).toBe(
+      'jxa_error',
+    );
+    expect(errSwiftFor('query photos', new Error('bridge crashed')).structuredContent.error.category).toBe(
+      'swift_error',
+    );
+  });
+});

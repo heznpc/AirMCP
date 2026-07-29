@@ -187,8 +187,19 @@ export function errUpstream(message: string, opts?: ToolErrorOptions) {
   return toolErr("upstream_error", message, opts);
 }
 
+/** TCC / Apple-events denial signals as they appear in osascript stderr and
+ *  Swift bridge errors. When one of these reaches errJxa/errSwift, the failure
+ *  is a permission problem, not an execution problem — reporting it as a
+ *  generic jxa_error/swift_error hides the one category clients can actually
+ *  act on (GitHub #145: "Calendar permission granted but results empty"). */
+const APPLE_PERMISSION_PATTERN =
+  /not authorized|not authorised|permission denied|permission_denied|\(-1743\)|error -1743|tcc denied|requires? .*(automation|accessibility|screen recording|full disk) (access|permission)/i;
+
 export function errJxa(message: string, opts?: ToolErrorOptions) {
   const cause = opts?.cause ?? {};
+  if (APPLE_PERMISSION_PATTERN.test(message)) {
+    return errPermission(message, { ...opts, cause: { origin: "jxa", ...cause } });
+  }
   return toolErr("jxa_error", message, {
     ...opts,
     cause: { origin: "jxa", ...cause },
@@ -197,6 +208,9 @@ export function errJxa(message: string, opts?: ToolErrorOptions) {
 
 export function errSwift(message: string, opts?: ToolErrorOptions) {
   const cause = opts?.cause ?? {};
+  if (APPLE_PERMISSION_PATTERN.test(message)) {
+    return errPermission(message, { ...opts, cause: { origin: "swift", ...cause } });
+  }
   return toolErr("swift_error", message, {
     ...opts,
     cause: { origin: "swift", ...cause },

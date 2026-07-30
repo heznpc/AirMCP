@@ -83,6 +83,14 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # lint-staged formats src/**/*.ts on commit, but that only covers files
+      # staged through a local hook — a bypassed hook, a web edit, or a merge
+      # can still land unformatted source. front-door-tools.ts drifted exactly
+      # that way and stayed red locally while every CI run passed, because
+      # nothing here checked it.
+      - name: Format check
+        run: npm run format:check
+
       - name: Build
         run: npm run build
 

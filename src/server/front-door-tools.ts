@@ -478,9 +478,7 @@ export function registerFrontDoorTools(server: McpServer, options: RegisterFront
         tool: z.string(),
         exists: z.boolean(),
         exposed: z.boolean().optional(),
-        annotations: z
-          .object({ destructive: z.boolean(), readOnly: z.boolean(), sensitive: z.boolean() })
-          .optional(),
+        annotations: z.object({ destructive: z.boolean(), readOnly: z.boolean(), sensitive: z.boolean() }).optional(),
         argsValid: z.boolean().optional(),
         validationError: z.string().optional(),
         wouldRequireApproval: z.boolean().optional(),

@@ -49,7 +49,7 @@ describe("add-on publish release lane", () => {
     expect(cdWorkflow).toContain("Inspect root registry identity");
     expect(cdWorkflow).toContain("node scripts/verify-publish-identity.mjs --allow-missing");
     expect(cdWorkflow).toContain("npm publish --provenance --access public");
-    expect(cdWorkflow).toContain("node scripts/verify-publish-identity.mjs --retry-seconds=60");
+    expect(cdWorkflow).toContain("node scripts/verify-publish-identity.mjs --retry-seconds=600");
     expect(cdWorkflow).toContain("npm run addons:publish -- --publish --all --no-build --skip-verify");
     expect(cdWorkflow).toContain("build/release-preflight/airmcp-${{ steps.pkg.outputs.version }}.mcpb");
   });

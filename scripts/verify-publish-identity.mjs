@@ -28,8 +28,13 @@ const allowMissing = process.argv.includes("--allow-missing");
 const retrySecondsValue = valueArg("--retry-seconds") || "0";
 const retrySeconds = Number(retrySecondsValue);
 
-if (!Number.isInteger(retrySeconds) || retrySeconds < 0 || retrySeconds > 300) {
-  console.error("publish-identity: --retry-seconds must be an integer from 0 to 300");
+// Upper bound raised from 300 to 900 after the v2.16.2 release: the registry
+// read path (`npm view`, which resolves the packument) lagged a SUCCESSFUL
+// immutable publish by well over five minutes for a brand-new scoped package
+// name, while the version-specific endpoint already served the tarball. A cap
+// below that lag turns a shipped artifact into a red release.
+if (!Number.isInteger(retrySeconds) || retrySeconds < 0 || retrySeconds > 900) {
+  console.error("publish-identity: --retry-seconds must be an integer from 0 to 900");
   process.exit(1);
 }
 

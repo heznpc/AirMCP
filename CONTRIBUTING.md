@@ -70,7 +70,7 @@ src/
 
 **Key patterns:**
 - `scripts.ts` — JXA script generators (pure functions returning strings)
-- `tools.ts` — MCP tool registrations (use `server.tool()`)
+- `tools.ts` — MCP tool registrations (use `server.registerTool()`)
 - `prompts.ts` — MCP prompt registrations (use `server.prompt()`)
 - Always use `esc()` for JXA string interpolation and `escJxaShell()` for shell arguments inside JXA
 
@@ -88,12 +88,15 @@ All four must pass — CI runs them automatically on every PR.
 Additional drift guards enforced by CI (run locally before touching docs or manifests):
 
 ```bash
-npm run stats:check         # tool/module/prompt/resource counts vs README + manifests
-npm run gen:manifest:check  # docs/tool-manifest.json reflects current src/
-npm run gen:intents:check   # Generated/MCPIntents.swift matches manifest
+npm run stats:check            # derived counts vs README + guarded docs
+npm run gen:manifest:check     # docs/tool-manifest.json reflects current src/
+npm run gen:intents:check      # Generated/MCPIntents.swift matches manifest
+npm run gen:app-catalog:check  # generated module/app catalog matches MODULE_MANIFEST
 ```
 
-Auto-fix the corresponding sources with `npm run stats:sync`, `npm run gen:manifest`, `npm run gen:intents`.
+Auto-fix the corresponding generated sources with `npm run stats:sync`,
+`npm run gen:manifest`, `npm run gen:intents`, and
+`npm run gen:app-catalog`.
 
 ### OAuth local development
 
@@ -113,7 +116,7 @@ node scripts/qa-sequential.mjs --out       # save report to file
 **Full smoke test** — loads all modules at once (resource-intensive):
 
 ```bash
-npm run qa                         # run all 61 read-only tool tests
+npm run qa                         # run the read-only smoke suite
 node scripts/qa-test.mjs --out     # save to qa-report-<date>.md
 node scripts/qa-test.mjs --json    # machine-readable JSON output
 ```
@@ -236,17 +239,28 @@ refactor: extract shared pagination logic
    - `readOnlyHint: true` for read operations
    - `destructiveHint: true` for delete/update operations
 3. Add tests for script generators in `tests/<module>-scripts.test.js`
-4. Run `npm run stats` to verify counts, then update `docs/index.html` if needed
+4. Run `npm run dev:test:changed` while iterating, then refresh and verify
+   generated surfaces with `npm run gen:manifest`, `npm run gen:intents`,
+   and `npm run stats:sync`; then run `npm run gen:manifest:check`,
+   `npm run gen:intents:check`, and `npm run stats:check` before opening a PR
 
 ## Adding a New Module
 
 1. Create `src/<module>/scripts.ts` and `src/<module>/tools.ts`
    - `tools.ts` must export a function named `register<Module>Tools(server, config)`
-2. Add one line to the `MANIFEST` array in `src/shared/modules.ts` — no other imports needed
-3. Add prompts if applicable (`src/<module>/prompts.ts`, set `hasPrompts: true` in MANIFEST)
+2. Add one line to the `MODULE_MANIFEST` array in `src/shared/modules.ts` — no other imports needed
+3. Add prompts if applicable (`src/<module>/prompts.ts`, set `hasPrompts: true` in `MODULE_MANIFEST`)
 4. Add tests in `tests/<module>-scripts.test.js`
 5. Verify with `node scripts/qa-sequential.mjs <module>`
-6. Update all documentation (README, landing page)
+6. Refresh the generated module/app surfaces with `npm run gen:app-catalog`,
+   `npm run gen:manifest`, `npm run gen:intents`, and `npm run stats:sync`;
+   then run `npm run gen:app-catalog:check`, `npm run gen:manifest:check`,
+   `npm run gen:intents:check`, and `npm run stats:check`
+
+`docs/index.html` is a curated public positioning page, not a routine
+count-sync target for `scripts/count-stats.mjs`. Change it only when the
+landing-page message itself changes; ordinary tool/module count drift should be
+handled by the generated guards above.
 
 ## Code Style
 
@@ -264,7 +278,7 @@ refactor: extract shared pagination logic
 
 ## Review process
 
-Review is **routed by risk tier**, not spread evenly across the 272-tool surface
+Review is **routed by risk tier**, not spread evenly across the full tool surface
 — see **[RFC 0013 — Stratified review process](docs/rfc/0013-review-process.md)**.
 In short: the critical infra layer (`src/shared/` audit / HITL / OAuth / rate-limit
 / registry, the transport, the codegen contract) is **T0** and gets max-effort

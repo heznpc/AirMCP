@@ -156,7 +156,7 @@ jobs:
       - name: Verify root registry identity
         env:
           AIRMCP_RELEASE_SHA: ${{ github.sha }}
-        run: node scripts/verify-publish-identity.mjs --retry-seconds=60
+        run: node scripts/verify-publish-identity.mjs --retry-seconds=600
 
       - name: Publish add-ons with provenance
         if: steps.npm-auth.outputs.mode == 'trusted-publishing'

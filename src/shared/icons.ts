@@ -15,18 +15,34 @@ export const WEBSITE_URL = "https://github.com/heznpc/AirMCP";
  * Wording tracks the canonical public positioning ("governed MCP runtime for the Apple
  * ecosystem … not another agent"). Keep it SHORT, STATIC, and COUNT-FREE: it is injected
  * every session, has no CI drift guard, and must never interpolate tool-returned or user
- * content. Every claim is code-grounded — no model/agent-loop in the request path, audit +
- * rate-limit wrap every call, HITL gates sensitive/destructive actions.
+ * content.
+ *
+ * Every claim here must be code-grounded, and the scope of each claim must match the code
+ * it points at — this string is the most-read thing AirMCP says about itself, so an
+ * overclaim here is the most expensive kind:
+ *   - no model/agent-loop in the request path;
+ *   - audit + rate-limit wrap every call (`src/shared/audit.ts`, `src/shared/rate-limit.ts`);
+ *   - HITL gates sensitive/destructive actions (`src/shared/hitl-guard.ts`);
+ *   - the emergency stop is DESTRUCTIVE-SCOPED, not a global halt — the gate is
+ *     `if (destructive && isEmergencyStopActive())` in `src/shared/rate-limit.ts`. Do not
+ *     restate it as "halts everything".
+ *
+ * Ordering is also load-bearing: leading with tool discovery trains a fresh session to
+ * treat "call a tool" as the goal. The task the user wants done in an Apple app comes
+ * first; the front-door calls are the mechanism that serves it.
  */
 export const SERVER_INSTRUCTIONS =
   "AirMCP is a governed MCP runtime for the Apple ecosystem — a connector and control " +
   "layer, not another agent. You are the agent; AirMCP is the governed layer your tool " +
   "calls pass through, and it runs no model, planner, or agent loop of its own. Rate limits " +
   "and a tamper-evident HMAC-chained audit log wrap every call; sensitive or destructive " +
-  "actions also require per-call human approval, and an emergency stop can halt everything. " +
-  "You start behind a small front door — call discover_tools or start_tool_session to widen " +
-  "access as needed. Skills are deterministic YAML pipelines, not model reasoning; the " +
-  "optional intelligence tools only delegate to on-device models and never drive AirMCP.";
+  "actions also require per-call human approval, and an emergency stop blocks every " +
+  "destructive call until an operator clears it. Start from the task the user wants done in " +
+  "a supported Apple app, then widen access for that task — you start behind a small front " +
+  "door, and discover_tools or start_tool_session open it. A successful call is evidence a " +
+  "step ran, not proof the user's task is complete. Skills are deterministic YAML " +
+  "pipelines, not model reasoning; the optional intelligence tools only delegate to " +
+  "on-device models and never drive AirMCP.";
 
 // Stylized "A" with signal waves
 const SERVER_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">

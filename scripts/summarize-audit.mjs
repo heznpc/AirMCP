@@ -20,27 +20,46 @@
  *   break CI on transient npm registry flakiness.
  */
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 
 const LEVELS = ["info", "low", "moderate", "high", "critical"];
 const BLOCKING_LEVEL = "high";
+const NPM_AUDIT_ARGS = ["audit", "--json", "--audit-level=moderate", "--omit=dev"];
 
-function main() {
-  const res = spawnSync("npm", ["audit", "--json", "--audit-level=moderate", "--omit=dev"], {
+function readAuditOutput(inputPath) {
+  if (inputPath) {
+    try {
+      return readFileSync(inputPath, "utf8");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.log(`::warning::summarize-audit: could not read audit JSON fixture — ${message}`);
+      return null;
+    }
+  }
+
+  const res = spawnSync("npm", NPM_AUDIT_ARGS, {
     encoding: "utf8",
     maxBuffer: 16 * 1024 * 1024,
   });
 
   if (res.error) {
     console.log(`::warning::summarize-audit: npm audit failed to run — ${res.error.message}`);
-    return;
+    return null;
   }
+
+  return res.stdout || "{}";
+}
+
+function main() {
+  const auditOutput = readAuditOutput(process.argv[2]);
+  if (auditOutput === null) return;
 
   let parsed;
   try {
-    parsed = JSON.parse(res.stdout || "{}");
+    parsed = JSON.parse(auditOutput || "{}");
   } catch {
-    console.log("::warning::summarize-audit: could not parse `npm audit --json` output");
-    if (res.stdout) console.log(res.stdout.slice(0, 400));
+    console.log("::warning::summarize-audit: could not parse npm audit JSON output");
+    if (auditOutput) console.log(auditOutput.slice(0, 400));
     return;
   }
 

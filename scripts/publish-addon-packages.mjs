@@ -186,7 +186,13 @@ function expectedReleaseGitHead() {
 
 function verifyRegistryIdentity(local, expectedGitHead, { retryAfterPublish = false } = {}) {
   if (retryAfterPublish) {
-    waitForPublishedIdentity({ local, expectedGitHead, timeoutMs: 60_000 });
+    // 60s was too tight and turned a shipped v2.16.2 add-on into a red release
+    // thirteen times: `npm view` resolves the packument, and for a brand-new
+    // scoped package name that read path lagged the successful publish by more
+    // than five minutes. A mismatch still fails immediately — only missing or
+    // incomplete metadata waits — so widening this window costs time solely in
+    // the lagging case, never correctness.
+    waitForPublishedIdentity({ local, expectedGitHead, timeoutMs: 600_000 });
     return true;
   }
   const published = queryPublishedIdentity(local.name, local.version);

@@ -43,6 +43,24 @@ The moderate+ advisory is emitted by `scripts/summarize-audit.mjs`, which runs a
 - **Shared note guard** — Destructive operations blocked on shared notes by default
 - **HITL gating** — Configurable human-in-the-loop approval for destructive operations
 
+## Enforcement Scope and Honest Limits
+
+The features above are real, but each enforces at a specific boundary. A reader who assumes "governed" means "globally enforced" would over-trust the runtime, so this table is the authoritative scope statement and every row is grounded in the cited source. The fuller mechanism-by-mechanism accounting — including the parts that are advisory only — lives in `docs/experiments/defended-vs-undefended-ablation-design.md`.
+
+| Mechanism | Enforced scope | Honest limit |
+| --------- | -------------- | ------------ |
+| Emergency stop | Destructive-classified calls | **Not** a global halt. The gate is `if (destructive && isEmergencyStopActive())` in `src/shared/rate-limit.ts`; non-destructive reads continue while the stop file exists. |
+| Per-call HITL approval | Gated calls at the configured level, when an approval channel exists | Fails **closed** — with no elicitation or approval socket, gated calls are denied (`src/shared/hitl-guard.ts`). But an operator can set `hitl.level: off`, which removes the gate entirely. |
+| Tamper-evident audit chain | Every call | Tamper-**evident**, not tamper-proof. `governed` stays `true` under a host-derived key, so the honest one-line verdict is `assurance`, never bare `governed` (`src/shared/resources.ts`). |
+| Audit key strength | Chain HMAC | `assurance: operator-attested` means the key is not derivable from host facts — it does **not** by itself mean non-repudiation. The `keyfile` variant is readable by any same-user process; only `keySource: "env"` resists a same-user local attacker (`src/shared/identity-key.ts`). |
+| Privacy-sensitive READ classification | Build time only | `src/shared/privacy-sensitive-tools.ts` is imported by no runtime path — only by `tests/safety-annotations.test.js`. It keeps the per-tool `sensitiveHint` annotations from drifting, and that annotation is what gates at runtime. It is **not** wired into the OAuth scope gate. |
+| OAuth scope gate | HTTP requests carrying OAuth claims | Applies only when the OAuth policy is active **and** claims are present; `rejectInsufficientScopes` returns early otherwise (`src/server/http-transport.ts`). stdio, loopback, and legacy bearer sessions are not scope-gated. |
+
+Two consequences worth stating plainly:
+
+- **A successful tool call is evidence that a step ran, not proof that the user's task completed.** The audit chain records calls; it does not verify end state in the target app.
+- **Run identity belongs to the caller.** AirMCP governs individual calls and correlates them via the optional `X-AirMCP-Run-Id` header (UUID-validated in `src/server/http-transport.ts`). Absent that header there is no server-side run object grouping a multi-call task.
+
 ## Outbound Network Calls (JXA / AppleScript / Swift)
 
 AirMCP's inbound attack surface (HTTP transport, stdio JSON-RPC) is defended by the items above. For traffic going the *other* direction — AppleScript `do shell script` with `curl`, JXA using `ObjC.import('Foundation')` for URL requests, or a Swift bridge command hitting the network — the following boundary applies:

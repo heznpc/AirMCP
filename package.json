@@ -1,7 +1,7 @@
 {
   "name": "airmcp",
   "description": "Governed MCP runtime for the Apple ecosystem, available on macOS for Notes, Mail, Calendar, Reminders, Shortcuts, and more.",
-  "version": "2.16.0",
+  "version": "2.16.2",
   "keywords": [
     "mcp",
     "mcp-server",
@@ -164,10 +164,10 @@
     }
   },
   "dependencies": {
-    "@modelcontextprotocol/ext-apps": "1.7.4",
+    "@modelcontextprotocol/ext-apps": "1.7.5",
     "@modelcontextprotocol/sdk": "1.30.0",
     "express": "5.2.1",
-    "jose": "6.2.3",
+    "jose": "6.2.4",
     "yaml": "2.9.0",
     "zod": "~4.4.3"
   },

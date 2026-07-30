@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**AirMCP v2.16.0** — Governed MCP Runtime for the Apple Ecosystem (macOS release)
+**AirMCP v2.16.2** — Governed MCP Runtime for the Apple Ecosystem (macOS release)
 Last updated: 2026-07-10
 
 ## Overview

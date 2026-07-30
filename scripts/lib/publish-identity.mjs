@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { parseNpmPackList } from "./npm-json.mjs";
 
 function commandFailure(command, args, result) {
   const detail = String(result.stderr || result.stdout || "command failed").trim().slice(0, 2_000);
@@ -20,19 +21,9 @@ function run(command, args, options = {}) {
 }
 
 function parsePackJson(output, packageRoot) {
-  const start = output.indexOf("[");
-  const end = output.lastIndexOf("]");
-  const json = start >= 0 && end > start ? output.slice(start, end + 1) : output;
-  let parsed;
-  try {
-    parsed = JSON.parse(json);
-  } catch (error) {
-    throw new Error(
-      `npm pack did not return JSON for ${packageRoot}: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-  const entry = Array.isArray(parsed) ? parsed[0] : parsed;
-  if (!entry?.filename) throw new Error(`npm pack did not report a filename for ${packageRoot}`);
+  const [entry] = parseNpmPackList(output) ?? [];
+  if (!entry) throw new Error(`npm pack did not return JSON for ${packageRoot}`);
+  if (!entry.filename) throw new Error(`npm pack did not report a filename for ${packageRoot}`);
   return entry;
 }
 
@@ -70,10 +61,12 @@ function parsePublishedJson(output, label) {
   } catch (error) {
     throw new Error(`${label} metadata was not JSON: ${error instanceof Error ? error.message : String(error)}`);
   }
+  // npm 12 wraps `npm view --json` results in a single-element array.
+  const entry = Array.isArray(parsed) ? parsed[0] : parsed;
   return {
-    version: parsed?.version,
-    integrity: parsed?.["dist.integrity"] ?? parsed?.dist?.integrity,
-    gitHead: parsed?.gitHead,
+    version: entry?.version,
+    integrity: entry?.["dist.integrity"] ?? entry?.dist?.integrity,
+    gitHead: entry?.gitHead,
   };
 }
 

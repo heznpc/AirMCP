@@ -61,29 +61,38 @@ PASS: ?  |  SKIP: ?  |  FAIL: ?  |  WARN: ?
 
 <!-- Check modules you changed — reviewers will focus on these. -->
 
-- [ ] Notes
-- [ ] Reminders
-- [ ] Calendar
-- [ ] Contacts
-- [ ] Mail
-- [ ] Music
-- [ ] Finder
-- [ ] Safari
-- [ ] System
-- [ ] Photos
-- [ ] Messages
-- [ ] Shortcuts
-- [ ] TV
-- [ ] Screen
-- [ ] Maps
-- [ ] Podcasts
-- [ ] Weather
-- [ ] Location
-- [ ] Bluetooth
-- [ ] Intelligence
-- [ ] Pages / Numbers / Keynote
-- [ ] Semantic
-- [ ] UI Automation
+- [ ] `notes`
+- [ ] `reminders`
+- [ ] `calendar`
+- [ ] `contacts`
+- [ ] `mail`
+- [ ] `music`
+- [ ] `finder`
+- [ ] `safari`
+- [ ] `system`
+- [ ] `photos`
+- [ ] `shortcuts`
+- [ ] `messages`
+- [ ] `intelligence`
+- [ ] `tv`
+- [ ] `ui`
+- [ ] `screen`
+- [ ] `maps`
+- [ ] `podcasts`
+- [ ] `weather`
+- [ ] `pages`
+- [ ] `numbers`
+- [ ] `keynote`
+- [ ] `location`
+- [ ] `bluetooth`
+- [ ] `google`
+- [ ] `speech`
+- [ ] `health`
+- [ ] `memory`
+- [ ] `audit`
+- [ ] `spatial_prep`
+- [ ] `webhooks`
+- [ ] `powerautomate`
 - [ ] Shared / Infrastructure
 
 ### Manual Testing

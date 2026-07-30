@@ -23,8 +23,18 @@
  *                 clipboard / photo / health / message reader added
  *                 unmarked fails CI — the smart_clipboard miss).
  *
+ * ENFORCEMENT SCOPE — read this before citing the file as a defense.
+ * Nothing under `src/` imports this module; its only consumer is
+ * tests/safety-annotations.test.js. It is therefore a BUILD-TIME drift guard,
+ * not a runtime gate. What actually gates a call at runtime is the per-tool
+ * `sensitiveHint: true` annotation that src/shared/hitl-guard.ts consumes —
+ * this file exists to make it impossible to land a privacy readout WITHOUT
+ * that annotation. Treat it as the reason the annotations stay correct, never
+ * as an independent enforcement layer.
+ *
  * This set is intended to also back the OAuth scope gate once the
- * sensitive→scope propagation (review finding #6) is ratified.
+ * sensitive→scope propagation (review finding #6) is ratified; that
+ * propagation is NOT wired up today.
  */
 export const PRIVACY_READOUT_TOOLS: ReadonlySet<string> = new Set([
   // clipboard

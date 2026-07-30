@@ -60,6 +60,27 @@ describe("immutable npm publish identity", () => {
     expect(clock).toBe(30);
   });
 
+  // Regression: the v2.16.2 release shipped every package, but a bare "was not
+  // visible" timeout read as a failed publish and drove thirteen re-runs of an
+  // already-published release. The propagation timeout must name itself as a
+  // read-path timeout and state that re-running skips published packages.
+  test("propagation timeout reports a shipped publish, not a failed one", () => {
+    let clock = 0;
+    expect(() =>
+      waitForPublishedIdentity({
+        local,
+        expectedGitHead,
+        timeoutMs: 100,
+        retryDelayMs: 50,
+        now: () => clock,
+        sleep: (milliseconds) => {
+          clock += milliseconds;
+        },
+        query: () => null, // registry read path still 404s after a successful publish
+      }),
+    ).toThrow(/publish succeeded.*propagation.*Re-run.*skipped/s);
+  });
+
   test("post-publish retry never waits through a complete identity mismatch", () => {
     let sleeps = 0;
     expect(() =>

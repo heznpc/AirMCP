@@ -159,8 +159,18 @@ export function waitForPublishedIdentity({
   }
 
   if (lastPublished) assertPublishedIdentity({ local, published: lastPublished, expectedGitHead, label });
-  if (lastQueryError) throw new Error(`${label} registry metadata remained unavailable after bounded retry`);
-  throw new Error(`${label} was not visible after bounded registry retry`);
+
+  // Reaching here means the publish itself SUCCEEDED and only the registry read
+  // path failed to confirm it in time. Say so explicitly: the previous wording
+  // ("was not visible") read as a failed publish and sent an operator through
+  // thirteen re-runs of an already-shipped release. Re-running is still the
+  // correct recovery — publish is idempotent and skips packages whose registry
+  // SRI and gitHead already match — but only once propagation catches up.
+  const resume =
+    "the publish succeeded; this is a registry read-path (propagation) timeout, not a failed publish. " +
+    "Re-run once the version resolves via `npm view` — already-published packages are skipped.";
+  if (lastQueryError) throw new Error(`${label} registry metadata remained unavailable after bounded retry — ${resume}`);
+  throw new Error(`${label} was not visible after bounded registry retry — ${resume}`);
 }
 
 export function verifyPublishedIdentity({

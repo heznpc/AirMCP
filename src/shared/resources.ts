@@ -356,11 +356,15 @@ export interface TrustAttestation {
     auditDisabled: boolean;
     /** First integrity break when `verified` is false; null when the chain verifies. */
     firstBreak: { file: string; lineIndex: number; reason: string } | null;
-    /** `operator-key` (external secret) vs `host-fallback` (tamper-evident only). */
+    /** `operator-key` (an `env` secret or the init-generated key file — either
+     *  way, not derivable from host facts) vs `host-fallback` (tamper-evident
+     *  only). This grade deliberately does NOT separate `env` from `keyfile`;
+     *  read `keySource` when the threat model includes a same-user process. */
     keyGrade: "operator-key" | "host-fallback";
-    /** Which variant backs the grade: `env` (strongest, secret outside the
-     *  store), `keyfile` (init-generated, same-user readable), or
-     *  `host-derived` (the fallback). */
+    /** Which variant backs the grade: `env` (the secret lives outside the store
+     *  — the only variant that resists a same-user local reader), `keyfile`
+     *  (init-generated, 0600, but readable by any same-user process), or
+     *  `host-derived` (the fallback, re-derivable by any local shell). */
     keySource: "env" | "keyfile" | "host-derived";
   };
   /** Human-in-the-loop approval posture. */
@@ -399,7 +403,12 @@ export interface TrustAttestation {
 
 /**
  * The honest, key-grade-aware assurance tier for an attestation.
- * - `operator-attested` — chain verifies, not halted, external operator key: strongest, non-repudiable.
+ * - `operator-attested` — chain verifies, not halted, and the chain is keyed by an operator key
+ *                          (`env` secret or the init-generated key file) rather than host facts, so
+ *                          it is not forgeable by someone who merely knows the hostname/platform.
+ *                          This tier is about NON-DERIVABILITY, not non-repudiation: the `keyfile`
+ *                          variant is readable by any same-user process, so only `keySource: "env"`
+ *                          resists a same-user local attacker. See `src/shared/identity-key.ts`.
  * - `tamper-evident`    — chain verifies, not halted, host-fallback key: still trustworthy as a record,
  *                          but an attacker with shell access can re-derive the key. NOT non-repudiation.
  * - `audit-halted`      — chain verifies but logging is currently halted (disk/permission/flush failure).

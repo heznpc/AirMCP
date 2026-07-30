@@ -21,13 +21,13 @@ body:
         - calendar
         - contacts
         - mail
-        - messages
         - music
         - finder
         - safari
         - system
         - photos
         - shortcuts
+        - messages
         - intelligence
         - tv
         - ui
@@ -41,6 +41,13 @@ body:
         - location
         - bluetooth
         - google
+        - speech
+        - health
+        - memory
+        - audit
+        - spatial_prep
+        - webhooks
+        - powerautomate
         - other / multiple
     validations:
       required: true

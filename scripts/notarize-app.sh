@@ -201,6 +201,31 @@ SUBMISSION_ID="$(printf '%s' "$SUBMIT_OUTPUT" | node -e '
 # team, certificate subject, or raw messages into the public Actions log.
 if [ "$SUBMIT_EXIT" -ne 0 ] || [ "$NOTARY_STATUS" != "Accepted" ]; then
   echo "notarize-app: notarization failed; raw account, certificate, and submission metadata is suppressed" >&2
+
+  # Two failures land here and they need completely different fixes:
+  #
+  #   a) Apple accepted the submission and rejected the binary. There is a
+  #      submission ID, and the sanitized issue log below says what to change.
+  #   b) notarytool never created a submission — credentials were refused, the
+  #      Apple ID does not belong to the team, or the Program License Agreement
+  #      is unaccepted. No submission ID exists, so the log path cannot run.
+  #
+  # Case (b) previously printed the suppression notice and nothing else, leaving
+  # an operator with a red release and no way to tell a bad app-specific password
+  # from a rejected binary. Classify it without echoing notarytool's raw output,
+  # which carries the account and team.
+  if ! [[ "$SUBMISSION_ID" =~ ^[0-9A-Fa-f-]{36}$ ]]; then
+    echo "notarize-app: Apple never accepted the submission, so this is a credential or account" >&2
+    echo "notarize-app: problem rather than a rejected build. Check, in this order:" >&2
+    echo "notarize-app:   1. APPLE_ID_PASSWORD must be an APP-SPECIFIC password from" >&2
+    echo "notarize-app:      appleid.apple.com (format xxxx-xxxx-xxxx-xxxx), not the Apple ID login password" >&2
+    echo "notarize-app:   2. APPLE_ID must be the Apple ID that belongs to the team in APPLE_TEAM_ID" >&2
+    echo "notarize-app:   3. the Apple Developer Program License Agreement must be accepted at" >&2
+    echo "notarize-app:      developer.apple.com — notarytool refuses before submitting while it is pending" >&2
+    echo "notarize-app: verify locally with: xcrun notarytool history --apple-id <id> --team-id <team> --password <app-specific>" >&2
+    exit 2
+  fi
+
   if [[ "$SUBMISSION_ID" =~ ^[0-9A-Fa-f-]{36}$ ]]; then
     set +e
     NOTARY_LOG="$(

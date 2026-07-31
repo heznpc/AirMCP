@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.16.3] - 2026-07-31
+
 ### Fixed
 
 - **Release pipeline reported failure on a shipped publish** — the add-on publish gate waited 60s for the npm registry read path to confirm an already-successful immutable publish. `npm view` resolves the packument, and for a brand-new scoped package name that lagged by over five minutes, so v2.16.2 published every package and still went red thirteen times. Because the add-on step aborts on that failure, everything downstream was skipped: `@heznpc/airmcp-powerautomate` went unpublished, and the tag, GitHub Release, signed app dispatch, and release verification never ran. The window is now 600s, `--retry-seconds` accepts up to 900, and the timeout message states that the publish succeeded and that re-running resumes by skipping packages whose registry SRI and gitHead already match. An identity mismatch still fails immediately.

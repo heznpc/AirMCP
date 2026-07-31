@@ -18,36 +18,13 @@ import {
   deleteReminderListScript,
 } from "./scripts.js";
 
-interface ReminderListItem {
-  id: string;
-  name: string;
-  reminderCount: number;
-}
-
-interface ReminderItem {
-  id: string;
-  name: string;
-  completed: boolean;
-  dueDate: string | null;
-  priority: number;
-  flagged: boolean;
-  list: string;
-}
-
-interface ReminderDetail extends ReminderItem {
-  body: string;
-  completionDate: string | null;
-  creationDate: string;
-  modificationDate: string;
-}
+// Return shapes live next to the scripts that emit them and are pinned by the
+// `*_EXAMPLE` fixtures in `tests/script-shape-contract.test.js`, so this file
+// consumes them rather than keeping a second, driftable copy.
+import type { RemindersListInfo, RemindersListOutput, RemindersReadOutput, RemindersSearchOutput } from "./scripts.js";
 
 interface CompleteResult extends MutationResult {
   completed: boolean;
-}
-
-interface SearchRemindersResult {
-  returned: number;
-  reminders: ReminderItem[];
 }
 
 interface RecurringReminderResult {
@@ -81,7 +58,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
     },
     async () => {
       try {
-        const result = await runAutomation<ReminderListItem[]>({
+        const result = await runAutomation<RemindersListInfo[]>({
           swift: { command: "list-reminder-lists" },
           jxa: () => listReminderListsScript(),
         });
@@ -142,12 +119,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
     },
     async ({ list, completed, limit, offset }) => {
       try {
-        const result = await runAutomation<{
-          total: number;
-          offset: number;
-          returned: number;
-          reminders: ReminderItem[];
-        }>({
+        const result = await runAutomation<RemindersListOutput>({
           swift: {
             command: "list-reminders",
             input: { list, completed, limit, offset },
@@ -191,7 +163,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
     },
     async ({ id }) => {
       try {
-        const result = await runAutomation<ReminderDetail>({
+        const result = await runAutomation<RemindersReadOutput>({
           swift: { command: "read-reminder", input: { id } },
           jxa: () => readReminderScript(id),
         });
@@ -385,7 +357,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
     },
     async ({ query, limit }) => {
       try {
-        const result = await runAutomation<SearchRemindersResult>({
+        const result = await runAutomation<RemindersSearchOutput>({
           swift: {
             command: "search-reminders",
             input: { query, limit },

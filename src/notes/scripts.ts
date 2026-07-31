@@ -21,6 +21,137 @@ const JXA_BUILD_NOTE = `
   }
 `;
 
+// The interfaces below pin the shape of each script's final
+// `JSON.stringify(...)`, and the `*_EXAMPLE` constants carry a concrete instance
+// of it. `tests/script-shape-contract.test.js` parses every example through the
+// matching tool's real `outputSchema`, so changing what a script emits without
+// updating the example (and the outputSchema) fails a test rather than passing
+// the tautological mock-in-mock-out runtime check. Examples and scripts must be
+// kept in lockstep by hand.
+//
+// `NoteListItem` is what `buildNote` above returns, so the three list-shaped
+// tools share it and each one adds only the fields its own loop appends.
+
+// ── Return shapes ───────────────────────────────────────────────────────
+export interface NotesListItem {
+  id: string;
+  name: string;
+  folder: string;
+  creationDate: string;
+  modificationDate: string;
+  shared: boolean;
+}
+
+export interface NotesListNotesOutput {
+  total: number;
+  offset: number;
+  returned: number;
+  notes: NotesListItem[];
+}
+
+/** `search_notes` appends a plaintext preview to each row. */
+export interface NotesSearchItem extends NotesListItem {
+  preview: string;
+}
+
+export interface NotesSearchNotesOutput {
+  total: number;
+  /** Lower bound: the loop exits once the page is full. */
+  totalMatched: number;
+  offset: number;
+  returned: number;
+  notes: NotesSearchItem[];
+}
+
+export interface NotesReadNoteOutput {
+  id: string;
+  name: string;
+  body: string;
+  plaintext: string;
+  creationDate: string;
+  modificationDate: string;
+  folder: string;
+  shared: boolean;
+  passwordProtected: boolean;
+}
+
+export interface NotesFolderItem {
+  id: string;
+  name: string;
+  account: string;
+  noteCount: number;
+  shared: boolean;
+}
+
+/** `list_folders` wraps the script's bare array as `{ folders }`. */
+export interface NotesListFoldersOutput {
+  folders: NotesFolderItem[];
+}
+
+/** `scan_notes` appends a preview plus its character count. */
+export interface NotesScanItem extends NotesListItem {
+  preview: string;
+  charCount: number;
+}
+
+export interface NotesScanNotesOutput {
+  total: number;
+  offset: number;
+  returned: number;
+  notes: NotesScanItem[];
+}
+
+// ── Example fixtures (hand-maintained; see tests/script-shape-contract) ──
+const NOTE_ROW: NotesListItem = {
+  id: "x-coredata://NOTE-1",
+  name: "Groceries",
+  folder: "Notes",
+  creationDate: "2026-03-01T08:00:00.000Z",
+  modificationDate: "2026-03-15T09:00:00.000Z",
+  shared: false,
+};
+
+export const LIST_NOTES_EXAMPLE: NotesListNotesOutput = {
+  total: 3,
+  offset: 0,
+  returned: 2,
+  notes: [NOTE_ROW, { ...NOTE_ROW, id: "x-coredata://NOTE-2", name: "Shared plan", shared: true }],
+};
+
+export const SEARCH_NOTES_EXAMPLE: NotesSearchNotesOutput = {
+  total: 12,
+  totalMatched: 2,
+  offset: 0,
+  returned: 1,
+  notes: [{ ...NOTE_ROW, preview: "milk, eggs, bread" }],
+};
+
+export const READ_NOTE_EXAMPLE: NotesReadNoteOutput = {
+  id: "x-coredata://NOTE-1",
+  name: "Groceries",
+  body: "<div>milk, eggs, bread</div>",
+  plaintext: "milk, eggs, bread",
+  creationDate: "2026-03-01T08:00:00.000Z",
+  modificationDate: "2026-03-15T09:00:00.000Z",
+  folder: "Notes",
+  shared: false,
+  passwordProtected: false,
+};
+
+export const LIST_FOLDERS_EXAMPLE: NotesListFoldersOutput = {
+  folders: [
+    { id: "FOLDER-1", name: "Notes", account: "iCloud", noteCount: 12, shared: false },
+    { id: "FOLDER-2", name: "Team", account: "iCloud", noteCount: 0, shared: true },
+  ],
+};
+
+export const SCAN_NOTES_EXAMPLE: NotesScanNotesOutput = {
+  total: 3,
+  offset: 0,
+  returned: 1,
+  notes: [{ ...NOTE_ROW, preview: "milk, eggs, bread", charCount: 17 }],
+};
+
 export function listNotesScript(limit: number, offset: number, folder?: string): string {
   if (folder) {
     return `

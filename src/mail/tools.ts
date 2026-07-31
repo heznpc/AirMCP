@@ -7,6 +7,16 @@ import { ok, okUntrustedStructured, okUntrustedLinkedStructured, errPermission, 
 // at module load time. The poller itself only starts when startPollers() is
 // invoked by the cross/event observer tool.
 import "./poller.js";
+// Return shapes live next to the scripts that emit them and are pinned by the
+// `*_EXAMPLE` fixtures in `tests/script-shape-contract.test.js`.
+import type {
+  MailMailboxSummary,
+  MailListMessagesOutput,
+  MailReadMessageOutput,
+  MailSearchMessagesOutput,
+  MailUnreadCountOutput,
+  MailAccountSummary,
+} from "./scripts.js";
 import {
   listMailboxesScript,
   listMessagesScript,
@@ -43,7 +53,11 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
     },
     async () => {
       try {
-        return okUntrustedStructured(await runJxa(listMailboxesScript()));
+        // The script emits a bare array; the declared outputSchema is
+        // `{ mailboxes }`, so it has to be wrapped here the same way
+        // list_accounts / notes list_folders already do.
+        const mailboxes = await runJxa<MailMailboxSummary[]>(listMailboxesScript());
+        return okUntrustedStructured({ mailboxes });
       } catch (e) {
         return errJxaFor("list mailboxes", e);
       }
@@ -88,7 +102,7 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
       try {
         return okUntrustedLinkedStructured(
           "list_mail",
-          await runJxa(listMessagesScript(mailbox, limit, offset, account)),
+          await runJxa<MailListMessagesOutput>(listMessagesScript(mailbox, limit, offset, account)),
         );
       } catch (e) {
         return errJxaFor("list messages", e);
@@ -137,7 +151,10 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
     },
     async ({ id, maxLength }) => {
       try {
-        return okUntrustedLinkedStructured("read_mail", await runJxa(readMessageScript(id, maxLength)));
+        return okUntrustedLinkedStructured(
+          "read_mail",
+          await runJxa<MailReadMessageOutput>(readMessageScript(id, maxLength)),
+        );
       } catch (e) {
         return errJxaFor("read message", e);
       }
@@ -176,7 +193,10 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
     },
     async ({ query, mailbox, limit }) => {
       try {
-        return okUntrustedLinkedStructured("search_mail", await runJxa(searchMessagesScript(query, mailbox, limit)));
+        return okUntrustedLinkedStructured(
+          "search_mail",
+          await runJxa<MailSearchMessagesOutput>(searchMessagesScript(query, mailbox, limit)),
+        );
       } catch (e) {
         return errJxaFor("search messages", e);
       }
@@ -255,7 +275,7 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
     },
     async () => {
       try {
-        return okUntrustedStructured(await runJxa(getUnreadCountScript()));
+        return okUntrustedStructured(await runJxa<MailUnreadCountOutput>(getUnreadCountScript()));
       } catch (e) {
         return errJxaFor("get unread count", e);
       }
@@ -306,10 +326,7 @@ export function registerMailTools(server: McpServer, config: AirMcpConfig): void
     },
     async () => {
       try {
-        const accounts =
-          await runJxa<Array<{ name: string; fullName: string | null; emailAddresses: string[] }>>(
-            listAccountsScript(),
-          );
+        const accounts = await runJxa<MailAccountSummary[]>(listAccountsScript());
         return okUntrustedStructured({ accounts });
       } catch (e) {
         return errJxaFor("list accounts", e);

@@ -14,6 +14,14 @@ import {
   trashFileScript,
   createFolderScript,
 } from "./scripts.js";
+// Return shapes live next to the scripts that emit them and are pinned by the
+// `*_EXAMPLE` fixtures in `tests/script-shape-contract.test.js`.
+import type {
+  FinderSearchFilesOutput,
+  FinderFileInfoOutput,
+  FinderRecentFilesOutput,
+  FinderListDirectoryOutput,
+} from "./scripts.js";
 
 export function registerFinderTools(server: McpServer, _config: AirMcpConfig): void {
   server.registerTool(
@@ -45,7 +53,10 @@ export function registerFinderTools(server: McpServer, _config: AirMcpConfig): v
     },
     async ({ query, folder, limit }) => {
       try {
-        return okLinkedStructured("search_files", await runJxa(searchFilesScript(folder, query, limit)));
+        return okLinkedStructured(
+          "search_files",
+          await runJxa<FinderSearchFilesOutput>(searchFilesScript(folder, query, limit)),
+        );
       } catch (e) {
         return errJxaFor("search files", e);
       }
@@ -73,7 +84,7 @@ export function registerFinderTools(server: McpServer, _config: AirMcpConfig): v
     },
     async ({ path }) => {
       try {
-        return okUntrustedStructured(await runJxa(getFileInfoScript(path)));
+        return okUntrustedStructured(await runJxa<FinderFileInfoOutput>(getFileInfoScript(path)));
       } catch (e) {
         return errJxaFor("get file info", e);
       }
@@ -129,7 +140,7 @@ export function registerFinderTools(server: McpServer, _config: AirMcpConfig): v
     },
     async ({ folder, days, limit }) => {
       try {
-        return okStructured(await runJxa(recentFilesScript(folder, days, limit)));
+        return okStructured(await runJxa<FinderRecentFilesOutput>(recentFilesScript(folder, days, limit)));
       } catch (e) {
         return errJxaFor("find recent files", e);
       }
@@ -161,7 +172,7 @@ export function registerFinderTools(server: McpServer, _config: AirMcpConfig): v
     },
     async ({ path, limit }) => {
       try {
-        return okUntrustedStructured(await runJxa(listDirectoryScript(path, limit)));
+        return okUntrustedStructured(await runJxa<FinderListDirectoryOutput>(listDirectoryScript(path, limit)));
       } catch (e) {
         return errJxaFor("list directory", e);
       }

@@ -2,6 +2,189 @@
 
 import { esc } from "../shared/esc.js";
 
+// The interfaces below pin the shape of each script's final
+// `JSON.stringify(...)`, and the `*_EXAMPLE` constants carry a concrete
+// instance of it. `tests/script-shape-contract.test.js` parses every example
+// through the matching tool's real `outputSchema`, so changing what a script
+// emits without updating the example (and the outputSchema) fails a test rather
+// than passing the tautological mock-in-mock-out runtime check. Examples and
+// scripts must be kept in lockstep by hand.
+
+// ── Return shapes ───────────────────────────────────────────────────────
+export interface MailMailboxSummary {
+  name: string;
+  account: string;
+  unreadCount: number;
+}
+
+/** `list_mailboxes` wraps the script's bare array as `{ mailboxes }`. */
+export interface MailListMailboxesOutput {
+  mailboxes: MailMailboxSummary[];
+}
+
+export interface MailMessageListItem {
+  id: string;
+  subject: string;
+  sender: string;
+  /** Null when the message carries no parseable received date. */
+  dateReceived: string | null;
+  read: boolean;
+  flagged: boolean;
+}
+
+export interface MailListMessagesOutput {
+  total: number;
+  offset: number;
+  returned: number;
+  messages: MailMessageListItem[];
+}
+
+export interface MailRecipient {
+  name: string | null;
+  address: string | null;
+}
+
+export interface MailReadMessageOutput {
+  id: string;
+  subject: string;
+  sender: string;
+  to: MailRecipient[];
+  cc: MailRecipient[];
+  dateReceived: string;
+  dateSent: string | null;
+  read: boolean;
+  flagged: boolean;
+  content: string;
+  mailbox: string;
+  account: string;
+}
+
+/** `search_messages` returns a narrower row than `list_messages`: no `flagged`. */
+export interface MailSearchMessageItem {
+  id: string;
+  subject: string;
+  sender: string;
+  dateReceived: string | null;
+  read: boolean;
+}
+
+export interface MailSearchMessagesOutput {
+  returned: number;
+  messages: MailSearchMessageItem[];
+}
+
+export interface MailUnreadMailbox {
+  account: string;
+  mailbox: string;
+  unread: number;
+}
+
+export interface MailUnreadCountOutput {
+  totalUnread: number;
+  mailboxes: MailUnreadMailbox[];
+}
+
+export interface MailAccountSummary {
+  name: string;
+  fullName: string | null;
+  emailAddresses: string[];
+}
+
+/** `list_accounts` wraps the script's bare array as `{ accounts }`. */
+export interface MailListAccountsOutput {
+  accounts: MailAccountSummary[];
+}
+
+// ── Example fixtures (hand-maintained; see tests/script-shape-contract) ──
+export const LIST_MAILBOXES_EXAMPLE: MailListMailboxesOutput = {
+  mailboxes: [
+    { name: "INBOX", account: "Work", unreadCount: 4 },
+    { name: "Archive", account: "Work", unreadCount: 0 },
+  ],
+};
+
+export const LIST_MESSAGES_EXAMPLE: MailListMessagesOutput = {
+  total: 3,
+  offset: 0,
+  returned: 2,
+  messages: [
+    {
+      id: "1001",
+      subject: "Quarterly review",
+      sender: "alice@example.com",
+      dateReceived: "2026-03-15T09:00:00.000Z",
+      read: true,
+      flagged: false,
+    },
+    {
+      // `subject` and `sender` fall back to '' and the date to null.
+      id: "1002",
+      subject: "",
+      sender: "",
+      dateReceived: null,
+      read: false,
+      flagged: true,
+    },
+  ],
+};
+
+export const READ_MESSAGE_EXAMPLE: MailReadMessageOutput = {
+  id: "1001",
+  subject: "Quarterly review",
+  sender: "alice@example.com",
+  to: [{ name: "Bob", address: "bob@example.com" }],
+  cc: [{ name: null, address: null }],
+  dateReceived: "2026-03-15T09:00:00.000Z",
+  dateSent: "2026-03-15T08:59:00.000Z",
+  read: true,
+  flagged: false,
+  content: "Agenda attached.",
+  mailbox: "INBOX",
+  account: "Work",
+};
+
+/** Same tool, unsent-draft case: `dateSent` is null and recipients are empty. */
+export const READ_MESSAGE_EXAMPLE_NO_SENT_DATE: MailReadMessageOutput = {
+  id: "1003",
+  subject: "",
+  sender: "",
+  to: [],
+  cc: [],
+  dateReceived: "2026-03-16T10:00:00.000Z",
+  dateSent: null,
+  read: false,
+  flagged: false,
+  content: "",
+  mailbox: "Drafts",
+  account: "Work",
+};
+
+export const SEARCH_MESSAGES_EXAMPLE: MailSearchMessagesOutput = {
+  returned: 1,
+  messages: [
+    {
+      id: "1001",
+      subject: "Quarterly review",
+      sender: "alice@example.com",
+      dateReceived: "2026-03-15T09:00:00.000Z",
+      read: true,
+    },
+  ],
+};
+
+export const GET_UNREAD_COUNT_EXAMPLE: MailUnreadCountOutput = {
+  totalUnread: 4,
+  mailboxes: [{ account: "Work", mailbox: "INBOX", unread: 4 }],
+};
+
+export const LIST_ACCOUNTS_EXAMPLE: MailListAccountsOutput = {
+  accounts: [
+    { name: "Work", fullName: "Example User", emailAddresses: ["user@example.com"] },
+    // `fullName` comes straight from Mail and can be null.
+    { name: "Legacy", fullName: null, emailAddresses: [] },
+  ],
+};
+
 export function listMailboxesScript(): string {
   return `
     const Mail = Application('Mail');
@@ -118,7 +301,7 @@ export function searchMessagesScript(query: string, mailbox: string, limit: numb
             subject: subj,
             sender: sender,
             dateReceived: dates[i] ? dates[i].toISOString() : null,
-            read: reads[i]
+            read: reads[i] ?? false
           });
         }
       }

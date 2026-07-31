@@ -9,13 +9,38 @@ const aggregateCount = /\b\d+\s+(?:tools?|modules?)\b/i;
 const visibleText = (html) => html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ");
 
 describe("public positioning surfaces", () => {
-  test("README discovery copy leads with the governed Apple ecosystem runtime, not catalog size", () => {
+  // The README's first screen is a conversion surface, not a spec sheet. It
+  // used to open on what AirMCP *is* (a governed runtime that mediates through
+  // profiles, progressive exposure, HMAC-chained audit logs, OAuth scopes) and
+  // reached the end of the fold without a single user-visible result. Traffic
+  // arrived and did not convert. So this guards the opposite failure from the
+  // rest of this file: the intro must lead with what a reader can *do*, and the
+  // governance story must stay present but stay below it.
+  test("README discovery copy leads with what the reader can do, not with what AirMCP is", () => {
     const intro = read("README.md").split("## What You Get")[0];
+    const [lead, governance] = intro.split("### It does not act behind your back");
 
-    expect(intro).toMatch(/Governed MCP runtime for the Apple ecosystem/);
-    expect(intro).toMatch(/macOS runtime is available today/i);
-    expect(intro).toMatch(/iOS runtime is in preview/i);
-    expect(intro).toMatch(/Notes.*Mail.*Calendar.*Reminders.*Shortcuts/s);
+    // A capability claim, in the reader's terms, before anything else.
+    expect(lead).toMatch(/can use the Mac apps you already use/i);
+    expect(lead).toMatch(/plain language/i);
+    // At least three literal prompts, so "ask for something" is shown not asserted.
+    expect((lead.match(/^"[^"]+\.?"$/gm) ?? []).length).toBeGreaterThanOrEqual(3);
+    // And a way to act on it without scrolling.
+    expect(lead).toMatch(/npx airmcp init/);
+
+    // Platform reality still has to be stated up front.
+    expect(lead).toMatch(/macOS runtime is available today/i);
+    expect(lead).toMatch(/iOS runtime is in preview/i);
+    expect(lead).toMatch(/Notes.*Mail.*Calendar.*Reminders.*Shortcuts/s);
+
+    // Governance is the reason to trust it, not the reason to click. It must
+    // exist, and it must come after the capability lead.
+    expect(governance).toMatch(/connector and control layer, not another agent/);
+    expect(governance).toMatch(/approval/i);
+    expect(governance).toMatch(/audit chain/i);
+    // The attribute pitch must not climb back above the capability lead.
+    expect(lead).not.toMatch(/progressive exposure|HMAC|OAuth scopes/i);
+
     expect(intro).not.toMatch(aggregateCount);
   });
 

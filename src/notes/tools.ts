@@ -32,42 +32,18 @@ import {
   bulkMoveNotesScript,
 } from "./scripts.js";
 
-interface NoteListItem extends Shareable {
-  id: string;
-  name: string;
-  folder: string;
-  creationDate: string;
-  modificationDate: string;
-}
-
-interface SearchResult extends NoteListItem {
-  preview: string;
-}
-
-interface NoteDetail extends NoteListItem {
-  body: string;
-  plaintext: string;
-  passwordProtected: boolean;
-}
-
-interface FolderItem extends Shareable {
-  id: string;
-  name: string;
-  account: string;
-  noteCount: number;
-}
-
-interface ScanNote extends NoteListItem {
-  preview: string;
-  charCount: number;
-}
-
-interface ScanResult {
-  total: number;
-  offset: number;
-  returned: number;
-  notes: ScanNote[];
-}
+// Return shapes live next to the scripts that emit them and are pinned by the
+// `*_EXAMPLE` fixtures in `tests/script-shape-contract.test.js`, so this file
+// consumes them rather than keeping a second, driftable copy. They all carry
+// `shared: boolean`, so they remain structurally assignable to `Shareable` for
+// `filterSharedAccess`.
+import type {
+  NotesListNotesOutput,
+  NotesSearchNotesOutput,
+  NotesReadNoteOutput,
+  NotesFolderItem,
+  NotesScanNotesOutput,
+} from "./scripts.js";
 
 interface CompareResult extends Shareable {
   id: string;
@@ -139,9 +115,7 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
     },
     async ({ folder, limit, offset }) => {
       try {
-        const result = await runJxa<{ total: number; offset: number; returned: number; notes: NoteListItem[] }>(
-          listNotesScript(limit, offset, folder),
-        );
+        const result = await runJxa<NotesListNotesOutput>(listNotesScript(limit, offset, folder));
         result.notes = filterSharedAccess(result.notes, config, "notes");
         result.returned = result.notes.length;
         return okUntrustedLinkedStructured("list_notes", result);
@@ -193,9 +167,7 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
     },
     async ({ query, limit, offset }) => {
       try {
-        const result = await runJxa<{ total: number; returned: number; offset: number; notes: SearchResult[] }>(
-          searchNotesScript(query, limit, offset),
-        );
+        const result = await runJxa<NotesSearchNotesOutput>(searchNotesScript(query, limit, offset));
         result.notes = filterSharedAccess(result.notes, config, "notes");
         result.returned = result.notes.length;
         return okUntrustedStructured(result);
@@ -233,7 +205,7 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
     },
     async ({ id }) => {
       try {
-        const result = await runJxa<NoteDetail>(readNoteScript(id));
+        const result = await runJxa<NotesReadNoteOutput>(readNoteScript(id));
         const blocked = await guardSharedAccess(result.shared, config, "notes", "read_note", { id });
         if (blocked) return errPermission(blocked);
         return okUntrustedStructured(result);
@@ -354,7 +326,7 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
     },
     async () => {
       try {
-        const result = await runJxa<FolderItem[]>(listFoldersScript());
+        const result = await runJxa<NotesFolderItem[]>(listFoldersScript());
         return okUntrustedStructured({ folders: filterSharedAccess(result, config, "notes") });
       } catch (e) {
         return errJxaFor("list folders", e);
@@ -479,7 +451,7 @@ export function registerNoteTools(server: McpServer, config: AirMcpConfig): void
     },
     async ({ folder, limit, offset, previewLength }) => {
       try {
-        const result = await runJxa<ScanResult>(scanNotesScript(limit, previewLength, offset, folder));
+        const result = await runJxa<NotesScanNotesOutput>(scanNotesScript(limit, previewLength, offset, folder));
         result.notes = filterSharedAccess(result.notes, config, "notes");
         result.returned = result.notes.length;
         return okUntrustedLinkedStructured("scan_notes", result);

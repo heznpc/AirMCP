@@ -143,7 +143,11 @@ const TOOL_FIXTURES = {
   // mail
   list_mailboxes: {
     args: {},
-    mock: { mailboxes: [] },
+    // The script emits a BARE array (the tool wraps it as `{ mailboxes }`).
+    // This mock used to claim the script returned the wrapped object, which is
+    // why it passed while the tool shipped an unwrapped array against an object
+    // schema. See tests/script-shape-contract.test.js.
+    mock: [{ name: 'INBOX', account: 'Work', unreadCount: 0 }],
   },
   get_unread_count: {
     args: {},

@@ -3,6 +3,118 @@
 
 import { esc } from "../shared/esc.js";
 
+// The interfaces below pin the shape of each script's final
+// `JSON.stringify(...)`, and the `*_EXAMPLE` constants carry a concrete instance
+// of it. `tests/script-shape-contract.test.js` parses every example through the
+// matching tool's real `outputSchema`, so changing what a script emits without
+// updating the example (and the outputSchema) fails a test rather than passing
+// the tautological mock-in-mock-out runtime check. Examples and scripts must be
+// kept in lockstep by hand.
+//
+// Reminder tools run through `runAutomation`, so these shapes are a contract for
+// BOTH backends: the EventKit Swift bridge (`AirMCPKit/Types.swift`
+// `ReminderListInfo` / `ReminderListItem` / `ReminderListOutput` /
+// `ReminderDetail` / `SearchRemindersOutput`) and the JXA fallback below must
+// agree field for field.
+
+// ── Return shapes ───────────────────────────────────────────────────────
+export interface RemindersListInfo {
+  id: string;
+  name: string;
+  reminderCount: number;
+}
+
+/** `list_reminder_lists` wraps the script's bare array as `{ lists }`. */
+export interface RemindersListListsOutput {
+  lists: RemindersListInfo[];
+}
+
+export interface RemindersListItem {
+  id: string;
+  name: string;
+  completed: boolean;
+  /** Null for reminders with no due date. */
+  dueDate: string | null;
+  priority: number;
+  flagged: boolean;
+  list: string;
+}
+
+export interface RemindersListOutput {
+  total: number;
+  offset: number;
+  returned: number;
+  reminders: RemindersListItem[];
+}
+
+export interface RemindersReadOutput extends RemindersListItem {
+  body: string;
+  /** Null until the reminder is completed. */
+  completionDate: string | null;
+  creationDate: string;
+  modificationDate: string;
+}
+
+/** `search_reminders` reports only `returned` — it has no total to offer,
+ *  because the scan stops as soon as the limit is reached. */
+export interface RemindersSearchOutput {
+  returned: number;
+  reminders: RemindersListItem[];
+}
+
+// ── Example fixtures (hand-maintained; see tests/script-shape-contract) ──
+const REMINDER_ROW: RemindersListItem = {
+  id: "REM-1",
+  name: "Buy milk",
+  completed: false,
+  dueDate: "2026-03-16T09:00:00.000Z",
+  priority: 0,
+  flagged: false,
+  list: "Reminders",
+};
+
+export const LIST_REMINDER_LISTS_EXAMPLE: RemindersListListsOutput = {
+  lists: [
+    { id: "LIST-1", name: "Reminders", reminderCount: 12 },
+    { id: "LIST-2", name: "Groceries", reminderCount: 0 },
+  ],
+};
+
+export const LIST_REMINDERS_EXAMPLE: RemindersListOutput = {
+  total: 3,
+  offset: 0,
+  returned: 2,
+  reminders: [
+    REMINDER_ROW,
+    // No due date, and the search path falls back to '' for a missing name.
+    { ...REMINDER_ROW, id: "REM-2", name: "", dueDate: null, completed: true, flagged: true, priority: 9 },
+  ],
+};
+
+export const READ_REMINDER_EXAMPLE: RemindersReadOutput = {
+  ...REMINDER_ROW,
+  body: "Whole milk",
+  completionDate: null,
+  creationDate: "2026-03-01T08:00:00.000Z",
+  modificationDate: "2026-03-15T09:00:00.000Z",
+};
+
+/** Same tool, completed case: `completionDate` is populated. */
+export const READ_REMINDER_EXAMPLE_COMPLETED: RemindersReadOutput = {
+  ...REMINDER_ROW,
+  id: "REM-2",
+  completed: true,
+  body: "",
+  completionDate: "2026-03-16T10:00:00.000Z",
+  creationDate: "2026-03-01T08:00:00.000Z",
+  modificationDate: "2026-03-16T10:00:00.000Z",
+};
+
+export const SEARCH_REMINDERS_EXAMPLE: RemindersSearchOutput = {
+  returned: 1,
+  reminders: [REMINDER_ROW],
+};
+
 export function listReminderListsScript(): string {
   return `
     const Reminders = Application('Reminders');

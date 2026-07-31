@@ -1,0 +1,62 @@
+{
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 3,
+      "high": 2,
+      "critical": 1,
+      "total": 6
+    }
+  },
+  "vulnerabilities": {
+    "moderate-one": {
+      "severity": "moderate",
+      "via": [
+        {
+          "title": "Moderate fixture advisory one"
+        }
+      ]
+    },
+    "moderate-two": {
+      "severity": "moderate",
+      "via": [
+        {
+          "title": "Moderate fixture advisory two"
+        }
+      ]
+    },
+    "moderate-three": {
+      "severity": "moderate",
+      "via": [
+        {
+          "title": "Moderate fixture advisory three"
+        }
+      ]
+    },
+    "high-one": {
+      "severity": "high",
+      "via": [
+        {
+          "title": "High fixture advisory one"
+        }
+      ]
+    },
+    "high-two": {
+      "severity": "high",
+      "via": [
+        {
+          "title": "High fixture advisory two"
+        }
+      ]
+    },
+    "critical-one": {
+      "severity": "critical",
+      "via": [
+        {
+          "title": "Critical fixture advisory"
+        }
+      ]
+    }
+  }
+}

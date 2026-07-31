@@ -1,0 +1,30 @@
+{
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 1,
+      "high": 1,
+      "critical": 0,
+      "total": 2
+    }
+  },
+  "vulnerabilities": {
+    "vulnerable-moderate": {
+      "severity": "moderate",
+      "via": [
+        {
+          "title": "Moderate impact audit fixture"
+        }
+      ]
+    },
+    "vulnerable-high": {
+      "severity": "high",
+      "via": [
+        {
+          "title": "High impact audit fixture"
+        }
+      ]
+    }
+  }
+}

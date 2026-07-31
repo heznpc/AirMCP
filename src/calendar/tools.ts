@@ -15,43 +15,17 @@ import {
   getUpcomingEventsScript,
   todayEventsScript,
 } from "./scripts.js";
-
-interface CalendarItem {
-  id: string;
-  name: string;
-  color: string;
-  writable: boolean;
-}
-
-interface EventListItem {
-  id: string;
-  summary: string;
-  startDate: string;
-  endDate: string;
-  allDay: boolean;
-  calendar: string;
-}
-
-interface EventListResult {
-  total: number;
-  offset: number;
-  returned: number;
-  events: EventListItem[];
-}
-
-interface Attendee {
-  name: string;
-  email: string;
-  status: string;
-}
-
-interface EventDetail extends EventListItem {
-  description: string;
-  location: string;
-  recurrence: string;
-  url: string;
-  attendees: Attendee[];
-}
+// Return shapes live next to the scripts that emit them (and are pinned by the
+// `*_EXAMPLE` fixtures in `tests/script-shape-contract.test.js`), so this file
+// consumes them rather than re-declaring a second, driftable copy.
+import type {
+  CalendarInfo,
+  CalendarListEventsOutput,
+  CalendarReadEventOutput,
+  CalendarSearchEventsOutput,
+  CalendarUpcomingEventsOutput,
+  CalendarTodayEventsOutput,
+} from "./scripts.js";
 
 interface MutationResult {
   id: string;
@@ -61,26 +35,6 @@ interface MutationResult {
 interface DeleteResult {
   deleted: boolean;
   summary: string;
-}
-
-interface SearchResult {
-  total: number;
-  events: EventListItem[];
-}
-
-interface UpcomingEventItem extends EventListItem {
-  location: string;
-}
-
-interface UpcomingEventsResult {
-  total: number;
-  returned: number;
-  events: UpcomingEventItem[];
-}
-
-interface TodayEventsResult {
-  total: number;
-  events: UpcomingEventItem[];
 }
 
 interface RecurringEventResult {
@@ -115,7 +69,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
     },
     async () => {
       try {
-        const result = await runAutomation<CalendarItem[]>({
+        const result = await runAutomation<CalendarInfo[]>({
           swift: { command: "list-calendars" },
           jxa: () => listCalendarsScript(),
         });
@@ -170,7 +124,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
     },
     async ({ startDate, endDate, calendar, limit, offset }) => {
       try {
-        const result = await runAutomation<EventListResult>({
+        const result = await runAutomation<CalendarListEventsOutput>({
           swift: {
             command: "list-events",
             input: { startDate, endDate, calendar, limit, offset },
@@ -221,7 +175,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
     },
     async ({ id }) => {
       try {
-        const result = await runAutomation<EventDetail>({
+        const result = await runAutomation<CalendarReadEventOutput>({
           swift: { command: "read-event", input: { id } },
           jxa: () => readEventScript(id),
         });
@@ -353,6 +307,10 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
       },
       outputSchema: {
         total: z.number(),
+        // Both backends have always emitted `returned` (Swift
+        // `SearchEventsOutput`, and the JXA `result.length`); the schema simply
+        // omitted it, so the field was undeclared to clients.
+        returned: z.number(),
         events: z.array(
           z.object({
             id: z.string(),
@@ -373,7 +331,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
     },
     async ({ query, startDate, endDate, limit }) => {
       try {
-        const result = await runAutomation<SearchResult>({
+        const result = await runAutomation<CalendarSearchEventsOutput>({
           swift: {
             command: "search-events",
             input: { query, startDate, endDate, limit },
@@ -420,7 +378,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
     },
     async ({ limit }) => {
       try {
-        const result = await runAutomation<UpcomingEventsResult>({
+        const result = await runAutomation<CalendarUpcomingEventsOutput>({
           swift: { command: "get-upcoming-events", input: { limit } },
           jxa: () => getUpcomingEventsScript(limit),
         });
@@ -439,6 +397,9 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
       inputSchema: {},
       outputSchema: {
         total: z.number(),
+        // Swift `TodayEventsOutput` and the JXA script both emit `returned`;
+        // the schema omitted it.
+        returned: z.number(),
         events: z.array(
           z.object({
             id: z.string(),
@@ -460,7 +421,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
     },
     async () => {
       try {
-        const result = await runAutomation<TodayEventsResult>({
+        const result = await runAutomation<CalendarTodayEventsOutput>({
           swift: { command: "today-events" },
           jxa: () => todayEventsScript(),
         });

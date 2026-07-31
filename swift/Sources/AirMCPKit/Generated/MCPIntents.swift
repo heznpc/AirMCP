@@ -1061,6 +1061,7 @@ public struct MCPSearchEventsOutput: Codable, Sendable {
     }
 
     public let total: Double
+    public let returned: Double
     public let events: [EventsItem]
 }
 
@@ -1213,6 +1214,7 @@ public struct MCPTodayEventsOutput: Codable, Sendable {
     }
 
     public let total: Double
+    public let returned: Double
     public let events: [EventsItem]
 }
 

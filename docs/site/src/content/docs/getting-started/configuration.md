@@ -126,8 +126,8 @@ In the extension: server URL `http://<host>:3847/mcp`, header `Authorization: Be
 |----------|-------------|
 | `GEMINI_API_KEY` | Gemini API key for cloud-based embeddings |
 | `AIRMCP_EMBEDDING_PROVIDER` | Provider selection: `auto`, `gemini`, `swift`, `hybrid`, `none` |
-| `AIRMCP_EMBEDDING_MODEL` | Gemini model name (default: `gemini-embedding-2-preview`) |
-| `AIRMCP_EMBEDDING_DIM` | Embedding dimension (default: `3072`) |
+| `AIRMCP_EMBEDDING_MODEL` | Gemini model name (default: `gemini-embedding-2`) |
+| `AIRMCP_EMBEDDING_DIM` | Embedding dimension (default: `256`) |
 
 ## CLI Flags
 

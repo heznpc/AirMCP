@@ -98,8 +98,11 @@ export async function runDoctor(): Promise<void> {
   const major = parseInt(nodeVer.slice(1), 10);
   s1.succeed("Environment checked");
 
-  if (major >= 18) ok("Node.js", `${nodeVer}`);
-  else bad("Node.js", `${nodeVer} — upgrade required (>= 18)`);
+  // Must track package.json `engines.node` (>=20). At >=18 this reported green
+  // on versions where npm refuses to install the package at all, so doctor
+  // cleared an environment that could never have run it.
+  if (major >= 20) ok("Node.js", `${nodeVer}`);
+  else bad("Node.js", `${nodeVer} — upgrade required (>= 20)`);
 
   const platform = process.platform;
   if (platform === "darwin") ok("Platform", "macOS");
@@ -155,9 +158,15 @@ export async function runDoctor(): Promise<void> {
   try {
     runtimeConfig = parseConfig();
     const enabledCount = MODULE_NAMES.filter((moduleName) => isModuleEnabled(runtimeConfig!, moduleName)).length;
+    // MODULE_NAMES covers the standard modules a profile can enable; the
+    // published catalogue count also includes OPT_IN_MODULE_NAMES, which no
+    // profile turns on. Naming both keeps this from reading as a contradiction
+    // of the documented module total.
+    const catalogueCount = MODULE_NAMES.length + OPT_IN_MODULE_NAMES.length;
     ok(
       "Runtime profile",
-      `${runtimeConfig.profile} (${runtimeConfig.toolExposure} exposure, ${enabledCount}/${MODULE_NAMES.length} modules enabled)`,
+      `${runtimeConfig.profile} (${runtimeConfig.toolExposure} exposure, ${enabledCount}/${MODULE_NAMES.length} standard modules enabled` +
+        `, ${OPT_IN_MODULE_NAMES.length} opt-in excluded of ${catalogueCount} total)`,
     );
     const requestedProfile = normalizeProfileName(fileConfig?.profile);
     if (fileConfig?.profile && requestedProfile !== runtimeConfig.profile) {

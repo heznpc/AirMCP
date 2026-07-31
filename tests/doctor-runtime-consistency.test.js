@@ -102,13 +102,21 @@ describe('doctor ↔ runtime consistency (#358 contract)', () => {
         maxBuffer: 4 * 1024 * 1024,
       });
       const text = stripAnsi(stdout);
-      const match = text.match(/Runtime profile\s+(\S+) \((\S+) exposure, (\d+)\/(\d+) modules enabled\)/);
+      // The label names the standard-module denominator AND the opt-in modules
+      // excluded from it, because reporting only "11/29" read as a
+      // contradiction of the documented 32-module catalogue.
+      const match = text.match(
+        /Runtime profile\s+(\S+) \((\S+) exposure, (\d+)\/(\d+) standard modules enabled, (\d+) opt-in excluded of (\d+) total\)/,
+      );
       expect(match).not.toBeNull();
-      const [, profile, exposure, enabled, total] = match;
+      const [, profile, exposure, enabled, total, optIn, catalogue] = match;
       expect(profile).toBe(resolved.profile);
       expect(exposure).toBe(resolved.toolExposure);
       expect(Number(enabled)).toBe(resolved.enabledModules.length);
       expect(Number(total)).toBe(resolved.totalModules);
+      // The two denominators have to add up, or the label just moves the
+      // confusion instead of resolving it.
+      expect(Number(total) + Number(optIn)).toBe(Number(catalogue));
       // The #358 regression path: a requested profile that is not effective
       // must be flagged. With a valid requested profile there is no mismatch
       // warning — doctor may not claim one exists.

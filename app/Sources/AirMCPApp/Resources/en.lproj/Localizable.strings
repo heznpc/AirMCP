@@ -267,7 +267,7 @@
 "module.google" = "Google Workspace";
 "module.google.desc" = "Gmail, Drive, Sheets, Calendar, Docs";
 "module.speech" = "Speech";
-"module.speech.desc" = "Text-to-speech, voice synthesis";
+"module.speech.desc" = "Audio transcription, speech recognition";
 "module.health" = "Health";
 "module.health.desc" = "Steps, heart rate, sleep, activity";
 "module.memory" = "Context Memory";

@@ -34,11 +34,11 @@ The release gate boots clean-installed npm and MCPB artifacts in `full/full` mod
 | **Weather** | 3 | Current weather, daily forecast, hourly forecast via Open-Meteo API. |
 | **Pages** | 7 | Apple Pages automation. List, create, read/write body text, close documents. |
 | **Numbers** | 12 | Apple Numbers automation. Spreadsheets, sheets, cell read/write. |
-| **Keynote** | 9 | Apple Keynote automation. Slides, presenter notes, add/delete slides. |
+| **Keynote** | 9 | Apple Keynote automation. Slides, presenter notes, add slides, PDF export, slideshow. |
 | **Location** | 2 | Location permission status, current location (via CoreLocation). |
 | **Bluetooth** | 4 | Bluetooth state, device discovery, connect/disconnect. |
 | **Google** | 16 | Google Workspace integration. Gmail, Google Calendar, Drive, Contacts, Tasks via GWS CLI. |
-| **Speech** | 3 | Speech recognition and text-to-speech helpers for local audio workflows. |
+| **Speech** | 3 | Speech recognition for local audio workflows: audio transcription, availability probe, smart clipboard. |
 | **Health** | 5 | HealthKit-backed summaries and samples through the optional Swift bridge. |
 | **Memory** | 4 | Local context memory for storing, querying, and summarizing reusable facts. |
 | **Audit** | 2 | Queryable audit summaries and raw audit log access. |

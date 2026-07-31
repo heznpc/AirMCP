@@ -216,3 +216,26 @@ jobs:
 
       - name: Swift — Test AirMCPServer
         run: cd ios && swift test
+
+  # Glama builds every listed MCP server from a Dockerfile and runs the protocol
+  # introspection exchange inside a sandbox. If that build fails the listing stays
+  # up but distribution is withheld — the server drops out of search results,
+  # category listings, and recommendations until a reproducible build succeeds.
+  # That failure is invisible from this repo, so it is asserted here: the image
+  # has to build on Linux and the server has to boot, state its identity, and
+  # answer tools/list. This does NOT claim AirMCP runs on Linux; tool calls need
+  # macOS and fail in the container by design.
+  registry-introspection:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 22
+
+      - name: Build the registry-introspection image
+        run: docker build -t airmcp-registry-introspection .
+
+      - name: Introspect the container the way an indexer does
+        run: npm run registry:verify

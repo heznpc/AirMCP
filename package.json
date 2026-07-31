@@ -103,6 +103,7 @@
     "start": "node dist/index.js",
     "test": "node --experimental-vm-modules node_modules/.bin/jest",
     "smoke": "node scripts/smoke-mcp.mjs",
+    "registry:verify": "node scripts/verify-container-introspection.mjs",
     "premcp:validate": "npm run build",
     "mcp:validate": "node scripts/mcp-validate.mjs",
     "profiles:check": "node scripts/verify-profiles.mjs",

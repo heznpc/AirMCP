@@ -2,6 +2,16 @@
 
 <!-- What does this PR do? Keep it to 1-3 sentences. -->
 
+## Linked Issue
+
+<!--
+  Use `Closes #123` so merging closes the issue automatically. `Refs #123`
+  only cross-links it and leaves it open for a maintainer to close by hand.
+  Use `Refs` only when the PR is a partial step toward the issue.
+-->
+
+Closes #
+
 ## Type of Change
 
 - [ ] New feature (new tool, module, or prompt)

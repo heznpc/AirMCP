@@ -186,15 +186,34 @@ jobs:
       # Events created with GITHUB_TOKEN do not recursively trigger tag-push
       # workflows. Dispatch the signed lane explicitly and let that workflow
       # re-check the immutable tag, package, bundle, and signing environment.
+      #
+      # Gated on the SIGNED_APP_RELEASE repository variable rather than dispatched
+      # unconditionally. Until the Apple signing secrets exist in the `release`
+      # environment, dispatching only produced a deployment-approval request for a
+      # run whose first step would then discover it cannot sign — and, because it
+      # was dispatched with require_signing=false, exit 0 and record a green
+      # "signed release" that produced no artifact. A variable is readable without
+      # entering a protected environment, so the decision can be made before the
+      # approval gate instead of after it.
       - name: Dispatch signed app release
+        if: vars.SIGNED_APP_RELEASE == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: v${{ steps.pkg.outputs.version }}
         run: |
+          # require_signing=true: once an operator has declared signing enabled, a
+          # missing secret is a real failure, not something to skip past quietly.
           gh workflow run release-app.yml \
             --ref "$RELEASE_TAG" \
             --field tag="$RELEASE_TAG" \
-            --field require_signing=false
+            --field require_signing=true
+
+      - name: Note that the signed app lane was skipped
+        if: vars.SIGNED_APP_RELEASE != 'true'
+        run: |
+          echo "::notice::Signed app release skipped — repository variable SIGNED_APP_RELEASE is not 'true'."
+          echo "::notice::To enable: add APPLE_DEVELOPER_ID, APPLE_ID, APPLE_ID_PASSWORD, APPLE_TEAM_ID, APPLE_CERT_P12_BASE64, APPLE_CERT_P12_PASSWORD to the 'release' environment, then set SIGNED_APP_RELEASE=true."
+          echo "::notice::npm and .mcpb distribution are unaffected."
 
       - name: Verify public release state
         env:

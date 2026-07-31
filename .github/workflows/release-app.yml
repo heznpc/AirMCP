@@ -118,6 +118,14 @@ jobs:
 
   release-app:
     needs: resolve-release
+    # `environment: release` requests a deployment approval the moment this job is
+    # reached, and the signing-secret preflight is a STEP inside it — so without
+    # this guard a human is asked to approve a run that then discovers it cannot
+    # sign. Secrets are unreadable outside a protected environment, but a
+    # repository variable is not, so the switch has to live here to be evaluated
+    # before the gate. Unset or not 'true' means the whole lane is skipped rather
+    # than approved-then-skipped.
+    if: vars.SIGNED_APP_RELEASE == 'true'
     runs-on: macos-latest
     environment: release
     permissions:

@@ -4,6 +4,9 @@
 
 set -euo pipefail
 
+# shellcheck source=scripts/lib/signing-identity.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/signing-identity.sh"
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 APP_BUNDLE="${APP_BUNDLE_PATH:-$PROJECT_DIR/AirMCP.app}"
@@ -106,12 +109,12 @@ fi
 SIGN_INFO="$(codesign -dv --verbose=4 "$APP_BUNDLE" 2>&1)"
 SIGN_AUTHORITY="$(printf '%s\n' "$SIGN_INFO" | sed -nE 's/^Authority=(Developer ID Application:.*)$/\1/p' | head -1)"
 SIGN_TEAM="$(printf '%s\n' "$SIGN_INFO" | sed -nE 's/^TeamIdentifier=([A-Z0-9]+)$/\1/p' | head -1)"
-if [[ ! "$SIGN_AUTHORITY" =~ ^Developer\ ID\ Application:\ Heznpc\ \(([A-Z0-9]{10})\)$ ]]; then
-  echo "verify-signed-app: signing authority is outside the Heznpc public identity" >&2
+if [ "$SIGN_AUTHORITY" != "$AIRMCP_SIGNING_COMMON_NAME" ]; then
+  echo "verify-signed-app: signing authority is not the project's published Developer ID" >&2
   exit 1
 fi
-if [ "$SIGN_TEAM" != "${BASH_REMATCH[1]}" ]; then
-  echo "verify-signed-app: signing team does not match the verified authority" >&2
+if [ "$SIGN_TEAM" != "$AIRMCP_SIGNING_TEAM_ID" ]; then
+  echo "verify-signed-app: signing team does not match the published Developer ID" >&2
   exit 1
 fi
 if printf '%s\n' "$SIGN_INFO" | grep -q "Signature=adhoc"; then

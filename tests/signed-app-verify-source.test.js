@@ -15,7 +15,13 @@ describe("signed app artifact verification script", () => {
   test("verifies an existing signed artifact instead of rebuilding it", () => {
     expect(script).toContain("codesign --verify --deep --strict");
     expect(script).toContain("SIGN_AUTHORITY=");
-    expect(script).toContain("Developer\\ ID\\ Application:\\ Heznpc");
+    // The expected Developer ID subject is centralised in
+    // scripts/lib/signing-identity.sh, so the check here is that the script
+    // compares against that single source of truth rather than carrying its own
+    // copy of the identity.
+    expect(script).toContain("lib/signing-identity.sh");
+    expect(script).toContain('"$AIRMCP_SIGNING_COMMON_NAME"');
+    expect(script).toContain('"$AIRMCP_SIGNING_TEAM_ID"');
     expect(script).toContain("TeamIdentifier=");
     expect(script).toContain("spctl --assess --type execute");
     expect(script).toContain("xcrun stapler validate");

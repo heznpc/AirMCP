@@ -1,21 +1,25 @@
 #!/bin/bash
 
-# Fail closed unless the certificate's complete public subject uses Heznpc.
-# Developer ID subjects are embedded in every distributed binary, so checking
-# only a secret name would not protect the project's public-identity boundary.
+# Fail closed unless the certificate's complete public subject is the project's
+# published Developer ID. Developer ID subjects are embedded in every distributed
+# binary, so checking only a secret name would not protect the project's
+# public-identity boundary. Expected values live in scripts/lib/signing-identity.sh.
 
 set -euo pipefail
+
+# shellcheck source=scripts/lib/signing-identity.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/signing-identity.sh"
 
 if [ -z "${APPLE_DEVELOPER_ID:-}" ]; then
   echo "signing-identity: APPLE_DEVELOPER_ID is required" >&2
   exit 1
 fi
 
-if [[ ! "$APPLE_DEVELOPER_ID" =~ ^Developer\ ID\ Application:\ Heznpc\ \(([A-Z0-9]{10})\)$ ]]; then
-  echo "signing-identity: certificate common name is outside the Heznpc public identity" >&2
+if [ "$APPLE_DEVELOPER_ID" != "$AIRMCP_SIGNING_COMMON_NAME" ]; then
+  echo "signing-identity: certificate common name is not the project's published Developer ID" >&2
   exit 1
 fi
-CERT_TEAM_ID="${BASH_REMATCH[1]}"
+CERT_TEAM_ID="$AIRMCP_SIGNING_TEAM_ID"
 
 if [ -n "${APPLE_TEAM_ID:-}" ] && [ "$APPLE_TEAM_ID" != "$CERT_TEAM_ID" ]; then
   echo "signing-identity: configured team does not match the certificate identity" >&2
@@ -39,9 +43,11 @@ COMMON_NAME="$(printf '%s\n' "$SUBJECT" | sed -nE 's/^[[:space:]]*commonName[[:s
 ORGANIZATION="$(printf '%s\n' "$SUBJECT" | sed -nE 's/^[[:space:]]*organizationName[[:space:]]*=[[:space:]]*(.*)$/\1/p' | head -1)"
 ORG_UNIT="$(printf '%s\n' "$SUBJECT" | sed -nE 's/^[[:space:]]*organizationalUnitName[[:space:]]*=[[:space:]]*(.*)$/\1/p' | head -1)"
 
-if [ "$COMMON_NAME" != "$APPLE_DEVELOPER_ID" ] || [ "$ORGANIZATION" != "Heznpc" ] || [ "$ORG_UNIT" != "$CERT_TEAM_ID" ]; then
-  echo "signing-identity: certificate subject contains a public identity other than Heznpc" >&2
+if [ "$COMMON_NAME" != "$AIRMCP_SIGNING_COMMON_NAME" ] ||
+  [ "$ORGANIZATION" != "$AIRMCP_SIGNING_SUBJECT_NAME" ] ||
+  [ "$ORG_UNIT" != "$AIRMCP_SIGNING_TEAM_ID" ]; then
+  echo "signing-identity: certificate subject is not the project's published Developer ID" >&2
   exit 1
 fi
 
-echo "ok: Developer ID public identity is Heznpc"
+echo "ok: Developer ID public identity is ${AIRMCP_SIGNING_COMMON_NAME}"

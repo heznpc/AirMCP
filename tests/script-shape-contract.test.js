@@ -7,7 +7,8 @@
  * They cannot detect a real drift where `scripts.ts` changes the JSON it
  * emits without the matching outputSchema update (or vice versa).
  *
- * This file closes that gap for the Wave 3 JXA modules (messages, shortcuts).
+ * This file closes that gap for the Wave 3 JXA modules (messages, shortcuts)
+ * and for calendar.
  * Each `scripts.ts` exports a hand-maintained `*_EXAMPLE` constant pinned to
  * the same TypeScript interface the script's final `JSON.stringify(...)` is
  * expected to produce. Here we parse every example through the tool's real
@@ -29,10 +30,12 @@ setupPlatformMocks();
 
 const { registerMessagesTools } = await import('../dist/messages/tools.js');
 const { registerShortcutsTools } = await import('../dist/shortcuts/tools.js');
+const { registerCalendarTools } = await import('../dist/calendar/tools.js');
 const healthTools = await import('../dist/health/tools.js');
 const { registerHealthTools } = healthTools;
 const messagesScripts = await import('../dist/messages/scripts.js');
 const shortcutsScripts = await import('../dist/shortcuts/scripts.js');
+const calendarScripts = await import('../dist/calendar/scripts.js');
 
 function schemaFor(server, toolName) {
   const tool = server._tools.get(toolName);
@@ -88,6 +91,60 @@ describe('Script shape ↔ outputSchema contract — shortcuts', () => {
   });
   test('get_shortcut_detail example conforms', () => {
     assertExampleFits(server, 'get_shortcut_detail', shortcutsScripts.GET_SHORTCUT_DETAIL_EXAMPLE);
+  });
+});
+
+// Calendar tools route through `runAutomation`, so each shape is a contract for
+// two backends at once: the EventKit Swift bridge and the JXA fallback. Writing
+// this contract down surfaced three real drifts that no runtime test could see —
+// `search_events` and `today_events` emitted `returned` from both backends
+// without declaring it, and the JXA upcoming/today scripts emitted a null
+// `location` against a non-nullable schema (Swift types it `String`).
+describe('Script shape ↔ outputSchema contract — calendar', () => {
+  let server;
+  beforeAll(() => {
+    server = createMockServer();
+    registerCalendarTools(server, createMockConfig());
+  });
+
+  test('list_calendars example conforms', () => {
+    assertExampleFits(server, 'list_calendars', calendarScripts.LIST_CALENDARS_EXAMPLE);
+  });
+  test('list_events example conforms', () => {
+    assertExampleFits(server, 'list_events', calendarScripts.LIST_EVENTS_EXAMPLE);
+  });
+  test('read_event example conforms', () => {
+    assertExampleFits(server, 'read_event', calendarScripts.READ_EVENT_EXAMPLE);
+  });
+  test('read_event unset-optional example conforms', () => {
+    assertExampleFits(server, 'read_event', calendarScripts.READ_EVENT_EXAMPLE_EMPTY);
+  });
+  test('search_events example conforms', () => {
+    assertExampleFits(server, 'search_events', calendarScripts.SEARCH_EVENTS_EXAMPLE);
+  });
+  test('get_upcoming_events example conforms', () => {
+    assertExampleFits(server, 'get_upcoming_events', calendarScripts.GET_UPCOMING_EVENTS_EXAMPLE);
+  });
+  test('today_events example conforms', () => {
+    assertExampleFits(server, 'today_events', calendarScripts.TODAY_EVENTS_EXAMPLE);
+  });
+
+  // The guard has to bite in both directions, or it is just a snapshot of
+  // whatever the example happens to say. A field the schema does not declare
+  // must fail (strict), and a renamed field must fail too.
+  test('an undeclared field fails the contract', () => {
+    expect(() =>
+      assertExampleFits(server, 'today_events', {
+        ...calendarScripts.TODAY_EVENTS_EXAMPLE,
+        unexpected: true,
+      }),
+    ).toThrow(/drifted from outputSchema/);
+  });
+  test('a renamed field fails the contract', () => {
+    const { returned, ...withoutReturned } = calendarScripts.TODAY_EVENTS_EXAMPLE;
+    expect(() =>
+      assertExampleFits(server, 'today_events', { ...withoutReturned, returnedCount: returned }),
+    ).toThrow(/drifted from outputSchema/);
   });
 });
 

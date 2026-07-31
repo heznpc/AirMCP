@@ -1,7 +1,181 @@
 // JXA scripts for Apple Calendar automation.
 // Each function returns a JXA script string to be executed via osascript.
+//
+// The interfaces below pin the shape of each script's final
+// `JSON.stringify(...)`, and the `*_EXAMPLE` constants carry a concrete
+// instance of that shape. `tests/script-shape-contract.test.js` parses every
+// example through the matching tool's real `outputSchema`, so changing what a
+// script emits without updating the example (and the outputSchema) fails a
+// test instead of silently passing the tautological mock-in-mock-out runtime
+// check. Examples and scripts must be kept in lockstep by hand.
+//
+// Calendar tools run through `runAutomation`, so these shapes are a contract
+// for BOTH backends: the EventKit Swift bridge (`AirMCPKit/Types.swift`
+// `EventListOutput` / `SearchEventsOutput` / `UpcomingEventsOutput` /
+// `TodayEventsOutput`) and the JXA fallback below must agree field for field.
 
 import { esc } from "../shared/esc.js";
+
+// ── Return shapes ───────────────────────────────────────────────────────
+export interface CalendarInfo {
+  id: string;
+  name: string;
+  color: string | null;
+  writable: boolean;
+}
+
+/** `list_calendars` wraps the script's bare array as `{ calendars }`. */
+export interface CalendarListCalendarsOutput {
+  calendars: CalendarInfo[];
+}
+
+export interface CalendarEventListItem {
+  id: string;
+  summary: string;
+  startDate: string;
+  endDate: string;
+  allDay: boolean;
+  calendar: string;
+}
+
+export interface CalendarListEventsOutput {
+  total: number;
+  offset: number;
+  returned: number;
+  events: CalendarEventListItem[];
+}
+
+export interface CalendarAttendee {
+  name: string | null;
+  email: string | null;
+  status: string | null;
+}
+
+export interface CalendarReadEventOutput {
+  id: string;
+  summary: string;
+  description: string | null;
+  location: string | null;
+  startDate: string;
+  endDate: string;
+  allDay: boolean;
+  recurrence: string | null;
+  url: string | null;
+  calendar: string;
+  attendees: CalendarAttendee[];
+}
+
+export interface CalendarSearchEventsOutput {
+  total: number;
+  returned: number;
+  events: CalendarEventListItem[];
+}
+
+/** Upcoming/today rows carry `location`; the Swift bridge types it
+ *  non-optional, so the JXA fallback emits `''` rather than `null`. */
+export interface CalendarLocatedEventItem extends CalendarEventListItem {
+  location: string;
+}
+
+export interface CalendarUpcomingEventsOutput {
+  total: number;
+  returned: number;
+  events: CalendarLocatedEventItem[];
+}
+
+export interface CalendarTodayEventsOutput {
+  total: number;
+  returned: number;
+  events: CalendarLocatedEventItem[];
+}
+
+// ── Example fixtures (hand-maintained; see tests/script-shape-contract) ──
+export const LIST_CALENDARS_EXAMPLE: CalendarListCalendarsOutput = {
+  calendars: [
+    { id: "CAL-1", name: "Work", color: "#FF5733", writable: true },
+    // `color` and `writable` are read behind their own try/catch in the
+    // script, so an unreadable calendar still returns a row.
+    { id: "CAL-2", name: "Subscribed Holidays", color: null, writable: false },
+  ],
+};
+
+export const LIST_EVENTS_EXAMPLE: CalendarListEventsOutput = {
+  total: 3,
+  offset: 0,
+  returned: 2,
+  events: [
+    {
+      id: "EV-1",
+      summary: "Standup",
+      startDate: "2026-03-15T09:00:00.000Z",
+      endDate: "2026-03-15T09:15:00.000Z",
+      allDay: false,
+      calendar: "Work",
+    },
+    {
+      // `summary` falls back to '' when the event has no title.
+      id: "EV-2",
+      summary: "",
+      startDate: "2026-03-16T00:00:00.000Z",
+      endDate: "2026-03-17T00:00:00.000Z",
+      allDay: true,
+      calendar: "Work",
+    },
+  ],
+};
+
+export const READ_EVENT_EXAMPLE: CalendarReadEventOutput = {
+  id: "EV-1",
+  summary: "Standup",
+  description: "Daily sync",
+  location: "Room 2",
+  startDate: "2026-03-15T09:00:00.000Z",
+  endDate: "2026-03-15T09:15:00.000Z",
+  allDay: false,
+  recurrence: "FREQ=WEEKLY",
+  url: "https://example.test/standup",
+  calendar: "Work",
+  attendees: [{ name: "Alice", email: "alice@example.com", status: "accepted" }],
+};
+
+/** Same tool, unset-optional case: the script passes `ev.description()` and
+ *  friends through verbatim, so every nullable field really can be null and
+ *  `attendees` is `[]` when the read throws. */
+export const READ_EVENT_EXAMPLE_EMPTY: CalendarReadEventOutput = {
+  id: "EV-3",
+  summary: "",
+  description: null,
+  location: null,
+  startDate: "2026-03-20T12:00:00.000Z",
+  endDate: "2026-03-20T13:00:00.000Z",
+  allDay: false,
+  recurrence: null,
+  url: null,
+  calendar: "Personal",
+  attendees: [],
+};
+
+export const SEARCH_EVENTS_EXAMPLE: CalendarSearchEventsOutput = {
+  total: 5,
+  returned: 1,
+  events: [LIST_EVENTS_EXAMPLE.events[0]!],
+};
+
+export const GET_UPCOMING_EVENTS_EXAMPLE: CalendarUpcomingEventsOutput = {
+  total: 4,
+  returned: 2,
+  events: [
+    { ...LIST_EVENTS_EXAMPLE.events[0]!, location: "Room 2" },
+    // Location-less events emit '' so the shape matches the Swift bridge.
+    { ...LIST_EVENTS_EXAMPLE.events[1]!, location: "" },
+  ],
+};
+
+export const TODAY_EVENTS_EXAMPLE: CalendarTodayEventsOutput = {
+  total: 2,
+  returned: 2,
+  events: GET_UPCOMING_EVENTS_EXAMPLE.events,
+};
 
 export function listCalendarsScript(): string {
   return `
@@ -281,7 +455,7 @@ export function getUpcomingEventsScript(limit: number): string {
         all.push({
           id: eUids[i], summary: eSummaries[i] || '',
           startDate: eStarts[i].toISOString(), endDate: eEnds[i].toISOString(),
-          allDay: eAllDay[i] ?? false, location: eLocs[i] || null, calendar: calName
+          allDay: eAllDay[i] ?? false, location: eLocs[i] || '', calendar: calName
         });
       }
     }
@@ -318,7 +492,7 @@ export function todayEventsScript(): string {
         all.push({
           id: eUids[i], summary: eSummaries[i] || '',
           startDate: eStarts[i].toISOString(), endDate: eEnds[i].toISOString(),
-          allDay: eAllDay[i] ?? false, location: eLocs[i] || null, calendar: calName
+          allDay: eAllDay[i] ?? false, location: eLocs[i] || '', calendar: calName
         });
       }
     }

@@ -81,7 +81,10 @@ const TOOL_FIXTURES = {
   },
   search_events: {
     args: { query: 'test', startDate: '2026-01-01T00:00:00Z', endDate: '2026-12-31T23:59:59Z', limit: 10 },
-    mock: { total: 0, events: [] },
+    // `returned` was missing here and from the outputSchema, while both the
+    // Swift bridge and the JXA script always emitted it — the mock was the only
+    // thing defining the shape. See tests/script-shape-contract.test.js.
+    mock: { total: 0, returned: 0, events: [] },
   },
   get_upcoming_events: {
     args: { limit: 5 },
@@ -89,7 +92,7 @@ const TOOL_FIXTURES = {
   },
   today_events: {
     args: {},
-    mock: { total: 0, events: [] },
+    mock: { total: 0, returned: 0, events: [] },
   },
   // contacts
   list_contacts: {

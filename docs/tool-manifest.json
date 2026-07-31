@@ -11958,6 +11958,9 @@
           "total": {
             "type": "number"
           },
+          "returned": {
+            "type": "number"
+          },
           "events": {
             "type": "array",
             "items": {
@@ -11996,6 +11999,7 @@
         },
         "required": [
           "total",
+          "returned",
           "events"
         ],
         "additionalProperties": false
@@ -14137,6 +14141,9 @@
           "total": {
             "type": "number"
           },
+          "returned": {
+            "type": "number"
+          },
           "events": {
             "type": "array",
             "items": {
@@ -14179,6 +14186,7 @@
         },
         "required": [
           "total",
+          "returned",
           "events"
         ],
         "additionalProperties": false

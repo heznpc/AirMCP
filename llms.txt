@@ -14,6 +14,30 @@
 - [Contributing Guide](https://github.com/heznpc/AirMCP/blob/main/CONTRIBUTING.md)
 - [Security Policy](https://github.com/heznpc/AirMCP/blob/main/SECURITY.md)
 
+## Start Here
+
+A reader that meets the module catalogue first concludes the job is to call a
+tool. These are the tasks the tools exist to serve; reach for the catalogue after
+picking one. Curated workflows come from `src/shared/workflows-catalog.json`.
+
+- **Today Overview** (`today-overview`) — See today's calendar and overdue reminders without changing anything.
+  Ask: "Tell me today's calendar events and overdue reminders. Do not change anything."
+- **Daily Briefing** (`daily-briefing`) — Start the day with calendar, reminders, mail, and recent notes.
+  Ask: "Brief me on today's calendar, overdue reminders, unread mail, and recent notes."
+- **Inbox Triage** (`inbox-triage`) — Turn mail backlog into a small, reviewable set of follow-up tasks.
+  Ask: "Find emails from Alex about the project and create reminders for action items."
+- **Meeting Prep** (`meeting-prep`) — Collect the context you need before the next meeting.
+  Ask: "For my next meeting, find related notes, contacts, files, and reminders."
+- **Project Digest** (`project-digest`) — Summarize active project context across indexed Apple workspace data.
+  Ask: "Summarize what changed since yesterday on my current project."
+- **Focus Blocks** (`focus-blocks`) — Turn open reminders into calendar time blocks.
+  Ask: "Plan focus blocks for today's open reminders, but ask before creating each event."
+- **Research to Output** (`research-output`) — Move from Safari, files, and notes into a draft note or email.
+  Ask: "Open the Apple developer docs in Safari, summarize the page, and draft a note."
+Tools are exposed behind a small front door by default: `discover_tools` and
+`start_tool_session` widen access for the task at hand. A successful call means
+a step ran, not that the task is complete.
+
 ## Modules
 
 - **audit** (2 tools): audit_log, audit_summary

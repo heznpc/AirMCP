@@ -180,6 +180,27 @@ export function generateLlmsText() {
 
   // Generate llms.txt (summary)
   const REPO = "https://github.com/heznpc/AirMCP";
+
+  // Representative jobs, read from the curated catalogue rather than restated
+  // here, so this section cannot drift from the workflows that actually ship.
+  const catalogPath = join(ROOT, "src", "shared", "workflows-catalog.json");
+  const catalog = JSON.parse(readFileSync(catalogPath, "utf8"));
+  const workflows = Array.isArray(catalog) ? catalog : (catalog.workflows ?? []);
+  if (workflows.length === 0) {
+    console.error("gen-llms-txt: workflows catalogue is empty — refusing to emit an empty Start Here section");
+    process.exit(1);
+  }
+  const startHere = workflows
+    .map((w) => {
+      const label = w.title ?? w.id;
+      const bestFor = (w.bestFor ?? "").trim();
+      const ask = (w.prompt ?? "").trim();
+      const head = `- **${label}** (\`${w.id}\`)${bestFor ? ` — ${bestFor}` : ""}`;
+      // The prompt is the actionable part: an agent can pass it through verbatim
+      // instead of guessing which tools compose the task.
+      return ask ? `${head}\n  Ask: "${ask}"` : head;
+    })
+    .join("\n");
   let llmsTxt = `# AirMCP
 
 > Governed MCP runtime for the Apple ecosystem. AirMCP is the connector and control layer MCP clients call — not another agent.
@@ -195,6 +216,17 @@ export function generateLlmsText() {
 - [Full Tool Reference](${REPO}/blob/main/llms-full.txt)
 - [Contributing Guide](${REPO}/blob/main/CONTRIBUTING.md)
 - [Security Policy](${REPO}/blob/main/SECURITY.md)
+
+## Start Here
+
+A reader that meets the module catalogue first concludes the job is to call a
+tool. These are the tasks the tools exist to serve; reach for the catalogue after
+picking one. Curated workflows come from \`src/shared/workflows-catalog.json\`.
+
+${startHere}
+Tools are exposed behind a small front door by default: \`discover_tools\` and
+\`start_tool_session\` widen access for the task at hand. A successful call means
+a step ran, not that the task is complete.
 
 ## Modules
 

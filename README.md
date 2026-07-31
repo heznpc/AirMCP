@@ -9,20 +9,45 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/heznpc/AirMCP)](https://github.com/heznpc/AirMCP/stargazers)
 
-**Governed MCP runtime for the Apple ecosystem.** AirMCP lets Claude, Codex,
-Cursor, Raycast, Xcode agents, and other MCP clients work across Notes, Mail,
-Calendar, Reminders, Finder, Safari, Shortcuts, and the rest of your Apple
-workspace. The macOS runtime is available today; the iOS runtime is in preview.
+**Your AI assistant can use the Mac apps you already use.** Ask for something in
+plain language and AirMCP does it in the real Notes, Mail, Calendar, Reminders,
+Messages, Photos, Safari, Finder, and Shortcuts on your machine — your actual
+data, not a copy and not a sandbox. The macOS runtime is available today; the
+iOS runtime is in preview.
 
-AirMCP is the connector and control layer, not another agent. It mediates Apple
-workspace actions through profiles, progressive exposure, per-call human
-approval, HMAC-chained audit logs, rate limits, OAuth scopes, and local controls.
+```text
+"Brief me on today's calendar, overdue reminders, and unread mail."
+"For my next meeting, pull up the related notes, contacts, files, and reminders."
+"Search my Safari tabs for that article and save a summary to Notes."
+"Draft replies to the urgent mail, but ask me before sending anything."
+"Run my Morning Routine shortcut."
+```
+
+Start on macOS with Node.js 20+:
+
+```bash
+npx airmcp init
+```
+
+Then ask your client. Works with Claude, Codex, Cursor, Raycast, Xcode agents,
+and any other MCP client. Nothing reads or changes a client's settings until you
+opt in.
+
+More to try: [Common Workflows](#common-workflows) ·
+[every tool](llms-full.txt) · [Quick Start](#quick-start)
+
+### It does not act behind your back
+
+AirMCP is the connector and control layer, not another agent. Destructive calls
+preview before they run, approval is per-call, and the audit chain is
+tamper-evident and verifiable by you — read `airmcp://trust` and check it
+yourself. Details in [Safety Model](#safety-model).
 
 <p align="center">
-  <a href="docs/demo.gif"><img src="docs/demo.gif" alt="Real AirMCP governance flow: live trust assurance, zero-side-effect destructive preview, and verified audit chain" width="900"></a>
+  <a href="docs/demo.gif"><img src="docs/demo.gif" alt="A real AirMCP session showing the live trust verdict, a destructive delete previewed without executing, and a verified audit chain" width="900"></a>
 </p>
 
-<p align="center"><strong>Preview the action. Inspect live trust. Verify the audit chain.</strong><br>The recording is generated from a real local MCP round-trip by <code>scripts/demo/governed-flow.mjs</code>.</p>
+<p align="center">Generated from a real local MCP round-trip by <code>scripts/demo/governed-flow.mjs</code> — real terminal output, not a staged transcript.</p>
 
 > Multi-language project page: [heznpc.github.io/AirMCP](https://heznpc.github.io/AirMCP/)
 

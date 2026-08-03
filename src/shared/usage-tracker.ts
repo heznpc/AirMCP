@@ -20,6 +20,22 @@ interface UsageProfile {
 const FLUSH_INTERVAL = 60_000; // flush to disk every 60s
 const MAX_SEQUENCE_ENTRIES = 500;
 
+/**
+ * Test-mode disk isolation (defense in depth).
+ *
+ * A test or harness process (NODE_ENV=test, or a gate booted with
+ * AIRMCP_TEST_MODE=1 such as smoke-mcp / mcp-validate) that did NOT
+ * explicitly point AIRMCP_USAGE_PROFILE_PATH at its own scratch file must
+ * never read or write the resolved profile path — on a dev box that path is
+ * the developer's real ~/.airmcp/profile.json. This closed a real incident:
+ * fixture tool names (tool_a / tool_b / foo / test_tool) leaked into a real
+ * user profile's frequency/hourly stats and then persisted forever through
+ * the merge-on-load cycle. Captured at import time to match how PATHS
+ * resolves the profile path.
+ */
+const PERSISTENCE_BLOCKED =
+  (process.env.NODE_ENV === "test" || process.env.AIRMCP_TEST_MODE === "1") && !process.env.AIRMCP_USAGE_PROFILE_PATH;
+
 class UsageTracker {
   private lastTool: string | null = null;
   private profile: UsageProfile | null = null;
@@ -106,6 +122,10 @@ class UsageTracker {
 
   /** Flush to disk immediately (async). Waits for disk load to complete first. */
   async flush(): Promise<void> {
+    if (PERSISTENCE_BLOCKED) {
+      this.dirty = false;
+      return;
+    }
     if (this.loaded) await this.loaded;
     if (!this.dirty || !this.profile) return;
     this.profile.updatedAt = new Date().toISOString();
@@ -122,6 +142,10 @@ class UsageTracker {
 
   /** Synchronous flush for process exit handler. Skips if disk load still in-flight to avoid partial writes. */
   flushSync(): void {
+    if (PERSISTENCE_BLOCKED) {
+      this.dirty = false;
+      return;
+    }
     if (this.loaded || !this.dirty || !this.profile) return;
     this.profile.updatedAt = new Date().toISOString();
     try {
@@ -159,6 +183,10 @@ class UsageTracker {
 
   private loadSync(): void {
     this.profile = { version: 1, frequency: {}, sequences: {}, hourly: {}, updatedAt: "" };
+    // Reading is blocked too: merging the developer's real profile into a
+    // test-mode process both leaks personal usage data into test output and
+    // makes suites flaky on the host's history.
+    if (PERSISTENCE_BLOCKED) return;
     this.loaded = this.loadFromDisk()
       .catch((e) => {
         // loadFromDisk swallows ENOENT (expected on first run); everything else

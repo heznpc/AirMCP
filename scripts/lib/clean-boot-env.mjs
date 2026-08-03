@@ -50,5 +50,11 @@ export function cleanBootEnv(base = process.env) {
   env.AIRMCP_CONFIG_PATH = ABSENT_CONFIG;
   env.AIRMCP_PROFILE = "starter";
   env.AIRMCP_TOOL_EXPOSURE = "progressive";
+  // These gates inherit the REAL HOME (node/npx need it), so any tool call
+  // they make would otherwise be recorded into the developer's real
+  // ~/.airmcp/profile.json usage stats. Belt: disable tracking outright.
+  // Suspenders: usage-tracker.ts also refuses disk persistence whenever
+  // AIRMCP_TEST_MODE=1 without an explicit AIRMCP_USAGE_PROFILE_PATH.
+  env.AIRMCP_USAGE_TRACKING = "false";
   return env;
 }

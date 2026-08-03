@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Signed app's embedded Node runtime crashed on launch** — `notarize-app.sh` signed the bundled Node binary with the hardened runtime and no entitlements. V8 needs writable-then-executable JIT pages, which the hardened runtime forbids by default, so the re-signed binary died with SIGTRAP before `main()`: the bundle signed, notarized, and stapled cleanly while its embedded server could never start. Found on the first real signed run of v2.16.3, where `verify-bundle-structure.sh` caught it by executing the bundled runtime — after Apple had already accepted the broken artifact. The Node binary is now signed with `allow-jit` and `allow-unsigned-executable-memory` from `scripts/lib/node-runtime-entitlements.plist`; the Swift bridge stays on the default entitlement set.
+
 ## [2.16.3] - 2026-07-31
 
 ### Fixed

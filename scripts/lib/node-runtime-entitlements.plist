@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- V8 allocates writable-then-executable JIT pages. Under the hardened
+       runtime both keys are required for the embedded Node binary to run at
+       all: without them the process dies with SIGTRAP before main(), so the
+       bundled server can never start. AirMcpBridge (Swift, no JIT) must NOT
+       receive these — grant them only to the Node runtime. -->
+  <key>com.apple.security.cs.allow-jit</key><true/>
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key><true/>
+</dict>
+</plist>

@@ -93,6 +93,20 @@ done
 # The self-contained app embeds executable Node and Swift bridge binaries.
 # They are nested code and must receive the same Developer ID + hardened
 # runtime treatment before the outer bundle is signed.
+#
+# The Node binary additionally needs JIT entitlements: V8 requires
+# writable-then-executable pages, which the hardened runtime forbids by
+# default. Signing node without them produces a bundle that signs, notarizes,
+# and staples cleanly but whose embedded runtime dies with SIGTRAP before
+# main() — verify-bundle-structure.sh catches this because it executes the
+# bundled runtime, but only after a wasted notarization round-trip. The
+# Swift bridge performs no JIT and must stay on the default (stricter)
+# entitlement set.
+NODE_RUNTIME_ENTITLEMENTS="$SCRIPT_DIR/lib/node-runtime-entitlements.plist"
+if [ ! -f "$NODE_RUNTIME_ENTITLEMENTS" ]; then
+  echo "notarize-app: node runtime entitlements file missing" >&2
+  exit 1
+fi
 for nested in \
   "$APP_BUNDLE/Contents/Resources/airmcp/runtime/bin/node" \
   "$APP_BUNDLE/Contents/Resources/airmcp/bin/AirMcpBridge"; do
@@ -101,7 +115,11 @@ for nested in \
     exit 1
   fi
   echo "  signing embedded executable"
-  if ! codesign --force --options=runtime --timestamp \
+  NESTED_SIGN_ARGS=(--force --options=runtime --timestamp)
+  if [ "$(basename "$nested")" = "node" ]; then
+    NESTED_SIGN_ARGS+=(--entitlements "$NODE_RUNTIME_ENTITLEMENTS")
+  fi
+  if ! codesign "${NESTED_SIGN_ARGS[@]}" \
     --sign "$APPLE_DEVELOPER_ID" \
     "$nested" >/dev/null 2>&1; then
     echo "notarize-app: embedded executable signing failed" >&2

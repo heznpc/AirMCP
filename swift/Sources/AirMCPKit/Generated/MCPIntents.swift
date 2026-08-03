@@ -70,6 +70,10 @@ public struct MCPAuditSummaryOutput: Codable, Sendable {
         public let lineIndex: Double
         public let reason: String
     }
+    public struct Quarantined: Codable, Sendable {
+        public let files: Double
+        public let rows: Double
+    }
 
     public let since: String
     public let total: Double
@@ -81,6 +85,10 @@ public struct MCPAuditSummaryOutput: Codable, Sendable {
     public let verified: Bool
     public let verifiedFirstBreak: Verifiedfirstbreak?
     public let auditDisabled: Bool
+    public let unverifiedTailRows: Double
+    public let unsignedLegacyRows: Double
+    public let quarantined: Quarantined
+    public let legacyMixedBreak: Bool
 }
 
 // Output type for: describe_tool
@@ -8415,6 +8423,34 @@ public struct MCPAuditSummarySnippetView: View {
                 Text("Audit Disabled")
                 Spacer()
                 Text((data.auditDisabled ? "Yes" : "No"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Unverified Tail Rows")
+                Spacer()
+                Text(data.unverifiedTailRows.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Unsigned Legacy Rows")
+                Spacer()
+                Text(data.unsignedLegacyRows.formatted())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Quarantined")
+                Spacer()
+                Text(String(describing: data.quarantined))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            HStack {
+                Text("Legacy Mixed Break")
+                Spacer()
+                Text((data.legacyMixedBreak ? "Yes" : "No"))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }

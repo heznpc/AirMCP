@@ -809,6 +809,31 @@
           },
           "auditDisabled": {
             "type": "boolean"
+          },
+          "unverifiedTailRows": {
+            "type": "number"
+          },
+          "unsignedLegacyRows": {
+            "type": "number"
+          },
+          "quarantined": {
+            "type": "object",
+            "properties": {
+              "files": {
+                "type": "number"
+              },
+              "rows": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "files",
+              "rows"
+            ],
+            "additionalProperties": false
+          },
+          "legacyMixedBreak": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -820,7 +845,11 @@
           "topTools",
           "byActor",
           "verified",
-          "auditDisabled"
+          "auditDisabled",
+          "unverifiedTailRows",
+          "unsignedLegacyRows",
+          "quarantined",
+          "legacyMixedBreak"
         ],
         "additionalProperties": false
       },

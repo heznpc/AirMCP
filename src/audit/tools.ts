@@ -147,6 +147,19 @@ export function registerAuditTools(server: McpServer, _config: AirMcpConfig): vo
         // flush failures). Surfaced so a doctor / health check can flag a gap
         // in coverage rather than reading silence as "nothing happened".
         auditDisabled: z.boolean(),
+        // Coverage disclosure — a broken chain must never silently shrink the
+        // summary. unverifiedTailRows = rows after a chain break that exist on
+        // disk but are not in `total`; unsignedLegacyRows = pre-HMAC rows
+        // still active; quarantined = audit.legacy-untrusted.* snapshot files
+        // (full pre-surgery file images, so rows may overlap the active
+        // chain's surviving prefix).
+        unverifiedTailRows: z.number(),
+        unsignedLegacyRows: z.number(),
+        quarantined: z.object({ files: z.number(), rows: z.number() }),
+        // True when the break is provably key-holder mixed-version history
+        // (old build / concurrent fork) rather than tampering; an upgraded
+        // server quarantines it automatically on its next flush.
+        legacyMixedBreak: z.boolean(),
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },

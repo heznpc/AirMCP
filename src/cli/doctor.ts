@@ -661,11 +661,23 @@ export async function runDoctor(): Promise<void> {
         ok("Audit HMAC chain", `verified across ${summary.scannedFiles} file(s), ${summary.total} entries`);
       } else if (summary.verifiedFirstBreak) {
         const b = summary.verifiedFirstBreak;
-        bad(
-          "Audit HMAC chain",
-          `break at ${b.file}:${b.lineIndex} (${b.reason}) — possible tampering or corruption. ` +
-            `Inspect the surrounding lines, then call audit_summary to see the full break window.`,
-        );
+        if (summary.legacyMixedBreak) {
+          // Key-holder-written rows under an older chain contract (pre-seq
+          // build or two builds appending concurrently) — not tampering. The
+          // server quarantines this automatically on its next flush.
+          meh(
+            "Audit HMAC chain",
+            `mixed-version legacy history at ${b.file}:${b.lineIndex} (${b.reason}) — ` +
+              `${summary.unverifiedTailRows} unverified row(s) will be quarantined byte-exact on the server's next ` +
+              `audit flush and the chain resumes. If this recurs, an outdated AirMCP build is still writing to this store.`,
+          );
+        } else {
+          bad(
+            "Audit HMAC chain",
+            `break at ${b.file}:${b.lineIndex} (${b.reason}) — possible tampering or corruption. ` +
+              `Inspect the surrounding lines, then call audit_summary to see the full break window.`,
+          );
+        }
       } else {
         meh("Audit HMAC chain", "no chained entries on disk yet");
       }

@@ -906,7 +906,7 @@ async function flushOneBatch(): Promise<boolean> {
   // Swap before waiting for the OS lock. New events remain ordered in the
   // fresh buffer and the outer queue seals them before its callers return.
   const toFlush = buffer;
-  const toFlushBytes = bufferBytes;
+  let toFlushBytes = bufferBytes;
   buffer = [];
   bufferBytes = 0;
   let appended = false;
@@ -928,6 +928,40 @@ async function flushOneBatch(): Promise<boolean> {
       // failure — re-derive the truth from a full scan before failing closed.
       clearChainTrust();
       disk = await scanAuditChain();
+    }
+    if (!disk.appendable && disk.legacyMixedBreak && !legacyMixedMigrationAttempted) {
+      // Provably key-holder-written history under an older chain contract
+      // (see migrateLegacyMixedHistory). Quarantine it once instead of letting
+      // every flush fail until audit authority is permanently revoked.
+      legacyMixedMigrationAttempted = true;
+      const brokenAt = disk.firstBreak!;
+      const stats = await migrateLegacyMixedHistory(disk);
+      clearChainTrust();
+      disk = await scanAuditChain();
+      if (!disk.appendable) {
+        const detail = disk.firstBreak
+          ? `${disk.firstBreak.file}:${disk.firstBreak.lineIndex} ${disk.firstBreak.reason}`
+          : "unknown integrity failure";
+        throw new Error(`Audit legacy-mixed migration did not restore an appendable chain (${detail})`);
+      }
+      // Seal a self-describing marker as the first post-migration row so the
+      // migration itself is on the tamper-evident record.
+      const marker = JSON.stringify({
+        timestamp: new Date().toISOString(),
+        kind: "tool",
+        tool: "__audit_chain_migration",
+        status: "ok",
+        args: {
+          reason: "legacy_mixed_history",
+          firstAnomaly: `${brokenAt.file}:${brokenAt.lineIndex}`,
+          anomalyReason: brokenAt.reason,
+          quarantinedFiles: stats.quarantinedFiles,
+          quarantinedRows: stats.quarantinedRows,
+          resumedFromHead: stats.previousHead,
+        },
+      });
+      toFlush.unshift(marker);
+      toFlushBytes += Buffer.byteLength(marker, "utf8");
     }
     if (!disk.appendable) {
       const detail = disk.firstBreak
@@ -1143,12 +1177,14 @@ function sortActiveAuditFiles(files: string[]): string[] {
     });
 }
 
+const LEGACY_QUARANTINE_PREFIX = "audit.legacy-untrusted.";
+
 async function createLegacyQuarantineLink(sourcePath: string, sourceName: string): Promise<string> {
   for (let attempt = 0; attempt < 8; attempt++) {
     // This prefix deliberately does not match either active rotation pattern.
     // A hard link preserves the exact original bytes before any active file is
     // unlinked or rewritten, and fails instead of overwriting a collision.
-    const targetPath = join(AUDIT_DIR, `audit.legacy-untrusted.${Date.now()}.${randomUUID()}.${sourceName}`);
+    const targetPath = join(AUDIT_DIR, `${LEGACY_QUARANTINE_PREFIX}${Date.now()}.${randomUUID()}.${sourceName}`);
     try {
       await link(sourcePath, targetPath);
       // Hard links share an inode, so this simultaneously repairs a
@@ -1271,6 +1307,130 @@ async function quarantineUnsignedLegacyPrefix(): Promise<void> {
   }
 }
 
+interface LegacyMixedMigrationStats {
+  quarantinedFiles: number;
+  quarantinedRows: number;
+  /** Chain head of the strict verified prefix that stays active. */
+  previousHead: string;
+  previousSeq: number;
+}
+
+/** At most one legacy-mixed migration per process. A chain that breaks AGAIN
+ * after a successful migration means a pre-contract writer is still appending
+ * concurrently (or the store is genuinely damaged); repeating the quarantine
+ * would just shuttle that writer's rows into quarantine forever, so the second
+ * break keeps the original hard fail-closed behavior and the operator log
+ * points at the stale co-installed build. */
+let legacyMixedMigrationAttempted = false;
+
+/**
+ * One-shot migration for mixed-version signed history (RFC: audit chain epoch
+ * migration).
+ *
+ * Real stores upgraded across several AirMCP releases can contain signed rows
+ * written by builds with DIFFERENT chain contracts: pre-`seq` rows appended
+ * after a sequenced era, a `seq` era restarting at 0, or two concurrently
+ * installed builds forking the chain off the same parent. Every such row still
+ * carries a valid HMAC under the store key — it is provably key-holder output,
+ * not tampering — but the strict scanner rejects it, which previously made
+ * every flush fail and (after MAX_FLUSH_FAILURES) permanently revoked audit
+ * logging with no migration path.
+ *
+ * Policy implemented here, symmetric with the unsigned-legacy quarantine:
+ *   - The strict verified prefix (everything before the first anomaly) stays
+ *     active and trusted; the checkpoint is re-anchored to its tail.
+ *   - Everything from the first anomaly onward is preserved byte-exact behind
+ *     the same `audit.legacy-untrusted.*` quarantine boundary (hard link
+ *     first, then rewrite/unlink), so no history is destroyed — it is just
+ *     never again part of the trusted verdict.
+ *   - The first row sealed after migration is a self-describing
+ *     `__audit_chain_migration` marker recording what was quarantined and the
+ *     quarantined head hmac, so the migration itself is tamper-evident.
+ *
+ * Caller must hold the audit writer lock and must only call this when the
+ * scan reported `legacyMixedBreak` (tamper-shaped breaks never reach here).
+ */
+async function migrateLegacyMixedHistory(scan: AuditChainScanResult): Promise<LegacyMixedMigrationStats> {
+  const brk = scan.firstBreak;
+  if (!brk || brk.lineIndex < 0) {
+    throw new Error("Audit legacy-mixed migration requires a row-level break location");
+  }
+  const files = sortActiveAuditFiles(await readdir(AUDIT_DIR));
+  const breakFileIdx = files.indexOf(brk.file);
+  if (breakFileIdx < 0) {
+    throw new Error(`Audit legacy-mixed migration could not find the break file (${brk.file})`);
+  }
+
+  let quarantinedFiles = 0;
+  let quarantinedRows = 0;
+  for (let i = breakFileIdx; i < files.length; i++) {
+    const file = files[i]!;
+    const sourcePath = join(AUDIT_DIR, file);
+    const raw = await readFile(sourcePath, "utf-8");
+    const allLines = raw.split("\n");
+    // Line indexes from the scanner refer to positions in the raw split, so
+    // slice on the raw array and only then drop blank lines.
+    const keepIdx = i === breakFileIdx ? brk.lineIndex : 0;
+    const kept = allLines.slice(0, keepIdx).filter((l) => l.length > 0);
+    const dropped = allLines.slice(keepIdx).filter((l) => l.length > 0);
+    if (dropped.length === 0) continue;
+
+    // Preserve the exact original bytes before any rewrite or unlink.
+    await createLegacyQuarantineLink(sourcePath, file);
+    quarantinedFiles++;
+    quarantinedRows += dropped.length;
+    if (kept.length === 0) {
+      await unlink(sourcePath);
+      await syncAuditDirectory();
+      continue;
+    }
+    const tempPath = join(AUDIT_DIR, `audit.legacy-rewrite.${process.pid}.${randomUUID()}.tmp`);
+    try {
+      await writeFile(tempPath, kept.join("\n") + "\n", { encoding: "utf-8", mode: 0o600, flag: "wx" });
+      // Same durability barrier as writeCheckpoint: seal the rewritten bytes
+      // and the directory entry before the old name disappears.
+      await syncPath(tempPath);
+      await rename(tempPath, sourcePath);
+      await syncAuditDirectory();
+    } finally {
+      await unlink(tempPath).catch(() => {});
+    }
+  }
+
+  // Re-anchor the truncation checkpoint to the surviving strict tail. When the
+  // surviving prefix has no sequenced rows the checkpoint must be absent —
+  // leaving the old (higher) anchor in place would read as truncation forever.
+  if (scan.chainLastSeq >= 0) {
+    if (!(await writeCheckpoint(scan.chainLastSeq, scan.chainHeadHmac))) {
+      throw new Error("Audit legacy-mixed migration could not re-anchor the checkpoint");
+    }
+  } else {
+    try {
+      await unlink(CHECKPOINT_PATH);
+      await syncAuditDirectory();
+    } catch (err) {
+      if (!isFsError(err, "ENOENT")) throw err;
+    }
+  }
+
+  log.warn("audit: mixed-version signed history quarantined behind an untrusted boundary", {
+    firstAnomaly: `${brk.file}:${brk.lineIndex} (${brk.reason})`,
+    files: quarantinedFiles,
+    rows: quarantinedRows,
+    keptVerifiedRows: scan.entries.length,
+    note:
+      "rows were HMAC-valid but written under an older chain contract (pre-seq build or concurrent fork); " +
+      "if this recurs, an outdated AirMCP build is still writing to this store — remove it",
+  });
+
+  return {
+    quarantinedFiles,
+    quarantinedRows,
+    previousHead: scan.chainHeadHmac,
+    previousSeq: scan.chainLastSeq,
+  };
+}
+
 async function nextRotatedAuditPath(tailSeq: number): Promise<string> {
   const files = await readdir(AUDIT_DIR);
   let maxTimestamp = -1;
@@ -1381,6 +1541,7 @@ export function _testReset(): string[] {
   warnedHostKey = false;
   observedCheckpointFloor = null;
   verifiedChainTrust = null;
+  legacyMixedMigrationAttempted = false;
   return snapshot;
 }
 
@@ -1495,6 +1656,20 @@ interface AuditChainScanResult {
   signedShapeEncountered: boolean;
   chainHeadHmac: string;
   chainLastSeq: number;
+  /** Non-empty rows at/after `firstBreak` that were read but never verified.
+   * Zero on an intact chain. Surfaced so summaries can DISCLOSE the size of
+   * the unverified remainder instead of silently shrinking `total`. */
+  unverifiedTailRows: number;
+  /** The break row is a well-formed sealed row whose own HMAC verifies under
+   * this store's key AND whose `_prev` points at history this scan already
+   * verified (the running head or an earlier verified row). Only a key-holding
+   * AirMCP writer can produce such a row, so the break is mixed-version legacy
+   * history — an older build that predates the `seq` contract, or two builds
+   * appending concurrently (a fork) — not byte tampering. Eligible for the
+   * one-shot legacy-mixed quarantine migration at flush time. Byte edits,
+   * unsigned insertions, forged envelopes, and every checkpoint break keep
+   * this false and remain hard fail-closed. */
+  legacyMixedBreak: boolean;
 }
 
 function asAuditEntry(entry: Record<string, unknown>): AuditEntry | null {
@@ -1552,6 +1727,7 @@ async function scanAuditChain(trust: ChainTrust | null = null): Promise<AuditCha
   const entries: AuditEntry[] = [];
   const legacyEntries: AuditEntry[] = [];
   const seenFiles = new Set<string>();
+  const seenHmacs = new Set<string>();
   let prev: string = HMAC_GENESIS;
   let chainStarted = false;
   let signedShapeEncountered = false;
@@ -1561,36 +1737,79 @@ async function scanAuditChain(trust: ChainTrust | null = null): Promise<AuditCha
   let legacyFirst: { file: string; lineIndex: number } | undefined;
   const checkpoint = await readCheckpoint();
   let checkpointHmacAtSeq: string | undefined;
+  let firstBreak: { file: string; lineIndex: number; reason: AuditChainBreakReason } | undefined;
+  let legacyMixedBreak = false;
+  let unverifiedTailRows = 0;
 
-  const broken = (file: string, lineIndex: number, reason: AuditChainBreakReason): AuditChainScanResult => ({
+  const brokenResult = (): AuditChainScanResult => ({
     entries,
     legacyEntries,
     scannedFiles: seenFiles.size,
     verified: false,
-    firstBreak: { file, lineIndex, reason },
+    firstBreak,
     appendable: false,
     chainStarted,
     signedShapeEncountered,
     chainHeadHmac,
     chainLastSeq,
+    unverifiedTailRows,
+    legacyMixedBreak,
   });
 
+  /** Was the break row itself written by a key holder chaining onto history
+   * this scan already verified? See `legacyMixedBreak` on the result type. */
+  const classifyLegacyMixed = (line: string, entry: Record<string, unknown> | null): boolean => {
+    if (!entry) return false;
+    const hmacField = entry._hmac;
+    const prevField = entry._prev;
+    if (typeof hmacField !== "string" || typeof prevField !== "string") return false;
+    if (!/^[0-9a-f]{64}$/.test(hmacField) || !/^[0-9a-f]{64}$/.test(prevField)) return false;
+    const body = exactSignedBody(line, prevField, hmacField);
+    if (!body) return false;
+    if (computeHmac(prevField, body) !== hmacField) return false;
+    return prevField === (chainStarted ? prev : HMAC_GENESIS) || seenHmacs.has(prevField);
+  };
+
   for await (const item of readAllAuditLinesIndexed()) {
-    if ("readFailure" in item) return broken(item.readFailure, -1, "malformed");
+    if ("readFailure" in item) {
+      // A whole file (or the directory) could not be read at all. There is no
+      // way to even count the remainder, so stop the walk here.
+      firstBreak ??= { file: item.readFailure, lineIndex: -1, reason: "malformed" };
+      break;
+    }
     const { line, file, lineIndex } = item;
     seenFiles.add(file);
+    if (firstBreak) {
+      // Verification is over, but keep draining so the unverified remainder is
+      // DISCLOSED by size instead of silently vanishing from every summary.
+      unverifiedTailRows++;
+      continue;
+    }
+
+    // Local helper: record the first break at this row, classify it, and count
+    // the row itself into the unverified tail.
+    const breakHere = (reason: AuditChainBreakReason, entry: Record<string, unknown> | null): void => {
+      firstBreak = { file, lineIndex, reason };
+      legacyMixedBreak = (reason === "malformed" || reason === "prev_mismatch") && classifyLegacyMixed(line, entry);
+      unverifiedTailRows = 1;
+    };
+
     let entry: Record<string, unknown>;
     try {
       entry = JSON.parse(line) as Record<string, unknown>;
     } catch {
-      return broken(file, lineIndex, "malformed");
+      breakHere("malformed", null);
+      continue;
     }
 
     const hasHmac = Object.prototype.hasOwnProperty.call(entry, "_hmac");
     const hasPrev = Object.prototype.hasOwnProperty.call(entry, "_prev");
     if (!hasHmac && !hasPrev) {
       const legacyEntry = asAuditEntry(entry);
-      if (chainStarted || !legacyEntry) return broken(file, lineIndex, "malformed");
+      if (chainStarted || !legacyEntry) {
+        breakHere("malformed", entry);
+        continue;
+      }
       legacyFirst ??= { file, lineIndex };
       legacyEntries.push(legacyEntry);
       continue;
@@ -1607,11 +1826,15 @@ async function scanAuditChain(trust: ChainTrust | null = null): Promise<AuditCha
       !/^[0-9a-f]{64}$/.test(hmacField) ||
       !/^[0-9a-f]{64}$/.test(prevField)
     ) {
-      return broken(file, lineIndex, "malformed");
+      breakHere("malformed", entry);
+      continue;
     }
 
     const expectedPrev = chainStarted ? prev : HMAC_GENESIS;
-    if (prevField !== expectedPrev) return broken(file, lineIndex, "prev_mismatch");
+    if (prevField !== expectedPrev) {
+      breakHere("prev_mismatch", entry);
+      continue;
+    }
 
     const rawSeq = entry.seq;
     const trustCovers =
@@ -1621,30 +1844,51 @@ async function scanAuditChain(trust: ChainTrust | null = null): Promise<AuditCha
       // skip only the HMAC recomputation. The anchor row must still carry the
       // exact hmac we recorded — any splice or history replacement breaks
       // either this comparison or the structural checks around it.
-      if (rawSeq === trust.seq && hmacField !== trust.hmac) return broken(file, lineIndex, "hmac_mismatch");
+      if (rawSeq === trust.seq && hmacField !== trust.hmac) {
+        breakHere("hmac_mismatch", entry);
+        continue;
+      }
     } else {
       // Verify the literal bytes sealed by the writer. Reconstructing from the
       // parsed object would normalize duplicate keys, escape spellings, and
       // whitespace, allowing a raw JSONL edit to keep `verified: true`.
       const signedBody = exactSignedBody(line, prevField, hmacField);
-      if (!signedBody) return broken(file, lineIndex, "malformed");
+      if (!signedBody) {
+        breakHere("malformed", entry);
+        continue;
+      }
       const expected = computeHmac(prevField, signedBody);
-      if (expected !== hmacField) return broken(file, lineIndex, "hmac_mismatch");
+      if (expected !== hmacField) {
+        breakHere("hmac_mismatch", entry);
+        continue;
+      }
     }
 
     const decoded = asAuditEntry(entry);
-    if (!decoded) return broken(file, lineIndex, "malformed");
+    if (!decoded) {
+      breakHere("malformed", entry);
+      continue;
+    }
 
     const seqField = entry.seq;
     if (seqField === undefined) {
       // Once the signed sequence starts it is part of every subsequent signed
       // body. Omitting it would evade the truncation checkpoint's ordering.
-      if (seqStarted) return broken(file, lineIndex, "malformed");
+      if (seqStarted) {
+        breakHere("malformed", entry);
+        continue;
+      }
     } else {
-      if (!Number.isInteger(seqField) || (seqField as number) < 0) return broken(file, lineIndex, "malformed");
+      if (!Number.isInteger(seqField) || (seqField as number) < 0) {
+        breakHere("malformed", entry);
+        continue;
+      }
       const seq = seqField as number;
       const expectedSeq = seqStarted ? chainLastSeq + 1 : 0;
-      if (seq !== expectedSeq) return broken(file, lineIndex, "malformed");
+      if (seq !== expectedSeq) {
+        breakHere("malformed", entry);
+        continue;
+      }
       seqStarted = true;
       chainLastSeq = seq;
       if (checkpoint.kind === "valid" && checkpoint.seq === seq) checkpointHmacAtSeq = hmacField;
@@ -1652,9 +1896,17 @@ async function scanAuditChain(trust: ChainTrust | null = null): Promise<AuditCha
 
     entries.push(decoded);
     prev = hmacField;
+    seenHmacs.add(hmacField);
     chainStarted = true;
     chainHeadHmac = hmacField;
   }
+
+  if (firstBreak) return brokenResult();
+
+  const broken = (file: string, lineIndex: number, reason: AuditChainBreakReason): AuditChainScanResult => {
+    firstBreak = { file, lineIndex, reason };
+    return brokenResult();
+  };
 
   // The checkpoint is atomically replaced. Missing/malformed state after a
   // sequenced chain exists is therefore a fail-closed integrity gap rather
@@ -1700,6 +1952,8 @@ async function scanAuditChain(trust: ChainTrust | null = null): Promise<AuditCha
       signedShapeEncountered,
       chainHeadHmac,
       chainLastSeq,
+      unverifiedTailRows: 0,
+      legacyMixedBreak: false,
     };
   }
 
@@ -1713,6 +1967,8 @@ async function scanAuditChain(trust: ChainTrust | null = null): Promise<AuditCha
     signedShapeEncountered,
     chainHeadHmac,
     chainLastSeq,
+    unverifiedTailRows: 0,
+    legacyMixedBreak: false,
   };
 }
 
@@ -1791,6 +2047,49 @@ export interface AuditSummary {
    *  too many failures). Auto-recovery kicks in after the backoff window;
    *  the field surfaces the state so a doctor / health check can flag it. */
   auditDisabled: boolean;
+  /** Rows at/after the first chain break that exist on disk but could not be
+   *  verified — and are therefore NOT inside `total`. Always disclosed (0 on
+   *  an intact chain) so a broken chain can never silently shrink the summary.
+   *  Unlike `total` these disclosure counters are window-independent: they
+   *  describe the whole store, not the `since` slice. */
+  unverifiedTailRows: number;
+  /** Unsigned pre-HMAC rows still in the active store. Inspectable via
+   *  audit_log on a legacy-only store, but never part of the trusted total. */
+  unsignedLegacyRows: number;
+  /** Byte-exact preserved history behind the `audit.legacy-untrusted.*`
+   *  quarantine boundary (unsigned pre-HMAC rows and mixed-version signed
+   *  rows). Counted so quarantined history stays visible in every summary
+   *  instead of disappearing without a trace. Quarantine files are FULL
+   *  pre-surgery snapshots of the affected file, so `rows` counts snapshot
+   *  lines and can overlap rows that also survived into the active chain. */
+  quarantined: { files: number; rows: number };
+  /** The current chain break looks like mixed-version key-holder history (see
+   *  scan classification) rather than tampering; the next flush of an upgraded
+   *  server will quarantine it automatically. */
+  legacyMixedBreak: boolean;
+}
+
+/** Count quarantined legacy history so summaries can disclose it. */
+async function collectQuarantineStats(): Promise<{ files: number; rows: number }> {
+  let names: string[];
+  try {
+    names = await readdir(AUDIT_DIR);
+  } catch {
+    return { files: 0, rows: 0 };
+  }
+  let files = 0;
+  let rows = 0;
+  for (const name of names) {
+    if (!name.startsWith(LEGACY_QUARANTINE_PREFIX)) continue;
+    files++;
+    try {
+      const raw = await readFile(join(AUDIT_DIR, name), "utf-8");
+      rows += raw.split("\n").filter(Boolean).length;
+    } catch {
+      // Unreadable quarantine file: still disclosed as a file.
+    }
+  }
+  return { files, rows };
 }
 
 /** Aggregate statistics over the HMAC-verified prefix only. */
@@ -1832,6 +2131,7 @@ export async function summarizeAuditEntries(opts: { since?: string; topN?: numbe
     .map(([actor, v]) => ({ actor, count: v.count, errors: v.errors }))
     .sort((a, b) => b.count - a.count);
   const total = page.entries.length;
+  const quarantined = await collectQuarantineStats();
   return {
     since: sinceIso,
     total,
@@ -1843,6 +2143,10 @@ export async function summarizeAuditEntries(opts: { since?: string; topN?: numbe
     verified: chainResult.verified,
     verifiedFirstBreak: chainResult.firstBreak,
     auditDisabled,
+    unverifiedTailRows: chainResult.unverifiedTailRows,
+    unsignedLegacyRows: chainResult.legacyEntries.length,
+    quarantined,
+    legacyMixedBreak: chainResult.legacyMixedBreak,
   };
 }
 

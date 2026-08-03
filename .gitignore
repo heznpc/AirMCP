@@ -52,3 +52,6 @@ CLAUDE.md
 # the Codex analog of .claude/* above. Not for publication.
 /AGENTS.md
 .codex/
+
+# Local-only agent state (internal strategy; never publish)
+docs/state.md

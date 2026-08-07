@@ -2,8 +2,8 @@
 //
 // Source: docs/tool-manifest.json
 // Generator: scripts/gen-swift-intents.mjs
-// RFC 0007 Phase A.2b.2 + A.4.1 — 233 auto-selected read-only
-// tools (85 with typed drift-guards + Interactive Snippet
+// RFC 0007 Phase A.2b.2 + A.4.1 — 234 auto-selected read-only
+// tools (86 with typed drift-guards + Interactive Snippet
 // SwiftUI views) + 8 AppShortcutsProvider entries.
 // Run `npm run gen:intents` to refresh after tool metadata changes.
 // CI guards against drift via `npm run gen:intents:check`.
@@ -51,6 +51,11 @@ public struct MCPAiPlanMetricsOutput: Codable, Sendable {
     public let expectedCoverageAvg: Double
     public let leakedForbiddenTotal: Double
     public let perCase: [PercaseItem]
+}
+
+// Output type for: allow_sleep
+public struct MCPAllowSleepOutput: Codable, Sendable {
+    public let cancelled: Bool
 }
 
 // Output type for: audit_summary
@@ -1699,6 +1704,34 @@ public struct AiStatusIntent: AppIntent {
             tool: "ai_status",
             args: [String: any Sendable]()
         )
+        return .result(value: result)
+    }
+}
+
+// Tool: allow_sleep
+public struct AllowSleepIntent: AppIntent {
+    nonisolated(unsafe) public static var title: LocalizedStringResource = "Allow Sleep"
+    nonisolated(unsafe) public static var description = IntentDescription("Cancel any active prevent_sleep assertion immediately, so the Mac can sleep normally again (idle timeout or closing the lid). No-op if no assertion is active.")
+    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
+
+    public init() {}
+
+    @MainActor
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let result = try await MCPIntentRouter.shared.call(
+            tool: "allow_sleep",
+            args: [String: any Sendable]()
+        )
+        guard let data = result.data(using: .utf8) else {
+            throw MCPIntentError.toolCallFailed(tool: "allow_sleep", message: "empty result from router")
+        }
+        let decoded = try JSONDecoder().decode(MCPAllowSleepOutput.self, from: data)
+        #if canImport(SwiftUI) && compiler(>=6.3)
+        if #available(macOS 26, iOS 26, *) {
+            return .result(value: result, view: MCPAllowSleepSnippetView(data: decoded))
+        }
+        #endif
+        _ = decoded
         return .result(value: result)
     }
 }
@@ -5838,7 +5871,7 @@ public struct PodcastPlaybackControlIntent: AppIntent {
 // Tool: prevent_sleep
 public struct PreventSleepIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Prevent Sleep"
-    nonisolated(unsafe) public static var description = IntentDescription("Prevent the Mac from sleeping for a specified duration using caffeinate. The assertion is transient — it auto-releases when the timer elapses; no manual stop is required.")
+    nonisolated(unsafe) public static var description = IntentDescription("Prevent the Mac from sleeping for a specified duration using caffeinate. The assertion auto-releases when the timer elapses, or immediately via allow_sleep. Note: this also blocks sleep triggered by closing the lid, not just idle timeout — call allow_sleep first if you're about to close the lid.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
@@ -8343,6 +8376,25 @@ public struct MCPAiPlanMetricsSnippetView: View {
                 Text(row.name)
                     .font(.body)
                     .lineLimit(1)
+            }
+        }
+        .padding()
+    }
+}
+
+// Snippet view for: allow_sleep  (shape: scalar)
+@available(macOS 26, iOS 26, *)
+public struct MCPAllowSleepSnippetView: View {
+    public let data: MCPAllowSleepOutput
+    public init(data: MCPAllowSleepOutput) { self.data = data }
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text("Cancelled")
+                Spacer()
+                Text((data.cancelled ? "Yes" : "No"))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
             }
         }
         .padding()

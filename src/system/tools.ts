@@ -572,7 +572,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
     {
       title: "Prevent Sleep",
       description:
-        "Prevent the Mac from sleeping for a specified duration using caffeinate. The assertion is transient — it auto-releases when the timer elapses; no manual stop is required.",
+        "Prevent the Mac from sleeping for a specified duration using caffeinate. The assertion auto-releases when the timer elapses, or immediately via allow_sleep. Note: this also blocks sleep triggered by closing the lid, not just idle timeout — call allow_sleep first if you're about to close the lid.",
       inputSchema: {
         seconds: z
           .number()
@@ -607,6 +607,37 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       } catch (e) {
         return errJxaFor("prevent sleep", e);
       }
+    },
+  );
+
+  server.registerTool(
+    "allow_sleep",
+    {
+      title: "Allow Sleep",
+      description:
+        "Cancel any active prevent_sleep assertion immediately, so the Mac can sleep normally again (idle timeout or closing the lid). No-op if no assertion is active.",
+      inputSchema: {},
+      outputSchema: {
+        cancelled: z.boolean(),
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async () => {
+      const cancelled = caffeinatePids.size > 0;
+      for (const pid of caffeinatePids) {
+        try {
+          process.kill(pid);
+        } catch {
+          /* already exited */
+        }
+      }
+      caffeinatePids.clear();
+      return okStructured({ cancelled });
     },
   );
 

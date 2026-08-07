@@ -57,7 +57,7 @@ When headline features change, walk this list before you touch any registry UI:
 
 - [ ] `npm run stats:sync` shows **no** remaining diffs (zero "sync:" lines)
 - [ ] `server.json` `version` matches `package.json` version
-- [ ] `server.json` `description` reflects current headline features (`.mcpb` one-click, OAuth 2.1, profiles, progressive tool exposure, 233 AppIntents, skills, memory, audit, inbound HTTP `allowNetwork`)
+- [ ] `server.json` `description` reflects current headline features (`.mcpb` one-click, OAuth 2.1, profiles, progressive tool exposure, 234 AppIntents, skills, memory, audit, inbound HTTP `allowNetwork`)
 - [ ] `README.md` Features block mirrors the description — catches the case where one was updated without the other
 - [ ] `docs/index.html` title, metadata, hero, and proof points lead with the governed Apple ecosystem runtime, distinguish current and roadmap platforms, and omit aggregate catalog counts
 - [ ] `CHANGELOG.md` `[Unreleased]` block names every user-visible change since the last registry ping

@@ -3,7 +3,7 @@ title: Module Overview
 description: All 32 AirMCP modules with tool counts and capabilities.
 ---
 
-AirMCP ships 32 modules that cover the Apple workspace. Each module registers a set of MCP tools that AI assistants can call. The full manifest contains 297 tools, while the default starter/progressive runtime exposes a smaller front door.
+AirMCP ships 32 modules that cover the Apple workspace. Each module registers a set of MCP tools that AI assistants can call. The full manifest contains 298 tools, while the default starter/progressive runtime exposes a smaller front door.
 
 Module packs are the activation boundary above modules. `npx airmcp modules enable productivity` or `AIRMCP_MODULE_PACKS=core,productivity` keeps core workspace tools and iWork active while reporting unavailable profile modules through `profile_status.modulesMissingPacks`. npm and MCPB releases are universal and already contain every standard JavaScript module; profiles and progressive exposure narrow the active context without making users assemble the product from packages. Scoped add-ons such as `@heznpc/airmcp-productivity` remain optional compatibility artifacts for `external-only` deployments.
 
@@ -22,7 +22,7 @@ The release gate boots clean-installed npm and MCPB artifacts in `full/full` mod
 | **Music** | 17 | Full Apple Music control. Playlists, playback, search, queue management. |
 | **Finder** | 8 | File system operations. Search, list directories, recent files, create directories, trash files. |
 | **Safari** | 12 | Tab management, bookmarks, reading list. Open/close tabs, get page content, execute JavaScript. |
-| **System** | 27 | Clipboard, volume, brightness, dark mode, Wi-Fi, Bluetooth, battery, running apps, windows, notifications. |
+| **System** | 28 | Clipboard, volume, brightness, dark mode, Wi-Fi, Bluetooth, battery, running apps, windows, notifications. |
 | **Photos** | 11 | Albums, search, favorites, photo info. Create albums, export photos. |
 | **Shortcuts** | 11 | List, search, run, create, delete, export, import, duplicate Siri Shortcuts. Plus dynamic per-shortcut tools. |
 | **Intelligence** | 13 | Apple Intelligence features (macOS 26+ only). Writing tools, image generation, summarization. |

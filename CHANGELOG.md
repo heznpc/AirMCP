@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`allow_sleep`** — `prevent_sleep` spawns a background `caffeinate -t <seconds>` (default 1h, max 24h) with no way to release it early. Bare `caffeinate` also blocks sleep triggered by closing the lid, not just idle timeout, so an active assertion left the Mac running (fans on, battery draining) with the lid shut until the timer expired, up to a full day later. `allow_sleep` kills the tracked `caffeinate` process immediately, restoring normal sleep behavior; it's a no-op when no assertion is active. `prevent_sleep`'s description now calls out the lid-close interaction.
+
 ## [2.16.4] - 2026-08-03
 
 ### Fixed

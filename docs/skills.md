@@ -1,6 +1,6 @@
 # AirMCP Skills Guide
 
-A practical guide for AI agents to effectively use AirMCP's 297 tools across 32 modules to orchestrate the Apple ecosystem via MCP.
+A practical guide for AI agents to effectively use AirMCP's 298 tools across 32 modules to orchestrate the Apple ecosystem via MCP.
 
 ## Overview
 
@@ -34,7 +34,7 @@ AirMCP bridges AI agents to native macOS applications through JXA (JavaScript fo
 | **safari** | Safari | `list_tabs`, `read_page_content`, `open_url`, `run_javascript`, `list_bookmarks`, `add_to_reading_list` | 12 |
 | **screen** | Screen Capture | `capture_screen`, `capture_window`, `capture_area`, `list_windows`, `record_screen` | 5 |
 | **shortcuts** | Shortcuts | `list_shortcuts`, `run_shortcut`, `get_shortcut_detail`, `search_shortcuts`, `export_shortcut` | 11 |
-| **system** | System | `get_clipboard`, `set_clipboard`, `show_notification`, `capture_screenshot`, `get_battery_status`, `toggle_dark_mode`, `system_sleep`, `prevent_sleep`, `system_power` | 27 |
+| **system** | System | `get_clipboard`, `set_clipboard`, `show_notification`, `capture_screenshot`, `get_battery_status`, `toggle_dark_mode`, `system_sleep`, `prevent_sleep`, `allow_sleep`, `system_power` | 28 |
 | **location** | Location | `get_current_location`, `get_location_status` | 2 |
 | **bluetooth** | Bluetooth | `bluetooth_scan`, `bluetooth_connect`, `bluetooth_disconnect`, `bluetooth_list_devices` | 4 |
 | **tv** | TV | `tv_list_playlists`, `tv_now_playing`, `tv_playback_control`, `tv_search`, `tv_play` | 6 |

@@ -37,7 +37,7 @@ describe('registerSystemTools', () => {
       'get_wifi_status', 'toggle_wifi', 'list_bluetooth_devices',
       'get_battery_status', 'get_brightness', 'set_brightness',
       'toggle_focus_mode',
-      'system_sleep', 'prevent_sleep', 'system_power',
+      'system_sleep', 'prevent_sleep', 'allow_sleep', 'system_power',
       'launch_app', 'quit_app', 'is_app_running',
       'list_all_windows', 'move_window', 'resize_window', 'minimize_window',
     ];
@@ -71,6 +71,40 @@ describe('registerSystemTools', () => {
       const tool = server._tools.get(name);
       expect(tool.opts.annotations.destructiveHint).toBe(true);
     }
+  });
+});
+
+// ── prevent_sleep / allow_sleep ──────────────────────────────────────
+
+describe('allow_sleep', () => {
+  beforeEach(() => {
+    mockRunJxa.mockReset();
+    mockRunAutomation.mockReset();
+  });
+
+  test('reports cancelled: false when no assertion is active', async () => {
+    const { server } = setup();
+
+    const result = await server.callTool('allow_sleep', {});
+
+    expect(result.isError).toBeUndefined();
+    expect(result.structuredContent).toEqual({ cancelled: false });
+  });
+
+  test('kills the tracked caffeinate process and reports cancelled: true', async () => {
+    const { server } = setup();
+    // Use a PID guaranteed not to correspond to a real process.
+    mockRunJxa.mockResolvedValue({ action: 'prevent_sleep', pid: 2147483647, seconds: 60 });
+    await server.callTool('prevent_sleep', { seconds: 60 });
+
+    const result = await server.callTool('allow_sleep', {});
+
+    expect(result.isError).toBeUndefined();
+    expect(result.structuredContent).toEqual({ cancelled: true });
+
+    // A second call is a no-op since the assertion was already cleared.
+    const second = await server.callTool('allow_sleep', {});
+    expect(second.structuredContent).toEqual({ cancelled: false });
   });
 });
 

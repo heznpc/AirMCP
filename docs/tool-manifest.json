@@ -1,8 +1,8 @@
 {
   "generatedAt": "STABLE_PLACEHOLDER",
   "protocolVersion": "2025-11-25",
-  "toolCount": 297,
-  "eligibleCount": 290,
+  "toolCount": 298,
+  "eligibleCount": 291,
   "ineligibleCount": 7,
   "ineligibleByReason": {
     "object-param:recurrence": 2,
@@ -476,6 +476,38 @@
       "outputSchema": null,
       "annotations": {
         "readOnlyHint": true,
+        "destructiveHint": false,
+        "sensitiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "appIntentEligible": true,
+      "ineligibleReason": null
+    },
+    {
+      "name": "allow_sleep",
+      "title": "Allow Sleep",
+      "description": "Cancel any active prevent_sleep assertion immediately, so the Mac can sleep normally again (idle timeout or closing the lid). No-op if no assertion is active.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {}
+      },
+      "outputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "cancelled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "cancelled"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
         "destructiveHint": false,
         "sensitiveHint": false,
         "idempotentHint": true,
@@ -9713,7 +9745,7 @@
     {
       "name": "prevent_sleep",
       "title": "Prevent Sleep",
-      "description": "Prevent the Mac from sleeping for a specified duration using caffeinate. The assertion is transient — it auto-releases when the timer elapses; no manual stop is required.",
+      "description": "Prevent the Mac from sleeping for a specified duration using caffeinate. The assertion auto-releases when the timer elapses, or immediately via allow_sleep. Note: this also blocks sleep triggered by closing the lid, not just idle timeout — call allow_sleep first if you're about to close the lid.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",

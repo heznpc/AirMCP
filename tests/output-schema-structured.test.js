@@ -140,6 +140,11 @@ const TOOL_FIXTURES = {
     args: {},
     mock: { name: 'Finder', bundleIdentifier: 'com.apple.finder', pid: 1 },
   },
+  allow_sleep: {
+    // Pure Node logic — no JXA/Swift/Automation call, so `mock` is unused.
+    args: {},
+    mock: {},
+  },
   // mail
   list_mailboxes: {
     args: {},

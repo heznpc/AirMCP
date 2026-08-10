@@ -164,7 +164,7 @@ More workflow examples live in [docs/workflows.md](docs/workflows.md).
 AirMCP is designed to keep a large local capability surface usable without
 dumping the full catalog into every client context.
 
-The complete generated catalog currently contains 297 tools across 32 modules.
+The complete generated catalog currently contains 298 tools across 32 modules.
 Profiles and progressive exposure keep clients from loading it all at once.
 
 - **Profiles**: `starter`, `communications-safe`, `productivity`, `full`, or
@@ -201,7 +201,7 @@ do not use it as the first-success workflow. Broader diagnostics such as
 The complete generated tool manifest is in
 [docs/tool-manifest.json](docs/tool-manifest.json).
 
-Current generated surfaces: 233 App Intent action types, 85 Interactive Snippet views,
+Current generated surfaces: 234 App Intent action types, 86 Interactive Snippet views,
 14 AppEnum pickers, and an iOS-only provider with 8 read-only App Shortcuts that match the preview runtime. The sessionless discovery card uses MCP schema version
 2025-11-25.
 

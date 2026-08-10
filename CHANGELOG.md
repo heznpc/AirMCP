@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`allow_sleep`** — `prevent_sleep` spawns a background `caffeinate -t <seconds>` (default 1h, max 24h) with no way to release it early. Bare `caffeinate` also blocks sleep triggered by closing the lid, not just idle timeout, so an active assertion left the Mac running (fans on, battery draining) with the lid shut until the timer expired, up to a full day later. `allow_sleep` kills the tracked `caffeinate` process immediately, restoring normal sleep behavior; it's a no-op when no assertion is active. `prevent_sleep`'s description now calls out the lid-close interaction.
 
+### Fixed
+
+- **HITL approval requests could time out without ever being shown** — on a fresh install a gated tool call from a Claude client returned `[hitl_timeout] Action denied: approval for "…" timed out before a decision` with no prompt appearing anywhere. The app starts its approval-socket listener at launch but deliberately never asks for notification permission there, so the server saw a reachable socket, picked the socket channel (Claude clients skip elicitation by design to avoid double approval), and `HitlManager` handed the request to `UNUserNotificationCenter` — which silently drops notifications while authorization is `.notDetermined`. "Socket reachable" was being treated as "visible to a human". `HitlManager` now routes each incoming request through a pure presentation decision (unit-tested behind an authorizer seam): authorized/provisional posts the notification as before; `.notDetermined` requests authorization on the spot — a gated action waiting on the user is the one moment that prompt is justified — and posts on grant; denied or refused falls back to opening the Trust Center window in the foreground via the app's existing window path, so approval is always possible even with notifications off. The server's `timed_out`/`unavailable` denials now say what to do (check the menubar pending-approvals list / Trust Center, allow notifications in System Settings, restart the app) instead of just reporting the failure.
+
 ## [2.16.4] - 2026-08-03
 
 ### Fixed

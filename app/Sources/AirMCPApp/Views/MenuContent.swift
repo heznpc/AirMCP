@@ -193,6 +193,14 @@ struct MenuContent: View {
         .onAppear {
             addonManager.refreshIfNeeded()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .hitlApprovalNeedsAttention)) { _ in
+            // A pending approval cannot reach the user as a notification
+            // (authorization denied or refused). Reuse the existing Trust
+            // Center open path so the approval UI is visible either way —
+            // LSUIElement apps need an explicit activate to come forward.
+            openWindow(id: AirMcpConstants.trustCenterWindowID)
+            NSApp.activate()
+        }
     }
 
     // MARK: 1 - Server Status

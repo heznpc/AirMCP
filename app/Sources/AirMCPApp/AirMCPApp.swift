@@ -140,9 +140,11 @@ struct AirMCPApp: App {
     private func setupHitl() {
         hitlManager.timeoutSeconds = configManager.hitlTimeout
         if configManager.hitlLevel != .off {
-            // Register the local approval channel without prompting. macOS
-            // notification authorization is requested only from an explicit
-            // user-initiated runtime start action.
+            // Register the local approval channel without prompting at launch.
+            // macOS notification authorization is requested from an explicit
+            // user-initiated runtime start action, or lazily by HitlManager
+            // when the first gated request actually arrives — a reachable
+            // socket alone must never be mistaken for a visible prompt.
             HitlManager.registerNotificationCategory()
             hitlManager.startListening()
         } else {
@@ -287,6 +289,10 @@ final class OnboardingWindowHolder: NSObject {
 
 extension Notification.Name {
     static let hitlNotificationResponse = Notification.Name("hitlNotificationResponse")
+    /// A pending HITL approval cannot be surfaced as a macOS notification
+    /// (authorization denied or just refused) — the scene layer must bring the
+    /// in-app approval UI to the foreground instead.
+    static let hitlApprovalNeedsAttention = Notification.Name("hitlApprovalNeedsAttention")
 }
 
 // MARK: - URL Scheme Handler (airmcp://)

@@ -117,6 +117,13 @@ struct TrustCenterView: View {
         store.filteredRuns(from: store.persistedRuns)
     }
 
+    /// Every live pending approval across visible runs, newest first. The
+    /// notification fallback opens this window with no run selected — approval
+    /// must complete on this surface without requiring a sidebar selection.
+    private var pendingApprovalsAcrossRuns: [LivePendingApproval] {
+        visibleRuns.flatMap(\.pendingApprovals).sorted { $0.timestamp > $1.timestamp }
+    }
+
     private var sidebar: some View {
         VStack(spacing: 0) {
             Picker(L("trust.section"), selection: $page) {
@@ -282,6 +289,11 @@ struct TrustCenterView: View {
         case .activity:
             if let run = store.selectedRun(in: visibleRuns) {
                 runDetail(run)
+            } else if !pendingApprovalsAcrossRuns.isEmpty {
+                // Fallback surface: the window may have just been opened by
+                // .hitlApprovalNeedsAttention with nothing selected. Pending
+                // approvals must be answerable right here, immediately.
+                pendingApprovalsDetail
             } else {
                 ContentUnavailableView(
                     L("trust.selectRun"),
@@ -377,6 +389,24 @@ struct TrustCenterView: View {
                             timelineRow(entry)
                         }
                     }
+                }
+            }
+            .padding(22)
+            .frame(maxWidth: 760, alignment: .leading)
+        }
+        .navigationTitle(L("trust.activity"))
+    }
+
+    /// Renders every pending approval as an actionable card (same
+    /// approve/deny path as the menubar), shown when no run is selected.
+    private var pendingApprovalsDetail: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                Label(L("settings.pendingApprovals"), systemImage: "person.crop.circle.badge.questionmark")
+                    .font(.title2.weight(.semibold))
+                    .foregroundStyle(.orange)
+                ForEach(pendingApprovalsAcrossRuns) { pending in
+                    pendingApprovalCard(pending)
                 }
             }
             .padding(22)

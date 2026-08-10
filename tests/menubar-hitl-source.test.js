@@ -65,7 +65,40 @@ describe("menubar HITL fallback source contract", () => {
     // The label closure of MenuBarExtra — not MenuContent (the dropdown) —
     // is what must construct this view, so the subscription is wired into
     // the always-alive status item rather than the ephemeral dropdown.
-    expect(airmcpApp).toMatch(/} label: \{[\s\S]*HitlFallbackMenuBarLabel\(onAppear: initializeRuntimeIfNeeded\)[\s\S]*\}\n\s*\.menuBarExtraStyle/);
+    expect(airmcpApp).toMatch(
+      /} label: \{[\s\S]*HitlFallbackMenuBarLabel\(hitlManager: hitlManager, onAppear: initializeRuntimeIfNeeded\)[\s\S]*\}\n\s*\.menuBarExtraStyle/,
+    );
+  });
+
+  test("status-bar icon flips to an alert glyph while any approval is pending, independent of window z-order", () => {
+    // Both the notification banner and the visual-fallback window can be
+    // hidden behind another foreground app's frontmost window — activate()
+    // cannot promote AirMCP above it. The status-item icon has no such
+    // failure mode, so it must react to pendingRequests directly rather than
+    // to which presentation channel a given request took.
+    expect(hitlManager).toContain("enum MenuBarIconState: Equatable, Sendable");
+    expect(hitlManager).toContain('case .idle: return "a.square.fill"');
+    expect(hitlManager).toContain('case .pendingApproval: return "exclamationmark.circle.fill"');
+    expect(hitlManager).toMatch(
+      /static func menuBarIconState\(pendingCount: Int\) -> MenuBarIconState \{\s*pendingCount > 0 \? \.pendingApproval : \.idle/,
+    );
+    expect(airmcpApp).toContain("let hitlManager: HitlManager");
+    expect(airmcpApp).toContain(
+      "HitlManager.menuBarIconState(pendingCount: hitlManager.pendingRequests.count)",
+    );
+    expect(airmcpApp).toContain("Label(\"AirMCP\", systemImage: iconState.systemImageName)");
+    expect(airmcpApp).toContain("iconState == .pendingApproval ? Color.orange : Color.primary");
+  });
+
+  test("visual fallback plays an alert sound to match the notification channel's content.sound", () => {
+    // postNotification sets content.sound = .default; the visual-fallback
+    // branch of presentApproval had no acoustic equivalent, so a request
+    // routed there was silent on top of being potentially hidden by z-order.
+    expect(hitlManager).toContain("content.sound = .default");
+    expect(hitlManager).toContain('NSSound(named: "Glass")?.play()');
+    expect(hitlManager).toMatch(
+      /case \.visualFallback:[\s\S]*playVisualFallbackAlertSound\(\)[\s\S]*NotificationCenter\.default\.post\(name: \.hitlApprovalNeedsAttention/,
+    );
   });
 
   test("trust center completes approval on the fallback surface without a selection", () => {

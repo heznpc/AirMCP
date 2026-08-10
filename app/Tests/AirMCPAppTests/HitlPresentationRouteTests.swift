@@ -105,4 +105,32 @@ final class HitlPresentationRouteTests: XCTestCase {
         let requests = await authorizer.authorizationRequestCount
         XCTAssertEqual(requests, 1)
     }
+
+    // MARK: - Menu-bar icon state (pure derivation from pending count)
+    //
+    // This covers only the logic: "does the icon state flip when there's a
+    // pending request". Whether the glyph actually renders distinctly and
+    // whether NSSound audibly plays in HitlManager's visual-fallback branch
+    // are both device-only — no simulator/headless check exists for either,
+    // so they are NOT covered here and must be confirmed on a real run.
+
+    func testZeroPendingIsIdleIcon() {
+        XCTAssertEqual(HitlManager.menuBarIconState(pendingCount: 0), .idle)
+        XCTAssertEqual(HitlManager.MenuBarIconState.idle.systemImageName, "a.square.fill")
+    }
+
+    func testAnyPendingIsAlertIcon() {
+        XCTAssertEqual(HitlManager.menuBarIconState(pendingCount: 1), .pendingApproval)
+        XCTAssertEqual(HitlManager.menuBarIconState(pendingCount: 5), .pendingApproval)
+        XCTAssertEqual(HitlManager.MenuBarIconState.pendingApproval.systemImageName, "exclamationmark.circle.fill")
+    }
+
+    func testIconStateIsNotConflatedWithPresentationChannel() {
+        // The icon must flip on pending count alone, independent of whether
+        // that specific request is being shown via notification or the
+        // visual fallback — it is a supplementary signal, not a replacement
+        // for either, and must not silently depend on which channel a given
+        // request happened to route through.
+        XCTAssertEqual(HitlManager.menuBarIconState(pendingCount: 1), .pendingApproval)
+    }
 }

@@ -94,7 +94,7 @@ struct AirMCPApp: App {
             // subscription must live here, not in MenuContent: a request that
             // needs the fallback arrives precisely when the user isn't looking
             // at the menu, so content may not exist to receive it.
-            HitlFallbackMenuBarLabel(onAppear: initializeRuntimeIfNeeded)
+            HitlFallbackMenuBarLabel(hitlManager: hitlManager, onAppear: initializeRuntimeIfNeeded)
         }
         .menuBarExtraStyle(.menu)
 
@@ -313,10 +313,24 @@ extension Notification.Name {
 /// lifetime is provably the app's lifetime, not the dropdown's.
 private struct HitlFallbackMenuBarLabel: View {
     @Environment(\.openWindow) private var openWindow
+    let hitlManager: HitlManager
     let onAppear: () -> Void
 
+    /// Reading `hitlManager.pendingRequests` here is what makes this view
+    /// re-render on change — @Observable tracks properties read from `body`
+    /// (or, as here, a computed var body reads), the same mechanism every
+    /// other manager-driven view in this app already relies on.
+    private var iconState: HitlManager.MenuBarIconState {
+        HitlManager.menuBarIconState(pendingCount: hitlManager.pendingRequests.count)
+    }
+
     var body: some View {
-        Label("AirMCP", systemImage: "a.square.fill")
+        // The status-item icon is the one signal with no z-order failure
+        // mode: a hidden window or an unheard sound both still leave this
+        // visible. Swap glyph + tint together so "something needs you" is
+        // legible even to someone who only glances at the menu bar.
+        Label("AirMCP", systemImage: iconState.systemImageName)
+            .foregroundStyle(iconState == .pendingApproval ? Color.orange : Color.primary)
             .onAppear(perform: onAppear)
             .onReceive(NotificationCenter.default.publisher(for: .hitlApprovalNeedsAttention)) { _ in
                 // Reuse the existing Trust Center window path (same call the

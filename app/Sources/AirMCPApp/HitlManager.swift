@@ -1,3 +1,4 @@
+import AppKit
 import Darwin
 import Foundation
 import Network
@@ -60,6 +61,31 @@ final class HitlManager {
         /// No notification can reach the user — bring the app's existing
         /// approval UI (Trust Center / menubar pending list) to the front.
         case visualFallback
+    }
+
+    /// Status-bar icon state, derived purely from whether any approval is
+    /// currently waiting on the user. Every other signal (notification
+    /// banner, the visual-fallback window) can be hidden by z-order — a
+    /// window behind another foreground app never becomes visible just
+    /// because NSApp.activate() was called, it cannot promote AirMCP above a
+    /// different app's frontmost window. The status-bar icon has no such
+    /// failure mode: it always renders, so it is the one signal a "did
+    /// anything even happen?" user can rely on regardless of what else on
+    /// screen failed to grab their attention.
+    enum MenuBarIconState: Equatable, Sendable {
+        case idle
+        case pendingApproval
+
+        var systemImageName: String {
+            switch self {
+            case .idle: return "a.square.fill"
+            case .pendingApproval: return "exclamationmark.circle.fill"
+            }
+        }
+    }
+
+    nonisolated static func menuBarIconState(pendingCount: Int) -> MenuBarIconState {
+        pendingCount > 0 ? .pendingApproval : .idle
     }
 
     /// First routing step, derived purely from the authorization status.
@@ -489,9 +515,23 @@ final class HitlManager {
             case .visualFallback:
                 // Whoever owns the approval UI (the SwiftUI scene layer) brings
                 // the Trust Center window forward; the manager stays UI-free.
+                // A notification would have carried content.sound = .default —
+                // this branch has no equivalent unless played explicitly, and
+                // the window it triggers can be hidden behind another
+                // foreground app (activate() cannot promote above it), so
+                // sound is the only signal here not subject to z-order.
+                Self.playVisualFallbackAlertSound()
                 NotificationCenter.default.post(name: .hitlApprovalNeedsAttention, object: nil)
             }
         }
+    }
+
+    /// Isolated to its own method (rather than inlined) so it is the one
+    /// spot to swap for an injectable seam if this ever needs a unit test
+    /// beyond "was it called" — NSSound.play() itself needs a real device to
+    /// confirm.
+    private static func playVisualFallbackAlertSound() {
+        NSSound(named: "Glass")?.play()
     }
 
     // MARK: - Notifications

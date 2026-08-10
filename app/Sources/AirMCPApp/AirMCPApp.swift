@@ -85,10 +85,16 @@ struct AirMCPApp: App {
                 hitlManager.respond(id: requestId, approved: approved, tool: tool)
             }
         } label: {
-            Label("AirMCP", systemImage: "a.square.fill")
-                .onAppear {
-                    initializeRuntimeIfNeeded()
-                }
+            // `label:` — unlike `content:` (MenuContent) above — is the actual
+            // status-bar item view. MenuBarExtra(content:label:) tears content
+            // down whenever the dropdown closes but keeps label instantiated
+            // for as long as the status item is shown, i.e. the app's entire
+            // run (this file already relies on that fact for the one-time
+            // initializeRuntimeIfNeeded() call below). The HITL visual-fallback
+            // subscription must live here, not in MenuContent: a request that
+            // needs the fallback arrives precisely when the user isn't looking
+            // at the menu, so content may not exist to receive it.
+            HitlFallbackMenuBarLabel(onAppear: initializeRuntimeIfNeeded)
         }
         .menuBarExtraStyle(.menu)
 
@@ -293,6 +299,34 @@ extension Notification.Name {
     /// (authorization denied or just refused) — the scene layer must bring the
     /// in-app approval UI to the foreground instead.
     static let hitlApprovalNeedsAttention = Notification.Name("hitlApprovalNeedsAttention")
+}
+
+/// The `label:` view of the menu bar's `MenuBarExtra` — i.e. the status-bar
+/// icon itself, not its dropdown. SwiftUI keeps this view instantiated for as
+/// long as the status item is visible (the app's entire run under
+/// `.menuBarExtraStyle(.menu)`), unlike `content:`, which SwiftUI tears down
+/// and rebuilds every time the dropdown closes/opens. A `.onReceive` placed on
+/// `content` (as an earlier version of this fix did) only fires when the
+/// dropdown happens to already be open — precisely the state a user who needs
+/// the visual fallback is *not* in. Placing the subscription on this label
+/// view instead is what makes it fire regardless of menu state: this view's
+/// lifetime is provably the app's lifetime, not the dropdown's.
+private struct HitlFallbackMenuBarLabel: View {
+    @Environment(\.openWindow) private var openWindow
+    let onAppear: () -> Void
+
+    var body: some View {
+        Label("AirMCP", systemImage: "a.square.fill")
+            .onAppear(perform: onAppear)
+            .onReceive(NotificationCenter.default.publisher(for: .hitlApprovalNeedsAttention)) { _ in
+                // Reuse the existing Trust Center window path (same call the
+                // menu's "Trust Center" button and onboarding's link use).
+                // LSUIElement apps need an explicit activate to come forward
+                // since there's no Dock icon to click.
+                openWindow(id: AirMcpConstants.trustCenterWindowID)
+                NSApp.activate()
+            }
+    }
 }
 
 // MARK: - URL Scheme Handler (airmcp://)

@@ -5,6 +5,7 @@ const root = new URL("..", import.meta.url);
 const hitlManager = readFileSync(new URL("app/Sources/AirMCPApp/HitlManager.swift", root), "utf8");
 const menuContent = readFileSync(new URL("app/Sources/AirMCPApp/Views/MenuContent.swift", root), "utf8");
 const trustCenter = readFileSync(new URL("app/Sources/AirMCPApp/Views/TrustCenterView.swift", root), "utf8");
+const airmcpApp = readFileSync(new URL("app/Sources/AirMCPApp/AirMCPApp.swift", root), "utf8");
 
 describe("menubar HITL fallback source contract", () => {
   test("tracks pending approval requests until a response is sent", () => {
@@ -42,6 +43,29 @@ describe("menubar HITL fallback source contract", () => {
     expect(menuContent).toContain("hitlManager.respond(id: request.id, approved: true");
     expect(menuContent).toContain('Button(L("hitl.deny"))');
     expect(menuContent).toContain("hitlManager.respond(id: request.id, approved: false");
+  });
+
+  test("visual-fallback subscription lives on the persistent status-item label, not the dropdown content", () => {
+    // MenuBarExtra(content:label:) tears `content` (MenuContent) down every
+    // time the dropdown closes and only rebuilds it while open. A request
+    // that needs the visual fallback arrives precisely when the user isn't
+    // looking at the menu — i.e. dropdown closed, content not instantiated —
+    // so subscribing there means the fallback silently never fires in the
+    // one situation it exists for. It must instead live on `label:`, which
+    // SwiftUI keeps instantiated for as long as the status item is visible
+    // (the app's entire run) — the same persistence this file already
+    // depends on for its one-time initializeRuntimeIfNeeded() call.
+    expect(menuContent).not.toContain("hitlApprovalNeedsAttention");
+    expect(airmcpApp).toContain("hitlApprovalNeedsAttention");
+    expect(airmcpApp).toContain("struct HitlFallbackMenuBarLabel: View");
+    expect(airmcpApp).toContain("@Environment(\\.openWindow) private var openWindow");
+    expect(airmcpApp).toMatch(
+      /struct HitlFallbackMenuBarLabel: View \{[\s\S]*onReceive\(NotificationCenter\.default\.publisher\(for: \.hitlApprovalNeedsAttention\)\)[\s\S]*openWindow\(id: AirMcpConstants\.trustCenterWindowID\)[\s\S]*NSApp\.activate\(\)/,
+    );
+    // The label closure of MenuBarExtra — not MenuContent (the dropdown) —
+    // is what must construct this view, so the subscription is wired into
+    // the always-alive status item rather than the ephemeral dropdown.
+    expect(airmcpApp).toMatch(/} label: \{[\s\S]*HitlFallbackMenuBarLabel\(onAppear: initializeRuntimeIfNeeded\)[\s\S]*\}\n\s*\.menuBarExtraStyle/);
   });
 
   test("trust center completes approval on the fallback surface without a selection", () => {

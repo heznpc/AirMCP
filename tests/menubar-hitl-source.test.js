@@ -36,6 +36,26 @@ describe("menubar HITL fallback source contract", () => {
     expect(hitlManager).toContain("pendingConnections.removeValue(forKey: request.id)");
   });
 
+  test("notification requests time-sensitive delivery to bypass macOS's Scheduled Summary", () => {
+    // A default-priority (.active) notification is fair game for macOS to
+    // batch into a later Scheduled Summary instead of delivering it now —
+    // indistinguishable from "nothing happened" while a gated tool call sits
+    // blocked. content.interruptionLevel = .timeSensitive is the documented,
+    // non-deprecated way to ask the OS not to do that.
+    expect(hitlManager).toContain("content.interruptionLevel = .timeSensitive");
+    expect(hitlManager).toMatch(
+      /func postNotification\(for request: ApprovalRequest\) \{[\s\S]*content\.interruptionLevel = \.timeSensitive[\s\S]*UNUserNotificationCenter\.current\(\)\.add\(notificationRequest\)/,
+    );
+    // UNAuthorizationOptions.timeSensitive is deprecated since macOS 12 in
+    // favor of the time-sensitive entitlement (confirmed by a build warning
+    // against this target's macOS 14 SDK) — it must not be requested as an
+    // authorization option in either call site, or the deprecated API sits
+    // silently unused-but-warned in a codebase whose CI treats build output
+    // as significant.
+    expect(hitlManager).not.toContain(".timeSensitive]");
+    expect(hitlManager).not.toContain(".timeSensitive,");
+  });
+
   test("menu exposes explicit approve and deny actions for pending requests", () => {
     expect(menuContent).toContain("hitlManager.pendingRequests");
     expect(menuContent).toContain('Text(L("settings.pendingApprovals"))');

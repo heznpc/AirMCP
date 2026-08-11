@@ -18,6 +18,15 @@ struct SystemHitlNotificationAuthorizer: HitlNotificationAuthorizing {
     }
 
     func requestAuthorization() async -> Bool {
+        // NOT requesting UNAuthorizationOptions.timeSensitive here: the SDK
+        // marks it deprecated since macOS 12 ("Use time-sensitive
+        // entitlement" — confirmed by a real build warning against the
+        // macOS 14 SDK this target compiles against). Apple moved this from
+        // an authorization-option the user grants to an entitlement the app
+        // must carry in its code signature; the option no longer gates
+        // anything on current macOS. content.interruptionLevel = .timeSensitive
+        // below is the still-current mechanism — it needs the entitlement,
+        // not this option, to actually be honored.
         (try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])) ?? false
     }
 }
@@ -549,6 +558,30 @@ final class HitlManager {
         content.sound = .default
         content.categoryIdentifier = "HITL_APPROVAL"
         content.userInfo = ["tool": request.tool]
+        // A gated tool call is genuinely time-sensitive — the caller is
+        // blocked waiting on a decision. Without this, macOS's Scheduled
+        // Summary notification setting (System Settings → Notifications →
+        // AirMCP → Notification Grouping / Summary) is free to judge a
+        // default-priority (.active) notification as non-urgent and defer it
+        // into a later batch instead of delivering it immediately — which
+        // reads identically to "nothing happened" from the caller's side,
+        // and plausibly explains a share of today's "did HITL even fire?"
+        // reports on top of the .notDetermined-authorization gap fixed
+        // above. Setting this property alone is always safe — it cannot
+        // throw or crash — but the OS only actually honors it if the app
+        // carries the com.apple.developer.usernotifications.time-sensitive
+        // entitlement. That entitlement is NOT currently present anywhere in
+        // this app's signing pipeline (scripts/bundle-app.sh's inline
+        // entitlements heredoc has app-sandbox + application-groups only,
+        // and no dedicated .entitlements file exists in this repo).
+        // Granting it requires enabling the capability in the Apple
+        // Developer Portal for this team, which cannot be confirmed or
+        // performed from source alone — deliberately left out of this
+        // change. Until that capability is granted, this line is inert:
+        // the OS silently falls back to .active (today's status quo), never
+        // a regression, and the moment the entitlement is added this
+        // already does the right thing with no further code change needed.
+        content.interruptionLevel = .timeSensitive
 
         let notificationRequest = UNNotificationRequest(
             identifier: request.id,
@@ -562,6 +595,9 @@ final class HitlManager {
     // MARK: - Notification Registration
 
     static func requestNotificationPermission() {
+        // See SystemHitlNotificationAuthorizer.requestAuthorization() for why
+        // .timeSensitive is deliberately NOT in this option set (deprecated
+        // since macOS 12 in favor of the time-sensitive entitlement).
         UNUserNotificationCenter.current().requestAuthorization(
             options: [.alert, .sound]
         ) { granted, error in

@@ -289,7 +289,7 @@
 
 /* Trust Center - Non-promptable system permissions */
 "trust.systemPermissions" = "Autorisations système";
-"trust.systemPermissionsHint" = "macOS n’affiche jamais de fenêtre pour ces autorisations. Ouvrez les réglages et activez-les manuellement.";
+"trust.systemPermissionsHint" = "Ces états décrivent uniquement AirMCP.app. Pour un serveur MCP stdio, accordez l’accès à l’application qui héberge AirMCP (par exemple Claude Code ou le Terminal), puis relancez l’outil.";
 "trust.screenRecording" = "Enregistrement de l’écran";
 "trust.accessibility" = "Accessibilité";
 "trust.fullDiskAccess" = "Accès complet au disque";

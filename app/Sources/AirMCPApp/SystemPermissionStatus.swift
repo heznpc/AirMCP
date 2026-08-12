@@ -4,9 +4,10 @@ import CoreGraphics
 import Foundation
 
 /// The three macOS privacy categories that can never show a consent popup:
-/// the user must flip the toggle in System Settings themselves. The Trust
-/// Center therefore shows their live status plus a deep link into the exact
-/// pane — the two things the product *can* do for non-promptable TCC grants.
+/// the user must flip the toggle in System Settings themselves. These probes
+/// report the AirMCP.app process only; stdio MCP servers must inspect the host
+/// process that launches their osascript/JXA execution path instead. The Trust
+/// Center therefore labels its status as app-local and provides a deep link.
 enum SystemPermissionState: Sendable {
     case granted
     case notGranted

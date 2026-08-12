@@ -60,7 +60,7 @@ describe('non-promptable system permission probes', () => {
     expect(trustView).toContain('L("trust.notGranted")');
   });
 
-  test('Swift bridge exposes the permission-status command for the server probe', () => {
+  test('Swift bridge keeps the native process probe for app-owned callers', () => {
     expect(bridge).toContain('case "permission-status":');
     expect(bridge).toContain('CGPreflightScreenCaptureAccess()');
     expect(bridge).toContain('AXIsProcessTrusted()');

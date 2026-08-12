@@ -289,7 +289,7 @@
 
 /* Trust Center - Non-promptable system permissions */
 "trust.systemPermissions" = "システム権限";
-"trust.systemPermissionsHint" = "macOSはこれらの権限のポップアップを表示しません。設定を開いて手動で有効にしてください。";
+"trust.systemPermissionsHint" = "これらの状態はAirMCP.app自身のみを示します。stdio MCPサーバーでは、AirMCPをホストするアプリ（Claude Codeやターミナルなど）に権限を与えてから、ツールを再実行してください。";
 "trust.screenRecording" = "画面収録";
 "trust.accessibility" = "アクセシビリティ";
 "trust.fullDiskAccess" = "フルディスクアクセス";

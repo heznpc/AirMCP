@@ -13459,7 +13459,7 @@
     {
       "name": "setup_permissions",
       "title": "Setup Permissions",
-      "description": "Trigger macOS permission prompts for all Apple apps used by AirMCP and report permission status. Run this once after installation to grant all permissions at once. Each app will show a one-time macOS permission dialog. Screen Recording, Accessibility, and Full Disk Access cannot be requested with a popup — their current status is reported, and open_settings jumps straight to the System Settings pane where the user can enable them.",
+      "description": "Trigger macOS permission prompts for all Apple apps used by AirMCP and report permission status. Run this once after installation to grant all permissions at once. Each app will show a one-time macOS permission dialog. Screen Recording and Accessibility are probed from the same osascript/JXA execution host used by JXA tools; Full Disk Access is probed from the MCP server process. None of these three permissions can be requested with a popup — open_settings jumps straight to the System Settings pane where the user can enable them.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",

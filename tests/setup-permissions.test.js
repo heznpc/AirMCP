@@ -12,6 +12,14 @@
 import { describe, test, expect, jest, beforeEach } from '@jest/globals';
 
 const spawnCalls = [];
+let executionHostProbeFails = false;
+const runJxa = jest.fn(async (script) => {
+  if (script.includes('CGPreflightScreenCaptureAccess')) {
+    if (executionHostProbeFails) throw new Error('JXA probe unavailable');
+    return { screenRecording: false, accessibility: true };
+  }
+  return '{"accessible":true}';
+});
 jest.unstable_mockModule('node:child_process', () => {
   const actual = jest.requireActual('node:child_process');
   return {
@@ -25,14 +33,15 @@ jest.unstable_mockModule('node:child_process', () => {
 });
 
 jest.unstable_mockModule('../dist/shared/jxa.js', () => ({
-  runJxa: jest.fn(async () => '{"accessible":true}'),
+  runJxa,
 }));
 
-let bridgeHasCommand = true;
-let bridgeStatus = { screenRecording: false, accessibility: true };
+// Compatibility mocks: setup_permissions must not use the Swift bridge for these probes.
+const hasSwiftCommand = jest.fn(async () => true);
+const runSwift = jest.fn(async () => ({ screenRecording: false, accessibility: true }));
 jest.unstable_mockModule('../dist/shared/swift.js', () => ({
-  hasSwiftCommand: jest.fn(async () => bridgeHasCommand),
-  runSwift: jest.fn(async () => bridgeStatus),
+  hasSwiftCommand,
+  runSwift,
   checkSwiftBridge: jest.fn(async () => null),
   closeSwiftBridge: jest.fn(),
 }));
@@ -54,8 +63,10 @@ function captureTool() {
 
 beforeEach(() => {
   spawnCalls.length = 0;
-  bridgeHasCommand = true;
-  bridgeStatus = { screenRecording: false, accessibility: true };
+  executionHostProbeFails = false;
+  runJxa.mockClear();
+  hasSwiftCommand.mockClear();
+  runSwift.mockClear();
 });
 
 describe('setup_permissions — non-promptable permission status', () => {
@@ -66,7 +77,7 @@ describe('setup_permissions — non-promptable permission status', () => {
     expect(tool.config.description).toContain('open_settings');
   });
 
-  test('reports bridge-probed Screen Recording / Accessibility status with settings deep links', async () => {
+  test('reports osascript/JXA execution-host status with settings deep links', async () => {
     const tool = captureTool();
     const result = await tool.cb({});
     const parsed = JSON.parse(result.content[0].text);
@@ -74,11 +85,13 @@ describe('setup_permissions — non-promptable permission status', () => {
     expect(parsed.system_permissions.screen_recording).toMatchObject({
       status: 'denied',
       settings_url: 'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture',
+      observed_by: 'osascript/JXA execution host (same path as JXA tools)',
     });
     expect(parsed.system_permissions.screen_recording.settings_path).toContain('Privacy & Security');
     expect(parsed.system_permissions.accessibility).toMatchObject({
       status: 'granted',
       settings_url: 'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility',
+      observed_by: 'osascript/JXA execution host (same path as JXA tools)',
     });
     // Full Disk is probed against the real TCC database on this machine —
     // the value is environment-dependent, the contract is the shape.
@@ -86,10 +99,15 @@ describe('setup_permissions — non-promptable permission status', () => {
     expect(parsed.system_permissions.full_disk.settings_url).toBe(
       'x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles',
     );
+    expect(parsed.system_permissions.full_disk.observed_by).toBe('MCP server process');
+    expect(runJxa).toHaveBeenCalledWith(expect.stringContaining('ObjC.bindFunction'));
+    expect(runJxa).toHaveBeenCalledWith(expect.stringContaining('CGPreflightScreenCaptureAccess'));
+    expect(hasSwiftCommand).not.toHaveBeenCalled();
+    expect(runSwift).not.toHaveBeenCalled();
   });
 
-  test('degrades to "unknown" when the compiled bridge lacks the permission-status command', async () => {
-    bridgeHasCommand = false;
+  test('degrades to "unknown" when the execution-host probe is unavailable', async () => {
+    executionHostProbeFails = true;
     const tool = captureTool();
     const result = await tool.cb({});
     const parsed = JSON.parse(result.content[0].text);

@@ -5,7 +5,6 @@ import { z } from "zod";
 import { HOME } from "./constants.js";
 import type { McpServer } from "./mcp.js";
 import { runJxa } from "./jxa.js";
-import { hasSwiftCommand, runSwift } from "./swift.js";
 import { MAC_PERMISSION_SETTINGS, ok, type MacPermissionCategory } from "./result.js";
 import { AirMcpConfig, isModuleEnabled } from "./config.js";
 
@@ -75,6 +74,8 @@ export interface SystemPermissionReport {
   status: SystemPermissionStatus;
   settings_path: string;
   settings_url: string;
+  /** Process identity whose TCC state this probe actually observed. */
+  observed_by: string;
 }
 
 /** The user copy of the TCC database always exists and is readable only with
@@ -116,30 +117,54 @@ export async function probeFullDiskAccess(
   }
 }
 
-/** Probe the Swift bridge for the two preflight-checkable TCC categories.
- *  Falls back to "unknown" when the bridge is missing or lacks the command
- *  (older compiled bridge) — never fails the tool over a status read. */
-async function probeBridgePermissions(): Promise<{
+/**
+ * Probe the same osascript/JXA execution host used by JXA-backed tools.
+ *
+ * `capture_screenshot` does not execute inside AirMCP.app or the Swift bridge:
+ * the stdio server starts `osascript -l JavaScript`, and that script invokes
+ * `screencapture`. Calling the preflight APIs from that same JXA process keeps
+ * setup_permissions from reporting the app-owned bridge's TCC state as proof
+ * about the stdio execution path. `CGPreflightScreenCaptureAccess` is a C
+ * function, so JXA must bind it explicitly.
+ */
+export const JXA_PERMISSION_PROBE = `
+ObjC.import('ApplicationServices');
+ObjC.import('CoreGraphics');
+ObjC.bindFunction('CGPreflightScreenCaptureAccess', ['bool', []]);
+JSON.stringify({
+  screenRecording: $.CGPreflightScreenCaptureAccess(),
+  accessibility: $.AXIsProcessTrusted()
+});`;
+
+export async function probeExecutionHostPermissions(): Promise<{
   screen_recording: SystemPermissionStatus;
   accessibility: SystemPermissionStatus;
 }> {
   try {
-    if (await hasSwiftCommand("permission-status")) {
-      const status = await runSwift<{ screenRecording: boolean; accessibility: boolean }>("permission-status", "{}");
-      return {
-        screen_recording: status.screenRecording ? "granted" : "denied",
-        accessibility: status.accessibility ? "granted" : "denied",
-      };
-    }
+    const status = await runJxa<{ screenRecording: boolean; accessibility: boolean }>(JXA_PERMISSION_PROBE);
+    return {
+      screen_recording: status.screenRecording ? "granted" : "denied",
+      accessibility: status.accessibility ? "granted" : "denied",
+    };
   } catch {
-    // Bridge crashed or timed out — report unknown rather than failing setup.
+    // JXA or the preflight symbol is unavailable — report unknown rather than
+    // failing setup. The actual tool call remains the final authority.
   }
   return { screen_recording: "unknown", accessibility: "unknown" };
 }
 
-function permissionReport(category: MacPermissionCategory, status: SystemPermissionStatus): SystemPermissionReport {
+function permissionReport(
+  category: MacPermissionCategory,
+  status: SystemPermissionStatus,
+  observedBy: string,
+): SystemPermissionReport {
   const entry = MAC_PERMISSION_SETTINGS[category];
-  return { status, settings_path: entry.settingsPath, settings_url: entry.settingsUrl };
+  return {
+    status,
+    settings_path: entry.settingsPath,
+    settings_url: entry.settingsUrl,
+    observed_by: observedBy,
+  };
 }
 
 const OPEN_SETTINGS_CHOICES = ["screen_recording", "accessibility", "full_disk", "automation"] as const;
@@ -164,7 +189,7 @@ export function registerSetupTools(server: McpServer, config?: AirMcpConfig): vo
     {
       title: "Setup Permissions",
       description:
-        "Trigger macOS permission prompts for all Apple apps used by AirMCP and report permission status. Run this once after installation to grant all permissions at once. Each app will show a one-time macOS permission dialog. Screen Recording, Accessibility, and Full Disk Access cannot be requested with a popup — their current status is reported, and open_settings jumps straight to the System Settings pane where the user can enable them.",
+        "Trigger macOS permission prompts for all Apple apps used by AirMCP and report permission status. Run this once after installation to grant all permissions at once. Each app will show a one-time macOS permission dialog. Screen Recording and Accessibility are probed from the same osascript/JXA execution host used by JXA tools; Full Disk Access is probed from the MCP server process. None of these three permissions can be requested with a popup — open_settings jumps straight to the System Settings pane where the user can enable them.",
       inputSchema: {
         open_settings: z
           .enum(OPEN_SETTINGS_CHOICES)
@@ -199,13 +224,21 @@ export function registerSetupTools(server: McpServer, config?: AirMcpConfig): vo
       const skipped = MODULE_APP_MAP.length - apps.length;
 
       // Non-promptable permissions: macOS never shows a popup for these, so
-      // the best setup_permissions can do is report where they stand and
-      // point at the exact System Settings pane.
-      const bridge = await probeBridgePermissions();
+      // report the state observed by the process that will actually perform
+      // the operation and point at the exact System Settings pane.
+      const executionHost = await probeExecutionHostPermissions();
       const systemPermissions = {
-        screen_recording: permissionReport("screen_recording", bridge.screen_recording),
-        accessibility: permissionReport("accessibility", bridge.accessibility),
-        full_disk: permissionReport("full_disk", await probeFullDiskAccess()),
+        screen_recording: permissionReport(
+          "screen_recording",
+          executionHost.screen_recording,
+          "osascript/JXA execution host (same path as JXA tools)",
+        ),
+        accessibility: permissionReport(
+          "accessibility",
+          executionHost.accessibility,
+          "osascript/JXA execution host (same path as JXA tools)",
+        ),
+        full_disk: permissionReport("full_disk", await probeFullDiskAccess(), "MCP server process"),
       };
 
       const openedSettings =

@@ -11,6 +11,8 @@ describe("self-contained macOS app bundle", () => {
     expect(bundle).toContain("Contents/Resources/airmcp");
     expect(bundle).toContain("npm ci --omit=dev --ignore-scripts");
     expect(bundle).toContain("runtime/bin");
+    expect(bundle).toContain('"$SCRIPT_DIR/lib/embed-node-runtime.sh" "$NODE_SOURCE" "$RUNTIME_ROOT/runtime"');
+    expect(bundle).toContain('find "$BUNDLE_DIR/Contents/Resources/airmcp/runtime/lib"');
     expect(bundle).toContain("AirMcpBridge");
     expect(bundle).toContain(
       'codesign --force --sign "$SIGN_IDENTITY" "$BUNDLE_DIR/Contents/Resources/airmcp/runtime/bin/node"',
@@ -34,6 +36,7 @@ describe("self-contained macOS app bundle", () => {
     expect(verify).toContain("SUPPORTED_LOCALES");
     expect(verify).toContain("packaged localization missing");
     expect(verify).toContain("packaged localization is not declared");
+    expect(verify).toContain("build-machine library");
     expect(bundle).toContain('rm -rf "$PREVIOUS_APP_BUILD_DIR/AirMCPApp_AirMCPApp.bundle"');
   });
 

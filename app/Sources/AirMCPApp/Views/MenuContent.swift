@@ -4,10 +4,10 @@ import AppKit
 // MARK: - Localization Helper
 
 func L(_ key: String) -> String {
-    let localized = Bundle.module.localizedString(forKey: key, value: nil, table: nil)
+    let localized = AirMCPResourceBundle.bundle.localizedString(forKey: key, value: nil, table: nil)
     if localized != key { return localized }
 
-    guard let path = Bundle.module.path(forResource: "en", ofType: "lproj"),
+    guard let path = AirMCPResourceBundle.bundle.path(forResource: "en", ofType: "lproj"),
           let englishBundle = Bundle(path: path)
     else { return key }
     return englishBundle.localizedString(forKey: key, value: key, table: nil)

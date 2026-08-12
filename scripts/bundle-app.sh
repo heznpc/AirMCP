@@ -168,7 +168,7 @@ for icon in AppIcon@2x.png AppIcon.png MenuBarIcon.png; do
   fi
 done
 
-# Also copy the SwiftPM resource bundle (contains Bundle.module resources)
+# Also copy the SwiftPM resource bundle (resolved by AirMCPResourceBundle)
 RESOURCE_BUNDLE="$BUILD_DIR/AirMCPApp_AirMCPApp.bundle"
 if [ -d "$RESOURCE_BUNDLE" ]; then
   cp -R "$RESOURCE_BUNDLE" "$BUNDLE_DIR/Contents/Resources/"
@@ -192,8 +192,7 @@ if [ "$AIRMCP_EMBED_RUNTIME" = "1" ]; then
   cp "$PROJECT_DIR/package.json" "$PROJECT_DIR/package-lock.json" "$SERVER_ROOT/"
   if [ -f "$PROJECT_DIR/LICENSE" ]; then cp "$PROJECT_DIR/LICENSE" "$SERVER_ROOT/"; fi
   npm ci --omit=dev --ignore-scripts --no-audit --no-fund --prefix "$SERVER_ROOT"
-  cp "$NODE_SOURCE" "$NODE_ROOT/node"
-  chmod 755 "$NODE_ROOT/node"
+  "$SCRIPT_DIR/lib/embed-node-runtime.sh" "$NODE_SOURCE" "$RUNTIME_ROOT/runtime"
   cp "$BRIDGE_BUILD_DIR/AirMcpBridge" "$BRIDGE_ROOT/AirMcpBridge"
   chmod 755 "$BRIDGE_ROOT/AirMcpBridge"
   echo "  ✓ Embedded Node runtime, universal server, production dependencies, and Swift bridge"
@@ -310,6 +309,9 @@ fi
 
 # Sign embedded executable code before signing the main app.
 if [ "$AIRMCP_EMBED_RUNTIME" = "1" ]; then
+  while IFS= read -r -d '' dylib; do
+    codesign --force --sign "$SIGN_IDENTITY" "$dylib"
+  done < <(find "$BUNDLE_DIR/Contents/Resources/airmcp/runtime/lib" -type f -name '*.dylib' -print0)
   codesign --force --sign "$SIGN_IDENTITY" "$BUNDLE_DIR/Contents/Resources/airmcp/runtime/bin/node"
   codesign --force --sign "$SIGN_IDENTITY" "$BUNDLE_DIR/Contents/Resources/airmcp/bin/AirMcpBridge"
 fi

@@ -51,6 +51,8 @@ describe("signed app artifact verification script", () => {
   test("notarization signs embedded runtime code and runs the final artifact gate", () => {
     expect(notarize).toContain("Contents/Resources/airmcp/runtime/bin/node");
     expect(notarize).toContain("Contents/Resources/airmcp/bin/AirMcpBridge");
+    expect(notarize).toContain('NOTARY_AUTH=(--keychain-profile "$NOTARY_KEYCHAIN_PROFILE")');
+    expect(notarize).toContain('"${NOTARY_AUTH[@]}"');
     expect(notarize).toContain('bash "$SCRIPT_DIR/verify-signed-app.sh"');
     expect(notarize).toContain('bash "$SCRIPT_DIR/verify-signing-identity.sh"');
     expect(notarize).not.toContain('codesigning with $APPLE_DEVELOPER_ID');

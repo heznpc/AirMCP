@@ -401,7 +401,7 @@ struct OnboardingView: View {
 
     @ViewBuilder
     private func appIcon(size: CGFloat) -> some View {
-        if let iconURL = Bundle.module.url(forResource: "AppIcon@2x", withExtension: "png"),
+        if let iconURL = AirMCPResourceBundle.bundle.url(forResource: "AppIcon@2x", withExtension: "png"),
            let nsImage = NSImage(contentsOf: iconURL) {
             Image(nsImage: nsImage)
                 .resizable()

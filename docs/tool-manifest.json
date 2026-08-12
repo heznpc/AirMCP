@@ -13459,11 +13459,22 @@
     {
       "name": "setup_permissions",
       "title": "Setup Permissions",
-      "description": "Trigger macOS permission prompts for all Apple apps used by AirMCP. Run this once after installation to grant all permissions at once. Each app will show a one-time macOS permission dialog.",
+      "description": "Trigger macOS permission prompts for all Apple apps used by AirMCP and report permission status. Run this once after installation to grant all permissions at once. Each app will show a one-time macOS permission dialog. Screen Recording, Accessibility, and Full Disk Access cannot be requested with a popup — their current status is reported, and open_settings jumps straight to the System Settings pane where the user can enable them.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
-        "properties": {}
+        "properties": {
+          "open_settings": {
+            "description": "Open the System Settings privacy pane for this permission category so the user can grant it manually (screen_recording, accessibility, full_disk, automation).",
+            "type": "string",
+            "enum": [
+              "screen_recording",
+              "accessibility",
+              "full_disk",
+              "automation"
+            ]
+          }
+        }
       },
       "outputSchema": null,
       "annotations": {

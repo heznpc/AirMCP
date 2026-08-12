@@ -186,6 +186,15 @@
 "trust.integrityUnavailableDetail" = "로컬 활동을 검증하려면 앱 소유 런타임을 시작해 주세요.";
 "trust.safeguardsSubtitle" = "런타임, 감사 무결성, 승인 및 비상 제어를 확인합니다.";
 "trust.permissionsSubtitle" = "실제 최소 읽기로 macOS 앱 접근을 확인합니다.";
+
+/* Trust Center - Non-promptable system permissions */
+"trust.systemPermissions" = "시스템 권한";
+"trust.systemPermissionsHint" = "macOS는 이 권한들의 팝업을 띄우지 않습니다. 설정 열기를 눌러 직접 활성화하세요.";
+"trust.screenRecording" = "화면 기록";
+"trust.accessibility" = "손쉬운 사용";
+"trust.fullDiskAccess" = "전체 디스크 접근";
+"trust.openSettings" = "설정 열기";
+"trust.notGranted" = "미부여";
 "trust.export" = "안전 보고서 내보내기…";
 "trust.exportTitle" = "Trust Center 보고서 내보내기";
 "trust.exportFailed" = "내보내기 실패";

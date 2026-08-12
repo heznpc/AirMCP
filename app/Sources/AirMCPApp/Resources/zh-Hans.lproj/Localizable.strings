@@ -286,6 +286,15 @@
 "trust.integrityUnavailableDetail" = "请启动App管理的运行时，以验证本地活动。";
 "trust.safeguardsSubtitle" = "运行时、审计完整性、审批和紧急控制。";
 "trust.permissionsSubtitle" = "通过实际的最小读取操作验证macOS App访问权限。";
+
+/* Trust Center - Non-promptable system permissions */
+"trust.systemPermissions" = "系统权限";
+"trust.systemPermissionsHint" = "macOS不会为这些权限显示弹窗。请点按打开设置并手动启用。";
+"trust.screenRecording" = "屏幕录制";
+"trust.accessibility" = "辅助功能";
+"trust.fullDiskAccess" = "完全磁盘访问权限";
+"trust.openSettings" = "打开设置";
+"trust.notGranted" = "未授予";
 "trust.export" = "导出已脱敏的报告…";
 "trust.exportTitle" = "导出信任中心报告";
 "trust.exportFailed" = "导出失败";

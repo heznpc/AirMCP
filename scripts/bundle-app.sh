@@ -82,7 +82,7 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 APP_DIR="$PROJECT_DIR/app"
-BUNDLE_ID="com.heznpc.AirMCP"
+BUNDLE_ID="app.airmcp"
 BUNDLE_DIR="$PROJECT_DIR/AirMCP.app"
 APP_EXECUTABLE="AirMCP"
 APP_BINARY="$BUNDLE_DIR/Contents/MacOS/$APP_EXECUTABLE"
@@ -256,7 +256,7 @@ elif [ -f "$WIDGET_DIR/Package.swift" ]; then
 	<false/>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.com.heznpc.AirMCP</string>
+		<string>group.app.airmcp</string>
 	</array>
 	<key>com.apple.security.personal-information.calendars</key>
 	<true/>
@@ -327,7 +327,7 @@ codesign --force --sign "$SIGN_IDENTITY" --entitlements /dev/stdin "$BUNDLE_DIR"
 	<false/>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.com.heznpc.AirMCP</string>
+		<string>group.app.airmcp</string>
 	</array>
 </dict>
 </plist>

@@ -202,7 +202,7 @@ The complete generated tool manifest is in
 [docs/tool-manifest.json](docs/tool-manifest.json).
 
 Current generated surfaces: 234 App Intent action types, 86 Interactive Snippet views,
-14 AppEnum pickers, and an iOS-only provider with 8 read-only App Shortcuts that match the preview runtime. The sessionless discovery card uses MCP schema version
+15 AppEnum pickers, and an iOS-only provider with 8 read-only App Shortcuts that match the preview runtime. The sessionless discovery card uses MCP schema version
 2025-11-25.
 
 ## Safety Model

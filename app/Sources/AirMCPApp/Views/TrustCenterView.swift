@@ -22,6 +22,7 @@ struct TrustCenterView: View {
     @State private var confirmEmergencyStopClear = false
     @State private var auditRefreshInFlight = false
     @State private var runtimeStateRefreshInFlight = false
+    @State private var systemPermissions: [SystemPermissionInfo] = []
 
     private static let emergencyStopURL: URL = {
         if let override = ProcessInfo.processInfo.environment["AIRMCP_EMERGENCY_STOP_PATH"]?
@@ -258,18 +259,31 @@ struct TrustCenterView: View {
 
     private var permissionsSidebar: some View {
         List {
-            if permissionManager.apps.isEmpty {
-                Text(L("trust.permissionsNotChecked"))
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(permissionManager.apps) { app in
-                    let presentation = permissionPresentation(app.status)
+            Section(L("trust.systemPermissions")) {
+                ForEach(systemPermissions) { permission in
+                    let presentation = systemPermissionPresentation(permission.state)
                     statusRow(
-                        app.name,
+                        L(permission.titleKey),
                         value: presentation.label,
                         icon: presentation.icon,
                         color: presentation.color
                     )
+                }
+            }
+            Section(L("trust.permissionsSection")) {
+                if permissionManager.apps.isEmpty {
+                    Text(L("trust.permissionsNotChecked"))
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(permissionManager.apps) { app in
+                        let presentation = permissionPresentation(app.status)
+                        statusRow(
+                            app.name,
+                            value: presentation.label,
+                            icon: presentation.icon,
+                            color: presentation.color
+                        )
+                    }
                 }
             }
         }
@@ -580,6 +594,33 @@ struct TrustCenterView: View {
                 sectionHeader(L("trust.permissionsSection"), subtitle: L("trust.permissionsSubtitle"), icon: "hand.raised")
                 GroupBox {
                     VStack(alignment: .leading, spacing: 10) {
+                        // macOS never shows a consent popup for these three —
+                        // status plus a jump into the exact settings pane is
+                        // everything the product can offer.
+                        Text(L("trust.systemPermissionsHint"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        ForEach(systemPermissions) { permission in
+                            let presentation = systemPermissionPresentation(permission.state)
+                            HStack {
+                                Label(L(permission.titleKey), systemImage: presentation.icon)
+                                    .foregroundStyle(presentation.color)
+                                Spacer()
+                                Text(presentation.label)
+                                    .foregroundStyle(.secondary)
+                                Button(L("trust.openSettings")) {
+                                    if let url = permission.settingsURL {
+                                        NSWorkspace.shared.open(url)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    Label(L("trust.systemPermissions"), systemImage: "gearshape")
+                }
+                GroupBox {
+                    VStack(alignment: .leading, spacing: 10) {
                         if permissionManager.apps.isEmpty {
                             Text(L("trust.permissionsNotChecked"))
                                 .foregroundStyle(.secondary)
@@ -657,6 +698,7 @@ struct TrustCenterView: View {
             if userInitiatedAuditRead { auditRefreshInFlight = false }
         }
         emergencyStopActive = FileManager.default.fileExists(atPath: Self.emergencyStopURL.path)
+        systemPermissions = SystemPermissionProbe.current()
         exposedToolCount = try? await AppRuntimeClient.listTools().count
         if TrustCenterRefreshPolicy.allowsAuditHistoryRead(
             userInitiated: userInitiatedAuditRead
@@ -831,6 +873,16 @@ struct TrustCenterView: View {
         case .pending: (L("trust.pending"), "clock", .secondary)
         case .granted: (L("trust.granted"), "checkmark.circle.fill", .green)
         case .failed: (L("trust.denied"), "xmark.circle.fill", .red)
+        }
+    }
+
+    private func systemPermissionPresentation(
+        _ state: SystemPermissionState
+    ) -> (label: String, icon: String, color: Color) {
+        switch state {
+        case .granted: (L("trust.granted"), "checkmark.circle.fill", .green)
+        case .notGranted: (L("trust.notGranted"), "xmark.circle.fill", .orange)
+        case .unknown: (L("trust.unknown"), "questionmark.circle", .secondary)
         }
     }
 }

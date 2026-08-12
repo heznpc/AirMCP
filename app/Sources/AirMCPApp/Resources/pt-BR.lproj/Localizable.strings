@@ -286,6 +286,15 @@
 "trust.integrityUnavailableDetail" = "Inicie o ambiente gerenciado pelo app para verificar a atividade local.";
 "trust.safeguardsSubtitle" = "Ambiente, integridade da auditoria, aprovações e controles de emergência.";
 "trust.permissionsSubtitle" = "Leituras mínimas reais verificam o acesso aos apps do macOS.";
+
+/* Trust Center - Non-promptable system permissions */
+"trust.systemPermissions" = "Permissões do sistema";
+"trust.systemPermissionsHint" = "O macOS nunca mostra um aviso para essas permissões. Abra os ajustes e ative-as manualmente.";
+"trust.screenRecording" = "Gravação de tela";
+"trust.accessibility" = "Acessibilidade";
+"trust.fullDiskAccess" = "Acesso total ao disco";
+"trust.openSettings" = "Abrir ajustes";
+"trust.notGranted" = "Não concedida";
 "trust.export" = "Exportar relatório sem dados sensíveis…";
 "trust.exportTitle" = "Exportar relatório da Central de Confiança";
 "trust.exportFailed" = "Falha na exportação";

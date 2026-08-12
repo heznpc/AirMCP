@@ -186,6 +186,15 @@
 "trust.integrityUnavailableDetail" = "Start the app-owned runtime to verify local activity.";
 "trust.safeguardsSubtitle" = "Runtime, audit integrity, approvals, and emergency controls.";
 "trust.permissionsSubtitle" = "Real minimal reads verify macOS app access.";
+
+/* Trust Center - Non-promptable system permissions */
+"trust.systemPermissions" = "System Permissions";
+"trust.systemPermissionsHint" = "macOS never shows a popup for these permissions. Use Open Settings and enable them manually.";
+"trust.screenRecording" = "Screen Recording";
+"trust.accessibility" = "Accessibility";
+"trust.fullDiskAccess" = "Full Disk Access";
+"trust.openSettings" = "Open Settings";
+"trust.notGranted" = "Not Granted";
 "trust.export" = "Export Redacted Report…";
 "trust.exportTitle" = "Export Trust Center Report";
 "trust.exportFailed" = "Export failed";

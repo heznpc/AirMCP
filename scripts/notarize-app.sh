@@ -143,6 +143,15 @@ if [ ! -f "$NODE_RUNTIME_ENTITLEMENTS" ]; then
   echo "notarize-app: node runtime entitlements file missing" >&2
   exit 1
 fi
+while IFS= read -r -d '' dylib; do
+  echo "  signing embedded Node dylib"
+  if ! codesign --force --options=runtime --timestamp \
+    --sign "$APPLE_DEVELOPER_ID" \
+    "$dylib" >/dev/null 2>&1; then
+    echo "notarize-app: embedded Node dylib signing failed" >&2
+    exit 1
+  fi
+done < <(find "$APP_BUNDLE/Contents/Resources/airmcp/runtime/lib" -type f -name '*.dylib' -print0 2>/dev/null)
 for nested in \
   "$APP_BUNDLE/Contents/Resources/airmcp/runtime/bin/node" \
   "$APP_BUNDLE/Contents/Resources/airmcp/bin/AirMcpBridge"; do

@@ -112,7 +112,7 @@ async function healthReady(mcpUrl: string): Promise<boolean> {
 async function launchLocalAppAndWait(mcpUrl: string): Promise<void> {
   if (!shouldAutoLaunchApp(mcpUrl) || (await healthReady(mcpUrl))) return;
 
-  const bundleId = process.env.AIRMCP_APP_BUNDLE_ID ?? "com.heznpc.AirMCP";
+  const bundleId = process.env.AIRMCP_APP_BUNDLE_ID ?? "app.airmcp";
   const launcher = spawn("/usr/bin/open", ["-b", bundleId], {
     detached: true,
     stdio: "ignore",

@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const APP_GROUP = "group.com.heznpc.AirMCP";
+const APP_GROUP = "group.app.airmcp";
 
 const bundleSh = readFileSync(join(ROOT, "scripts/bundle-app.sh"), "utf-8");
 // WidgetSnapshotConfig (appGroupID) moved from WidgetSnapshot.swift into the
@@ -36,7 +36,7 @@ describe("widget App Group entitlement agreement", () => {
   test("the briefing widget's kind string is consistent between reader and writer", () => {
     const widgetSwift = readFileSync(join(ROOT, "app/widget/Sources/AirMCPWidget.swift"), "utf-8");
     const writerSwift = readFileSync(join(ROOT, "app/Sources/AirMCPApp/WidgetSnapshotWriter.swift"), "utf-8");
-    const kind = "com.heznpc.AirMCP.BriefingWidget";
+    const kind = "app.airmcp.BriefingWidget";
     expect(widgetSwift).toContain(kind);
     expect(writerSwift).toContain(kind);
   });
@@ -44,7 +44,7 @@ describe("widget App Group entitlement agreement", () => {
   test("the trust-status widget's kind is consistent between the widget and the writer's reload", () => {
     const trustSwift = readFileSync(join(ROOT, "app/widget/Sources/TrustStatusWidget.swift"), "utf-8");
     const writerSwift = readFileSync(join(ROOT, "app/Sources/AirMCPApp/WidgetSnapshotWriter.swift"), "utf-8");
-    const kind = "com.heznpc.AirMCP.TrustStatusWidget";
+    const kind = "app.airmcp.TrustStatusWidget";
     expect(trustSwift).toContain(`kind = "${kind}"`);
     expect(writerSwift).toContain(kind);
   });

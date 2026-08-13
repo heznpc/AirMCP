@@ -176,10 +176,72 @@ const DEFAULT_PERMISSION_HINT =
     ? "Open System Settings → Privacy & Security and grant the requested permission, then re-run the tool."
     : "";
 
+/** The four macOS privacy categories that AirMCP tools can trip over.
+ *  Automation can at least trigger its own consent popup; Screen Recording,
+ *  Accessibility, and Full Disk Access cannot be requested with a prompt at
+ *  all — the user must flip the toggle in System Settings. The best the
+ *  product can do is take them to the exact pane, which is what the
+ *  `settingsUrl` deep link does. */
+export type MacPermissionCategory = "screen_recording" | "accessibility" | "full_disk" | "automation";
+
+export const MAC_PERMISSION_SETTINGS: Record<
+  MacPermissionCategory,
+  { label: string; settingsPath: string; settingsUrl: string }
+> = {
+  screen_recording: {
+    label: "Screen Recording",
+    settingsPath: "System Settings → Privacy & Security → Screen & System Audio Recording",
+    settingsUrl: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture",
+  },
+  accessibility: {
+    label: "Accessibility",
+    settingsPath: "System Settings → Privacy & Security → Accessibility",
+    settingsUrl: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
+  },
+  full_disk: {
+    label: "Full Disk Access",
+    settingsPath: "System Settings → Privacy & Security → Full Disk Access",
+    settingsUrl: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles",
+  },
+  automation: {
+    label: "Automation",
+    settingsPath: "System Settings → Privacy & Security → Automation",
+    settingsUrl: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation",
+  },
+};
+
+/** Classify a TCC denial message into the privacy pane the user must visit.
+ *  Ordered so the specific non-promptable categories win over the broad
+ *  Automation signals (`-1743` / "Apple events" appear in many messages). */
+export function detectMacPermissionCategory(message: string): MacPermissionCategory | null {
+  if (/screen\s?record|screen\s?captur/i.test(message)) return "screen_recording";
+  if (/accessibilit/i.test(message)) return "accessibility";
+  if (/full\s?disk/i.test(message)) return "full_disk";
+  if (/automation|apple\s?events?|\(-1743\)|error -1743|osascript/i.test(message)) return "automation";
+  return null;
+}
+
+/** Human-readable recovery line for a detected permission category:
+ *  exact settings path plus the deep link that opens it. */
+export function macPermissionGuidance(category: MacPermissionCategory): string {
+  const entry = MAC_PERMISSION_SETTINGS[category];
+  return (
+    `Grant ${entry.label} access to the app hosting AirMCP (your MCP client, terminal, or the AirMCP app) in ` +
+    `${entry.settingsPath}, then re-run the tool. Open the pane directly: ${entry.settingsUrl}`
+  );
+}
+
 export function errPermission(message: string, opts?: ToolErrorOptions) {
-  // Caller-supplied hint wins. Fall through to the platform default
-  // when the caller doesn't supply one.
-  const hint = opts?.hint || DEFAULT_PERMISSION_HINT;
+  // Caller-supplied hint wins, but when the message names one of the four
+  // TCC categories we always append the settings path + deep link — an
+  // error string alone leaves the user stranded (capture_screenshot failing
+  // without Screen Recording access told them *what* broke, not *where* to
+  // fix it). Fall through to the platform default otherwise.
+  const category = detectMacPermissionCategory(message);
+  const guidance = category ? macPermissionGuidance(category) : null;
+  let hint = opts?.hint;
+  if (guidance) hint = hint ? `${hint} ${guidance}` : guidance;
+  hint = hint || DEFAULT_PERMISSION_HINT;
   return toolErr("permission_denied", message, { ...opts, hint });
 }
 

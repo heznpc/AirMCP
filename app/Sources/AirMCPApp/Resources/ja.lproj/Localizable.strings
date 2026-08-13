@@ -286,6 +286,15 @@
 "trust.integrityUnavailableDetail" = "ローカルアクティビティを検証するには、アプリ管理ランタイムを起動してください。";
 "trust.safeguardsSubtitle" = "ランタイム、監査の完全性、承認、緊急制御を確認します。";
 "trust.permissionsSubtitle" = "実際の最小限の読み取りでmacOSアプリへのアクセスを確認します。";
+
+/* Trust Center - Non-promptable system permissions */
+"trust.systemPermissions" = "システム権限";
+"trust.systemPermissionsHint" = "これらの状態はAirMCP.app自身のみを示します。stdio MCPサーバーでは、AirMCPをホストするアプリ（Claude Codeやターミナルなど）に権限を与えてから、ツールを再実行してください。";
+"trust.screenRecording" = "画面収録";
+"trust.accessibility" = "アクセシビリティ";
+"trust.fullDiskAccess" = "フルディスクアクセス";
+"trust.openSettings" = "設定を開く";
+"trust.notGranted" = "未許可";
 "trust.export" = "編集済みレポートを書き出す…";
 "trust.exportTitle" = "トラストセンターレポートを書き出す";
 "trust.exportFailed" = "書き出しに失敗";

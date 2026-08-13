@@ -71,25 +71,25 @@ final class SingleInstanceAndRuntimeProbeTests: XCTestCase {
         let candidates = [
             RunningApplicationSnapshot(
                 processIdentifier: 900,
-                bundleIdentifier: "com.heznpc.AirMCP",
+                bundleIdentifier: "app.airmcp",
                 launchDate: now,
                 isTerminated: false
             ),
             RunningApplicationSnapshot(
                 processIdentifier: 100,
-                bundleIdentifier: "com.heznpc.AirMCP",
+                bundleIdentifier: "app.airmcp",
                 launchDate: now.addingTimeInterval(-60),
                 isTerminated: false
             ),
             RunningApplicationSnapshot(
                 processIdentifier: 200,
-                bundleIdentifier: "com.heznpc.AirMCP",
+                bundleIdentifier: "app.airmcp",
                 launchDate: now.addingTimeInterval(-30),
                 isTerminated: false
             ),
             RunningApplicationSnapshot(
                 processIdentifier: 50,
-                bundleIdentifier: "com.heznpc.AirMCP",
+                bundleIdentifier: "app.airmcp",
                 launchDate: now.addingTimeInterval(-120),
                 isTerminated: true
             ),
@@ -103,7 +103,7 @@ final class SingleInstanceAndRuntimeProbeTests: XCTestCase {
 
         XCTAssertEqual(
             SingleInstancePolicy.existingProcessIdentifier(
-                bundleIdentifier: "com.heznpc.AirMCP",
+                bundleIdentifier: "app.airmcp",
                 currentProcessIdentifier: 900,
                 candidates: candidates
             ),
@@ -115,7 +115,7 @@ final class SingleInstanceAndRuntimeProbeTests: XCTestCase {
         let candidates = [
             RunningApplicationSnapshot(
                 processIdentifier: 900,
-                bundleIdentifier: "com.heznpc.AirMCP",
+                bundleIdentifier: "app.airmcp",
                 launchDate: Date(),
                 isTerminated: false
             ),
@@ -123,7 +123,7 @@ final class SingleInstanceAndRuntimeProbeTests: XCTestCase {
 
         XCTAssertNil(
             SingleInstancePolicy.existingProcessIdentifier(
-                bundleIdentifier: "com.heznpc.AirMCP",
+                bundleIdentifier: "app.airmcp",
                 currentProcessIdentifier: 900,
                 candidates: candidates
             )
@@ -135,13 +135,13 @@ final class SingleInstanceAndRuntimeProbeTests: XCTestCase {
         let candidates = [
             RunningApplicationSnapshot(
                 processIdentifier: 100,
-                bundleIdentifier: "com.heznpc.AirMCP",
+                bundleIdentifier: "app.airmcp",
                 launchDate: sameDate,
                 isTerminated: false
             ),
             RunningApplicationSnapshot(
                 processIdentifier: 200,
-                bundleIdentifier: "com.heznpc.AirMCP",
+                bundleIdentifier: "app.airmcp",
                 launchDate: sameDate,
                 isTerminated: false
             ),
@@ -149,14 +149,14 @@ final class SingleInstanceAndRuntimeProbeTests: XCTestCase {
 
         XCTAssertNil(
             SingleInstancePolicy.existingProcessIdentifier(
-                bundleIdentifier: "com.heznpc.AirMCP",
+                bundleIdentifier: "app.airmcp",
                 currentProcessIdentifier: 100,
                 candidates: candidates
             )
         )
         XCTAssertEqual(
             SingleInstancePolicy.existingProcessIdentifier(
-                bundleIdentifier: "com.heznpc.AirMCP",
+                bundleIdentifier: "app.airmcp",
                 currentProcessIdentifier: 200,
                 candidates: candidates
             ),

@@ -41,6 +41,11 @@ struct Output: Encodable {
     let output: String
 }
 
+struct PermissionStatusOutput: Encodable {
+    let screenRecording: Bool
+    let accessibility: Bool
+}
+
 // MARK: - Foundation Models input/output types (bridge-local)
 
 struct GenerateStructuredInput: Decodable {
@@ -1018,6 +1023,17 @@ case "location-permission":
     let output = LocationPermissionOutput(status: locationStatusString(status), authorized: authorized)
     do { try writeJSON(output) } catch { writeError("Location permission error: \(error.localizedDescription)") }
 
+// --- TCC: non-promptable permission status (Screen Recording / Accessibility) ---
+// These two panes cannot show a consent popup; the server surfaces this
+// status through setup_permissions so users learn where to flip the toggle.
+// Preflight calls are read-only: they never enqueue a TCC prompt.
+case "permission-status":
+    let output = PermissionStatusOutput(
+        screenRecording: CGPreflightScreenCaptureAccess(),
+        accessibility: AXIsProcessTrusted()
+    )
+    do { try writeJSON(output) } catch { writeError("Permission status error: \(error.localizedDescription)") }
+
 // --- CoreBluetooth: state ---
 case "bluetooth-state":
     let bt = BluetoothManager()
@@ -1294,6 +1310,7 @@ case "list-commands":
         "delete-photos",
         "get-location",
         "location-permission",
+        "permission-status",
         "bluetooth-state",
         "scan-bluetooth",
         "connect-bluetooth",

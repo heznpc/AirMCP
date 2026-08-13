@@ -4,10 +4,10 @@ import AppKit
 // MARK: - Localization Helper
 
 func L(_ key: String) -> String {
-    let localized = Bundle.module.localizedString(forKey: key, value: nil, table: nil)
+    let localized = Bundle.moduleResources.localizedString(forKey: key, value: nil, table: nil)
     if localized != key { return localized }
 
-    guard let path = Bundle.module.path(forResource: "en", ofType: "lproj"),
+    guard let path = Bundle.moduleResources.path(forResource: "en", ofType: "lproj"),
           let englishBundle = Bundle(path: path)
     else { return key }
     return englishBundle.localizedString(forKey: key, value: key, table: nil)
@@ -21,7 +21,7 @@ func L(_ key: String, _ args: CVarArg...) -> String {
 
 enum AirMcpConstants {
     static let npmPackageName = "airmcp"
-    static let npmPackageVersion = "2.16.4"
+    static let npmPackageVersion = "2.16.5"
     static var npmPackageSpecifier: String {
         ProcessInfo.processInfo.environment["AIRMCP_NPM_PACKAGE_SPECIFIER"]
             ?? "\(npmPackageName)@\(npmPackageVersion)"

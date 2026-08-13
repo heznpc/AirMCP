@@ -8,10 +8,23 @@
 #   APPLE_DEVELOPER_ID          — Developer ID Application certificate
 #                                 common name, e.g. "Developer ID Application:
 #                                 Heznpc (TEAMID)"
-#   APPLE_ID                    — Apple ID email for notarytool
-#   APPLE_ID_PASSWORD           — app-specific password
-#                                 (appleid.apple.com → sign-in and security)
-#   APPLE_TEAM_ID               — 10-char team ID
+#
+# Notarization credentials — supply exactly ONE of the three sets below.
+# They are tried in this order, most robust first:
+#
+#   1. App Store Connect API key (preferred; no 2FA, one key for the whole team)
+#      APPLE_API_KEY_PATH       — path to AuthKey_<KEYID>.p8
+#      APPLE_API_KEY_ID         — 10-char key ID
+#      APPLE_API_ISSUER_ID      — issuer UUID
+#
+#   2. Stored keychain profile (preferred for local runs)
+#      NOTARY_KEYCHAIN_PROFILE  — profile name saved by
+#                                 `xcrun notarytool store-credentials`
+#
+#   3. Apple ID + app-specific password (legacy; breaks on 2FA changes)
+#      APPLE_ID                 — Apple ID email
+#      APPLE_ID_PASSWORD        — app-specific password
+#      APPLE_TEAM_ID            — 10-char team ID
 #
 # Optional environment:
 #   APP_BUNDLE_PATH             — default: AirMCP.app (relative to repo root)
@@ -51,10 +64,33 @@ need_var() {
 }
 need_var APPLE_DEVELOPER_ID
 
+# ── Resolve notarytool credentials ───────────────────────────────────
+# Built once here so `submit` and the failure-path `log` call can never
+# authenticate two different ways. NOTARY_AUTH_KIND drives the diagnostics
+# printed when Apple refuses the credentials outright.
+NOTARY_AUTH=()
+NOTARY_AUTH_KIND=""
 if [ "${SKIP_NOTARIZATION:-}" != "1" ]; then
-  need_var APPLE_ID
-  need_var APPLE_ID_PASSWORD
-  need_var APPLE_TEAM_ID
+  if [ -n "${APPLE_API_KEY_PATH:-}" ] || [ -n "${APPLE_API_KEY_ID:-}" ] || [ -n "${APPLE_API_ISSUER_ID:-}" ]; then
+    need_var APPLE_API_KEY_PATH
+    need_var APPLE_API_KEY_ID
+    need_var APPLE_API_ISSUER_ID
+    if [ ! -f "$APPLE_API_KEY_PATH" ]; then
+      echo "notarize-app: APPLE_API_KEY_PATH points at no file" >&2
+      exit 1
+    fi
+    NOTARY_AUTH=(--key "$APPLE_API_KEY_PATH" --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER_ID")
+    NOTARY_AUTH_KIND="api-key"
+  elif [ -n "${NOTARY_KEYCHAIN_PROFILE:-}" ]; then
+    NOTARY_AUTH=(--keychain-profile "$NOTARY_KEYCHAIN_PROFILE")
+    NOTARY_AUTH_KIND="keychain-profile"
+  else
+    need_var APPLE_ID
+    need_var APPLE_ID_PASSWORD
+    need_var APPLE_TEAM_ID
+    NOTARY_AUTH=(--apple-id "$APPLE_ID" --password "$APPLE_ID_PASSWORD" --team-id "$APPLE_TEAM_ID")
+    NOTARY_AUTH_KIND="apple-id"
+  fi
 fi
 
 # The certificate subject is public in every distributed binary. Refuse to
@@ -107,6 +143,15 @@ if [ ! -f "$NODE_RUNTIME_ENTITLEMENTS" ]; then
   echo "notarize-app: node runtime entitlements file missing" >&2
   exit 1
 fi
+while IFS= read -r -d '' dylib; do
+  echo "  signing embedded Node dylib"
+  if ! codesign --force --options=runtime --timestamp \
+    --sign "$APPLE_DEVELOPER_ID" \
+    "$dylib" >/dev/null 2>&1; then
+    echo "notarize-app: embedded Node dylib signing failed" >&2
+    exit 1
+  fi
+done < <(find "$APP_BUNDLE/Contents/Resources/airmcp/runtime/lib" -type f -name '*.dylib' -print0 2>/dev/null)
 for nested in \
   "$APP_BUNDLE/Contents/Resources/airmcp/runtime/bin/node" \
   "$APP_BUNDLE/Contents/Resources/airmcp/bin/AirMcpBridge"; do
@@ -189,9 +234,7 @@ echo "notarize-app: submitting to Apple (this takes 2-10 minutes) …"
 set +e
 SUBMIT_OUTPUT="$(
   xcrun notarytool submit "$ZIP_PATH" \
-    --apple-id "$APPLE_ID" \
-    --password "$APPLE_ID_PASSWORD" \
-    --team-id "$APPLE_TEAM_ID" \
+    "${NOTARY_AUTH[@]}" \
     --wait \
     --output-format json 2>&1
 )"
@@ -219,13 +262,51 @@ SUBMISSION_ID="$(printf '%s' "$SUBMIT_OUTPUT" | node -e '
 # team, certificate subject, or raw messages into the public Actions log.
 if [ "$SUBMIT_EXIT" -ne 0 ] || [ "$NOTARY_STATUS" != "Accepted" ]; then
   echo "notarize-app: notarization failed; raw account, certificate, and submission metadata is suppressed" >&2
+
+  # Two failures land here and they need completely different fixes:
+  #
+  #   a) Apple accepted the submission and rejected the binary. There is a
+  #      submission ID, and the sanitized issue log below says what to change.
+  #   b) notarytool never created a submission — credentials were refused, the
+  #      Apple ID does not belong to the team, or the Program License Agreement
+  #      is unaccepted. No submission ID exists, so the log path cannot run.
+  #
+  # Case (b) previously printed the suppression notice and nothing else, leaving
+  # an operator with a red release and no way to tell a bad app-specific password
+  # from a rejected binary. Classify it without echoing notarytool's raw output,
+  # which carries the account and team.
+  if ! [[ "$SUBMISSION_ID" =~ ^[0-9A-Fa-f-]{36}$ ]]; then
+    echo "notarize-app: Apple never accepted the submission, so this is a credential or account" >&2
+    echo "notarize-app: problem rather than a rejected build. Check, in this order:" >&2
+    case "$NOTARY_AUTH_KIND" in
+      api-key)
+        echo "notarize-app:   1. APPLE_API_KEY_ID and APPLE_API_ISSUER_ID must belong to the same key" >&2
+        echo "notarize-app:      as the .p8 at APPLE_API_KEY_PATH — a mismatched pair is refused" >&2
+        echo "notarize-app:   2. the key needs the Admin (or App Manager) role in App Store Connect" >&2
+        echo "notarize-app:   3. a revoked key keeps its .p8 file but stops authenticating" >&2
+        ;;
+      keychain-profile)
+        echo "notarize-app:   1. NOTARY_KEYCHAIN_PROFILE must name a profile saved by" >&2
+        echo "notarize-app:      'xcrun notarytool store-credentials' on THIS machine and keychain" >&2
+        echo "notarize-app:   2. a locked login keychain makes the stored profile unreadable" >&2
+        ;;
+      *)
+        echo "notarize-app:   1. APPLE_ID_PASSWORD must be an APP-SPECIFIC password from" >&2
+        echo "notarize-app:      appleid.apple.com (format xxxx-xxxx-xxxx-xxxx), not the Apple ID login password" >&2
+        echo "notarize-app:   2. APPLE_ID must be the Apple ID that belongs to the team in APPLE_TEAM_ID" >&2
+        ;;
+    esac
+    echo "notarize-app:   the Apple Developer Program License Agreement must also be accepted at" >&2
+    echo "notarize-app:   developer.apple.com — notarytool refuses before submitting while it is pending" >&2
+    echo "notarize-app: verify the same credentials locally with: xcrun notarytool history <same auth flags>" >&2
+    exit 2
+  fi
+
   if [[ "$SUBMISSION_ID" =~ ^[0-9A-Fa-f-]{36}$ ]]; then
     set +e
     NOTARY_LOG="$(
       xcrun notarytool log "$SUBMISSION_ID" \
-        --apple-id "$APPLE_ID" \
-        --password "$APPLE_ID_PASSWORD" \
-        --team-id "$APPLE_TEAM_ID" \
+        "${NOTARY_AUTH[@]}" \
         --output-format json 2>/dev/null
     )"
     LOG_EXIT=$?

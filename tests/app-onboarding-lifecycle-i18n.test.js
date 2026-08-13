@@ -399,7 +399,7 @@ describe("macOS onboarding localization", () => {
   );
 
   test("uses explicit English fallback for partial locale bundles", () => {
-    expect(menu).toContain('Bundle.module.path(forResource: "en", ofType: "lproj")');
+    expect(menu).toContain('Bundle.moduleResources.path(forResource: "en", ofType: "lproj")');
     expect(menu).toContain("englishBundle.localizedString(forKey: key");
   });
 

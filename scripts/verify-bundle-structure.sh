@@ -90,6 +90,16 @@ if [ ! -x "$BUNDLED_NODE" ] || [ ! -x "$BUNDLED_BRIDGE" ]; then
   exit 1
 fi
 
+for macho in "$BUNDLED_NODE" "$RUNTIME_ROOT"/runtime/lib/*.dylib; do
+  [ -f "$macho" ] || continue
+  external_deps="$(otool -L "$macho" | sed -n '2,$p' | sed -E 's/^[[:space:]]+([^[:space:]]+)[[:space:]].*$/\1/' | grep -E '^/(opt/homebrew|usr/local)/' || true)"
+  if [ -n "$external_deps" ]; then
+    echo "✗ bundled runtime still references a build-machine library: $macho" >&2
+    echo "$external_deps" >&2
+    exit 1
+  fi
+done
+
 RUNTIME_VERSION="$("$BUNDLED_NODE" "$BUNDLED_SERVER" --version)"
 if [ "$RUNTIME_VERSION" != "$MAIN_VERSION" ]; then
   echo "✗ bundled runtime version $RUNTIME_VERSION does not match app $MAIN_VERSION" >&2

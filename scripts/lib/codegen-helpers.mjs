@@ -232,7 +232,9 @@ export function nonNullSchema(schema) {
 }
 
 function arrayItemSchema(schema) {
-  const items = schema?.items;
+  // Tuples arrive as `prefixItems` (2020-12, the manifest's dialect) or as an
+  // array-form `items` (draft-7); either collapses to a homogeneous element.
+  const items = Array.isArray(schema?.prefixItems) ? schema.prefixItems : schema?.items;
   if (!Array.isArray(items)) return items ?? {};
   if (items.length === 0) return {};
   const types = items.map((item) => item?.type);

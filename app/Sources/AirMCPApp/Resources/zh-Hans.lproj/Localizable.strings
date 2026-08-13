@@ -289,7 +289,7 @@
 
 /* Trust Center - Non-promptable system permissions */
 "trust.systemPermissions" = "系统权限";
-"trust.systemPermissionsHint" = "macOS不会为这些权限显示弹窗。请点按打开设置并手动启用。";
+"trust.systemPermissionsHint" = "这些状态仅反映 AirMCP.app。对于 stdio MCP 服务器，请向托管 AirMCP 的应用（例如 Claude Code 或终端）授予权限，然后重新运行工具。";
 "trust.screenRecording" = "屏幕录制";
 "trust.accessibility" = "辅助功能";
 "trust.fullDiskAccess" = "完全磁盘访问权限";

@@ -11,6 +11,10 @@ const menu = readFileSync(
   new URL("app/Sources/AirMCPApp/Views/MenuContent.swift", root),
   "utf8",
 );
+const moduleResources = readFileSync(
+  new URL("app/Sources/AirMCPApp/ModuleResources.swift", root),
+  "utf8",
+);
 const en = readFileSync(
   new URL("app/Sources/AirMCPApp/Resources/en.lproj/Localizable.strings", root),
   "utf8",
@@ -41,7 +45,10 @@ describe("macOS onboarding layout", () => {
   });
 
   test("loads the copied SwiftPM icon from its real bundle location and keeps a fallback", () => {
-    expect(onboarding).toContain('Bundle.module.url(forResource: "AppIcon@2x", withExtension: "png")');
+    expect(onboarding).toContain('Bundle.moduleResources.url(forResource: "AppIcon@2x", withExtension: "png")');
+    expect(app).toContain('Bundle.moduleResources.url(forResource: "AppIcon@2x", withExtension: "png")');
+    expect(moduleResources).toContain("Bundle.main.resourceURL");
+    expect(moduleResources).toContain('let name = "AirMCPApp_AirMCPApp.bundle"');
     expect(onboarding).not.toContain('subdirectory: "Resources"');
     expect(onboarding).toContain('Image(systemName: "a.square.fill")');
     expect(app).not.toContain('subdirectory: "Resources"');

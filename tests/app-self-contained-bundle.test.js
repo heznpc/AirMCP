@@ -5,12 +5,16 @@ const bundle = readFileSync(new URL("../scripts/bundle-app.sh", import.meta.url)
 const verify = readFileSync(new URL("../scripts/verify-bundle-structure.sh", import.meta.url), "utf8");
 const menu = readFileSync(new URL("../app/Sources/AirMCPApp/Views/MenuContent.swift", import.meta.url), "utf8");
 const server = readFileSync(new URL("../app/Sources/AirMCPApp/ServerManager.swift", import.meta.url), "utf8");
+const connect = readFileSync(new URL("../src/cli/connect.ts", import.meta.url), "utf8");
+const signedVerify = readFileSync(new URL("../scripts/verify-signed-app.sh", import.meta.url), "utf8");
 
 describe("self-contained macOS app bundle", () => {
   test("embeds a fixed Node runtime, universal server, production dependencies, and Swift bridge", () => {
     expect(bundle).toContain("Contents/Resources/airmcp");
     expect(bundle).toContain("npm ci --omit=dev --ignore-scripts");
     expect(bundle).toContain("runtime/bin");
+    expect(bundle).toContain('"$SCRIPT_DIR/lib/embed-node-runtime.sh" "$NODE_SOURCE" "$RUNTIME_ROOT/runtime"');
+    expect(bundle).toContain('find "$BUNDLE_DIR/Contents/Resources/airmcp/runtime/lib"');
     expect(bundle).toContain("AirMcpBridge");
     expect(bundle).toContain(
       'codesign --force --sign "$SIGN_IDENTITY" "$BUNDLE_DIR/Contents/Resources/airmcp/runtime/bin/node"',
@@ -34,7 +38,14 @@ describe("self-contained macOS app bundle", () => {
     expect(verify).toContain("SUPPORTED_LOCALES");
     expect(verify).toContain("packaged localization missing");
     expect(verify).toContain("packaged localization is not declared");
+    expect(verify).toContain("build-machine library");
     expect(bundle).toContain('rm -rf "$PREVIOUS_APP_BUILD_DIR/AirMCPApp_AirMCPApp.bundle"');
+  });
+
+  test("uses the app.airmcp identity for packaging, verification, and CLI auto-launch", () => {
+    expect(bundle).toContain('BUNDLE_ID="app.airmcp"');
+    expect(signedVerify).toContain('"app.airmcp" "$APP_EXECUTABLE"');
+    expect(connect).toContain('process.env.AIRMCP_APP_BUNDLE_ID ?? "app.airmcp"');
   });
 
   test("non-interactive verification cleans up only this checkout app and runtime", () => {

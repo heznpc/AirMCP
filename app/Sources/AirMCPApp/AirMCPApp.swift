@@ -43,7 +43,7 @@ struct AirMCPApp: App {
         DispatchQueue.main.async {
             UNUserNotificationCenter.current().delegate = delegate
 
-            if let iconURL = Bundle.module.url(forResource: "AppIcon@2x", withExtension: "png"),
+            if let iconURL = Bundle.moduleResources.url(forResource: "AppIcon@2x", withExtension: "png"),
                let icon = NSImage(contentsOf: iconURL) {
                 NSApp?.applicationIconImage = icon
             }

@@ -82,7 +82,7 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 APP_DIR="$PROJECT_DIR/app"
-BUNDLE_ID="com.heznpc.AirMCP"
+BUNDLE_ID="app.airmcp"
 BUNDLE_DIR="$PROJECT_DIR/AirMCP.app"
 APP_EXECUTABLE="AirMCP"
 APP_BINARY="$BUNDLE_DIR/Contents/MacOS/$APP_EXECUTABLE"
@@ -168,7 +168,7 @@ for icon in AppIcon@2x.png AppIcon.png MenuBarIcon.png; do
   fi
 done
 
-# Also copy the SwiftPM resource bundle (contains Bundle.module resources)
+# Also copy the SwiftPM resource bundle (resolved by Bundle.moduleResources)
 RESOURCE_BUNDLE="$BUILD_DIR/AirMCPApp_AirMCPApp.bundle"
 if [ -d "$RESOURCE_BUNDLE" ]; then
   cp -R "$RESOURCE_BUNDLE" "$BUNDLE_DIR/Contents/Resources/"
@@ -192,8 +192,7 @@ if [ "$AIRMCP_EMBED_RUNTIME" = "1" ]; then
   cp "$PROJECT_DIR/package.json" "$PROJECT_DIR/package-lock.json" "$SERVER_ROOT/"
   if [ -f "$PROJECT_DIR/LICENSE" ]; then cp "$PROJECT_DIR/LICENSE" "$SERVER_ROOT/"; fi
   npm ci --omit=dev --ignore-scripts --no-audit --no-fund --prefix "$SERVER_ROOT"
-  cp "$NODE_SOURCE" "$NODE_ROOT/node"
-  chmod 755 "$NODE_ROOT/node"
+  "$SCRIPT_DIR/lib/embed-node-runtime.sh" "$NODE_SOURCE" "$RUNTIME_ROOT/runtime"
   cp "$BRIDGE_BUILD_DIR/AirMcpBridge" "$BRIDGE_ROOT/AirMcpBridge"
   chmod 755 "$BRIDGE_ROOT/AirMcpBridge"
   echo "  ✓ Embedded Node runtime, universal server, production dependencies, and Swift bridge"
@@ -256,7 +255,7 @@ elif [ -f "$WIDGET_DIR/Package.swift" ]; then
 	<false/>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.com.heznpc.AirMCP</string>
+		<string>group.app.airmcp</string>
 	</array>
 	<key>com.apple.security.personal-information.calendars</key>
 	<true/>
@@ -310,6 +309,9 @@ fi
 
 # Sign embedded executable code before signing the main app.
 if [ "$AIRMCP_EMBED_RUNTIME" = "1" ]; then
+  while IFS= read -r -d '' dylib; do
+    codesign --force --sign "$SIGN_IDENTITY" "$dylib"
+  done < <(find "$BUNDLE_DIR/Contents/Resources/airmcp/runtime/lib" -type f -name '*.dylib' -print0)
   codesign --force --sign "$SIGN_IDENTITY" "$BUNDLE_DIR/Contents/Resources/airmcp/runtime/bin/node"
   codesign --force --sign "$SIGN_IDENTITY" "$BUNDLE_DIR/Contents/Resources/airmcp/bin/AirMcpBridge"
 fi
@@ -327,7 +329,7 @@ codesign --force --sign "$SIGN_IDENTITY" --entitlements /dev/stdin "$BUNDLE_DIR"
 	<false/>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.com.heznpc.AirMCP</string>
+		<string>group.app.airmcp</string>
 	</array>
 </dict>
 </plist>

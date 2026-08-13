@@ -118,7 +118,7 @@ struct TrustStatusWidgetEntryView: View {
 // MARK: - Widget
 
 struct TrustStatusWidget: Widget {
-    let kind = "com.heznpc.AirMCP.TrustStatusWidget"
+    let kind = "app.airmcp.TrustStatusWidget"
 
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: TrustStatusProvider()) { entry in

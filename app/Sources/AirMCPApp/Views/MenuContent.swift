@@ -21,7 +21,7 @@ func L(_ key: String, _ args: CVarArg...) -> String {
 
 enum AirMcpConstants {
     static let npmPackageName = "airmcp"
-    static let npmPackageVersion = "2.16.4"
+    static let npmPackageVersion = "2.16.5"
     static var npmPackageSpecifier: String {
         ProcessInfo.processInfo.environment["AIRMCP_NPM_PACKAGE_SPECIFIER"]
             ?? "\(npmPackageName)@\(npmPackageVersion)"

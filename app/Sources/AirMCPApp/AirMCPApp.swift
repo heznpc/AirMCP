@@ -85,10 +85,16 @@ struct AirMCPApp: App {
                 hitlManager.respond(id: requestId, approved: approved, tool: tool)
             }
         } label: {
-            Label("AirMCP", systemImage: "a.square.fill")
-                .onAppear {
-                    initializeRuntimeIfNeeded()
-                }
+            // `label:` — unlike `content:` (MenuContent) above — is the actual
+            // status-bar item view. MenuBarExtra(content:label:) tears content
+            // down whenever the dropdown closes but keeps label instantiated
+            // for as long as the status item is shown, i.e. the app's entire
+            // run (this file already relies on that fact for the one-time
+            // initializeRuntimeIfNeeded() call below). The HITL visual-fallback
+            // subscription must live here, not in MenuContent: a request that
+            // needs the fallback arrives precisely when the user isn't looking
+            // at the menu, so content may not exist to receive it.
+            HitlFallbackMenuBarLabel(hitlManager: hitlManager, onAppear: initializeRuntimeIfNeeded)
         }
         .menuBarExtraStyle(.menu)
 
@@ -140,9 +146,11 @@ struct AirMCPApp: App {
     private func setupHitl() {
         hitlManager.timeoutSeconds = configManager.hitlTimeout
         if configManager.hitlLevel != .off {
-            // Register the local approval channel without prompting. macOS
-            // notification authorization is requested only from an explicit
-            // user-initiated runtime start action.
+            // Register the local approval channel without prompting at launch.
+            // macOS notification authorization is requested from an explicit
+            // user-initiated runtime start action, or lazily by HitlManager
+            // when the first gated request actually arrives — a reachable
+            // socket alone must never be mistaken for a visible prompt.
             HitlManager.registerNotificationCategory()
             hitlManager.startListening()
         } else {
@@ -287,6 +295,52 @@ final class OnboardingWindowHolder: NSObject {
 
 extension Notification.Name {
     static let hitlNotificationResponse = Notification.Name("hitlNotificationResponse")
+    /// A pending HITL approval cannot be surfaced as a macOS notification
+    /// (authorization denied or just refused) — the scene layer must bring the
+    /// in-app approval UI to the foreground instead.
+    static let hitlApprovalNeedsAttention = Notification.Name("hitlApprovalNeedsAttention")
+}
+
+/// The `label:` view of the menu bar's `MenuBarExtra` — i.e. the status-bar
+/// icon itself, not its dropdown. SwiftUI keeps this view instantiated for as
+/// long as the status item is visible (the app's entire run under
+/// `.menuBarExtraStyle(.menu)`), unlike `content:`, which SwiftUI tears down
+/// and rebuilds every time the dropdown closes/opens. A `.onReceive` placed on
+/// `content` (as an earlier version of this fix did) only fires when the
+/// dropdown happens to already be open — precisely the state a user who needs
+/// the visual fallback is *not* in. Placing the subscription on this label
+/// view instead is what makes it fire regardless of menu state: this view's
+/// lifetime is provably the app's lifetime, not the dropdown's.
+private struct HitlFallbackMenuBarLabel: View {
+    @Environment(\.openWindow) private var openWindow
+    let hitlManager: HitlManager
+    let onAppear: () -> Void
+
+    /// Reading `hitlManager.pendingRequests` here is what makes this view
+    /// re-render on change — @Observable tracks properties read from `body`
+    /// (or, as here, a computed var body reads), the same mechanism every
+    /// other manager-driven view in this app already relies on.
+    private var iconState: HitlManager.MenuBarIconState {
+        HitlManager.menuBarIconState(pendingCount: hitlManager.pendingRequests.count)
+    }
+
+    var body: some View {
+        // The status-item icon is the one signal with no z-order failure
+        // mode: a hidden window or an unheard sound both still leave this
+        // visible. Swap glyph + tint together so "something needs you" is
+        // legible even to someone who only glances at the menu bar.
+        Label("AirMCP", systemImage: iconState.systemImageName)
+            .foregroundStyle(iconState == .pendingApproval ? Color.orange : Color.primary)
+            .onAppear(perform: onAppear)
+            .onReceive(NotificationCenter.default.publisher(for: .hitlApprovalNeedsAttention)) { _ in
+                // Reuse the existing Trust Center window path (same call the
+                // menu's "Trust Center" button and onboarding's link use).
+                // LSUIElement apps need an explicit activate to come forward
+                // since there's no Dock icon to click.
+                openWindow(id: AirMcpConstants.trustCenterWindowID)
+                NSApp.activate()
+            }
+    }
 }
 
 // MARK: - URL Scheme Handler (airmcp://)

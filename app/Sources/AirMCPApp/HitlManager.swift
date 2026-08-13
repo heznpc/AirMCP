@@ -1,7 +1,35 @@
+import AppKit
 import Darwin
 import Foundation
 import Network
 import UserNotifications
+
+/// Seam over UNUserNotificationCenter authorization so the presentation
+/// routing below stays a pure, testable decision (the real center cannot be
+/// constructed in unit tests).
+protocol HitlNotificationAuthorizing: Sendable {
+    func authorizationStatus() async -> UNAuthorizationStatus
+    func requestAuthorization() async -> Bool
+}
+
+struct SystemHitlNotificationAuthorizer: HitlNotificationAuthorizing {
+    func authorizationStatus() async -> UNAuthorizationStatus {
+        await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+    }
+
+    func requestAuthorization() async -> Bool {
+        // NOT requesting UNAuthorizationOptions.timeSensitive here: the SDK
+        // marks it deprecated since macOS 12 ("Use time-sensitive
+        // entitlement" — confirmed by a real build warning against the
+        // macOS 14 SDK this target compiles against). Apple moved this from
+        // an authorization-option the user grants to an entitlement the app
+        // must carry in its code signature; the option no longer gates
+        // anything on current macOS. content.interruptionLevel = .timeSensitive
+        // below is the still-current mechanism — it needs the entitlement,
+        // not this option, to actually be honored.
+        (try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])) ?? false
+    }
+}
 
 @MainActor
 @Observable
@@ -33,6 +61,46 @@ final class HitlManager {
         case idle
         case listening
         case connected
+    }
+
+    /// How a pending approval request is surfaced to the human.
+    enum ApprovalPresentation: Equatable, Sendable {
+        /// Post a macOS user notification with Approve/Deny actions.
+        case notification
+        /// No notification can reach the user — bring the app's existing
+        /// approval UI (Trust Center / menubar pending list) to the front.
+        case visualFallback
+    }
+
+    /// Status-bar icon state, derived purely from whether any approval is
+    /// currently waiting on the user. Every other signal (notification
+    /// banner, the visual-fallback window) can be hidden by z-order — a
+    /// window behind another foreground app never becomes visible just
+    /// because NSApp.activate() was called, it cannot promote AirMCP above a
+    /// different app's frontmost window. The status-bar icon has no such
+    /// failure mode: it always renders, so it is the one signal a "did
+    /// anything even happen?" user can rely on regardless of what else on
+    /// screen failed to grab their attention.
+    enum MenuBarIconState: Equatable, Sendable {
+        case idle
+        case pendingApproval
+
+        var systemImageName: String {
+            switch self {
+            case .idle: return "a.square.fill"
+            case .pendingApproval: return "exclamationmark.circle.fill"
+            }
+        }
+    }
+
+    nonisolated static func menuBarIconState(pendingCount: Int) -> MenuBarIconState {
+        pendingCount > 0 ? .pendingApproval : .idle
+    }
+
+    /// First routing step, derived purely from the authorization status.
+    enum PresentationRoute: Equatable, Sendable {
+        case present(ApprovalPresentation)
+        case requestAuthorization
     }
 
     // MARK: - Observable State
@@ -67,6 +135,8 @@ final class HitlManager {
     private let socketPathConfiguration = HitlManager.configuredSocketPath()
 
     var timeoutSeconds: Int = 30
+    /// Injectable for tests; production uses the real notification center.
+    var notificationAuthorizer: HitlNotificationAuthorizing = SystemHitlNotificationAuthorizer()
 
     // MARK: - Lifecycle
 
@@ -316,7 +386,7 @@ final class HitlManager {
         pendingTools[request.id] = request.tool
         pendingRequests.removeAll { $0.id == request.id }
         pendingRequests.insert(request, at: 0)
-        postNotification(for: request)
+        presentApproval(for: request)
 
         let timeout = DispatchWorkItem { [weak self] in
             Task { @MainActor [weak self] in
@@ -405,6 +475,74 @@ final class HitlManager {
         )
     }
 
+    // MARK: - Presentation Routing
+
+    /// Pure routing: "socket reachable" is not "visible to a human". A request
+    /// may only rely on a notification when the app is actually authorized to
+    /// post one — with .notDetermined authorization, `UNUserNotificationCenter
+    /// .add` silently drops the notification and the request times out unseen.
+    nonisolated static func presentationRoute(for status: UNAuthorizationStatus) -> PresentationRoute {
+        switch status {
+        case .authorized, .provisional, .ephemeral:
+            return .present(.notification)
+        case .notDetermined:
+            // A gated action is literally waiting on the user — this is the
+            // one moment a permission prompt is justified.
+            return .requestAuthorization
+        case .denied:
+            return .present(.visualFallback)
+        @unknown default:
+            return .present(.visualFallback)
+        }
+    }
+
+    nonisolated static func presentation(afterAuthorizationGranted granted: Bool) -> ApprovalPresentation {
+        granted ? .notification : .visualFallback
+    }
+
+    nonisolated static func resolvePresentation(
+        using authorizer: HitlNotificationAuthorizing
+    ) async -> ApprovalPresentation {
+        switch presentationRoute(for: await authorizer.authorizationStatus()) {
+        case .present(let presentation):
+            return presentation
+        case .requestAuthorization:
+            return presentation(afterAuthorizationGranted: await authorizer.requestAuthorization())
+        }
+    }
+
+    private func presentApproval(for request: ApprovalRequest) {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            let presentation = await Self.resolvePresentation(using: self.notificationAuthorizer)
+            // The settings read (or permission prompt) may resolve after the
+            // request was already answered or timed out — never surface stale UI.
+            guard self.pendingRequests.contains(where: { $0.id == request.id }) else { return }
+            switch presentation {
+            case .notification:
+                self.postNotification(for: request)
+            case .visualFallback:
+                // Whoever owns the approval UI (the SwiftUI scene layer) brings
+                // the Trust Center window forward; the manager stays UI-free.
+                // A notification would have carried content.sound = .default —
+                // this branch has no equivalent unless played explicitly, and
+                // the window it triggers can be hidden behind another
+                // foreground app (activate() cannot promote above it), so
+                // sound is the only signal here not subject to z-order.
+                Self.playVisualFallbackAlertSound()
+                NotificationCenter.default.post(name: .hitlApprovalNeedsAttention, object: nil)
+            }
+        }
+    }
+
+    /// Isolated to its own method (rather than inlined) so it is the one
+    /// spot to swap for an injectable seam if this ever needs a unit test
+    /// beyond "was it called" — NSSound.play() itself needs a real device to
+    /// confirm.
+    private static func playVisualFallbackAlertSound() {
+        NSSound(named: "Glass")?.play()
+    }
+
     // MARK: - Notifications
 
     private func postNotification(for request: ApprovalRequest) {
@@ -420,6 +558,30 @@ final class HitlManager {
         content.sound = .default
         content.categoryIdentifier = "HITL_APPROVAL"
         content.userInfo = ["tool": request.tool]
+        // A gated tool call is genuinely time-sensitive — the caller is
+        // blocked waiting on a decision. Without this, macOS's Scheduled
+        // Summary notification setting (System Settings → Notifications →
+        // AirMCP → Notification Grouping / Summary) is free to judge a
+        // default-priority (.active) notification as non-urgent and defer it
+        // into a later batch instead of delivering it immediately — which
+        // reads identically to "nothing happened" from the caller's side,
+        // and plausibly explains a share of today's "did HITL even fire?"
+        // reports on top of the .notDetermined-authorization gap fixed
+        // above. Setting this property alone is always safe — it cannot
+        // throw or crash — but the OS only actually honors it if the app
+        // carries the com.apple.developer.usernotifications.time-sensitive
+        // entitlement. That entitlement is NOT currently present anywhere in
+        // this app's signing pipeline (scripts/bundle-app.sh's inline
+        // entitlements heredoc has app-sandbox + application-groups only,
+        // and no dedicated .entitlements file exists in this repo).
+        // Granting it requires enabling the capability in the Apple
+        // Developer Portal for this team, which cannot be confirmed or
+        // performed from source alone — deliberately left out of this
+        // change. Until that capability is granted, this line is inert:
+        // the OS silently falls back to .active (today's status quo), never
+        // a regression, and the moment the entitlement is added this
+        // already does the right thing with no further code change needed.
+        content.interruptionLevel = .timeSensitive
 
         let notificationRequest = UNNotificationRequest(
             identifier: request.id,
@@ -433,6 +595,9 @@ final class HitlManager {
     // MARK: - Notification Registration
 
     static func requestNotificationPermission() {
+        // See SystemHitlNotificationAuthorizer.requestAuthorization() for why
+        // .timeSensitive is deliberately NOT in this option set (deprecated
+        // since macOS 12 in favor of the time-sensitive entitlement).
         UNUserNotificationCenter.current().requestAuthorization(
             options: [.alert, .sound]
         ) { granted, error in

@@ -364,11 +364,18 @@ export function installHitlGuard(server: McpServer, hitlClient: HitlClient, conf
       }
       await recordApprovalDecision(name, decision, "socket");
       if (decision === "timed_out") {
-        return toolErr("hitl_timeout", `Action denied: approval for "${name}" timed out before a decision.`);
+        return toolErr(
+          "hitl_timeout",
+          `Action denied: approval for "${name}" timed out before a decision. ` +
+            `The prompt may not have been visible: check the pending approvals under the AirMCP menubar icon ` +
+            `(or its Trust Center window), allow notifications for AirMCP in System Settings → Notifications, ` +
+            `then retry the call.`,
+        );
       }
       if (decision === "unavailable") {
         return errPermission(
-          `Action denied: the AirMCP approval socket became unavailable before "${name}" received a decision.`,
+          `Action denied: the AirMCP approval socket became unavailable before "${name}" received a decision. ` +
+            `Restart the AirMCP menubar app and retry the call.`,
         );
       }
       if (decision === "denied") {
@@ -482,13 +489,17 @@ export function installHitlGuard(server: McpServer, hitlClient: HitlClient, conf
         if (decision === "timed_out") {
           return resourceDeny(
             "hitl_timeout",
-            `Action denied: approval for "${governedName}" timed out before a decision.`,
+            `Action denied: approval for "${governedName}" timed out before a decision. ` +
+              `The prompt may not have been visible: check the pending approvals under the AirMCP menubar icon ` +
+              `(or its Trust Center window), allow notifications for AirMCP in System Settings → Notifications, ` +
+              `then retry the call.`,
           );
         }
         if (decision === "unavailable") {
           return resourceDeny(
             "permission_denied",
-            `Action denied: the approval channel became unavailable before "${governedName}" received a decision.`,
+            `Action denied: the approval channel became unavailable before "${governedName}" received a decision. ` +
+              `Restart the AirMCP menubar app and retry the call.`,
           );
         }
         if (decision === "denied") {

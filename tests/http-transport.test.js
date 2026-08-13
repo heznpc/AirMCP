@@ -692,13 +692,46 @@ describe("startHttpServer live middleware", () => {
       expect(health.status).toBe(200);
       expect(await health.json()).toEqual({ status: "ok", version: "9.9.9-test", appOwned: false });
 
+      const { auditLog } = await import("../dist/shared/audit.js");
+      auditLog.mockClear();
+
       const protectedRoute = await fetch(serverUrl(server, "/mcp"), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "User-Agent": "dialect-test-agent/1.0" },
         body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize" }),
       });
       expect(protectedRoute.status).toBe(401);
       expect(await protectedRoute.json()).toEqual({ error: "Unauthorized: invalid or missing Bearer token" });
+
+      // The 401 audit row must identify the knocking client class — a bare
+      // {ip, path} row proved un-attributable in practice.
+      expect(auditLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tool: "__auth_failure",
+          status: "error",
+          args: expect.objectContaining({
+            path: "/mcp",
+            reason: "missing_token",
+            userAgent: "dialect-test-agent/1.0",
+          }),
+        }),
+      );
+
+      const wrongToken = await fetch(serverUrl(server, "/mcp"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer not-the-right-token",
+        },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize" }),
+      });
+      expect(wrongToken.status).toBe(401);
+      expect(auditLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tool: "__auth_failure",
+          args: expect.objectContaining({ reason: "wrong_token" }),
+        }),
+      );
     } finally {
       await closeServer(server);
     }

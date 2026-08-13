@@ -1406,6 +1406,18 @@ public enum SetShuffleSongrepeatOption: String, AppEnum {
 }
 
 @available(iOS 16, macOS 13, *)
+public enum SetupPermissionsOpenSettingsOption: String, AppEnum {
+    case screen_recording, accessibility, full_disk, automation
+    nonisolated(unsafe) public static var typeDisplayRepresentation: TypeDisplayRepresentation = "Open the System Settings privacy pane for this permission category so the user c"
+    nonisolated(unsafe) public static var caseDisplayRepresentations: [Self: DisplayRepresentation] = [
+        .screen_recording: "Screen_recording",
+        .accessibility: "Accessibility",
+        .full_disk: "Full_disk",
+        .automation: "Automation"
+    ]
+}
+
+@available(iOS 16, macOS 13, *)
 public enum TvPlaybackControlActionOption: String, AppEnum {
     case play, pause, nextTrack, previousTrack
     nonisolated(unsafe) public static var typeDisplayRepresentation: TypeDisplayRepresentation = "Playback action"
@@ -7228,16 +7240,21 @@ public struct SetVolumeIntent: AppIntent {
 // Tool: setup_permissions
 public struct SetupPermissionsIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Setup Permissions"
-    nonisolated(unsafe) public static var description = IntentDescription("Trigger macOS permission prompts for all Apple apps used by AirMCP. Run this once after installation to grant all permissions at once. Each app will show a one-time macOS permission dialog.")
+    nonisolated(unsafe) public static var description = IntentDescription("Trigger macOS permission prompts for all Apple apps used by AirMCP and report permission status. Run this once after installation to grant all permissions at once. Each app will show a one-time macOS permission dialog. Screen Recording, Accessibility, and Full Disk Access cannot be requested with a popup — their current status is reported, and open_settings jumps straight to the System Settings pane where the user can enable them.")
     nonisolated(unsafe) public static var openAppWhenRun: Bool = false
 
     public init() {}
 
+    @Parameter(title: "Open the System Settings privacy pane for this permission category so the user c")
+    public var open_settings: SetupPermissionsOpenSettingsOption?
+
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        var args: [String: any Sendable] = [:]
+        if let v = open_settings { args["open_settings"] = v.rawValue }
         let result = try await MCPIntentRouter.shared.call(
             tool: "setup_permissions",
-            args: [String: any Sendable]()
+            args: args
         )
         return .result(value: result)
     }

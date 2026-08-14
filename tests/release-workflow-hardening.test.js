@@ -119,17 +119,26 @@ describe("release workflow source and identity hardening", () => {
   test("binds CD to main and the workflow SHA, then dispatches the signed lane explicitly", () => {
     expect(cd.jobs.publish.permissions.actions).toBe("write");
     const checkout = cd.jobs.publish.steps.find((step) => step.uses?.startsWith("actions/checkout@"));
-    expect(checkout.with.ref).toBe("${{ github.sha }}");
+    // release_sha lets a fallback dispatch resume a commit that already left
+    // main HEAD (e.g. after a prior publish attempt partially succeeded and a
+    // later commit landed on main before the rerun). It defaults to the plain
+    // dispatched SHA, so the no-input path is unchanged.
+    expect(checkout.with.ref).toBe("${{ inputs.release_sha || github.sha }}");
     expect(checkout.with["fetch-depth"]).toBe(0);
 
     const source = namedStep(cd, "publish", "Verify release source");
     expect(source.env.RELEASE_REF).toBe("${{ github.ref }}");
-    expect(source.env.RELEASE_SHA).toBe("${{ github.sha }}");
+    expect(source.env.WORKFLOW_SHA).toBe("${{ github.sha }}");
+    expect(source.env.RELEASE_SHA).toBe("${{ inputs.release_sha || github.sha }}");
     expect(source.run).toContain("refs/heads/main");
     expect(source.run).toContain("git rev-parse HEAD");
+    // The resume path must still prove provenance: release_sha has to be an
+    // ancestor of the main commit that dispatched the workflow, so someone
+    // can't smuggle in an arbitrary commit via the input.
+    expect(source.run).toContain("git merge-base --is-ancestor");
 
     const release = namedStep(cd, "publish", "Create GitHub Release");
-    expect(release.with.target_commitish).toBe("${{ github.sha }}");
+    expect(release.with.target_commitish).toBe("${{ inputs.release_sha || github.sha }}");
     const dispatch = namedStep(cd, "publish", "Dispatch signed app release");
     expect(dispatch.run).toContain("gh workflow run release-app.yml");
     expect(dispatch.run).toContain('--ref "$RELEASE_TAG"');
@@ -152,7 +161,7 @@ describe("release workflow source and identity hardening", () => {
     const inspect = namedStep(cd, "publish", "Inspect root registry identity");
     const verify = namedStep(cd, "publish", "Verify root registry identity");
     expect(inspect.run).toContain("verify-publish-identity.mjs --allow-missing");
-    expect(inspect.env.AIRMCP_RELEASE_SHA).toBe("${{ github.sha }}");
+    expect(inspect.env.AIRMCP_RELEASE_SHA).toBe("${{ inputs.release_sha || github.sha }}");
     expect(verify.run).toContain("verify-publish-identity.mjs --retry-seconds=60");
 
     for (const name of ["Publish root with provenance", "Publish root with provenance (token fallback)"]) {

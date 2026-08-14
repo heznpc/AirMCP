@@ -4,6 +4,8 @@ import { describe, expect, test } from "@jest/globals";
 const root = new URL("..", import.meta.url);
 const hitlManager = readFileSync(new URL("app/Sources/AirMCPApp/HitlManager.swift", root), "utf8");
 const menuContent = readFileSync(new URL("app/Sources/AirMCPApp/Views/MenuContent.swift", root), "utf8");
+const trustCenter = readFileSync(new URL("app/Sources/AirMCPApp/Views/TrustCenterView.swift", root), "utf8");
+const airmcpApp = readFileSync(new URL("app/Sources/AirMCPApp/AirMCPApp.swift", root), "utf8");
 
 describe("menubar HITL fallback source contract", () => {
   test("tracks pending approval requests until a response is sent", () => {
@@ -34,6 +36,26 @@ describe("menubar HITL fallback source contract", () => {
     expect(hitlManager).toContain("pendingConnections.removeValue(forKey: request.id)");
   });
 
+  test("notification requests time-sensitive delivery to bypass macOS's Scheduled Summary", () => {
+    // A default-priority (.active) notification is fair game for macOS to
+    // batch into a later Scheduled Summary instead of delivering it now —
+    // indistinguishable from "nothing happened" while a gated tool call sits
+    // blocked. content.interruptionLevel = .timeSensitive is the documented,
+    // non-deprecated way to ask the OS not to do that.
+    expect(hitlManager).toContain("content.interruptionLevel = .timeSensitive");
+    expect(hitlManager).toMatch(
+      /func postNotification\(for request: ApprovalRequest\) \{[\s\S]*content\.interruptionLevel = \.timeSensitive[\s\S]*UNUserNotificationCenter\.current\(\)\.add\(notificationRequest\)/,
+    );
+    // UNAuthorizationOptions.timeSensitive is deprecated since macOS 12 in
+    // favor of the time-sensitive entitlement (confirmed by a build warning
+    // against this target's macOS 14 SDK) — it must not be requested as an
+    // authorization option in either call site, or the deprecated API sits
+    // silently unused-but-warned in a codebase whose CI treats build output
+    // as significant.
+    expect(hitlManager).not.toContain(".timeSensitive]");
+    expect(hitlManager).not.toContain(".timeSensitive,");
+  });
+
   test("menu exposes explicit approve and deny actions for pending requests", () => {
     expect(menuContent).toContain("hitlManager.pendingRequests");
     expect(menuContent).toContain('Text(L("settings.pendingApprovals"))');
@@ -41,5 +63,77 @@ describe("menubar HITL fallback source contract", () => {
     expect(menuContent).toContain("hitlManager.respond(id: request.id, approved: true");
     expect(menuContent).toContain('Button(L("hitl.deny"))');
     expect(menuContent).toContain("hitlManager.respond(id: request.id, approved: false");
+  });
+
+  test("visual-fallback subscription lives on the persistent status-item label, not the dropdown content", () => {
+    // MenuBarExtra(content:label:) tears `content` (MenuContent) down every
+    // time the dropdown closes and only rebuilds it while open. A request
+    // that needs the visual fallback arrives precisely when the user isn't
+    // looking at the menu — i.e. dropdown closed, content not instantiated —
+    // so subscribing there means the fallback silently never fires in the
+    // one situation it exists for. It must instead live on `label:`, which
+    // SwiftUI keeps instantiated for as long as the status item is visible
+    // (the app's entire run) — the same persistence this file already
+    // depends on for its one-time initializeRuntimeIfNeeded() call.
+    expect(menuContent).not.toContain("hitlApprovalNeedsAttention");
+    expect(airmcpApp).toContain("hitlApprovalNeedsAttention");
+    expect(airmcpApp).toContain("struct HitlFallbackMenuBarLabel: View");
+    expect(airmcpApp).toContain("@Environment(\\.openWindow) private var openWindow");
+    expect(airmcpApp).toMatch(
+      /struct HitlFallbackMenuBarLabel: View \{[\s\S]*onReceive\(NotificationCenter\.default\.publisher\(for: \.hitlApprovalNeedsAttention\)\)[\s\S]*openWindow\(id: AirMcpConstants\.trustCenterWindowID\)[\s\S]*NSApp\.activate\(\)/,
+    );
+    // The label closure of MenuBarExtra — not MenuContent (the dropdown) —
+    // is what must construct this view, so the subscription is wired into
+    // the always-alive status item rather than the ephemeral dropdown.
+    expect(airmcpApp).toMatch(
+      /} label: \{[\s\S]*HitlFallbackMenuBarLabel\(hitlManager: hitlManager, onAppear: initializeRuntimeIfNeeded\)[\s\S]*\}\n\s*\.menuBarExtraStyle/,
+    );
+  });
+
+  test("status-bar icon flips to an alert glyph while any approval is pending, independent of window z-order", () => {
+    // Both the notification banner and the visual-fallback window can be
+    // hidden behind another foreground app's frontmost window — activate()
+    // cannot promote AirMCP above it. The status-item icon has no such
+    // failure mode, so it must react to pendingRequests directly rather than
+    // to which presentation channel a given request took.
+    expect(hitlManager).toContain("enum MenuBarIconState: Equatable, Sendable");
+    expect(hitlManager).toContain('case .idle: return "a.square.fill"');
+    expect(hitlManager).toContain('case .pendingApproval: return "exclamationmark.circle.fill"');
+    expect(hitlManager).toMatch(
+      /static func menuBarIconState\(pendingCount: Int\) -> MenuBarIconState \{\s*pendingCount > 0 \? \.pendingApproval : \.idle/,
+    );
+    expect(airmcpApp).toContain("let hitlManager: HitlManager");
+    expect(airmcpApp).toContain(
+      "HitlManager.menuBarIconState(pendingCount: hitlManager.pendingRequests.count)",
+    );
+    expect(airmcpApp).toContain("Label(\"AirMCP\", systemImage: iconState.systemImageName)");
+    expect(airmcpApp).toContain("iconState == .pendingApproval ? Color.orange : Color.primary");
+  });
+
+  test("visual fallback plays an alert sound to match the notification channel's content.sound", () => {
+    // postNotification sets content.sound = .default; the visual-fallback
+    // branch of presentApproval had no acoustic equivalent, so a request
+    // routed there was silent on top of being potentially hidden by z-order.
+    expect(hitlManager).toContain("content.sound = .default");
+    expect(hitlManager).toContain('NSSound(named: "Glass")?.play()');
+    expect(hitlManager).toMatch(
+      /case \.visualFallback:[\s\S]*playVisualFallbackAlertSound\(\)[\s\S]*NotificationCenter\.default\.post\(name: \.hitlApprovalNeedsAttention/,
+    );
+  });
+
+  test("trust center completes approval on the fallback surface without a selection", () => {
+    // The .hitlApprovalNeedsAttention fallback opens the Trust Center window
+    // with no run selected — pending approvals must be answerable right there,
+    // through the same respond path the menubar uses, not display-only.
+    expect(trustCenter).toContain('Button(L("hitl.approve")');
+    expect(trustCenter).toContain('Button(L("hitl.deny")');
+    expect(trustCenter).toContain("hitlManager.respond(id: pending.id, approved: approved, tool: pending.tool)");
+    expect(trustCenter).toContain("pendingApprovalsAcrossRuns");
+    expect(trustCenter).toMatch(
+      /else if !pendingApprovalsAcrossRuns\.isEmpty \{[\s\S]*pendingApprovalsDetail[\s\S]*\} else \{[\s\S]*ContentUnavailableView/,
+    );
+    expect(trustCenter).toMatch(
+      /pendingApprovalsDetail[\s\S]*ForEach\(pendingApprovalsAcrossRuns\)[\s\S]*pendingApprovalCard\(pending\)/,
+    );
   });
 });

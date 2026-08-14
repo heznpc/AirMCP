@@ -8,7 +8,7 @@ public enum WidgetSnapshotConfig {
     /// App Group shared by the main app (writer) and the widget (reader). Must
     /// match the `com.apple.security.application-groups` entitlement on BOTH
     /// signed targets; the release gate checks that agreement.
-    public static let appGroupID = "group.com.heznpc.AirMCP"
+    public static let appGroupID = "group.app.airmcp"
 }
 
 /// Reads/writes a ``WidgetSnapshot`` to a shared App Group container. The

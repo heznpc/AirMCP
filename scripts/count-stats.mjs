@@ -148,6 +148,7 @@ syncFile("README.md", [
   { pattern: /(\d+) Shortcuts\/AppIntents/g, value: appIntents },
   { pattern: /\*\*(\d+) Shortcuts \/ Siri AppIntents\*\*/, value: appIntents },
   { pattern: /Current generated surfaces: (\d+) Shortcuts \/ Siri AppIntents/g, value: appIntents },
+  { pattern: /(\d+) App Intent action types/g, value: appIntents },
   { pattern: /(\d+) Interactive Snippet views/g, value: snippetViews },
   { pattern: /and (\d+) AppEnum pickers/g, value: appEnums },
   { pattern: /(\d+) auto-generated AppIntents/g, value: appIntents },

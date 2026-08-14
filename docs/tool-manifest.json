@@ -1,8 +1,8 @@
 {
   "generatedAt": "STABLE_PLACEHOLDER",
   "protocolVersion": "2025-11-25",
-  "toolCount": 297,
-  "eligibleCount": 290,
+  "toolCount": 298,
+  "eligibleCount": 291,
   "ineligibleCount": 7,
   "ineligibleByReason": {
     "object-param:recurrence": 2,
@@ -16,7 +16,7 @@
       "title": "Activate Tab",
       "description": "Switch to a specific Safari tab. Use list_tabs to find window/tab indices.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "windowIndex": {
@@ -53,7 +53,7 @@
       "title": "Add Contact Email",
       "description": "Add an email address to an existing contact.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "id": {
@@ -95,7 +95,7 @@
       "title": "Add Contact Phone",
       "description": "Add a phone number to an existing contact.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "id": {
@@ -137,7 +137,7 @@
       "title": "Add Photos to Album",
       "description": "Add photos to an existing album by photo IDs and album name.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "photoIds": {
@@ -177,7 +177,7 @@
       "title": "Add to Playlist",
       "description": "Add a track to an existing playlist.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "playlistName": {
@@ -212,7 +212,7 @@
       "title": "Add to Reading List",
       "description": "Add a URL to Safari's Reading List with an optional title.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "url": {
@@ -246,7 +246,7 @@
       "title": "On-Device AI Agent (read-only)",
       "description": "Run a prompt through Apple's on-device Foundation Models with read-only access to AirMCP data (today's events, due reminders, contacts search). The on-device LLM autonomously decides which read tool to call. Requires macOS 26+ with Apple Silicon. GOVERNANCE BOUNDARY: the model's read sub-calls run inside the Swift process and do NOT pass through the Node toolRegistry (no per-call HITL, rate-limit, or audit) — the result's `subReadsGoverned:false` makes this explicit. Write actions are intentionally NOT exposed to the model, so writes belong to direct MCP tool calls. The response is treated as untrusted content because it is synthesized from arbitrary Apple data.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "prompt": {
@@ -266,7 +266,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "response": {
@@ -322,7 +322,7 @@
       "title": "AI Chat",
       "description": "Send a message to an on-device AI session using Apple Foundation Models. Note: each call creates a fresh session — sessionName is for caller-side tracking only, not server-side persistence. Requires macOS 26+.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "sessionName": {
@@ -362,7 +362,7 @@
       "title": "AI Plan Metrics",
       "description": "Run a sample of planner goals against the on-device Foundation Model and report the aggregate score. Useful after macOS / Apple Intelligence updates to catch planner regressions. Requires macOS 26+ with Apple Silicon. Each case makes one model call, so keep `limit` small for interactive use.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "limit": {
@@ -381,7 +381,7 @@
         }
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "sampled": {
@@ -469,7 +469,7 @@
       "title": "AI Status",
       "description": "Check availability and status of Apple's on-device Foundation Models. Returns whether the model is available, macOS version, and Apple Silicon status.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
@@ -485,11 +485,43 @@
       "ineligibleReason": null
     },
     {
+      "name": "allow_sleep",
+      "title": "Allow Sleep",
+      "description": "Cancel any active prevent_sleep assertion immediately, so the Mac can sleep normally again (idle timeout or closing the lid). No-op if no assertion is active.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {}
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cancelled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "cancelled"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "sensitiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "appIntentEligible": true,
+      "ineligibleReason": null
+    },
+    {
       "name": "audit_log",
       "title": "Audit Log",
       "description": "Query the on-device audit log of tool calls. Reads JSONL rows from ~/.airmcp/audit.jsonl (+ rotated siblings) and returns recent entries newest-first with optional filters by tool / status / time window. Args are already PII-scrubbed at write-time; sensitive-tool entries have `_redacted` args.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "since": {
@@ -539,7 +571,7 @@
         }
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "total": {
@@ -694,7 +726,7 @@
       "title": "Audit Summary",
       "description": "Aggregate the audit log over a time window — total call count, error rate, the busiest tools, and a provenance breakdown (`byActor`) of what ran human-driven (`direct`) vs. autonomously (`daemon-skill:<name>`). Useful for weekly reviews and for spotting runaway agents (a sudden top-of-leaderboard `create_*` tool, or daemon activity you didn't authorize, is a red flag).",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "since": {
@@ -713,7 +745,7 @@
         }
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "since": {
@@ -868,7 +900,7 @@
       "title": "Bulk Move Notes",
       "description": "Move multiple notes to a target folder at once. Same limitations as move_note apply to each successful move (new ID, body-only copy — Notes JXA cannot preserve creationDate/modificationDate or attachments on the copy). Use `dryRun: true` to preview which notes would move + what meta would be lost without making any change. Default `stopOnError: true` halts on the first failure to keep the source/target in a recoverable mid-state — pass `false` for best-effort partial completion. Returns per-note results plus aggregate counts.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "ids": {
@@ -918,7 +950,7 @@
       "title": "Calendar Week View",
       "description": "Display an interactive calendar week view showing events for a 7-day period.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "startDate": {
@@ -944,7 +976,7 @@
       "title": "Capture Screen Area",
       "description": "Capture a screenshot of a specific rectangular region of the screen. Coordinates are in screen pixels with origin at top-left. Requires Screen Recording permission.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "x": {
@@ -989,7 +1021,7 @@
       "title": "Capture Screen",
       "description": "Capture a full-screen screenshot as a PNG image. Optionally specify a display number for multi-monitor setups (1 = main display). Requires Screen Recording permission.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "display": {
@@ -1016,7 +1048,7 @@
       "title": "Capture Screenshot",
       "description": "Capture the screen to an image file at the given path — writes a file; needs macOS Screen Recording permission. Supports full screen, window, or selection capture.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "path": {
@@ -1056,7 +1088,7 @@
       "title": "Capture Window",
       "description": "Capture a screenshot of the frontmost window. Optionally specify an app name to activate that app first and capture its window. Requires Screen Recording permission.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "appName": {
@@ -1082,7 +1114,7 @@
       "title": "Classify Image",
       "description": "Classify an image using Apple Vision framework. Returns labels with confidence scores (e.g. 'dog', 'outdoor', 'food'). Works on any image file. Requires Swift bridge.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "imagePath": {
@@ -1119,7 +1151,7 @@
       "title": "Close Tab",
       "description": "Close a specific Safari tab. Use list_tabs to find window/tab indices.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "windowIndex": {
@@ -1156,7 +1188,7 @@
       "title": "iCloud Sync Status",
       "description": "Check iCloud sync status — see what usage data and config is synced across your Apple devices.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
@@ -1176,7 +1208,7 @@
       "title": "Compare Notes",
       "description": "Retrieve full plaintext content of 2-5 notes at once for comparison. Use this after scan_notes to safely compare potentially duplicate or similar notes before deciding what to keep, merge, or delete.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "ids": {
@@ -1209,7 +1241,7 @@
       "title": "Complete Reminder",
       "description": "Mark a reminder as completed or un-complete it.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "id": {
@@ -1243,7 +1275,7 @@
       "title": "Connect Bluetooth",
       "description": "Connect to a BLE device by its UUID. The UUID can be obtained from scan_bluetooth results. Note: the connection persists only while the server process is running.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "identifier": {
@@ -1273,7 +1305,7 @@
       "title": "Create Album",
       "description": "Create a new photo album.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "name": {
@@ -1302,7 +1334,7 @@
       "title": "Create Contact",
       "description": "Create a new contact with name and optional email, phone, organization.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "firstName": {
@@ -1363,7 +1395,7 @@
       "title": "Create Directory",
       "description": "Create a new directory (and intermediate directories if needed).",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "path": {
@@ -1393,7 +1425,7 @@
       "title": "Create Event",
       "description": "Create a new calendar event. Recurring events cannot be created via automation. Attendees cannot be added programmatically.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "summary": {
@@ -1454,7 +1486,7 @@
       "title": "Create Folder",
       "description": "Create a new folder in Apple Notes — a non-destructive write. Optionally specify which account to create it in.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "name": {
@@ -1488,7 +1520,7 @@
       "title": "Create Note",
       "description": "Create a new note with HTML body. The first line of the body becomes the note title automatically. Optionally specify a target folder.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "body": {
@@ -1522,7 +1554,7 @@
       "title": "Create Playlist",
       "description": "Create a new playlist in Music.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "name": {
@@ -1551,7 +1583,7 @@
       "title": "Create Recurring Event",
       "description": "Create a recurring calendar event via EventKit. Supports daily, weekly, monthly, and yearly recurrence with configurable intervals. Requires macOS 26+ Swift bridge.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "summary": {
@@ -1655,7 +1687,7 @@
       "title": "Create Recurring Reminder",
       "description": "Create a recurring reminder via EventKit. Supports daily, weekly, monthly, and yearly recurrence with configurable intervals. Requires macOS 26+ Swift bridge.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "title": {
@@ -1752,7 +1784,7 @@
       "title": "Create Reminder",
       "description": "Create a new reminder. Optionally set notes, due date, priority (0=none, 1-4=high, 5=medium, 6-9=low), and target list. Recurrence rules cannot be set via automation.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "title": {
@@ -1802,7 +1834,7 @@
       "title": "Create Reminder List",
       "description": "Create a new reminder list.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "name": {
@@ -1831,7 +1863,7 @@
       "title": "Create Shortcut",
       "description": "Create a new empty Siri Shortcut by name — drives the Shortcuts app via UI automation (needs Accessibility permission; the app opens and takes focus). The shortcut must be further configured in the Shortcuts app.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "name": {
@@ -1860,7 +1892,7 @@
       "title": "Delete Contact",
       "description": "Delete a contact by ID. This action is permanent.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "id": {
@@ -1889,7 +1921,7 @@
       "title": "Delete Event",
       "description": "Delete a calendar event by ID. This action is permanent.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "id": {
@@ -1918,7 +1950,7 @@
       "title": "Delete Note",
       "description": "Delete a note by ID. The note is moved to Recently Deleted and permanently removed after 30 days.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "id": {
@@ -1947,7 +1979,7 @@
       "title": "Delete Photos",
       "description": "Delete photos by local identifier. Shows macOS confirmation dialog for user approval. Requires macOS 26+ Swift bridge.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "identifiers": {
@@ -1978,7 +2010,7 @@
       "title": "Delete Playlist",
       "description": "Delete an existing playlist from Music.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "name": {
@@ -2007,7 +2039,7 @@
       "title": "Delete Reminder",
       "description": "Delete a reminder by ID. This action is permanent.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "id": {
@@ -2036,7 +2068,7 @@
       "title": "Delete Reminder List",
       "description": "Delete a reminder list by name. This action is permanent and removes all reminders in the list.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "name": {
@@ -2065,7 +2097,7 @@
       "title": "Delete Shortcut",
       "description": "Delete a Siri Shortcut by name. Uses the macOS shortcuts CLI (macOS 13+). This action is permanent and cannot be undone.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "name": {
@@ -2094,7 +2126,7 @@
       "title": "Describe Tool",
       "description": "Fetch the full description for one registered AirMCP tool after discover_tools returns a compact match.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "name": {
@@ -2119,7 +2151,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "name": {
@@ -2173,7 +2205,7 @@
       "title": "Disconnect Bluetooth",
       "description": "Disconnect a BLE device by its UUID.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "identifier": {
@@ -2203,7 +2235,7 @@
       "title": "Discover Tools",
       "description": "Search available tools by keyword. Returns matching tools with descriptions. Use this instead of scanning the full tool catalog — describe what you need and get relevant tools.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "query": {
@@ -2230,7 +2262,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "query": {
@@ -2288,7 +2320,7 @@
       "title": "Drop Pin",
       "description": "Drop a pin at specific coordinates in Apple Maps.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "latitude": {
@@ -2330,7 +2362,7 @@
       "title": "Duplicate Shortcut",
       "description": "Duplicate an existing Siri Shortcut. Exports the shortcut to a temporary file and re-imports it with a new name.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "name": {
@@ -2365,7 +2397,7 @@
       "title": "Edit Shortcut",
       "description": "Open a Siri Shortcut in the Shortcuts app for manual editing. Uses UI automation (System Events) to activate the app, search for the shortcut, and open it. The user can then edit the shortcut in the Shortcuts app UI.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "name": {
@@ -2394,7 +2426,7 @@
       "title": "End Tool Session",
       "description": "End a tool session before its TTL expires.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "sessionId": {
@@ -2409,7 +2441,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "sessionId": {
@@ -2440,7 +2472,7 @@
       "title": "Event Monitor Status",
       "description": "Check if real-time event monitoring is active.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
@@ -2460,7 +2492,7 @@
       "title": "Subscribe to Events",
       "description": "Start real-time monitoring of Apple data changes: calendar, reminders, clipboard, mail unread count, focus mode, now-playing track, and watched file paths. Native observers (calendar/reminders/clipboard/focus/files) are pushed from the Swift bridge; mail and now-playing are polled. Requires the Swift bridge in persistent mode for the native observers.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
@@ -2480,7 +2512,7 @@
       "title": "Export Shortcut",
       "description": "Export a Siri Shortcut to a .shortcut file. Uses the macOS shortcuts CLI to save the shortcut to the specified output path.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "name": {
@@ -2516,7 +2548,7 @@
       "title": "Find Related Items",
       "description": "Find items semantically related to a note, event, reminder, or email ID across indexed Apple apps — read-only; requires semantic_index to be built first. Discovers cross-app connections (e.g., a calendar event related to notes and reminders about the same topic).",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "id": {
@@ -2557,7 +2589,7 @@
       "title": "Flag Message",
       "description": "Flag or unflag an email message.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "id": {
@@ -2592,7 +2624,7 @@
       "title": "Generate Image",
       "description": "Generate an image from a text description using Apple Intelligence on-device image generation (Image Playground). Returns the file path to the generated PNG. Requires macOS 26+ with Apple Silicon.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "prompt": {
@@ -2628,7 +2660,7 @@
       "title": "Generate Plan",
       "description": "Use Apple's on-device Foundation Model to analyze a goal and generate a suggested plan of AirMCP tool calls. Returns a JSON array of planned actions for the CALLER to review and execute — this tool does NOT execute anything itself. Requires macOS 26+. Works completely offline with no API keys.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "goal": {
@@ -2669,7 +2701,7 @@
       "title": "Generate Structured Output",
       "description": "Generate structured JSON output from Apple's on-device Foundation Model with optional schema constraints. Useful for extracting structured data from natural language. Requires macOS 26+.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "prompt": {
@@ -2728,7 +2760,7 @@
       "title": "Generate Text",
       "description": "Generate text using Apple's on-device Foundation Model with custom system instructions. Runs entirely on-device via Apple Silicon. Requires macOS 26+.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "prompt": {
@@ -2768,7 +2800,7 @@
       "title": "Geocode",
       "description": "Convert a place name or address to geographic coordinates. Returns up to 5 matching locations with latitude, longitude, country, and timezone.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "query": {
@@ -2798,12 +2830,12 @@
       "title": "Get Battery Status",
       "description": "Get battery percentage, charging state, power source, and estimated time remaining.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "percentage": {
@@ -2869,7 +2901,7 @@
       "title": "Get Bluetooth State",
       "description": "Check whether Bluetooth is powered on, off, or unauthorized.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
@@ -2889,12 +2921,12 @@
       "title": "Get Brightness",
       "description": "Get the current display brightness level.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "brightness": {
@@ -2934,12 +2966,12 @@
       "title": "Get Clipboard",
       "description": "Read the current text content of the system clipboard.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "content": {
@@ -2974,7 +3006,7 @@
       "title": "Get Current Location",
       "description": "Get the device's current geographic location (latitude, longitude, altitude). Requires Location Services permission. First use triggers a macOS permission dialog.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
@@ -2994,12 +3026,12 @@
       "title": "Get Current Tab",
       "description": "Get the title and URL of the active Safari tab.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "title": {
@@ -3030,7 +3062,7 @@
       "title": "Get Current Weather",
       "description": "Get current weather conditions for a location using coordinates.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "latitude": {
@@ -3052,7 +3084,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "temperature": {
@@ -3143,7 +3175,7 @@
       "title": "Get Daily Forecast",
       "description": "Get daily weather forecast for a location.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "latitude": {
@@ -3187,7 +3219,7 @@
       "title": "Get Directions",
       "description": "Get directions between two locations in Apple Maps.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "from": {
@@ -3232,7 +3264,7 @@
       "title": "Get File Info",
       "description": "Get detailed file information including size, dates, kind, and tags.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "path": {
@@ -3247,7 +3279,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "path": {
@@ -3301,12 +3333,12 @@
       "title": "Get Frontmost App",
       "description": "Get the name, bundle identifier, and PID of the currently active (frontmost) application.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "name": {
@@ -3341,7 +3373,7 @@
       "title": "Get Hourly Forecast",
       "description": "Get the hour-by-hour weather forecast (temperature, precipitation, wind) for a latitude/longitude via the Open-Meteo API — read-only, no API key needed.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "latitude": {
@@ -3385,7 +3417,7 @@
       "title": "Get Location Permission",
       "description": "Check the current Location Services authorization status. Returns the permission state (not_determined, authorized_always, denied, restricted).",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
@@ -3405,7 +3437,7 @@
       "title": "Get Photo Info",
       "description": "Get detailed metadata for a specific photo by ID.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "id": {
@@ -3419,7 +3451,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "id": {
@@ -3541,7 +3573,7 @@
       "title": "Get Rating",
       "description": "Get the rating, favorited, and disliked status for a track.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "trackName": {
@@ -3555,7 +3587,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "name": {
@@ -3600,12 +3632,12 @@
       "title": "Get Screen Info",
       "description": "Get display information including resolution, pixel dimensions, and Retina status.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "displays": {
@@ -3685,7 +3717,7 @@
       "title": "Get Shortcut Detail",
       "description": "Get details about a Siri Shortcut including its actions.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "name": {
@@ -3699,7 +3731,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "shortcut": {
@@ -3730,7 +3762,7 @@
       "title": "Get Track Info",
       "description": "Get detailed metadata for a specific track by name.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "trackName": {
@@ -3744,7 +3776,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "id": {
@@ -3862,12 +3894,12 @@
       "title": "Get Unread Count",
       "description": "Get unread message count across all mailboxes.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "totalUnread": {
@@ -3918,7 +3950,7 @@
       "title": "Get Upcoming Events",
       "description": "Get the next N upcoming events from now (searches up to 30 days ahead). A convenience wrapper that doesn't require date range parameters.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "limit": {
@@ -3931,7 +3963,7 @@
         }
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "total": {
@@ -4002,12 +4034,12 @@
       "title": "Get Volume",
       "description": "Get the current system output volume level and mute state.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "outputVolume": {
@@ -4042,12 +4074,12 @@
       "title": "Get WiFi Status",
       "description": "Get the current WiFi status including connected network name, signal strength, and channel.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "ssid": {
@@ -4137,7 +4169,7 @@
       "title": "Get Workflow",
       "description": "Retrieve a registered MCP prompt by name and return its workflow instructions as text. Useful in autonomous/Cowork environments where prompts cannot be invoked directly.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "name": {
@@ -4177,7 +4209,7 @@
       "title": "Create Google Calendar Event",
       "description": "Create an event in Google Calendar.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "summary": {
@@ -4231,7 +4263,7 @@
       "title": "List Google Calendar Events",
       "description": "List upcoming events from Google Calendar.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "maxResults": {
@@ -4273,7 +4305,7 @@
       "title": "Read Google Doc",
       "description": "Read the content of a Google Doc by document ID.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "documentId": {
@@ -4303,7 +4335,7 @@
       "title": "List Drive Files",
       "description": "List files in Google Drive. Supports query filters.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "query": {
@@ -4340,7 +4372,7 @@
       "title": "Read Drive File Metadata",
       "description": "Get metadata for a Google Drive file by ID.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "fileId": {
@@ -4370,7 +4402,7 @@
       "title": "Search Drive",
       "description": "Full-text search across Google Drive files by content or name.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "query": {
@@ -4406,7 +4438,7 @@
       "title": "List Gmail Messages",
       "description": "List recent Gmail messages. Supports query filters (e.g. 'from:alice is:unread').",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "query": {
@@ -4439,7 +4471,7 @@
       "title": "Read Gmail Message",
       "description": "Read a Gmail message by ID. Returns subject, from, to, date, and body.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "messageId": {
@@ -4479,7 +4511,7 @@
       "title": "Send Gmail",
       "description": "Send an email via Gmail. Encodes the message in RFC 2822 format.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "to": {
@@ -4526,7 +4558,7 @@
       "title": "Search Google Contacts",
       "description": "Search contacts in Google People/Contacts.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "query": {
@@ -4562,7 +4594,7 @@
       "title": "Raw GWS Command",
       "description": "Execute any Google Workspace CLI command. For advanced use when specific tools don't cover your need.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "service": {
@@ -4624,7 +4656,7 @@
       "title": "Read Google Sheet",
       "description": "Read cell values from a Google Sheets spreadsheet.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "spreadsheetId": {
@@ -4660,7 +4692,7 @@
       "title": "Write to Google Sheet",
       "description": "Write values to a Google Sheets range.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "spreadsheetId": {
@@ -4709,7 +4741,7 @@
       "title": "Google Workspace Status",
       "description": "Check if Google Workspace CLI (gws) is installed and authenticated.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
@@ -4729,7 +4761,7 @@
       "title": "Create Google Task",
       "description": "Create a task in Google Tasks.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "title": {
@@ -4769,7 +4801,7 @@
       "title": "List Google Tasks",
       "description": "List tasks from Google Tasks (default task list).",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "maxResults": {
@@ -4801,7 +4833,7 @@
       "title": "Import Photo",
       "description": "Import a photo from a file path into Photos library. Optionally add to an existing album. Requires macOS 26+ Swift bridge.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "filePath": {
@@ -4836,7 +4868,7 @@
       "title": "Import Shortcut",
       "description": "Import a .shortcut file into Siri Shortcuts. Uses the macOS shortcuts CLI to import the shortcut from the specified file path.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "filePath": {
@@ -4866,7 +4898,7 @@
       "title": "Install Module Pack",
       "description": "Install, repair, update, or uninstall one AirMCP add-on package after explicit user confirmation. Use dryRun first to preview the npm command.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "pack": {
@@ -4897,7 +4929,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "pack": {
@@ -4975,7 +5007,7 @@
       "title": "Is App Running",
       "description": "Check whether an application is currently running. Returns process details if found.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "name": {
@@ -4990,7 +5022,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "running": {
@@ -5056,7 +5088,7 @@
       "title": "Add Keynote Slide",
       "description": "Add a new slide to a Keynote presentation.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "document": {
@@ -5085,7 +5117,7 @@
       "title": "Close Keynote Document",
       "description": "Close an open Keynote presentation, optionally saving changes.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "document": {
@@ -5119,7 +5151,7 @@
       "title": "Create Keynote Presentation",
       "description": "Create a new blank Keynote presentation.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
@@ -5139,7 +5171,7 @@
       "title": "Export Keynote to PDF",
       "description": "Export a Keynote presentation to PDF. Will overwrite an existing file at the same path.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "document": {
@@ -5175,7 +5207,7 @@
       "title": "Get Keynote Slide",
       "description": "Get detailed content of a specific slide including all text items and presenter notes.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "document": {
@@ -5211,7 +5243,7 @@
       "title": "List Keynote Documents",
       "description": "List all open Keynote presentations.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
@@ -5231,7 +5263,7 @@
       "title": "List Keynote Slides",
       "description": "List all slides in a Keynote presentation with title, body preview, and presenter notes.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "document": {
@@ -5260,7 +5292,7 @@
       "title": "Set Keynote Presenter Notes",
       "description": "Set presenter notes on a specific slide.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "document": {
@@ -5302,7 +5334,7 @@
       "title": "Start Keynote Slideshow",
       "description": "Start playing a Keynote slideshow from a specific slide.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "document": {
@@ -5338,7 +5370,7 @@
       "title": "Launch App",
       "description": "Launch an application by name. Lightweight — just activates the app without reading its accessibility tree.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "name": {
@@ -5368,12 +5400,12 @@
       "title": "List Mail Accounts",
       "description": "List all mail accounts.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "accounts": {
@@ -5430,7 +5462,7 @@
       "title": "List Photo Albums",
       "description": "List all photo albums with name and item count.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
@@ -5450,12 +5482,12 @@
       "title": "List All Windows",
       "description": "List windows across all running applications with title, size, position, app name, and PID.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "total": {
@@ -5483,7 +5515,7 @@
                   "anyOf": [
                     {
                       "type": "array",
-                      "items": [
+                      "prefixItems": [
                         {
                           "type": "number"
                         },
@@ -5501,7 +5533,7 @@
                   "anyOf": [
                     {
                       "type": "array",
-                      "items": [
+                      "prefixItems": [
                         {
                           "type": "number"
                         },
@@ -5552,12 +5584,12 @@
       "title": "List Bluetooth Devices",
       "description": "List paired Bluetooth devices with their connection status.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "total": {
@@ -5628,12 +5660,12 @@
       "title": "List Bookmarks",
       "description": "List all Safari bookmarks across all folders, including subfolder paths.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "count": {
@@ -5684,12 +5716,12 @@
       "title": "List Calendars",
       "description": "List all calendars with name, color, and writable status.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "calendars": {
@@ -5747,7 +5779,7 @@
       "title": "List Chats",
       "description": "List recent chats in Messages with participants and last update time.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "limit": {
@@ -5760,7 +5792,7 @@
         }
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "total": {
@@ -5863,7 +5895,7 @@
       "title": "List Contacts",
       "description": "List contacts with name, primary email, and phone. Supports pagination.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "limit": {
@@ -5883,7 +5915,7 @@
         }
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "total": {
@@ -5960,7 +5992,7 @@
       "title": "List Directory",
       "description": "List files and folders in a directory with metadata (kind, size, modification date).",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "path": {
@@ -5982,7 +6014,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "total": {
@@ -6039,7 +6071,7 @@
       "title": "List Events",
       "description": "List events within a date range. Requires startDate and endDate (ISO 8601). Optionally filter by calendar name. Supports limit/offset pagination.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "startDate": {
@@ -6078,7 +6110,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "total": {
@@ -6149,7 +6181,7 @@
       "title": "List Favorite Photos",
       "description": "List photos marked as favorites.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "limit": {
@@ -6162,7 +6194,7 @@
         }
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "total": {
@@ -6254,12 +6286,12 @@
       "title": "List Folders",
       "description": "List all folders across all accounts with note counts.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "folders": {
@@ -6314,7 +6346,7 @@
       "title": "List Group Members",
       "description": "List contacts in a specific group.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "groupName": {
@@ -6335,7 +6367,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "group": {
@@ -6412,12 +6444,12 @@
       "title": "List Contact Groups",
       "description": "List all contact groups.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "groups": {
@@ -6460,12 +6492,12 @@
       "title": "List Mailboxes",
       "description": "List all mailboxes across accounts with unread counts.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "mailboxes": {
@@ -6512,7 +6544,7 @@
       "title": "List Messages",
       "description": "List recent messages in a mailbox (e.g. 'INBOX'). Returns subject, sender, date, read status.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "mailbox": {
@@ -6545,7 +6577,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "total": {
@@ -6623,12 +6655,12 @@
       "title": "List Module Packs",
       "description": "List DLC-like AirMCP module packs and whether each pack is available in the current runtime configuration.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "configured": {
@@ -6804,7 +6836,7 @@
       "title": "List Notes",
       "description": "List all notes with title, folder, and dates. Optionally filter by folder name. Supports pagination via limit/offset.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "folder": {
@@ -6829,7 +6861,7 @@
         }
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "total": {
@@ -6900,7 +6932,7 @@
       "title": "List Chat Participants",
       "description": "List all participants in a specific chat.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "chatId": {
@@ -6914,7 +6946,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "chatId": {
@@ -6986,7 +7018,7 @@
       "title": "List Photos",
       "description": "List photos in an album with metadata. Use list_albums to find album names first.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "album": {
@@ -7014,7 +7046,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "total": {
@@ -7110,12 +7142,12 @@
       "title": "List Playlists",
       "description": "List all Music playlists with track counts and duration.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "playlists": {
@@ -7166,7 +7198,7 @@
       "title": "List Podcast Episodes",
       "description": "List episodes of a podcast show with title, date, duration, and played status.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "showName": {
@@ -7202,7 +7234,7 @@
       "title": "List Podcast Shows",
       "description": "List all subscribed podcast shows with episode counts.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
@@ -7222,12 +7254,12 @@
       "title": "List Profiles",
       "description": "List AirMCP runtime profiles. Profiles choose which modules load; toolExposure chooses how much of that surface appears in tools/list.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "profiles": {
@@ -7289,12 +7321,12 @@
       "title": "List Reading List",
       "description": "List all items in Safari's Reading List.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "count": {
@@ -7341,12 +7373,12 @@
       "title": "List Reminder Lists",
       "description": "List all reminder lists with reminder counts.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "lists": {
@@ -7393,7 +7425,7 @@
       "title": "List Reminders",
       "description": "List reminders. Optionally filter by list name and/or completion status. Supports pagination via limit/offset.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "list": {
@@ -7422,7 +7454,7 @@
         }
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "total": {
@@ -7504,12 +7536,12 @@
       "title": "List Running Apps",
       "description": "List all running applications with name, bundle identifier, PID, and visibility.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "total": {
@@ -7568,12 +7600,12 @@
       "title": "List Shortcuts",
       "description": "List all available Siri Shortcuts on this Mac.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "total": {
@@ -7607,12 +7639,12 @@
       "title": "List Safari Tabs",
       "description": "List all open tabs across all Safari windows with title and URL.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "tabs": {
@@ -7663,7 +7695,7 @@
       "title": "List Tracks",
       "description": "List tracks in a playlist with name, artist, album, and duration.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "playlist": {
@@ -7684,7 +7716,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "total": {
@@ -7801,7 +7833,7 @@
       "title": "List Event Triggers",
       "description": "Show all skills with event triggers (calendar_changed, reminders_changed, pasteboard_changed, mail_unread_changed, focus_mode_changed, now_playing_changed, file_modified, screen_locked, screen_unlocked) and their debounce settings.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
@@ -7821,7 +7853,7 @@
       "title": "List Windows",
       "description": "List all visible windows across all running applications. Returns JSON with each window's app name, bundle ID, title, position, and size. Requires Accessibility permissions.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
@@ -7841,7 +7873,7 @@
       "title": "Local LLM Generate",
       "description": "Generate text using a local Ollama model. Runs entirely on your machine — no data sent to any cloud. Requires Ollama running at localhost:11434. Useful for summarization, extraction, and analysis.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "prompt": {
@@ -7881,7 +7913,7 @@
       "title": "Local LLM Status",
       "description": "Check if a local Ollama LLM is available and list installed models.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
@@ -7901,7 +7933,7 @@
       "title": "Mark Message Read/Unread",
       "description": "Mark an email message as read or unread.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "id": {
@@ -7936,7 +7968,7 @@
       "title": "Forget Memory Entries",
       "description": "Delete context-memory entries. Provide exactly one selector: `id` (single entry), `key` (all entries with that key), or `tag` (all entries carrying that tag). Optional `kind` further restricts the delete within the chosen selector.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "id": {
@@ -7963,7 +7995,7 @@
         }
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "removed": {
@@ -7997,7 +8029,7 @@
       "title": "Remember a Fact, Entity, or Episode",
       "description": "Insert or update a context-memory entry. Use `fact` for durable key→value notes, `entity` for named people/places/projects, and `episode` for time-anchored records. If you omit `id`, the key is used as the stable id (so a second call with the same key upserts). `ttl_ms` makes the entry self-expiring.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "kind": {
@@ -8053,7 +8085,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "stored": {
@@ -8127,7 +8159,7 @@
       "title": "Query Context Memory",
       "description": "List non-expired memory entries. All filters are AND-combined. Returns entries sorted by `updatedAt` descending by default. Safe read-only — use before composing LLM prompts so recent user-supplied context is recalled.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "kind": {
@@ -8167,7 +8199,7 @@
         }
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "total": {
@@ -8248,12 +8280,12 @@
       "title": "Context Memory Stats",
       "description": "Summarize the context-memory store: counts by kind, oldest/newest timestamps, and on-disk path. Also sweeps any expired entries as a side-effect.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "total": {
@@ -8315,7 +8347,7 @@
       "title": "Minimize Window",
       "description": "Minimize or restore a window.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "appName": {
@@ -8355,7 +8387,7 @@
       "title": "Move File",
       "description": "Move or rename a file or folder to a new location.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "source": {
@@ -8392,7 +8424,7 @@
       "title": "Move Message",
       "description": "Move a message to another mailbox.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "id": {
@@ -8433,7 +8465,7 @@
       "title": "Move Note",
       "description": "Move a note to a different folder. NOTE: Apple Notes has no native move command, so this copies the note body to the target folder and deletes the original. The note will get a new ID and creation date. Attachments (images) will be lost.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "id": {
@@ -8468,7 +8500,7 @@
       "title": "Move Window",
       "description": "Move a window to a specific position on screen.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "appName": {
@@ -8517,7 +8549,7 @@
       "title": "Music Player",
       "description": "Display an interactive music player showing the currently playing track.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
@@ -8537,12 +8569,12 @@
       "title": "Now Playing",
       "description": "Get the currently playing track and playback state.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "playerState": {
@@ -8605,7 +8637,7 @@
       "title": "Add Numbers Sheet",
       "description": "Add a new sheet to a Numbers spreadsheet.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "document": {
@@ -8640,7 +8672,7 @@
       "title": "Close Numbers Document",
       "description": "Close an open Numbers spreadsheet, optionally saving changes.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "document": {
@@ -8674,7 +8706,7 @@
       "title": "Create Numbers Document",
       "description": "Create a new blank Numbers spreadsheet.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
@@ -8694,7 +8726,7 @@
       "title": "Export Numbers to PDF",
       "description": "Export a Numbers spreadsheet to PDF. Will overwrite an existing file at the same path.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "document": {
@@ -8730,7 +8762,7 @@
       "title": "Get Numbers Cell",
       "description": "Read a single cell value by address (e.g. 'A1').",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "document": {
@@ -8756,7 +8788,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "address": {
@@ -8796,7 +8828,7 @@
       "title": "Get Numbers Cell Formula",
       "description": "Read the literal formula behind a cell (e.g. '=SUM(A1:A10)') instead of its evaluated value. Returns null formula for cells that hold a constant.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "document": {
@@ -8822,7 +8854,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "address": {
@@ -8873,12 +8905,12 @@
       "title": "List Numbers Documents",
       "description": "List all open Numbers spreadsheets.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "documents": {
@@ -8932,7 +8964,7 @@
       "title": "List Numbers Sheets",
       "description": "List all sheets (tabs) in a Numbers spreadsheet.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "document": {
@@ -8946,7 +8978,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "sheets": {
@@ -8991,7 +9023,7 @@
       "title": "List Numbers Tables",
       "description": "List every table in a Numbers sheet with its name + dimensions. A sheet can hold multiple tables (totals + breakdown + chart-source); the older tools assume the first table is canonical, this lets a caller pick by name.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "document": {
@@ -9011,7 +9043,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "tables": {
@@ -9062,7 +9094,7 @@
       "title": "Read Numbers Cell Range",
       "description": "Read a range of cells from a sheet. Uses 0-based row/column indices.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "document": {
@@ -9110,7 +9142,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "rows": {
@@ -9165,7 +9197,7 @@
       "title": "Rename Numbers Sheet",
       "description": "Rename a sheet in place. Numbers does NOT allow duplicate sheet names; the call fails with errJxa when the new name is taken.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "document": {
@@ -9207,7 +9239,7 @@
       "title": "Set Numbers Cell",
       "description": "Write a value to a single cell. Numbers and booleans land as native cell types (not text), so they sort and feed formulas correctly; strings are written verbatim and Numbers interprets a leading '=' as a formula.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "document": {
@@ -9264,7 +9296,7 @@
       "title": "Open Address",
       "description": "Open a specific address in Apple Maps.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "address": {
@@ -9293,7 +9325,7 @@
       "title": "Open URL",
       "description": "Open a URL in Safari's frontmost window.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "url": {
@@ -9322,7 +9354,7 @@
       "title": "Close Pages Document",
       "description": "Close an open Pages document, optionally saving changes.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "document": {
@@ -9356,7 +9388,7 @@
       "title": "Create Pages Document",
       "description": "Create a new blank Pages document.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
@@ -9376,7 +9408,7 @@
       "title": "Export Pages to PDF",
       "description": "Export an open Pages document to PDF. Will overwrite an existing file at the same path.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "document": {
@@ -9412,7 +9444,7 @@
       "title": "Get Pages Body Text",
       "description": "Get the body text content of an open Pages document.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "document": {
@@ -9441,7 +9473,7 @@
       "title": "List Pages Documents",
       "description": "List all open Pages documents with name, path, and modified status.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
@@ -9461,7 +9493,7 @@
       "title": "Open Pages Document",
       "description": "Open a Pages document from a file path.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "path": {
@@ -9491,7 +9523,7 @@
       "title": "Set Pages Body Text",
       "description": "Replace the body text of an open Pages document.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "document": {
@@ -9526,7 +9558,7 @@
       "title": "Play Playlist",
       "description": "Start playing a playlist by name, with optional shuffle control.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "name": {
@@ -9559,7 +9591,7 @@
       "title": "Play Podcast Episode",
       "description": "Play a specific podcast episode by name, optionally from a specific show.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "episodeName": {
@@ -9593,7 +9625,7 @@
       "title": "Play Track",
       "description": "Play a specific track by name, optionally from a specific playlist.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "trackName": {
@@ -9627,7 +9659,7 @@
       "title": "Playback Control",
       "description": "Control Music playback: play, pause, nextTrack, previousTrack.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "action": {
@@ -9661,7 +9693,7 @@
       "title": "Podcast Now Playing",
       "description": "Get the currently playing podcast episode and playback state.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
@@ -9681,7 +9713,7 @@
       "title": "Podcast Playback Control",
       "description": "Control Podcasts playback: play, pause, next, previous.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "action": {
@@ -9713,9 +9745,9 @@
     {
       "name": "prevent_sleep",
       "title": "Prevent Sleep",
-      "description": "Prevent the Mac from sleeping for a specified duration using caffeinate. The assertion is transient — it auto-releases when the timer elapses; no manual stop is required.",
+      "description": "Prevent the Mac from sleeping for a specified duration using caffeinate. The assertion auto-releases when the timer elapses, or immediately via allow_sleep. Note: this also blocks sleep triggered by closing the lid, not just idle timeout — call allow_sleep first if you're about to close the lid.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "seconds": {
@@ -9743,7 +9775,7 @@
       "title": "Preview Action",
       "description": "Dry-run governance preview of a tool call WITHOUT executing it. Validates the args against the tool's real input schema, reports its risk annotations, whether it would require per-call human approval at the current HITL level, its required OAuth scope, the exact PII-scrubbed record the audit log would write, and the live rate-limit / emergency-stop posture. The target handler is never invoked — zero side effect. Use it to see what a destructive call would record and whether it would be gated, before committing to run it.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "tool": {
@@ -9766,7 +9798,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "tool": {
@@ -9889,12 +9921,12 @@
       "title": "Proactive Context",
       "description": "Return tool/workflow candidates ranked by a deterministic heuristic over the current time of day, day of week, and this install's tallied usage counts. No model and no inference — it surfaces likely-relevant tools from recorded history; it does not decide, learn, or act.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "timeContext": {
@@ -9971,12 +10003,12 @@
       "title": "Profile Status",
       "description": "Show the active AirMCP profile, module set, tool exposure mode, exposed tool count, and total registered tool count.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "profile": {
@@ -10191,7 +10223,7 @@
       "title": "Proofread Text",
       "description": "Proofread and correct grammar/spelling using Apple Intelligence (on-device Foundation Models). Requires macOS 26+ with Apple Silicon.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "text": {
@@ -10220,7 +10252,7 @@
       "title": "Query Photos",
       "description": "Query the Photos library with filters: media type, date range, favorites. Returns photo metadata (identifier, filename, date, dimensions). Requires Swift bridge.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "mediaType": {
@@ -10271,7 +10303,7 @@
       "title": "Quit App",
       "description": "Quit a running application by name. May cause unsaved work to be lost.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "name": {
@@ -10301,7 +10333,7 @@
       "title": "Read Chat",
       "description": "Read chat details including participants and last update time by chat ID.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "chatId": {
@@ -10315,7 +10347,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "id": {
@@ -10398,7 +10430,7 @@
       "title": "Read Contact",
       "description": "Read full details of a contact by ID including all emails, phones, and addresses.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "id": {
@@ -10412,7 +10444,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "id": {
@@ -10571,7 +10603,7 @@
       "title": "Read Event",
       "description": "Read full details of a calendar event by ID. Includes attendees (read-only), location, description, and recurrence info.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "id": {
@@ -10585,7 +10617,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "id": {
@@ -10721,7 +10753,7 @@
       "title": "Read Message",
       "description": "Read full content of an email message by ID. Content length is configurable (default: 5000 chars, max: 100000).",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "id": {
@@ -10743,7 +10775,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "id": {
@@ -10881,7 +10913,7 @@
       "title": "Read Note",
       "description": "Read the full content of a specific note by its ID. Returns HTML body and plaintext.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "id": {
@@ -10895,7 +10927,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "id": {
@@ -10954,7 +10986,7 @@
       "title": "Read Page Content",
       "description": "Read the HTML source of a Safari tab. Specify window and tab index from list_tabs.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "windowIndex": {
@@ -10981,7 +11013,7 @@
         }
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "title": {
@@ -11020,7 +11052,7 @@
       "title": "Read Reminder",
       "description": "Read the full details of a specific reminder by ID.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "id": {
@@ -11034,7 +11066,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "id": {
@@ -11115,7 +11147,7 @@
       "title": "Recent Files",
       "description": "Find recently modified files in a folder using Spotlight.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "folder": {
@@ -11141,7 +11173,7 @@
         }
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "total": {
@@ -11188,7 +11220,7 @@
       "title": "Record Screen",
       "description": "Record the screen for a specified duration (1-60 seconds). Returns the recording as a .mov file path. Requires Screen Recording permission.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "duration": {
@@ -11224,7 +11256,7 @@
       "title": "Remove from Playlist",
       "description": "Remove a track from a playlist.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "playlistName": {
@@ -11259,7 +11291,7 @@
       "title": "Reply to Email",
       "description": "Reply to an email message. Requires allowSendMail config.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "id": {
@@ -11300,7 +11332,7 @@
       "title": "Resize Window",
       "description": "Resize a window to specific dimensions.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "appName": {
@@ -11349,7 +11381,7 @@
       "title": "Reverse Geocode",
       "description": "Convert geographic coordinates to a place name and address.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "latitude": {
@@ -11386,7 +11418,7 @@
       "title": "Rewrite Text",
       "description": "Rewrite text in a specified tone using Apple Intelligence (on-device Foundation Models). Requires macOS 26+ with Apple Silicon.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "text": {
@@ -11425,7 +11457,7 @@
       "title": "Run JavaScript",
       "description": "Execute JavaScript in a Safari tab. Use list_tabs to find window/tab indices. Returns the result as a string.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "code": {
@@ -11468,7 +11500,7 @@
       "title": "Run Shortcut",
       "description": "Run a Siri Shortcut by name. Optionally provide text input. Returns the shortcut's output. Note: shortcuts may trigger UI prompts or perform system actions.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "name": {
@@ -11502,7 +11534,7 @@
       "title": "Run Tool",
       "description": "Run an AirMCP tool by name with JSON arguments. Use discover_tools first when the tool is not visible in tools/list.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "name": {
@@ -11546,7 +11578,7 @@
       "title": "Scan Bluetooth",
       "description": "Scan for nearby BLE (Bluetooth Low Energy) devices. Returns device names, UUIDs, and signal strength (RSSI). Default scan duration is 5 seconds.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "duration": {
@@ -11574,7 +11606,7 @@
       "title": "Scan Document",
       "description": "Extract text and structure from an image file using Apple Vision framework OCR. Returns recognized text elements with confidence scores. Works with photos of documents, receipts, whiteboards, etc.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "imagePath": {
@@ -11604,7 +11636,7 @@
       "title": "Scan Notes",
       "description": "Bulk scan notes returning metadata and a text preview for each. Supports pagination via offset. Optionally filter by folder. Use this to get an overview before organizing.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "folder": {
@@ -11636,7 +11668,7 @@
         }
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "total": {
@@ -11715,7 +11747,7 @@
       "title": "Search Chats",
       "description": "Search chats by participant name, handle, or chat name.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "query": {
@@ -11736,7 +11768,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "total": {
@@ -11839,7 +11871,7 @@
       "title": "Search Contacts",
       "description": "Search contacts by name, email, phone, or organization.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "query": {
@@ -11860,7 +11892,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "total": {
@@ -11948,7 +11980,7 @@
       "title": "Search Events",
       "description": "Search events by keyword in title or description within a date range.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "query": {
@@ -11981,7 +12013,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "total": {
@@ -12048,7 +12080,7 @@
       "title": "Search Files",
       "description": "Search files using Spotlight (mdfind). Searches file names and content.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "query": {
@@ -12075,7 +12107,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "total": {
@@ -12135,7 +12167,7 @@
       "title": "Search Location",
       "description": "Search for a place or location in Apple Maps.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "query": {
@@ -12164,7 +12196,7 @@
       "title": "Search Messages",
       "description": "Search messages by keyword in subject or sender within a mailbox.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "query": {
@@ -12191,7 +12223,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "returned": {
@@ -12257,7 +12289,7 @@
       "title": "Search Nearby",
       "description": "Search for places near a location in Apple Maps. If no coordinates are given, searches near the current location.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "query": {
@@ -12298,7 +12330,7 @@
       "title": "Search Notes",
       "description": "Search notes by keyword in title and body. Returns matching notes with a 200-char preview.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "query": {
@@ -12327,7 +12359,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "total": {
@@ -12406,7 +12438,7 @@
       "title": "Search Photos",
       "description": "Search photos by filename, name, or description keyword.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "query": {
@@ -12427,7 +12459,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "total": {
@@ -12518,7 +12550,7 @@
       "title": "Search Podcast Episodes",
       "description": "Search across all podcast episodes by name or description.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "query": {
@@ -12554,7 +12586,7 @@
       "title": "Search Reminders",
       "description": "Search reminders by keyword in name or body across all lists (case-insensitive).",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "query": {
@@ -12575,7 +12607,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "returned": {
@@ -12649,7 +12681,7 @@
       "title": "Search Shortcuts",
       "description": "Search Siri Shortcuts by name keyword.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "query": {
@@ -12663,7 +12695,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "total": {
@@ -12697,7 +12729,7 @@
       "title": "Search Tabs",
       "description": "Search open Safari tabs by title or URL keyword.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "query": {
@@ -12711,7 +12743,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "returned": {
@@ -12766,7 +12798,7 @@
       "title": "Search Tracks",
       "description": "Search tracks in Music library by name, artist, or album.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "query": {
@@ -12787,7 +12819,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "total": {
@@ -12856,7 +12888,7 @@
       "title": "Clear Semantic Index",
       "description": "Delete all indexed data from the local vector store AND remove corresponding entries from macOS Spotlight. Use for privacy or to force a fresh re-index. Requires Swift bridge for Spotlight cleanup.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
@@ -12876,7 +12908,7 @@
       "title": "Build Semantic Index",
       "description": "Build the local vector index over enabled Apple apps for semantic search — replaces any existing index; embeddings need GEMINI_API_KEY or the Swift bridge. Covers Notes, Calendar, Reminders, Mail, Photos, and Finder. Run once, then use semantic_search.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "sources": {
@@ -12912,7 +12944,7 @@
       "title": "Semantic Search",
       "description": "Search across Apple app data by meaning, not just keywords. Finds related notes, events, reminders, and emails even if they use different words. Auto-indexes on first use and refreshes every 30 minutes.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "query": {
@@ -12966,7 +12998,7 @@
       "title": "Semantic Index Status",
       "description": "Show the current state of the semantic vector index -- total entries, breakdown by source.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
@@ -12986,7 +13018,7 @@
       "title": "Send File",
       "description": "Send a file attachment via iMessage/SMS. Requires absolute file path and recipient handle.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "target": {
@@ -13023,7 +13055,7 @@
       "title": "Send Email",
       "description": "Compose and send an email via Apple Mail. Requires allowSendMail config.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "to": {
@@ -13095,7 +13127,7 @@
       "title": "Send Message",
       "description": "Send a text message via iMessage/SMS. Requires a phone number or email as the target handle.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "target": {
@@ -13131,7 +13163,7 @@
       "title": "Set Brightness",
       "description": "Set the display brightness level. Requires the 'brightness' CLI tool (brew install brightness).",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "level": {
@@ -13161,7 +13193,7 @@
       "title": "Set Clipboard",
       "description": "Write text to the system clipboard, replacing its current content.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "text": {
@@ -13175,7 +13207,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "set": {
@@ -13206,7 +13238,7 @@
       "title": "Set Disliked",
       "description": "Mark or unmark a track as disliked.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "trackName": {
@@ -13240,7 +13272,7 @@
       "title": "Set Favorited",
       "description": "Mark or unmark a track as favorited (loved).",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "trackName": {
@@ -13274,7 +13306,7 @@
       "title": "Set File Tags",
       "description": "Set Finder tags on a file. Replaces all existing tags.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "path": {
@@ -13312,7 +13344,7 @@
       "title": "Set Rating",
       "description": "Set the star rating (0-100) for a track. Use multiples of 20 for full stars (0, 20, 40, 60, 80, 100).",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "trackName": {
@@ -13348,7 +13380,7 @@
       "title": "Set Shuffle & Repeat",
       "description": "Enable/disable shuffle and set repeat mode (off, one, all).",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "shuffle": {
@@ -13382,7 +13414,7 @@
       "title": "Set Volume",
       "description": "Set the system output volume (0-100) and/or mute state.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "volume": {
@@ -13398,7 +13430,7 @@
         }
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "outputVolume": {
@@ -13427,11 +13459,22 @@
     {
       "name": "setup_permissions",
       "title": "Setup Permissions",
-      "description": "Trigger macOS permission prompts for all Apple apps used by AirMCP. Run this once after installation to grant all permissions at once. Each app will show a one-time macOS permission dialog.",
+      "description": "Trigger macOS permission prompts for all Apple apps used by AirMCP and report permission status. Run this once after installation to grant all permissions at once. Each app will show a one-time macOS permission dialog. Screen Recording and Accessibility are probed from the same osascript/JXA execution host used by JXA tools; Full Disk Access is probed from the MCP server process. None of these three permissions can be requested with a popup — open_settings jumps straight to the System Settings pane where the user can enable them.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
-        "properties": {}
+        "properties": {
+          "open_settings": {
+            "description": "Open the System Settings privacy pane for this permission category so the user can grant it manually (screen_recording, accessibility, full_disk, automation).",
+            "type": "string",
+            "enum": [
+              "screen_recording",
+              "accessibility",
+              "full_disk",
+              "automation"
+            ]
+          }
+        }
       },
       "outputSchema": null,
       "annotations": {
@@ -13449,7 +13492,7 @@
       "title": "Share Location",
       "description": "Generate a shareable Apple Maps link for a location.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "latitude": {
@@ -13491,7 +13534,7 @@
       "title": "Show Notification",
       "description": "Display a macOS system notification with optional title, subtitle, and sound.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "message": {
@@ -13535,7 +13578,7 @@
       "title": "Calendar Change Alert",
       "description": "[Skill] Automatically fetches today's events when the calendar is modified.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
@@ -13555,7 +13598,7 @@
       "title": "Clipboard URL → Reading List",
       "description": "[Skill] Watch the clipboard and add any copied URL to Safari's Reading List — writes to Reading List; non-URL clipboard content is ignored. Combines the `pasteboard_changed` event trigger with `on_error: continue` so Safari's validator rejects non-URLs and the skill quietly moves on.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
@@ -13575,7 +13618,7 @@
       "title": "Daily Briefing",
       "description": "[Skill] Read today's calendar, open reminders, unread mail count, and recent notes for a safe morning overview. This skill performs no writes.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
@@ -13595,7 +13638,7 @@
       "title": "Daily Journal → Memory",
       "description": "[Skill] Summarise today's events and open reminders on-device and save the result as a context-memory `episode` tagged `journal` — writes one memory entry. Nothing is written to Apple apps. Demonstrates inputs + parallel + retry + `memory_put` so ai_agent can later recall \"what did I do last Tuesday?\" via `memory_query`.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "note": {
@@ -13621,7 +13664,7 @@
       "title": "Evening Wind-down",
       "description": "[Skill] Fires when the screen is locked — drafts a short day-in-review note covering today's events + open reminders so the next unlock (or tomorrow morning) has a fresh snapshot waiting. Showcases the `screen_locked` event trigger combined with `parallel` reads and `retry` on the on-device summariser.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
@@ -13641,7 +13684,7 @@
       "title": "Focus Block Planner",
       "description": "[Skill] Create a calendar time-block event for each of today's open reminders — writes calendar events (each creation HITL-gated); reminders are only read. Uses `loop` with `on_error: continue` so a single failed event creation (conflicting calendar, missing permission) doesn't abort the rest of the plan — the skill result reports which reminders got blocked and which didn't.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
@@ -13661,7 +13704,7 @@
       "title": "Focus Mode Guardian",
       "description": "[Skill] Snapshot today's events and open reminders whenever macOS Focus mode changes (Do Not Disturb, Personal, etc.) — read-only, nothing is written. Gives the AI fresh context right after a mode switch; showcases the `focus_mode_changed` event trigger plus parallel data gathering.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
@@ -13681,7 +13724,7 @@
       "title": "Inbox Triage",
       "description": "[Skill] Check unread mail count and list recent messages for triage.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
@@ -13701,7 +13744,7 @@
       "title": "Project Digest",
       "description": "[Skill] Semantic-search indexed Apple data for a topic and expand each hit with related items — a read-only cross-app digest; needs semantic_index first. Demonstrates the Skills DSL's loop construct and conditional execution.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
@@ -13721,7 +13764,7 @@
       "title": "Sender → Tasks",
       "description": "[Skill] Scan Mail for a keyword or sender and create one reminder per matching message — writes reminders (each creation HITL-gated); mail is only read. Accepts runtime inputs so the same skill handles newsletter triage, a specific sender, or any ad-hoc query without editing YAML. Loop + `on_error: continue` means the rest of the batch still gets queued even if one reminder-create fails (HITL denial, Reminders permission, etc.).",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "query": {
@@ -13757,7 +13800,7 @@
       "title": "Smart Clipboard",
       "description": "Get clipboard content with automatic type detection (text, URL, email, phone, date, file path, image). More structured than raw clipboard access.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
@@ -13777,7 +13820,7 @@
       "title": "Speech Recognition Status",
       "description": "Report whether this device supports on-device speech recognition. A true result is DEVICE capability only — NOT proof the caller is authorized: macOS gates transcription by Speech Recognition permission on the responsible process (the signed AirMCP app), so only a successful transcribe_audio confirms authorization.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
@@ -13797,7 +13840,7 @@
       "title": "Clear Spotlight Index",
       "description": "Remove all AirMCP entries from macOS Spotlight without clearing the local vector store. Requires Swift bridge.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
@@ -13817,7 +13860,7 @@
       "title": "Sync to Spotlight",
       "description": "Push semantically indexed data to macOS Core Spotlight, making it discoverable via Spotlight search and Siri. Run after semantic_index to expose your notes, events, reminders, and emails to system-wide search. Requires Swift bridge (npm run swift-build).",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
@@ -13837,7 +13880,7 @@
       "title": "Start Tool Session",
       "description": "Create a short-lived allowlist for discover_tools and run_tool. Use this to keep a task scoped to the tools it actually needs.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "tools": {
@@ -13868,7 +13911,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "sessionId": {
@@ -13917,7 +13960,7 @@
       "title": "Suggest Next Tools",
       "description": "Rank the tools that most often followed a given tool in this install's local call history. A deterministic frequency count over recorded tool-sequence pairs — no model, no learning, just tallied usage counts.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "after": {
@@ -13938,7 +13981,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "after": {
@@ -13992,7 +14035,7 @@
       "title": "Summarize Context",
       "description": "Gather recent context from enabled Apple apps and produce a concise briefing via MCP sampling — read-only; the connected client must support sampling. Works with whatever LLM the client is using; no API keys required.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "focus": {
@@ -14018,7 +14061,7 @@
       "title": "Summarize Text",
       "description": "Summarize text using Apple Intelligence (on-device Foundation Models). Requires macOS 26+ with Apple Silicon.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "text": {
@@ -14047,7 +14090,7 @@
       "title": "System Power",
       "description": "Shutdown or restart the Mac. Use with caution.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "action": {
@@ -14079,7 +14122,7 @@
       "title": "System Sleep",
       "description": "Put the Mac to sleep.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
@@ -14099,7 +14142,7 @@
       "title": "Tag Content",
       "description": "Classify and tag content using Apple's on-device Foundation Model. Returns confidence scores for each provided tag/category. Requires macOS 26+.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "text": {
@@ -14139,7 +14182,7 @@
       "title": "Timeline (Today)",
       "description": "Display today's events and due reminders on a single day-axis timeline. Fuses Calendar + Reminders; items without a start/due time fall into an 'Unscheduled' rail.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
@@ -14159,12 +14202,12 @@
       "title": "Today's Events",
       "description": "Get all calendar events for today.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "total": {
@@ -14235,12 +14278,12 @@
       "title": "Toggle Dark Mode",
       "description": "Toggle macOS appearance between dark mode and light mode.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "darkMode": {
@@ -14267,7 +14310,7 @@
       "title": "Toggle Focus Mode",
       "description": "Toggle Do Not Disturb (Focus mode) on or off.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "enable": {
@@ -14295,7 +14338,7 @@
       "title": "Toggle WiFi",
       "description": "Turn WiFi on or off.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "enable": {
@@ -14323,7 +14366,7 @@
       "title": "Tool Session Status",
       "description": "Inspect one active tool session by id without listing other clients' sessions.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "sessionId": {
@@ -14338,7 +14381,7 @@
         ]
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "sessionId": {
@@ -14387,7 +14430,7 @@
       "title": "Transcribe Audio",
       "description": "Transcribe an audio file to text using Apple's on-device speech recognition. Supports most audio formats (m4a, mp3, wav, caf). Requires the responsible process to hold macOS Speech Recognition permission (the signed AirMCP app surface); from an unentitled CLI caller it aborts with a permission error.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "path": {
@@ -14420,7 +14463,7 @@
       "title": "Trash File",
       "description": "Move a file or folder to the Trash using Finder.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "path": {
@@ -14450,7 +14493,7 @@
       "title": "List TV Playlists",
       "description": "List all playlists (libraries) in Apple TV app.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
@@ -14470,7 +14513,7 @@
       "title": "List TV Tracks",
       "description": "List movies/episodes in a TV playlist.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "playlist": {
@@ -14506,7 +14549,7 @@
       "title": "TV Now Playing",
       "description": "Get currently playing content in Apple TV app.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {}
       },
@@ -14526,7 +14569,7 @@
       "title": "Play TV Content",
       "description": "Play a movie or episode by name.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "name": {
@@ -14555,7 +14598,7 @@
       "title": "TV Playback Control",
       "description": "Control Apple TV playback: play, pause, next, previous.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "action": {
@@ -14589,7 +14632,7 @@
       "title": "Search TV Library",
       "description": "Search movies and TV shows by name or show title.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "query": {
@@ -14625,7 +14668,7 @@
       "title": "Query UI Elements",
       "description": "Search for UI elements by accessibility attributes (role, title, value, description, identifier). More precise than ui_read — returns only matching elements with full attribute data. Works on any app, including those without AppleScript support. Requires Accessibility permissions.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "app": {
@@ -14693,7 +14736,7 @@
       "title": "Click UI Element",
       "description": "Click a UI element either by exact screen coordinates (x, y) or by searching for an element containing the given text. Optionally filter by accessibility role (e.g. 'AXButton', 'AXMenuItem', 'AXTextField'). Requires Accessibility permissions.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "appName": {
@@ -14741,7 +14784,7 @@
       "title": "Compare UI State",
       "description": "Compare the current UI state against a previous snapshot to detect changes. Pass the 'elements' array from a previous ui_traverse result as beforeSnapshot. Returns added, removed, and changed elements. Useful for verifying action results.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "beforeSnapshot": {
@@ -14776,7 +14819,7 @@
       "title": "Open App (UI Automation)",
       "description": "Open an application by name or bundle ID and return an accessibility tree summary of its windows and top-level UI elements. Requires Accessibility permissions.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "appName": {
@@ -14805,7 +14848,7 @@
       "title": "Perform Action on UI Element",
       "description": "Find a UI element by locator (role + title/value) and perform an accessibility action on it. Actions: press (click), pick (select), confirm, setValue, raise (focus), showMenu. Combines query + action in one step. Requires Accessibility permissions.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "app": {
@@ -14898,7 +14941,7 @@
       "title": "Press Key Combination",
       "description": "Send a key or key combination (e.g. Return, Cmd+S, Ctrl+C). Supports modifier keys: command/cmd, shift, option/alt, control/ctrl. Special keys: return, enter, tab, space, delete, escape, arrow keys (up/down/left/right), F1-F12, home, end, pageup, pagedown. Requires Accessibility permissions.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "key": {
@@ -14938,7 +14981,7 @@
       "title": "Read Accessibility Tree",
       "description": "Read the accessibility tree of the frontmost app (or specified app). Returns structured data about all visible UI elements including their roles, names, values, positions, and hierarchy. Use this to understand what UI elements are available before interacting with them. Requires Accessibility permissions.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "appName": {
@@ -14978,7 +15021,7 @@
       "title": "Scroll",
       "description": "Scroll in the specified direction within the frontmost window. Uses arrow key simulation for cross-app compatibility. Requires Accessibility permissions.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "direction": {
@@ -15023,7 +15066,7 @@
       "title": "BFS Traverse UI Tree",
       "description": "Breadth-first traversal of the accessibility tree. Returns a flat list of all UI elements with parent-child relationships, positions, sizes, and states. Supports PID targeting and visible-only filtering. More thorough than ui_read. Requires Accessibility permissions.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "app": {
@@ -15074,7 +15117,7 @@
       "title": "Type Text",
       "description": "Type text into the currently focused field using simulated keystrokes via System Events. Optionally activate a specific app first. Requires Accessibility permissions.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "text": {
@@ -15108,7 +15151,7 @@
       "title": "Update Contact",
       "description": "Update contact properties. Only specified fields are changed.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "id": {
@@ -15162,7 +15205,7 @@
       "title": "Update Event",
       "description": "Update event properties. Only specified fields are changed. Attendees and recurrence rules cannot be modified via automation.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "id": {
@@ -15216,7 +15259,7 @@
       "title": "Update Note",
       "description": "Replace the entire body of an existing note. WARNING: This overwrites all content. Read the note first if you need to preserve parts of it. Attachments may be lost.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "id": {
@@ -15251,7 +15294,7 @@
       "title": "Update Reminder",
       "description": "Update fields of an existing reminder in Apple Reminders — a write to user data; only the fields you pass change. Set dueDate to null to clear it. Recurrence rules cannot be modified via automation.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "id": {
@@ -15311,7 +15354,7 @@
       "title": "Workflow Readiness",
       "description": "Explain whether curated AirMCP workflows are ready in the active runtime, including missing modules, add-ons, tools, and write opt-ins.",
       "inputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "id": {
@@ -15323,7 +15366,7 @@
         }
       },
       "outputSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
           "activeProfile": {

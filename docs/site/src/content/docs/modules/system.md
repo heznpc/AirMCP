@@ -26,6 +26,7 @@ description: Clipboard, volume, brightness, dark mode, Wi-Fi, Bluetooth, battery
 | `toggle_focus_mode` | Toggle Do Not Disturb (Focus mode) on or off. | ❌ |
 | `system_sleep` | Put the Mac to sleep. | ❌ |
 | `prevent_sleep` | Prevent the Mac from sleeping for a specified duration using caffeinate. | ❌ |
+| `allow_sleep` | Cancel any active prevent_sleep assertion immediately, so the Mac can sleep normally again. | ❌ |
 | `system_power` | Shutdown or restart the Mac. Use with caution. | ❌ |
 | `launch_app` | Launch an application by name. Lightweight -- just activates the app. | ❌ |
 | `quit_app` | Quit a running application by name. May cause unsaved work to be lost. | ❌ |

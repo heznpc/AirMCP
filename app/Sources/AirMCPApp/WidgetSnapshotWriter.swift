@@ -12,7 +12,7 @@ import WidgetSnapshotKit
 /// do nothing, leaving the widget to fall back to its OS-native EventKit read.
 struct WidgetSnapshotWriter {
     /// Must match the widget's `StaticConfiguration(kind:)`.
-    static let widgetKind = "com.heznpc.AirMCP.BriefingWidget"
+    static let widgetKind = "app.airmcp.BriefingWidget"
 
     private let store = EKEventStore()
     private let snapshotStore = WidgetSnapshotStore(appGroupID: WidgetSnapshotConfig.appGroupID)
@@ -47,7 +47,7 @@ struct WidgetSnapshotWriter {
         WidgetCenter.shared.reloadTimelines(ofKind: WidgetSnapshotWriter.trustWidgetKind)
     }
 
-    static let trustWidgetKind = "com.heznpc.AirMCP.TrustStatusWidget"
+    static let trustWidgetKind = "app.airmcp.TrustStatusWidget"
 
     /// Assemble the snapshot from today's events + active reminders. Titles are
     /// left intact here; `WidgetSnapshotStore.write` redacts them before

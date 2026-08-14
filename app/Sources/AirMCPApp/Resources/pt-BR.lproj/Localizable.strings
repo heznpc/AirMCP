@@ -286,6 +286,15 @@
 "trust.integrityUnavailableDetail" = "Inicie o ambiente gerenciado pelo app para verificar a atividade local.";
 "trust.safeguardsSubtitle" = "Ambiente, integridade da auditoria, aprovações e controles de emergência.";
 "trust.permissionsSubtitle" = "Leituras mínimas reais verificam o acesso aos apps do macOS.";
+
+/* Trust Center - Non-promptable system permissions */
+"trust.systemPermissions" = "Permissões do sistema";
+"trust.systemPermissionsHint" = "Estes estados descrevem apenas o AirMCP.app. Para um servidor MCP stdio, conceda o acesso ao aplicativo que hospeda o AirMCP (por exemplo, Claude Code ou Terminal) e execute a ferramenta novamente.";
+"trust.screenRecording" = "Gravação de tela";
+"trust.accessibility" = "Acessibilidade";
+"trust.fullDiskAccess" = "Acesso total ao disco";
+"trust.openSettings" = "Abrir ajustes";
+"trust.notGranted" = "Não concedida";
 "trust.export" = "Exportar relatório sem dados sensíveis…";
 "trust.exportTitle" = "Exportar relatório da Central de Confiança";
 "trust.exportFailed" = "Falha na exportação";

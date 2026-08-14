@@ -286,6 +286,15 @@
 "trust.integrityUnavailableDetail" = "Starten Sie die App-eigene Laufzeit, um lokale Aktivitäten zu verifizieren.";
 "trust.safeguardsSubtitle" = "Laufzeit, Audit-Integrität, Genehmigungen und Notfallsteuerung.";
 "trust.permissionsSubtitle" = "Echte minimale Lesezugriffe prüfen den Zugriff auf macOS-Apps.";
+
+/* Trust Center - Non-promptable system permissions */
+"trust.systemPermissions" = "Systemberechtigungen";
+"trust.systemPermissionsHint" = "Diese Statusanzeigen gelten nur für AirMCP.app. Bei einem stdio-MCP-Server gewähren Sie die Berechtigung der App, die AirMCP hostet (z. B. Claude Code oder Terminal), und führen Sie das Tool erneut aus.";
+"trust.screenRecording" = "Bildschirmaufnahme";
+"trust.accessibility" = "Bedienungshilfen";
+"trust.fullDiskAccess" = "Festplattenvollzugriff";
+"trust.openSettings" = "Einstellungen öffnen";
+"trust.notGranted" = "Nicht erteilt";
 "trust.export" = "Redigierten Bericht exportieren …";
 "trust.exportTitle" = "Trust-Center-Bericht exportieren";
 "trust.exportFailed" = "Export fehlgeschlagen";

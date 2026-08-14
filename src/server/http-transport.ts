@@ -619,6 +619,7 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
                 ip: req.ip ?? req.socket.remoteAddress ?? "unknown",
                 path: req.path,
                 reason: result.reason,
+                userAgent: req.headers["user-agent"] ?? "none",
               },
               status: "error",
             });
@@ -672,10 +673,19 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
       const auth = req.headers.authorization ?? "";
       const authHash = createHash("sha256").update(auth).digest();
       if (!timingSafeEqual(authHash, expectedHash)) {
+        // userAgent + reason identify the knocking client class without
+        // logging any token material — a bare {ip, path} row proved
+        // un-attributable in practice (2026-08: 10 loopback 401s with no
+        // way to tell a stale-token client from a token-less prober).
         auditLog({
           timestamp: new Date().toISOString(),
           tool: "__auth_failure",
-          args: { ip: req.ip ?? req.socket.remoteAddress ?? "unknown", path: req.path },
+          args: {
+            ip: req.ip ?? req.socket.remoteAddress ?? "unknown",
+            path: req.path,
+            reason: auth === "" ? "missing_token" : "wrong_token",
+            userAgent: req.headers["user-agent"] ?? "none",
+          },
           status: "error",
         });
         res.status(401).json({ error: "Unauthorized: invalid or missing Bearer token" });

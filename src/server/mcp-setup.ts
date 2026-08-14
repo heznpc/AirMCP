@@ -37,6 +37,7 @@ import { withAddonInstallStatus } from "../shared/addon-operations.js";
 import { buildMissingPackInstallHints, registerFrontDoorTools } from "./front-door-tools.js";
 import { registerToolSessionTools } from "./tool-session-tools.js";
 import { registerEventTools } from "./event-tools.js";
+import { installToolListSchemaDialectFix } from "./schema-dialect.js";
 
 export interface CreateServerOptions {
   config: AirMcpConfig;
@@ -78,6 +79,12 @@ export async function createServer(options: CreateServerOptions): Promise<{
     // states AirMCP's "governed runtime, not an agent" identity into client context.
     { instructions: SERVER_INSTRUCTIONS },
   );
+  // Re-serialize tools/list schemas as JSON Schema 2020-12 — the SDK's
+  // hardcoded draft-7 target makes strict clients reject every tool that has
+  // an outputSchema. Must install before the first registerTool() call (the
+  // SDK lazily registers its tools/list handler there).
+  installToolListSchemaDialectFix(server);
+
   // Cast to lightweight McpServer for module registration (avoids heavy generic inference)
   const lServer = server as unknown as LightMcpServer;
   const toolRegistry = createToolRegistry();

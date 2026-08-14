@@ -286,6 +286,15 @@
 "trust.integrityUnavailableDetail" = "请启动App管理的运行时，以验证本地活动。";
 "trust.safeguardsSubtitle" = "运行时、审计完整性、审批和紧急控制。";
 "trust.permissionsSubtitle" = "通过实际的最小读取操作验证macOS App访问权限。";
+
+/* Trust Center - Non-promptable system permissions */
+"trust.systemPermissions" = "系统权限";
+"trust.systemPermissionsHint" = "这些状态仅反映 AirMCP.app。对于 stdio MCP 服务器，请向托管 AirMCP 的应用（例如 Claude Code 或终端）授予权限，然后重新运行工具。";
+"trust.screenRecording" = "屏幕录制";
+"trust.accessibility" = "辅助功能";
+"trust.fullDiskAccess" = "完全磁盘访问权限";
+"trust.openSettings" = "打开设置";
+"trust.notGranted" = "未授予";
 "trust.export" = "导出已脱敏的报告…";
 "trust.exportTitle" = "导出信任中心报告";
 "trust.exportFailed" = "导出失败";

@@ -10,7 +10,7 @@ struct AirMCPWidgetBundle: WidgetBundle {
 }
 
 struct BriefingWidget: Widget {
-    let kind = "com.heznpc.AirMCP.BriefingWidget"
+    let kind = "app.airmcp.BriefingWidget"
 
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: BriefingProvider()) { entry in

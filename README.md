@@ -101,12 +101,16 @@ Full guide: [docs/mcpb.md](docs/mcpb.md).
 
 ### macOS app (signed + notarized)
 
-Every release from v2.16.3 on ships a Developer-ID-signed, notarized, and
+Every release from v2.16.5 on ships a Developer-ID-signed, notarized, and
 stapled `AirMCP-<version>.zip` in
 [Releases](https://github.com/heznpc/AirMCP/releases). It is the one artifact
 with the full surface and no build step: the embedded Node runtime, the Swift
 bridge, the menubar Trust Center, and the generated App Intents (Shortcuts
 actions) and widget are all included.
+
+Install v2.16.5 or later. The v2.16.3 and v2.16.4 releases carry an app ZIP
+that signs, notarizes, and staples correctly but crashes on launch before the
+menubar icon appears — a resource-bundle path bug fixed in v2.16.5.
 
 1. Download `AirMCP-<version>.zip` and unzip it.
 2. Move `AirMCP.app` to `/Applications` and open it. Gatekeeper accepts it
@@ -129,7 +133,7 @@ read or changed until you opt in.
 
 For Codex, Claude Code, Cursor, Windsurf, and other stdio clients, use the
 direct runtime, or the app-owned runtime after installing the signed
-`AirMCP-<version>.zip` that ships with each release since v2.16.3:
+`AirMCP-<version>.zip` that ships with each release since v2.16.5:
 
 ```bash
 npx airmcp init --no-clients
@@ -138,9 +142,9 @@ npx airmcp connect-clients --client-runtime direct
 ```
 
 The app-owned runtime is available only after installing that signed app ZIP
-and explicitly choosing **Start Local Runtime**. Releases before v2.16.3 did
-not ship the app asset; do not configure a client to wait for AirMCP.app on
-those.
+and explicitly choosing **Start Local Runtime**. Releases before v2.16.5 have
+no app asset, or one that cannot launch; do not configure a client to wait for
+AirMCP.app on those.
 
 Non-interactive examples:
 
@@ -257,7 +261,7 @@ HTTP policy details are in
 
 ## Client Setup
 
-Each release since v2.16.3 includes a signed AirMCP.app ZIP; the
+Each release since v2.16.5 includes a runnable signed AirMCP.app ZIP; the
 app-owned desktop pattern keeps one local runtime behind every connected
 client. A per-install token is created only by an explicit action: **Start
 Local Runtime** in AirMCP.app, or an opted-in app-runtime client connection

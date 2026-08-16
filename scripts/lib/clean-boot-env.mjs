@@ -56,5 +56,15 @@ export function cleanBootEnv(base = process.env) {
   // Suspenders: usage-tracker.ts also refuses disk persistence whenever
   // AIRMCP_TEST_MODE=1 without an explicit AIRMCP_USAGE_PROFILE_PATH.
   env.AIRMCP_USAGE_TRACKING = "false";
+  // Same leak, different file: the audit log lives under PATHS.VECTOR_STORE
+  // (default ~/.airmcp), so a cleanBootEnv-spawned server audit-logs into the
+  // developer's REAL ~/.airmcp/audit.jsonl. cli-connect.test.js deliberately
+  // sends an unauthenticated request to assert a 401 — every full-suite run
+  // was appending one __auth_failure row to the real audit chain, which then
+  // read as an unattributable production auth incident (2026-08: 13 loopback
+  // 401s traced back to exactly this before the redirect existed).
+  // Per-parent-process dir: parallel jest workers each isolate their spawns,
+  // and the multiprocess audit lock handles siblings sharing one dir.
+  env.AIRMCP_VECTOR_STORE_DIR = join(tmpdir(), `airmcp-test-state-${process.pid}`);
   return env;
 }

@@ -1,113 +1,30 @@
 ## Summary
 
-<!-- What does this PR do? Keep it to 1-3 sentences. -->
+<!-- What does this PR do, and why? 1-3 sentences. -->
 
 ## Linked Issue
 
 <!--
-  Use `Closes #123` so merging closes the issue automatically. `Refs #123`
-  only cross-links it and leaves it open for a maintainer to close by hand.
-  Use `Refs` only when the PR is a partial step toward the issue.
+  `Closes #123` closes the issue on merge. `Refs #123` only cross-links it —
+  use that when the PR is a partial step.
 -->
 
 Closes #
 
-## Type of Change
+## Checks
 
-- [ ] New feature (new tool, module, or prompt)
-- [ ] Bug fix
-- [ ] Refactoring (no behavior change)
-- [ ] Documentation
-- [ ] CI/CD or build configuration
-
-## Checklist
-
-- [ ] `npm run lint` passes
-- [ ] `npm run typecheck` passes
-- [ ] `npm run build` succeeds
-- [ ] `npm test` passes
-- [ ] User input is escaped with `esc()` / `escJxaShell()` (if adding JXA scripts)
-- [ ] Tool has `annotations` with `readOnlyHint` or `destructiveHint`
-- [ ] README / docs updated (if tool count or features changed)
-
-## QA Reports
-
-### Read-Only Smoke Test
+- [ ] `npm run lint && npm run typecheck && npm run build && npm test` pass
+- [ ] JXA input is escaped with `esc()` / `escJxaShell()` (only if you touched JXA)
+- [ ] New tools declare `readOnlyHint` or `destructiveHint` (only if you added a tool)
 
 <!--
-  npm run build && npm run qa
--->
+  Optional — the QA suites need a Mac with the Apple app permissions granted,
+  so skipping them is expected for outside contributors. CI and the maintainer
+  cover the rest.
 
-<details>
-<summary>Read-Only Test Results (click to expand)</summary>
+    npm run qa        # read-only smoke
+    npm run qa:crud   # CRUD roundtrip
 
-<!-- Paste the output of `node scripts/qa-test.mjs` below -->
-
-```
-PASS: ?  |  SKIP: ?  |  FAIL: ?  |  ERROR: ?
-```
-
-</details>
-
-### CRUD Roundtrip Test
-
-<!--
-  npm run qa:crud
-  (or specific modules: node scripts/qa-crud-test.mjs --module notes,calendar)
--->
-
-<details>
-<summary>CRUD Test Results (click to expand)</summary>
-
-<!-- Paste the output of `node scripts/qa-crud-test.mjs` below -->
-
-```
-PASS: ?  |  SKIP: ?  |  FAIL: ?  |  WARN: ?
-```
-
-</details>
-
-### Modules Affected
-
-<!-- Check modules you changed — reviewers will focus on these. -->
-
-- [ ] `notes`
-- [ ] `reminders`
-- [ ] `calendar`
-- [ ] `contacts`
-- [ ] `mail`
-- [ ] `music`
-- [ ] `finder`
-- [ ] `safari`
-- [ ] `system`
-- [ ] `photos`
-- [ ] `shortcuts`
-- [ ] `messages`
-- [ ] `intelligence`
-- [ ] `tv`
-- [ ] `ui`
-- [ ] `screen`
-- [ ] `maps`
-- [ ] `podcasts`
-- [ ] `weather`
-- [ ] `pages`
-- [ ] `numbers`
-- [ ] `keynote`
-- [ ] `location`
-- [ ] `bluetooth`
-- [ ] `google`
-- [ ] `speech`
-- [ ] `health`
-- [ ] `memory`
-- [ ] `audit`
-- [ ] `spatial_prep`
-- [ ] `webhooks`
-- [ ] `powerautomate`
-- [ ] Shared / Infrastructure
-
-### Manual Testing
-
-<!--
-For modules in the "Skipped" list (Messages, Mail-Send, System-Power, etc.),
-describe manual testing and outcomes here.
+  If you did run them, paste the summary lines here. If you tested anything by
+  hand (Messages, Mail send, system power — the suites skip those), say so.
 -->

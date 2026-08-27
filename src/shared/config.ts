@@ -488,7 +488,14 @@ export function parseConfig(): AirMcpConfig {
   const hitlLevelRaw = process.env.AIRMCP_HITL_LEVEL ?? file.hitl?.level ?? "sensitive-only";
   const hitlLevel: HitlLevel = HITL_LEVELS.includes(hitlLevelRaw) ? (hitlLevelRaw as HitlLevel) : "sensitive-only";
   const hitlWhitelist = new Set<string>(file.hitl?.whitelist ?? []);
-  const hitlTimeout = file.hitl?.timeout ?? 30;
+  // A HITL gate blocks on a *person*, not a machine. The notification
+  // route is not always available — with .denied authorization
+  // HitlManager falls back to an alert sound plus the Trust Center
+  // window, which a user busy in another app can easily miss. 30s was
+  // short enough that a request could expire before it was ever noticed;
+  // 120s keeps the caller from hanging indefinitely while leaving a
+  // realistic window to react. Override with hitl.timeout.
+  const hitlTimeout = file.hitl?.timeout ?? 120;
   const hitlSocketPath = PATHS.HITL_SOCKET;
 
   const hitl: HitlConfig = {

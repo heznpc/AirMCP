@@ -176,6 +176,9 @@ jobs:
       - name: Verify llms.txt + llms-full.txt drift
         run: npm run llms:check
 
+      - name: Verify debt ledger integrity (single TODO of record)
+        run: npm run ledger:check
+
       - name: Verify tool description token budget
         run: npm run tokens:check
 

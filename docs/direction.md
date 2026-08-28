@@ -77,51 +77,43 @@ rate limits, OAuth scopes, and local controls govern Apple workspace actions.
 
 **3-surface 톤 모델 (표면마다 다른 목소리)**
 
-| Surface | 톤 | 누구에게 | 카피 예시 |
-|---------|----|----|----------|
-| 랜딩·소개 (`docs/index.html`) | 프로슈머 메이커 + 애플 미니멀 | Apple 앱에 AI를 연결하려는 파워 유저 | "Governed MCP for your Apple ecosystem." + 현재 플랫폼 상태 + 주요 앱 이름 |
-| GitHub README·개발자 문서 (`docs/site/`) | 건조·정확·런타임 레이어 강조 | MCP 서버를 포크·확장할 개발자 | "Governed MCP runtime for the Apple ecosystem." + connector/control layer + 통제 기능 + 플랫폼 역할 |
-| Skills 가이드·블로그·릴리즈 노트 | 오픈소스 커뮤널 (투명성) | 공통 | 실사용 예시, 로드맵 공개, 기여 초대 |
+| Surface                                  | 톤                            | 누구에게                             | 카피 예시                                                                                           |
+| ---------------------------------------- | ----------------------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| 랜딩·소개 (`docs/index.html`)            | 프로슈머 메이커 + 애플 미니멀 | Apple 앱에 AI를 연결하려는 파워 유저 | "Governed MCP for your Apple ecosystem." + 현재 플랫폼 상태 + 주요 앱 이름                          |
+| GitHub README·개발자 문서 (`docs/site/`) | 건조·정확·런타임 레이어 강조  | MCP 서버를 포크·확장할 개발자        | "Governed MCP runtime for the Apple ecosystem." + connector/control layer + 통제 기능 + 플랫폼 역할 |
+| Skills 가이드·블로그·릴리즈 노트         | 오픈소스 커뮤널 (투명성)      | 공통                                 | 실사용 예시, 로드맵 공개, 기여 초대                                                                 |
 
 한 문서가 두 청중을 동시에 설득하려 하지 않는다. 랜딩은 감정, docs는 스펙·레이어, 블로그는 투명성 — 각 표면이 자기 일만 한다.
 
 ## 플랫폼 전략
 
-| 플랫폼 | 상태 | 역할 |
-|--------|------|------|
-| macOS | 제공 중 | 전체 로컬 MCP 런타임과 광범위한 Apple 앱·시스템 제어 |
-| iOS / iPadOS | 프리뷰 | Calendar·Reminders·Contacts·Health·Location 네이티브 실행과 AppIntents |
-| visionOS | 로드맵 | 공간형 상호작용과 네이티브 액션, Mac 전용 자동화는 연결된 Mac으로 라우팅 |
-| watchOS | 로드맵 | 명령·알림·호출별 승인, 실행은 페어링된 iPhone 런타임과 분담 |
+| 플랫폼       | 상태    | 역할                                                                     |
+| ------------ | ------- | ------------------------------------------------------------------------ |
+| macOS        | 제공 중 | 전체 로컬 MCP 런타임과 광범위한 Apple 앱·시스템 제어                     |
+| iOS / iPadOS | 프리뷰  | Calendar·Reminders·Contacts·Health·Location 네이티브 실행과 AppIntents   |
+| visionOS     | 로드맵  | 공간형 상호작용과 네이티브 액션, Mac 전용 자동화는 연결된 Mac으로 라우팅 |
+| watchOS      | 로드맵  | 명령·알림·호출별 승인, 실행은 페어링된 iPhone 런타임과 분담              |
 
 모든 OS에 macOS 서버를 복제하지 않는다. 공용 Swift·AppIntents·통제 계약을 공유하고, 샌드박스와 백그라운드 수명에 맞춰 실행 위치를 분리한다. 미출시 플랫폼을 지원된 제품처럼 쓰지 않는다.
 
 ---
 
-## 현재 상태 (2026-07-11, v2.16.0 준비)
+## 현재 상태
 
-| 지표 | 값 |
-|------|-----|
-| 모듈 | 32 (notes, reminders, calendar, contacts, mail, messages, music, finder, safari, system, photos, shortcuts, intelligence, tv, ui, screen, maps, podcasts¹, weather, pages, numbers, keynote, location, bluetooth, google, speech, health, memory, audit, spatial_prep, webhooks, powerautomate) |
-| 툴 | 296 (tool-manifest canonical) + Shortcuts 동적 등록 |
-| 프롬프트 | 32 (한국어 워크플로우 18+ 포함) |
-| 리소스 | 9 |
-| 빌트인 Skills | 14 (YAML DSL, parallel/loop/조건/이벤트 트리거, on_error 지원) |
-| AppIntents | 233 |
-| 런타임 프로필 | starter, communications-safe, productivity, full + progressive/profile/full tool exposure |
-| AppEnum | 14 자동 생성 |
-| Apple 네이티브 통합 | EventKit, Contacts, HealthKit, NLContextualEmbedding, Foundation Models, Vision OCR, Core Spotlight, ImagePlayground, Speech |
-| On-device AI | 요약·재작성·교정·구조화 출력·분류·대화·이미지 생성·문서 OCR·계획 생성·자율 에이전트 |
-| 보안·관측 | HITL 듀얼채널, 감사 로그 JSONL + HMAC chain + correlation id, OpenTelemetry, 프로토타입 오염 방어, circuit breaker, RFC 0001 error 카테고리 (PERMISSION/INVALID_INPUT/NOT_FOUND/UPSTREAM/SWIFT/DEPRECATED), rate limit + emergency-stop kill switch |
-| Transport | stdio, HTTP(+bearer), OAuth 2.1 + PKCE + Resource Indicators (RFC 0005 Step 1+2 ✅) + SEP-985/RFC 9728 정합 |
-| 디스커버리 | `.well-known/mcp.json` 세션리스 + active advertised tools/modules/license/homepage/schema_version 필드 |
-| 패키징 | npm (`airmcp`), `.mcpb` Desktop Extensions 번들 |
-| 클라이언트 연결 | 명시적 opt-in (Claude Desktop, Claude Code, Codex, Cursor, Windsurf) |
-| 검증 | 계약 기반 Jest·Swift·실제 npm/MCPB/app 산출물 게이트 |
+수치는 이 문서에 적지 않는다. `npm run stats`가 코드에서 직접 집계한다 —
+모듈·툴·프롬프트·리소스·Skills·AppIntents·AppEnum 전부.
+2026-07-11에 박아 둔 표가 5개 항목에서 틀어진 채 47일간 초록으로 남아 있었던 이유는
+`scripts/count-stats.mjs`의 동기화 대상 14개 파일에 이 문서가 없었기 때문이다.
 
-¹ podcasts 모듈은 macOS 26+에서 `brokenOn: [26]` 게이트로 등록 스킵 (Apple이 Podcasts JXA 딕셔너리 제거). v3.0.0에서 드랍 예정.
+|           |                                                                                             |
+| --------- | ------------------------------------------------------------------------------------------- |
+| 지원 표면 | macOS = 제공 · iOS = 프리뷰 · visionOS/watchOS = 로드맵                                     |
+| 패키징    | npm (`airmcp`) · `.mcpb` Desktop Extensions · 서명·공증된 macOS 앱 ZIP                      |
+| Transport | stdio · HTTP(+bearer) · OAuth 2.1 + PKCE + Resource Indicators                              |
+| 통제      | HITL 듀얼채널 · 감사 로그 JSONL + HMAC chain + correlation id · rate limit + emergency-stop |
+| 검증      | 계약 기반 Jest·Swift 게이트 + 실제 npm/MCPB/app 산출물 게이트                               |
 
----
+`podcasts` 모듈은 macOS 26 이상에서 등록되지 않는다 (Apple이 Podcasts JXA 딕셔너리 제거).
 
 ## 사명 (Mission)
 
@@ -153,62 +145,9 @@ rate limits, OAuth scopes, and local controls govern Apple workspace actions.
 
 ---
 
-## 로드맵 (v2.12 → v3.0)
-
-세부 권고 근거는 [`docs/archive/2026-04-19-advancement-recommendations.md`](archive/2026-04-19-advancement-recommendations.md) 참조 (역사 자료, Phase A/B 4/4 출하 완료, Phase C 1/4+1 진행 중). 아래는 출하 기록과 현재 열린 항목을 상태별로 정리한다.
-
-### ✅ 이미 출하 (v0.3 → v2.12 사이에 닫힌 것)
-
-- Skills 쇼케이스 빌트인 14종 (계획 7 → 실제 14)
-- `audit_log` / `audit_summary` 툴 + HMAC chain (v2.12 PR #192) + correlation id (v2.12 PR #190 / #198)
-- Rate limit + `emergency-stop` 킬 스위치 (`src/shared/rate-limit.ts`)
-- 맥락 기억 색인 (Context Memory Index) — `memory` 모듈 4툴 + 9 리소스 중 일부
-- Skills `on_error` — executor + 빌트인 yaml 6개에서 사용
-- 이벤트 타입 확장 — 3 → 9개 (mail_unread, focus_mode, now_playing, file_modified, screen_locked, screen_unlocked 추가)
-- HITL Phase 1 (elicitation + capability 게이트) = RFC 0008 Phase 1 (v2.12 PR #196)
-- OAuth 2.1 + PKCE + Resource Indicators (RFC 0005 Step 1+2) + SEP-985 / RFC 9728 정합 (v2.12 PR #193)
-- `.mcpb` Desktop Extensions 패키징
-- RFC 0007 Phase A (229 AppIntents 자동 생성)
-- RFC 0009 Phase 1 batch 1 (3 numbers 도구, 14 queued)
-- RFC 0012 Phase 1 prep — cron parser + scheduler state + hitl queue (v2.12 PR #207)
-- iOS companion 골격 1954 LOC (`ios/Sources/AirMCPServer` + `AirMCPiOS`)
-- `npx airmcp doctor --deep` 진단 (v2.12 PR #198)
-- README runtime layer reframe (v2.12 PR #216, WWDC 6/8 overhang 대응)
-- outputSchema Wave 1-7 출하 — handler의 `structuredContent` 런타임 계약을 테스트로 검증하며, 남은 집중 계약 대상은 system 19 + music 14 + shortcuts 8 = 41개
-
-### v2.13–v2.15 — WWDC 6/8 직전–직후 (5/12 → 7/15)
-
-- **RFC 0011 §5 quadrant 선택 + execute** — 2026-06-09에 Q2로 판정·해결. 결정과 후속 방향은 tracked 문서 `docs/rfc/0011-post-wwdc-2026.md`에 기록.
-- **mcp-setup.ts 통합 테스트** — tracked `tests/mcp-setup.test.js`가 module isolation, compatibility routing, registry/HITL 순서와 profile/install 계약을 검증.
-- **RFC 0012 daemon mode Phase 2** — Phase 1 prep 완료. 다음: event loop 배선 + hitl queue 활성화 + launchd plist 자동 설치
-- **RFC 0009 Phase 1 batch 2/3** — 실제 Numbers 검증용 `scripts/smoke/numbers-rfc0009-batch{2,3}.mjs`는 tracked 상태. 대응 queued tool 구현은 별도 백로그.
-- **outputSchema Wave 8 focused** — system 19 + music 14 + shortcuts 8 untyped 중 read/idempotent만 추려 ~15-20
-- **macOS 26.5 GA (5/15±1주) 호환성 매트릭스 검증** — CI runner 추가
-- **iWork 신규 모듈 또는 깊이 확장** — 6/8 발표 의존
-- **`gitleaks/gitleaks-action` Node.js 24 대응** (2026-06-02 강제 전환, 3주 마감)
-
-### v3.0 — 메이저 정리 (post-WWDC, 6/15+)
-
-- Safari `add_bookmark` 레거시 ≤25 등록 코드 제거 (deprecation removeAt: 3.0.0)
-- podcasts 모듈 코드 제거 또는 Shortcuts 브리지로 재구현 (removeAt: 3.0.0)
-- RFC 0011 §5에서 선택된 quadrant의 후속 architecture 변경
-
-### 백로그 (시점 미정 — 6/8 결과 의존)
-
-- **C5 음성 엔드투엔드** (`start_listening` 핫워드 + `speak_text`) — *"진짜 Siri 대체"* 증명
-- **MCP Apps 확장** — Photo Memory / Health Dashboard / Workflow Result
-- **HomeKit Phase 0** (6/8에 Apple system MCP 발표 시 *재평가*)
-- **Translate / Voice Memos / Books / Stocks** 신규 모듈
-- **HITL 승인 inbox/triage + trust 설명 + dry-run** — 승인 판단과 권한은 계속 호출별로 유지
-- **CloudKit private DB 벡터 싱크**
-- **iOS companion MVP 출하** (Reminders + Calendar)
-- Anthropic 공식 MCP Registry 정식 등재
-
----
-
 ## 관련 문서
 
-- [`docs/archive/2026-04-19-advancement-recommendations.md`](archive/2026-04-19-advancement-recommendations.md) — 본 방향성 작성 시 참조한 고도화 권고 (Phase A/B 4/4 출하 완료, Phase C 1/4 + 1 진행).
-- [`QUALITY_DIAGNOSIS_2026-04-17.md`](../QUALITY_DIAGNOSIS_2026-04-17.md) — 진행 progress tracker (§0 갱신 5/12 기준 HIGH 4/4 + MEDIUM 4/5 해결).
-- [`docs/rfc/0011-post-wwdc-2026.md`](rfc/0011-post-wwdc-2026.md) — WWDC 이후 플랫폼 방향 판정 기록.
-- [GitHub Issues](https://github.com/heznpc/AirMCP/issues) · [`docs/rfc/`](rfc/) — 현재 실행 백로그와 설계 결정.
+- [`docs/ledger.md`](ledger.md) — **작업 항목의 유일한 정본.** 열린 부채·처분·오너 결정 대기가 전부 여기 있다.
+- [`docs/state.md`](state.md) — 내부 전략 판단의 정본 (운영 모드·가설의 무덤).
+- [`docs/rfc/`](rfc/) — 설계 결정 기록.
+- [GitHub Issues](https://github.com/heznpc/AirMCP/issues) — 외부에서 도착한 신호.

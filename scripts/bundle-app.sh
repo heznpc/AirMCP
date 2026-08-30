@@ -98,6 +98,7 @@ APP_HTTP_PORT=3847
 APP_HEALTH_URL="http://127.0.0.1:$APP_HTTP_PORT/health"
 APP_MCP_URL="http://127.0.0.1:$APP_HTTP_PORT/mcp"
 TOKEN_FILE="${AIRMCP_APP_RUNTIME_TOKEN_PATH:-$HOME/Library/Application Support/AirMCP/http-token}"
+OWNER_SECRET_FILE="${AIRMCP_APP_RUNTIME_OWNER_PATH:-$HOME/Library/Application Support/AirMCP/runtime-owner-secret}"
 GOVERNED_STATE_DIR=""
 GOVERNED_STATE_PARENT="${TMPDIR:-/tmp}"
 PROCESS_SHUTDOWN_WAIT_STEPS=70 # 7s, above the server's 5s graceful-shutdown budget
@@ -299,7 +300,7 @@ fi
 /usr/libexec/PlistBuddy -c "Delete :CFBundlePackageType" "$PLIST" 2>/dev/null || true
 /usr/libexec/PlistBuddy -c "Add :CFBundlePackageType string APPL" "$PLIST"
 /usr/libexec/PlistBuddy -c "Delete :CFBundleShortVersionString" "$PLIST" 2>/dev/null || true
-/usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 2.16.5" "$PLIST"
+/usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 2.16.6" "$PLIST"
 /usr/libexec/PlistBuddy -c "Delete :CFBundleVersion" "$PLIST" 2>/dev/null || true
 /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $BUILD_NUMBER" "$PLIST"
 /usr/libexec/PlistBuddy -c "Delete :LSUIElement" "$PLIST" 2>/dev/null || true
@@ -473,6 +474,7 @@ setup_governed_environment() {
   export AIRMCP_HITL_LEVEL="sensitive-only"
   export AIRMCP_HITL_SOCKET_PATH="$GOVERNED_STATE_DIR/hitl.sock"
   export AIRMCP_APP_RUNTIME_TOKEN_PATH="$GOVERNED_STATE_DIR/http-token"
+  export AIRMCP_APP_RUNTIME_OWNER_PATH="$GOVERNED_STATE_DIR/runtime-owner-secret"
   export AIRMCP_MEMORY_STORE_PATH="$GOVERNED_STATE_DIR/memory.json"
   export AIRMCP_VECTOR_STORE_DIR="$GOVERNED_STATE_DIR/audit"
   export AIRMCP_USAGE_PROFILE_PATH="$GOVERNED_STATE_DIR/usage.json"
@@ -487,6 +489,7 @@ setup_governed_environment() {
   export AIRMCP_FORCE_APP_RUNTIME="1"
   export AIRMCP_NPM_PACKAGE_SPECIFIER="$PROJECT_DIR"
   TOKEN_FILE="$AIRMCP_APP_RUNTIME_TOKEN_PATH"
+  OWNER_SECRET_FILE="$AIRMCP_APP_RUNTIME_OWNER_PATH"
 }
 
 verify_governed_workflow() {
@@ -550,7 +553,11 @@ wait_for_http_runtime() {
 verify_app_owned_runtime() {
   local health
   local actual_version
-  local token_mode
+  local credential_label
+  local credential_path
+  local credential_mode
+  local credential_uid
+  local current_uid
   local unauth_status
 
   health="$(wait_for_http_runtime)" || {
@@ -567,16 +574,28 @@ verify_app_owned_runtime() {
   fi
   echo "✓ App-owned runtime is healthy (v$actual_version)"
 
-  if [ ! -f "$TOKEN_FILE" ]; then
-    echo "✗ app-owned runtime token missing: $TOKEN_FILE" >&2
-    exit 1
-  fi
-  token_mode="$(stat -f "%Lp" "$TOKEN_FILE")"
-  if [ "$token_mode" != "600" ]; then
-    echo "✗ app-owned runtime token permissions must be 600, got $token_mode" >&2
-    exit 1
-  fi
-  echo "✓ App-owned runtime token is private (0600)"
+  current_uid="$(id -u)"
+  for credential_label in "token" "owner secret"; do
+    case "$credential_label" in
+      token) credential_path="$TOKEN_FILE" ;;
+      "owner secret") credential_path="$OWNER_SECRET_FILE" ;;
+    esac
+    if [ ! -f "$credential_path" ] || [ -L "$credential_path" ]; then
+      echo "✗ app-owned runtime $credential_label must be a regular non-symlink file: $credential_path" >&2
+      exit 1
+    fi
+    credential_mode="$(stat -f "%Lp" "$credential_path")"
+    credential_uid="$(stat -f "%u" "$credential_path")"
+    if [ "$credential_mode" != "600" ]; then
+      echo "✗ app-owned runtime $credential_label permissions must be 600, got $credential_mode" >&2
+      exit 1
+    fi
+    if [ "$credential_uid" != "$current_uid" ]; then
+      echo "✗ app-owned runtime $credential_label must be owned by uid $current_uid, got $credential_uid" >&2
+      exit 1
+    fi
+  done
+  echo "✓ App-owned runtime token and owner secret are private current-user files (0600)"
 
   unauth_status="$(
     curl -sS --max-time 2 -o /dev/null -w "%{http_code}" \
@@ -595,15 +614,16 @@ verify_app_owned_runtime() {
   if ! probe_output="$(
     node "$SCRIPT_DIR/probe-app-runtime.mjs" \
       --url "$APP_MCP_URL" \
-      --token-file "$TOKEN_FILE" \
+      --owner-secret-file "$OWNER_SECRET_FILE" \
+      --expected-version "$EXPECTED_VERSION" \
       --min-tools 1 \
       --timeout-ms 5000 2>&1
   )"; then
-    echo "✗ token-authenticated MCP initialize/tools-list failed" >&2
+    echo "✗ app identity challenge or generation-authenticated MCP initialize/tools-list failed" >&2
     echo "$probe_output" >&2
     exit 1
   fi
-  echo "✓ Token-authenticated MCP initialize + tools/list passes ($probe_output)"
+  echo "✓ App identity challenge yields generation-authenticated MCP initialize + tools/list ($probe_output)"
 }
 
 verify_running() {

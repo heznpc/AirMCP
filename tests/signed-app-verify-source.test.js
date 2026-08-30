@@ -32,7 +32,9 @@ describe("signed app artifact verification script", () => {
     expect(script).toContain('--env "AIRMCP_FORCE_APP_RUNTIME=$AIRMCP_FORCE_APP_RUNTIME"');
     expect(script).toContain("ownerFingerprint");
     expect(script).toContain("pid_matches_prefix");
-    expect(script).toContain('--token-file "$TOKEN_FILE"');
+    expect(script).toContain('--owner-secret-file "$OWNER_FILE"');
+    expect(script).toContain("airmcp-app-generation-bearer-v1");
+    expect(script).toContain("tokenFingerprint");
     expect(script).toContain("processIdentifier == $APP_PID");
     expect(script).toContain("AIRMCP_REQUIRE_WIDGET=1");
     expect(script).toContain("bundle structure verification failed");

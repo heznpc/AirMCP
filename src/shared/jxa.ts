@@ -140,7 +140,7 @@ function execOsascript(script: string, timeout: number, language?: "JavaScript")
   return new Promise((resolve, reject) => {
     let settled = false;
     const args = language ? ["-l", language, "-e", script] : ["-e", script];
-    const child = execFile("osascript", args, { timeout, maxBuffer: BUFFER.JXA }, (error, stdout) => {
+    const child = execFile("/usr/bin/osascript", args, { timeout, maxBuffer: BUFFER.JXA }, (error, stdout) => {
       if (settled) return;
       settled = true;
       clearTimeout(killTimer);

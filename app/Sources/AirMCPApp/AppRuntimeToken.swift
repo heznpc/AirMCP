@@ -112,6 +112,90 @@ enum AppRuntimeToken {
         return digest.map { String(format: "%02x", $0) }.joined()
     }
 
+    /// Match the Node runtime's tokenless listener challenge. Binding the
+    /// proof to a caller nonce, process ID, and version prevents a process on
+    /// the reserved port from imitating the public health response and being
+    /// treated as the app-owned runtime.
+    static func listenerIdentityProof(
+        nonce: String,
+        processIdentifier: Int,
+        version: String,
+        ownerSecret: String
+    ) -> String? {
+        guard ownerSecret.range(of: #"^[A-Za-z0-9_-]{43}$"#, options: .regularExpression) != nil,
+              nonce.range(of: #"^[A-Za-z0-9_-]{32,64}$"#, options: .regularExpression) != nil,
+              processIdentifier > 1,
+              !version.isEmpty
+        else { return nil }
+        let payload = Data(
+            "airmcp-app-listener-v1\n\(nonce)\n\(processIdentifier)\n\(version)".utf8
+        )
+        let key = SymmetricKey(data: Data(ownerSecret.utf8))
+        let proof = HMAC<SHA256>.authenticationCode(for: payload, using: key)
+        return proof.map { String(format: "%02x", $0) }.joined()
+    }
+
+    static func listenerIdentityProofIsValid(
+        _ proof: String,
+        nonce: String,
+        processIdentifier: Int,
+        version: String,
+        ownerSecret: String
+    ) -> Bool {
+        guard ownerSecret.range(of: #"^[A-Za-z0-9_-]{43}$"#, options: .regularExpression) != nil,
+              nonce.range(of: #"^[A-Za-z0-9_-]{32,64}$"#, options: .regularExpression) != nil,
+              processIdentifier > 1,
+              !version.isEmpty,
+              let proofData = dataFromLowercaseHex(proof)
+        else { return false }
+        let payload = Data(
+            "airmcp-app-listener-v1\n\(nonce)\n\(processIdentifier)\n\(version)".utf8
+        )
+        let key = SymmetricKey(data: Data(ownerSecret.utf8))
+        return HMAC<SHA256>.isValidAuthenticationCode(
+            proofData,
+            authenticating: payload,
+            using: key
+        )
+    }
+
+    /// Authorization accepted only by the current app-owned runtime
+    /// generation. The owner secret is rotated before every child launch, so a
+    /// token intercepted after that listener exits cannot authenticate to its
+    /// replacement.
+    static func runtimeGenerationBearer(
+        processIdentifier: Int,
+        version: String,
+        ownerSecret: String
+    ) -> String? {
+        guard ownerSecret.range(of: #"^[A-Za-z0-9_-]{43}$"#, options: .regularExpression) != nil,
+              processIdentifier > 1,
+              !version.isEmpty
+        else { return nil }
+        let payload = Data(
+            "airmcp-app-generation-bearer-v1\n\(processIdentifier)\n\(version)".utf8
+        )
+        let key = SymmetricKey(data: Data(ownerSecret.utf8))
+        let proof = HMAC<SHA256>.authenticationCode(for: payload, using: key)
+        return "airmcp_app_" + proof.map { String(format: "%02x", $0) }.joined()
+    }
+
+    private static func dataFromLowercaseHex(_ value: String) -> Data? {
+        guard value.range(of: #"^[0-9a-f]{64}$"#, options: .regularExpression) != nil else {
+            return nil
+        }
+        var bytes: [UInt8] = []
+        bytes.reserveCapacity(value.count / 2)
+        var index = value.startIndex
+        while index < value.endIndex {
+            let next = value.index(index, offsetBy: 2)
+            guard let byte = UInt8(value[index..<next], radix: 16) else { return nil }
+            bytes.append(byte)
+            index = next
+        }
+        return Data(bytes)
+    }
+
     static func expectedOwnerFingerprint() throws -> String? {
         guard let secret = try loadExistingOwnerSecret() else { return nil }
         return ownerFingerprint(for: secret)

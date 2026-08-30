@@ -5,7 +5,7 @@
 
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
-import { randomUUID, timingSafeEqual, randomBytes, createHash } from "node:crypto";
+import { randomUUID, timingSafeEqual, randomBytes, createHash, createHmac } from "node:crypto";
 import type { Server as NodeHttpServer } from "node:http";
 import { NPM_PACKAGE_NAME } from "../shared/config.js";
 import { LIMITS, TIMEOUT } from "../shared/constants.js";
@@ -46,7 +46,9 @@ if (ratePruneTimer.unref) ratePruneTimer.unref();
  *  clients. Only UUIDs are accepted so an untrusted HTTP peer cannot inject
  *  arbitrary text or high-cardinality labels into the audit trail. */
 export const RUN_ID_HEADER = "x-airmcp-run-id";
+export const APP_IDENTITY_CHALLENGE_PATH = "/app/identity-challenge";
 const RUN_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const APP_IDENTITY_NONCE_RE = /^[A-Za-z0-9_-]{32,64}$/;
 
 export function parseRunCorrelationId(value: string | string[] | undefined): string | undefined {
   if (typeof value !== "string") return undefined;
@@ -69,6 +71,46 @@ export function runtimeOwnerFingerprint(ownerSecret: string | undefined): string
   const normalized = ownerSecret?.trim();
   if (!normalized || !/^[A-Za-z0-9_-]{43}$/.test(normalized)) return undefined;
   return createHash("sha256").update(`airmcp-app-owner-v1\n${normalized}`, "utf8").digest("hex");
+}
+
+export function runtimeTokenFingerprint(token: string): string {
+  return createHash("sha256").update(`airmcp-runtime-token-v1\n${token}`).digest("hex");
+}
+
+/** Prove possession of the per-generation app owner secret without exposing
+ * either that secret or the persistent HTTP bearer token. Native app clients
+ * verify this proof before any authenticated request reaches the listener. */
+export function runtimeIdentityProof(
+  ownerSecret: string | undefined,
+  nonce: string | undefined,
+  pid: number,
+  version: string,
+): string | undefined {
+  const normalized = ownerSecret?.trim();
+  if (!normalized || !/^[A-Za-z0-9_-]{43}$/.test(normalized)) return undefined;
+  if (!nonce || !APP_IDENTITY_NONCE_RE.test(nonce)) return undefined;
+  if (!Number.isSafeInteger(pid) || pid <= 1 || !version) return undefined;
+  return createHmac("sha256", normalized)
+    .update(`airmcp-app-listener-v1\n${nonce}\n${pid}\n${version}`, "utf8")
+    .digest("hex");
+}
+
+/** Generation-scoped bearer for native/plugin clients that already proved the
+ * owner secret. It becomes useless as soon as the app-owned child exits because
+ * the native launcher rotates that secret for every new runtime generation. */
+export function runtimeGenerationBearer(
+  ownerSecret: string | undefined,
+  pid: number,
+  version: string,
+): string | undefined {
+  const normalized = ownerSecret?.trim();
+  if (!normalized || !/^[A-Za-z0-9_-]{43}$/.test(normalized) || !Number.isSafeInteger(pid) || pid < 2 || !version) {
+    return undefined;
+  }
+  const proof = createHmac("sha256", normalized)
+    .update(`airmcp-app-generation-bearer-v1\n${pid}\n${version}`, "utf8")
+    .digest("hex");
+  return `airmcp_app_${proof}`;
 }
 
 /**
@@ -102,6 +144,7 @@ export interface HttpServerOptions extends CreateServerOptions {
   port: number;
   bindAll: boolean;
   httpToken: string;
+  appRuntimeOwnerSecret?: string;
   /** Overrides the policy inferred from CLI flags / env. When omitted the
    *  policy is derived: loopback-only unless `--bind-all` or
    *  `--unsafe-no-auth` is set. */
@@ -417,8 +460,22 @@ export function validateNetworkPolicy(ctx: {
 }
 
 export async function startHttpServer(options: HttpServerOptions): Promise<NodeHttpServer> {
-  const { port, bindAll, httpToken, allowNetwork: explicitPolicy, unsafeNoAuth, ...serverOptions } = options;
+  const {
+    port,
+    bindAll,
+    httpToken,
+    appRuntimeOwnerSecret,
+    allowNetwork: explicitPolicy,
+    unsafeNoAuth,
+    ...serverOptions
+  } = options;
   const { pkg } = serverOptions;
+  const appRuntimeOwnerFingerprint = runtimeOwnerFingerprint(appRuntimeOwnerSecret);
+  const appOwnedRuntime =
+    process.env.AIRMCP_APP_OWNED_RUNTIME === "1" && Boolean(httpToken) && Boolean(appRuntimeOwnerFingerprint);
+  const appRuntimeAuthorizationToken = appOwnedRuntime
+    ? runtimeGenerationBearer(appRuntimeOwnerSecret, process.pid, pkg.version)
+    : undefined;
 
   const express = (await import("express")).default;
   const app = express();
@@ -531,7 +588,7 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
   // Both the bucket math and the IP eviction policy live in the shared
   // rate-limit module — this middleware only owns the response shape.
   app.use((req, res, next) => {
-    if (req.path === "/health") return next();
+    if (req.path === "/health" || req.path === APP_IDENTITY_CHALLENGE_PATH) return next();
     const ip = req.ip ?? req.socket.remoteAddress ?? "unknown";
     const verdict = checkIpRateLimit(ip);
     res.set("RateLimit-Limit", String(verdict.limit));
@@ -593,6 +650,7 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
       : "/.well-known/oauth-authorization-server";
   const AUTH_SKIP_PATHS = new Set([
     "/health",
+    APP_IDENTITY_CHALLENGE_PATH,
     "/.well-known/mcp.json",
     "/.well-known/oauth-protected-resource",
     resourceMetadataPath,
@@ -667,12 +725,14 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
     // Legacy Bearer token. Hash both inputs to a fixed length before
     // timingSafeEqual so the length comparison itself does not become a
     // timing oracle for the token length.
-    const expectedHash = createHash("sha256").update(`Bearer ${httpToken}`).digest();
+    const expectedHashes = [httpToken, appRuntimeAuthorizationToken]
+      .filter((token): token is string => Boolean(token))
+      .map((token) => createHash("sha256").update(`Bearer ${token}`).digest());
     app.use((req, res, next) => {
       if (AUTH_SKIP_PATHS.has(req.path)) return next();
       const auth = req.headers.authorization ?? "";
       const authHash = createHash("sha256").update(auth).digest();
-      if (!timingSafeEqual(authHash, expectedHash)) {
+      if (!expectedHashes.some((expectedHash) => timingSafeEqual(authHash, expectedHash))) {
         // userAgent + reason identify the knocking client class without
         // logging any token material — a bare {ip, path} row proved
         // un-attributable in practice (2026-08: 10 loopback 401s with no
@@ -825,9 +885,6 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
   // the private bearer token and an MCP round trip before it trusts a listener.
   // The bit only prevents it from adopting/killing a same-token runtime the
   // user launched manually on the reserved port.
-  const appRuntimeOwnerFingerprint = runtimeOwnerFingerprint(process.env.AIRMCP_APP_RUNTIME_OWNER_SECRET);
-  const appOwnedRuntime =
-    process.env.AIRMCP_APP_OWNED_RUNTIME === "1" && Boolean(httpToken) && Boolean(appRuntimeOwnerFingerprint);
   // Warmup owns the authoritative effective module surface. Keep it nullable
   // until createServer has applied module packs, add-on presence, and host/OS
   // compatibility; an empty array before then would be false readiness.
@@ -841,6 +898,30 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
       status: "ok",
       version: pkg.version,
       appOwned: appOwnedRuntime,
+    });
+  });
+
+  // Tokenless server-authentication challenge for the native app. The caller
+  // contributes a fresh nonce and verifies the HMAC with the owner-only
+  // generation secret before deriving authorization scoped to this process.
+  app.get(APP_IDENTITY_CHALLENGE_PATH, (req, res) => {
+    if (!appOwnedRuntime) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    const nonce = typeof req.query.nonce === "string" ? req.query.nonce : undefined;
+    const proof = runtimeIdentityProof(appRuntimeOwnerSecret, nonce, process.pid, pkg.version);
+    if (!proof) {
+      res.status(400).json({ error: "Invalid identity challenge nonce" });
+      return;
+    }
+    res.set("Cache-Control", "no-store");
+    res.json({
+      status: "ok",
+      version: pkg.version,
+      appOwned: true,
+      pid: process.pid,
+      proof,
     });
   });
 
@@ -867,6 +948,7 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
       appOwned: appOwnedRuntime,
       pid: process.pid,
       ownerFingerprint: appRuntimeOwnerFingerprint,
+      tokenFingerprint: runtimeTokenFingerprint(httpToken),
       disabledModules,
       scopeFingerprint: runtimeScopeFingerprint(disabledModules),
       enabledModules: runtimeModuleState.enabledModules,

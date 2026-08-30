@@ -95,15 +95,26 @@ describe("HTTP governed-run correlation header", () => {
 
 describe("native runtime owner identity", () => {
   let runtimeOwnerFingerprint;
+  let runtimeIdentityProof;
 
   beforeAll(async () => {
-    ({ runtimeOwnerFingerprint } = await import("../dist/server/http-transport.js"));
+    ({ runtimeOwnerFingerprint, runtimeIdentityProof } = await import("../dist/server/http-transport.js"));
   });
 
   test("fingerprints only canonical app owner credentials", () => {
     expect(runtimeOwnerFingerprint("a".repeat(43))).toMatch(/^[0-9a-f]{64}$/);
     expect(runtimeOwnerFingerprint("short")).toBeUndefined();
     expect(runtimeOwnerFingerprint(undefined)).toBeUndefined();
+  });
+
+  test("binds listener proofs to a canonical nonce, pid, and version", () => {
+    const secret = "a".repeat(43);
+    const nonce = "b".repeat(43);
+    const proof = runtimeIdentityProof(secret, nonce, 123, "2.16.5");
+    expect(proof).toMatch(/^[0-9a-f]{64}$/);
+    expect(runtimeIdentityProof(secret, nonce, 124, "2.16.5")).not.toBe(proof);
+    expect(runtimeIdentityProof(secret, "short", 123, "2.16.5")).toBeUndefined();
+    expect(runtimeIdentityProof(undefined, nonce, 123, "2.16.5")).toBeUndefined();
   });
 });
 
@@ -614,6 +625,7 @@ describe("startHttpServer live middleware", () => {
       port: 0,
       bindAll: true,
       httpToken: "secret",
+      appRuntimeOwnerSecret: process.env.AIRMCP_APP_RUNTIME_OWNER_SECRET,
       allowNetwork: "with-token",
       config: {
         disabledModules: new Set(["notes", "mail"]),
@@ -749,6 +761,76 @@ describe("startHttpServer live middleware", () => {
     }
   });
 
+  test("tokenless identity challenge proves the app-owned listener without exposing secrets", async () => {
+    process.env.AIRMCP_APP_OWNED_RUNTIME = "1";
+    process.env.AIRMCP_APP_RUNTIME_OWNER_SECRET = "a".repeat(43);
+    const { runtimeGenerationBearer, runtimeIdentityProof } = await import("../dist/server/http-transport.js");
+    const server = await startHttpServer(options());
+    try {
+      const nonce = "b".repeat(43);
+      const response = await fetch(serverUrl(server, `/app/identity-challenge?nonce=${nonce}`));
+      expect(response.status).toBe(200);
+      expect(response.headers.get("cache-control")).toBe("no-store");
+      const body = await response.json();
+      expect(body).toEqual({
+        status: "ok",
+        version: "9.9.9-test",
+        appOwned: true,
+        pid: process.pid,
+        proof: runtimeIdentityProof("a".repeat(43), nonce, process.pid, "9.9.9-test"),
+      });
+      expect(JSON.stringify(body)).not.toContain("a".repeat(43));
+
+      const generationAuthorization = runtimeGenerationBearer("a".repeat(43), process.pid, "9.9.9-test");
+      expect(generationAuthorization).toMatch(/^airmcp_app_[0-9a-f]{64}$/);
+      const generationAuthenticated = await fetch(serverUrl(server, "/app/runtime-state"), {
+        headers: { Authorization: `Bearer ${generationAuthorization}` },
+      });
+      expect(generationAuthenticated.status).toBe(200);
+
+      const invalid = await fetch(serverUrl(server, "/app/identity-challenge?nonce=short"));
+      expect(invalid.status).toBe(400);
+    } finally {
+      await closeServer(server);
+    }
+  });
+
+  test("a generation bearer cannot authenticate after owner-secret rotation on the same port", async () => {
+    process.env.AIRMCP_APP_OWNED_RUNTIME = "1";
+    const { runtimeGenerationBearer } = await import("../dist/server/http-transport.js");
+    const firstSecret = "a".repeat(43);
+    const secondSecret = "b".repeat(43);
+    const firstBearer = runtimeGenerationBearer(firstSecret, process.pid, "9.9.9-test");
+    const secondBearer = runtimeGenerationBearer(secondSecret, process.pid, "9.9.9-test");
+    const first = await startHttpServer(options({ appRuntimeOwnerSecret: firstSecret }));
+    const firstAddress = first.address();
+    if (!firstAddress || typeof firstAddress === "string") throw new Error("expected TCP test server");
+    const port = firstAddress.port;
+    try {
+      const accepted = await fetch(serverUrl(first, "/app/runtime-state"), {
+        headers: { Authorization: `Bearer ${firstBearer}` },
+      });
+      expect(accepted.status).toBe(200);
+    } finally {
+      await closeServer(first);
+    }
+
+    const second = await startHttpServer(options({ port, appRuntimeOwnerSecret: secondSecret }));
+    try {
+      const stale = await fetch(serverUrl(second, "/app/runtime-state"), {
+        headers: { Authorization: `Bearer ${firstBearer}` },
+      });
+      expect(stale.status).toBe(401);
+
+      const fresh = await fetch(serverUrl(second, "/app/runtime-state"), {
+        headers: { Authorization: `Bearer ${secondBearer}` },
+      });
+      expect(fresh.status).toBe(200);
+    } finally {
+      await closeServer(second);
+    }
+  });
+
   test("loopback-only rejects unsolicited browser origins while preserving native clients", async () => {
     const server = await startHttpServer(options({ allowNetwork: "loopback-only", bindAll: false, httpToken: "" }));
     try {
@@ -806,6 +888,7 @@ describe("startHttpServer live middleware", () => {
         appOwned: true,
         pid: process.pid,
         ownerFingerprint: expect.stringMatching(/^[0-9a-f]{64}$/),
+        tokenFingerprint: expect.stringMatching(/^[0-9a-f]{64}$/),
         disabledModules: ["mail", "notes"],
         scopeFingerprint: expect.stringMatching(/^[0-9a-f]{64}$/),
         enabledModules: ["calendar", "reminders"],

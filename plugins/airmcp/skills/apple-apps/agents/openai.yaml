@@ -1,0 +1,7 @@
+interface:
+  display_name: AirMCP Apple Apps
+  short_description: Work carefully with Apple apps on this Mac.
+  brand_color: "#0E1117"
+  default_prompt: Use AirMCP to find the relevant Apple-app data, identify exact targets, and confirm any changes before acting.
+policy:
+  allow_implicit_invocation: true

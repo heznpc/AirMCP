@@ -119,6 +119,7 @@ describe("public positioning surfaces", () => {
       JSON.parse(read("mcp.json")).mcpServers.airmcp.description,
       JSON.parse(read("glama.json")).description,
       JSON.parse(read(".claude-plugin/plugin.json")).description,
+      JSON.parse(read("plugins/airmcp/.codex-plugin/plugin.json")).description,
       JSON.parse(read("mcpb/manifest.template.json")).long_description,
       read("smithery.yaml").match(/^description:\s*(.+)$/m)?.[1] ?? "",
     ];
@@ -143,6 +144,7 @@ describe("public positioning surfaces", () => {
       "glama.json",
       "smithery.yaml",
       ".claude-plugin/plugin.json",
+      "plugins/airmcp/.codex-plugin/plugin.json",
     ];
 
     for (const target of forbiddenSyncTargets) {

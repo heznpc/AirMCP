@@ -1,0 +1,49 @@
+{
+  "name": "airmcp",
+  "version": "2.16.6",
+  "description": "A maintained, permission-aware MCP bridge between ChatGPT and Apple apps on macOS.",
+  "author": {
+    "name": "Heznpc",
+    "url": "https://github.com/heznpc"
+  },
+  "homepage": "https://github.com/heznpc/AirMCP",
+  "repository": "https://github.com/heznpc/AirMCP",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "chatgpt",
+    "codex",
+    "apple",
+    "macos",
+    "notes",
+    "reminders",
+    "calendar",
+    "finder",
+    "shortcuts"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "AirMCP",
+    "shortDescription": "Connect ChatGPT to Apple apps on your Mac.",
+    "longDescription": "A maintained, permission-aware bridge between ChatGPT and Apple apps on your Mac. Find and work with Notes, Reminders, Calendar, Finder, Shortcuts, screen capture, and the other capabilities exposed by your local AirMCP runtime.",
+    "developerName": "Heznpc",
+    "category": "Productivity",
+    "capabilities": [
+      "Read",
+      "Write",
+      "Interactive"
+    ],
+    "websiteURL": "https://github.com/heznpc/AirMCP",
+    "privacyPolicyURL": "https://github.com/heznpc/AirMCP/blob/main/docs/PRIVACY_POLICY.md",
+    "termsOfServiceURL": "https://github.com/heznpc/AirMCP/blob/main/docs/TERMS_OF_SERVICE.md",
+    "defaultPrompt": [
+      "Find my recent project notes and summarize the action items.",
+      "Show tomorrow's calendar and the open time slots.",
+      "Find a reminder, confirm its details, then update it."
+    ],
+    "brandColor": "#0E1117",
+    "composerIcon": "./assets/icon-64.png",
+    "logo": "./assets/logo-512.png"
+  }
+}

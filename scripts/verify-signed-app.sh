@@ -13,6 +13,7 @@ APP_BUNDLE="${APP_BUNDLE_PATH:-$PROJECT_DIR/AirMCP.app}"
 APP_EXECUTABLE="AirMCP"
 APP_BINARY="$APP_BUNDLE/Contents/MacOS/$APP_EXECUTABLE"
 APP_HEALTH_URL="${AIRMCP_APP_HEALTH_URL:-http://127.0.0.1:3847/health}"
+APP_IDENTITY_CHALLENGE_URL="${AIRMCP_APP_IDENTITY_CHALLENGE_URL:-http://127.0.0.1:3847/app/identity-challenge}"
 APP_RUNTIME_STATE_URL="${AIRMCP_APP_RUNTIME_STATE_URL:-http://127.0.0.1:3847/app/runtime-state}"
 APP_MCP_URL="${AIRMCP_APP_MCP_URL:-http://127.0.0.1:3847/mcp}"
 RUNTIME_NODE="$APP_BUNDLE/Contents/Resources/airmcp/runtime/bin/node"
@@ -228,15 +229,41 @@ RUNTIME_STATE_FILE="$STATE_DIR/runtime-state.json"
 for _ in $(seq 1 100); do
   if [ -s "$TOKEN_FILE" ] && [ -s "$OWNER_FILE" ]; then
     curl -fsS --max-time 1 "$APP_HEALTH_URL" -o "$HEALTH_FILE" 2>/dev/null || true
-    node --input-type=module - "$TOKEN_FILE" "$APP_RUNTIME_STATE_URL" "$RUNTIME_STATE_FILE" <<'NODE' >/dev/null 2>&1 || true
+    node --input-type=module - \
+      "$OWNER_FILE" "$TOKEN_FILE" "$APP_IDENTITY_CHALLENGE_URL" \
+      "$APP_RUNTIME_STATE_URL" "$RUNTIME_STATE_FILE" "$EXPECTED_VERSION" <<'NODE' >/dev/null 2>&1 || true
+      import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
       import { readFileSync, writeFileSync } from "node:fs";
-      const token = readFileSync(process.argv[2], "utf8").trim();
-      const response = await fetch(process.argv[3], {
-        headers: { Authorization: `Bearer ${token}` },
+      const [ownerPath, tokenPath, challengeBase, stateUrl, outputPath, expectedVersion] = process.argv.slice(2);
+      const owner = readFileSync(ownerPath, "utf8").trim();
+      const nonce = randomBytes(32).toString("base64url");
+      const challengeUrl = new URL(challengeBase);
+      challengeUrl.searchParams.set("nonce", nonce);
+      const challengeResponse = await fetch(challengeUrl, { signal: AbortSignal.timeout(1_000) });
+      if (!challengeResponse.ok) process.exit(2);
+      const challenge = await challengeResponse.json();
+      if (challenge.status !== "ok" || challenge.appOwned !== true || challenge.version !== expectedVersion ||
+          !Number.isSafeInteger(challenge.pid) || challenge.pid < 2 || !/^[0-9a-f]{64}$/.test(challenge.proof)) {
+        process.exit(3);
+      }
+      const expectedProof = Buffer.from(createHmac("sha256", owner)
+        .update(`airmcp-app-listener-v1\n${nonce}\n${challenge.pid}\n${challenge.version}`)
+        .digest("hex"), "hex");
+      const actualProof = Buffer.from(challenge.proof, "hex");
+      if (actualProof.length !== expectedProof.length || !timingSafeEqual(actualProof, expectedProof)) process.exit(4);
+      const generationToken = `airmcp_app_${createHmac("sha256", owner)
+        .update(`airmcp-app-generation-bearer-v1\n${challenge.pid}\n${challenge.version}`)
+        .digest("hex")}`;
+      const response = await fetch(stateUrl, {
+        headers: { Authorization: `Bearer ${generationToken}` },
         signal: AbortSignal.timeout(1_000),
       });
-      if (!response.ok) process.exit(2);
-      writeFileSync(process.argv[4], JSON.stringify(await response.json()), { mode: 0o600 });
+      if (!response.ok) process.exit(5);
+      const state = await response.json();
+      const token = readFileSync(tokenPath, "utf8").trim();
+      const tokenFingerprint = createHash("sha256").update(`airmcp-runtime-token-v1\n${token}`).digest("hex");
+      if (state.pid !== challenge.pid || state.tokenFingerprint !== tokenFingerprint) process.exit(6);
+      writeFileSync(outputPath, JSON.stringify(state), { mode: 0o600 });
 NODE
     if [ -s "$HEALTH_FILE" ] && [ -s "$RUNTIME_STATE_FILE" ]; then break; fi
   fi
@@ -250,17 +277,20 @@ for private_file in "$TOKEN_FILE" "$OWNER_FILE"; do
   fi
 done
 
-RUNTIME_PID="$(node - "$HEALTH_FILE" "$RUNTIME_STATE_FILE" "$OWNER_FILE" "$EXPECTED_VERSION" <<'NODE'
+RUNTIME_PID="$(node - "$HEALTH_FILE" "$RUNTIME_STATE_FILE" "$OWNER_FILE" "$TOKEN_FILE" "$EXPECTED_VERSION" <<'NODE'
   const { createHash } = require("crypto");
   const { readFileSync } = require("fs");
-  const [healthPath, statePath, ownerPath, expectedVersion] = process.argv.slice(2);
+  const [healthPath, statePath, ownerPath, tokenPath, expectedVersion] = process.argv.slice(2);
   const health = JSON.parse(readFileSync(healthPath, "utf8"));
   const state = JSON.parse(readFileSync(statePath, "utf8"));
   const owner = readFileSync(ownerPath, "utf8").trim();
+  const token = readFileSync(tokenPath, "utf8").trim();
   const fingerprint = createHash("sha256").update(`airmcp-app-owner-v1\n${owner}`, "utf8").digest("hex");
+  const tokenFingerprint = createHash("sha256").update(`airmcp-runtime-token-v1\n${token}`, "utf8").digest("hex");
   if (health.status !== "ok" || health.version !== expectedVersion || health.appOwned !== true) process.exit(2);
   if (state.status !== "ok" || state.version !== expectedVersion || state.appOwned !== true) process.exit(3);
-  if (!Number.isSafeInteger(state.pid) || state.pid < 2 || state.ownerFingerprint !== fingerprint) process.exit(4);
+  if (!Number.isSafeInteger(state.pid) || state.pid < 2 || state.ownerFingerprint !== fingerprint ||
+      state.tokenFingerprint !== tokenFingerprint) process.exit(4);
   process.stdout.write(String(state.pid));
 NODE
 )" || {
@@ -291,7 +321,8 @@ fi
 
 node "$SCRIPT_DIR/probe-app-runtime.mjs" \
   --url "$APP_MCP_URL" \
-  --token-file "$TOKEN_FILE" \
+  --owner-secret-file "$OWNER_FILE" \
+  --expected-version "$EXPECTED_VERSION" \
   --min-tools 100 \
   --timeout-ms 10000 \
   --client-name "airmcp-signed-artifact-verify"

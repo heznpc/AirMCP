@@ -110,6 +110,7 @@ final class OnboardingGovernedWritePolicyTests: XCTestCase {
           "appOwned": true,
           "pid": 4242,
           "ownerFingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tokenFingerprint": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
           "disabledModules": [],
           "scopeFingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
           "enabledModules": ["reminders"],

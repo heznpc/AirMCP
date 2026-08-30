@@ -192,6 +192,7 @@ func installMCPIntentRouterForMacOS() {
 
 private enum AppIntentMCPTransportError: Error {
     case invalidRuntimeURL
+    case unverifiedRuntimeListener
     case missingRuntimeToken
     case missingSessionID
     case httpStatus(Int, String)
@@ -199,6 +200,19 @@ private enum AppIntentMCPTransportError: Error {
     case rpcError(String)
     case missingToolText
     case toolCallUncertain(Error)
+}
+
+private final class SynchronousListenerProofBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: VerifiedAppRuntimeListener?
+
+    func store(_ listener: VerifiedAppRuntimeListener?) {
+        lock.withLock { value = listener }
+    }
+
+    func load() -> VerifiedAppRuntimeListener? {
+        lock.withLock { value }
+    }
 }
 
 /// JSON-compatible tool arguments crossing App Intent, Services, and
@@ -226,6 +240,7 @@ struct AppRuntimeState: Decodable, Sendable, Equatable {
     let appOwned: Bool
     let pid: Int
     let ownerFingerprint: String
+    let tokenFingerprint: String
     let disabledModules: [String]
     let scopeFingerprint: String
     let enabledModules: [String]
@@ -242,6 +257,19 @@ struct AppRuntimeState: Decodable, Sendable, Equatable {
     }
 }
 
+struct AppRuntimeIdentityChallenge: Decodable, Sendable, Equatable {
+    let status: String
+    let version: String
+    let appOwned: Bool
+    let pid: Int
+    let proof: String
+}
+
+struct VerifiedAppRuntimeListener: Sendable, Equatable {
+    let challenge: AppRuntimeIdentityChallenge
+    let authorizationToken: String
+}
+
 struct AppRuntimeModuleUnavailable: Decodable, Sendable, Equatable {
     let module: String
     let reason: String
@@ -251,11 +279,118 @@ struct AppRuntimeModuleUnavailable: Decodable, Sendable, Equatable {
 /// Execute an AirMCP MCP tool through the app-owned HTTP runtime when it is
 /// already available, then fall back to the legacy stdio bridge. The fallback
 /// keeps cold App Intent/Services invocations working while the preferred path
-/// shares the same token-gated, app-owned runtime as Claude/Codex/Cursor.
+/// shares the same governed, app-owned runtime as Claude/Codex/Cursor.
 enum AppRuntimeClient {
+    private static func identityChallengeRequest(
+        timeout: TimeInterval
+    ) throws -> (request: URLRequest, nonce: String, ownerSecret: String) {
+        guard let ownerSecret = try AppRuntimeToken.loadExistingOwnerSecret() else {
+            throw AppIntentMCPTransportError.unverifiedRuntimeListener
+        }
+        let nonce = UUID().uuidString.lowercased()
+        guard var components = URLComponents(string: AirMcpConstants.appOwnedIdentityChallengeURL) else {
+            throw AppIntentMCPTransportError.invalidRuntimeURL
+        }
+        components.queryItems = [URLQueryItem(name: "nonce", value: nonce)]
+        guard let url = components.url else {
+            throw AppIntentMCPTransportError.invalidRuntimeURL
+        }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = timeout
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        return (request, nonce, ownerSecret)
+    }
+
+    static func identityChallengeIsValid(
+        _ challenge: AppRuntimeIdentityChallenge,
+        nonce: String,
+        ownerSecret: String,
+        expectedVersion: String = AirMcpConstants.npmPackageVersion
+    ) -> Bool {
+        guard challenge.status == "ok",
+              challenge.version == expectedVersion,
+              challenge.appOwned
+        else { return false }
+        return AppRuntimeToken.listenerIdentityProofIsValid(
+            challenge.proof,
+            nonce: nonce,
+            processIdentifier: challenge.pid,
+            version: challenge.version,
+            ownerSecret: ownerSecret
+        )
+    }
+
+    /// Authenticate the listener without sending the persistent HTTP token.
+    /// A runtime that only imitates `/health` cannot compute this fresh proof.
+    static func verifyListenerOwnership(
+        requestTimeout: TimeInterval = 1
+    ) async throws -> VerifiedAppRuntimeListener {
+        let challengeRequest = try identityChallengeRequest(timeout: requestTimeout)
+        let (data, response) = try await URLSession.shared.data(for: challengeRequest.request)
+        guard let http = response as? HTTPURLResponse,
+              http.statusCode == 200,
+              let challenge = try? JSONDecoder().decode(AppRuntimeIdentityChallenge.self, from: data),
+              identityChallengeIsValid(
+                  challenge,
+                  nonce: challengeRequest.nonce,
+                  ownerSecret: challengeRequest.ownerSecret
+              )
+        else {
+            throw AppIntentMCPTransportError.unverifiedRuntimeListener
+        }
+        guard let authorizationToken = AppRuntimeToken.runtimeGenerationBearer(
+            processIdentifier: challenge.pid,
+            version: challenge.version,
+            ownerSecret: challengeRequest.ownerSecret
+        ) else {
+            throw AppIntentMCPTransportError.unverifiedRuntimeListener
+        }
+        return VerifiedAppRuntimeListener(
+            challenge: challenge,
+            authorizationToken: authorizationToken
+        )
+    }
+
+    static func verifyListenerOwnershipSynchronously(
+        timeout: TimeInterval
+    ) -> VerifiedAppRuntimeListener? {
+        guard let challengeRequest = try? identityChallengeRequest(timeout: timeout) else {
+            return nil
+        }
+        let box = SynchronousListenerProofBox()
+        let semaphore = DispatchSemaphore(value: 0)
+        let task = URLSession.shared.dataTask(with: challengeRequest.request) { data, response, _ in
+            defer { semaphore.signal() }
+            guard let http = response as? HTTPURLResponse,
+                  http.statusCode == 200,
+                  let data,
+                  let challenge = try? JSONDecoder().decode(AppRuntimeIdentityChallenge.self, from: data)
+            else { return }
+            guard identityChallengeIsValid(
+                challenge,
+                nonce: challengeRequest.nonce,
+                ownerSecret: challengeRequest.ownerSecret
+            ), let authorizationToken = AppRuntimeToken.runtimeGenerationBearer(
+                processIdentifier: challenge.pid,
+                version: challenge.version,
+                ownerSecret: challengeRequest.ownerSecret
+            ) else { return }
+            box.store(VerifiedAppRuntimeListener(
+                challenge: challenge,
+                authorizationToken: authorizationToken
+            ))
+        }
+        task.resume()
+        guard semaphore.wait(timeout: .now() + timeout) == .success else {
+            task.cancel()
+            return nil
+        }
+        return box.load()
+    }
+
     /// Shared governed execution path for macOS App Intents and Services.
-    /// The app-owned HTTP runtime is preferred so calls share the same token,
-    /// audit, rate-limit, emergency-stop, and per-call HITL controls. A cold
+    /// The app-owned HTTP runtime is preferred so calls share the same audit,
+    /// rate-limit, emergency-stop, and per-call HITL controls. A cold
     /// invocation may use the stdio transport, which reaches those same server
     /// guards and the app's owner-only HITL socket.
     static func callTool(_ toolName: String, args: AppRuntimeToolArguments) async throws -> String {
@@ -389,12 +524,13 @@ enum AppRuntimeClient {
         token: String,
         requestTimeout: TimeInterval
     ) async throws -> AppRuntimeState {
+        let listener = try await verifyListenerOwnership(requestTimeout: min(1, requestTimeout))
         guard let url = URL(string: AirMcpConstants.appOwnedRuntimeStateURL) else {
             throw AppIntentMCPTransportError.invalidRuntimeURL
         }
         var request = URLRequest(url: url)
         request.timeoutInterval = requestTimeout
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(listener.authorizationToken)", forHTTPHeaderField: "Authorization")
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse else {
             throw AppIntentMCPTransportError.invalidJSONResponse("missing HTTP response")
@@ -403,7 +539,13 @@ enum AppRuntimeClient {
             let body = String(data: data, encoding: .utf8) ?? ""
             throw AppIntentMCPTransportError.httpStatus(http.statusCode, body)
         }
-        return try JSONDecoder().decode(AppRuntimeState.self, from: data)
+        let state = try JSONDecoder().decode(AppRuntimeState.self, from: data)
+        guard state.pid == listener.challenge.pid,
+              state.tokenFingerprint == AppRuntimeToken.fingerprint(for: token)
+        else {
+            throw AppIntentMCPTransportError.unverifiedRuntimeListener
+        }
+        return state
     }
 
     /// `/app/runtime-state` is deliberately 503 until Node's warmup publishes
@@ -834,18 +976,19 @@ private func appRuntimeURL() throws -> URL {
 
 private func postAppRuntimeMCPRequest(
     _ payload: [String: Any],
-    token: String,
+    token _: String,
     sessionID: String? = nil,
     runID: String? = nil,
     allowsEmptyResponse: Bool = false,
     timeoutInterval: TimeInterval = 2
 ) async throws -> (json: [String: Any], sessionID: String?) {
+    let listener = try await AppRuntimeClient.verifyListenerOwnership(requestTimeout: min(1, timeoutInterval))
     var request = URLRequest(url: try appRuntimeURL())
     request.httpMethod = "POST"
     request.timeoutInterval = timeoutInterval
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
     request.setValue("application/json, text/event-stream", forHTTPHeaderField: "Accept")
-    request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+    request.setValue("Bearer \(listener.authorizationToken)", forHTTPHeaderField: "Authorization")
     if let sessionID {
         request.setValue(sessionID, forHTTPHeaderField: "Mcp-Session-Id")
     }
@@ -869,11 +1012,12 @@ private func postAppRuntimeMCPRequest(
     return (json, http.value(forHTTPHeaderField: "Mcp-Session-Id"))
 }
 
-private func closeAppRuntimeMCPSession(sessionID: String, token: String) async throws {
+private func closeAppRuntimeMCPSession(sessionID: String, token _: String) async throws {
+    let listener = try await AppRuntimeClient.verifyListenerOwnership(requestTimeout: 1)
     var request = URLRequest(url: try appRuntimeURL())
     request.httpMethod = "DELETE"
     request.timeoutInterval = 1
-    request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+    request.setValue("Bearer \(listener.authorizationToken)", forHTTPHeaderField: "Authorization")
     request.setValue(sessionID, forHTTPHeaderField: "Mcp-Session-Id")
     _ = try await URLSession.shared.data(for: request)
 }

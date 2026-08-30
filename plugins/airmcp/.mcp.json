@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "airmcp": {
+      "command": "/usr/bin/env",
+      "args": [
+        "-i",
+        "PATH=/usr/bin:/bin:/usr/sbin:/sbin",
+        "/bin/sh",
+        "./scripts/launch-airmcp-connector.sh"
+      ],
+      "cwd": "."
+    }
+  }
+}

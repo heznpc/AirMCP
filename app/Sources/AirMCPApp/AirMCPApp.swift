@@ -50,13 +50,6 @@ struct AirMCPApp: App {
 
             NSApp?.servicesProvider = ServicesProvider()
 
-            // Register URL scheme handler (airmcp://)
-            NSAppleEventManager.shared().setEventHandler(
-                URLSchemeHandler.shared,
-                andSelector: #selector(URLSchemeHandler.handleURL(_:withReply:)),
-                forEventClass: AEEventClass(kInternetEventClass),
-                andEventID: AEEventID(kAEGetURL)
-            )
         }
     }
 
@@ -116,6 +109,7 @@ struct AirMCPApp: App {
         }
         applicationDelegate.serverManager = serverManager
         serverManager.logManager = logManager
+        URLSchemeHandler.shared.configure(serverManager: serverManager)
         serverManager.startPolling()
         if !hitlInitialized {
             hitlInitialized = true
@@ -197,6 +191,14 @@ final class AirMCPApplicationDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         guardPrimaryInstance()
+        // Register before SwiftUI scene construction so a launch-time GetURL
+        // event can be buffered until the ServerManager is attached.
+        NSAppleEventManager.shared().setEventHandler(
+            URLSchemeHandler.shared,
+            andSelector: #selector(URLSchemeHandler.handleURL(_:withReply:)),
+            forEventClass: AEEventClass(kInternetEventClass),
+            andEventID: AEEventID(kAEGetURL)
+        )
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -345,9 +347,38 @@ private struct HitlFallbackMenuBarLabel: View {
 
 // MARK: - URL Scheme Handler (airmcp://)
 
+enum RuntimeStartURLPolicy {
+    static let canonicalURL = "airmcp://runtime/start"
+
+    static func accepts(_ url: URL) -> Bool {
+        url.absoluteString == canonicalURL
+    }
+}
+
 @MainActor
 final class URLSchemeHandler: NSObject {
     static let shared = URLSchemeHandler()
+    private weak var serverManager: ServerManager?
+    private var pendingRuntimeStart = false
+
+    func configure(serverManager: ServerManager) {
+        self.serverManager = serverManager
+        guard pendingRuntimeStart else { return }
+        pendingRuntimeStart = false
+        requestRuntimeStart()
+    }
+
+    private func requestRuntimeStart() {
+        guard let serverManager else {
+            // A launch-time GetURL event can arrive before SwiftUI instantiates
+            // the persistent menu-bar label. Drain it once the manager is wired.
+            pendingRuntimeStart = true
+            return
+        }
+        // A deep link may resume only a runtime the user already consented to
+        // auto-start. It cannot create first-run consent or change preferences.
+        serverManager.requestConnectorRuntimeStart()
+    }
 
     @objc func handleURL(_ event: NSAppleEventDescriptor, withReply reply: NSAppleEventDescriptor) {
         guard let urlString = event.paramDescriptor(forKeyword: keyDirectObject)?.stringValue,
@@ -362,6 +393,9 @@ final class URLSchemeHandler: NSObject {
             // From the Trust Status widget — bring the app forward so the user
             // can open the Trust Center. No tool details are conveyed in the URL.
             NSApp.activate()
+        case "runtime":
+            guard RuntimeStartURLPolicy.accepts(url) else { return }
+            requestRuntimeStart()
         default:
             NSApp.activate()
         }

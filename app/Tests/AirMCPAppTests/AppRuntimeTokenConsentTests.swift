@@ -104,4 +104,74 @@ final class AppRuntimeTokenConsentTests: XCTestCase {
             ["runtime-owner-secret"]
         )
     }
+
+    func testListenerIdentityProofMatchesNodeContractAndRejectsTampering() throws {
+        let secret = String(repeating: "a", count: 43)
+        let nonce = String(repeating: "b", count: 43)
+        let proof = try XCTUnwrap(
+            AppRuntimeToken.listenerIdentityProof(
+                nonce: nonce,
+                processIdentifier: 123,
+                version: "2.16.5",
+                ownerSecret: secret
+            )
+        )
+        XCTAssertEqual(
+            proof,
+            "0d01fef81ad4d828dcf263f268d2906f4c965bcb3e93cef4ae7b216ebcac9830"
+        )
+        XCTAssertEqual(
+            AppRuntimeToken.runtimeGenerationBearer(
+                processIdentifier: 123,
+                version: "2.16.5",
+                ownerSecret: secret
+            ),
+            "airmcp_app_897599a80e1c449a8beeba036882deeeb1c801e7498a30f0b0d4cb7a4f101197"
+        )
+
+        let challenge = AppRuntimeIdentityChallenge(
+            status: "ok",
+            version: "2.16.5",
+            appOwned: true,
+            pid: 123,
+            proof: proof
+        )
+        XCTAssertTrue(
+            AppRuntimeClient.identityChallengeIsValid(
+                challenge,
+                nonce: nonce,
+                ownerSecret: secret,
+                expectedVersion: "2.16.5"
+            )
+        )
+        XCTAssertFalse(
+            AppRuntimeClient.identityChallengeIsValid(
+                AppRuntimeIdentityChallenge(
+                    status: challenge.status,
+                    version: challenge.version,
+                    appOwned: challenge.appOwned,
+                    pid: 124,
+                    proof: challenge.proof
+                ),
+                nonce: nonce,
+                ownerSecret: secret,
+                expectedVersion: "2.16.5"
+            )
+        )
+        XCTAssertNil(
+            AppRuntimeToken.listenerIdentityProof(
+                nonce: "short",
+                processIdentifier: 123,
+                version: "2.16.5",
+                ownerSecret: secret
+            )
+        )
+        XCTAssertNil(
+            AppRuntimeToken.runtimeGenerationBearer(
+                processIdentifier: 1,
+                version: "2.16.5",
+                ownerSecret: secret
+            )
+        )
+    }
 }

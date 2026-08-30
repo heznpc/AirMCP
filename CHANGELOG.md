@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Private ChatGPT/Codex plugin package** — adds a plugin manifest, Apple-app workflow skill,
+  local evaluation set, and a signed-app connector that keeps macOS TCC ownership in
+  `AirMCP.app`. The connector fails closed unless the live listener matches the current user's
+  bundled runtime and signed app parent, then verifies an owner-secret HMAC challenge bound to
+  the listener PID and runtime version. It derives a generation-scoped bearer instead of
+  forwarding the persistent local token, so the old bearer cannot authenticate to the next
+  app-owned runtime generation. The native app applies the same challenge and launches its
+  runtime with a strict environment allowlist. If the app remains alive after its child stops,
+  the connector targets the exact verified app with a canonical background deep link; the app
+  resumes only a previously authorized runtime, re-probes the empty port, and rotates the
+  generation credential. A staging command injects the developer-mode ChatGPT connection ID
+  into an ignored copy, and a live preflight verifies the connector through MCP `initialize`,
+  `tools/list`, and a read-only `profile_status` call before local installation. Public
+  submission remains a separate deployment step.
+
 ## [2.16.5] - 2026-08-13
 
 ### Added

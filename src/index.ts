@@ -77,8 +77,6 @@ import { createServer } from "./server/mcp-setup.js";
 import { startHttpServer } from "./server/http-transport.js";
 import { wireStdioShutdown } from "./server/stdio-shutdown.js";
 
-const ctx = initializeServer();
-
 const args = process.argv.slice(2);
 const httpMode = args.includes("--http");
 const portIdx = args.indexOf("--port");
@@ -86,6 +84,14 @@ const port = portIdx !== -1 && args[portIdx + 1] ? parseInt(args[portIdx + 1]!, 
 const bindAll = args.includes("--bind-all");
 const unsafeNoAuth = args.includes("--unsafe-no-auth");
 const httpToken = process.env.AIRMCP_HTTP_TOKEN ?? "";
+const appRuntimeOwnerSecret = process.env.AIRMCP_APP_RUNTIME_OWNER_SECRET ?? "";
+
+// Keep HTTP credentials in this process only. Child tools inherit process.env,
+// so remove both secrets before any tool subprocess can be launched.
+delete process.env.AIRMCP_HTTP_TOKEN;
+delete process.env.AIRMCP_APP_RUNTIME_OWNER_SECRET;
+
+const ctx = initializeServer();
 
 async function main() {
   if (httpMode) {
@@ -97,6 +103,7 @@ async function main() {
       port,
       bindAll,
       httpToken,
+      appRuntimeOwnerSecret,
       unsafeNoAuth,
     });
   } else {

@@ -21,7 +21,7 @@ func L(_ key: String, _ args: CVarArg...) -> String {
 
 enum AirMcpConstants {
     static let npmPackageName = "airmcp"
-    static let npmPackageVersion = "2.16.5"
+    static let npmPackageVersion = "2.16.6"
     static var npmPackageSpecifier: String {
         ProcessInfo.processInfo.environment["AIRMCP_NPM_PACKAGE_SPECIFIER"]
             ?? "\(npmPackageName)@\(npmPackageVersion)"
@@ -30,6 +30,7 @@ enum AirMcpConstants {
     static let appOwnedHttpPort = 3847
     static let appOwnedHttpURL = "http://127.0.0.1:\(appOwnedHttpPort)/mcp"
     static let appOwnedHealthURL = "http://127.0.0.1:\(appOwnedHttpPort)/health"
+    static let appOwnedIdentityChallengeURL = "http://127.0.0.1:\(appOwnedHttpPort)/app/identity-challenge"
     static let appOwnedRuntimeStateURL = "http://127.0.0.1:\(appOwnedHttpPort)/app/runtime-state"
     static let keyAutoStart = "autoStartServer"
     static let keyOnboardingCompleted = "onboardingCompleted"

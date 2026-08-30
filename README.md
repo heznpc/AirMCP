@@ -281,6 +281,12 @@ Local Runtime** creates the token and opts into automatic startup; each client
 is registered only after its own **Connect** action and a fresh
 scope/readiness check.
 
+The private ChatGPT plugin connector can resume that same previously enabled
+runtime if its child process stops while the menu-bar app remains open. It
+addresses only the verified `/Applications/AirMCP.app` with
+`airmcp://runtime/start`, requires the existing owner-only token metadata, and
+never reads, forwards, or creates the persistent token.
+
 Existing Codex registrations can be inspected or disabled without deleting
 their settings:
 
@@ -404,6 +410,7 @@ preview; visionOS and watchOS are roadmap targets, not released products.
 - [Shortcuts](docs/shortcuts.md): macOS App Intent actions and the iOS-only App Shortcuts surface.
 - [Environment variables](docs/environment.md): all runtime knobs.
 - [MCPB install](docs/mcpb.md): Claude Desktop extension package.
+- [ChatGPT plugin](docs/chatgpt-plugin.md): private developer-mode packaging and app-owned runtime testing.
 - [OAuth browser PKCE](docs/oauth-browser-pkce.md): browser client setup.
 - [RFC index](docs/rfc/README.md): design records and architecture notes.
 - [Testing](docs/testing.md): development test workflow.

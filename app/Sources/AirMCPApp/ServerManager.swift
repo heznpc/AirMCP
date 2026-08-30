@@ -99,6 +99,7 @@ final class ServerManager {
     private var onboardingRuntimeControlAuthorized = false
     private var onboardingRuntimeGeneration: UInt64 = 0
     private var onboardingScopeRevision: UInt64 = 0
+    private var connectorRuntimeStartRequested = false
 
     /// Only a live child launched by this app or an authenticated runtime whose
     /// exact PID and app-only owner fingerprint were verified may be stopped.
@@ -192,6 +193,10 @@ final class ServerManager {
     // MARK: - Server Control
 
     func startServer() {
+        startServer(tokenPolicy: .createIfNeeded)
+    }
+
+    private func startServer(tokenPolicy: RuntimeTokenLaunchPolicy) {
         guard !isShuttingDown,
               (!onboardingActivationInProgress || onboardingRuntimeControlAuthorized),
               status != .running,
@@ -230,7 +235,11 @@ final class ServerManager {
             if let logManager {
                 pipes = logManager.makePipes()
             }
-            let result = await Self.launchServer(stdoutPipe: pipes?.stdout, stderrPipe: pipes?.stderr)
+            let result = await Self.launchServer(
+                stdoutPipe: pipes?.stdout,
+                stderrPipe: pipes?.stderr,
+                tokenPolicy: tokenPolicy
+            )
             guard operationGate.accepts(operationGeneration),
                   startAttemptID == attemptID
             else {
@@ -367,7 +376,114 @@ final class ServerManager {
         startServer()
     }
 
+    /// Resume a previously authorized app runtime when a verified local
+    /// connector delivers the canonical deep link. This deliberately ignores
+    /// cached `status`: the listener can disappear just before Process invokes
+    /// its termination handler, leaving `.running` stale for a short window.
+    func requestConnectorRuntimeStart() {
+        guard autoStartEnabled else {
+            connectorRuntimeStartRequested = false
+            return
+        }
+        let existingToken: String
+        do {
+            guard let token = try AppRuntimeToken.loadExisting() else {
+                connectorRuntimeStartRequested = false
+                logManager?.append(
+                    "Ignored connector runtime start: no previously enabled app runtime token exists",
+                    isError: true
+                )
+                return
+            }
+            existingToken = token
+        } catch {
+            connectorRuntimeStartRequested = false
+            logManager?.append(
+                "Ignored connector runtime start: existing app runtime consent is unreadable",
+                isError: true
+            )
+            return
+        }
+
+        // Preserve the intent across the short interval where the listener is
+        // already gone but Process has not delivered its termination callback.
+        connectorRuntimeStartRequested = true
+        let managedProcessIsRunning = serverProcess?.isRunning == true
+        guard Self.shouldProbeConnectorRuntimeStart(
+            autoStartEnabled: autoStartEnabled,
+            hasExistingToken: true,
+            isShuttingDown: isShuttingDown,
+            managedProcessIsRunning: managedProcessIsRunning,
+            startInProgress: startAttemptID != nil,
+            stopInProgress: stopOperationGeneration != nil
+        ) else { return }
+
+        if let staleProcess = serverProcess, !staleProcess.isRunning {
+            staleProcess.terminationHandler = nil
+            logManager?.detachPipes(stdout: stdoutPipe, stderr: stderrPipe)
+            stdoutPipe = nil
+            stderrPipe = nil
+            serverProcess = nil
+        }
+
+        let requestGeneration = beginRuntimeOperation()
+        status = .checking
+        Task {
+            let probe = await Self.probeAppOwnedRuntime()
+            let verifiedIdentity = await Self.verifiedAdoptedRuntimeIdentity(for: probe)
+            guard operationGate.accepts(requestGeneration),
+                  startAttemptID == nil,
+                  stopOperationGeneration == nil
+            else { return }
+            guard autoStartEnabled,
+                  AppRuntimeToken.matchesExisting(existingToken)
+            else {
+                connectorRuntimeStartRequested = false
+                return
+            }
+
+            if case .unavailable = probe {
+                connectorRuntimeStartRequested = false
+                ownedRuntimeIdentity = nil
+                status = .stopped
+                startServer(tokenPolicy: .existing(existingToken))
+            } else {
+                connectorRuntimeStartRequested = false
+                applyRuntimeProbe(
+                    probe,
+                    preserveExistingErrorWhenUnavailable: false,
+                    verifiedAdoptedIdentity: verifiedIdentity
+                )
+            }
+        }
+    }
+
+    nonisolated static func shouldProbeConnectorRuntimeStart(
+        autoStartEnabled: Bool,
+        hasExistingToken: Bool,
+        isShuttingDown: Bool,
+        managedProcessIsRunning: Bool,
+        startInProgress: Bool,
+        stopInProgress: Bool
+    ) -> Bool {
+        autoStartEnabled
+            && hasExistingToken
+            && !isShuttingDown
+            && !managedProcessIsRunning
+            && !startInProgress
+            && !stopInProgress
+    }
+
+    nonisolated static func shouldResumeConnectorRuntimeAfterTermination(
+        requestPending: Bool,
+        autoStartEnabled: Bool,
+        isShuttingDown: Bool
+    ) -> Bool {
+        requestPending && autoStartEnabled && !isShuttingDown
+    }
+
     func stopServer() {
+        connectorRuntimeStartRequested = false
         guard (!onboardingActivationInProgress || onboardingRuntimeControlAuthorized),
               stopOperationGeneration == nil,
               canStopRuntime
@@ -788,6 +904,7 @@ final class ServerManager {
         let managedProcess = serverProcess
         _ = beginRuntimeOperation()
         isShuttingDown = true
+        connectorRuntimeStartRequested = false
         startAttemptID = nil
         stopOperationGeneration = nil
         stopPolling()
@@ -843,11 +960,22 @@ final class ServerManager {
                     if case .unavailable = probe {
                         self.status = .stopped
                     } else {
+                        self.connectorRuntimeStartRequested = false
                         self.applyRuntimeProbe(
                             probe,
                             preserveExistingErrorWhenUnavailable: false,
                             verifiedAdoptedIdentity: verifiedIdentity
                         )
+                        return
+                    }
+
+                    if Self.shouldResumeConnectorRuntimeAfterTermination(
+                        requestPending: self.connectorRuntimeStartRequested,
+                        autoStartEnabled: self.autoStartEnabled,
+                        isShuttingDown: self.isShuttingDown
+                    ) {
+                        self.connectorRuntimeStartRequested = false
+                        self.requestConnectorRuntimeStart()
                         return
                     }
 
@@ -867,6 +995,14 @@ final class ServerManager {
                     }
                 } else {
                     self.status = .stopped
+                    if Self.shouldResumeConnectorRuntimeAfterTermination(
+                        requestPending: self.connectorRuntimeStartRequested,
+                        autoStartEnabled: self.autoStartEnabled,
+                        isShuttingDown: self.isShuttingDown
+                    ) {
+                        self.connectorRuntimeStartRequested = false
+                        self.requestConnectorRuntimeStart()
+                    }
                 }
             }
         }
@@ -901,6 +1037,11 @@ final class ServerManager {
 
     // MARK: - Static Process Launchers (nonisolated)
 
+    private enum RuntimeTokenLaunchPolicy: Sendable {
+        case createIfNeeded
+        case existing(String)
+    }
+
     private enum LaunchResult: Sendable {
         case success(Process, expectedOwnerFingerprint: String)
         case failure(String)
@@ -908,7 +1049,8 @@ final class ServerManager {
 
     private static func launchServer(
         stdoutPipe: Pipe?,
-        stderrPipe: Pipe?
+        stderrPipe: Pipe?,
+        tokenPolicy: RuntimeTokenLaunchPolicy
     ) async -> LaunchResult {
         await withCheckedContinuation { continuation in
             DispatchQueue.global().async {
@@ -936,7 +1078,18 @@ final class ServerManager {
                 let token: String
                 let ownerSecret: String
                 do {
-                    token = try AppRuntimeToken.ensure()
+                    switch tokenPolicy {
+                    case .createIfNeeded:
+                        token = try AppRuntimeToken.ensure()
+                    case .existing(let existingToken):
+                        guard AppRuntimeToken.matchesExisting(existingToken) else {
+                            continuation.resume(returning: .failure(
+                                "Existing app runtime consent changed before connector start"
+                            ))
+                            return
+                        }
+                        token = existingToken
+                    }
                     ownerSecret = try AppRuntimeToken.rotateOwnerSecret()
                 } catch {
                     continuation.resume(returning: .failure(
@@ -950,7 +1103,7 @@ final class ServerManager {
                 process.arguments = arguments
                 process.standardOutput = stdoutPipe ?? FileHandle.nullDevice
                 process.standardError = stderrPipe ?? FileHandle.nullDevice
-                var env = NodeEnvironment.buildEnv()
+                var env = NodeEnvironment.buildAppRuntimeEnv()
                 env["AIRMCP_ALLOW_NETWORK"] = "with-token"
                 env["AIRMCP_HTTP_TOKEN"] = token
                 env["AIRMCP_APP_OWNED_RUNTIME"] = "1"
@@ -1019,7 +1172,7 @@ final class ServerManager {
         case .versionMismatch(let found, let expected):
             return .versionMismatch(found: found, expected: expected)
         case .matching(let version, let appOwned):
-            return authenticatedReady
+            return appOwned && authenticatedReady
                 ? .ready(version: version, appOwned: appOwned)
                 : .authenticationFailed(version: version)
         }
@@ -1067,11 +1220,13 @@ final class ServerManager {
         }
 
         switch health {
-        case .matching:
+        case .matching(_, appOwned: true):
             return completeRuntimeProbe(
                 health: health,
                 authenticatedReady: await AppRuntimeClient.probe()
             )
+        case .matching:
+            return completeRuntimeProbe(health: health, authenticatedReady: false)
         case .unavailable, .occupiedUnrecognized, .versionMismatch:
             return completeRuntimeProbe(health: health, authenticatedReady: false)
         }
@@ -1140,7 +1295,10 @@ final class ServerManager {
     private nonisolated static func terminateVerifiedAdoptedRuntimeSynchronously(
         _ expectedIdentity: AppOwnedRuntimeIdentity
     ) {
-        guard let state = synchronousRuntimeState(timeout: 0.75),
+        guard let state = synchronousRuntimeState(
+                  timeout: 0.75,
+                  expectedProcessIdentifier: expectedIdentity.processIdentifier
+              ),
               let expectedOwnerFingerprint = try? AppRuntimeToken.expectedOwnerFingerprint(),
               authenticatedOwnedRuntimeIdentity(
                   state: state,
@@ -1152,15 +1310,22 @@ final class ServerManager {
     }
 
     private nonisolated static func synchronousRuntimeState(
-        timeout: TimeInterval
+        timeout: TimeInterval,
+        expectedProcessIdentifier: Int32
     ) -> AppRuntimeState? {
-        guard let token = try? AppRuntimeToken.loadExisting(),
+        let startedAt = Date()
+        guard let listener = AppRuntimeClient.verifyListenerOwnershipSynchronously(
+                  timeout: min(0.4, timeout)
+              ),
+              listener.challenge.pid == Int(expectedProcessIdentifier),
               let url = URL(string: AirMcpConstants.appOwnedRuntimeStateURL)
         else { return nil }
+        let remaining = timeout - Date().timeIntervalSince(startedAt)
+        guard remaining > 0 else { return nil }
 
         var request = URLRequest(url: url)
-        request.timeoutInterval = timeout
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.timeoutInterval = remaining
+        request.setValue("Bearer \(listener.authorizationToken)", forHTTPHeaderField: "Authorization")
         let box = SynchronousRuntimeStateBox()
         let semaphore = DispatchSemaphore(value: 0)
         let task = URLSession.shared.dataTask(with: request) { data, response, _ in
@@ -1168,25 +1333,23 @@ final class ServerManager {
             guard let http = response as? HTTPURLResponse,
                   http.statusCode == 200,
                   let data,
-                  let state = try? JSONDecoder().decode(AppRuntimeState.self, from: data)
+                  let state = try? JSONDecoder().decode(AppRuntimeState.self, from: data),
+                  state.pid == listener.challenge.pid
             else { return }
             box.store(state)
         }
         task.resume()
-        guard semaphore.wait(timeout: .now() + timeout) == .success else {
+        guard semaphore.wait(timeout: .now() + remaining) == .success else {
             task.cancel()
             return nil
         }
         return box.load()
     }
 
-    /// Returns the exact version of the authenticated runtime at the app's
-    /// reserved endpoint. The accompanying probe result separately carries
-    /// whether the process declared app ownership; a manual same-token runtime
-    /// is usable but is never adopted for application-termination cleanup.
-    /// A bare health response is not sufficient because another AirMCP copy
-    /// can own the port; the runtime must match this app and complete an MCP
-    /// initialize/tools-list round trip with the current owner-only token.
+    /// Returns the exact version of the authenticated app-owned runtime at the
+    /// reserved endpoint. A bare health response is not sufficient: the
+    /// runtime must first prove the owner-only generation secret, then complete
+    /// an MCP initialize/tools-list round trip with generation-scoped authorization.
     nonisolated static func authenticatedRuntimeVersionAtAppEndpoint() async -> String? {
         guard case .ready(let version, _) = await probeAppOwnedRuntime() else { return nil }
         return version
@@ -1231,6 +1394,12 @@ final class ServerManager {
         preserveExistingErrorWhenUnavailable: Bool,
         verifiedAdoptedIdentity: AppOwnedRuntimeIdentity? = nil
     ) {
+        if case .unavailable = probe {
+            // Keep a deep-link request alive until the managed Process delivers
+            // its termination callback or a later retry can launch the child.
+        } else {
+            connectorRuntimeStartRequested = false
+        }
         switch probe {
         case .ready(_, appOwned: true):
             // A public ownership bit and even the shared HTTP token are not

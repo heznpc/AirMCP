@@ -14,8 +14,10 @@
  *   9. mcp.json                            (MCP Registry submission manifest)
  *   10. .claude-plugin/plugin.json         (Claude Code plugin manifest)
  *   11. .mcp.json                          (Claude Code project/plugin MCP config — pinned npm version)
- *   12. docs/index.html                    (structured data softwareVersion)
- *   13. app/widget/Info.plist              (widget short version)
+ *   12. plugins/airmcp/.../plugin.json      (ChatGPT/Codex plugin manifest)
+ *   13. plugins/airmcp/.../airmcp-app-stdio.mjs (minimum compatible app version)
+ *   14. docs/index.html                    (structured data softwareVersion)
+ *   15. app/widget/Info.plist              (widget short version)
  *
  * Usage:
  *   node scripts/sync-version.mjs           # sync all files
@@ -194,7 +196,34 @@ syncFile(".mcp.json", [
   },
 ]);
 
-// 12. docs/index.html — Schema.org SoftwareApplication softwareVersion.
+// 12. plugins/airmcp/.codex-plugin/plugin.json — ChatGPT/Codex plugin manifest.
+const chatgptPluginJsonPath = resolve(root, "plugins/airmcp/.codex-plugin/plugin.json");
+if (existsSync(chatgptPluginJsonPath)) {
+  const pj = JSON.parse(readFileSync(chatgptPluginJsonPath, "utf8"));
+  if (pj.version !== VERSION) {
+    if (checkMode) {
+      console.error("  STALE: plugins/airmcp/.codex-plugin/plugin.json");
+      dirty = true;
+    } else {
+      pj.version = VERSION;
+      writeFileSync(chatgptPluginJsonPath, JSON.stringify(pj, null, 2) + "\n");
+      console.log("  sync: plugins/airmcp/.codex-plugin/plugin.json");
+    }
+  } else {
+    console.log("  ok:   plugins/airmcp/.codex-plugin/plugin.json");
+  }
+}
+
+// 13. plugins/airmcp/scripts/airmcp-app-stdio.mjs — minimum compatible app version.
+syncFile("plugins/airmcp/scripts/airmcp-app-stdio.mjs", [
+  {
+    pattern: /const MIN_APP_VERSION = "[^"]+"/,
+    replacement: `const MIN_APP_VERSION = "${VERSION}"`,
+    label: "ChatGPT plugin minimum app version",
+  },
+]);
+
+// 14. docs/index.html — Schema.org SoftwareApplication softwareVersion.
 syncFile("docs/index.html", [
   {
     pattern: /"softwareVersion": "[^"]+"/,

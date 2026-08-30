@@ -1,7 +1,7 @@
 {
   "name": "airmcp",
   "description": "Governed MCP runtime for the Apple ecosystem, available on macOS for Notes, Mail, Calendar, Reminders, Shortcuts, and more.",
-  "version": "2.16.5",
+  "version": "2.16.6",
   "keywords": [
     "mcp",
     "mcp-server",
@@ -115,6 +115,10 @@
     "build:mcpb": "node scripts/build-mcpb.mjs",
     "verify:mcpb": "node scripts/verify-mcpb-artifact.mjs",
     "build:mcpb:check": "npm run build && npm run build:mcpb && npm run verify:mcpb",
+    "plugin:validate": "node scripts/validate-chatgpt-plugin.mjs",
+    "plugin:preflight": "node scripts/verify-chatgpt-plugin.mjs",
+    "plugin:recovery": "node scripts/verify-chatgpt-plugin-recovery.mjs",
+    "plugin:stage": "node scripts/stage-chatgpt-plugin.mjs",
     "gen:manifest": "node scripts/dump-tool-manifest.mjs",
     "gen:manifest:check": "node scripts/dump-tool-manifest.mjs --check",
     "gen:app-catalog": "node scripts/gen-app-catalog.mjs",

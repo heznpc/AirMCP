@@ -37,7 +37,11 @@ describe("app-owned runtime npm package pin", () => {
     expect(appIntents).toContain("return try await runAirMCPToolViaStdio(toolName, args: args)");
     expect(appIntents).toContain("AppRuntimeToken.ensure()");
     expect(appIntents).toContain("AirMcpConstants.appOwnedHttpURL");
-    expect(appIntents).toContain('request.setValue("Bearer \\(token)", forHTTPHeaderField: "Authorization")');
+    expect(appIntents).toContain(
+      'request.setValue("Bearer \\(listener.authorizationToken)", forHTTPHeaderField: "Authorization")',
+    );
+    expect(appIntents).toContain("AppRuntimeToken.runtimeGenerationBearer(");
+    expect(appIntents).not.toContain('request.setValue("Bearer \\(token)", forHTTPHeaderField: "Authorization")');
     expect(appIntents).toContain('request.setValue(sessionID, forHTTPHeaderField: "Mcp-Session-Id")');
     expect(appIntents).toContain('"application/json, text/event-stream"');
     expect(appIntents).toContain('trimmed.hasPrefix("data:")');
@@ -88,6 +92,6 @@ describe("app-owned runtime npm package pin", () => {
     expect(bundleScript).toContain("app-owned runtime version mismatch");
     expect(bundleScript).toContain("unauthenticated /mcp request should return 401");
     expect(bundleScript).toContain("probe-app-runtime.mjs");
-    expect(bundleScript).toContain("token-authenticated MCP initialize/tools-list failed");
+    expect(bundleScript).toContain("generation-authenticated MCP initialize/tools-list failed");
   });
 });

@@ -28,10 +28,10 @@ export function expectNoWireError(resp, label) {
   }
 }
 
-export function startMcp({ entry, cwd, env, timeoutMs = 30_000, nodeBin = "node" }) {
+export function startMcp({ entry, args, cwd, env, timeoutMs = 30_000, nodeBin = "node" }) {
   if (!entry) throw new TypeError("startMcp requires an entry path");
 
-  const proc = spawn(nodeBin, [entry], { cwd, env, stdio: ["pipe", "pipe", "pipe"] });
+  const proc = spawn(nodeBin, args ?? [entry], { cwd, env, stdio: ["pipe", "pipe", "pipe"] });
   const rl = createInterface({ input: proc.stdout });
   const pending = new Map();
   let stderr = "";

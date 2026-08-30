@@ -4,6 +4,27 @@ import XCTest
 @testable import AirMCPApp
 
 final class SingleInstanceAndRuntimeProbeTests: XCTestCase {
+    func testRuntimeStartURLPolicyAcceptsOnlyTheCanonicalRoute() throws {
+        XCTAssertTrue(
+            RuntimeStartURLPolicy.accepts(
+                try XCTUnwrap(URL(string: RuntimeStartURLPolicy.canonicalURL))
+            )
+        )
+        for rejected in [
+            "airmcp://runtime",
+            "airmcp://runtime/start/",
+            "airmcp://runtime/start?source=connector",
+            "airmcp://runtime/start#fragment",
+            "airmcp://trust/start",
+            "https://runtime/start",
+        ] {
+            XCTAssertFalse(
+                RuntimeStartURLPolicy.accepts(try XCTUnwrap(URL(string: rejected))),
+                rejected
+            )
+        }
+    }
+
     func testRuntimeOperationGenerationRejectsStaleWork() {
         var gate = RuntimeOperationGate()
         let startGeneration = gate.advance()
@@ -50,6 +71,90 @@ final class SingleInstanceAndRuntimeProbeTests: XCTestCase {
                 currentGeneration: 4,
                 autoStartEnabled: true,
                 stopInProgress: true
+            )
+        )
+    }
+
+    func testConnectorRecoveryProbesWithoutTrustingCachedRunningStatus() {
+        XCTAssertTrue(
+            ServerManager.shouldProbeConnectorRuntimeStart(
+                autoStartEnabled: true,
+                hasExistingToken: true,
+                isShuttingDown: false,
+                managedProcessIsRunning: false,
+                startInProgress: false,
+                stopInProgress: false
+            )
+        )
+        XCTAssertFalse(
+            ServerManager.shouldProbeConnectorRuntimeStart(
+                autoStartEnabled: false,
+                hasExistingToken: true,
+                isShuttingDown: false,
+                managedProcessIsRunning: false,
+                startInProgress: false,
+                stopInProgress: false
+            )
+        )
+        XCTAssertFalse(
+            ServerManager.shouldProbeConnectorRuntimeStart(
+                autoStartEnabled: true,
+                hasExistingToken: true,
+                isShuttingDown: false,
+                managedProcessIsRunning: true,
+                startInProgress: false,
+                stopInProgress: false
+            )
+        )
+        XCTAssertFalse(
+            ServerManager.shouldProbeConnectorRuntimeStart(
+                autoStartEnabled: true,
+                hasExistingToken: true,
+                isShuttingDown: false,
+                managedProcessIsRunning: false,
+                startInProgress: true,
+                stopInProgress: false
+            )
+        )
+        XCTAssertFalse(
+            ServerManager.shouldProbeConnectorRuntimeStart(
+                autoStartEnabled: true,
+                hasExistingToken: false,
+                isShuttingDown: false,
+                managedProcessIsRunning: false,
+                startInProgress: false,
+                stopInProgress: false
+            )
+        )
+    }
+
+    func testPendingConnectorRequestResumesOnlyAfterAuthorizedTermination() {
+        XCTAssertTrue(
+            ServerManager.shouldResumeConnectorRuntimeAfterTermination(
+                requestPending: true,
+                autoStartEnabled: true,
+                isShuttingDown: false
+            )
+        )
+        XCTAssertFalse(
+            ServerManager.shouldResumeConnectorRuntimeAfterTermination(
+                requestPending: false,
+                autoStartEnabled: true,
+                isShuttingDown: false
+            )
+        )
+        XCTAssertFalse(
+            ServerManager.shouldResumeConnectorRuntimeAfterTermination(
+                requestPending: true,
+                autoStartEnabled: false,
+                isShuttingDown: false
+            )
+        )
+        XCTAssertFalse(
+            ServerManager.shouldResumeConnectorRuntimeAfterTermination(
+                requestPending: true,
+                autoStartEnabled: true,
+                isShuttingDown: true
             )
         )
     }
@@ -228,7 +333,7 @@ final class SingleInstanceAndRuntimeProbeTests: XCTestCase {
         )
     }
 
-    func testAuthenticatedManualRuntimeRemainsReadyWithoutAppOwnership() throws {
+    func testManualRuntimeNeverAdvancesToBearerReadiness() throws {
         let data = try JSONSerialization.data(withJSONObject: [
             "status": "ok",
             "version": "2.16.0",
@@ -242,11 +347,11 @@ final class SingleInstanceAndRuntimeProbeTests: XCTestCase {
 
         XCTAssertEqual(
             ServerManager.completeRuntimeProbe(health: health, authenticatedReady: true),
-            .ready(version: "2.16.0", appOwned: false)
+            .authenticationFailed(version: "2.16.0")
         )
     }
 
-    func testHealthWithoutOwnershipContractDefaultsToManualRuntime() throws {
+    func testHealthWithoutOwnershipContractCannotAuthorizeBearerProbe() throws {
         let data = try JSONSerialization.data(withJSONObject: [
             "status": "ok",
             "version": "2.16.0",
@@ -261,7 +366,7 @@ final class SingleInstanceAndRuntimeProbeTests: XCTestCase {
                 ),
                 authenticatedReady: true
             ),
-            .ready(version: "2.16.0", appOwned: false)
+            .authenticationFailed(version: "2.16.0")
         )
     }
 
@@ -429,6 +534,7 @@ final class SingleInstanceAndRuntimeProbeTests: XCTestCase {
             appOwned: true,
             pid: 4242,
             ownerFingerprint: fingerprint,
+            tokenFingerprint: String(repeating: "a", count: 64),
             disabledModules: [],
             scopeFingerprint: String(repeating: "c", count: 64),
             enabledModules: ["calendar"],
@@ -466,6 +572,7 @@ final class SingleInstanceAndRuntimeProbeTests: XCTestCase {
                     appOwned: false,
                     pid: 4242,
                     ownerFingerprint: fingerprint,
+                    tokenFingerprint: String(repeating: "a", count: 64),
                     disabledModules: [],
                     scopeFingerprint: String(repeating: "c", count: 64),
                     enabledModules: ["calendar"],
@@ -485,6 +592,7 @@ final class SingleInstanceAndRuntimeProbeTests: XCTestCase {
                     appOwned: true,
                     pid: 1,
                     ownerFingerprint: fingerprint,
+                    tokenFingerprint: String(repeating: "a", count: 64),
                     disabledModules: [],
                     scopeFingerprint: String(repeating: "c", count: 64),
                     enabledModules: ["calendar"],

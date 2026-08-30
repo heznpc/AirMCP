@@ -197,7 +197,7 @@ export function recentFilesScript(folder: string, days: number, limit: number): 
     const app = Application.currentApplication();
     app.includeStandardAdditions = true;
     const dateStr = new Date(Date.now() - ${d} * 86400000).toISOString().split('T')[0];
-    const results = app.doShellScript('mdfind -onlyin "${escJxaShell(folder)}" "kMDItemContentModificationDate >= $time.iso(' + dateStr + ')" | head -${n}');
+    const results = app.doShellScript('mdfind -onlyin "${escJxaShell(folder)}" "kMDItemContentModificationDate >= \\\\$time.iso(' + dateStr + ')" | head -${n}');
     const paths = results.split(/[\\r\\n]+/).filter(p => p.length > 0);
     const result = paths.map(p => ({path: p, name: p.split('/').pop()}));
     JSON.stringify({total: paths.length, files: result});

@@ -1,4 +1,5 @@
 import { describe, test, expect, jest } from '@jest/globals';
+import { z } from 'zod';
 
 const mockRunJxa = jest.fn();
 
@@ -7,6 +8,7 @@ jest.unstable_mockModule('../dist/shared/jxa.js', () => ({
 }));
 
 const { registerFinderTools } = await import('../dist/finder/tools.js');
+const { HOME } = await import('../dist/shared/constants.js');
 
 function createMockServer() {
   const tools = new Map();
@@ -85,5 +87,19 @@ describe('Finder tools registration', () => {
     const { config } = server.tools.get('create_directory');
     expect(config.annotations.destructiveHint).toBe(false);
     expect(config.annotations.sensitiveHint).toBe(true);
+  });
+
+  test.each([
+    ['search_files', { query: 'report' }],
+    ['recent_files', {}],
+  ])('%s resolves an omitted folder default through zFilePath', async (toolName, input) => {
+    const { config, handler } = server.tools.get(toolName);
+    const parsed = z.object(config.inputSchema).parse(input);
+
+    expect(parsed.folder).toBe(HOME);
+
+    mockRunJxa.mockResolvedValueOnce({ total: 0, files: [] });
+    await handler(parsed);
+    expect(mockRunJxa).toHaveBeenLastCalledWith(expect.stringContaining(`mdfind -onlyin "${HOME}"`));
   });
 });

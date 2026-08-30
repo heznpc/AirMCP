@@ -148,7 +148,7 @@ final class HitlManager {
 
     private let socketPathConfiguration = HitlManager.configuredSocketPath()
 
-    var timeoutSeconds: Int = 30
+    var timeoutSeconds: Int = 120
     /// Injectable for tests; production uses the real notification center.
     var notificationAuthorizer: HitlNotificationAuthorizing = SystemHitlNotificationAuthorizer()
 

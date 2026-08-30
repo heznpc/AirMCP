@@ -23,7 +23,7 @@ The default config file location is `~/.config/airmcp/config.json`. You can over
   "hitl": {
     "level": "sensitive-only",
     "whitelist": ["list_notes", "search_notes"],
-    "timeout": 30
+    "timeout": 120
   },
   "performance": {
     "embeddingProvider": "swift",

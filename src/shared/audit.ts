@@ -297,6 +297,38 @@ function isSensitiveTool(name: string): boolean {
   return SENSITIVE_TOOL_PATTERNS.some((re) => re.test(name));
 }
 
+/**
+ * Per-argument redaction for UI tools whose remaining arguments are useful
+ * audit context. These values can contain typed credentials or serialized UI
+ * state, but their names are intentionally generic and therefore do not match
+ * sanitizeArgs' secret-key patterns.
+ */
+const SENSITIVE_UI_ARGS: ReadonlyMap<string, ReadonlySet<string>> = new Map([
+  ["ui_type", new Set(["text"])],
+  ["ui_perform_action", new Set(["actionValue"])],
+  ["ui_diff", new Set(["beforeSnapshot"])],
+]);
+
+function redactSensitiveUiArgs(tool: string, args: Record<string, unknown>): Record<string, unknown> {
+  const sensitiveArgs = SENSITIVE_UI_ARGS.get(tool);
+  if (!sensitiveArgs) return args;
+
+  let changed = false;
+  const redacted: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(args)) {
+    if (sensitiveArgs.has(key) && value !== undefined && value !== null) {
+      redacted[key] = {
+        _redacted: "ui_input",
+        ...(typeof value === "string" ? { length: value.length } : {}),
+      };
+      changed = true;
+    } else {
+      redacted[key] = value;
+    }
+  }
+  return changed ? redacted : args;
+}
+
 let initialized = false;
 let buffer: string[] = [];
 let bufferBytes = 0;
@@ -342,7 +374,7 @@ export function auditLog(entry: AuditEntry): void {
   if (isSensitiveTool(entry.tool)) {
     sanitized = entry.args ? { _redacted: "sensitive_tool" } : undefined;
   } else if (entry.args) {
-    sanitized = sanitizeArgs(entry.args);
+    sanitized = sanitizeArgs(redactSensitiveUiArgs(entry.tool, entry.args));
   }
   // Auto-attach the active correlation ID when the caller didn't pass
   // one. Falls through to undefined for synthetic / pre-context callers

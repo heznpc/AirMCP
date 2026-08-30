@@ -102,7 +102,7 @@ final class ServerManager {
     private var connectorRuntimeStartRequested = false
 
     /// Only a live child launched by this app or an authenticated runtime whose
-    /// exact PID and app-only owner fingerprint were verified may be stopped.
+    /// exact PID and current-user owner fingerprint were verified may be stopped.
     /// A same-token manual runtime remains usable, but its lifecycle belongs to
     /// the terminal or service that launched it.
     var canStopRuntime: Bool {
@@ -192,11 +192,21 @@ final class ServerManager {
 
     // MARK: - Server Control
 
+    /// A direct user start requests both the current launch and future app-owned
+    /// recovery. The persistent consent is committed only after authenticated
+    /// app-owned readiness succeeds.
+    func startServerFromExplicitUserAction() {
+        startServer(tokenPolicy: .createIfNeeded, commitAutoStartOnReady: true)
+    }
+
     func startServer() {
         startServer(tokenPolicy: .createIfNeeded)
     }
 
-    private func startServer(tokenPolicy: RuntimeTokenLaunchPolicy) {
+    private func startServer(
+        tokenPolicy: RuntimeTokenLaunchPolicy,
+        commitAutoStartOnReady: Bool = false
+    ) {
         guard !isShuttingDown,
               (!onboardingActivationInProgress || onboardingRuntimeControlAuthorized),
               status != .running,
@@ -223,6 +233,13 @@ final class ServerManager {
             if case .unavailable = existingProbe {
                 // No listener owns the app runtime port; continue with launch.
             } else {
+                if Self.shouldCommitExplicitAutoStart(
+                    requested: commitAutoStartOnReady,
+                    probe: existingProbe,
+                    hasVerifiedIdentity: existingIdentity != nil
+                ) {
+                    autoStartEnabled = true
+                }
                 applyRuntimeProbe(
                     existingProbe,
                     preserveExistingErrorWhenUnavailable: false,
@@ -282,6 +299,13 @@ final class ServerManager {
                         )
                         return
                     }
+                    if Self.shouldCommitExplicitAutoStart(
+                        requested: commitAutoStartOnReady,
+                        probe: readiness,
+                        hasVerifiedIdentity: runtimeIdentity != nil
+                    ) {
+                        autoStartEnabled = true
+                    }
                     applyRuntimeProbe(
                         readiness,
                         preserveExistingErrorWhenUnavailable: false,
@@ -316,6 +340,19 @@ final class ServerManager {
                 status = .error(error)
             }
         }
+    }
+
+    /// Persist connector recovery consent only for a verified app-owned
+    /// listener. A manual listener, public ownership bit, failed probe, or an
+    /// internal lifecycle launch can never opt the user into auto-start.
+    nonisolated static func shouldCommitExplicitAutoStart(
+        requested: Bool,
+        probe: RuntimeProbeResult,
+        hasVerifiedIdentity: Bool
+    ) -> Bool {
+        guard requested, hasVerifiedIdentity else { return false }
+        guard case .ready(_, appOwned: true) = probe else { return false }
+        return true
     }
 
     /// A spawned runtime is ours even when it never becomes reachable. Detach
@@ -1060,7 +1097,7 @@ final class ServerManager {
                     executable = runtime.node
                     arguments = [runtime.entry, "--http", "--port", "\(AirMcpConstants.appOwnedHttpPort)"]
                 } else {
-                    guard let npxPath = NodeEnvironment.findExecutable(named: "npx") else {
+                    guard let npxPath = NodeEnvironment.findTrustedAppRuntimeExecutable(named: "npx") else {
                         continuation.resume(returning: .failure(
                             "Bundled runtime is unavailable and Node.js was not found"
                         ))
@@ -1075,12 +1112,11 @@ final class ServerManager {
                         "\(AirMcpConstants.appOwnedHttpPort)",
                     ]
                 }
-                let token: String
                 let ownerSecret: String
                 do {
                     switch tokenPolicy {
                     case .createIfNeeded:
-                        token = try AppRuntimeToken.ensure()
+                        _ = try AppRuntimeToken.ensure()
                     case .existing(let existingToken):
                         guard AppRuntimeToken.matchesExisting(existingToken) else {
                             continuation.resume(returning: .failure(
@@ -1088,7 +1124,6 @@ final class ServerManager {
                             ))
                             return
                         }
-                        token = existingToken
                     }
                     ownerSecret = try AppRuntimeToken.rotateOwnerSecret()
                 } catch {
@@ -1103,11 +1138,19 @@ final class ServerManager {
                 process.arguments = arguments
                 process.standardOutput = stdoutPipe ?? FileHandle.nullDevice
                 process.standardError = stderrPipe ?? FileHandle.nullDevice
-                var env = NodeEnvironment.buildAppRuntimeEnv()
+                var env = NodeEnvironment.buildAppRuntimeEnv(executablePath: executable)
+                #if AIRMCP_ACCEPTANCE_HARNESS
+                for (key, value) in NodeEnvironment.appRuntimeAcceptanceOverrides() {
+                    env[key] = value
+                }
+                #endif
                 env["AIRMCP_ALLOW_NETWORK"] = "with-token"
-                env["AIRMCP_HTTP_TOKEN"] = token
                 env["AIRMCP_APP_OWNED_RUNTIME"] = "1"
-                env["AIRMCP_APP_RUNTIME_OWNER_SECRET"] = ownerSecret
+                // Pass owner-only credential locations, not credential values.
+                // The Node child opens and validates the files itself, keeping
+                // secrets out of its exec-time environment (`ps eww`).
+                env["AIRMCP_APP_RUNTIME_TOKEN_PATH"] = AppRuntimeToken.tokenURL.path
+                env["AIRMCP_APP_RUNTIME_OWNER_PATH"] = AppRuntimeToken.ownerSecretURL.path
                 if let bridge = AirMcpConstants.bundledBridgePath {
                     env["AIRMCP_BRIDGE_PATH"] = bridge
                 }
@@ -1233,7 +1276,7 @@ final class ServerManager {
     }
 
     /// Convert authenticated runtime-state into lifecycle authority only when
-    /// its version and app-only owner fingerprint match this installation.
+    /// its version and current-user owner fingerprint match this installation.
     /// The public `appOwned` health bit alone is never sufficient.
     nonisolated static func authenticatedOwnedRuntimeIdentity(
         state: AppRuntimeState,
@@ -1348,7 +1391,7 @@ final class ServerManager {
 
     /// Returns the exact version of the authenticated app-owned runtime at the
     /// reserved endpoint. A bare health response is not sufficient: the
-    /// runtime must first prove the owner-only generation secret, then complete
+    /// runtime must first prove the current-user generation secret, then complete
     /// an MCP initialize/tools-list round trip with generation-scoped authorization.
     nonisolated static func authenticatedRuntimeVersionAtAppEndpoint() async -> String? {
         guard case .ready(let version, _) = await probeAppOwnedRuntime() else { return nil }

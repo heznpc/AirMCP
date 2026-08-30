@@ -9,6 +9,9 @@ import { fileURLToPath } from "node:url";
 
 const PACKAGE_VERSION = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
 const IDENTITY_PROOF_DOMAIN = "airmcp-app-listener-v1";
+const REQUEST_NONCE_HEADER = "x-airmcp-runtime-nonce";
+const RESPONSE_PROOF_HEADER = "x-airmcp-runtime-proof";
+const RESPONSE_PROOF_SCHEME = "hmac-sha256-v1";
 
 function usage() {
   return [
@@ -125,6 +128,59 @@ export function runtimeGenerationBearer(ownerSecret, pid, version) {
   return `airmcp_app_${proof}`;
 }
 
+export function runtimeResponseProof(ownerSecret, nonce, pid, version, method, pathname) {
+  if (
+    !/^[A-Za-z0-9_-]{43}$/.test(ownerSecret) ||
+    !/^[A-Za-z0-9_-]{32,64}$/.test(nonce ?? "") ||
+    !Number.isSafeInteger(pid) ||
+    pid < 2 ||
+    !version ||
+    !/^[A-Z]+$/.test(method) ||
+    pathname !== "/mcp"
+  ) {
+    throw new Error("app runtime response proof inputs are invalid");
+  }
+  return createHmac("sha256", ownerSecret)
+    .update(`airmcp-app-response-v1\n${nonce}\n${pid}\n${version}\n${method}\n${pathname}`, "utf8")
+    .digest("hex");
+}
+
+function authenticatedRuntimeFetch(mcpUrl, ownerSecret, challenge, fetchImpl) {
+  const expected = new URL(mcpUrl);
+  expected.search = "";
+  expected.hash = "";
+  return async (input, init) => {
+    const request = new Request(input, init);
+    const target = new URL(request.url);
+    target.hash = "";
+    if (target.href !== expected.href) throw new Error("runtime probe refused a non-canonical MCP target");
+    const nonce = randomBytes(32).toString("base64url");
+    const headers = new Headers(request.headers);
+    headers.set(REQUEST_NONCE_HEADER, nonce);
+    const response = await fetchImpl(new Request(request, { headers }));
+    const actual = response.headers.get(RESPONSE_PROOF_HEADER) ?? "";
+    const expectedProof = runtimeResponseProof(
+      ownerSecret,
+      nonce,
+      challenge.pid,
+      challenge.version,
+      request.method.toUpperCase(),
+      target.pathname,
+    );
+    const actualBytes = Buffer.from(actual, "hex");
+    const expectedBytes = Buffer.from(expectedProof, "hex");
+    if (
+      !/^[0-9a-f]{64}$/.test(actual) ||
+      actualBytes.length !== expectedBytes.length ||
+      !timingSafeEqual(actualBytes, expectedBytes)
+    ) {
+      await response.body?.cancel();
+      throw new Error("app runtime MCP response proof is missing or invalid");
+    }
+    return response;
+  };
+}
+
 function appIdentityChallengeUrl(mcpUrl, nonce) {
   const url = new URL(mcpUrl);
   if (url.protocol !== "http:" || url.hostname !== "127.0.0.1") {
@@ -157,7 +213,8 @@ export async function verifyRuntimeIdentityChallenge(options, dependencies = {})
     !Number.isSafeInteger(challenge?.pid) ||
     challenge.pid < 2 ||
     challenge?.version !== options.expectedVersion ||
-    !/^[0-9a-f]{64}$/.test(challenge?.proof ?? "")
+    !/^[0-9a-f]{64}$/.test(challenge?.proof ?? "") ||
+    challenge?.responseProof !== RESPONSE_PROOF_SCHEME
   ) {
     throw new Error("app runtime identity challenge did not match the expected app-owned runtime");
   }
@@ -170,6 +227,7 @@ export async function verifyRuntimeIdentityChallenge(options, dependencies = {})
   return {
     challenge,
     authorizationToken: runtimeGenerationBearer(ownerSecret, challenge.pid, challenge.version),
+    authenticatedFetch: authenticatedRuntimeFetch(options.url, ownerSecret, challenge, fetchImpl),
   };
 }
 
@@ -185,6 +243,7 @@ export async function probeAppRuntime(options) {
         Authorization: `Bearer ${receipt.authorizationToken}`,
       },
     },
+    fetch: receipt.authenticatedFetch,
   });
 
   try {

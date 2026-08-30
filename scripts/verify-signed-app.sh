@@ -19,13 +19,11 @@ APP_MCP_URL="${AIRMCP_APP_MCP_URL:-http://127.0.0.1:3847/mcp}"
 RUNTIME_NODE="$APP_BUNDLE/Contents/Resources/airmcp/runtime/bin/node"
 RUNTIME_ENTRY="$APP_BUNDLE/Contents/Resources/airmcp/server/dist/index.js"
 RUNTIME_COMMAND="$RUNTIME_NODE $RUNTIME_ENTRY --http --port 3847"
-EXPECTED_VERSION="$(
-  node -e 'const fs = require("fs"); console.log(JSON.parse(fs.readFileSync(process.argv[1], "utf8")).version)' \
-    "$PROJECT_DIR/package.json"
-)"
+EXPECTED_VERSION=""
 STATE_PARENT="${TMPDIR:-/tmp}"
 STATE_PARENT="${STATE_PARENT%/}"
 STATE_DIR=""
+ISOLATED_HOME=""
 APP_PID=""
 RUNTIME_PID=""
 
@@ -77,11 +75,31 @@ if [ ! -d "$APP_BUNDLE" ]; then
   echo "verify-signed-app: app bundle not found" >&2
   exit 1
 fi
+if /usr/libexec/PlistBuddy -c "Print :AirMCPAcceptanceHarnessBuild" \
+  "$APP_BUNDLE/Contents/Info.plist" >/dev/null 2>&1; then
+  echo "verify-signed-app: refusing an acceptance-harness build" >&2
+  exit 1
+fi
+EXPECTED_VERSION="$(
+  node -e 'const fs = require("fs"); console.log(JSON.parse(fs.readFileSync(process.argv[1], "utf8")).version)' \
+    "$PROJECT_DIR/package.json"
+)"
 
 STATE_DIR="$(mktemp -d "$STATE_PARENT/airmcp-signed-verify.XXXXXX")"
 chmod 700 "$STATE_DIR"
-mkdir -p "$STATE_DIR/home" "$STATE_DIR/audit" "$STATE_DIR/tmp"
-chmod 700 "$STATE_DIR/home" "$STATE_DIR/audit" "$STATE_DIR/tmp"
+ISOLATED_HOME="$STATE_DIR/home"
+mkdir -p \
+  "$ISOLATED_HOME/.config/airmcp" \
+  "$ISOLATED_HOME/Library/Application Support/AirMCP" \
+  "$ISOLATED_HOME/Library/Preferences"
+chmod 700 \
+  "$ISOLATED_HOME" \
+  "$ISOLATED_HOME/.config" \
+  "$ISOLATED_HOME/.config/airmcp" \
+  "$ISOLATED_HOME/Library" \
+  "$ISOLATED_HOME/Library/Application Support" \
+  "$ISOLATED_HOME/Library/Application Support/AirMCP" \
+  "$ISOLATED_HOME/Library/Preferences"
 
 # A final signed distribution must include the widget even when this command is
 # run locally rather than under release-app.yml.
@@ -147,7 +165,7 @@ while read -r pid command; do
   esac
 done < <(ps -axo pid=,command=)
 
-CONFIG_FILE="$STATE_DIR/config.json"
+CONFIG_FILE="$ISOLATED_HOME/.config/airmcp/config.json"
 umask 077
 cat > "$CONFIG_FILE" <<'CONFIG_EOF'
 {
@@ -155,51 +173,25 @@ cat > "$CONFIG_FILE" <<'CONFIG_EOF'
   "toolExposure": "full",
   "disabledModules": [],
   "requireToolSession": false,
-  "hitl": { "level": "off", "whitelist": [], "timeout": 5 }
+  "hitl": { "level": "off", "whitelist": [], "timeout": 5 },
+  "features": { "auditLog": false, "usageTracking": false }
 }
 CONFIG_EOF
 
-# Clear developer-shell AirMCP overrides, then provide a complete disposable
-# runtime state. This makes a pre-existing same-version listener fail rather
-# than becoming evidence for the artifact under test.
+# Exercise the production launch contract: ordinary config paths, ordinary
+# UserDefaults auto-start consent, and no acceptance-only AirMCP environment.
+# This makes a pre-existing same-version listener fail rather than becoming
+# evidence for the artifact under test.
+/usr/bin/defaults write "$ISOLATED_HOME/Library/Preferences/app.airmcp" \
+  autoStartServer -bool true
+/usr/bin/defaults write "$ISOLATED_HOME/Library/Preferences/app.airmcp" \
+  onboardingPresented -bool true
 for env_name in $(env | awk -F= '/^AIRMCP_/ { print $1 }'); do unset "$env_name"; done
-export HOME="$STATE_DIR/home"
-export CFFIXED_USER_HOME="$STATE_DIR/home"
-export AIRMCP_CONFIG_PATH="$CONFIG_FILE"
-export AIRMCP_PROFILE="full"
-export AIRMCP_TOOL_EXPOSURE="full"
-export AIRMCP_REQUIRE_TOOL_SESSION="false"
-export AIRMCP_HITL_LEVEL="off"
-export AIRMCP_HITL_SOCKET_PATH="$STATE_DIR/hitl.sock"
-export AIRMCP_APP_RUNTIME_TOKEN_PATH="$STATE_DIR/http-token"
-export AIRMCP_APP_RUNTIME_OWNER_PATH="$STATE_DIR/runtime-owner-secret"
-export AIRMCP_MEMORY_STORE_PATH="$STATE_DIR/memory.json"
-export AIRMCP_VECTOR_STORE_DIR="$STATE_DIR/audit"
-export AIRMCP_USAGE_PROFILE_PATH="$STATE_DIR/usage.json"
-export AIRMCP_EMERGENCY_STOP_PATH="$STATE_DIR/emergency-stop"
-export AIRMCP_TEMP_DIR="$STATE_DIR/tmp"
-export AIRMCP_AUDIT_LOG="false"
-export AIRMCP_FORCE_APP_RUNTIME="1"
 
 echo "verify-signed-app: launching isolated artifact generation..."
 if ! open -n \
-  --env "HOME=$HOME" \
-  --env "CFFIXED_USER_HOME=$CFFIXED_USER_HOME" \
-  --env "AIRMCP_CONFIG_PATH=$AIRMCP_CONFIG_PATH" \
-  --env "AIRMCP_PROFILE=$AIRMCP_PROFILE" \
-  --env "AIRMCP_TOOL_EXPOSURE=$AIRMCP_TOOL_EXPOSURE" \
-  --env "AIRMCP_REQUIRE_TOOL_SESSION=$AIRMCP_REQUIRE_TOOL_SESSION" \
-  --env "AIRMCP_HITL_LEVEL=$AIRMCP_HITL_LEVEL" \
-  --env "AIRMCP_HITL_SOCKET_PATH=$AIRMCP_HITL_SOCKET_PATH" \
-  --env "AIRMCP_APP_RUNTIME_TOKEN_PATH=$AIRMCP_APP_RUNTIME_TOKEN_PATH" \
-  --env "AIRMCP_APP_RUNTIME_OWNER_PATH=$AIRMCP_APP_RUNTIME_OWNER_PATH" \
-  --env "AIRMCP_MEMORY_STORE_PATH=$AIRMCP_MEMORY_STORE_PATH" \
-  --env "AIRMCP_VECTOR_STORE_DIR=$AIRMCP_VECTOR_STORE_DIR" \
-  --env "AIRMCP_USAGE_PROFILE_PATH=$AIRMCP_USAGE_PROFILE_PATH" \
-  --env "AIRMCP_EMERGENCY_STOP_PATH=$AIRMCP_EMERGENCY_STOP_PATH" \
-  --env "AIRMCP_TEMP_DIR=$AIRMCP_TEMP_DIR" \
-  --env "AIRMCP_AUDIT_LOG=$AIRMCP_AUDIT_LOG" \
-  --env "AIRMCP_FORCE_APP_RUNTIME=$AIRMCP_FORCE_APP_RUNTIME" \
+  --env "HOME=$ISOLATED_HOME" \
+  --env "CFFIXED_USER_HOME=$ISOLATED_HOME" \
   "$APP_BUNDLE" >/dev/null 2>&1; then
   echo "verify-signed-app: isolated artifact launch request failed" >&2
   exit 1
@@ -221,8 +213,8 @@ if [ -z "$APP_PID" ] || ! pid_matches_prefix "$APP_PID" "$APP_BINARY"; then
   exit 1
 fi
 
-TOKEN_FILE="$AIRMCP_APP_RUNTIME_TOKEN_PATH"
-OWNER_FILE="$AIRMCP_APP_RUNTIME_OWNER_PATH"
+TOKEN_FILE="$ISOLATED_HOME/Library/Application Support/AirMCP/http-token"
+OWNER_FILE="$ISOLATED_HOME/Library/Application Support/AirMCP/runtime-owner-secret"
 HEALTH_FILE="$STATE_DIR/health.json"
 RUNTIME_STATE_FILE="$STATE_DIR/runtime-state.json"
 
@@ -243,7 +235,8 @@ for _ in $(seq 1 100); do
       if (!challengeResponse.ok) process.exit(2);
       const challenge = await challengeResponse.json();
       if (challenge.status !== "ok" || challenge.appOwned !== true || challenge.version !== expectedVersion ||
-          !Number.isSafeInteger(challenge.pid) || challenge.pid < 2 || !/^[0-9a-f]{64}$/.test(challenge.proof)) {
+          !Number.isSafeInteger(challenge.pid) || challenge.pid < 2 || !/^[0-9a-f]{64}$/.test(challenge.proof) ||
+          challenge.responseProof !== "hmac-sha256-v1") {
         process.exit(3);
       }
       const expectedProof = Buffer.from(createHmac("sha256", owner)

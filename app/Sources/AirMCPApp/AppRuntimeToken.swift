@@ -19,8 +19,8 @@ enum AppRuntimeToken {
         return base.appendingPathComponent(directoryName, isDirectory: true).appendingPathComponent(fileName)
     }
 
-    /// A second, app-only credential distinguishes a runtime launched by the
-    /// native app from a manual process that happens to reuse its HTTP token.
+    /// A second, current-user credential distinguishes a runtime launched by
+    /// the native app from a manual process that happens to reuse its HTTP token.
     /// The runtime never returns this secret; it returns only the domain-
     /// separated SHA-256 fingerprint from its authenticated state endpoint.
     static var ownerSecretURL: URL {
@@ -178,6 +178,39 @@ enum AppRuntimeToken {
         let key = SymmetricKey(data: Data(ownerSecret.utf8))
         let proof = HMAC<SHA256>.authenticationCode(for: payload, using: key)
         return "airmcp_app_" + proof.map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// Validate the runtime-possession proof carried by each generation-authorized MCP
+    /// request. The request nonce makes a proof unusable on a later TCP
+    /// exchange, binding the response to the child that answered the listener
+    /// challenge even though Streamable HTTP opens separate connections.
+    static func runtimeResponseProofIsValid(
+        _ proof: String?,
+        nonce: String,
+        processIdentifier: Int,
+        version: String,
+        method: String,
+        path: String,
+        ownerSecret: String
+    ) -> Bool {
+        guard ownerSecret.range(of: #"^[A-Za-z0-9_-]{43}$"#, options: .regularExpression) != nil,
+              nonce.range(of: #"^[A-Za-z0-9_-]{32,64}$"#, options: .regularExpression) != nil,
+              processIdentifier > 1,
+              !version.isEmpty,
+              method.range(of: #"^[A-Z]+$"#, options: .regularExpression) != nil,
+              path == "/mcp",
+              let proof,
+              let proofData = dataFromLowercaseHex(proof)
+        else { return false }
+        let payload = Data(
+            "airmcp-app-response-v1\n\(nonce)\n\(processIdentifier)\n\(version)\n\(method)\n\(path)".utf8
+        )
+        let key = SymmetricKey(data: Data(ownerSecret.utf8))
+        return HMAC<SHA256>.isValidAuthenticationCode(
+            proofData,
+            authenticating: payload,
+            using: key
+        )
     }
 
     private static func dataFromLowercaseHex(_ value: String) -> Data? {

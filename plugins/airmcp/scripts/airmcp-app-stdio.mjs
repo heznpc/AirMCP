@@ -12,6 +12,9 @@ const DEFAULT_BUNDLE_ID = "app.airmcp";
 const DEFAULT_TEAM_ID = "XS7HJJN7GC";
 const DEFAULT_APP_REQUIREMENT =
   'anchor apple generic and identifier "app.airmcp" and certificate leaf[subject.OU] = "XS7HJJN7GC"';
+const DEFAULT_NODE_REQUIREMENT =
+  'anchor apple generic and identifier "node" and certificate leaf[subject.OU] = "XS7HJJN7GC"';
+const RESPONSE_PROOF_SCHEME = "hmac-sha256-v1";
 const DEFAULT_MCP_URL = "http://127.0.0.1:3847/mcp";
 const RUNTIME_START_URL = "airmcp://runtime/start";
 const MIN_APP_VERSION = "2.16.6";
@@ -108,6 +111,14 @@ function inspect(command, args, label, options = {}) {
   fail(`${label} failed: ${(result.stderr || result.stdout || `exit ${result.status}`).trim()}`);
 }
 
+function verifyLiveProcessSignature(pid, requirement, label) {
+  inspect(
+    "/usr/bin/codesign",
+    ["--verify", "--strict", "--requirement", requirement, `+${pid}`],
+    `${label} live signature verification`,
+  );
+}
+
 function parseLsofProcesses(output) {
   const records = [];
   let current;
@@ -196,7 +207,7 @@ export function verifyAppOwnedListener(paths, uid = process.getuid?.()) {
     nodePath: realpathSync(paths.nodePath),
     serverEntry: realpathSync(paths.serverEntry),
   };
-  return validateListenerIdentity(
+  const identity = validateListenerIdentity(
     {
       ...runtime,
       parentUid: parent.uid,
@@ -205,6 +216,9 @@ export function verifyAppOwnedListener(paths, uid = process.getuid?.()) {
     canonicalPaths,
     uid,
   );
+  verifyLiveProcessSignature(identity.pid, DEFAULT_NODE_REQUIREMENT, "AirMCP bundled Node process");
+  verifyLiveProcessSignature(identity.parentPid, DEFAULT_APP_REQUIREMENT, "AirMCP parent process");
+  return identity;
 }
 
 export function readPrivateOwnerSecret(ownerSecretPath, uid = process.getuid?.()) {
@@ -254,7 +268,8 @@ export async function verifyRuntimeIdentityChallenge(paths, expectedPid, timeout
     challenge?.appOwned !== true ||
     challenge?.pid !== expectedPid ||
     typeof challenge?.version !== "string" ||
-    !/^[0-9a-f]{64}$/.test(challenge?.proof ?? "")
+    !/^[0-9a-f]{64}$/.test(challenge?.proof ?? "") ||
+    challenge?.responseProof !== RESPONSE_PROOF_SCHEME
   ) {
     fail("AirMCP.app identity challenge did not match the verified listener");
   }
@@ -277,9 +292,16 @@ export function validateLoopbackMcpUrl(value) {
   } catch (error) {
     fail(`invalid MCP URL: ${error instanceof Error ? error.message : String(error)}`);
   }
-  const loopback = url.hostname === "127.0.0.1" || url.hostname === "localhost" || url.hostname === "[::1]";
-  if (url.protocol !== "http:" || !loopback || url.pathname !== "/mcp") {
-    fail("the app connector only accepts a loopback http://.../mcp URL");
+  if (
+    url.protocol !== "http:" ||
+    url.hostname !== "127.0.0.1" ||
+    url.pathname !== "/mcp" ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash
+  ) {
+    fail("the app connector only accepts the exact http://127.0.0.1/.../mcp URL");
   }
   return url;
 }
@@ -407,7 +429,7 @@ export async function preflight(options = {}) {
   return { paths, health, listener, challenge: receipt.challenge };
 }
 
-export function makeProxyEnvironment(env, token) {
+export function makeProxyEnvironment(env) {
   const account = userInfo();
   const proxyEnvironment = {
     HOME: account.homedir,
@@ -415,7 +437,6 @@ export function makeProxyEnvironment(env, token) {
     LOGNAME: account.username,
     PATH: SAFE_CHILD_PATH,
     AIRMCP_CONNECT_NO_LAUNCH: "1",
-    AIRMCP_HTTP_TOKEN: token,
   };
   for (const key of SAFE_LOCALE_KEYS) {
     const value = env[key];
@@ -430,10 +451,16 @@ export async function runConnector(env = process.env) {
   const { paths, health } = await preflight();
   const listener = verifyAppOwnedListener(paths);
   const receipt = await verifyRuntimeIdentityChallenge(paths, listener.pid);
-  console.error(`[AirMCP plugin] connected to signed app-owned runtime v${health.version}`);
+  if (receipt.challenge.version !== health.version) {
+    fail("AirMCP.app health and identity challenge versions changed during connector startup");
+  }
+  console.error(`[AirMCP plugin] connected to signed app-owned runtime v${receipt.challenge.version}`);
 
   const child = spawn(paths.nodePath, [paths.serverEntry, "connect", "--url", paths.mcpUrl], {
-    env: makeProxyEnvironment(env, receipt.authorizationToken),
+    // The generic connector performs its own fresh challenge and per-response
+    // runtime-possession proof. Do not put even the generation bearer in child
+    // argv/env.
+    env: makeProxyEnvironment(env),
     stdio: "inherit",
   });
 

@@ -128,13 +128,36 @@ final class AppRuntimeTokenConsentTests: XCTestCase {
             ),
             "airmcp_app_897599a80e1c449a8beeba036882deeeb1c801e7498a30f0b0d4cb7a4f101197"
         )
+        XCTAssertTrue(
+            AppRuntimeToken.runtimeResponseProofIsValid(
+                "721f568c5c0e8e25925b047509c4a14c6e9e85b412466219e1d86e853d302fef",
+                nonce: nonce,
+                processIdentifier: 123,
+                version: "2.16.5",
+                method: "POST",
+                path: "/mcp",
+                ownerSecret: secret
+            )
+        )
+        XCTAssertFalse(
+            AppRuntimeToken.runtimeResponseProofIsValid(
+                "721f568c5c0e8e25925b047509c4a14c6e9e85b412466219e1d86e853d302fef",
+                nonce: nonce,
+                processIdentifier: 123,
+                version: "2.16.5",
+                method: "DELETE",
+                path: "/mcp",
+                ownerSecret: secret
+            )
+        )
 
         let challenge = AppRuntimeIdentityChallenge(
             status: "ok",
             version: "2.16.5",
             appOwned: true,
             pid: 123,
-            proof: proof
+            proof: proof,
+            responseProof: "hmac-sha256-v1"
         )
         XCTAssertTrue(
             AppRuntimeClient.identityChallengeIsValid(
@@ -151,7 +174,8 @@ final class AppRuntimeTokenConsentTests: XCTestCase {
                     version: challenge.version,
                     appOwned: challenge.appOwned,
                     pid: 124,
-                    proof: challenge.proof
+                    proof: challenge.proof,
+                    responseProof: challenge.responseProof
                 ),
                 nonce: nonce,
                 ownerSecret: secret,

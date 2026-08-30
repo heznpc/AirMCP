@@ -16,14 +16,16 @@ personal ChatGPT Chat
   -> enabled Apple-app tools and macOS permissions
 ```
 
-The signed app-owned runtime is the stable local permission subject. The connector verifies a fresh owner-secret HMAC challenge bound to the listener PID and AirMCP version, then derives a bearer valid only for that app-owned runtime generation. It never reads or forwards the persistent app runtime token. When the app is alive but its child has stopped, the connector can deliver the exact `airmcp://runtime/start` route to the verified bundle; the app accepts it only for a previously authorized runtime and rotates the generation credential on restart. The plugin source never stores the app runtime token, owner secret, tunnel runtime API key, or a ChatGPT connection ID.
+The signed app-owned runtime is the stable local permission subject. The connector verifies the installed bundle and live app/Node process signatures, completes a fresh owner-secret HMAC challenge bound to the listener PID and AirMCP version, then requires fresh nonce-bound runtime-possession proof on every generation-authorized MCP exchange. That proof authenticates the responding runtime under the current-user secret; it does not hash the streamed response body. The connector never reads or forwards the persistent app runtime token, and it does not put the derived generation bearer in the connector child's environment. When the app is alive but its child has stopped, the connector can deliver the exact `airmcp://runtime/start` route to the verified bundle; the app accepts it only for a previously authorized runtime and rotates the generation credential on restart. The plugin source never stores the app runtime token, owner secret, tunnel runtime API key, or a ChatGPT connection ID.
+
+The local credential boundary is the current macOS Unix account, not a hostile process already running as that same user. File mode `0600` blocks other users; it does not isolate same-UID processes, which can read user-owned files. The signature, PID, challenge, generation bearer, and per-response runtime-possession checks fail closed for stale, accidental, cross-user, or wrong-process listeners, but they are not a sandbox or malware boundary for a compromised login account.
 
 The repository plugin at `plugins/airmcp` intentionally contains `.mcp.json` but not `.app.json`. Its `.codex-plugin/plugin.json` intentionally omits `apps`. `scripts/stage-chatgpt-plugin.mjs` adds the real registered connection mapping only to a generated copy under ignored `build/` output.
 
 ## Prerequisites
 
 - macOS with the signed `AirMCP.app` installed at `/Applications/AirMCP.app`.
-- AirMCP.app local runtime explicitly enabled at least once, so its owner-only persistent token already exists. The connector accepts only the fixed app-owned loopback `/mcp` runtime and validates the installed app against its Apple trust anchor, bundle identity, and team requirement, then binds the live listener PID, current-user UID, bundled runtime executable and command, and signed app parent. It next verifies a fresh HMAC identity challenge using the owner-only app secret and derives a generation-scoped bearer. The persistent token never crosses the connector boundary. An occupied or unverified port fails closed.
+- AirMCP.app local runtime explicitly enabled with **Start Local Runtime** (or an opted-in client connection), so automatic app-owned recovery is enabled and its owner-only persistent token already exists. The connector accepts only the exact app-owned `http://127.0.0.1:3847/mcp` runtime and validates the installed app against its Apple trust anchor, bundle identity, and team requirement, then binds the live listener PID, current-user UID, bundled runtime executable and command, and live signed app parent. It next verifies a fresh HMAC identity challenge and requires nonce-bound runtime-possession proof on each MCP exchange. The persistent token never crosses the connector boundary. An occupied, changed, or unverified port fails closed.
 - Node.js for the plugin connector and repository scripts.
 - A personal ChatGPT account where **Settings → Security and login → Developer mode** is available.
 - A personal OpenAI Platform organization with a tunnel `tunnel_id`, a tunnel runtime API key, and Tunnels Read + Use access. Creating or editing the tunnel also needs Tunnels Read + Manage.
@@ -53,7 +55,7 @@ npx @modelcontextprotocol/inspector@latest \
   /bin/sh "$PWD/plugins/airmcp/scripts/launch-airmcp-connector.sh"
 ```
 
-The connector may ask the exact verified `/Applications/AirMCP.app` to resume a previously enabled runtime on demand. It checks for owner-only existing consent metadata without reading the token, delivers the canonical deep link without foregrounding the app, and still treats readiness plus listener identity as the authority. A successful connection proves that the Apple-anchored signed app, owner-only identity secret, verified app-child listener, HMAC identity challenge, generation-scoped authorization, app-owned health response, and stdio-to-loopback proxy are usable. It does **not** prove that every macOS TCC permission is granted.
+The connector may ask the exact verified `/Applications/AirMCP.app` to resume a previously enabled runtime on demand. It checks for owner-only existing consent metadata without reading the token, delivers the canonical deep link without foregrounding the app, and still treats readiness plus listener identity as the authority. Within the current-user threat boundary described above, a successful connection proves that the Apple-anchored live app/Node processes, identity challenge, generation-scoped authorization, per-request runtime-possession proof, app-owned health response, and stdio-to-loopback proxy are usable. It does **not** prove that every macOS TCC permission is granted.
 
 After the ordinary preflight passes, run the destructive-but-self-restoring availability gate once against the installed test build:
 
@@ -131,7 +133,7 @@ Before installation, verify all of the following:
 - The staged `.codex-plugin/plugin.json` has `"apps": "./.app.json"`.
 - The staged manifest version is the source version plus one UTC `+codex.local-YYYYMMDD-HHMMSS` cachebuster. The source manifest version remains unchanged.
 - The source `plugins/airmcp/.codex-plugin/plugin.json` still has no `apps` field and the source plugin still has no `.app.json`.
-- The staged package contains no tunnel key, local runtime token, or personal path.
+- The entire staged tree contains no tunnel key, local runtime token, or personal path; its ownership marker binds the output directory by filesystem identity rather than recording the absolute path.
 - The staged marketplace name is `airmcp-local` and points to `./plugins/airmcp`.
 
 Staging output is local build state. Do not commit it.

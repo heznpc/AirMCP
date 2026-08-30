@@ -40,6 +40,51 @@ final class SingleInstanceAndRuntimeProbeTests: XCTestCase {
         XCTAssertLessThanOrEqual(ServerManager.appOwnedReadinessTimeoutSeconds, 15)
     }
 
+    func testExplicitAutoStartConsentCommitsOnlyForVerifiedAppOwnedReadiness() {
+        let appOwned = ServerManager.RuntimeProbeResult.ready(
+            version: "2.16.0",
+            appOwned: true
+        )
+        XCTAssertTrue(
+            ServerManager.shouldCommitExplicitAutoStart(
+                requested: true,
+                probe: appOwned,
+                hasVerifiedIdentity: true
+            )
+        )
+        XCTAssertFalse(
+            ServerManager.shouldCommitExplicitAutoStart(
+                requested: true,
+                probe: appOwned,
+                hasVerifiedIdentity: false
+            )
+        )
+        XCTAssertFalse(
+            ServerManager.shouldCommitExplicitAutoStart(
+                requested: false,
+                probe: appOwned,
+                hasVerifiedIdentity: true
+            )
+        )
+
+        for rejected in [
+            ServerManager.RuntimeProbeResult.ready(version: "2.16.0", appOwned: false),
+            .unavailable,
+            .portOccupied,
+            .versionMismatch(found: "2.15.0", expected: "2.16.0"),
+            .authenticationFailed(version: "2.16.0"),
+        ] {
+            XCTAssertFalse(
+                ServerManager.shouldCommitExplicitAutoStart(
+                    requested: true,
+                    probe: rejected,
+                    hasVerifiedIdentity: true
+                ),
+                "Unexpected auto-start consent for \(rejected)"
+            )
+        }
+    }
+
     func testScheduledRestartRequiresCurrentGenerationAndAutoStart() {
         XCTAssertTrue(
             ServerManager.shouldPerformScheduledRestart(

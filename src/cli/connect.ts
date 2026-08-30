@@ -2,9 +2,14 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { JSONRPCMessage, RequestId } from "@modelcontextprotocol/sdk/types.js";
 import { spawn } from "node:child_process";
-import { IDENTITY } from "../shared/constants.js";
+import { APP_RUNTIME_OWNER_SECRET_PATH, verifyRuntimeIdentityChallenge } from "../shared/app-runtime-identity.js";
 
-const DEFAULT_URL = `http://127.0.0.1:${IDENTITY.HTTP_PORT}/mcp`;
+// The native app owns one fixed local endpoint. General HTTP server launches
+// may still honor AIRMCP_HTTP_PORT, but that operator override must never
+// redefine which URL receives the app-identity handshake instead of the
+// configured persistent bearer.
+export const APP_OWNED_HTTP_PORT = 3847;
+const DEFAULT_URL = `http://127.0.0.1:${APP_OWNED_HTTP_PORT}/mcp`;
 const INITIALIZE_METHOD = "initialize";
 
 interface ConnectOptions {
@@ -18,7 +23,10 @@ function usage(): string {
     "",
     "Connect a stdio-only MCP client to the AirMCP.app-owned local HTTP runtime.",
     "For the default loopback URL, this command launches AirMCP.app on demand",
-    "and waits for its runtime instead of launching a second server.",
+    "and waits for its runtime instead of launching a second server. It verifies",
+    "the signed app child, derives a generation bearer, and verifies fresh",
+    "runtime-possession proof on every MCP response. The persistent token is",
+    "never forwarded to the canonical listener.",
   ].join("\n");
 }
 
@@ -90,11 +98,33 @@ function makeProxyUnavailableResponse(message: JSONRPCMessage, error: unknown): 
   };
 }
 
+export function isCanonicalAppOwnedEndpoint(url: string): boolean {
+  const parsed = new URL(url);
+  return (
+    parsed.protocol === "http:" &&
+    parsed.hostname === "127.0.0.1" &&
+    Number(parsed.port || "80") === APP_OWNED_HTTP_PORT &&
+    parsed.pathname === "/mcp" &&
+    parsed.username === "" &&
+    parsed.password === "" &&
+    parsed.search === "" &&
+    parsed.hash === ""
+  );
+}
+
+function isReservedAppOwnedHttpPort(url: string): boolean {
+  const parsed = new URL(url);
+  // Reserve the entire cleartext app port, not just familiar loopback spellings.
+  // WHATWG URLs admit aliases such as localhost., 127/8, IPv4-mapped IPv6,
+  // numeric IPv4, and hostnames resolved through /etc/hosts. Treating any of
+  // those as a custom endpoint would forward the persistent configured bearer
+  // before the canonical app-child verification runs.
+  return parsed.protocol === "http:" && Number(parsed.port || "80") === APP_OWNED_HTTP_PORT;
+}
+
 export function shouldAutoLaunchApp(url: string): boolean {
   if (process.env.AIRMCP_CONNECT_NO_LAUNCH === "1" || process.platform !== "darwin") return false;
-  const parsed = new URL(url);
-  const loopback = parsed.hostname === "127.0.0.1" || parsed.hostname === "localhost" || parsed.hostname === "[::1]";
-  return loopback && Number(parsed.port || "80") === IDENTITY.HTTP_PORT && parsed.pathname === "/mcp";
+  return isCanonicalAppOwnedEndpoint(url);
 }
 
 async function healthReady(mcpUrl: string): Promise<boolean> {
@@ -127,16 +157,67 @@ async function launchLocalAppAndWait(mcpUrl: string): Promise<void> {
   throw new Error(`AirMCP.app launched but its local runtime did not become ready at ${mcpUrl}`);
 }
 
+interface ConnectAuthorizationDependencies {
+  verifyIdentity?: typeof verifyRuntimeIdentityChallenge;
+  ownerSecretPath?: string;
+}
+
+interface ConnectAuthorization {
+  authorizationToken?: string;
+  authenticatedFetch?: typeof fetch;
+}
+
+export async function resolveConnectAuthorization(
+  url: string,
+  configuredToken: string | undefined,
+  dependencies: ConnectAuthorizationDependencies = {},
+): Promise<ConnectAuthorization> {
+  if (!isCanonicalAppOwnedEndpoint(url)) {
+    if (isReservedAppOwnedHttpPort(url)) {
+      throw new Error("the reserved AirMCP.app HTTP port accepts only the canonical 127.0.0.1 /mcp endpoint");
+    }
+    return { authorizationToken: configuredToken };
+  }
+  const verifyIdentity = dependencies.verifyIdentity ?? verifyRuntimeIdentityChallenge;
+  const receipt = await verifyIdentity({
+    url,
+    ownerSecretPath: dependencies.ownerSecretPath ?? APP_RUNTIME_OWNER_SECRET_PATH,
+    timeoutMs: 1_000,
+  });
+  return {
+    authorizationToken: receipt.authorizationToken,
+    authenticatedFetch: receipt.authenticatedFetch,
+  };
+}
+
+export async function resolveConnectAuthorizationToken(
+  url: string,
+  configuredToken: string | undefined,
+  dependencies: ConnectAuthorizationDependencies = {},
+): Promise<string | undefined> {
+  return (await resolveConnectAuthorization(url, configuredToken, dependencies)).authorizationToken;
+}
+
 export async function runConnect(args = process.argv.slice(3)): Promise<void> {
   const options = parseArgs(args);
+  let authorization: ConnectAuthorization;
   try {
     await launchLocalAppAndWait(options.url);
+    authorization = await resolveConnectAuthorization(options.url, options.token);
   } catch (error) {
     console.error(`[AirMCP connect] ${error instanceof Error ? error.message : String(error)}`);
+    process.exitCode = 1;
+    return;
   }
+  const authorizationToken = authorization.authorizationToken;
   const stdio = new StdioServerTransport();
-  const requestInit: RequestInit = options.token ? { headers: { Authorization: `Bearer ${options.token}` } } : {};
-  const http = new StreamableHTTPClientTransport(new URL(options.url), { requestInit });
+  const requestInit: RequestInit = authorizationToken
+    ? { headers: { Authorization: `Bearer ${authorizationToken}` } }
+    : {};
+  const http = new StreamableHTTPClientTransport(new URL(options.url), {
+    requestInit,
+    ...(authorization.authenticatedFetch ? { fetch: authorization.authenticatedFetch } : {}),
+  });
   const initializeRequestIds = new Set<RequestId>();
   const keepAlive = setInterval(() => {}, 60_000);
   let closing = false;

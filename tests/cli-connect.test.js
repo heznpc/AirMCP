@@ -1,13 +1,19 @@
-import { afterEach, describe, expect, test } from "@jest/globals";
-import { spawn } from "node:child_process";
-import { createServer } from "node:net";
+import { afterEach, describe, expect, jest, test } from "@jest/globals";
+import { execFileSync, spawn } from "node:child_process";
+import { createServer as createTcpServer } from "node:net";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import { cleanBootEnv } from "../scripts/lib/clean-boot-env.mjs";
 import { probeAppRuntimeMcp } from "../dist/cli/app-runtime-probe.js";
-import { shouldAutoLaunchApp } from "../dist/cli/connect.js";
+import {
+  isCanonicalAppOwnedEndpoint,
+  resolveConnectAuthorization,
+  resolveConnectAuthorizationToken,
+  shouldAutoLaunchApp,
+} from "../dist/cli/connect.js";
 
 const DIST = fileURLToPath(new URL("../dist/index.js", import.meta.url));
+const CONNECT_MODULE_URL = new URL("../dist/cli/connect.js", import.meta.url).href;
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const children = [];
 
@@ -16,7 +22,7 @@ function sleep(ms) {
 }
 
 async function getFreePort() {
-  const server = createServer();
+  const server = createTcpServer();
   await new Promise((resolve, reject) => {
     server.once("error", reject);
     server.listen(0, "127.0.0.1", resolve);
@@ -154,12 +160,124 @@ afterEach(async () => {
 
 describe("airmcp connect", () => {
   test("auto-launch is scoped to the app-owned default loopback endpoint", () => {
+    expect(isCanonicalAppOwnedEndpoint("http://127.0.0.1:3847/mcp")).toBe(true);
+    expect(isCanonicalAppOwnedEndpoint("http://localhost:3847/mcp")).toBe(false);
+    expect(isCanonicalAppOwnedEndpoint("http://[::1]:3847/mcp")).toBe(false);
+    expect(isCanonicalAppOwnedEndpoint("http://127.0.0.1:3847/mcp?session=1#local")).toBe(false);
+    expect(isCanonicalAppOwnedEndpoint("https://127.0.0.1:3847/mcp")).toBe(false);
     if (process.platform === "darwin") {
       expect(shouldAutoLaunchApp("http://127.0.0.1:3847/mcp")).toBe(true);
-      expect(shouldAutoLaunchApp("http://localhost:3847/mcp")).toBe(true);
+      expect(shouldAutoLaunchApp("http://localhost:3847/mcp")).toBe(false);
     }
     expect(shouldAutoLaunchApp("http://127.0.0.1:9999/mcp")).toBe(false);
     expect(shouldAutoLaunchApp("https://example.com/mcp")).toBe(false);
+  });
+
+  test("canonical app connections replace the persistent token with a generation bearer", async () => {
+    const authenticatedFetch = jest.fn();
+    const verifyIdentity = jest.fn(async () => ({
+      challenge: { status: "ok", appOwned: true, pid: 123, version: "2.16.6", proof: "a".repeat(64) },
+      authorizationToken: `airmcp_app_${"b".repeat(64)}`,
+      authenticatedFetch,
+    }));
+
+    await expect(
+      resolveConnectAuthorizationToken("http://127.0.0.1:3847/mcp", "persistent-token", {
+        verifyIdentity,
+        ownerSecretPath: "/tmp/runtime-owner-secret",
+      }),
+    ).resolves.toBe(`airmcp_app_${"b".repeat(64)}`);
+    expect(verifyIdentity).toHaveBeenCalledWith({
+      url: "http://127.0.0.1:3847/mcp",
+      ownerSecretPath: "/tmp/runtime-owner-secret",
+      timeoutMs: 1_000,
+    });
+
+    await expect(
+      resolveConnectAuthorization("http://127.0.0.1:3847/mcp", "persistent-token", {
+        verifyIdentity,
+        ownerSecretPath: "/tmp/runtime-owner-secret",
+      }),
+    ).resolves.toEqual({
+      authorizationToken: `airmcp_app_${"b".repeat(64)}`,
+      authenticatedFetch,
+    });
+  });
+
+  test("canonical challenge failure never falls back to the persistent token", async () => {
+    const verifyIdentity = jest.fn(async () => {
+      throw new Error("identity proof is invalid");
+    });
+
+    await expect(
+      resolveConnectAuthorizationToken("http://127.0.0.1:3847/mcp", "persistent-token", { verifyIdentity }),
+    ).rejects.toThrow(/identity proof is invalid/);
+  });
+
+  test("custom endpoints preserve their configured bearer without an app challenge", async () => {
+    const verifyIdentity = jest.fn();
+    await expect(
+      resolveConnectAuthorizationToken("http://127.0.0.1:43847/mcp", "custom-token", { verifyIdentity }),
+    ).resolves.toBe("custom-token");
+    expect(verifyIdentity).not.toHaveBeenCalled();
+  });
+
+  test("reserved-port near misses fail closed instead of downgrading to the persistent token", async () => {
+    for (const url of [
+      "http://127.0.0.1:3847/not-mcp",
+      "http://127.0.0.1:3847/mcp?session=1",
+      "http://127.0.0.1:3847/mcp#fragment",
+      "http://localhost:3847/mcp",
+      "http://localhost.:3847/mcp",
+      "http://[::1]:3847/mcp",
+      "http://[::ffff:127.0.0.1]:3847/mcp",
+      "http://127.0.0.2:3847/mcp",
+      "http://0.0.0.0:3847/mcp",
+      "http://example.test:3847/mcp",
+    ]) {
+      await expect(resolveConnectAuthorizationToken(url, "persistent-token")).rejects.toThrow(
+        /reserved AirMCP\.app HTTP port/,
+      );
+    }
+  });
+
+  test("AIRMCP_HTTP_PORT cannot downgrade the fixed app endpoint to persistent bearer auth", () => {
+    const script = `
+      const connector = await import(${JSON.stringify(CONNECT_MODULE_URL)});
+      const url = "http://127.0.0.1:3847/mcp";
+      const authorization = await connector.resolveConnectAuthorizationToken(
+        url,
+        "persistent-token",
+        {
+          verifyIdentity: async () => ({
+            challenge: {
+              status: "ok",
+              appOwned: true,
+              pid: 123,
+              version: "2.16.6",
+              proof: "a".repeat(64),
+              responseProof: "hmac-sha256-v1",
+            },
+            authorizationToken: "airmcp_app_" + "b".repeat(64),
+            authenticatedFetch: fetch,
+          }),
+        },
+      );
+      console.log(JSON.stringify({
+        canonical: connector.isCanonicalAppOwnedEndpoint(url),
+        authorization,
+      }));
+    `;
+    const output = execFileSync(process.execPath, ["--input-type=module", "--eval", script], {
+      cwd: ROOT,
+      encoding: "utf8",
+      env: { ...cleanBootEnv(), AIRMCP_HTTP_PORT: "9999" },
+    });
+
+    expect(JSON.parse(output)).toEqual({
+      canonical: true,
+      authorization: `airmcp_app_${"b".repeat(64)}`,
+    });
   });
 
   test("app runtime probe performs initialize and tools/list over token-gated HTTP", async () => {
@@ -265,11 +383,18 @@ describe("airmcp connect", () => {
     });
     const reader = createJsonReader(proxy.stdout);
 
-    const initialized = await request(proxy, reader, 1, "initialize", {
-      protocolVersion: "2025-03-26",
-      capabilities: {},
-      clientInfo: { name: "airmcp-connect-test", version: "0.0.0" },
-    }, 30_000);
+    const initialized = await request(
+      proxy,
+      reader,
+      1,
+      "initialize",
+      {
+        protocolVersion: "2025-03-26",
+        capabilities: {},
+        clientInfo: { name: "airmcp-connect-test", version: "0.0.0" },
+      },
+      30_000,
+    );
     expect(initialized.error).toBeUndefined();
     expect(initialized.result.serverInfo.name).toBe("airmcp");
 

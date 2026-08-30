@@ -106,6 +106,7 @@ const FIXTURES = [
   { module: '../dist/ui/scripts.js', fn: 'uiReadScript', args: [] },
   { module: '../dist/screen/scripts.js', fn: 'captureScreenScript', args: [] },
   { module: '../dist/screen/scripts.js', fn: 'captureWindowScript', args: [] },
+  { module: '../dist/screen/scripts.js', fn: 'captureWindowScript', args: ["it's\n\u2028"] },
   { module: '../dist/screen/scripts.js', fn: 'listWindowsScript', args: [] },
   { module: '../dist/screen/scripts.js', fn: 'captureAreaScript', args: [0, 0, 100, 100] },
 ];

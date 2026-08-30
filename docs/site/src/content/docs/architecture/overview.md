@@ -97,7 +97,7 @@ This is under development in the `ios/` directory.
 AirMCP supports two MCP transports:
 
 - **Streamable HTTP** (`--http` flag) -- Express-based HTTP server with session management. This is the recommended AirMCP.app-owned local runtime on `127.0.0.1:3847`.
-- **Stdio** (default) -- communicates via stdin/stdout. Direct stdio is useful for development; stdio-only clients should use `npx -y airmcp connect --url http://127.0.0.1:3847/mcp` with `AIRMCP_HTTP_TOKEN` set to proxy into the app-owned runtime.
+- **Stdio** (default) -- communicates via stdin/stdout. Direct stdio is useful for development; stdio-only clients should use `npx -y airmcp connect --url http://127.0.0.1:3847/mcp` to proxy into the app-owned runtime. Current client setup still stores the owner-only persistent `AIRMCP_HTTP_TOKEN` for backward-compatible configuration detection and repair, but the canonical proxy verifies the signed bundle and live app/Node processes, replaces that credential with a process-generation bearer, and requires a fresh nonce-bound MAC on every MCP response. The local credential boundary is the current Unix account, not a hostile same-UID process.
 
 ### Module System
 

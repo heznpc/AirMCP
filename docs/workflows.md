@@ -97,6 +97,14 @@ For Claude Code:
 claude mcp add --env AIRMCP_HTTP_TOKEN=<token> airmcp -- npx -y airmcp connect --url http://127.0.0.1:3847/mcp
 ```
 
+Current client setup still stores the owner-only persistent token for
+backward-compatible configuration detection and repair. On the canonical app
+endpoint, `connect` verifies the signed bundle and live app/Node processes,
+replaces that credential with a process-generation bearer, and authenticates
+each MCP response with a fresh nonce-bound MAC; it never forwards the persistent
+token to the listener. The `0600` credential files isolate other Unix users,
+not a hostile process already running under the same macOS account.
+
 For the platform split, see [shortcuts.md](shortcuts.md). macOS exposes App Intent actions but no App Shortcuts provider. The exact eight-action phrase provider is iOS-only; `AskAirMCPIntent` is a separate opt-in Foundation Models action for supported macOS/iOS builds that define `AIRMCP_ENABLE_FOUNDATION_MODELS`, and is not advertised by that provider.
 
 ## What Exists Today

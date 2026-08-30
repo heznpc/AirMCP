@@ -307,7 +307,16 @@ Stdio clients can proxy into the app-owned HTTP runtime:
 npx -y airmcp connect --url http://127.0.0.1:3847/mcp
 ```
 
-Set `AIRMCP_HTTP_TOKEN` to the token value when using that proxy.
+Current client setup still records the owner-only persistent
+`AIRMCP_HTTP_TOKEN` for backward-compatible configuration detection and repair.
+For the canonical `127.0.0.1:3847/mcp` endpoint, `connect` does not forward that
+credential: it verifies the signed bundle and live app/Node processes, completes
+a fresh owner-secret challenge, derives a bearer scoped to that process
+generation, and rejects every MCP response without a fresh nonce-bound MAC.
+Custom endpoints continue to use their explicitly configured bearer. These
+local credentials are protected from other Unix users by `0600`; they are not a
+security boundary against a hostile process already running under the same
+macOS account.
 
 Examples:
 

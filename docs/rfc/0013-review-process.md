@@ -32,7 +32,7 @@ floor that must hold underneath, and the cadence — including deep-auditing
 
 | Tier | What | Failure mode | Review depth |
 |---|---|---|---|
-| **T0 — Critical infra** | `src/shared/` audit (HMAC chain), HITL gate, rate-limit, OAuth verifier + scope gate, `allowNetwork` policy, tool-registry interceptor, structured-content validators, `esc`/JXA escaping; `src/server/` transport + boot invariants; the codegen *contract* (tool-manifest ↔ generated AppIntents ↔ runtime). | **Silent, systemic** — removes a safety property everywhere without erroring. | **Max** — `/code-review` at max effort on every diff + periodic deep audit of unchanged code (§5) + a behaviour-asserting contract test per invariant (§4). |
+| **T0 — Critical infra** | `src/shared/` audit (HMAC chain), HITL gate, rate-limit, OAuth verifier + scope gate, `allowNetwork` policy, tool-registry interceptor, structured-content validators, `esc`/JXA escaping; `src/server/` transport + boot invariants; native app-owned runtime, release harness, plugin connector/package, and CLI runtime identity; the codegen *contract* (tool-manifest ↔ generated AppIntents ↔ runtime). | **Silent, systemic** — removes a safety property everywhere without erroring. | **Max** — `/code-review` at max effort on every diff + periodic deep audit of unchanged code (§5) + a behaviour-asserting contract test per invariant (§4). |
 | **T1 — High-blast-radius surface** | `system` (27t), `ui` (10t), `finder`, `shortcuts` — the *agent-drives-the-Mac* surface — plus the HTTP transport. | **Loud but destructive** — a real action on the user's machine. | **High** — review + verify HITL coverage, `destructiveHint` annotations, scope-gate mapping, rate-limit tier (this is RFC 0014 §4.5). |
 | **T2 — JXA-thin tool modules** | PIM + media + iWork modules (`notes`, `calendar`, `mail`, `music`, …). | **Fails loud, blast = 1 call.** | **Light** — the drift/contract tests are the floor; diff-review checks escaping + the `okUntrusted`/`toolError` shape, not deep logic. |
 | **T3 — Generated / vendored** | `swift/.../Generated/`, lockfiles, `dist/`. | Wrong only if the *generator* is wrong. | **Review the generator + the drift guard, never the output.** |
@@ -52,12 +52,16 @@ a *specific* defect class and the test that guards it:
 | HITL gate | gated-call bypass, batched "next N calls" regression, deny-on-unreachable | `hitl-client`, `hitl-guard`, `skills-hitl-queue` |
 | Rate limit | off-by-one, reset-window drift, counter race | `rate-limit` |
 | OAuth | alg confusion (`alg=none`/HS), scope-gate bypass, RFC 8707 audience, RFC 9728 PRM | `oauth-verifier`, `oauth-scope`, `well-known-card` |
-| Network policy | SSRF, allowlist bypass, Origin 403, bind-all-without-token | `http-transport` |
+| Network policy | SSRF, allowlist bypass, Origin 403, bind-all-without-token, app-owner challenge/generation-bearer rotation | `http-transport` |
 | Tool-registry interceptor | wrapper not forwarding, re-entry/recursion, scope-gate not applied | `tool-registry`, `tool-registry-scope-gate` |
-| JXA escaping | injection via `esc`/`escShell`/`escJxaShell`, prototype-pollution in Swift JSON reviver | `esc`, `jxa`, `jxa-scripts-ast` |
+| JXA/Swift bridge boundary | injection via `esc`/`escShell`/`escJxaShell`, prototype-pollution in Swift JSON reviver, bridge executable-path confusion | `esc`, `jxa`, `jxa-scripts-ast`, `swift` |
 | outputSchema ↔ structuredContent | declared schema with no matching runtime payload → SDK validation error in prod | `output-schema-*` (8), `script-shape-contract` |
 | Codegen contract | manifest ↔ AppIntents ↔ README drift; destructive-confirmation body | `codegen-destructive-dialog`, `codegen-helpers`; CI `gen:manifest:check` / `gen:intents:check` |
 | Logger / banner | stdout pollution on stdio transport (must be stderr); ANSI on a pipe | `logger`; `banner` isTTY guard |
+| Native app-owned runtime | credential consent/ownership drift, restart race, manual-runtime adoption, sanitized fallback launch failure, app identity/TCC declaration drift | `app-runtime-token`, `app-owned-runtime-version-pin`, `app-single-instance-runtime-diagnostics`, `app-onboarding-lifecycle-i18n`, `app-info-plist-usage`; Swift `AppRuntimeTokenConsentTests`, `NodeEnvironmentTests`, `SingleInstanceAndRuntimeProbeTests` |
+| App runtime release harness | release-only bypass, acceptance/production environment confusion, wrong-process probe, credential leakage in harness arguments | `governed-acceptance-wiring`, `probe-app-runtime-identity`, `signed-app-verify-source` |
+| Plugin connector/package | package secret/symlink inclusion, connector identity bypass, persistent-token forwarding, recovery against the wrong app/runtime | `chatgpt-plugin` |
+| CLI runtime identity | owner-secret validation, canonical endpoint downgrade, stale generation bearer, runtime-possession-proof bypass, listener PID/UID/codesign confusion, persistent-token leakage | `app-runtime-identity`, `app-runtime-token`, `cli-connect` |
 
 The standing memory rule applies on top: **ask "what does this test actually
 verify" — registration-shape ≠ runtime-contract.** A test that only checks a tool
@@ -111,15 +115,19 @@ so routing is mechanical, not a thing you remember to do:
 
 - **`npm run review:route`** (or `node scripts/review-route.mjs --base <ref>`) —
   classifies the diff, prints each file's tier, the *specific* failure modes to
-  hunt per touched T0/T1 area, the guard tests that must stay green, and a ⚠ for
-  any T0 file changed without touching its guard test. `--json` drives tooling;
-  `--check --strict` exits non-zero on an unguarded T0 change.
+  hunt per touched T0/T1 area, the expected guard-test files to run, and a ⚠ for
+  any independently guarded T0 source group changed without touching one of
+  that group's own guard files. A sibling test in the same broad area does not
+  satisfy the signal. The router does not
+  execute tests or inspect their results; CI and the reviewer run them separately.
+  `--json` drives tooling; `--check --strict` exits non-zero only on this
+  file-touch coverage signal, not on test pass/fail.
 - **`npm run review:audit`** — the RFC §5 cadence: emits the full T0 deep-audit
   plan over *unchanged* infra, independent of any diff.
 - **`/review`** (`.claude/commands/review.md`) — runs the router, then reviews at
   the routed depth instead of scanning uniformly.
 - **CI** runs the router on every PR (informational step in `ci.yml`), so the
-  tier plan + hunt list + unguarded-T0 warnings are visible on each change.
+  tier plan + hunt list + missing-guard-change warnings are visible on each change.
 
 Keep `scripts/review-route.mjs`'s tier lists + catalog in sync with §1/§2 — when
 a T0 invariant is added, add its row there *and* its behaviour test (§4).

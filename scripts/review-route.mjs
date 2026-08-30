@@ -6,8 +6,9 @@
  * silent-systemic defects (audit-seal / HITL-bypass / OAuth / rate-limit) that
  * actually matter. This script is the EXECUTABLE form of RFC 0013: it takes a
  * diff, classifies every changed file into a risk tier, and emits the exact
- * failure modes to hunt + the contract tests that must stay green — so review
- * effort is ROUTED to blast radius instead of spread evenly.
+ * failure modes to hunt + the expected contract-test files — so review effort
+ * is ROUTED to blast radius instead of spread evenly. It does not execute or
+ * report the result of those tests; run them separately.
  *
  * It is not another doc. It runs.
  *
@@ -66,7 +67,7 @@ const CATALOG = [
     area: "network-transport",
     tier: 0,
     files: ["src/server/http-transport.ts", "src/server/init.ts", "src/server/mcp-setup.ts", "src/server/shutdown.ts"],
-    hunt: "SSRF, allowlist bypass, Origin 403, bind-all-without-token, boot-order invariants",
+    hunt: "SSRF, allowlist bypass, Origin 403, bind-all-without-token, boot-order invariants, app-owner challenge/generation-bearer rotation/runtime-possession proof",
     tests: ["http-transport"],
   },
   {
@@ -81,7 +82,12 @@ const CATALOG = [
     tier: 0,
     files: ["src/shared/esc.ts", "src/shared/jxa.ts", "src/shared/swift.ts"],
     hunt: "injection via esc/escShell/escJxaShell, prototype-pollution in the Swift JSON reviver",
-    tests: ["esc", "jxa", "jxa-scripts-ast"],
+    tests: ["esc", "jxa", "jxa-scripts-ast", "swift"],
+    guardGroups: [
+      { name: "literal-escaping", files: ["src/shared/esc.ts"], tests: ["esc", "jxa-scripts-ast"] },
+      { name: "jxa-runtime", files: ["src/shared/jxa.ts"], tests: ["jxa"] },
+      { name: "swift-bridge", files: ["src/shared/swift.ts"], tests: ["swift"] },
+    ],
   },
   {
     area: "result-validators",
@@ -112,6 +118,159 @@ const CATALOG = [
     tests: ["codegen-destructive-dialog", "codegen-helpers", "tool-count-drift"],
   },
   {
+    area: "app-native-runtime",
+    tier: 0,
+    files: [
+      "app/Sources/AirMCPApp/AppRuntimeToken.swift",
+      "app/Sources/AirMCPApp/AirMCPApp.swift",
+      "app/Sources/AirMCPApp/AppIntents.swift",
+      "app/Sources/AirMCPApp/NodeEnvironment.swift",
+      "app/Sources/AirMCPApp/ServerManager.swift",
+      "app/Sources/AirMCPApp/SetupManager.swift",
+      "app/Sources/AirMCPApp/Views/MenuContent.swift",
+      "app/Sources/AirMCPApp/Views/OnboardingView.swift",
+      "app/Sources/AirMCPApp/Resources/Info.plist",
+    ],
+    hunt: "credential consent/ownership drift, restart race, manual-runtime adoption, unlaunchable sanitized fallback, app identity/TCC declaration drift",
+    tests: [
+      "app-runtime-token",
+      "app-owned-runtime-version-pin",
+      "app-single-instance-runtime-diagnostics",
+      "app-onboarding-lifecycle-i18n",
+      "app-info-plist-usage",
+      "app/Tests/AirMCPAppTests/AppRuntimeTokenConsentTests.swift",
+      "app/Tests/AirMCPAppTests/NodeEnvironmentTests.swift",
+      "app/Tests/AirMCPAppTests/SingleInstanceAndRuntimeProbeTests.swift",
+    ],
+    guardGroups: [
+      {
+        name: "runtime-token-consent",
+        files: ["app/Sources/AirMCPApp/AppRuntimeToken.swift"],
+        tests: ["app-runtime-token", "app/Tests/AirMCPAppTests/AppRuntimeTokenConsentTests.swift"],
+      },
+      {
+        name: "app-lifecycle-launch",
+        files: ["app/Sources/AirMCPApp/AirMCPApp.swift"],
+        tests: ["app-owned-runtime-version-pin", "app-single-instance-runtime-diagnostics"],
+      },
+      {
+        name: "server-runtime-lifecycle",
+        files: ["app/Sources/AirMCPApp/ServerManager.swift"],
+        tests: [
+          "app-owned-runtime-version-pin",
+          "app-single-instance-runtime-diagnostics",
+          "app/Tests/AirMCPAppTests/SingleInstanceAndRuntimeProbeTests.swift",
+        ],
+      },
+      {
+        name: "trusted-node-environment",
+        files: ["app/Sources/AirMCPApp/NodeEnvironment.swift"],
+        tests: ["app/Tests/AirMCPAppTests/NodeEnvironmentTests.swift"],
+      },
+      {
+        name: "quick-setup-runtime-consent",
+        files: ["app/Sources/AirMCPApp/SetupManager.swift"],
+        tests: ["app-owned-runtime-version-pin"],
+      },
+      {
+        name: "menu-runtime-consent",
+        files: ["app/Sources/AirMCPApp/Views/MenuContent.swift"],
+        tests: ["app-owned-runtime-version-pin"],
+      },
+      {
+        name: "onboarding-runtime-consent",
+        files: ["app/Sources/AirMCPApp/Views/OnboardingView.swift"],
+        tests: ["app-owned-runtime-version-pin", "app-onboarding-lifecycle-i18n"],
+      },
+      {
+        name: "app-intent-runtime-proxy",
+        files: ["app/Sources/AirMCPApp/AppIntents.swift"],
+        tests: ["app-owned-runtime-version-pin"],
+      },
+      {
+        name: "app-identity-and-tcc-plist",
+        files: ["app/Sources/AirMCPApp/Resources/Info.plist"],
+        tests: ["app-info-plist-usage"],
+      },
+    ],
+  },
+  {
+    area: "app-runtime-release-harness",
+    tier: 0,
+    files: [
+      "scripts/bundle-app.sh",
+      "scripts/notarize-app.sh",
+      "scripts/probe-app-runtime.mjs",
+      "scripts/verify-signed-app.sh",
+    ],
+    hunt: "release-only bypass, acceptance/production environment confusion, unsigned or wrong-process probe, credential leakage in harness arguments",
+    tests: ["governed-acceptance-wiring", "probe-app-runtime-identity", "signed-app-verify-source"],
+    guardGroups: [
+      {
+        name: "acceptance-bundle",
+        files: ["scripts/bundle-app.sh"],
+        tests: ["governed-acceptance-wiring"],
+      },
+      {
+        name: "runtime-identity-probe",
+        files: ["scripts/probe-app-runtime.mjs"],
+        tests: ["probe-app-runtime-identity"],
+      },
+      {
+        name: "signed-artifact-verification",
+        files: ["scripts/notarize-app.sh", "scripts/verify-signed-app.sh"],
+        tests: ["signed-app-verify-source"],
+      },
+    ],
+  },
+  {
+    area: "plugin-connector-package",
+    tier: 0,
+    files: [
+      "plugins/airmcp/",
+      "scripts/stage-chatgpt-plugin.mjs",
+      "scripts/validate-chatgpt-plugin.mjs",
+      "scripts/verify-chatgpt-plugin.mjs",
+      "scripts/verify-chatgpt-plugin-recovery.mjs",
+    ],
+    hunt: "package secret/symlink inclusion, connector identity bypass, persistent-token forwarding, recovery against the wrong app/runtime",
+    tests: ["chatgpt-plugin"],
+  },
+  {
+    area: "cli-runtime-identity",
+    tier: 0,
+    files: [
+      "src/index.ts",
+      "src/cli/connect.ts",
+      "src/shared/app-runtime-identity.ts",
+      "src/shared/app-runtime-token.ts",
+    ],
+    hunt: "owner-secret validation, canonical endpoint downgrade, stale generation bearer or runtime-possession proof, listener PID/UID/codesign confusion, persistent-token leakage",
+    tests: ["app-runtime-identity", "app-runtime-token", "cli-connect"],
+    guardGroups: [
+      {
+        name: "connect-command-registration",
+        files: ["src/index.ts"],
+        tests: ["cli-connect"],
+      },
+      {
+        name: "connect-proxy",
+        files: ["src/cli/connect.ts"],
+        tests: ["cli-connect"],
+      },
+      {
+        name: "app-listener-identity",
+        files: ["src/shared/app-runtime-identity.ts"],
+        tests: ["app-runtime-identity"],
+      },
+      {
+        name: "persistent-runtime-token",
+        files: ["src/shared/app-runtime-token.ts"],
+        tests: ["app-runtime-token"],
+      },
+    ],
+  },
+  {
     area: "agent-controls-the-mac",
     tier: 1,
     files: ["src/system/", "src/ui/", "src/finder/", "src/shortcuts/"],
@@ -119,6 +278,14 @@ const CATALOG = [
     tests: ["output-schema-wave1", "output-schema-wave2"],
   },
 ];
+
+function matchesCatalogPath(file, catalogPath) {
+  return catalogPath.endsWith("/") ? file.startsWith(catalogPath) : file === catalogPath;
+}
+
+function guardGroupsFor(row) {
+  return row.guardGroups ?? [{ name: row.area, files: row.files, tests: row.tests }];
+}
 
 // ── Tier classification (RFC 0013 §1) ──
 // Returns { tier, label, depth, area? } for a repo-relative path.
@@ -131,18 +298,22 @@ function classify(file) {
     file.startsWith("docs/llms") ||
     file === "docs/tool-manifest.json"
   ) {
-    return { tier: 3, label: "T3 generated/vendored", depth: "review the generator + the drift guard, never the output" };
+    return {
+      tier: 3,
+      label: "T3 generated/vendored",
+      depth: "review the generator + the drift guard, never the output",
+    };
   }
 
   // T0 / T1 — by catalog membership (exact file or path-prefix).
   for (const row of CATALOG) {
     for (const f of row.files) {
-      const isPrefix = f.endsWith("/");
-      if (isPrefix ? file.startsWith(f) : file === f) {
+      if (matchesCatalogPath(file, f)) {
         return {
           tier: row.tier,
           label: row.tier === 0 ? "T0 critical infra" : "T1 high-blast surface",
-          depth: row.tier === 0 ? "MAX — adversarial, per failure mode below" : "HIGH — governance + the failure mode below",
+          depth:
+            row.tier === 0 ? "MAX — adversarial, per failure mode below" : "HIGH — governance + the failure mode below",
           area: row.area,
         };
       }
@@ -151,7 +322,11 @@ function classify(file) {
 
   // T2 — JXA-thin tool modules (any other src/<module>/ source).
   if (file.startsWith("src/") && file.endsWith(".ts")) {
-    return { tier: 2, label: "T2 JXA-thin module", depth: "LIGHT — escaping + result-shape + contract test still green" };
+    return {
+      tier: 2,
+      label: "T2 JXA-thin module",
+      depth: "LIGHT — escaping + result-shape; run the contract test separately",
+    };
   }
 
   // Everything else (docs, workflows, config) — context, not risk-routed.
@@ -172,17 +347,27 @@ function changedFiles() {
   // from outside input. A review-routing tool must follow it.
   try {
     const out = execFileSync("git", ["diff", "--name-only", `${base}...HEAD`], { cwd: ROOT, encoding: "utf8" });
-    return out.split("\n").map((s) => s.trim()).filter(Boolean);
+    return out
+      .split("\n")
+      .map((s) => s.trim())
+      .filter(Boolean);
   } catch {
     // No base ref (shallow clone / detached) — fall back to staged + unstaged.
     const out = execFileSync("git", ["diff", "--name-only", "HEAD"], { cwd: ROOT, encoding: "utf8" });
-    return out.split("\n").map((s) => s.trim()).filter(Boolean);
+    return out
+      .split("\n")
+      .map((s) => s.trim())
+      .filter(Boolean);
   }
 }
 
-function testTouched(testStem) {
+function testPath(test) {
+  return test.includes("/") ? test : `tests/${test}.test.js`;
+}
+
+function testTouched(test) {
   // Is the guarding test in the diff? (heuristic for "did you re-verify the contract")
-  return changed.some((f) => f === `tests/${testStem}.test.js`);
+  return changed.some((f) => f === testPath(test));
 }
 
 // ── AUDIT mode: the full T0 deep-audit plan, regardless of diff (RFC 0013 §5) ──
@@ -198,7 +383,7 @@ if (mode === "audit") {
     console.log(`■ ${r.area}`);
     console.log(`  files: ${present.join(", ")}`);
     console.log(`  hunt:  ${r.hunt}`);
-    console.log(`  guard: ${r.tests.map((t) => `tests/${t}.test.js`).join(", ")}\n`);
+    console.log(`  guard: ${r.tests.map(testPath).join(", ")}\n`);
   }
   process.exit(0);
 }
@@ -210,11 +395,24 @@ const byTier = (t) => routed.filter((r) => r.tier === t);
 const touchedAreas = [...new Set(routed.map((r) => r.area).filter(Boolean))];
 const catalogFor = (area) => CATALOG.find((r) => r.area === area);
 
-// Teeth: a T0 area changed but its guard test did not (RFC 0013 §4).
+function touchedGuardGroups(row) {
+  return guardGroupsFor(row).filter((group) =>
+    changed.some((file) => group.files.some((catalogPath) => matchesCatalogPath(file, catalogPath))),
+  );
+}
+
+// Teeth: every independently guarded T0 source group needs one of its own
+// behaviour tests in the diff. A test for a sibling group in the same broad
+// area must not turn this signal green.
 const unguarded = touchedAreas
   .map(catalogFor)
-  .filter((r) => r && r.tier === 0)
-  .filter((r) => !r.tests.some(testTouched));
+  .filter((row) => row && row.tier === 0)
+  .flatMap((row) =>
+    touchedGuardGroups(row)
+      .filter((group) => !group.tests.some(testTouched))
+      .map((group) => ({ area: row.area, group: group.name, tests: group.tests })),
+  );
+const unguardedAreas = [...new Set(unguarded.map((entry) => entry.area))];
 
 if (asJson) {
   console.log(
@@ -224,7 +422,8 @@ if (asJson) {
         changed: routed,
         highestTier: Math.min(...routed.map((r) => r.tier), 9),
         touchedAreas: touchedAreas.map((a) => catalogFor(a)),
-        unguardedT0: unguarded.map((r) => r.area),
+        unguardedT0: unguardedAreas,
+        unguardedGuardGroups: unguarded,
       },
       null,
       2,
@@ -258,21 +457,26 @@ for (const t of TIER_ORDER) {
 }
 
 // For each touched T0/T1 area, print the exact failure modes + guard tests.
-const hot = touchedAreas.map(catalogFor).filter(Boolean).sort((a, b) => a.tier - b.tier);
+const hot = touchedAreas
+  .map(catalogFor)
+  .filter(Boolean)
+  .sort((a, b) => a.tier - b.tier);
 if (hot.length) {
   console.log("Hunt these (do not run a generic scan):");
   for (const r of hot) {
     console.log(`  ■ T${r.tier} ${r.area}`);
     console.log(`    hunt:  ${r.hunt}`);
-    console.log(`    guard: ${r.tests.map((t) => `tests/${t}.test.js`).join(", ")} (must be green)`);
+    for (const group of touchedGuardGroups(r)) {
+      console.log(`    expected guard [${group.name}]: ${group.tests.map(testPath).join(", ")} (run separately)`);
+    }
   }
   console.log("");
 }
 
 if (unguarded.length) {
   console.log("⚠ T0 changed WITHOUT touching its guard test — confirm the invariant is still covered:");
-  for (const r of unguarded) {
-    console.log(`  • ${r.area} → expected one of ${r.tests.map((t) => `tests/${t}.test.js`).join(", ")}`);
+  for (const entry of unguarded) {
+    console.log(`  • ${entry.area}/${entry.group} → expected one of ${entry.tests.map(testPath).join(", ")}`);
   }
   console.log("");
   if (mode === "check" && strict) {

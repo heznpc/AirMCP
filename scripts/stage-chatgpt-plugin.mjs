@@ -10,7 +10,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SOURCE_PLUGIN = join(ROOT, "plugins", "airmcp");
 const DEFAULT_OUTPUT = join(ROOT, "build", "chatgpt-plugin");
 const STAGE_MARKER = ".airmcp-chatgpt-plugin-stage.json";
-const STAGE_MARKER_VALUE = { generatedBy: "airmcp-chatgpt-plugin-stager", schemaVersion: 2 };
+const STAGE_MARKER_VALUE = { generatedBy: "airmcp-chatgpt-plugin-stager", schemaVersion: 3 };
 
 function usage() {
   return [
@@ -70,6 +70,11 @@ function writeJson(path, value) {
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 }
 
+function outputDirectoryIdentity(output) {
+  const stat = lstatSync(output);
+  return { device: String(stat.dev), inode: String(stat.ino) };
+}
+
 function assertOwnedStageOutput(output) {
   const markerPath = join(output, STAGE_MARKER);
   let marker;
@@ -78,11 +83,17 @@ function assertOwnedStageOutput(output) {
   } catch {
     throw new Error(`refusing to replace an unowned staging output: ${output}`);
   }
+  const expectedIdentity = outputDirectoryIdentity(output);
+  const currentMarker =
+    marker?.schemaVersion === STAGE_MARKER_VALUE.schemaVersion &&
+    marker?.outputIdentity?.device === expectedIdentity.device &&
+    marker?.outputIdentity?.inode === expectedIdentity.inode &&
+    marker?.outputDir === undefined;
+  const legacyMarker = marker?.schemaVersion === 2 && marker?.outputDir === resolve(output);
   if (
     marker?.generatedBy !== STAGE_MARKER_VALUE.generatedBy ||
-    marker?.schemaVersion !== STAGE_MARKER_VALUE.schemaVersion ||
-    marker?.outputDir !== resolve(output) ||
-    marker?.layout !== "airmcp-local-marketplace-v1"
+    marker?.layout !== "airmcp-local-marketplace-v1" ||
+    (!currentMarker && !legacyMarker)
   ) {
     throw new Error(`refusing to replace an unowned staging output: ${output}`);
   }
@@ -135,8 +146,11 @@ export function stageChatgptPlugin({
 
   mkdirSync(output, { recursive: true });
   const stagedPlugin = join(output, "plugins", "airmcp");
-  mkdirSync(dirname(stagedPlugin), { recursive: true });
-  cpSync(source, stagedPlugin, { recursive: true });
+  for (const sourceFile of sourceValidation.files) {
+    const target = join(stagedPlugin, relative(source, sourceFile));
+    mkdirSync(dirname(target), { recursive: true });
+    cpSync(sourceFile, target);
+  }
 
   const manifestPath = join(stagedPlugin, ".codex-plugin", "plugin.json");
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
@@ -174,7 +188,7 @@ export function stageChatgptPlugin({
   }
   writeJson(join(output, STAGE_MARKER), {
     ...STAGE_MARKER_VALUE,
-    outputDir: output,
+    outputIdentity: outputDirectoryIdentity(output),
     layout: "airmcp-local-marketplace-v1",
   });
   return {

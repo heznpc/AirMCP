@@ -8,6 +8,14 @@ const probe = readFileSync(new URL("../scripts/verify-governed-workflow.mjs", im
 const constants = readFileSync(new URL("../src/shared/constants.ts", import.meta.url), "utf8");
 const tokenNode = readFileSync(new URL("../src/shared/app-runtime-token.ts", import.meta.url), "utf8");
 const tokenSwift = readFileSync(new URL("../app/Sources/AirMCPApp/AppRuntimeToken.swift", import.meta.url), "utf8");
+const nodeEnvironmentSwift = readFileSync(
+  new URL("../app/Sources/AirMCPApp/NodeEnvironment.swift", import.meta.url),
+  "utf8",
+);
+const serverManagerSwift = readFileSync(
+  new URL("../app/Sources/AirMCPApp/ServerManager.swift", import.meta.url),
+  "utf8",
+);
 const app = readFileSync(new URL("../app/Sources/AirMCPApp/AirMCPApp.swift", import.meta.url), "utf8");
 const preflight = readFileSync(new URL("../scripts/release-preflight.mjs", import.meta.url), "utf8");
 const cdWorkflow = parseYaml(readFileSync(new URL("../.github/workflows/cd.yml", import.meta.url), "utf8"));
@@ -118,6 +126,43 @@ describe("governed app-owned acceptance wiring", () => {
     expect(bundle).toContain('AIRMCP_VECTOR_STORE_DIR="$GOVERNED_STATE_DIR/audit"');
     expect(bundle).toContain('AIRMCP_EMERGENCY_STOP_PATH="$GOVERNED_STATE_DIR/emergency-stop"');
     expect(bundle).toContain('CFFIXED_USER_HOME="$GOVERNED_STATE_DIR/home"');
+  });
+
+  test("passes exactly the governed Node overrides through the sanitized app launch", () => {
+    const setup = bundle.match(/setup_governed_environment\(\) \{([\s\S]*?)\n\}/)?.[1] ?? "";
+    const swiftKeys = nodeEnvironmentSwift.match(
+      /private static let appRuntimeAcceptanceOverrideKeys = \[([\s\S]*?)\n    \]/,
+    )?.[1];
+    expect(swiftKeys).toBeDefined();
+
+    const harnessKeys = new Set([...setup.matchAll(/export (AIRMCP_[A-Z0-9_]+)(?:=|\s|$)/gm)].map((match) => match[1]));
+    for (const swiftOnly of [
+      "AIRMCP_APP_RUNTIME_TOKEN_PATH",
+      "AIRMCP_APP_RUNTIME_OWNER_PATH",
+      "AIRMCP_FORCE_APP_RUNTIME",
+      "AIRMCP_NPM_PACKAGE_SPECIFIER",
+    ]) {
+      harnessKeys.delete(swiftOnly);
+    }
+    const allowlist = new Set([...swiftKeys.matchAll(/"(AIRMCP_[A-Z0-9_]+)"/g)].map((match) => match[1]));
+
+    expect([...allowlist].sort()).toEqual([...harnessKeys].sort());
+    expect(nodeEnvironmentSwift).toContain('inherited["CFFIXED_USER_HOME"]');
+    expect(allowlist.has("AIRMCP_HTTP_TOKEN")).toBe(false);
+    expect(allowlist.has("AIRMCP_APP_RUNTIME_OWNER_SECRET")).toBe(false);
+  });
+
+  test("compiles acceptance-only launch wiring only into verification builds", () => {
+    expect(serverManagerSwift).toMatch(
+      /#if AIRMCP_ACCEPTANCE_HARNESS\s+for \(key, value\) in NodeEnvironment\.appRuntimeAcceptanceOverrides\(\)/,
+    );
+    expect(app).toMatch(/#if AIRMCP_ACCEPTANCE_HARNESS[\s\S]*?envForceAppRuntime[\s\S]*?#else[\s\S]*?return false/);
+    expect(bundle).toMatch(
+      /case "\$MODE" in\s+verify\|verify-governed\|verify-appintents\)[\s\S]*?APP_SWIFT_BUILD_ARGS\+=\(-Xswiftc -DAIRMCP_ACCEPTANCE_HARNESS\)[\s\S]*?;;\s+esac/,
+    );
+    expect(bundle).toContain('swift build "${APP_SWIFT_BUILD_ARGS[@]}"');
+    expect(bundle).toContain('BUNDLE_DIR="$PROJECT_DIR/.build/AirMCP-Acceptance.app"');
+    expect(bundle).toContain("Add :AirMCPAcceptanceHarnessBuild bool true");
   });
 
   test("does not request notification permission when the app-side HITL listener is off", () => {

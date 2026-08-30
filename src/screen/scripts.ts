@@ -37,20 +37,26 @@ export function captureScreenScript(display?: number): string {
 export function captureWindowScript(appName?: string): string {
   const filePath = tempScreenshotPath();
   const activateBlock = appName ? `Application('${esc(appName)}').activate(); delay(1.0);` : "";
-  // To avoid JXA→shell→Python multi-layer escaping pitfalls, pass the app name
-  // as a base64 literal. Base64 output is [A-Za-z0-9+/=] only — safe in all layers.
-  const b64 = appName ? Buffer.from(appName).toString("base64") : "";
+  const ownerFilter = appName ? `win.kCGWindowOwnerName !== '${esc(appName)}'` : "false";
   return `
+    ObjC.import('CoreGraphics');
     const app = Application.currentApplication();
     app.includeStandardAdditions = true;
     ${activateBlock}
-    // Get window ID via CGWindowListCopyWindowInfo
-    ${
-      appName
-        ? `const pyCmd = 'python3 -c "import Quartz,base64;name=base64.b64decode(\\"${b64}\\").decode();ws=[w for w in Quartz.CGWindowListCopyWindowInfo(Quartz.kCGWindowListOptionOnScreenOnly|Quartz.kCGWindowListExcludeDesktopElements,Quartz.kCGNullWindowID) if w.get(\\"kCGWindowOwnerName\\")==name and w.get(\\"kCGWindowLayer\\")==0];print(ws[0][\\"kCGWindowNumber\\"] if ws else 0)"';`
-        : `const pyCmd = 'python3 -c "import Quartz;ws=[w for w in Quartz.CGWindowListCopyWindowInfo(Quartz.kCGWindowListOptionOnScreenOnly|Quartz.kCGWindowListExcludeDesktopElements,Quartz.kCGNullWindowID) if w.get(\\"kCGWindowLayer\\")==0];print(ws[0][\\"kCGWindowNumber\\"] if ws else 0)"';`
+    const windowListRef = $.CGWindowListCopyWindowInfo(
+      $.kCGWindowListOptionOnScreenOnly | $.kCGWindowListExcludeDesktopElements,
+      0
+    );
+    const windowInfo = windowListRef
+      ? ObjC.deepUnwrap(ObjC.castRefToObject(windowListRef))
+      : [];
+    let wid = 0;
+    for (let i = 0; i < windowInfo.length; i++) {
+      const win = windowInfo[i];
+      if (Number(win.kCGWindowLayer) !== 0 || ${ownerFilter}) continue;
+      wid = Number(win.kCGWindowNumber) || 0;
+      if (wid > 0) break;
     }
-    const wid = parseInt(app.doShellScript(pyCmd).trim(), 10);
     if (wid > 0) {
       app.doShellScript('screencapture -x -t png -l ' + wid + ' "${filePath}"');
     } else {

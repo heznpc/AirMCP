@@ -24,4 +24,28 @@ describe('JXA module', () => {
     expect(typeof mod.runJxa).toBe('function');
     expect(typeof mod.runAppleScript).toBe('function');
   });
+
+  test('executes JXA with the fixed system osascript path', async () => {
+    const { execFile } = await import('node:child_process');
+    execFile.mockClear();
+    execFile.mockImplementationOnce((_path, _args, _options, callback) => {
+      const child = {
+        on: jest.fn(),
+        killed: false,
+        exitCode: null,
+        kill: jest.fn(),
+      };
+      queueMicrotask(() => callback(null, '{"ok":true}\n'));
+      return child;
+    });
+
+    const mod = await import('../dist/shared/jxa.js');
+    await expect(mod.runJxa('JSON.stringify({ ok: true })')).resolves.toEqual({ ok: true });
+    expect(execFile).toHaveBeenCalledWith(
+      '/usr/bin/osascript',
+      ['-l', 'JavaScript', '-e', 'JSON.stringify({ ok: true })'],
+      { timeout: 30000, maxBuffer: 10 * 1024 * 1024 },
+      expect.any(Function),
+    );
+  });
 });

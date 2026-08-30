@@ -72,6 +72,8 @@ if (_sub && !_sub.startsWith("--")) {
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { printBanner } from "./shared/banner.js";
 import { IDENTITY } from "./shared/constants.js";
+import { APP_RUNTIME_TOKEN_PATH } from "./shared/app-runtime-token.js";
+import { APP_RUNTIME_OWNER_SECRET_PATH, readPrivateRuntimeCredential } from "./shared/app-runtime-identity.js";
 import { initializeServer } from "./server/init.js";
 import { createServer } from "./server/mcp-setup.js";
 import { startHttpServer } from "./server/http-transport.js";
@@ -83,18 +85,30 @@ const portIdx = args.indexOf("--port");
 const port = portIdx !== -1 && args[portIdx + 1] ? parseInt(args[portIdx + 1]!, 10) : IDENTITY.HTTP_PORT;
 const bindAll = args.includes("--bind-all");
 const unsafeNoAuth = args.includes("--unsafe-no-auth");
-const httpToken = process.env.AIRMCP_HTTP_TOKEN ?? "";
-const appRuntimeOwnerSecret = process.env.AIRMCP_APP_RUNTIME_OWNER_SECRET ?? "";
+const appOwnedRuntime = process.env.AIRMCP_APP_OWNED_RUNTIME === "1";
+const environmentHttpToken = process.env.AIRMCP_HTTP_TOKEN ?? "";
+const environmentOwnerSecret = process.env.AIRMCP_APP_RUNTIME_OWNER_SECRET ?? "";
+const appRuntimeTokenPath = process.env.AIRMCP_APP_RUNTIME_TOKEN_PATH || APP_RUNTIME_TOKEN_PATH;
+const appRuntimeOwnerPath = process.env.AIRMCP_APP_RUNTIME_OWNER_PATH || APP_RUNTIME_OWNER_SECRET_PATH;
 
-// Keep HTTP credentials in this process only. Child tools inherit process.env,
-// so remove both secrets before any tool subprocess can be launched.
+// Keep HTTP credentials and app-owned credential locations in this process
+// only. The native app passes owner-only file paths instead of secret values;
+// remove both legacy values and paths before any tool subprocess can launch.
 delete process.env.AIRMCP_HTTP_TOKEN;
 delete process.env.AIRMCP_APP_RUNTIME_OWNER_SECRET;
+delete process.env.AIRMCP_APP_RUNTIME_TOKEN_PATH;
+delete process.env.AIRMCP_APP_RUNTIME_OWNER_PATH;
 
 const ctx = initializeServer();
 
 async function main() {
   if (httpMode) {
+    const httpToken = appOwnedRuntime
+      ? readPrivateRuntimeCredential(appRuntimeTokenPath, "app runtime HTTP token")
+      : environmentHttpToken;
+    const appRuntimeOwnerSecret = appOwnedRuntime
+      ? readPrivateRuntimeCredential(appRuntimeOwnerPath, "app runtime owner secret")
+      : environmentOwnerSecret;
     await startHttpServer({
       config: ctx.config,
       hitlClient: ctx.hitlClient,

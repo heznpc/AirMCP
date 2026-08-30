@@ -1,8 +1,12 @@
 import { afterEach, describe, expect, test } from "@jest/globals";
+import { execFileSync, spawn } from "node:child_process";
 import { createServer } from "node:http";
+import { createServer as createTcpServer } from "node:net";
 import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { cleanBootEnv } from "../scripts/lib/clean-boot-env.mjs";
 
 import {
   parseArgs,
@@ -11,6 +15,7 @@ import {
   readPrivateToken,
   runtimeGenerationBearer,
   runtimeIdentityProof,
+  runtimeResponseProof,
   verifyRuntimeIdentityChallenge,
 } from "../scripts/probe-app-runtime.mjs";
 
@@ -19,11 +24,45 @@ const OWNER_SECRET = "a".repeat(43);
 const TOKEN = "t".repeat(43);
 const tempDirs = [];
 const servers = [];
+const children = [];
+const DIST = fileURLToPath(new URL("../dist/index.js", import.meta.url));
+const ROOT = fileURLToPath(new URL("..", import.meta.url));
+const PACKAGE_VERSION = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
 
 afterEach(async () => {
+  for (const child of children.splice(0)) {
+    if (child.exitCode === null) child.kill();
+  }
   await Promise.all(servers.splice(0).map((server) => new Promise((resolve) => server.close(() => resolve()))));
   for (const path of tempDirs.splice(0)) rmSync(path, { recursive: true, force: true });
 });
+
+async function freePort() {
+  const server = createTcpServer();
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const address = server.address();
+  await new Promise((resolve) => server.close(resolve));
+  if (!address || typeof address === "string") throw new Error("failed to allocate a test port");
+  return address.port;
+}
+
+async function waitForHealth(port, child) {
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    if (child.exitCode !== null) throw new Error(`app-owned test server exited with ${child.exitCode}`);
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}/health`);
+      if (response.ok) return;
+    } catch {
+      // Keep waiting for the listener.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error("app-owned test server did not become healthy");
+}
 
 function makeCredentials() {
   const directory = mkdtempSync(join(tmpdir(), "airmcp-runtime-probe-"));
@@ -84,6 +123,9 @@ describe("app runtime identity probe", () => {
     expect(runtimeGenerationBearer(OWNER_SECRET, 123, VERSION)).toBe(
       "airmcp_app_897599a80e1c449a8beeba036882deeeb1c801e7498a30f0b0d4cb7a4f101197",
     );
+    expect(runtimeResponseProof(OWNER_SECRET, "b".repeat(43), 123, VERSION, "POST", "/mcp")).toBe(
+      "721f568c5c0e8e25925b047509c4a14c6e9e85b412466219e1d86e853d302fef",
+    );
   });
 
   test("uses a fresh nonce and never sends Authorization on the challenge", async () => {
@@ -106,6 +148,7 @@ describe("app runtime identity probe", () => {
           pid: 321,
           version: VERSION,
           proof: runtimeIdentityProof(OWNER_SECRET, nonce, 321, VERSION),
+          responseProof: "hmac-sha256-v1",
         }),
       );
     });
@@ -129,7 +172,16 @@ describe("app runtime identity probe", () => {
     const url = await listen((request, response) => {
       requests.push({ method: request.method, authorization: request.headers.authorization });
       response.writeHead(200, { "content-type": "application/json" });
-      response.end(JSON.stringify({ status: "ok", appOwned: true, pid: 321, version: VERSION, proof: "0".repeat(64) }));
+      response.end(
+        JSON.stringify({
+          status: "ok",
+          appOwned: true,
+          pid: 321,
+          version: VERSION,
+          proof: "0".repeat(64),
+          responseProof: "hmac-sha256-v1",
+        }),
+      );
     });
 
     await expect(
@@ -144,4 +196,43 @@ describe("app runtime identity probe", () => {
     ).rejects.toThrow(/proof is invalid/);
     expect(requests).toEqual([{ method: "GET", authorization: undefined }]);
   });
+
+  test("real app-owned boot reads credential files and MACs the MCP channel", async () => {
+    const { directory, tokenFile, ownerSecretFile } = makeCredentials();
+    const port = await freePort();
+    const child = spawn(process.execPath, [DIST, "--http", "--port", String(port)], {
+      cwd: ROOT,
+      env: {
+        ...cleanBootEnv(),
+        HOME: directory,
+        AIRMCP_ALLOW_NETWORK: "with-token",
+        AIRMCP_APP_OWNED_RUNTIME: "1",
+        AIRMCP_APP_RUNTIME_TOKEN_PATH: tokenFile,
+        AIRMCP_APP_RUNTIME_OWNER_PATH: ownerSecretFile,
+      },
+      stdio: ["ignore", "ignore", "pipe"],
+    });
+    children.push(child);
+    child.stderr.resume();
+    await waitForHealth(port, child);
+
+    await expect(
+      probeAppRuntime({
+        url: `http://127.0.0.1:${port}/mcp`,
+        ownerSecretFile,
+        expectedVersion: PACKAGE_VERSION,
+        timeoutMs: 10_000,
+        minTools: 1,
+        clientName: "app-owned-file-credential-test",
+      }),
+    ).resolves.toContain(`tools from airmcp v${PACKAGE_VERSION}`);
+
+    const execEnvironment = execFileSync("/bin/ps", ["eww", "-p", String(child.pid), "-o", "command="], {
+      encoding: "utf8",
+    });
+    expect(execEnvironment).not.toContain(TOKEN);
+    expect(execEnvironment).not.toContain(OWNER_SECRET);
+    expect(execEnvironment).toContain("AIRMCP_APP_RUNTIME_TOKEN_PATH=");
+    expect(execEnvironment).toContain("AIRMCP_APP_RUNTIME_OWNER_PATH=");
+  }, 60_000);
 });

@@ -764,7 +764,8 @@ describe("startHttpServer live middleware", () => {
   test("tokenless identity challenge proves the app-owned listener without exposing secrets", async () => {
     process.env.AIRMCP_APP_OWNED_RUNTIME = "1";
     process.env.AIRMCP_APP_RUNTIME_OWNER_SECRET = "a".repeat(43);
-    const { runtimeGenerationBearer, runtimeIdentityProof } = await import("../dist/server/http-transport.js");
+    const { runtimeGenerationBearer, runtimeIdentityProof, runtimeResponseProof } =
+      await import("../dist/server/http-transport.js");
     const server = await startHttpServer(options());
     try {
       const nonce = "b".repeat(43);
@@ -778,6 +779,7 @@ describe("startHttpServer live middleware", () => {
         appOwned: true,
         pid: process.pid,
         proof: runtimeIdentityProof("a".repeat(43), nonce, process.pid, "9.9.9-test"),
+        responseProof: "hmac-sha256-v1",
       });
       expect(JSON.stringify(body)).not.toContain("a".repeat(43));
 
@@ -787,6 +789,30 @@ describe("startHttpServer live middleware", () => {
         headers: { Authorization: `Bearer ${generationAuthorization}` },
       });
       expect(generationAuthenticated.status).toBe(200);
+
+      const requestNonce = "c".repeat(43);
+      const generationMcp = await fetch(serverUrl(server, "/mcp"), {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${generationAuthorization}`,
+          "Content-Type": "application/json",
+          "X-AirMCP-Runtime-Nonce": requestNonce,
+        },
+        body: JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }),
+      });
+      expect(generationMcp.headers.get("x-airmcp-runtime-proof")).toBe(
+        runtimeResponseProof("a".repeat(43), requestNonce, process.pid, "9.9.9-test", "POST", "/mcp"),
+      );
+
+      const missingRequestNonce = await fetch(serverUrl(server, "/mcp"), {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${generationAuthorization}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }),
+      });
+      expect(missingRequestNonce.status).toBe(400);
 
       const invalid = await fetch(serverUrl(server, "/app/identity-challenge?nonce=short"));
       expect(invalid.status).toBe(400);
@@ -958,7 +984,7 @@ describe("startHttpServer live middleware", () => {
     }
   });
 
-  test("runtime-state stays unavailable without the app-only owner credential", async () => {
+  test("runtime-state stays unavailable without the current-user owner credential", async () => {
     process.env.AIRMCP_APP_OWNED_RUNTIME = "1";
     const server = await startHttpServer(options());
     try {
@@ -1132,7 +1158,7 @@ describe("startHttpServer live middleware", () => {
       expect(response.headers.get("vary")).toContain("Origin");
       expect(response.headers.get("access-control-allow-methods")).toBe("GET, POST, DELETE, OPTIONS");
       expect(response.headers.get("access-control-allow-headers")).toBe(
-        "Authorization, Content-Type, Mcp-Session-Id, MCP-Protocol-Version, Last-Event-ID, X-AirMCP-Run-Id",
+        "Authorization, Content-Type, Mcp-Session-Id, MCP-Protocol-Version, Last-Event-ID, X-AirMCP-Run-Id, X-AirMCP-Runtime-Nonce",
       );
       const exposed = response.headers.get("access-control-expose-headers");
       for (const header of [
@@ -1141,6 +1167,7 @@ describe("startHttpServer live middleware", () => {
         "X-Request-ID",
         "WWW-Authenticate",
         "Retry-After",
+        "X-AirMCP-Runtime-Proof",
         "RateLimit-Limit",
       ]) {
         expect(exposed).toContain(header);

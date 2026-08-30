@@ -82,8 +82,18 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 APP_DIR="$PROJECT_DIR/app"
-BUNDLE_ID="app.airmcp"
+APP_SWIFT_BUILD_ARGS=(-c release)
 BUNDLE_DIR="$PROJECT_DIR/AirMCP.app"
+ACCEPTANCE_HARNESS_BUILD=0
+case "$MODE" in
+  verify|verify-governed|verify-appintents)
+    APP_SWIFT_BUILD_ARGS+=(--scratch-path "$APP_DIR/.build/acceptance-harness")
+    APP_SWIFT_BUILD_ARGS+=(-Xswiftc -DAIRMCP_ACCEPTANCE_HARNESS)
+    BUNDLE_DIR="$PROJECT_DIR/.build/AirMCP-Acceptance.app"
+    ACCEPTANCE_HARNESS_BUILD=1
+    ;;
+esac
+BUNDLE_ID="app.airmcp"
 APP_EXECUTABLE="AirMCP"
 APP_BINARY="$BUNDLE_DIR/Contents/MacOS/$APP_EXECUTABLE"
 LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
@@ -146,13 +156,13 @@ if [ "$AIRMCP_EMBED_RUNTIME" = "1" ]; then
 fi
 
 echo "Building AirMCPApp..."
-PREVIOUS_APP_BUILD_DIR="$(cd "$APP_DIR" && swift build -c release --show-bin-path)"
+PREVIOUS_APP_BUILD_DIR="$(cd "$APP_DIR" && swift build "${APP_SWIFT_BUILD_ARGS[@]}" --show-bin-path)"
 # SwiftPM can leave removed .lproj directories in an incremental resource
 # bundle. Recreate that generated bundle so renamed locales cannot leak into
 # the packaged app.
 rm -rf "$PREVIOUS_APP_BUILD_DIR/AirMCPApp_AirMCPApp.bundle"
-(cd "$APP_DIR" && swift build -c release)
-BUILD_DIR="$(cd "$APP_DIR" && swift build -c release --show-bin-path)"
+(cd "$APP_DIR" && swift build "${APP_SWIFT_BUILD_ARGS[@]}")
+BUILD_DIR="$(cd "$APP_DIR" && swift build "${APP_SWIFT_BUILD_ARGS[@]}" --show-bin-path)"
 
 echo "Creating app bundle..."
 rm -rf "$BUNDLE_DIR"
@@ -305,6 +315,12 @@ fi
 /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $BUILD_NUMBER" "$PLIST"
 /usr/libexec/PlistBuddy -c "Delete :LSUIElement" "$PLIST" 2>/dev/null || true
 /usr/libexec/PlistBuddy -c "Add :LSUIElement bool true" "$PLIST"
+/usr/libexec/PlistBuddy -c "Delete :AirMCPAcceptanceHarnessBuild" "$PLIST" 2>/dev/null || true
+if [ "$ACCEPTANCE_HARNESS_BUILD" = "1" ]; then
+  # Defense in depth for local release workflows: verification binaries have
+  # test-only launch wiring and must never be signed or notarized as products.
+  /usr/libexec/PlistBuddy -c "Add :AirMCPAcceptanceHarnessBuild bool true" "$PLIST"
+fi
 /usr/libexec/PlistBuddy -c "Delete :NSMicrophoneUsageDescription" "$PLIST" 2>/dev/null || true
 /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string AirMCP uses the microphone for speech recognition." "$PLIST"
 
@@ -336,7 +352,7 @@ codesign --force --sign "$SIGN_IDENTITY" --entitlements /dev/stdin "$BUNDLE_DIR"
 </plist>
 APP_ENTITLEMENTS_EOF
 "$SCRIPT_DIR/verify-bundle-structure.sh" "$BUNDLE_DIR" "$BUNDLE_ID" "$APP_EXECUTABLE"
-if [ -x "$LSREGISTER" ]; then
+if [ "$ACCEPTANCE_HARNESS_BUILD" = "0" ] && [ -x "$LSREGISTER" ]; then
   "$LSREGISTER" -f "$BUNDLE_DIR" 2>/dev/null || true
 fi
 
@@ -693,6 +709,16 @@ cleanup_verification() {
 
   stop_bundle_processes
   if ! assert_no_bundle_processes; then cleanup_failed=1; fi
+  # `open` registers launched bundles even when this script skips its explicit
+  # registration step. Remove the hidden acceptance path so a later
+  # `open -b app.airmcp` cannot select test-only launch wiring over the
+  # installed production app.
+  if [ "$ACCEPTANCE_HARNESS_BUILD" = "1" ] && [ -x "$LSREGISTER" ]; then
+    if ! "$LSREGISTER" -u "$BUNDLE_DIR" >/dev/null 2>&1; then
+      echo "✗ Failed to unregister acceptance-harness bundle: $BUNDLE_DIR" >&2
+      cleanup_failed=1
+    fi
+  fi
 
   if [ -n "$state_dir" ]; then
     case "$state_dir" in

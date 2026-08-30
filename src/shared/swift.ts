@@ -10,7 +10,18 @@ import { log } from "./logger.js";
 // Package root — works in repo checkout, npm cache, and git worktrees.
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = resolve(__dirname, "..", "..");
-const BINARY_PATH = resolve(PKG_ROOT, "swift", ".build", "release", "AirMcpBridge");
+const DEFAULT_BINARY_PATH = resolve(PKG_ROOT, "swift", ".build", "release", "AirMcpBridge");
+
+/** Resolve the bridge embedded by AirMCP.app before falling back to the
+ * package-local development build. The signed app runtime launches from its
+ * bundled `server/` tree, so deriving the bridge from PKG_ROOT cannot reach
+ * `Contents/Resources/airmcp/bin/AirMcpBridge`. */
+export function resolveSwiftBridgePath(env: NodeJS.ProcessEnv = process.env): string {
+  const configured = env.AIRMCP_BRIDGE_PATH?.trim();
+  return configured ? resolve(configured) : DEFAULT_BINARY_PATH;
+}
+
+const BINARY_PATH = resolveSwiftBridgePath();
 
 // ── Bridge availability check ────────────────────────────────────────
 

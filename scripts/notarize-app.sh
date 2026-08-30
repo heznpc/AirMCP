@@ -55,6 +55,11 @@ if [ ! -d "$APP_BUNDLE" ]; then
   echo "notarize-app: app bundle not found — run scripts/bundle-app.sh first" >&2
   exit 1
 fi
+if /usr/libexec/PlistBuddy -c "Print :AirMCPAcceptanceHarnessBuild" \
+  "$APP_BUNDLE/Contents/Info.plist" >/dev/null 2>&1; then
+  echo "notarize-app: refusing to sign an acceptance-harness build; run scripts/bundle-app.sh bundle" >&2
+  exit 1
+fi
 
 need_var() {
   if [ -z "${!1:-}" ]; then

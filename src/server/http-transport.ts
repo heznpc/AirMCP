@@ -5,7 +5,7 @@
 
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
-import { randomUUID, timingSafeEqual, randomBytes, createHash, createHmac } from "node:crypto";
+import { randomUUID, timingSafeEqual, randomBytes, createHash } from "node:crypto";
 import type { Server as NodeHttpServer } from "node:http";
 import { NPM_PACKAGE_NAME } from "../shared/config.js";
 import { LIMITS, TIMEOUT } from "../shared/constants.js";
@@ -13,6 +13,15 @@ import { log, errToCtx } from "./../shared/logger.js";
 import { printBanner } from "../shared/banner.js";
 import { auditLog } from "../shared/audit.js";
 import { SERVER_ICON, WEBSITE_URL } from "../shared/icons.js";
+import {
+  APP_IDENTITY_CHALLENGE_PATH,
+  APP_RUNTIME_REQUEST_NONCE_HEADER,
+  APP_RUNTIME_RESPONSE_PROOF_HEADER,
+  APP_RUNTIME_RESPONSE_PROOF_SCHEME,
+  runtimeGenerationBearer,
+  runtimeIdentityProof,
+  runtimeResponseProof,
+} from "../shared/app-runtime-identity.js";
 import type { ToolRegistry } from "../shared/tool-registry.js";
 import { getOAuthClaims, getRequestContext, runWithRequestContext } from "../shared/request-context.js";
 import { checkIpRateLimit, pruneStaleIpBuckets } from "../shared/rate-limit.js";
@@ -46,9 +55,16 @@ if (ratePruneTimer.unref) ratePruneTimer.unref();
  *  clients. Only UUIDs are accepted so an untrusted HTTP peer cannot inject
  *  arbitrary text or high-cardinality labels into the audit trail. */
 export const RUN_ID_HEADER = "x-airmcp-run-id";
-export const APP_IDENTITY_CHALLENGE_PATH = "/app/identity-challenge";
+export {
+  APP_IDENTITY_CHALLENGE_PATH,
+  APP_RUNTIME_REQUEST_NONCE_HEADER,
+  APP_RUNTIME_RESPONSE_PROOF_HEADER,
+  APP_RUNTIME_RESPONSE_PROOF_SCHEME,
+  runtimeGenerationBearer,
+  runtimeIdentityProof,
+  runtimeResponseProof,
+};
 const RUN_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const APP_IDENTITY_NONCE_RE = /^[A-Za-z0-9_-]{32,64}$/;
 
 export function parseRunCorrelationId(value: string | string[] | undefined): string | undefined {
   if (typeof value !== "string") return undefined;
@@ -75,42 +91,6 @@ export function runtimeOwnerFingerprint(ownerSecret: string | undefined): string
 
 export function runtimeTokenFingerprint(token: string): string {
   return createHash("sha256").update(`airmcp-runtime-token-v1\n${token}`).digest("hex");
-}
-
-/** Prove possession of the per-generation app owner secret without exposing
- * either that secret or the persistent HTTP bearer token. Native app clients
- * verify this proof before any authenticated request reaches the listener. */
-export function runtimeIdentityProof(
-  ownerSecret: string | undefined,
-  nonce: string | undefined,
-  pid: number,
-  version: string,
-): string | undefined {
-  const normalized = ownerSecret?.trim();
-  if (!normalized || !/^[A-Za-z0-9_-]{43}$/.test(normalized)) return undefined;
-  if (!nonce || !APP_IDENTITY_NONCE_RE.test(nonce)) return undefined;
-  if (!Number.isSafeInteger(pid) || pid <= 1 || !version) return undefined;
-  return createHmac("sha256", normalized)
-    .update(`airmcp-app-listener-v1\n${nonce}\n${pid}\n${version}`, "utf8")
-    .digest("hex");
-}
-
-/** Generation-scoped bearer for native/plugin clients that already proved the
- * owner secret. It becomes useless as soon as the app-owned child exits because
- * the native launcher rotates that secret for every new runtime generation. */
-export function runtimeGenerationBearer(
-  ownerSecret: string | undefined,
-  pid: number,
-  version: string,
-): string | undefined {
-  const normalized = ownerSecret?.trim();
-  if (!normalized || !/^[A-Za-z0-9_-]{43}$/.test(normalized) || !Number.isSafeInteger(pid) || pid < 2 || !version) {
-    return undefined;
-  }
-  const proof = createHmac("sha256", normalized)
-    .update(`airmcp-app-generation-bearer-v1\n${pid}\n${version}`, "utf8")
-    .digest("hex");
-  return `airmcp_app_${proof}`;
 }
 
 /**
@@ -546,6 +526,7 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
     "MCP-Protocol-Version",
     "Last-Event-ID",
     "X-AirMCP-Run-Id",
+    "X-AirMCP-Runtime-Nonce",
   ] as const;
   const CORS_EXPOSED_HEADERS = [
     "Mcp-Session-Id",
@@ -553,6 +534,7 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
     "X-Request-ID",
     "WWW-Authenticate",
     "Retry-After",
+    "X-AirMCP-Runtime-Proof",
     "RateLimit",
     "RateLimit-Limit",
     "RateLimit-Remaining",
@@ -588,7 +570,7 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
   // Both the bucket math and the IP eviction policy live in the shared
   // rate-limit module — this middleware only owns the response shape.
   app.use((req, res, next) => {
-    if (req.path === "/health" || req.path === APP_IDENTITY_CHALLENGE_PATH) return next();
+    if (req.path === "/health") return next();
     const ip = req.ip ?? req.socket.remoteAddress ?? "unknown";
     const verdict = checkIpRateLimit(ip);
     res.set("RateLimit-Limit", String(verdict.limit));
@@ -755,6 +737,35 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
     });
   }
 
+  // The generation bearer prevents reuse against a later app child, while
+  // this per-request response proof demonstrates possession of the current
+  // process-generation secret for the separate Streamable HTTP fetch. It does
+  // not hash the streamed response body. A listener that
+  // replaces the verified child after the challenge can observe only a stale
+  // generation bearer; it cannot authenticate an MCP response without the
+  // current-user owner secret. Persistent-token clients retain their existing
+  // wire contract and do not need this connector-only nonce header.
+  app.use((req, res, next) => {
+    if (
+      req.path !== "/mcp" ||
+      !appOwnedRuntime ||
+      !appRuntimeAuthorizationToken ||
+      req.headers.authorization !== `Bearer ${appRuntimeAuthorizationToken}`
+    ) {
+      return next();
+    }
+    const nonceHeader = req.headers[APP_RUNTIME_REQUEST_NONCE_HEADER];
+    const nonce = typeof nonceHeader === "string" ? nonceHeader : undefined;
+    const proof = runtimeResponseProof(appRuntimeOwnerSecret, nonce, process.pid, pkg.version, req.method, req.path);
+    if (!proof) {
+      res.status(400).json({ error: "Invalid app runtime request nonce" });
+      return;
+    }
+    res.set(APP_RUNTIME_RESPONSE_PROOF_HEADER, proof);
+    res.set("Cache-Control", "no-store");
+    next();
+  });
+
   // Parse MCP JSON only after origin, rate-limit, preflight, and authentication
   // gates. The parser's errors are normalized here instead of falling through
   // to Express's development handler, which otherwise returns a stack trace
@@ -902,7 +913,7 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
   });
 
   // Tokenless server-authentication challenge for the native app. The caller
-  // contributes a fresh nonce and verifies the HMAC with the owner-only
+  // contributes a fresh nonce and verifies the HMAC with the current-user
   // generation secret before deriving authorization scoped to this process.
   app.get(APP_IDENTITY_CHALLENGE_PATH, (req, res) => {
     if (!appOwnedRuntime) {
@@ -922,13 +933,14 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
       appOwned: true,
       pid: process.pid,
       proof,
+      responseProof: APP_RUNTIME_RESPONSE_PROOF_SCHEME,
     });
   });
 
   // Authenticated native-app state: unlike public /health, this may reveal the
   // effective module and HITL policies. Setup uses it to prove the running
   // generation actually parsed the exact scope and per-call approval policy.
-  // PID plus the app-only owner fingerprint binds lifecycle control to this
+  // PID plus the current-user owner fingerprint binds lifecycle control to this
   // exact process instead of every process with a matching command line.
   app.get("/app/runtime-state", (_req, res) => {
     if (!appOwnedRuntime || !httpToken || !appRuntimeOwnerFingerprint) {

@@ -3,6 +3,14 @@ import UserNotifications
 import AppKit
 import WidgetKit
 
+private var acceptanceHarnessForcesAppRuntime: Bool {
+    #if AIRMCP_ACCEPTANCE_HARNESS
+    return ProcessInfo.processInfo.environment[AirMcpConstants.envForceAppRuntime] == "1"
+    #else
+    return false
+    #endif
+}
+
 @main
 struct AirMCPApp: App {
     @NSApplicationDelegateAdaptor(AirMCPApplicationDelegate.self)
@@ -125,7 +133,7 @@ struct AirMCPApp: App {
 
             if ProcessInfo.processInfo.environment[AirMcpConstants.envShowOnboarding] == "1" {
                 showOnboardingWindow()
-            } else if ProcessInfo.processInfo.environment[AirMcpConstants.envForceAppRuntime] == "1" {
+            } else if acceptanceHarnessForcesAppRuntime {
                 serverManager.startServer()
             } else if !onboardingCompleted && !onboardingPresented {
                 showOnboardingWindow()

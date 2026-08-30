@@ -41,6 +41,9 @@ describe("app-owned runtime npm package pin", () => {
       'request.setValue("Bearer \\(listener.authorizationToken)", forHTTPHeaderField: "Authorization")',
     );
     expect(appIntents).toContain("AppRuntimeToken.runtimeGenerationBearer(");
+    expect(appIntents).toContain('request.setValue(nonce, forHTTPHeaderField: "X-AirMCP-Runtime-Nonce")');
+    expect(appIntents).toContain('response.value(forHTTPHeaderField: "X-AirMCP-Runtime-Proof")');
+    expect(appIntents).toContain("AppRuntimeToken.runtimeResponseProofIsValid(");
     expect(appIntents).not.toContain('request.setValue("Bearer \\(token)", forHTTPHeaderField: "Authorization")');
     expect(appIntents).toContain('request.setValue(sessionID, forHTTPHeaderField: "Mcp-Session-Id")');
     expect(appIntents).toContain('"application/json, text/event-stream"');
@@ -65,6 +68,20 @@ describe("app-owned runtime npm package pin", () => {
     expect(menuContent).toContain('L("settings.launchAtLogin")');
   });
 
+  test("explicit menu and Quick Setup starts commit recovery only after verified readiness", () => {
+    const setupManager = readFileSync(new URL("../app/Sources/AirMCPApp/SetupManager.swift", import.meta.url), "utf8");
+    const explicitStart = serverManager.match(/func startServerFromExplicitUserAction\(\) \{([\s\S]*?)\n    \}/)?.[1];
+
+    expect(explicitStart).toBeDefined();
+    expect(explicitStart).toContain("commitAutoStartOnReady: true");
+    expect(explicitStart).not.toContain("autoStartEnabled = true");
+    expect(serverManager).toContain("shouldCommitExplicitAutoStart(");
+    expect(serverManager).toContain("hasVerifiedIdentity: existingIdentity != nil");
+    expect(serverManager).toContain("hasVerifiedIdentity: runtimeIdentity != nil");
+    expect(menuContent).toContain("serverManager.startServerFromExplicitUserAction()");
+    expect(setupManager).toContain("serverManager.startServerFromExplicitUserAction()");
+  });
+
   test("normal AppKit termination signals the owned runtime child", () => {
     expect(app).toContain("@NSApplicationDelegateAdaptor(AirMCPApplicationDelegate.self)");
     expect(app).toContain("serverManager?.prepareForApplicationTermination()");
@@ -86,8 +103,16 @@ describe("app-owned runtime npm package pin", () => {
     const bundleScript = readFileSync(new URL("../scripts/bundle-app.sh", import.meta.url), "utf8");
     expect(menuContent).toContain('static let envForceAppRuntime = "AIRMCP_FORCE_APP_RUNTIME"');
     expect(app).toContain('ProcessInfo.processInfo.environment[AirMcpConstants.envForceAppRuntime] == "1"');
+    expect(app).toContain("#if AIRMCP_ACCEPTANCE_HARNESS");
+    expect(app).toContain("acceptanceHarnessForcesAppRuntime");
     expect(app).toContain("serverManager.startServer()");
     expect(bundleScript).toContain("export AIRMCP_FORCE_APP_RUNTIME=1");
+    expect(bundleScript).toContain("APP_SWIFT_BUILD_ARGS+=(-Xswiftc -DAIRMCP_ACCEPTANCE_HARNESS)");
+    expect(bundleScript).toContain('BUNDLE_DIR="$PROJECT_DIR/.build/AirMCP-Acceptance.app"');
+    expect(bundleScript).toContain("AirMCPAcceptanceHarnessBuild");
+    expect(bundleScript).toMatch(
+      /case "\$MODE" in\s+verify\|verify-governed\|verify-appintents\)[\s\S]*?-DAIRMCP_ACCEPTANCE_HARNESS[\s\S]*?;;\s+esac/,
+    );
     expect(bundleScript).toContain("verify_app_owned_runtime");
     expect(bundleScript).toContain("app-owned runtime version mismatch");
     expect(bundleScript).toContain("unauthenticated /mcp request should return 401");

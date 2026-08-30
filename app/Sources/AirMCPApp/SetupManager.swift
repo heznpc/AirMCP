@@ -61,7 +61,7 @@ final class SetupManager {
                 self?.state = .step(2, L("setup.startingServer"))
             }
 
-            serverManager.startServer()
+            serverManager.startServerFromExplicitUserAction()
 
             // Wait for server to come up (up to 15 seconds)
             var attempts = 0

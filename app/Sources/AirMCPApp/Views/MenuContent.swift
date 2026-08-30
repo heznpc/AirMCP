@@ -241,7 +241,7 @@ struct MenuContent: View {
             case .stopped, .error:
                 Button {
                     requestApprovalNotificationsForExplicitRuntimeStart()
-                    serverManager.startServer()
+                    serverManager.startServerFromExplicitUserAction()
                 } label: {
                     Label(L("menu.startServer"), systemImage: "play.circle")
                 }

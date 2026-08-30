@@ -58,13 +58,37 @@ function listSkillFiles(skillsRoot) {
     .filter((path) => existsSync(path));
 }
 
-function listPluginTextFiles(root) {
+const ALLOWED_PLUGIN_FILE_PATHS = new Set([
+  ".app.json",
+  ".codex-plugin/plugin.json",
+  ".mcp.json",
+  "README.md",
+  "assets/icon-64.png",
+  "assets/logo-512.png",
+  "evals/chatgpt.json",
+  "scripts/airmcp-app-stdio.mjs",
+  "scripts/launch-airmcp-connector.sh",
+  "skills/apple-apps/SKILL.md",
+  "skills/apple-apps/agents/openai.yaml",
+]);
+
+function listPluginFiles(root, errors) {
   const files = [];
   const visit = (directory) => {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
       const path = join(directory, entry.name);
-      if (entry.isDirectory()) visit(path);
-      else if (entry.isFile() && /(?:^|\.)(?:json|md|mjs|js|sh|ya?ml)$/i.test(entry.name)) files.push(path);
+      const rel = relative(root, path).split("\\").join("/");
+      if (entry.isSymbolicLink()) {
+        errors.push(`plugin must not contain symbolic links: ${rel}`);
+      } else if (entry.isDirectory()) {
+        visit(path);
+      } else if (!entry.isFile()) {
+        errors.push(`plugin contains an unsupported filesystem entry: ${rel}`);
+      } else if (!ALLOWED_PLUGIN_FILE_PATHS.has(rel)) {
+        errors.push(`plugin contains an unsupported file: ${rel}`);
+      } else {
+        files.push(path);
+      }
     }
   };
   visit(root);
@@ -102,7 +126,8 @@ export function validateChatgptPlugin(pluginPath = DEFAULT_PLUGIN, options = {})
     errors.push("plugin manifest contains placeholder text");
   }
 
-  for (const path of listPluginTextFiles(pluginRoot)) {
+  const pluginFiles = listPluginFiles(pluginRoot, errors);
+  for (const path of pluginFiles) {
     const rel = relative(pluginRoot, path);
     const body = readFileSync(path, "utf8");
     if (/\/Users\/[^\s"']+/.test(body)) {
@@ -204,7 +229,7 @@ export function validateChatgptPlugin(pluginPath = DEFAULT_PLUGIN, options = {})
     }
   }
 
-  return { ok: errors.length === 0, errors, manifest, pluginRoot };
+  return { ok: errors.length === 0, errors, manifest, pluginRoot, files: pluginFiles };
 }
 
 function main() {

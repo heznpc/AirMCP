@@ -152,7 +152,13 @@ Starting the local runtime creates the owner-only token at
 `~/Library/Application Support/AirMCP/http-token` and starts the loopback
 runtime at `http://127.0.0.1:3847/mcp`. Merely opening AirMCP.app or finishing
 Setup does neither. Stdio-only clients use `npx -y airmcp connect` as a proxy
-into that runtime with `AIRMCP_HTTP_TOKEN` set.
+into that runtime. Current client setup still stores the owner-only persistent
+`AIRMCP_HTTP_TOKEN` for backward-compatible configuration detection and repair,
+but the canonical proxy does not forward it: it verifies the signed app child
+and live app/Node processes, derives a bearer scoped to the live process
+generation, and requires a fresh nonce-bound MAC on every MCP response. File
+mode `0600` protects these credentials from other Unix users, not a hostile
+process already running under the same macOS account.
 
 The app-owned path centralizes runtime state, approvals, and Trust Center
 history. Do not configure this path from an older npm release unless the

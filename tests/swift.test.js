@@ -36,8 +36,13 @@ jest.unstable_mockModule('../dist/shared/constants.js', () => ({
   BUFFER: { SWIFT: 1024, SWIFT_LINE_MAX: 512 },
 }));
 
-const { checkSwiftBridge, runSwift, closeSwiftBridge, hasSwiftCommand } =
+const TEST_APP_BRIDGE_PATH = '/Applications/AirMCP.app/Contents/Resources/airmcp/bin/AirMcpBridge';
+const originalBridgePath = process.env.AIRMCP_BRIDGE_PATH;
+process.env.AIRMCP_BRIDGE_PATH = TEST_APP_BRIDGE_PATH;
+const { checkSwiftBridge, runSwift, closeSwiftBridge, hasSwiftCommand, resolveSwiftBridgePath } =
   await import('../dist/shared/swift.js');
+if (originalBridgePath === undefined) delete process.env.AIRMCP_BRIDGE_PATH;
+else process.env.AIRMCP_BRIDGE_PATH = originalBridgePath;
 
 // ── Test helpers ────────────────────────────────────────────────────
 
@@ -85,6 +90,22 @@ describe('swift bridge', () => {
     expect(typeof runSwift).toBe('function');
     expect(typeof closeSwiftBridge).toBe('function');
     expect(typeof hasSwiftCommand).toBe('function');
+    expect(typeof resolveSwiftBridgePath).toBe('function');
+  });
+
+  test('prefers the app-bundled bridge path from AIRMCP_BRIDGE_PATH', () => {
+    expect(resolveSwiftBridgePath({
+      AIRMCP_BRIDGE_PATH: '  /Applications/AirMCP.app/Contents/Resources/airmcp/bin/AirMcpBridge  ',
+    })).toBe('/Applications/AirMCP.app/Contents/Resources/airmcp/bin/AirMcpBridge');
+  });
+
+  test('falls back to the package-local development bridge', () => {
+    expect(resolveSwiftBridgePath({})).toMatch(/\/swift\/\.build\/release\/AirMcpBridge$/);
+  });
+
+  test('checks the app-provided bridge path captured at module load', async () => {
+    await checkSwiftBridge();
+    expect(mockAccess).toHaveBeenCalledWith(TEST_APP_BRIDGE_PATH);
   });
 
   test('checkSwiftBridge caches result', async () => {

@@ -48,12 +48,18 @@ describe('screen script generators', () => {
     expect(script).toContain('airmcp-screenshot-');
     expect(script).toContain('JSON.stringify');
     expect(script).toContain('CGWindowListCopyWindowInfo');
+    expect(script).toContain("ObjC.import('CoreGraphics')");
+    expect(script).toContain('ObjC.castRefToObject');
+    expect(script).toContain('ObjC.deepUnwrap');
+    expect(script).not.toContain('python3');
+    expect(script).not.toContain('import Quartz');
   });
 
   test('captureWindowScript activates app when appName given', () => {
     const script = captureWindowScript('Safari');
     expect(script).toContain("Application('Safari')");
     expect(script).toContain('activate()');
+    expect(script).toContain("win.kCGWindowOwnerName !== 'Safari'");
     expect(script).toContain('screencapture -x -t png -l');
   });
 

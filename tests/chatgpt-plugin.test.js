@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, test } from "@jest/globals";
 import {
   chmodSync,
+  cpSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -94,12 +96,25 @@ describe("AirMCP ChatGPT plugin package", () => {
     const stagedManifest = JSON.parse(readFileSync(join(staged.pluginPath, ".codex-plugin", "plugin.json"), "utf8"));
     const app = JSON.parse(readFileSync(join(staged.pluginPath, ".app.json"), "utf8"));
     const marketplace = JSON.parse(readFileSync(staged.marketplacePath, "utf8"));
+    const markerText = readFileSync(join(staged.outputDir, ".airmcp-chatgpt-plugin-stage.json"), "utf8");
+    const marker = JSON.parse(markerText);
 
     expect(stagedManifest.apps).toBe("./.app.json");
     expect(stagedManifest.version).toBe(`${PACKAGE.version}+codex.${CACHEBUSTER}`);
     expect(staged.pluginVersion).toBe(stagedManifest.version);
     expect(app).toEqual({ apps: { airmcp: { id: APP_ID } } });
     expect(marketplace.plugins[0].source.path).toBe("./plugins/airmcp");
+    expect(marker).toMatchObject({
+      generatedBy: "airmcp-chatgpt-plugin-stager",
+      schemaVersion: 3,
+      layout: "airmcp-local-marketplace-v1",
+    });
+    expect(marker.outputIdentity).toEqual({
+      device: expect.stringMatching(/^\d+$/),
+      inode: expect.stringMatching(/^\d+$/),
+    });
+    expect(marker.outputDir).toBeUndefined();
+    expect(markerText).not.toContain(outputDir);
     expect(readFileSync(join(PLUGIN_ROOT, ".codex-plugin", "plugin.json"), "utf8")).toBe(sourceBefore);
     expect(
       validateChatgptPlugin(staged.pluginPath, {
@@ -114,6 +129,44 @@ describe("AirMCP ChatGPT plugin package", () => {
         allowCodexCachebuster: true,
       }).errors,
     ).toContain("source plugin manifest must omit apps; add the registered mapping only while staging");
+  });
+
+  test("validation and staging reject unexpected files before they can leak", () => {
+    const temp = mkdtempSync(join(tmpdir(), "airmcp-chatgpt-plugin-"));
+    tempDirs.push(temp);
+    const sourcePlugin = join(temp, "source");
+    const outputDir = join(temp, "stage");
+    cpSync(PLUGIN_ROOT, sourcePlugin, { recursive: true });
+    writeFileSync(
+      join(sourcePlugin, "leak.env"),
+      'CONTROL_PLANE_API_KEY="sk-proj-0123456789abcdefghijklmnop"\nHOME="/Users/private"\n',
+    );
+    writeFileSync(join(sourcePlugin, "notes.txt"), "private staging note\n");
+    writeFileSync(join(sourcePlugin, "SECRET"), "extensionless secret\n");
+    writeFileSync(join(sourcePlugin, "scripts", "local-secret.js"), "export const controlPlaneKey = 'private';\n");
+    writeFileSync(join(sourcePlugin, "evals", "private.json"), '{"private":true}\n');
+    const outsideSecret = join(temp, "outside.json");
+    writeFileSync(outsideSecret, '{"token":"outside"}\n');
+    symlinkSync(outsideSecret, join(sourcePlugin, "linked.json"));
+
+    const validation = validateChatgptPlugin(sourcePlugin, { expectedVersion: PACKAGE.version });
+    expect(validation.ok).toBe(false);
+    expect(validation.errors).toContain("plugin contains an unsupported file: leak.env");
+    expect(validation.errors).toContain("plugin contains an unsupported file: notes.txt");
+    expect(validation.errors).toContain("plugin contains an unsupported file: SECRET");
+    expect(validation.errors).toContain("plugin contains an unsupported file: scripts/local-secret.js");
+    expect(validation.errors).toContain("plugin contains an unsupported file: evals/private.json");
+    expect(validation.errors).toContain("plugin must not contain symbolic links: linked.json");
+    expect(() =>
+      stageChatgptPlugin({
+        appId: APP_ID,
+        outputDir,
+        sourcePlugin,
+        expectedVersion: PACKAGE.version,
+        cachebuster: CACHEBUSTER,
+      }),
+    ).toThrow(/unsupported file: leak\.env/);
+    expect(existsSync(outputDir)).toBe(false);
   });
 
   test("staging cachebusters are UTC, stable in shape, and replace build metadata", () => {
@@ -181,6 +234,20 @@ describe("AirMCP ChatGPT plugin package", () => {
       expectedVersion: PACKAGE.version,
       cachebuster: CACHEBUSTER,
     });
+    const markerPath = join(outputDir, ".airmcp-chatgpt-plugin-stage.json");
+    writeFileSync(
+      markerPath,
+      `${JSON.stringify(
+        {
+          generatedBy: "airmcp-chatgpt-plugin-stager",
+          schemaVersion: 2,
+          outputDir,
+          layout: "airmcp-local-marketplace-v1",
+        },
+        null,
+        2,
+      )}\n`,
+    );
     const replacement = stageChatgptPlugin({
       appId: APP_ID,
       outputDir,
@@ -190,6 +257,36 @@ describe("AirMCP ChatGPT plugin package", () => {
       cachebuster: "local-20260830-120001",
     });
     expect(replacement.pluginVersion).toBe(`${PACKAGE.version}+codex.local-20260830-120001`);
+    const replacementMarker = JSON.parse(readFileSync(markerPath, "utf8"));
+    expect(replacementMarker.schemaVersion).toBe(3);
+    expect(replacementMarker.outputIdentity).toEqual({
+      device: expect.stringMatching(/^\d+$/),
+      inode: expect.stringMatching(/^\d+$/),
+    });
+    expect(replacementMarker.outputDir).toBeUndefined();
+
+    writeFileSync(
+      markerPath,
+      `${JSON.stringify(
+        {
+          ...replacementMarker,
+          outputIdentity: { ...replacementMarker.outputIdentity, inode: "0" },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    expect(() =>
+      stageChatgptPlugin({
+        appId: APP_ID,
+        outputDir,
+        force: true,
+        sourcePlugin: PLUGIN_ROOT,
+        expectedVersion: PACKAGE.version,
+        cachebuster: "local-20260830-120002",
+      }),
+    ).toThrow(/unowned staging output/);
+    writeFileSync(markerPath, `${JSON.stringify(replacementMarker, null, 2)}\n`);
 
     const unknown = join(outputDir, "keep-me");
     writeFileSync(unknown, "not generated by the stager");
@@ -254,6 +351,7 @@ describe("AirMCP app-owned connector boundaries", () => {
           appOwned: true,
           pid: expectedPid,
           proof: runtimeIdentityProof(secret, nonce, expectedPid, PACKAGE.version),
+          responseProof: "hmac-sha256-v1",
         }),
       );
     });
@@ -275,26 +373,23 @@ describe("AirMCP app-owned connector boundaries", () => {
   });
 
   test("tunnel control-plane credentials are not forwarded into AirMCP", () => {
-    const childEnv = makeProxyEnvironment(
-      {
-        HOME: "/tmp/attacker-home",
-        PATH: "/usr/bin",
-        CONTROL_PLANE_API_KEY: "sensitive-tunnel-key",
-        AIRMCP_APP_PATH: "/tmp/fake.app",
-        AIRMCP_APP_TEAM_ID: "ATTACKER",
-        AIRMCP_CONNECT_URL: "http://127.0.0.1:9999/mcp",
-        AIRMCP_SKIP_APP_SIGNATURE_CHECK: "1",
-        NODE_OPTIONS: "--require=/tmp/steal-token.cjs",
-        NODE_PATH: "/tmp/attacker-modules",
-        DYLD_INSERT_LIBRARIES: "/tmp/steal-token.dylib",
-        LD_PRELOAD: "/tmp/steal-token.so",
-        HTTPS_PROXY: "http://attacker.invalid:8080",
-      },
-      "local-app-token",
-    );
+    const childEnv = makeProxyEnvironment({
+      HOME: "/tmp/attacker-home",
+      PATH: "/usr/bin",
+      CONTROL_PLANE_API_KEY: "sensitive-tunnel-key",
+      AIRMCP_APP_PATH: "/tmp/fake.app",
+      AIRMCP_APP_TEAM_ID: "ATTACKER",
+      AIRMCP_CONNECT_URL: "http://127.0.0.1:9999/mcp",
+      AIRMCP_SKIP_APP_SIGNATURE_CHECK: "1",
+      NODE_OPTIONS: "--require=/tmp/steal-token.cjs",
+      NODE_PATH: "/tmp/attacker-modules",
+      DYLD_INSERT_LIBRARIES: "/tmp/steal-token.dylib",
+      LD_PRELOAD: "/tmp/steal-token.so",
+      HTTPS_PROXY: "http://attacker.invalid:8080",
+    });
     expect(childEnv.PATH).toBe("/usr/bin:/bin:/usr/sbin:/sbin");
     expect(childEnv.HOME).not.toBe("/tmp/attacker-home");
-    expect(childEnv.AIRMCP_HTTP_TOKEN).toBe("local-app-token");
+    expect(childEnv.AIRMCP_HTTP_TOKEN).toBeUndefined();
     expect(childEnv.AIRMCP_CONNECT_NO_LAUNCH).toBe("1");
     expect(childEnv.CONTROL_PLANE_API_KEY).toBeUndefined();
     expect(childEnv.AIRMCP_APP_PATH).toBeUndefined();
@@ -345,12 +440,12 @@ describe("AirMCP app-owned connector boundaries", () => {
     ).toThrow(/verified AirMCP app/);
   });
 
-  test("connector accepts only loopback streamable HTTP endpoints", () => {
+  test("connector accepts only the exact canonical streamable HTTP endpoint", () => {
     expect(validateLoopbackMcpUrl("http://127.0.0.1:3847/mcp").port).toBe("3847");
     expect(listenerInspectionArgs("http://127.0.0.1:3847/mcp")).toContain("-iTCP:3847");
     expect(listenerInspectionArgs("http://127.0.0.1:3847/mcp").join(" ")).not.toContain("@127.0.0.1");
-    expect(() => validateLoopbackMcpUrl("https://example.com/mcp")).toThrow(/loopback/);
-    expect(() => validateLoopbackMcpUrl("http://127.0.0.1:3847/health")).toThrow(/loopback/);
+    expect(() => validateLoopbackMcpUrl("https://example.com/mcp")).toThrow(/exact http:\/\/127\.0\.0\.1/);
+    expect(() => validateLoopbackMcpUrl("http://127.0.0.1:3847/health")).toThrow(/exact http:\/\/127\.0\.0\.1/);
   });
 
   test("runtime recovery targets the exact signed app with one canonical deep link", () => {

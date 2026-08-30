@@ -263,11 +263,13 @@ struct AppRuntimeIdentityChallenge: Decodable, Sendable, Equatable {
     let appOwned: Bool
     let pid: Int
     let proof: String
+    let responseProof: String
 }
 
 struct VerifiedAppRuntimeListener: Sendable, Equatable {
     let challenge: AppRuntimeIdentityChallenge
     let authorizationToken: String
+    let responseProofKey: String
 }
 
 struct AppRuntimeModuleUnavailable: Decodable, Sendable, Equatable {
@@ -309,7 +311,8 @@ enum AppRuntimeClient {
     ) -> Bool {
         guard challenge.status == "ok",
               challenge.version == expectedVersion,
-              challenge.appOwned
+              challenge.appOwned,
+              challenge.responseProof == "hmac-sha256-v1"
         else { return false }
         return AppRuntimeToken.listenerIdentityProofIsValid(
             challenge.proof,
@@ -347,7 +350,8 @@ enum AppRuntimeClient {
         }
         return VerifiedAppRuntimeListener(
             challenge: challenge,
-            authorizationToken: authorizationToken
+            authorizationToken: authorizationToken,
+            responseProofKey: challengeRequest.ownerSecret
         )
     }
 
@@ -377,7 +381,8 @@ enum AppRuntimeClient {
             ) else { return }
             box.store(VerifiedAppRuntimeListener(
                 challenge: challenge,
-                authorizationToken: authorizationToken
+                authorizationToken: authorizationToken,
+                responseProofKey: challengeRequest.ownerSecret
             ))
         }
         task.resume()
@@ -386,6 +391,36 @@ enum AppRuntimeClient {
             return nil
         }
         return box.load()
+    }
+
+    /// Attach the per-request nonce required for generation-authorized MCP
+    /// traffic and validate fresh runtime-possession proof before accepting a
+    /// payload within the current-user boundary. The proof does not hash the body.
+    static func authorizeMCPRequest(
+        _ request: inout URLRequest,
+        listener: VerifiedAppRuntimeListener
+    ) -> String {
+        let nonce = UUID().uuidString.lowercased()
+        request.setValue("Bearer \(listener.authorizationToken)", forHTTPHeaderField: "Authorization")
+        request.setValue(nonce, forHTTPHeaderField: "X-AirMCP-Runtime-Nonce")
+        return nonce
+    }
+
+    static func mcpResponseProofIsValid(
+        _ response: HTTPURLResponse,
+        nonce: String,
+        listener: VerifiedAppRuntimeListener,
+        method: String
+    ) -> Bool {
+        AppRuntimeToken.runtimeResponseProofIsValid(
+            response.value(forHTTPHeaderField: "X-AirMCP-Runtime-Proof"),
+            nonce: nonce,
+            processIdentifier: listener.challenge.pid,
+            version: listener.challenge.version,
+            method: method,
+            path: "/mcp",
+            ownerSecret: listener.responseProofKey
+        )
     }
 
     /// Shared governed execution path for macOS App Intents and Services.
@@ -988,7 +1023,7 @@ private func postAppRuntimeMCPRequest(
     request.timeoutInterval = timeoutInterval
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
     request.setValue("application/json, text/event-stream", forHTTPHeaderField: "Accept")
-    request.setValue("Bearer \(listener.authorizationToken)", forHTTPHeaderField: "Authorization")
+    let responseNonce = AppRuntimeClient.authorizeMCPRequest(&request, listener: listener)
     if let sessionID {
         request.setValue(sessionID, forHTTPHeaderField: "Mcp-Session-Id")
     }
@@ -1000,6 +1035,14 @@ private func postAppRuntimeMCPRequest(
     let (data, response) = try await URLSession.shared.data(for: request)
     guard let http = response as? HTTPURLResponse else {
         throw AppIntentMCPTransportError.invalidJSONResponse("missing HTTP response")
+    }
+    guard AppRuntimeClient.mcpResponseProofIsValid(
+        http,
+        nonce: responseNonce,
+        listener: listener,
+        method: "POST"
+    ) else {
+        throw AppIntentMCPTransportError.unverifiedRuntimeListener
     }
     guard (200..<300).contains(http.statusCode) else {
         let body = String(data: data, encoding: .utf8) ?? ""
@@ -1017,9 +1060,17 @@ private func closeAppRuntimeMCPSession(sessionID: String, token _: String) async
     var request = URLRequest(url: try appRuntimeURL())
     request.httpMethod = "DELETE"
     request.timeoutInterval = 1
-    request.setValue("Bearer \(listener.authorizationToken)", forHTTPHeaderField: "Authorization")
+    let responseNonce = AppRuntimeClient.authorizeMCPRequest(&request, listener: listener)
     request.setValue(sessionID, forHTTPHeaderField: "Mcp-Session-Id")
-    _ = try await URLSession.shared.data(for: request)
+    let (_, response) = try await URLSession.shared.data(for: request)
+    guard let http = response as? HTTPURLResponse,
+          AppRuntimeClient.mcpResponseProofIsValid(
+              http,
+              nonce: responseNonce,
+              listener: listener,
+              method: "DELETE"
+          )
+    else { throw AppIntentMCPTransportError.unverifiedRuntimeListener }
 }
 
 private func decodeMCPHTTPBody(_ data: Data, allowsEmptyResponse: Bool = false) throws -> [String: Any] {

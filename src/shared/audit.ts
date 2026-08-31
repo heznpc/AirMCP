@@ -297,6 +297,84 @@ function isSensitiveTool(name: string): boolean {
   return SENSITIVE_TOOL_PATTERNS.some((re) => re.test(name));
 }
 
+/**
+ * Per-argument redaction for UI tools whose remaining arguments are useful
+ * audit context. These values can contain typed credentials or serialized UI
+ * state, but their names are intentionally generic and therefore do not match
+ * sanitizeArgs' secret-key patterns.
+ */
+const SENSITIVE_UI_ARGS: ReadonlyMap<string, ReadonlySet<string>> = new Map([
+  ["ui_click", new Set(["text"])],
+  ["ui_type", new Set(["text"])],
+  ["ui_press_key", new Set(["key"])],
+  ["ui_accessibility_query", new Set(["title", "value", "description", "label"])],
+  ["ui_perform_action", new Set(["title", "value", "description", "label", "actionValue"])],
+  ["ui_diff", new Set(["beforeSnapshot"])],
+]);
+
+function redactSensitiveUiArgs(tool: string, args: Record<string, unknown>): Record<string, unknown> {
+  const sensitiveArgs = SENSITIVE_UI_ARGS.get(tool);
+  if (!sensitiveArgs) return args;
+
+  let changed = false;
+  const redacted: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(args)) {
+    if (sensitiveArgs.has(key) && value !== undefined && value !== null) {
+      redacted[key] = {
+        _redacted: "ui_input",
+        ...(typeof value === "string" ? { length: value.length } : {}),
+      };
+      changed = true;
+    } else {
+      redacted[key] = value;
+    }
+  }
+  return changed ? redacted : args;
+}
+
+const MAX_PREVIEW_ACTION_DEPTH = 3;
+
+function isArgsRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function sanitizeToolArgsAtDepth(
+  tool: string,
+  args: Record<string, unknown>,
+  previewDepth: number,
+): Record<string, unknown> {
+  if (isSensitiveTool(tool)) return { _redacted: "sensitive_tool" };
+
+  const sanitized = sanitizeArgs(redactSensitiveUiArgs(tool, args));
+  if (tool !== "preview_action" || !Object.hasOwn(args, "args")) return sanitized;
+
+  const targetTool = args.tool;
+  const targetArgs = args.args;
+  // `preview_action` is itself audited as a tool call. Its nested `args`
+  // describe the target tool, so generic key-only scrubbing is insufficient:
+  // `{ tool: "ui_type", args: { text: "..." } }` would otherwise seal the
+  // typed value into the HMAC chain. Invalid/malicious wrapper shapes and
+  // unbounded preview-of-preview recursion fail closed by dropping the entire
+  // nested payload.
+  const nested =
+    typeof targetTool === "string" &&
+    targetTool.length > 0 &&
+    isArgsRecord(targetArgs) &&
+    previewDepth < MAX_PREVIEW_ACTION_DEPTH
+      ? sanitizeToolArgsAtDepth(targetTool, targetArgs, previewDepth + 1)
+      : { _redacted: "preview_target_args" };
+  return { ...sanitized, args: nested };
+}
+
+/**
+ * Apply the exact tool-aware redaction policy used by both persisted audit
+ * rows and pre-hoc previews. Keeping this boundary shared prevents a preview
+ * from exposing data that the corresponding executed call would redact.
+ */
+export function sanitizeToolArgs(tool: string, args: Record<string, unknown>): Record<string, unknown> {
+  return sanitizeToolArgsAtDepth(tool, args, 0);
+}
+
 let initialized = false;
 let buffer: string[] = [];
 let bufferBytes = 0;
@@ -338,12 +416,7 @@ export function auditLog(entry: AuditEntry): void {
   if (auditDisabled) {
     maybeAttemptRecovery();
   }
-  let sanitized: Record<string, unknown> | undefined;
-  if (isSensitiveTool(entry.tool)) {
-    sanitized = entry.args ? { _redacted: "sensitive_tool" } : undefined;
-  } else if (entry.args) {
-    sanitized = sanitizeArgs(entry.args);
-  }
+  const sanitized = entry.args ? sanitizeToolArgs(entry.tool, entry.args) : undefined;
   // Auto-attach the active correlation ID when the caller didn't pass
   // one. Falls through to undefined for synthetic / pre-context callers
   // (e.g. startup banner, direct test invocations).

@@ -10,9 +10,9 @@ const readAuditEntriesMock = jest.fn();
 jest.unstable_mockModule("../dist/shared/audit.js", () => ({
   auditLog: auditLogMock,
   readAuditEntries: readAuditEntriesMock,
-  // previewCall() PII-scrubs args via sanitizeArgs; a passthrough is enough
+  // previewCall() PII-scrubs args via sanitizeToolArgs; a passthrough is enough
   // for registry unit tests that don't assert on the scrubbing itself.
-  sanitizeArgs: jest.fn((a) => a),
+  sanitizeToolArgs: jest.fn((_tool, args) => args),
 }));
 jest.unstable_mockModule("../dist/shared/tool-filter.js", () => ({
   compactDescription: jest.fn((d) => (d ? d.substring(0, 80) : d)),

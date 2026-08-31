@@ -11,27 +11,25 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const APP_GROUP = "group.app.airmcp";
 
 const bundleSh = readFileSync(join(ROOT, "scripts/bundle-app.sh"), "utf-8");
+const mainEntitlements = readFileSync(join(ROOT, "scripts/lib/main-app-entitlements.plist"), "utf-8");
 // WidgetSnapshotConfig (appGroupID) moved from WidgetSnapshot.swift into the
 // store file when the I/O layer was split out of the pure data model.
 const snapshotSwift = readFileSync(join(ROOT, "app/widget/SnapshotKit/WidgetSnapshotStore.swift"), "utf-8");
 
 describe("widget App Group entitlement agreement", () => {
   test("bundle-app.sh declares the app group for BOTH the widget appex and the main app", () => {
-    // One occurrence in the widget-appex entitlements heredoc, one in the main
-    // app entitlements heredoc.
-    const occurrences = bundleSh.split(APP_GROUP).length - 1;
-    expect(occurrences).toBeGreaterThanOrEqual(2);
+    expect(bundleSh).toContain(APP_GROUP);
+    expect(mainEntitlements).toContain(`<string>${APP_GROUP}</string>`);
+    expect(bundleSh).toContain('MAIN_APP_ENTITLEMENTS="$SCRIPT_DIR/lib/main-app-entitlements.plist"');
     expect(bundleSh).toContain("com.apple.security.application-groups");
   });
 
   test("both entitlement blocks use application-groups (widget appex + main app)", () => {
-    const groupBlocks = bundleSh.split("com.apple.security.application-groups").length - 1;
-    expect(groupBlocks).toBeGreaterThanOrEqual(2);
+    expect(bundleSh).toContain("com.apple.security.application-groups");
+    expect(mainEntitlements).toContain("com.apple.security.application-groups");
   });
 
   test("the main app declares Apple Events automation without inventing a screen-capture entitlement", () => {
-    const mainEntitlements = bundleSh.match(/<<'APP_ENTITLEMENTS_EOF'\n([\s\S]*?)\nAPP_ENTITLEMENTS_EOF/)?.[1];
-    expect(mainEntitlements).toBeDefined();
     expect(mainEntitlements).toMatch(
       /<key>com\.apple\.security\.application-groups<\/key>\s*<array>\s*<string>group\.app\.airmcp<\/string>\s*<\/array>/,
     );

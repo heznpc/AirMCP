@@ -9,8 +9,12 @@ const script = readFileSync(scriptPath, "utf8");
 const notarizePath = new URL("../scripts/notarize-app.sh", import.meta.url);
 const notarize = readFileSync(notarizePath, "utf8");
 const bundleScript = readFileSync(new URL("../scripts/bundle-app.sh", import.meta.url), "utf8");
+const mainEntitlements = readFileSync(new URL("../scripts/lib/main-app-entitlements.plist", import.meta.url), "utf8");
 const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
 const temporaryDirectories = [];
+const mainValidatorStart = notarize.indexOf("MAIN_ALLOWED_ENTITLEMENTS=(");
+const mainValidatorEnd = notarize.indexOf("\nverify_widget_entitlements()");
+const mainValidatorSource = notarize.slice(mainValidatorStart, mainValidatorEnd);
 
 afterEach(() => {
   for (const directory of temporaryDirectories.splice(0)) {
@@ -57,6 +61,24 @@ function artifactGateEnvironment(bundle) {
     delete environment[name];
   }
   return environment;
+}
+
+function validateMainEntitlements(contents) {
+  const directory = mkdtempSync(join(tmpdir(), "airmcp-main-entitlements-"));
+  temporaryDirectories.push(directory);
+  const entitlements = join(directory, "candidate.plist");
+  const harness = join(directory, "validate.sh");
+  writeFileSync(entitlements, contents);
+  writeFileSync(
+    harness,
+    `#!/bin/bash
+set -euo pipefail
+ENT_DIR="$1"
+${mainValidatorSource}
+verify_main_entitlements "$2" "contract"
+`,
+  );
+  return spawnSync("bash", [harness, directory, entitlements], { encoding: "utf8" });
 }
 
 describe("signed app artifact verification script", () => {
@@ -151,8 +173,15 @@ describe("signed app artifact verification script", () => {
     expect(notarize).toContain('bash "$SCRIPT_DIR/verify-signing-identity.sh"');
     expect(notarize).toContain("Print :AirMCPAcceptanceHarnessBuild");
     expect(notarize).toContain("refusing to sign an acceptance-harness build");
-    expect(notarize).toContain('MAIN_ENTITLEMENTS="$ENT_DIR/main-app.plist"');
-    expect(notarize).toContain('--entitlements "$MAIN_ENTITLEMENTS"');
+    expect(notarize).toContain('SOURCE_MAIN_ENTITLEMENTS="$ENT_DIR/source-main-app.plist"');
+    expect(notarize).toContain('MAIN_ENTITLEMENTS="$SCRIPT_DIR/lib/main-app-entitlements.plist"');
+    expect(notarize).toContain('verify_main_entitlements "$SOURCE_MAIN_ENTITLEMENTS" "source"');
+    expect(notarize).toContain('verify_main_entitlements "$MAIN_ENTITLEMENTS" "allowlisted"');
+    const outerBundleSigning = notarize.match(
+      /# Finally sign the outer bundle[\s\S]*?if ! codesign --force --options=runtime --timestamp \\\n[\s\S]*?\nfi/,
+    )?.[0];
+    expect(outerBundleSigning).toContain('--entitlements "$MAIN_ENTITLEMENTS"');
+    expect(outerBundleSigning).not.toContain("SOURCE_MAIN_ENTITLEMENTS");
     expect(notarize).toContain('FINAL_MAIN_ENTITLEMENTS="$ENT_DIR/final-main-app.plist"');
     expect(notarize).toContain('verify_main_entitlements "$FINAL_MAIN_ENTITLEMENTS" "re-signed"');
     expect(notarize).toContain('verify_widget_entitlements "$ent_file" "source"');
@@ -162,6 +191,10 @@ describe("signed app artifact verification script", () => {
     expect(notarize).toContain("for capability in calendars reminders");
     expect(notarize).toContain("personal-information\\.$capability");
     expect(notarize).toContain("application-groups entitlement must be an array");
+    expect(notarize).toContain("application-groups must contain only group.app.airmcp");
+    expect(notarize).toContain("main-app contains an unexpected entitlement");
+    expect(notarize).toContain("main-app sandbox entitlement must be a boolean");
+    expect(notarize).toContain("main-app must remain outside the App Sandbox");
     expect(notarize).not.toContain("codesigning with $APPLE_DEVELOPER_ID");
     expect(notarize).not.toContain('echo "$SUBMIT_OUTPUT"');
     expect(notarize).not.toContain("preserved entitlements: $appex");
@@ -169,6 +202,47 @@ describe("signed app artifact verification script", () => {
     expect(notarize).not.toContain('echo "  signing $appex"');
     expect(notarize).not.toContain("zipping $APP_BUNDLE");
     expect(notarize).not.toContain("✓ $APP_BUNDLE");
+  });
+
+  test("uses one exact main-app entitlement allowlist for the baseline and Developer ID signatures", () => {
+    const keys = [...mainEntitlements.matchAll(/<key>([^<]+)<\/key>/g)].map((match) => match[1]).sort();
+    expect(keys).toEqual(
+      [
+        "com.apple.security.app-sandbox",
+        "com.apple.security.application-groups",
+        "com.apple.security.automation.apple-events",
+      ].sort(),
+    );
+    expect(mainEntitlements).toMatch(/<key>com\.apple\.security\.app-sandbox<\/key>\s*<false\/>/);
+    expect(mainEntitlements).toMatch(
+      /<key>com\.apple\.security\.application-groups<\/key>\s*<array>\s*<string>group\.app\.airmcp<\/string>\s*<\/array>/,
+    );
+    expect(mainEntitlements).toMatch(/<key>com\.apple\.security\.automation\.apple-events<\/key>\s*<true\/>/);
+    expect(mainEntitlements).not.toMatch(/get-task-allow|disable-library-validation|allow-dyld-environment-variables/);
+    expect(bundleScript).toContain('MAIN_APP_ENTITLEMENTS="$SCRIPT_DIR/lib/main-app-entitlements.plist"');
+    expect(bundleScript).toContain('--entitlements "$MAIN_APP_ENTITLEMENTS"');
+  });
+
+  test("fails closed when a source signature adds a debug entitlement or another app group", () => {
+    expect(mainValidatorStart).toBeGreaterThanOrEqual(0);
+    expect(mainValidatorEnd).toBeGreaterThan(mainValidatorStart);
+    expect(validateMainEntitlements(mainEntitlements).status).toBe(0);
+
+    const withDebugEntitlement = mainEntitlements.replace(
+      "</dict>",
+      "\t<key>com.apple.security.get-task-allow</key>\n\t<true/>\n</dict>",
+    );
+    const debugResult = validateMainEntitlements(withDebugEntitlement);
+    expect(debugResult.status).toBe(1);
+    expect(debugResult.stderr).toContain("contains an unexpected entitlement");
+
+    const withAnotherGroup = mainEntitlements.replace(
+      "\t\t<string>group.app.airmcp</string>",
+      "\t\t<string>group.app.airmcp</string>\n\t\t<string>group.attacker</string>",
+    );
+    const groupResult = validateMainEntitlements(withAnotherGroup);
+    expect(groupResult.status).toBe(1);
+    expect(groupResult.stderr).toContain("application-groups must contain only group.app.airmcp");
   });
 
   test("rejects an acceptance bundle before reading signing or notarization credentials", () => {

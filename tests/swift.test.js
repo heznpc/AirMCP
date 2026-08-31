@@ -193,6 +193,50 @@ describe('swift bridge', () => {
     clearTimeoutSpy.mockRestore();
   });
 
+  test('late close from an exited generation cannot orphan its replacement launch', async () => {
+    closeSwiftBridge();
+    const oldProc = createMockProcess();
+    const replacementProc = createMockProcess();
+    const unexpectedProc = createMockProcess();
+    mockSpawn
+      .mockReturnValueOnce(oldProc)
+      .mockReturnValueOnce(replacementProc)
+      .mockReturnValue(unexpectedProc);
+
+    const { promise: initial } = await ready(oldProc, 'generation-1');
+    oldProc.stdout.emit('data', '{"id":"generation-1","result":"initial"}\n');
+    await expect(initial).resolves.toBe('initial');
+
+    // Node exposes exitCode before all stdio closes. A new request can begin
+    // launching the replacement in that exit -> close window.
+    oldProc.exitCode = 1;
+    mockRandomUUID
+      .mockReturnValueOnce('generation-2-a')
+      .mockReturnValueOnce('generation-2-b');
+    const first = mute(runSwift('cmd', '{}'));
+    await tick();
+    expect(mockSpawn).toHaveBeenCalledTimes(2);
+
+    // This close belongs only to oldProc. It must not clear replacementProc's
+    // launching promise, reject callback, or readiness timer.
+    oldProc.emit('close', 1);
+    const second = mute(runSwift('cmd', '{}'));
+    await tick();
+    expect(mockSpawn).toHaveBeenCalledTimes(2);
+
+    replacementProc.stdout.emit('data', '{"id":"__ready__"}\n');
+    await tick();
+    replacementProc.stdout.emit(
+      'data',
+      '{"id":"generation-2-a","result":"first"}\n' +
+        '{"id":"generation-2-b","result":"second"}\n',
+    );
+
+    await expect(first).resolves.toBe('first');
+    await expect(second).resolves.toBe('second');
+    expect(unexpectedProc.stdin.write).not.toHaveBeenCalled();
+  });
+
   test('keeps default commands responsive while an embedding request is pending', async () => {
     closeSwiftBridge();
     const embeddingProc = createMockProcess();
@@ -398,6 +442,46 @@ describe('swift bridge', () => {
       proc.stdout.emit('data', '{"id":"cc-1","result":"r1"}\n{"id":"cc-2","result":"r2"}\n');
       expect(await p1).toBe('r1');
       expect(await p2).toBe('r2');
+    });
+
+    test('queued request receives a fresh timeout only when it is dispatched', async () => {
+      closeSwiftBridge();
+      jest.useFakeTimers();
+      try {
+        const serialProc = createMockProcess();
+        mockSpawn.mockReturnValue(serialProc);
+        mockRandomUUID
+          .mockReturnValueOnce('serial-active')
+          .mockReturnValueOnce('serial-queued');
+
+        const active = mute(runSwift('embed-batch', '{}'));
+        await jest.advanceTimersByTimeAsync(0);
+        serialProc.stdout.emit('data', '{"id":"__ready__"}\n');
+        await jest.advanceTimersByTimeAsync(0);
+
+        const queued = mute(runSwift('embed-text', '{}'));
+        await jest.advanceTimersByTimeAsync(0);
+        expect(serialProc.stdin.write).toHaveBeenCalledTimes(1);
+        expect(serialProc.stdin.write).toHaveBeenLastCalledWith(expect.stringContaining('"id":"serial-active"'));
+
+        // Finish the first command just before its 5s timeout. The second
+        // command has spent that time queued and must now receive a fresh 5s.
+        await jest.advanceTimersByTimeAsync(4_900);
+        serialProc.stdout.emit('data', '{"id":"serial-active","result":"done"}\n');
+        await expect(active).resolves.toBe('done');
+        expect(serialProc.stdin.write).toHaveBeenCalledTimes(2);
+        expect(serialProc.stdin.write).toHaveBeenLastCalledWith(expect.stringContaining('"id":"serial-queued"'));
+
+        // This crosses five seconds since enqueue. The old implementation
+        // timed out here and killed the otherwise healthy serial process.
+        await jest.advanceTimersByTimeAsync(200);
+        expect(serialProc.kill).not.toHaveBeenCalled();
+        serialProc.stdout.emit('data', '{"id":"serial-queued","result":"survived"}\n');
+        await expect(queued).resolves.toBe('survived');
+      } finally {
+        closeSwiftBridge();
+        jest.useRealTimers();
+      }
     });
 
     test('rejectAll clears all pending requests on process close', async () => {

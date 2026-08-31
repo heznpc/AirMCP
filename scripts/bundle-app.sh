@@ -333,26 +333,13 @@ if [ "$AIRMCP_EMBED_RUNTIME" = "1" ]; then
   codesign --force --sign "$SIGN_IDENTITY" "$BUNDLE_DIR/Contents/Resources/airmcp/bin/AirMcpBridge"
 fi
 
-# Sign the main app after embedding extensions and runtime executables.
-# The app-group entitlement must match the widget's above so the app can WRITE
-# the shared WidgetSnapshot container the widget reads. (Developer ID, so no
-# sandbox; the group works cross-target under the same team.)
-codesign --force --sign "$SIGN_IDENTITY" --entitlements /dev/stdin "$BUNDLE_DIR" <<'APP_ENTITLEMENTS_EOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-	<key>com.apple.security.app-sandbox</key>
-	<false/>
-	<key>com.apple.security.application-groups</key>
-	<array>
-		<string>group.app.airmcp</string>
-	</array>
-	<key>com.apple.security.automation.apple-events</key>
-	<true/>
-</dict>
-</plist>
-APP_ENTITLEMENTS_EOF
+# Sign the main app after embedding extensions and runtime executables. The
+# canonical allowlist is also used for the Developer ID re-sign, so the ad-hoc
+# and distribution identities cannot drift or promote development entitlements.
+MAIN_APP_ENTITLEMENTS="$SCRIPT_DIR/lib/main-app-entitlements.plist"
+codesign --force --sign "$SIGN_IDENTITY" \
+  --entitlements "$MAIN_APP_ENTITLEMENTS" \
+  "$BUNDLE_DIR"
 "$SCRIPT_DIR/verify-bundle-structure.sh" "$BUNDLE_DIR" "$BUNDLE_ID" "$APP_EXECUTABLE"
 if [ "$ACCEPTANCE_HARNESS_BUILD" = "0" ] && [ -x "$LSREGISTER" ]; then
   "$LSREGISTER" -f "$BUNDLE_DIR" 2>/dev/null || true

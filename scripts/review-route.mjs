@@ -199,17 +199,30 @@ const CATALOG = [
     tier: 0,
     files: [
       "scripts/bundle-app.sh",
+      "scripts/lib/main-app-entitlements.plist",
       "scripts/notarize-app.sh",
       "scripts/probe-app-runtime.mjs",
+      "scripts/verify-bundle-structure.sh",
       "scripts/verify-signed-app.sh",
     ],
-    hunt: "release-only bypass, acceptance/production environment confusion, unsigned or wrong-process probe, credential leakage in harness arguments",
-    tests: ["governed-acceptance-wiring", "probe-app-runtime-identity", "signed-app-verify-source"],
+    hunt: "release-only bypass, acceptance/production environment confusion, unsigned or wrong-process probe, entitlement allowlist drift, credential leakage in harness arguments",
+    tests: [
+      "bundle-structure",
+      "governed-acceptance-wiring",
+      "probe-app-runtime-identity",
+      "signed-app-verify-source",
+      "widget-app-group",
+    ],
     guardGroups: [
       {
         name: "acceptance-bundle",
         files: ["scripts/bundle-app.sh"],
-        tests: ["governed-acceptance-wiring"],
+        tests: ["bundle-structure", "governed-acceptance-wiring", "widget-app-group"],
+      },
+      {
+        name: "bundle-structure-verification",
+        files: ["scripts/verify-bundle-structure.sh"],
+        tests: ["bundle-structure"],
       },
       {
         name: "runtime-identity-probe",
@@ -218,7 +231,7 @@ const CATALOG = [
       },
       {
         name: "signed-artifact-verification",
-        files: ["scripts/notarize-app.sh", "scripts/verify-signed-app.sh"],
+        files: ["scripts/lib/main-app-entitlements.plist", "scripts/notarize-app.sh", "scripts/verify-signed-app.sh"],
         tests: ["signed-app-verify-source"],
       },
     ],

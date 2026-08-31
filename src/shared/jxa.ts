@@ -3,7 +3,11 @@ import { TIMEOUT, BUFFER, CONCURRENCY } from "./constants.js";
 import { Semaphore } from "./semaphore.js";
 import { log } from "./logger.js";
 
-const TRANSIENT_PATTERNS = ["Application isn't running", "Connection is invalid", "-1728"];
+/** Apple Event failures that are safe to retry only for an explicitly
+ * read-only JXA operation. Match the terminal osascript error number, never
+ * arbitrary diagnostic text, because thrown/user-generated messages can
+ * contain strings such as `-1728` without that being the process error. */
+const TRANSIENT_ERROR_CODES = new Set(["-1728", "-600", "-609"]);
 
 // ── JXA error code descriptions ──────────────────────────────────────
 const JXA_ERROR_CODES: Record<string, string> = {
@@ -16,11 +20,14 @@ const JXA_ERROR_CODES: Record<string, string> = {
   "-10810": "Application launch failed — the app may be damaged or missing",
 };
 
+function osascriptErrorCode(msg: string): string | null {
+  return msg.match(/\((-?\d+)\)\s*$/)?.[1] ?? null;
+}
+
 function describeJxaError(msg: string): string | null {
-  for (const [code, desc] of Object.entries(JXA_ERROR_CODES)) {
-    if (msg.includes(code)) return `${desc} (${code})`;
-  }
-  return null;
+  const code = osascriptErrorCode(msg);
+  const desc = code ? JXA_ERROR_CODES[code] : undefined;
+  return code && desc ? `${desc} (${code})` : null;
 }
 
 // ── PII scrubbing ────────────────────────────────────────────────────
@@ -198,12 +205,15 @@ function execOsascript(script: string, timeout: number, language?: "JavaScript")
 function isTransient(e: unknown): boolean {
   const err = e as OsascriptProcessError;
   if (err.killed || err.signal === "SIGTERM") return true;
-  const msg = osascriptDiagnostic(err);
-  return TRANSIENT_PATTERNS.some((p) => msg.includes(p));
+  const code = osascriptErrorCode(osascriptDiagnostic(err));
+  return code !== null && TRANSIENT_ERROR_CODES.has(code);
 }
 
 // ── Main entry point ─────────────────────────────────────────────────
-export async function runJxa<T>(script: string, appName?: string): Promise<T> {
+/** Execute a JXA script once by default. A whole-script retry can duplicate a
+ * mutation that reached the target app before the Apple Event response failed,
+ * so transient recovery requires an explicit read-only declaration. */
+export async function runJxa<T>(script: string, appName?: string, options?: { retryMode?: "read-only" }): Promise<T> {
   const app = appName ?? extractAppName(script);
 
   if (app) checkCircuit(app);
@@ -211,24 +221,25 @@ export async function runJxa<T>(script: string, appName?: string): Promise<T> {
   const sem = jxaSemaphore();
   await sem.acquire();
   try {
-    return await runJxaInner<T>(script, app);
+    return await runJxaInner<T>(script, app, options?.retryMode === "read-only");
   } finally {
     sem.release();
   }
 }
 
-async function runJxaInner<T>(script: string, app: string | undefined): Promise<T> {
+async function runJxaInner<T>(script: string, app: string | undefined, allowTransientRetry: boolean): Promise<T> {
   let stdout: string;
+  const maxRetries = allowTransientRetry ? CONCURRENCY.JXA_RETRIES : 0;
 
-  for (let attempt = 0; attempt <= CONCURRENCY.JXA_RETRIES; attempt++) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       stdout = await execOsascript(script, TIMEOUT.JXA, "JavaScript");
       break;
     } catch (e: unknown) {
-      if (!isTransient(e) || attempt === CONCURRENCY.JXA_RETRIES) {
+      if (!isTransient(e) || attempt === maxRetries) {
         handleOsascriptError(e, app, TIMEOUT.JXA);
       }
-      log.debug("jxa retry", { attempt: attempt + 2, max: 3, app });
+      log.debug("jxa retry", { attempt: attempt + 2, max: maxRetries + 1, app });
       const jitter = Math.floor(Math.random() * 100);
       await new Promise((r) => setTimeout(r, CONCURRENCY.JXA_RETRY_DELAYS[attempt]! + jitter));
     }

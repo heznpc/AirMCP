@@ -121,21 +121,74 @@ echo "notarize-app: codesigning with the verified Heznpc Developer ID …"
 # subshells, keyed by a hash of the appex path.)
 ENT_DIR="$(mktemp -d)"
 trap 'rm -rf "$ENT_DIR"' EXIT
+MAIN_ENTITLEMENTS="$SCRIPT_DIR/lib/main-app-entitlements.plist"
+
+MAIN_ALLOWED_ENTITLEMENTS=(
+  "com.apple.security.app-sandbox"
+  "com.apple.security.application-groups"
+  "com.apple.security.automation.apple-events"
+)
+
+verify_main_entitlement_allowlist() {
+  local entitlements_file="$1"
+  local stage="$2"
+  local allowlist_copy="$ENT_DIR/main-$stage-allowlist-check.plist"
+  local allowed_key
+  local remaining
+
+  if ! /bin/cp "$entitlements_file" "$allowlist_copy"; then
+    echo "notarize-app: $stage main-app entitlement allowlist could not be inspected" >&2
+    return 1
+  fi
+  for allowed_key in "${MAIN_ALLOWED_ENTITLEMENTS[@]}"; do
+    /usr/libexec/PlistBuddy -c "Delete :$allowed_key" "$allowlist_copy" >/dev/null 2>&1 || true
+  done
+  if ! remaining="$(/usr/bin/plutil -p "$allowlist_copy" 2>/dev/null | /usr/bin/tr -d '[:space:]')"; then
+    echo "notarize-app: $stage main-app entitlement allowlist could not be inspected" >&2
+    return 1
+  fi
+  if [ "$remaining" != "{}" ]; then
+    echo "notarize-app: $stage main-app contains an unexpected entitlement" >&2
+    return 1
+  fi
+}
 
 verify_main_entitlements() {
   local entitlements_file="$1"
   local stage="$2"
+  local sandbox_type
+  local sandbox_enabled
   local app_groups_type
   local app_groups
+  local app_groups_compact
   local automation_type
   local automation_allowed
 
-  if ! plutil -lint "$entitlements_file" >/dev/null 2>&1; then
+  if ! /usr/bin/plutil -lint "$entitlements_file" >/dev/null 2>&1; then
     echo "notarize-app: $stage main-app entitlements are missing or invalid" >&2
     return 1
   fi
+  if ! verify_main_entitlement_allowlist "$entitlements_file" "$stage"; then
+    return 1
+  fi
+  sandbox_type="$(
+    /usr/bin/plutil -type 'com\.apple\.security\.app-sandbox' \
+      "$entitlements_file" 2>/dev/null || true
+  )"
+  if [ "$sandbox_type" != "bool" ]; then
+    echo "notarize-app: $stage main-app sandbox entitlement must be a boolean" >&2
+    return 1
+  fi
+  sandbox_enabled="$(
+    /usr/libexec/PlistBuddy -c "Print :com.apple.security.app-sandbox" \
+      "$entitlements_file" 2>/dev/null || true
+  )"
+  if [ "$sandbox_enabled" != "false" ]; then
+    echo "notarize-app: $stage main-app must remain outside the App Sandbox" >&2
+    return 1
+  fi
   app_groups_type="$(
-    plutil -type 'com\.apple\.security\.application-groups' \
+    /usr/bin/plutil -type 'com\.apple\.security\.application-groups' \
       "$entitlements_file" 2>/dev/null || true
   )"
   if [ "$app_groups_type" != "array" ]; then
@@ -146,12 +199,13 @@ verify_main_entitlements() {
     /usr/libexec/PlistBuddy -c "Print :com.apple.security.application-groups" \
       "$entitlements_file" 2>/dev/null || true
   )"
-  if ! grep -Eq '^[[:space:]]*group\.app\.airmcp[[:space:]]*$' <<<"$app_groups"; then
-    echo "notarize-app: $stage main-app entitlements are missing group.app.airmcp" >&2
+  app_groups_compact="$(printf '%s' "$app_groups" | /usr/bin/tr -d '[:space:]')"
+  if [ "$app_groups_compact" != "Array{group.app.airmcp}" ]; then
+    echo "notarize-app: $stage main-app application-groups must contain only group.app.airmcp" >&2
     return 1
   fi
   automation_type="$(
-    plutil -type 'com\.apple\.security\.automation\.apple-events' \
+    /usr/bin/plutil -type 'com\.apple\.security\.automation\.apple-events' \
       "$entitlements_file" 2>/dev/null || true
   )"
   if [ "$automation_type" != "bool" ]; then
@@ -217,20 +271,25 @@ verify_widget_entitlements() {
   done
 }
 
-# Preserve the outer app's entitlements just as strictly as each extension's.
-# Removing the outer signature also removes these values, and a re-sign without
-# --entitlements still passes codesign verification while breaking the shared
-# widget container and Automation consent attribution at runtime.
-MAIN_ENTITLEMENTS="$ENT_DIR/main-app.plist"
-if ! codesign -d --entitlements "$MAIN_ENTITLEMENTS" --xml \
+# Inspect the source signature before changing it, but never promote its plist
+# wholesale into a Developer ID signature. A stray development/debug entitlement
+# in the ad-hoc input must fail closed instead of becoming part of the release.
+SOURCE_MAIN_ENTITLEMENTS="$ENT_DIR/source-main-app.plist"
+if ! codesign -d --entitlements "$SOURCE_MAIN_ENTITLEMENTS" --xml \
   "$APP_BUNDLE" >/dev/null 2>&1; then
   echo "notarize-app: could not extract main-app entitlements" >&2
   exit 1
 fi
-if ! verify_main_entitlements "$MAIN_ENTITLEMENTS" "source"; then
+if ! verify_main_entitlements "$SOURCE_MAIN_ENTITLEMENTS" "source"; then
   exit 1
 fi
-echo "  preserved required main-app entitlements"
+
+# Reuse the canonical minimal release allowlist from the original bundle sign,
+# never the extracted source plist.
+if ! verify_main_entitlements "$MAIN_ENTITLEMENTS" "allowlisted"; then
+  exit 1
+fi
+echo "  constructed allowlisted main-app entitlements"
 
 find "$APP_BUNDLE" -name "*.appex" -print0 2>/dev/null | while IFS= read -r -d '' appex; do
   ent_file="$ENT_DIR/$(printf '%s' "$appex" | shasum -a 256 | cut -d' ' -f1).plist"

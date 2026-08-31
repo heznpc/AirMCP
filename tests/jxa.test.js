@@ -94,4 +94,81 @@ describe('JXA module', () => {
     );
     expect(execFile).toHaveBeenCalledTimes(1);
   });
+
+  test("does not retry when stderr user text contains -1728 but osascript's final code is -2700", async () => {
+    const { execFile } = await import('node:child_process');
+    execFile.mockClear();
+    execFile.mockImplementation((_path, _args, _options, callback) => {
+      const child = {
+        on: jest.fn(),
+        killed: false,
+        exitCode: null,
+        kill: jest.fn(),
+      };
+      const error = new Error('Command failed: /usr/bin/osascript');
+      queueMicrotask(() => callback(error, '', 'execution error: Error: Error: ordinary failure -1728 (-2700)\n'));
+      return child;
+    });
+
+    const mod = await import('../dist/shared/jxa.js');
+    await expect(
+      mod.runJxa("throw new Error('ordinary failure -1728')", undefined, { retryMode: 'read-only' }),
+    ).rejects.toThrow('osascript error: execution error: Error: Error: ordinary failure -1728 (-2700)');
+    expect(execFile).toHaveBeenCalledTimes(1);
+  });
+
+  test('does not replay a write after a genuine terminal Apple -1728 error by default', async () => {
+    const { execFile } = await import('node:child_process');
+    execFile.mockClear();
+    execFile.mockImplementation((_path, _args, _options, callback) => {
+      const child = {
+        on: jest.fn(),
+        killed: false,
+        exitCode: null,
+        kill: jest.fn(),
+      };
+      const error = new Error('Command failed: /usr/bin/osascript');
+      queueMicrotask(() => callback(error, '', 'execution error: Error: Object not found. (-1728)\n'));
+      return child;
+    });
+
+    const mod = await import('../dist/shared/jxa.js');
+    await expect(mod.runJxa('applyWriteThenReadUid()')).rejects.toThrow(
+      'osascript error: Object not found — the app may need to be opened first (-1728)',
+    );
+    expect(execFile).toHaveBeenCalledTimes(1);
+  });
+
+  test('retries a genuine terminal Apple -1728 error only in explicit read-only mode', async () => {
+    const { execFile } = await import('node:child_process');
+    execFile.mockClear();
+    execFile
+      .mockImplementationOnce((_path, _args, _options, callback) => {
+        const child = {
+          on: jest.fn(),
+          killed: false,
+          exitCode: null,
+          kill: jest.fn(),
+        };
+        const error = new Error('Command failed: /usr/bin/osascript');
+        queueMicrotask(() => callback(error, '', 'execution error: Error: Object not found. (-1728)\n'));
+        return child;
+      })
+      .mockImplementationOnce((_path, _args, _options, callback) => {
+        const child = {
+          on: jest.fn(),
+          killed: false,
+          exitCode: null,
+          kill: jest.fn(),
+        };
+        queueMicrotask(() => callback(null, '{"ok":true}\n', ''));
+        return child;
+      });
+
+    const mod = await import('../dist/shared/jxa.js');
+    await expect(
+      mod.runJxa('JSON.stringify({ ok: true })', undefined, { retryMode: 'read-only' }),
+    ).resolves.toEqual({ ok: true });
+    expect(execFile).toHaveBeenCalledTimes(2);
+  });
 });

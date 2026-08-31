@@ -51,12 +51,14 @@ describe("review route for app-owned runtime trust boundaries", () => {
       "app/Sources/AirMCPApp/Resources/Info.plist",
       "scripts/bundle-app.sh",
       "scripts/notarize-app.sh",
+      "scripts/verify-bundle-structure.sh",
       "plugins/airmcp/scripts/airmcp-app-stdio.mjs",
       "src/cli/connect.ts",
       "app/Tests/AirMCPAppTests/NodeEnvironmentTests.swift",
       "tests/app-onboarding-lifecycle-i18n.test.js",
       "tests/app-info-plist-usage.test.js",
       "tests/governed-acceptance-wiring.test.js",
+      "tests/bundle-structure.test.js",
       "tests/chatgpt-plugin.test.js",
       "tests/cli-connect.test.js",
     ]);
@@ -74,6 +76,10 @@ describe("review route for app-owned runtime trust boundaries", () => {
       area: "app-runtime-release-harness",
     });
     expect(byFile.get("scripts/notarize-app.sh")).toMatchObject({
+      tier: 0,
+      area: "app-runtime-release-harness",
+    });
+    expect(byFile.get("scripts/verify-bundle-structure.sh")).toMatchObject({
       tier: 0,
       area: "app-runtime-release-harness",
     });
@@ -122,6 +128,12 @@ describe("review route for app-owned runtime trust boundaries", () => {
       "tests/governed-acceptance-wiring.test.js",
     ],
     [
+      "app-runtime-release-harness",
+      "bundle-structure-verification",
+      "scripts/verify-bundle-structure.sh",
+      "tests/widget-app-group.test.js",
+    ],
+    [
       "plugin-connector-package",
       "plugin-connector-package",
       "plugins/airmcp/scripts/airmcp-app-stdio.mjs",
@@ -149,6 +161,48 @@ describe("review route for app-owned runtime trust boundaries", () => {
     expect(result.unguardedT0).not.toContain("jxa-escaping");
     expect(result.unguardedGuardGroups).not.toContainEqual(
       expect.objectContaining({ area: "jxa-escaping", group: "swift-bridge" }),
+    );
+  });
+
+  test("maps bundle structure verification to its direct behavior test", () => {
+    const { repo, route } = createFixtureRepository();
+    const result = commitAndRoute(repo, route, [
+      "scripts/verify-bundle-structure.sh",
+      "tests/bundle-structure.test.js",
+    ]);
+
+    expect(result.changed.find((entry) => entry.file === "scripts/verify-bundle-structure.sh")).toMatchObject({
+      tier: 0,
+      area: "app-runtime-release-harness",
+    });
+    expect(result.unguardedT0).not.toContain("app-runtime-release-harness");
+    expect(result.unguardedGuardGroups).not.toContainEqual(
+      expect.objectContaining({ area: "app-runtime-release-harness", group: "bundle-structure-verification" }),
+    );
+  });
+
+  test("maps the canonical main-app entitlement allowlist to its signing contract test", () => {
+    const { repo, route } = createFixtureRepository();
+    const result = commitAndRoute(repo, route, [
+      "scripts/lib/main-app-entitlements.plist",
+      "tests/signed-app-verify-source.test.js",
+    ]);
+
+    expect(result.changed.find((entry) => entry.file === "scripts/lib/main-app-entitlements.plist")).toMatchObject({
+      tier: 0,
+      area: "app-runtime-release-harness",
+    });
+    expect(result.unguardedGuardGroups).not.toContainEqual(
+      expect.objectContaining({ area: "app-runtime-release-harness", group: "signed-artifact-verification" }),
+    );
+  });
+
+  test("accepts the widget entitlement contract as a direct bundle-app guard", () => {
+    const { repo, route } = createFixtureRepository();
+    const result = commitAndRoute(repo, route, ["scripts/bundle-app.sh", "tests/widget-app-group.test.js"]);
+
+    expect(result.unguardedGuardGroups).not.toContainEqual(
+      expect.objectContaining({ area: "app-runtime-release-harness", group: "acceptance-bundle" }),
     );
   });
 });

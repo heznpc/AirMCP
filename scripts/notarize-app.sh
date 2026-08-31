@@ -121,13 +121,127 @@ echo "notarize-app: codesigning with the verified Heznpc Developer ID …"
 # subshells, keyed by a hash of the appex path.)
 ENT_DIR="$(mktemp -d)"
 trap 'rm -rf "$ENT_DIR"' EXIT
+
+verify_main_entitlements() {
+  local entitlements_file="$1"
+  local stage="$2"
+  local app_groups_type
+  local app_groups
+  local automation_type
+  local automation_allowed
+
+  if ! plutil -lint "$entitlements_file" >/dev/null 2>&1; then
+    echo "notarize-app: $stage main-app entitlements are missing or invalid" >&2
+    return 1
+  fi
+  app_groups_type="$(
+    plutil -type 'com\.apple\.security\.application-groups' \
+      "$entitlements_file" 2>/dev/null || true
+  )"
+  if [ "$app_groups_type" != "array" ]; then
+    echo "notarize-app: $stage main-app application-groups entitlement must be an array" >&2
+    return 1
+  fi
+  app_groups="$(
+    /usr/libexec/PlistBuddy -c "Print :com.apple.security.application-groups" \
+      "$entitlements_file" 2>/dev/null || true
+  )"
+  if ! grep -Eq '^[[:space:]]*group\.app\.airmcp[[:space:]]*$' <<<"$app_groups"; then
+    echo "notarize-app: $stage main-app entitlements are missing group.app.airmcp" >&2
+    return 1
+  fi
+  automation_type="$(
+    plutil -type 'com\.apple\.security\.automation\.apple-events' \
+      "$entitlements_file" 2>/dev/null || true
+  )"
+  if [ "$automation_type" != "bool" ]; then
+    echo "notarize-app: $stage main-app Apple Events automation entitlement must be a boolean" >&2
+    return 1
+  fi
+  automation_allowed="$(
+    /usr/libexec/PlistBuddy -c "Print :com.apple.security.automation.apple-events" \
+      "$entitlements_file" 2>/dev/null || true
+  )"
+  if [ "$automation_allowed" != "true" ]; then
+    echo "notarize-app: $stage main-app entitlements are missing Apple Events automation access" >&2
+    return 1
+  fi
+}
+
+verify_widget_entitlements() {
+  local entitlements_file="$1"
+  local stage="$2"
+  local app_groups_type
+  local app_groups
+  local capability
+  local capability_type
+  local capability_allowed
+
+  if ! plutil -lint "$entitlements_file" >/dev/null 2>&1; then
+    echo "notarize-app: $stage widget entitlements are missing or invalid" >&2
+    return 1
+  fi
+  app_groups_type="$(
+    plutil -type 'com\.apple\.security\.application-groups' \
+      "$entitlements_file" 2>/dev/null || true
+  )"
+  if [ "$app_groups_type" != "array" ]; then
+    echo "notarize-app: $stage widget application-groups entitlement must be an array" >&2
+    return 1
+  fi
+  app_groups="$(
+    /usr/libexec/PlistBuddy -c "Print :com.apple.security.application-groups" \
+      "$entitlements_file" 2>/dev/null || true
+  )"
+  if ! grep -Eq '^[[:space:]]*group\.app\.airmcp[[:space:]]*$' <<<"$app_groups"; then
+    echo "notarize-app: $stage widget entitlements are missing group.app.airmcp" >&2
+    return 1
+  fi
+  for capability in calendars reminders; do
+    capability_type="$(
+      plutil -type "com\.apple\.security\.personal-information\.$capability" \
+        "$entitlements_file" 2>/dev/null || true
+    )"
+    if [ "$capability_type" != "bool" ]; then
+      echo "notarize-app: $stage widget $capability entitlement must be a boolean" >&2
+      return 1
+    fi
+    capability_allowed="$(
+      /usr/libexec/PlistBuddy -c "Print :com.apple.security.personal-information.$capability" \
+        "$entitlements_file" 2>/dev/null || true
+    )"
+    if [ "$capability_allowed" != "true" ]; then
+      echo "notarize-app: $stage widget $capability entitlement must be enabled" >&2
+      return 1
+    fi
+  done
+}
+
+# Preserve the outer app's entitlements just as strictly as each extension's.
+# Removing the outer signature also removes these values, and a re-sign without
+# --entitlements still passes codesign verification while breaking the shared
+# widget container and Automation consent attribution at runtime.
+MAIN_ENTITLEMENTS="$ENT_DIR/main-app.plist"
+if ! codesign -d --entitlements "$MAIN_ENTITLEMENTS" --xml \
+  "$APP_BUNDLE" >/dev/null 2>&1; then
+  echo "notarize-app: could not extract main-app entitlements" >&2
+  exit 1
+fi
+if ! verify_main_entitlements "$MAIN_ENTITLEMENTS" "source"; then
+  exit 1
+fi
+echo "  preserved required main-app entitlements"
+
 find "$APP_BUNDLE" -name "*.appex" -print0 2>/dev/null | while IFS= read -r -d '' appex; do
   ent_file="$ENT_DIR/$(printf '%s' "$appex" | shasum -a 256 | cut -d' ' -f1).plist"
-  if codesign -d --entitlements - --xml "$appex" > "$ent_file" 2>/dev/null && plutil -lint "$ent_file" >/dev/null 2>&1; then
-    echo "  preserved entitlements for embedded extension"
-  else
-    rm -f "$ent_file" # no (valid) entitlements present — re-sign without
+  if ! codesign -d --entitlements "$ent_file" --xml "$appex" >/dev/null 2>&1; then
+    echo "notarize-app: could not extract widget entitlements" >&2
+    exit 1
   fi
+  if ! verify_widget_entitlements "$ent_file" "source"; then
+    exit 1
+  fi
+  echo "  preserved required widget entitlements"
   codesign --remove-signature "$appex" 2>/dev/null || true
 done
 
@@ -182,22 +296,23 @@ codesign --remove-signature "$APP_BUNDLE" 2>/dev/null || true
 # preserved above so the widget keeps its app-group / capabilities.
 find "$APP_BUNDLE" -name "*.appex" -print0 2>/dev/null | while IFS= read -r -d '' appex; do
   echo "  signing embedded extension"
-  ent_file="$ENT_DIR/$(printf '%s' "$appex" | shasum -a 256 | cut -d' ' -f1).plist"
-  if [ -f "$ent_file" ]; then
-    codesign --force --options=runtime --timestamp \
-      --entitlements "$ent_file" \
-      --sign "$APPLE_DEVELOPER_ID" \
-      "$appex" >/dev/null 2>&1 || {
-        echo "notarize-app: extension signing failed" >&2
-        exit 1
-      }
-  else
-    codesign --force --options=runtime --timestamp \
-      --sign "$APPLE_DEVELOPER_ID" \
-      "$appex" >/dev/null 2>&1 || {
-        echo "notarize-app: extension signing failed" >&2
-        exit 1
-      }
+  ent_hash="$(printf '%s' "$appex" | shasum -a 256 | cut -d' ' -f1)"
+  ent_file="$ENT_DIR/$ent_hash.plist"
+  final_ent_file="$ENT_DIR/final-$ent_hash.plist"
+  codesign --force --options=runtime --timestamp \
+    --entitlements "$ent_file" \
+    --sign "$APPLE_DEVELOPER_ID" \
+    "$appex" >/dev/null 2>&1 || {
+      echo "notarize-app: extension signing failed" >&2
+      exit 1
+    }
+  if ! codesign -d --entitlements "$final_ent_file" --xml \
+    "$appex" >/dev/null 2>&1; then
+    echo "notarize-app: could not inspect re-signed widget entitlements" >&2
+    exit 1
+  fi
+  if ! verify_widget_entitlements "$final_ent_file" "re-signed"; then
+    exit 1
   fi
 done
 
@@ -207,6 +322,7 @@ done
 # `codesign --verify --deep --strict` below still validates the whole tree, so
 # any nested code that genuinely went unsigned is caught loudly, not shipped.
 if ! codesign --force --options=runtime --timestamp \
+  --entitlements "$MAIN_ENTITLEMENTS" \
   --sign "$APPLE_DEVELOPER_ID" \
   "$APP_BUNDLE" >/dev/null 2>&1; then
   echo "notarize-app: outer bundle signing failed" >&2
@@ -219,6 +335,16 @@ codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE" >/dev/null 2>&1 || {
   echo "notarize-app: codesign verification failed — refusing to submit" >&2
   exit 1
 }
+FINAL_MAIN_ENTITLEMENTS="$ENT_DIR/final-main-app.plist"
+if ! codesign -d --entitlements "$FINAL_MAIN_ENTITLEMENTS" --xml \
+  "$APP_BUNDLE" >/dev/null 2>&1; then
+  echo "notarize-app: could not inspect re-signed main-app entitlements" >&2
+  exit 1
+fi
+if ! verify_main_entitlements "$FINAL_MAIN_ENTITLEMENTS" "re-signed"; then
+  exit 1
+fi
+echo "notarize-app: required main-app entitlements preserved"
 
 if [ "${SKIP_NOTARIZATION:-}" = "1" ]; then
   echo "notarize-app: SKIP_NOTARIZATION=1 — signed but not notarized"

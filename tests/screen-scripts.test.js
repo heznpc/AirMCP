@@ -8,6 +8,19 @@ import {
 } from '../dist/screen/scripts.js';
 
 describe('screen script generators', () => {
+  test.each([
+    ['capture_screen', () => captureScreenScript()],
+    ['capture_window', () => captureWindowScript()],
+    ['capture_area', () => captureAreaScript(0, 0, 100, 100)],
+    ['record_screen', () => recordScreenScript(1)],
+  ])('%s preflights the responsible process Screen Recording grant', (_name, buildScript) => {
+    const script = buildScript();
+    expect(script).toContain("ObjC.bindFunction('CGPreflightScreenCaptureAccess'");
+    expect(script).toContain('$.CGPreflightScreenCaptureAccess()');
+    expect(script).toContain('Screen Recording permission denied for the app hosting AirMCP.');
+    expect(script).not.toContain('CGRequestScreenCaptureAccess');
+  });
+
   // --- captureScreenScript ---
   test('captureScreenScript generates screencapture command', () => {
     const script = captureScreenScript();

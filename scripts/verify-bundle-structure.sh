@@ -21,6 +21,8 @@ BUNDLED_BRIDGE="$RUNTIME_ROOT/bin/AirMcpBridge"
 LOCALIZATION_BUNDLE="$BUNDLE_DIR/Contents/Resources/AirMCPApp_AirMCPApp.bundle"
 SUPPORTED_LOCALES="de en es fr ja ko pt-BR zh-Hans zh-Hant"
 REQUIRE_WIDGET="${AIRMCP_REQUIRE_WIDGET:-0}"
+SCREEN_CAPTURE_USAGE_DESCRIPTION="AirMCP captures your screen or app windows only when you explicitly ask it to take a screenshot or screen recording."
+APPLE_EVENTS_USAGE_DESCRIPTION="AirMCP controls other Mac apps only when you explicitly ask it to read or change their data."
 
 if [ "$REQUIRE_WIDGET" != "0" ] && [ "$REQUIRE_WIDGET" != "1" ]; then
   echo "✗ AIRMCP_REQUIRE_WIDGET must be 0 or 1, got: $REQUIRE_WIDGET" >&2
@@ -50,6 +52,8 @@ require_plist_value ":CFBundlePackageType" "APPL"
 require_plist_value ":CFBundleDevelopmentRegion" "en"
 require_plist_value ":CFBundleAllowMixedLocalizations" "true"
 require_plist_value ":LSMultipleInstancesProhibited" "true"
+require_plist_value ":NSScreenCaptureUsageDescription" "$SCREEN_CAPTURE_USAGE_DESCRIPTION"
+require_plist_value ":NSAppleEventsUsageDescription" "$APPLE_EVENTS_USAGE_DESCRIPTION"
 
 PLIST_LOCALIZATIONS="$(/usr/libexec/PlistBuddy -c "Print :CFBundleLocalizations" "$PLIST" 2>/dev/null || true)"
 for locale in $SUPPORTED_LOCALES; do
@@ -141,4 +145,92 @@ fi
 if ! codesign --verify --deep --strict "$BUNDLE_DIR" 2>/dev/null; then
   echo "✗ $BUNDLE_DIR did not pass strict code-sign verification" >&2
   exit 1
+fi
+
+# Signature validity alone does not prove that required entitlements survived
+# the final outer signing pass. Extract and inspect the signed main app so a
+# package with a working signature but broken TCC/App Group behavior fails here.
+ENTITLEMENTS_DIR="$(mktemp -d "${TMPDIR:-/tmp}/airmcp-entitlements.XXXXXX")"
+trap 'rm -rf "$ENTITLEMENTS_DIR"' EXIT
+MAIN_ENTITLEMENTS="$ENTITLEMENTS_DIR/main-app.plist"
+if ! codesign -d --entitlements "$MAIN_ENTITLEMENTS" --xml \
+  "$BUNDLE_DIR" >/dev/null 2>&1 || ! plutil -lint "$MAIN_ENTITLEMENTS" >/dev/null 2>&1; then
+  echo "✗ signed main app has no valid entitlements" >&2
+  exit 1
+fi
+APP_GROUPS_TYPE="$(
+  plutil -type 'com\.apple\.security\.application-groups' \
+    "$MAIN_ENTITLEMENTS" 2>/dev/null || true
+)"
+if [ "$APP_GROUPS_TYPE" != "array" ]; then
+  echo "✗ signed main app application-groups entitlement must be an array" >&2
+  exit 1
+fi
+APP_GROUPS="$(
+  /usr/libexec/PlistBuddy -c "Print :com.apple.security.application-groups" \
+    "$MAIN_ENTITLEMENTS" 2>/dev/null || true
+)"
+if ! grep -Eq '^[[:space:]]*group\.app\.airmcp[[:space:]]*$' <<<"$APP_GROUPS"; then
+  echo "✗ signed main app is missing the group.app.airmcp entitlement" >&2
+  exit 1
+fi
+AUTOMATION_TYPE="$(
+  plutil -type 'com\.apple\.security\.automation\.apple-events' \
+    "$MAIN_ENTITLEMENTS" 2>/dev/null || true
+)"
+if [ "$AUTOMATION_TYPE" != "bool" ]; then
+  echo "✗ signed main app Apple Events automation entitlement must be a boolean" >&2
+  exit 1
+fi
+AUTOMATION_ALLOWED="$(
+  /usr/libexec/PlistBuddy -c "Print :com.apple.security.automation.apple-events" \
+    "$MAIN_ENTITLEMENTS" 2>/dev/null || true
+)"
+if [ "$AUTOMATION_ALLOWED" != "true" ]; then
+  echo "✗ signed main app is missing the Apple Events automation entitlement" >&2
+  exit 1
+fi
+
+if [ -d "$BUNDLE_DIR/Contents/PlugIns/AirMCPWidget.appex" ]; then
+  WIDGET_ENTITLEMENTS="$ENTITLEMENTS_DIR/widget.plist"
+  if ! codesign -d --entitlements "$WIDGET_ENTITLEMENTS" --xml \
+    "$BUNDLE_DIR/Contents/PlugIns/AirMCPWidget.appex" >/dev/null 2>&1 || \
+    ! plutil -lint "$WIDGET_ENTITLEMENTS" >/dev/null 2>&1; then
+    echo "✗ signed widget has no valid entitlements" >&2
+    exit 1
+  fi
+  WIDGET_APP_GROUPS_TYPE="$(
+    plutil -type 'com\.apple\.security\.application-groups' \
+      "$WIDGET_ENTITLEMENTS" 2>/dev/null || true
+  )"
+  if [ "$WIDGET_APP_GROUPS_TYPE" != "array" ]; then
+    echo "✗ signed widget application-groups entitlement must be an array" >&2
+    exit 1
+  fi
+  WIDGET_APP_GROUPS="$(
+    /usr/libexec/PlistBuddy -c "Print :com.apple.security.application-groups" \
+      "$WIDGET_ENTITLEMENTS" 2>/dev/null || true
+  )"
+  if ! grep -Eq '^[[:space:]]*group\.app\.airmcp[[:space:]]*$' <<<"$WIDGET_APP_GROUPS"; then
+    echo "✗ signed widget is missing the group.app.airmcp entitlement" >&2
+    exit 1
+  fi
+  for capability in calendars reminders; do
+    WIDGET_CAPABILITY_TYPE="$(
+      plutil -type "com\.apple\.security\.personal-information\.$capability" \
+        "$WIDGET_ENTITLEMENTS" 2>/dev/null || true
+    )"
+    if [ "$WIDGET_CAPABILITY_TYPE" != "bool" ]; then
+      echo "✗ signed widget $capability entitlement must be a boolean" >&2
+      exit 1
+    fi
+    WIDGET_CAPABILITY_ALLOWED="$(
+      /usr/libexec/PlistBuddy -c "Print :com.apple.security.personal-information.$capability" \
+        "$WIDGET_ENTITLEMENTS" 2>/dev/null || true
+    )"
+    if [ "$WIDGET_CAPABILITY_ALLOWED" != "true" ]; then
+      echo "✗ signed widget $capability entitlement must be enabled" >&2
+      exit 1
+    fi
+  done
 fi

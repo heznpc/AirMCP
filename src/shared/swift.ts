@@ -147,40 +147,92 @@ interface PendingRequest {
   timer: ReturnType<typeof setTimeout>;
 }
 
-let child: ChildProcess | null = null;
-let buffer = "";
-const pending = new Map<string, PendingRequest>();
-let launching: Promise<void> | null = null;
-let launchFailed = false;
-let launchFailedAt = 0;
-let launchRetryCount = 0;
+class SwiftBridgeClosedError extends Error {
+  constructor() {
+    super("Swift bridge closed");
+    this.name = "SwiftBridgeClosedError";
+  }
+}
+
+interface BridgeLane {
+  readonly name: "default" | "embedding" | "observer";
+  child: ChildProcess | null;
+  launchingChild: ChildProcess | null;
+  buffer: string;
+  readonly pending: Map<string, PendingRequest>;
+  launching: Promise<void> | null;
+  launchReject: ((error: Error) => void) | null;
+  launchTimer: ReturnType<typeof setTimeout> | null;
+  launchFailed: boolean;
+  launchFailedAt: number;
+  launchRetryCount: number;
+}
+
+function createBridgeLane(name: BridgeLane["name"]): BridgeLane {
+  return {
+    name,
+    child: null,
+    launchingChild: null,
+    buffer: "",
+    pending: new Map(),
+    launching: null,
+    launchReject: null,
+    launchTimer: null,
+    launchFailed: false,
+    launchFailedAt: 0,
+    launchRetryCount: 0,
+  };
+}
+
+// NaturalLanguage contextual embeddings can take minutes to load and index a
+// large tool catalog. Native observers must also outlive an unrelated command
+// timeout: timeout recovery terminates the affected serial bridge process, and
+// restarting the default lane would not re-run start-observer. Isolate both
+// workloads so neither can block or tear down the other bridge responsibilities.
+const EMBEDDING_COMMANDS = new Set(["embed-text", "embed-batch"]);
+const OBSERVER_COMMANDS = new Set(["start-observer", "stop-observer"]);
+const defaultLane = createBridgeLane("default");
+const embeddingLane = createBridgeLane("embedding");
+const observerLane = createBridgeLane("observer");
+const bridgeLanes = [defaultLane, embeddingLane, observerLane] as const;
+
+function laneForCommand(command: string): BridgeLane {
+  if (EMBEDDING_COMMANDS.has(command)) return embeddingLane;
+  if (OBSERVER_COMMANDS.has(command)) return observerLane;
+  return defaultLane;
+}
+
 const LAUNCH_COOLDOWN_MS = 30_000;
 const LAUNCH_MAX_RETRIES = 3;
 
-function ensureProcess(): Promise<void> {
-  if (child && !child.killed && child.exitCode === null) return Promise.resolve();
-  if (launching) return launching;
+function ensureProcess(lane: BridgeLane): Promise<void> {
+  if (lane.child && !lane.child.killed && lane.child.exitCode === null) return Promise.resolve();
+  if (lane.launching) return lane.launching;
 
-  launching = new Promise<void>((resolve, reject) => {
-    launchFailed = false;
+  lane.launching = new Promise<void>((resolve, reject) => {
+    lane.launchFailed = false;
+    lane.launchReject = reject;
     const proc = spawn(BINARY_PATH, ["--persistent"], {
       stdio: ["pipe", "pipe", "pipe"],
     });
+    lane.launchingChild = proc;
 
     let ready = false;
 
     proc.stdout!.setEncoding("utf-8");
     proc.stdout!.on("data", (chunk: string) => {
-      buffer += chunk;
+      const ownsProcess = lane.child === proc || lane.launchingChild === proc;
+      if (!ownsProcess) return;
+      lane.buffer += chunk;
       // Kill immediately if buffer grows too large (prevents OOM)
-      if (buffer.length > BUFFER.SWIFT) {
-        buffer = "";
-        rejectAll(`Swift bridge persistent buffer exceeded ${BUFFER.SWIFT} bytes`);
+      if (lane.buffer.length > BUFFER.SWIFT) {
+        lane.buffer = "";
+        rejectAll(lane, `Swift bridge persistent buffer exceeded ${BUFFER.SWIFT} bytes`);
         proc.kill("SIGKILL");
         return;
       }
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
+      const lines = lane.buffer.split("\n");
+      lane.buffer = lines.pop() ?? "";
 
       for (const line of lines) {
         const trimmed = line.trim();
@@ -204,8 +256,11 @@ function ensureProcess(): Promise<void> {
           if (!ready && msg.id === "__ready__") {
             ready = true;
             clearTimeout(readyTimer);
-            child = proc;
-            launching = null;
+            lane.launchTimer = null;
+            lane.child = proc;
+            lane.launchingChild = null;
+            lane.launching = null;
+            lane.launchReject = null;
             resolve();
             continue;
           }
@@ -220,9 +275,9 @@ function ensureProcess(): Promise<void> {
             continue;
           }
 
-          const entry = pending.get(msg.id);
+          const entry = lane.pending.get(msg.id);
           if (!entry) continue;
-          pending.delete(msg.id);
+          lane.pending.delete(msg.id);
           clearTimeout(entry.timer);
           if (msg.error) {
             entry.reject(new Error(msg.error));
@@ -244,62 +299,99 @@ function ensureProcess(): Promise<void> {
     });
 
     proc.on("error", (err) => {
-      rejectAll(`Swift bridge error: ${err.message}`);
-      child = null;
+      const ownsProcess = lane.child === proc || lane.launchingChild === proc;
+      if (!ownsProcess) return;
+      rejectAll(lane, `Swift bridge error: ${err.message}`);
+      if (lane.child === proc) lane.child = null;
+      if (lane.launchingChild === proc) lane.launchingChild = null;
       if (!ready) {
         clearTimeout(readyTimer);
-        launching = null;
-        launchFailed = true;
-        launchFailedAt = Date.now();
+        lane.launchTimer = null;
+        lane.launching = null;
+        lane.launchReject = null;
+        lane.launchFailed = true;
+        lane.launchFailedAt = Date.now();
         reject(err);
       }
     });
 
     proc.on("close", (code) => {
-      rejectAll(`Swift bridge exited with code ${code}`);
-      child = null;
-      launching = null;
+      const ownsProcess = lane.child === proc || lane.launchingChild === proc;
+      if (!ownsProcess) return;
+      rejectAll(lane, `Swift bridge exited with code ${code}`);
+      if (lane.child === proc) lane.child = null;
+      if (lane.launchingChild === proc) lane.launchingChild = null;
+      lane.launching = null;
+      lane.launchReject = null;
       if (!ready) {
         clearTimeout(readyTimer);
-        launchFailed = true;
-        launchFailedAt = Date.now();
+        lane.launchTimer = null;
+        lane.launchFailed = true;
+        lane.launchFailedAt = Date.now();
         reject(new Error(`Swift bridge exited during startup with code ${code}`));
       }
     });
 
     // Timeout for initial readiness
     const readyTimer = setTimeout(() => {
-      if (!ready) {
+      if (!ready && lane.launchingChild === proc) {
+        lane.launchTimer = null;
         proc.kill("SIGTERM");
-        launching = null;
-        launchFailed = true;
-        launchFailedAt = Date.now();
+        if (lane.launchingChild === proc) lane.launchingChild = null;
+        lane.launching = null;
+        lane.launchReject = null;
+        lane.launchFailed = true;
+        lane.launchFailedAt = Date.now();
         reject(new Error("Swift bridge did not become ready within 10s"));
       }
     }, 10_000);
+    lane.launchTimer = readyTimer;
   });
 
-  return launching;
+  return lane.launching;
 }
 
-function rejectAll(message: string): void {
-  for (const [, entry] of pending) {
+function rejectAll(lane: BridgeLane, message: string): void {
+  for (const [, entry] of lane.pending) {
     clearTimeout(entry.timer);
     entry.reject(new Error(message));
   }
-  pending.clear();
-  buffer = "";
+  lane.pending.clear();
+  lane.buffer = "";
+}
+function terminateActiveProcess(lane: BridgeLane, proc: ChildProcess, message: string): void {
+  if (lane.child !== proc) return;
+  lane.child = null;
+  rejectAll(lane, message);
+  if (!proc.killed) {
+    proc.stdin!.end();
+    proc.kill("SIGTERM");
+  }
+}
+
+function closeBridgeLane(lane: BridgeLane): void {
+  const processes = new Set([lane.child, lane.launchingChild]);
+  const rejectLaunch = lane.launchReject;
+  const launchTimer = lane.launchTimer;
+  lane.child = null;
+  lane.launchingChild = null;
+  lane.launching = null;
+  lane.launchReject = null;
+  lane.launchTimer = null;
+  if (launchTimer) clearTimeout(launchTimer);
+  rejectAll(lane, "Swift bridge closed");
+  rejectLaunch?.(new SwiftBridgeClosedError());
+  for (const proc of processes) {
+    if (proc && !proc.killed) {
+      proc.stdin!.end();
+      proc.kill("SIGTERM");
+    }
+  }
 }
 
 /** Gracefully shut down the persistent Swift process. */
 export function closeSwiftBridge(): void {
-  if (child && !child.killed) {
-    child.stdin!.end();
-    child.kill("SIGTERM");
-  }
-  child = null;
-  launching = null;
-  rejectAll("Swift bridge closed");
+  for (const lane of bridgeLanes) closeBridgeLane(lane);
 }
 
 // ── Public API ───────────────────────────────────────────────────────
@@ -307,26 +399,30 @@ export function closeSwiftBridge(): void {
 export async function runSwift<T>(command: string, input: string): Promise<T> {
   const missing = await checkSwiftBridge();
   if (missing) throw new Error(missing);
+  const lane = laneForCommand(command);
 
   // If persistent mode failed to launch, check if recovery is possible
-  if (launchFailed) {
-    if (launchRetryCount >= LAUNCH_MAX_RETRIES) {
+  if (lane.launchFailed) {
+    if (lane.launchRetryCount >= LAUNCH_MAX_RETRIES) {
       return runSwiftSingleShot<T>(command, input);
     }
-    if (Date.now() - launchFailedAt < LAUNCH_COOLDOWN_MS) {
+    if (Date.now() - lane.launchFailedAt < LAUNCH_COOLDOWN_MS) {
       return runSwiftSingleShot<T>(command, input);
     }
-    launchFailed = false;
-    launchRetryCount++;
+    lane.launchFailed = false;
+    lane.launchRetryCount++;
   }
 
   try {
-    await ensureProcess();
-    launchRetryCount = 0;
-  } catch {
+    await ensureProcess(lane);
+    lane.launchRetryCount = 0;
+  } catch (error) {
+    // An explicit shutdown must not be treated as a launch failure: falling
+    // back here would spawn a new single-shot helper while closing.
+    if (error instanceof SwiftBridgeClosedError) throw error;
     // Persistent mode unavailable — fall back to single-shot
-    launchFailed = true;
-    launchFailedAt = Date.now();
+    lane.launchFailed = true;
+    lane.launchFailedAt = Date.now();
     return runSwiftSingleShot<T>(command, input);
   }
 
@@ -335,25 +431,29 @@ export async function runSwift<T>(command: string, input: string): Promise<T> {
 
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => {
-      pending.delete(id);
+      lane.pending.delete(id);
       reject(new Error(`Swift bridge timed out after ${TIMEOUT.SWIFT / 1000}s`));
+      const proc = lane.child;
+      if (proc) {
+        terminateActiveProcess(lane, proc, "Swift bridge reset after another request timed out");
+      }
     }, TIMEOUT.SWIFT);
 
-    pending.set(id, {
+    lane.pending.set(id, {
       resolve: resolve as (value: unknown) => void,
       reject,
       timer,
     });
 
     try {
-      child!.stdin!.write(request + "\n");
+      lane.child!.stdin!.write(request + "\n");
     } catch (e) {
-      pending.delete(id);
+      lane.pending.delete(id);
       clearTimeout(timer);
       // Process may have died — reset and fall back
-      child = null;
-      launchFailed = true;
-      launchFailedAt = Date.now();
+      lane.child = null;
+      lane.launchFailed = true;
+      lane.launchFailedAt = Date.now();
       reject(new Error(`Failed to write to Swift bridge: ${e}`));
     }
   });

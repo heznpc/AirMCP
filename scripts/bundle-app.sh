@@ -348,6 +348,8 @@ codesign --force --sign "$SIGN_IDENTITY" --entitlements /dev/stdin "$BUNDLE_DIR"
 	<array>
 		<string>group.app.airmcp</string>
 	</array>
+	<key>com.apple.security.automation.apple-events</key>
+	<true/>
 </dict>
 </plist>
 APP_ENTITLEMENTS_EOF

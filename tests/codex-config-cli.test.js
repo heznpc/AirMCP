@@ -10,9 +10,12 @@ const DIST = fileURLToPath(new URL("../dist/index.js", import.meta.url));
 const homes = [];
 
 function runCli(home, args, cwd = home, env = {}) {
+  const childEnv = { ...cleanBootEnv(), HOME: home, NO_COLOR: "1", PATH: "/usr/bin:/bin:/usr/sbin:/sbin" };
+  delete childEnv.CODEX_HOME;
+  Object.assign(childEnv, env);
   return spawnSync(process.execPath, [DIST, ...args], {
     cwd,
-    env: { ...cleanBootEnv(), HOME: home, NO_COLOR: "1", PATH: "/usr/bin:/bin:/usr/sbin:/sbin", ...env },
+    env: childEnv,
     encoding: "utf8",
   });
 }
@@ -29,6 +32,31 @@ afterEach(() => {
 });
 
 describe("airmcp codex", () => {
+  test("does not let an inherited CODEX_HOME escape the isolated test home", () => {
+    const home = createHome();
+    const configPath = join(home, ".codex", "config.toml");
+    const inheritedCodexHome = join(home, "inherited-codex-home");
+    const inheritedConfigPath = join(inheritedCodexHome, "config.toml");
+    mkdirSync(inheritedCodexHome, { recursive: true });
+    writeFileSync(configPath, '[mcp_servers.airmcp]\ncommand = "npx"\n');
+    writeFileSync(inheritedConfigPath, 'model = "must-stay"\n');
+    const previousCodexHome = process.env.CODEX_HOME;
+
+    try {
+      process.env.CODEX_HOME = inheritedCodexHome;
+      const result = runCli(home, ["codex", "status", "--json"]);
+
+      expect(result.status).toBe(0);
+      expect(JSON.parse(result.stdout)).toEqual(
+        expect.objectContaining({ globalState: "enabled", globalConfigPath: configPath }),
+      );
+      expect(readFileSync(inheritedConfigPath, "utf8")).toBe('model = "must-stay"\n');
+    } finally {
+      if (previousCodexHome === undefined) delete process.env.CODEX_HOME;
+      else process.env.CODEX_HOME = previousCodexHome;
+    }
+  });
+
   test("an invalid Codex override does not block help or config-only init", () => {
     const home = createHome();
     const invalidOverride = join(home, "custom-codex.toml");

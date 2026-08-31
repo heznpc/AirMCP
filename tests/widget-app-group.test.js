@@ -29,6 +29,16 @@ describe("widget App Group entitlement agreement", () => {
     expect(groupBlocks).toBeGreaterThanOrEqual(2);
   });
 
+  test("the main app declares Apple Events automation without inventing a screen-capture entitlement", () => {
+    const mainEntitlements = bundleSh.match(/<<'APP_ENTITLEMENTS_EOF'\n([\s\S]*?)\nAPP_ENTITLEMENTS_EOF/)?.[1];
+    expect(mainEntitlements).toBeDefined();
+    expect(mainEntitlements).toMatch(
+      /<key>com\.apple\.security\.application-groups<\/key>\s*<array>\s*<string>group\.app\.airmcp<\/string>\s*<\/array>/,
+    );
+    expect(mainEntitlements).toMatch(/<key>com\.apple\.security\.automation\.apple-events<\/key>\s*<true\/>/);
+    expect(mainEntitlements).not.toMatch(/<key>com\.apple\.security\.[^<]*(?:screen|capture)[^<]*<\/key>/i);
+  });
+
   test("the Swift WidgetSnapshotConfig.appGroupID matches the entitlement id", () => {
     expect(snapshotSwift).toContain(`appGroupID = "${APP_GROUP}"`);
   });

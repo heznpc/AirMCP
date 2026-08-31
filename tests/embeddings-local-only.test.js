@@ -184,6 +184,68 @@ describe('embedText hybrid — fallback audit + LOCAL_ONLY refusal', () => {
   });
 });
 
+describe('embedBatch swift — bounded sequential bridge requests', () => {
+  test('sends exactly 50 texts in one request and preserves language + vector order', async () => {
+    const texts = Array.from({ length: 50 }, (_, i) => `swift-boundary-${i}`);
+    swiftMock.runSwift.mockImplementation(async (_command, input) => {
+      const payload = JSON.parse(input);
+      return {
+        vectors: payload.texts.map((text) => [Number(text.split('-').at(-1))]),
+        dimension: 1,
+        count: payload.texts.length,
+      };
+    });
+
+    const vectors = await embeddings.embedBatch(texts, 'swift', 'ko');
+
+    expect(swiftMock.runSwift).toHaveBeenCalledTimes(1);
+    expect(swiftMock.runSwift.mock.calls[0][0]).toBe('embed-batch');
+    expect(JSON.parse(swiftMock.runSwift.mock.calls[0][1])).toEqual({ texts, language: 'ko' });
+    expect(vectors).toEqual(texts.map((_, i) => [i]));
+  });
+
+  test('splits 120 texts into sequential 50/50/20 requests and preserves global order', async () => {
+    const texts = Array.from({ length: 120 }, (_, i) => `swift-chunked-${i}`);
+    let activeCalls = 0;
+    let maxActiveCalls = 0;
+    swiftMock.runSwift.mockImplementation(async (_command, input) => {
+      activeCalls++;
+      maxActiveCalls = Math.max(maxActiveCalls, activeCalls);
+      const payload = JSON.parse(input);
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      activeCalls--;
+      return {
+        vectors: payload.texts.map((text) => [Number(text.split('-').at(-1))]),
+        dimension: 1,
+        count: payload.texts.length,
+      };
+    });
+
+    const vectors = await embeddings.embedBatch(texts, 'swift', 'en');
+    const payloads = swiftMock.runSwift.mock.calls.map(([, input]) => JSON.parse(input));
+
+    expect(payloads.map(({ texts: chunk }) => chunk.length)).toEqual([50, 50, 20]);
+    expect(payloads.every(({ language }) => language === 'en')).toBe(true);
+    expect(payloads.flatMap(({ texts: chunk }) => chunk)).toEqual(texts);
+    expect(maxActiveCalls).toBe(1);
+    expect(vectors).toEqual(texts.map((_, i) => [i]));
+  });
+
+  test('rejects a Swift chunk whose reported vector count does not match its input', async () => {
+    const texts = Array.from({ length: 51 }, (_, i) => `swift-count-mismatch-${i}`);
+    swiftMock.runSwift.mockResolvedValue({
+      vectors: Array.from({ length: 49 }, (_, i) => [i]),
+      dimension: 1,
+      count: 49,
+    });
+
+    await expect(embeddings.embedBatch(texts, 'swift', 'fr')).rejects.toThrow(
+      'Swift embedding batch returned 49 vectors (count=49) for 50 texts',
+    );
+    expect(swiftMock.runSwift).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('getEmbeddingConfig — localOnly diagnostic surface', () => {
   test('reports localOnly: true when env is set', () => {
     setEnv('AIRMCP_LOCAL_ONLY', 'true');

@@ -32,6 +32,28 @@ function scrubPii(msg: string): string {
   return msg.replace(EMAIL_RE, "[email]").replace(PATH_RE, "[path]").slice(0, MAX_ERR_LEN);
 }
 
+type OsascriptProcessError = {
+  killed?: boolean;
+  signal?: string;
+  stderr?: string;
+  message?: string;
+};
+
+/** Return only subprocess diagnostics, never the user-generated `-e` script.
+ * `execFile` includes the complete argv in Error.message, so searching that
+ * string for Apple error codes can mistake script literals/user input for the
+ * actual failure and retry a write. Callback stderr is authoritative; when it
+ * is absent, retain process metadata while replacing the script body. */
+function osascriptDiagnostic(error: OsascriptProcessError): string {
+  const stderr = typeof error.stderr === "string" ? error.stderr.trim() : "";
+  if (stderr) return stderr;
+
+  const message = typeof error.message === "string" ? error.message.trim() : "";
+  const scriptMarker = " -e ";
+  const scriptIndex = message.indexOf(scriptMarker);
+  return scriptIndex >= 0 ? `${message.slice(0, scriptIndex)}${scriptMarker}[script]` : message;
+}
+
 // ── Concurrency semaphore (lazy — created on first use after config is parsed) ──
 let _semaphore: Semaphore | undefined;
 function jxaSemaphore(): Semaphore {
@@ -101,13 +123,13 @@ function extractAppName(script: string): string | undefined {
 /** Classify an osascript error and throw a clean, PII-scrubbed Error. */
 function handleOsascriptError(e: unknown, app: string | undefined, timeout: number): never {
   if (app) recordFailure(app);
-  const error = e as { killed?: boolean; signal?: string; stderr?: string; message?: string };
+  const error = e as OsascriptProcessError;
   if (error.killed || error.signal === "SIGTERM" || error.signal === "SIGKILL") {
     throw new Error(`osascript timed out after ${timeout / 1000}s`, { cause: e });
   }
-  const rawMsg = `${error.stderr ?? ""} ${error.message ?? ""}`.trim();
-  const cleanMsg = scrubPii(rawMsg);
-  const friendly = describeJxaError(rawMsg);
+  const diagnostic = osascriptDiagnostic(error);
+  const cleanMsg = scrubPii(diagnostic);
+  const friendly = describeJxaError(diagnostic);
   throw new Error(friendly ? `osascript error: ${friendly}` : `osascript error: ${cleanMsg}`, { cause: e });
 }
 
@@ -140,12 +162,17 @@ function execOsascript(script: string, timeout: number, language?: "JavaScript")
   return new Promise((resolve, reject) => {
     let settled = false;
     const args = language ? ["-l", language, "-e", script] : ["-e", script];
-    const child = execFile("/usr/bin/osascript", args, { timeout, maxBuffer: BUFFER.JXA }, (error, stdout) => {
+    const child = execFile("/usr/bin/osascript", args, { timeout, maxBuffer: BUFFER.JXA }, (error, stdout, stderr) => {
       if (settled) return;
       settled = true;
       clearTimeout(killTimer);
 
       if (error) {
+        // `execFile` delivers stderr as a separate callback argument. It is
+        // not reliably attached to the Error object, so preserve it before
+        // classification/scrubbing; otherwise a long `-e <script>` command
+        // consumes the diagnostic limit and hides the actual TCC denial.
+        (error as Error & { stderr?: string }).stderr = stderr;
         reject(error);
         return;
       }
@@ -169,9 +196,9 @@ function execOsascript(script: string, timeout: number, language?: "JavaScript")
 
 // ── Transient detection ──────────────────────────────────────────────
 function isTransient(e: unknown): boolean {
-  const err = e as { killed?: boolean; signal?: string; stderr?: string; message?: string };
+  const err = e as OsascriptProcessError;
   if (err.killed || err.signal === "SIGTERM") return true;
-  const msg = `${err.stderr ?? ""} ${err.message ?? ""}`;
+  const msg = osascriptDiagnostic(err);
   return TRANSIENT_PATTERNS.some((p) => msg.includes(p));
 }
 

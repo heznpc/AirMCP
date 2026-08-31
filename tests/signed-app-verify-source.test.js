@@ -151,6 +151,17 @@ describe("signed app artifact verification script", () => {
     expect(notarize).toContain('bash "$SCRIPT_DIR/verify-signing-identity.sh"');
     expect(notarize).toContain("Print :AirMCPAcceptanceHarnessBuild");
     expect(notarize).toContain("refusing to sign an acceptance-harness build");
+    expect(notarize).toContain('MAIN_ENTITLEMENTS="$ENT_DIR/main-app.plist"');
+    expect(notarize).toContain('--entitlements "$MAIN_ENTITLEMENTS"');
+    expect(notarize).toContain('FINAL_MAIN_ENTITLEMENTS="$ENT_DIR/final-main-app.plist"');
+    expect(notarize).toContain('verify_main_entitlements "$FINAL_MAIN_ENTITLEMENTS" "re-signed"');
+    expect(notarize).toContain('verify_widget_entitlements "$ent_file" "source"');
+    expect(notarize).toContain('verify_widget_entitlements "$final_ent_file" "re-signed"');
+    expect(notarize).toContain("com.apple.security.application-groups");
+    expect(notarize).toContain("com.apple.security.automation.apple-events");
+    expect(notarize).toContain("for capability in calendars reminders");
+    expect(notarize).toContain("personal-information\\.$capability");
+    expect(notarize).toContain("application-groups entitlement must be an array");
     expect(notarize).not.toContain("codesigning with $APPLE_DEVELOPER_ID");
     expect(notarize).not.toContain('echo "$SUBMIT_OUTPUT"');
     expect(notarize).not.toContain("preserved entitlements: $appex");

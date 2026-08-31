@@ -47,6 +47,10 @@
     <string>AirMCP reads your current location only when you explicitly ask for location-based tools.</string>
     <key>NSHealthShareUsageDescription</key>
     <string>AirMCP reads aggregated HealthKit summaries only when you explicitly ask for health-related tools.</string>
+    <key>NSScreenCaptureUsageDescription</key>
+    <string>AirMCP captures your screen or app windows only when you explicitly ask it to take a screenshot or screen recording.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>AirMCP controls other Mac apps only when you explicitly ask it to read or change their data.</string>
     <key>NSServices</key>
     <array>
         <dict>

@@ -48,4 +48,50 @@ describe('JXA module', () => {
       expect.any(Function),
     );
   });
+
+  test('uses stderr without classifying an error code embedded in the generated script', async () => {
+    const { execFile } = await import('node:child_process');
+    execFile.mockClear();
+    execFile.mockImplementationOnce((_path, args, _options, callback) => {
+      const child = {
+        on: jest.fn(),
+        killed: false,
+        exitCode: null,
+        kill: jest.fn(),
+      };
+      const error = new Error(`Command failed: /usr/bin/osascript -l JavaScript -e ${args.at(-1)}`);
+      queueMicrotask(() =>
+        callback(error, '', 'execution error: Screen Recording permission denied for AirMCP. (-2700)\n'),
+      );
+      return child;
+    });
+
+    const mod = await import('../dist/shared/jxa.js');
+    await expect(mod.runJxa("const userText = '-1743'; throw new Error('capture failed');")).rejects.toThrow(
+      'osascript error: execution error: Screen Recording permission denied for AirMCP. (-2700)',
+    );
+    expect(execFile).toHaveBeenCalledTimes(1);
+  });
+
+  test('does not retry when only the generated script contains a transient error marker', async () => {
+    const { execFile } = await import('node:child_process');
+    execFile.mockClear();
+    execFile.mockImplementation((_path, args, _options, callback) => {
+      const child = {
+        on: jest.fn(),
+        killed: false,
+        exitCode: null,
+        kill: jest.fn(),
+      };
+      const error = new Error(`Command failed: /usr/bin/osascript -l JavaScript -e ${args.at(-1)}`);
+      queueMicrotask(() => callback(error, '', ''));
+      return child;
+    });
+
+    const mod = await import('../dist/shared/jxa.js');
+    await expect(mod.runJxa("const userText = '-1728'; throw new Error('ordinary failure');")).rejects.toThrow(
+      'osascript error: Command failed: /usr/bin/osascript -l JavaScript -e [script]',
+    );
+    expect(execFile).toHaveBeenCalledTimes(1);
+  });
 });

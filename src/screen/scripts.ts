@@ -13,6 +13,18 @@ function tempScreenshotPath(): string {
   return join(PATHS.TEMP_DIR, `airmcp-screenshot-${Date.now()}.png`);
 }
 
+/** Fail with an actionable error before invoking screencapture. This tool
+ * path intentionally uses the read-only preflight API rather than surprising
+ * the user with a consent prompt, so a denial must point at System Settings
+ * instead of surfacing the CLI's ambiguous "could not create image" message. */
+const SCREEN_RECORDING_PREFLIGHT = `
+    ObjC.import('CoreGraphics');
+    ObjC.bindFunction('CGPreflightScreenCaptureAccess', ['bool', []]);
+    if (!$.CGPreflightScreenCaptureAccess()) {
+      throw new Error('Screen Recording permission denied for the app hosting AirMCP.');
+    }
+`;
+
 /**
  * Capture the full screen (or a specific display) using macOS screencapture CLI.
  * Returns a JXA script that runs screencapture and outputs the file path as JSON.
@@ -21,6 +33,7 @@ export function captureScreenScript(display?: number): string {
   const filePath = tempScreenshotPath();
   const displayFlag = display !== undefined ? ` -D ${Math.floor(display)}` : "";
   return `
+    ${SCREEN_RECORDING_PREFLIGHT}
     const app = Application.currentApplication();
     app.includeStandardAdditions = true;
     app.doShellScript('screencapture -x -t png${displayFlag} "${filePath}"');
@@ -39,7 +52,7 @@ export function captureWindowScript(appName?: string): string {
   const activateBlock = appName ? `Application('${esc(appName)}').activate(); delay(1.0);` : "";
   const ownerFilter = appName ? `win.kCGWindowOwnerName !== '${esc(appName)}'` : "false";
   return `
-    ObjC.import('CoreGraphics');
+    ${SCREEN_RECORDING_PREFLIGHT}
     const app = Application.currentApplication();
     app.includeStandardAdditions = true;
     ${activateBlock}
@@ -76,6 +89,7 @@ export function recordScreenScript(duration: number, display?: number): string {
   const filePath = join(PATHS.TEMP_DIR, `airmcp-recording-${Date.now()}.mov`);
   const displayFlag = display !== undefined ? ` -D ${Math.floor(display)}` : "";
   return `
+    ${SCREEN_RECORDING_PREFLIGHT}
     const app = Application.currentApplication();
     app.includeStandardAdditions = true;
     app.doShellScript('screencapture -x -v${displayFlag} "${filePath}" & SCPID=$!; sleep ${safeDuration}; kill $SCPID 2>/dev/null; wait $SCPID 2>/dev/null || true');
@@ -93,6 +107,7 @@ export function captureAreaScript(x: number, y: number, width: number, height: n
   const safeW = Math.floor(width);
   const safeH = Math.floor(height);
   return `
+    ${SCREEN_RECORDING_PREFLIGHT}
     const app = Application.currentApplication();
     app.includeStandardAdditions = true;
     app.doShellScript('screencapture -x -t png -R ${safeX},${safeY},${safeW},${safeH} "${filePath}"');

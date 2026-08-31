@@ -71,10 +71,17 @@ const PRIVACY_REQUIREMENTS = [
   },
 ];
 
+// These APIs are hosted by the signed app's embedded Node process rather than
+// the Swift bridge, so source-derived Swift requirements alone cannot see them.
+const APP_HOST_REQUIREMENTS = ["NSScreenCaptureUsageDescription", "NSAppleEventsUsageDescription"];
+
 const REQUIRED = [
-  ...new Set(
-    PRIVACY_REQUIREMENTS.flatMap((requirement) => (requirement.uses.test(swiftBridgeSource) ? requirement.keys : [])),
-  ),
+  ...new Set([
+    ...PRIVACY_REQUIREMENTS.flatMap((requirement) =>
+      requirement.uses.test(swiftBridgeSource) ? requirement.keys : [],
+    ),
+    ...APP_HOST_REQUIREMENTS,
+  ]),
 ];
 
 describe("app Info.plist — privacy usage descriptions for TCC-gated tools", () => {

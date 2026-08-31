@@ -7,7 +7,15 @@ import { describe, expect, test } from "@jest/globals";
 const root = new URL("..", import.meta.url);
 const verifier = new URL("scripts/verify-bundle-structure.sh", root).pathname;
 
-function makeBundle({ bundleId = "com.example.TestApp", executable = "TestApp", signed = true } = {}) {
+function makeBundle({
+  bundleId = "com.example.TestApp",
+  executable = "TestApp",
+  signed = true,
+  includeRequiredEntitlements = true,
+  mainEntitlementTypes = "valid",
+  includeWidget = false,
+  widgetEntitlements = "valid",
+} = {}) {
   const temp = mkdtempSync(join(tmpdir(), "airmcp-bundle-"));
   const bundle = join(temp, `${executable}.app`);
   const contents = join(bundle, "Contents");
@@ -87,19 +95,120 @@ int main(int argc, char **argv) {
   <string>1.0.0</string>
   <key>CFBundleVersion</key>
   <string>1</string>
+  <key>NSScreenCaptureUsageDescription</key>
+  <string>AirMCP captures your screen or app windows only when you explicitly ask it to take a screenshot or screen recording.</string>
+  <key>NSAppleEventsUsageDescription</key>
+  <string>AirMCP controls other Mac apps only when you explicitly ask it to read or change their data.</string>
 </dict>
 </plist>
 `,
   );
+
+  let widget;
+  let widgetBinary;
+  if (includeWidget) {
+    widget = join(contents, "PlugIns", "AirMCPWidget.appex");
+    const widgetContents = join(widget, "Contents");
+    const widgetMacOS = join(widgetContents, "MacOS");
+    widgetBinary = join(widgetMacOS, "AirMCPWidget");
+    mkdirSync(widgetMacOS, { recursive: true });
+    copyFileSync(bundledNode, widgetBinary);
+    chmodSync(widgetBinary, 0o755);
+    writeFileSync(
+      join(widgetContents, "Info.plist"),
+      `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleIdentifier</key>
+  <string>app.airmcp.Widget</string>
+  <key>CFBundleExecutable</key>
+  <string>AirMCPWidget</string>
+  <key>CFBundlePackageType</key>
+  <string>XPC!</string>
+  <key>CFBundleShortVersionString</key>
+  <string>1.0.0</string>
+  <key>CFBundleVersion</key>
+  <string>1</string>
+</dict>
+</plist>
+`,
+    );
+  }
+
   if (signed) {
-    for (const nested of [bundledNode, bundledBridge, binary]) {
+    for (const nested of [bundledNode, bundledBridge, binary, ...(widgetBinary ? [widgetBinary] : [])]) {
       const nestedResult = spawnSync("codesign", ["--force", "--sign", "-", nested], { encoding: "utf8" });
       expect(nestedResult.status).toBe(0);
     }
-    const signedResult = spawnSync("codesign", ["--force", "--deep", "--sign", "-", bundle], { encoding: "utf8" });
+
+    if (widget) {
+      const widgetSignArguments = ["--force", "--sign", "-"];
+      if (widgetEntitlements !== "none") {
+        const entitlements = join(temp, "widget.entitlements");
+        const groupValue =
+          widgetEntitlements === "string-types"
+            ? "<string>group.app.airmcp</string>"
+            : "<array><string>group.app.airmcp</string></array>";
+        const capabilityValue =
+          widgetEntitlements === "string-types" || widgetEntitlements === "string-booleans"
+            ? "<string>true</string>"
+            : "<true/>";
+        writeFileSync(
+          entitlements,
+          `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.application-groups</key>
+  ${groupValue}
+  <key>com.apple.security.personal-information.calendars</key>
+  ${capabilityValue}
+  <key>com.apple.security.personal-information.reminders</key>
+  ${capabilityValue}
+</dict>
+</plist>
+`,
+        );
+        widgetSignArguments.push("--entitlements", entitlements);
+      }
+      widgetSignArguments.push(widget);
+      const widgetSignedResult = spawnSync("codesign", widgetSignArguments, { encoding: "utf8" });
+      expect(widgetSignedResult.status).toBe(0);
+    }
+
+    const signArguments = ["--force", "--sign", "-"];
+    if (includeRequiredEntitlements) {
+      const entitlements = join(temp, "main.entitlements");
+      const groupValue =
+        mainEntitlementTypes === "string-types"
+          ? "<string>group.app.airmcp</string>"
+          : "<array><string>group.app.airmcp</string></array>";
+      const automationValue =
+        mainEntitlementTypes === "string-types" || mainEntitlementTypes === "string-boolean"
+          ? "<string>true</string>"
+          : "<true/>";
+      writeFileSync(
+        entitlements,
+        `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.application-groups</key>
+  ${groupValue}
+  <key>com.apple.security.automation.apple-events</key>
+  ${automationValue}
+</dict>
+</plist>
+`,
+      );
+      signArguments.push("--entitlements", entitlements);
+    }
+    signArguments.push(bundle);
+    const signedResult = spawnSync("codesign", signArguments, { encoding: "utf8" });
     expect(signedResult.status).toBe(0);
   }
-  return { temp, bundle, binary, executable, bundleId };
+  return { temp, bundle, binary, executable, bundleId, widget };
 }
 
 function verifyBundle(bundle, bundleId, executable, env = {}) {
@@ -169,6 +278,7 @@ describe("macOS bundle structure verifier", () => {
   test("requires the widget when building a signed distribution", () => {
     if (process.platform !== "darwin") return;
     const fixture = makeBundle();
+    const withWidget = makeBundle({ includeWidget: true });
     try {
       const optional = verifyBundle(fixture.bundle, fixture.bundleId, fixture.executable);
       expect(optional.status).toBe(0);
@@ -178,6 +288,91 @@ describe("macOS bundle structure verifier", () => {
       });
       expect(required.status).toBe(1);
       expect(required.stderr).toContain("requires a complete AirMCPWidget.appex");
+
+      const validWidget = verifyBundle(withWidget.bundle, withWidget.bundleId, withWidget.executable, {
+        AIRMCP_REQUIRE_WIDGET: "1",
+      });
+      expect(validWidget.stderr).toBe("");
+      expect(validWidget.status).toBe(0);
+    } finally {
+      rmSync(fixture.temp, { recursive: true, force: true });
+      rmSync(withWidget.temp, { recursive: true, force: true });
+    }
+  });
+
+  test("rejects a valid signature whose main-app entitlements were dropped", () => {
+    if (process.platform !== "darwin") return;
+    const fixture = makeBundle({ includeRequiredEntitlements: false });
+    try {
+      const result = verifyBundle(fixture.bundle, fixture.bundleId, fixture.executable);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("signed main app has no valid entitlements");
+    } finally {
+      rmSync(fixture.temp, { recursive: true, force: true });
+    }
+  });
+
+  test("rejects string-typed main-app entitlements that only look valid in text output", () => {
+    if (process.platform !== "darwin") return;
+    const fixture = makeBundle({ mainEntitlementTypes: "string-types" });
+    try {
+      const result = verifyBundle(fixture.bundle, fixture.bundleId, fixture.executable);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("application-groups entitlement must be an array");
+    } finally {
+      rmSync(fixture.temp, { recursive: true, force: true });
+    }
+  });
+
+  test("rejects a string-typed main-app automation flag even when the app group is a valid array", () => {
+    if (process.platform !== "darwin") return;
+    const fixture = makeBundle({ mainEntitlementTypes: "string-boolean" });
+    try {
+      const result = verifyBundle(fixture.bundle, fixture.bundleId, fixture.executable);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("Apple Events automation entitlement must be a boolean");
+    } finally {
+      rmSync(fixture.temp, { recursive: true, force: true });
+    }
+  });
+
+  test("rejects a valid widget signature whose required entitlements were dropped", () => {
+    if (process.platform !== "darwin") return;
+    const fixture = makeBundle({ includeWidget: true, widgetEntitlements: "none" });
+    try {
+      const result = verifyBundle(fixture.bundle, fixture.bundleId, fixture.executable, {
+        AIRMCP_REQUIRE_WIDGET: "1",
+      });
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("signed widget has no valid entitlements");
+    } finally {
+      rmSync(fixture.temp, { recursive: true, force: true });
+    }
+  });
+
+  test("rejects string-typed widget entitlements that codesign accepts", () => {
+    if (process.platform !== "darwin") return;
+    const fixture = makeBundle({ includeWidget: true, widgetEntitlements: "string-types" });
+    try {
+      const result = verifyBundle(fixture.bundle, fixture.bundleId, fixture.executable, {
+        AIRMCP_REQUIRE_WIDGET: "1",
+      });
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("signed widget application-groups entitlement must be an array");
+    } finally {
+      rmSync(fixture.temp, { recursive: true, force: true });
+    }
+  });
+
+  test("rejects string-typed widget capability flags even when the app group is a valid array", () => {
+    if (process.platform !== "darwin") return;
+    const fixture = makeBundle({ includeWidget: true, widgetEntitlements: "string-booleans" });
+    try {
+      const result = verifyBundle(fixture.bundle, fixture.bundleId, fixture.executable, {
+        AIRMCP_REQUIRE_WIDGET: "1",
+      });
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("signed widget calendars entitlement must be a boolean");
     } finally {
       rmSync(fixture.temp, { recursive: true, force: true });
     }

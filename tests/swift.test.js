@@ -41,6 +41,7 @@ const originalBridgePath = process.env.AIRMCP_BRIDGE_PATH;
 process.env.AIRMCP_BRIDGE_PATH = TEST_APP_BRIDGE_PATH;
 const { checkSwiftBridge, runSwift, closeSwiftBridge, hasSwiftCommand, resolveSwiftBridgePath } =
   await import('../dist/shared/swift.js');
+const { eventBus } = await import('../dist/shared/event-bus.js');
 if (originalBridgePath === undefined) delete process.env.AIRMCP_BRIDGE_PATH;
 else process.env.AIRMCP_BRIDGE_PATH = originalBridgePath;
 
@@ -153,6 +154,148 @@ describe('swift bridge', () => {
     const { promise: p } = await ready(proc, 'cl-2');
     closeSwiftBridge();
     await expect(p).rejects.toThrow('Swift bridge closed');
+  });
+
+  test('close during startup does not spawn fallback or accept a stale ready signal', async () => {
+    closeSwiftBridge();
+    const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout');
+    const startingProc = createMockProcess();
+    const replacementProc = createMockProcess();
+    mockSpawn.mockReturnValueOnce(startingProc).mockReturnValueOnce(replacementProc);
+
+    const closingRequest = mute(runSwift('cmd', '{}'));
+    await tick();
+    closeSwiftBridge();
+
+    await expect(closingRequest).rejects.toThrow('Swift bridge closed');
+    expect(startingProc.stdin.end).toHaveBeenCalled();
+    expect(startingProc.kill).toHaveBeenCalledWith('SIGTERM');
+    expect(clearTimeoutSpy).toHaveBeenCalled();
+    expect(mockSpawn).toHaveBeenCalledTimes(1);
+
+    mockRandomUUID.mockReturnValue('replacement-1');
+    const replacement = mute(runSwift('cmd', '{}'));
+    await tick();
+    replacementProc.stdout.emit('data', '{"id":"__ready__"}\n');
+    await tick();
+
+    // The closed startup process must not overwrite the live replacement.
+    startingProc.stdout.emit('data', '{"id":"__ready__"}\n');
+    replacementProc.stdout.emit('data', '{"id":"replacement-1","result":"ok"}\n');
+    await expect(replacement).resolves.toBe('ok');
+
+    mockRandomUUID.mockReturnValue('replacement-2');
+    const reused = mute(runSwift('cmd', '{}'));
+    await tick();
+    replacementProc.stdout.emit('data', '{"id":"replacement-2","result":"reused"}\n');
+    await expect(reused).resolves.toBe('reused');
+    expect(mockSpawn).toHaveBeenCalledTimes(2);
+    clearTimeoutSpy.mockRestore();
+  });
+
+  test('keeps default commands responsive while an embedding request is pending', async () => {
+    closeSwiftBridge();
+    const embeddingProc = createMockProcess();
+    const defaultProc = createMockProcess();
+    mockSpawn.mockReturnValueOnce(embeddingProc).mockReturnValueOnce(defaultProc);
+
+    mockRandomUUID.mockReturnValueOnce('embed-1');
+    const embedding = mute(runSwift('embed-batch', '{"texts":["slow"]}'));
+    await tick();
+    embeddingProc.stdout.emit('data', '{"id":"__ready__"}\n');
+    await tick();
+
+    mockRandomUUID.mockReturnValueOnce('speech-1');
+    const speech = mute(runSwift('speech-availability', '{}'));
+    await tick();
+    defaultProc.stdout.emit('data', '{"id":"__ready__"}\n');
+    await tick();
+    defaultProc.stdout.emit('data', '{"id":"speech-1","result":{"available":true}}\n');
+
+    await expect(speech).resolves.toEqual({ available: true });
+    expect(embeddingProc.stdin.write).toHaveBeenCalledWith(expect.stringContaining('"command":"embed-batch"'));
+    expect(defaultProc.stdin.write).toHaveBeenCalledWith(expect.stringContaining('"command":"speech-availability"'));
+    expect(mockSpawn).toHaveBeenCalledTimes(2);
+
+    embeddingProc.stdout.emit('data', '{"id":"embed-1","result":[[0.1]]}\n');
+    await expect(embedding).resolves.toEqual([[0.1]]);
+  });
+
+  test('keeps native observers alive across default timeout and embedding exit', async () => {
+    closeSwiftBridge();
+    const observerProc = createMockProcess();
+    const defaultProc = createMockProcess();
+    const embeddingProc = createMockProcess();
+    mockSpawn.mockReturnValueOnce(observerProc).mockReturnValueOnce(defaultProc).mockReturnValueOnce(embeddingProc);
+
+    mockRandomUUID.mockReturnValueOnce('observer-start');
+    const observer = mute(runSwift('start-observer', '{}'));
+    await tick();
+    observerProc.stdout.emit('data', '{"id":"__ready__"}\n');
+    await tick();
+    observerProc.stdout.emit('data', '{"id":"observer-start","result":{"status":"observer_started"}}\n');
+    await expect(observer).resolves.toEqual({ status: 'observer_started' });
+
+    mockRandomUUID.mockReturnValueOnce('default-timeout');
+    const timedOut = mute(runSwift('speech-availability', '{}'));
+    await tick();
+    defaultProc.stdout.emit('data', '{"id":"__ready__"}\n');
+    await expect(timedOut).rejects.toThrow(/timed out after/);
+    expect(defaultProc.kill).toHaveBeenCalledWith('SIGTERM');
+    expect(observerProc.kill).not.toHaveBeenCalled();
+
+    mockRandomUUID.mockReturnValueOnce('embedding-exit');
+    const embedding = mute(runSwift('embed-text', '{"text":"hello"}'));
+    await tick();
+    embeddingProc.stdout.emit('data', '{"id":"__ready__"}\n');
+    await tick();
+    embeddingProc.emit('close', 1);
+    await expect(embedding).rejects.toThrow('Swift bridge exited with code 1');
+    expect(observerProc.kill).not.toHaveBeenCalled();
+
+    const event = new Promise(resolve => eventBus.once('calendar_changed', resolve));
+    observerProc.stdout.emit('data', '{"id":"__event__","event":"calendar_changed","data":{"source":"eventkit"}}\n');
+    await expect(event).resolves.toMatchObject({ type: 'calendar_changed', data: { source: 'eventkit' } });
+
+    closeSwiftBridge();
+  }, 10_000);
+
+  test('closeSwiftBridge closes all persistent lanes', async () => {
+    closeSwiftBridge();
+    const embeddingProc = createMockProcess();
+    const defaultProc = createMockProcess();
+    const observerProc = createMockProcess();
+    mockSpawn.mockReturnValueOnce(embeddingProc).mockReturnValueOnce(defaultProc).mockReturnValueOnce(observerProc);
+
+    mockRandomUUID.mockReturnValueOnce('embed-close');
+    const embedding = mute(runSwift('embed-text', '{"text":"hello"}'));
+    await tick();
+    embeddingProc.stdout.emit('data', '{"id":"__ready__"}\n');
+    await tick();
+    embeddingProc.stdout.emit('data', '{"id":"embed-close","result":[0.1]}\n');
+    await embedding;
+
+    mockRandomUUID.mockReturnValueOnce('default-close');
+    const command = mute(runSwift('speech-availability', '{}'));
+    await tick();
+    defaultProc.stdout.emit('data', '{"id":"__ready__"}\n');
+    await tick();
+    defaultProc.stdout.emit('data', '{"id":"default-close","result":true}\n');
+    await command;
+
+    mockRandomUUID.mockReturnValueOnce('observer-close');
+    const observer = mute(runSwift('start-observer', '{}'));
+    await tick();
+    observerProc.stdout.emit('data', '{"id":"__ready__"}\n');
+    await tick();
+    observerProc.stdout.emit('data', '{"id":"observer-close","result":{"status":"observer_started"}}\n');
+    await observer;
+
+    closeSwiftBridge();
+    for (const proc of [embeddingProc, defaultProc, observerProc]) {
+      expect(proc.stdin.end).toHaveBeenCalled();
+      expect(proc.kill).toHaveBeenCalledWith('SIGTERM');
+    }
   });
 
   // ── Persistent happy path ─────────────────────────────────────────
@@ -304,12 +447,32 @@ describe('swift bridge', () => {
       mockRandomUUID.mockReturnValue('to-1');
       const p = mute(runSwift('cmd', '{}'));
       await tick();
+      expect(mockSpawn.mock.results[0]?.value).toBe(proc);
       proc.stdout.emit('data', '{"id":"__ready__"}\n');
       await tick();
 
       // Request is now pending with a 5000ms timer (lines 206-207)
       // Don't resolve it -- wait for the real timeout to fire
       await expect(p).rejects.toThrow(/timed out after/);
+      expect(proc.stdin.end).toHaveBeenCalled();
+      expect(proc.kill).toHaveBeenCalledWith('SIGTERM');
+
+      // A timed-out serial process must not poison the lane permanently.
+      const retryProc = createMockProcess();
+      mockSpawn.mockReturnValue(retryProc);
+      mockRandomUUID.mockReturnValue('to-2');
+      const retry = mute(runSwift('cmd', '{}'));
+      await tick();
+      expect(mockSpawn.mock.results[1]?.value).toBe(retryProc);
+      retryProc.stdout.emit('data', '{"id":"__ready__"}\n');
+      await tick();
+      expect(retryProc.stdin.write).toHaveBeenCalledWith(expect.stringContaining('"id":"to-2"'));
+      // The timed-out process may report its close after the replacement is
+      // ready; that stale lifecycle event must not reject the new request.
+      proc.emit('close', 0);
+      expect(retryProc.kill).not.toHaveBeenCalled();
+      retryProc.stdout.emit('data', '{"id":"to-2","result":"recovered"}\n');
+      await expect(retry).resolves.toBe('recovered');
     }, 10_000);
   });
 

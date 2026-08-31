@@ -67,6 +67,12 @@ const NO_BACKEND_ERROR = "No embedding backend available. Set GEMINI_API_KEY or 
 // -- Max concurrent batch chunks to Gemini API --
 const BATCH_CONCURRENCY = 3;
 
+// The Swift bridge returns high-dimensional vectors as one NDJSON line.
+// Fifty vectors stay safely below the persistent bridge's 1 MiB line limit;
+// larger local batches are split sequentially so the serial native process
+// cannot accumulate concurrent NaturalLanguage work.
+const SWIFT_EMBED_BATCH_SIZE = 50;
+
 // -- Provider detection --
 
 export type EmbeddingProvider = "gemini" | "swift" | "hybrid" | "none";
@@ -204,8 +210,18 @@ async function swiftEmbed(text: string, language?: string): Promise<number[]> {
 }
 
 async function swiftBatchEmbed(texts: string[], language?: string): Promise<number[][]> {
-  const result = await runSwift<EmbedBatchResult>("embed-batch", JSON.stringify({ texts, language }));
-  return result.vectors;
+  const allVectors: number[][] = [];
+  for (let i = 0; i < texts.length; i += SWIFT_EMBED_BATCH_SIZE) {
+    const chunk = texts.slice(i, i + SWIFT_EMBED_BATCH_SIZE);
+    const result = await runSwift<EmbedBatchResult>("embed-batch", JSON.stringify({ texts: chunk, language }));
+    if (result.count !== chunk.length || result.vectors.length !== chunk.length) {
+      throw new Error(
+        `Swift embedding batch returned ${result.vectors.length} vectors (count=${result.count}) for ${chunk.length} texts`,
+      );
+    }
+    allVectors.push(...result.vectors);
+  }
+  return allVectors;
 }
 
 // -- Hybrid: on-device first, cloud fallback --

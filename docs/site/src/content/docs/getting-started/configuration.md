@@ -23,7 +23,7 @@ The default config file location is `~/.config/airmcp/config.json`. You can over
   "hitl": {
     "level": "sensitive-only",
     "whitelist": ["list_notes", "search_notes"],
-    "timeout": 30
+    "timeout": 120
   },
   "performance": {
     "embeddingProvider": "swift",
@@ -49,7 +49,7 @@ The default config file location is `~/.config/airmcp/config.json`. You can over
 | `shareApproval` | string[] | `[]` | Modules that require share approval before accessing |
 | `hitl.level` | string | `"sensitive-only"` | Human-in-the-loop level: `off`, `destructive-only`, `sensitive-only`, `all-writes`, `all` |
 | `hitl.whitelist` | string[] | `[]` | Tool names that bypass HITL confirmation |
-| `hitl.timeout` | number | `30` | Seconds to wait for HITL confirmation |
+| `hitl.timeout` | number | `120` | Seconds to wait for HITL confirmation |
 | `performance.embeddingProvider` | string | `"auto"` | Embedding provider: `gemini`, `swift`, `hybrid`, `none` |
 | `performance.jxaConcurrency` | number | `3` | Max parallel JXA/osascript processes |
 | `performance.circuitBreakerThreshold` | number | `3` | Failures before circuit breaker opens |

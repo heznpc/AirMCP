@@ -16,7 +16,7 @@ final class ConfigManager {
         var whitelist: [String]
         var timeout: Int
 
-        static let `default` = HitlConfig(level: .sensitiveOnly, whitelist: [], timeout: 30)
+        static let `default` = HitlConfig(level: .sensitiveOnly, whitelist: [], timeout: 120)
 
         init(level: HitlLevel, whitelist: [String], timeout: Int) {
             self.level = level
@@ -28,7 +28,7 @@ final class ConfigManager {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             level = try container.decodeIfPresent(HitlLevel.self, forKey: .level) ?? .sensitiveOnly
             whitelist = try container.decodeIfPresent([String].self, forKey: .whitelist) ?? []
-            timeout = try container.decodeIfPresent(Int.self, forKey: .timeout) ?? 30
+            timeout = try container.decodeIfPresent(Int.self, forKey: .timeout) ?? 120
         }
     }
 
@@ -435,7 +435,7 @@ final class ConfigManager {
     }
 
     var hitlTimeout: Int {
-        get { config.hitl?.timeout ?? 30 }
+        get { config.hitl?.timeout ?? 120 }
         set {
             if config.hitl == nil { config.hitl = .default }
             config.hitl?.timeout = newValue

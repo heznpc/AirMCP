@@ -23,6 +23,12 @@ describe("AirMCP.app ConfigManager defaults", () => {
     expect(source).toMatch(/decodeIfPresent\(Bool\.self,\s*forKey:\s*\.requireToolSession\)\s*\?\?\s*true/);
   });
 
+  test("keeps the app-side HITL timeout aligned with the Node runtime default", () => {
+    expect(source).toContain("timeout: 120");
+    expect(source).toMatch(/decodeIfPresent\(Int\.self,\s*forKey:\s*\.timeout\)\s*\?\?\s*120/);
+    expect(source).toMatch(/var hitlTimeout:[\s\S]*config\.hitl\?\.timeout\s*\?\?\s*120/);
+  });
+
   test("preserves module pack activation written by the CLI", () => {
     expect(source).toMatch(/var modulePacks:\s*\[String\]\?/);
     expect(source).toMatch(/decodeIfPresent\(\[String\]\.self,\s*forKey:\s*\.modulePacks\)/);

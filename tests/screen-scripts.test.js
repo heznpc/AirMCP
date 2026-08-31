@@ -1,4 +1,7 @@
-import { describe, test, expect } from '@jest/globals';
+import { join } from 'node:path';
+import { Script } from 'node:vm';
+import { describe, test, expect, jest } from '@jest/globals';
+import { PATHS } from '../dist/shared/constants.js';
 import {
   captureScreenScript,
   captureWindowScript,
@@ -86,6 +89,37 @@ describe('screen script generators', () => {
     expect(script).toContain('delay(1.0)');
   });
 
+  test('captureWindowScript fails closed when no target window is found', () => {
+    const script = captureWindowScript('Finder');
+    const shellCalls = [];
+    const currentApp = {
+      includeStandardAdditions: false,
+      doShellScript: (command) => shellCalls.push(command),
+    };
+    const Application = () => ({ activate() {} });
+    Application.currentApplication = () => currentApp;
+
+    expect(() =>
+      new Script(script).runInNewContext({
+        Application,
+        delay() {},
+        ObjC: {
+          import() {},
+          bindFunction() {},
+          castRefToObject: (value) => value,
+          deepUnwrap: (value) => value,
+        },
+        $: {
+          CGPreflightScreenCaptureAccess: () => true,
+          CGWindowListCopyWindowInfo: () => [],
+          kCGWindowListOptionOnScreenOnly: 1,
+          kCGWindowListExcludeDesktopElements: 2,
+        },
+      }),
+    ).toThrow('No capturable window found for the requested application.');
+    expect(shellCalls).toEqual([]);
+  });
+
   // --- captureAreaScript ---
   test('captureAreaScript uses -R flag with coordinates', () => {
     const script = captureAreaScript(100, 200, 300, 400);
@@ -161,6 +195,123 @@ describe('screen esc() injection prevention', () => {
     const script = captureScreenScript(1);
     // Display flag should be a clean integer
     expect(script).toMatch(/-D \d+/);
+  });
+
+  test('escapes AIRMCP_TEMP_DIR across both JXA and shell string boundaries', () => {
+    const originalTempDir = PATHS.TEMP_DIR;
+    const maliciousTempDir = `/tmp/airmcp'); globalThis.jxaInjected = true; ('" ; $(id) ; \`id\` ; "$HOME`;
+    PATHS.TEMP_DIR = maliciousTempDir;
+
+    try {
+      const scripts = [
+        captureScreenScript(),
+        captureWindowScript(),
+        captureAreaScript(0, 0, 10, 10),
+        recordScreenScript(1),
+      ];
+
+      for (const script of scripts) {
+        const commands = [];
+        const currentApp = {
+          includeStandardAdditions: false,
+          doShellScript: (command) => commands.push(command),
+        };
+        const Application = () => ({ activate() {} });
+        Application.currentApplication = () => currentApp;
+        const sandbox = {
+          jxaInjected: false,
+          Application,
+          ObjC: {
+            import() {},
+            bindFunction() {},
+            castRefToObject: (value) => value,
+            deepUnwrap: (value) => value,
+          },
+          $: {
+            CGPreflightScreenCaptureAccess: () => true,
+            CGWindowListCopyWindowInfo: () => [
+              { kCGWindowLayer: 0, kCGWindowOwnerName: 'Finder', kCGWindowNumber: 42 },
+            ],
+            kCGWindowListOptionOnScreenOnly: 1,
+            kCGWindowListExcludeDesktopElements: 2,
+          },
+        };
+
+        const result = new Script(script).runInNewContext(sandbox);
+        const { path: returnedPath } = JSON.parse(result);
+        const filename = returnedPath.split('/').at(-1);
+        expect(returnedPath).toBe(join(maliciousTempDir, filename));
+        expect(sandbox.jxaInjected).toBe(false);
+        expect(commands).toHaveLength(1);
+
+        const quotedArguments = shellDoubleQuotedArguments(commands[0]);
+        expect(quotedArguments).toHaveLength(1);
+        const encodedPath = quotedArguments[0];
+        for (let i = 0; i < encodedPath.length; i++) {
+          if (encodedPath[i] === '$' || encodedPath[i] === '`' || encodedPath[i] === '"') {
+            expect(isShellEscaped(encodedPath, i)).toBe(true);
+          }
+        }
+        expect(decodeShellDoubleQuoted(encodedPath)).toBe(returnedPath);
+      }
+    } finally {
+      PATHS.TEMP_DIR = originalTempDir;
+    }
+  });
+});
+
+function isShellEscaped(value, index) {
+  let backslashes = 0;
+  for (let i = index - 1; i >= 0 && value[i] === '\\'; i--) backslashes++;
+  return backslashes % 2 === 1;
+}
+
+function shellDoubleQuotedArguments(command) {
+  const values = [];
+  let start = -1;
+  for (let i = 0; i < command.length; i++) {
+    if (command[i] !== '"' || isShellEscaped(command, i)) continue;
+    if (start < 0) {
+      start = i + 1;
+    } else {
+      values.push(command.slice(start, i));
+      start = -1;
+    }
+  }
+  expect(start).toBe(-1);
+  return values;
+}
+
+function decodeShellDoubleQuoted(value) {
+  let decoded = '';
+  for (let i = 0; i < value.length; i++) {
+    if (value[i] === '\\' && i + 1 < value.length && '$`"\\'.includes(value[i + 1])) {
+      decoded += value[++i];
+    } else {
+      decoded += value[i];
+    }
+  }
+  return decoded;
+}
+
+describe('screen temp path uniqueness', () => {
+  test('same-millisecond parallel captures receive distinct paths', () => {
+    const now = jest.spyOn(Date, 'now').mockReturnValue(123456789);
+    try {
+      const scripts = [
+        ...Array.from({ length: 8 }, () => captureScreenScript()),
+        ...Array.from({ length: 8 }, () => captureWindowScript()),
+        ...Array.from({ length: 8 }, () => captureAreaScript(0, 0, 10, 10)),
+        ...Array.from({ length: 8 }, () => recordScreenScript(1)),
+      ];
+      const paths = scripts.map(
+        (script) => script.match(/airmcp-(?:screenshot|recording)-\d+-[0-9a-f-]+\.(?:png|mov)/)?.[0],
+      );
+      expect(paths.every(Boolean)).toBe(true);
+      expect(new Set(paths).size).toBe(paths.length);
+    } finally {
+      now.mockRestore();
+    }
   });
 });
 

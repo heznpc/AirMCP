@@ -39,8 +39,14 @@ jest.unstable_mockModule('../dist/shared/constants.js', () => ({
 const TEST_APP_BRIDGE_PATH = '/Applications/AirMCP.app/Contents/Resources/airmcp/bin/AirMcpBridge';
 const originalBridgePath = process.env.AIRMCP_BRIDGE_PATH;
 process.env.AIRMCP_BRIDGE_PATH = TEST_APP_BRIDGE_PATH;
-const { checkSwiftBridge, runSwift, closeSwiftBridge, hasSwiftCommand, resolveSwiftBridgePath } =
-  await import('../dist/shared/swift.js');
+const {
+  checkSwiftBridge,
+  runSwift,
+  closeSwiftBridge,
+  hasSwiftCommand,
+  isSwiftObserverRunning,
+  resolveSwiftBridgePath,
+} = await import('../dist/shared/swift.js');
 const { eventBus } = await import('../dist/shared/event-bus.js');
 if (originalBridgePath === undefined) delete process.env.AIRMCP_BRIDGE_PATH;
 else process.env.AIRMCP_BRIDGE_PATH = originalBridgePath;
@@ -91,6 +97,7 @@ describe('swift bridge', () => {
     expect(typeof runSwift).toBe('function');
     expect(typeof closeSwiftBridge).toBe('function');
     expect(typeof hasSwiftCommand).toBe('function');
+    expect(typeof isSwiftObserverRunning).toBe('function');
     expect(typeof resolveSwiftBridgePath).toBe('function');
   });
 
@@ -342,6 +349,68 @@ describe('swift bridge', () => {
     }
   });
 
+  test.each(['close', 'error'])('observer %s clears liveness and a later start launches a replacement', async event => {
+    closeSwiftBridge();
+    const crashedProc = createMockProcess();
+    const replacementProc = createMockProcess();
+    mockSpawn.mockReturnValueOnce(crashedProc).mockReturnValueOnce(replacementProc);
+
+    mockRandomUUID.mockReturnValueOnce(`observer-${event}-initial`);
+    const initial = mute(runSwift('start-observer', '{}'));
+    await tick();
+    crashedProc.stdout.emit('data', '{"id":"__ready__"}\n');
+    await tick();
+    crashedProc.stdout.emit(
+      'data',
+      `{"id":"observer-${event}-initial","result":{"status":"observer_started"}}\n`,
+    );
+    await expect(initial).resolves.toEqual({ status: 'observer_started' });
+    expect(isSwiftObserverRunning()).toBe(true);
+
+    if (event === 'error') crashedProc.emit('error', new Error('observer crashed'));
+    else crashedProc.emit('close', 1);
+    expect(isSwiftObserverRunning()).toBe(false);
+    if (event === 'error') {
+      expect(crashedProc.stdin.end).toHaveBeenCalled();
+      expect(crashedProc.kill).toHaveBeenCalledWith('SIGTERM');
+    }
+
+    mockRandomUUID.mockReturnValueOnce(`observer-${event}-replacement`);
+    const restarted = mute(runSwift('start-observer', '{}'));
+    await tick();
+    replacementProc.stdout.emit('data', '{"id":"__ready__"}\n');
+    await tick();
+    replacementProc.stdout.emit(
+      'data',
+      `{"id":"observer-${event}-replacement","result":{"status":"observer_started"}}\n`,
+    );
+
+    await expect(restarted).resolves.toEqual({ status: 'observer_started' });
+    expect(isSwiftObserverRunning()).toBe(true);
+    expect(mockSpawn).toHaveBeenCalledTimes(2);
+    closeSwiftBridge();
+  });
+
+  test('observer startup failure never falls back to a single-shot process', async () => {
+    closeSwiftBridge();
+    const persistentProc = createMockProcess();
+    const forbiddenSingleShotProc = createMockProcess();
+    mockSpawn.mockReturnValue(forbiddenSingleShotProc).mockReturnValueOnce(persistentProc);
+
+    const initial = mute(runSwift('start-observer', '{}'));
+    await tick();
+    persistentProc.emit('close', 1);
+
+    await expect(initial).rejects.toThrow(/requires persistent bridge mode/);
+    expect(isSwiftObserverRunning()).toBe(false);
+    expect(mockSpawn).toHaveBeenCalledTimes(1);
+
+    const cooldownAttempt = mute(runSwift('stop-observer', '{}'));
+    await expect(cooldownAttempt).rejects.toThrow(/requires persistent bridge mode/);
+    expect(mockSpawn).toHaveBeenCalledTimes(1);
+    expect(forbiddenSingleShotProc.stdin.write).not.toHaveBeenCalled();
+  });
+
   // ── Persistent happy path ─────────────────────────────────────────
 
   describe('persistent happy path', () => {
@@ -576,12 +645,26 @@ describe('swift bridge', () => {
       ['constructor', '{"id":"pp","constructor":{}}'],
       ['prototype', '{"id":"pp","prototype":{}}'],
       ['nested __proto__', '{"id":"pp","result":{"a":{"__proto__":{}}}}'],
+      ['nested constructor', '{"id":"pp","result":{"a":{"constructor":{}}}}'],
+      ['nested prototype', '{"id":"pp","result":{"a":{"prototype":{}}}}'],
     ])('rejects %s key', async (_name, poisoned) => {
       const { promise: p } = await ready(proc, 'pp');
       proc.stdout.emit('data', poisoned + '\n');
       await tick();
       proc.stdout.emit('data', '{"id":"pp","result":"clean"}\n');
       expect(await p).toBe('clean');
+      spy.mockRestore();
+    });
+
+    test.each(['__proto__', 'constructor', 'prototype'])('allows %s as a normal string value', async value => {
+      const { promise: p } = await ready(proc, 'pp-value');
+      proc.stdout.emit(
+        'data',
+        JSON.stringify({ id: 'pp-value', result: { label: value } }) +
+          '\n' +
+          '{"id":"pp-value","result":"fallback"}\n',
+      );
+      await expect(p).resolves.toEqual({ label: value });
       spy.mockRestore();
     });
   });
@@ -864,6 +947,16 @@ describe('swift bridge', () => {
       expect(await p).toEqual({ s: 'ok', v: 42 });
     });
 
+    test.each(['__proto__', 'constructor', 'prototype'])('allows %s as a normal string value', async value => {
+      const ss = createMockProcess();
+      mockSpawn.mockReturnValueOnce(ss);
+      const p = mute(runSwift('cmd', '{}'));
+      await tick();
+      ss.stdout.emit('data', Buffer.from(JSON.stringify({ label: value })));
+      ss.emit('close', 0, null);
+      await expect(p).resolves.toEqual({ label: value });
+    });
+
     test('stdin write + end', async () => {
       const ss = createMockProcess();
       mockSpawn.mockReturnValueOnce(ss);
@@ -920,6 +1013,8 @@ describe('swift bridge', () => {
       ['constructor', '{"constructor":{}}'],
       ['prototype', '{"prototype":{}}'],
       ['nested __proto__', '{"a":{"__proto__":{}}}'],
+      ['nested constructor', '{"a":{"constructor":{}}}'],
+      ['nested prototype', '{"a":{"prototype":{}}}'],
     ])('%s poisoned payload rejected', async (_label, payload) => {
       const ss = createMockProcess();
       mockSpawn.mockReturnValueOnce(ss);

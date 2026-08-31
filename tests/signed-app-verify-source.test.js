@@ -10,11 +10,15 @@ const notarizePath = new URL("../scripts/notarize-app.sh", import.meta.url);
 const notarize = readFileSync(notarizePath, "utf8");
 const bundleScript = readFileSync(new URL("../scripts/bundle-app.sh", import.meta.url), "utf8");
 const mainEntitlements = readFileSync(new URL("../scripts/lib/main-app-entitlements.plist", import.meta.url), "utf8");
+const widgetEntitlements = readFileSync(new URL("../scripts/lib/widget-entitlements.plist", import.meta.url), "utf8");
 const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
 const temporaryDirectories = [];
 const mainValidatorStart = notarize.indexOf("MAIN_ALLOWED_ENTITLEMENTS=(");
 const mainValidatorEnd = notarize.indexOf("\nverify_widget_entitlements()");
 const mainValidatorSource = notarize.slice(mainValidatorStart, mainValidatorEnd);
+const widgetValidatorStart = notarize.indexOf("WIDGET_ALLOWED_ENTITLEMENTS=(");
+const widgetValidatorEnd = notarize.indexOf("\n# Inspect the source signature");
+const widgetValidatorSource = notarize.slice(widgetValidatorStart, widgetValidatorEnd);
 
 afterEach(() => {
   for (const directory of temporaryDirectories.splice(0)) {
@@ -81,6 +85,24 @@ verify_main_entitlements "$2" "contract"
   return spawnSync("bash", [harness, directory, entitlements], { encoding: "utf8" });
 }
 
+function validateWidgetEntitlements(contents) {
+  const directory = mkdtempSync(join(tmpdir(), "airmcp-widget-entitlements-"));
+  temporaryDirectories.push(directory);
+  const entitlements = join(directory, "candidate.plist");
+  const harness = join(directory, "validate.sh");
+  writeFileSync(entitlements, contents);
+  writeFileSync(
+    harness,
+    `#!/bin/bash
+set -euo pipefail
+ENT_DIR="$1"
+${widgetValidatorSource}
+verify_widget_entitlements "$2" "contract"
+`,
+  );
+  return spawnSync("bash", [harness, directory, entitlements], { encoding: "utf8" });
+}
+
 describe("signed app artifact verification script", () => {
   test("is valid bash", () => {
     expect(() => execFileSync("bash", ["-n", scriptPath.pathname], { stdio: "pipe" })).not.toThrow();
@@ -120,6 +142,9 @@ describe("signed app artifact verification script", () => {
     expect(script).toContain("tokenFingerprint");
     expect(script).toContain("processIdentifier == $APP_PID");
     expect(script).toContain("AIRMCP_REQUIRE_WIDGET=1");
+    expect(script).toContain("AIRMCP_EXPECTED_SIGNING_MODE=developer-id");
+    expect(script).toContain('AIRMCP_EXPECTED_SIGNING_AUTHORITY="$AIRMCP_SIGNING_COMMON_NAME"');
+    expect(script).toContain('AIRMCP_EXPECTED_SIGNING_TEAM_ID="$AIRMCP_SIGNING_TEAM_ID"');
     expect(script).toContain("bundle structure verification failed");
     expect(script).toContain("Print :AirMCPAcceptanceHarnessBuild");
     expect(script).toContain("refusing an acceptance-harness build");
@@ -136,7 +161,8 @@ describe("signed app artifact verification script", () => {
   });
 
   test("does not leave the hidden acceptance bundle registered as the app.airmcp launch target", () => {
-    expect(bundleScript).toContain('if [ "$ACCEPTANCE_HARNESS_BUILD" = "0" ] && [ -x "$LSREGISTER" ]');
+    expect(bundleScript).toContain('if [ "$ACCEPTANCE_HARNESS_BUILD" = "0" ]; then');
+    expect(bundleScript).toContain("register_bundle_with_launch_services");
     expect(bundleScript).toContain('"$LSREGISTER" -u "$BUNDLE_DIR"');
     expect(bundleScript).toContain("cannot select test-only launch wiring");
   });
@@ -185,7 +211,14 @@ describe("signed app artifact verification script", () => {
     expect(notarize).toContain('FINAL_MAIN_ENTITLEMENTS="$ENT_DIR/final-main-app.plist"');
     expect(notarize).toContain('verify_main_entitlements "$FINAL_MAIN_ENTITLEMENTS" "re-signed"');
     expect(notarize).toContain('verify_widget_entitlements "$ent_file" "source"');
+    expect(notarize).toContain('verify_widget_entitlements "$WIDGET_ENTITLEMENTS" "allowlisted"');
     expect(notarize).toContain('verify_widget_entitlements "$final_ent_file" "re-signed"');
+    expect(notarize).toContain('WIDGET_ENTITLEMENTS="$SCRIPT_DIR/lib/widget-entitlements.plist"');
+    const extensionSigning = notarize.match(
+      /# Sign embedded extensions first[\s\S]*?(?=# Finally sign the outer bundle)/,
+    )?.[0];
+    expect(extensionSigning).toContain('--entitlements "$WIDGET_ENTITLEMENTS"');
+    expect(extensionSigning).not.toContain('--entitlements "$ent_file"');
     expect(notarize).toContain("com.apple.security.application-groups");
     expect(notarize).toContain("com.apple.security.automation.apple-events");
     expect(notarize).toContain("for capability in calendars reminders");
@@ -195,6 +228,8 @@ describe("signed app artifact verification script", () => {
     expect(notarize).toContain("main-app contains an unexpected entitlement");
     expect(notarize).toContain("main-app sandbox entitlement must be a boolean");
     expect(notarize).toContain("main-app must remain outside the App Sandbox");
+    expect(notarize).toContain("widget contains an unexpected entitlement");
+    expect(notarize).toContain("widget must enable the App Sandbox");
     expect(notarize).not.toContain("codesigning with $APPLE_DEVELOPER_ID");
     expect(notarize).not.toContain('echo "$SUBMIT_OUTPUT"');
     expect(notarize).not.toContain("preserved entitlements: $appex");
@@ -223,6 +258,15 @@ describe("signed app artifact verification script", () => {
     expect(bundleScript).toContain('--entitlements "$MAIN_APP_ENTITLEMENTS"');
   });
 
+  test("resolves a codesign selector to the signed authority and team before verification", () => {
+    expect(bundleScript).toContain('SIGNED_BUNDLE_INFO="$(codesign -dv --verbose=4 "$BUNDLE_DIR" 2>&1)"');
+    expect(bundleScript).toContain("SIGNED_AUTHORITY=");
+    expect(bundleScript).toContain("SIGNED_TEAM_ID=");
+    expect(bundleScript).toContain('AIRMCP_EXPECTED_SIGNING_AUTHORITY="$SIGNED_AUTHORITY"');
+    expect(bundleScript).toContain('AIRMCP_EXPECTED_SIGNING_TEAM_ID="$SIGNED_TEAM_ID"');
+    expect(bundleScript).not.toContain('AIRMCP_EXPECTED_SIGNING_AUTHORITY="$SIGN_IDENTITY"');
+  });
+
   test("fails closed when a source signature adds a debug entitlement or another app group", () => {
     expect(mainValidatorStart).toBeGreaterThanOrEqual(0);
     expect(mainValidatorEnd).toBeGreaterThan(mainValidatorStart);
@@ -241,6 +285,44 @@ describe("signed app artifact verification script", () => {
       "\t\t<string>group.app.airmcp</string>\n\t\t<string>group.attacker</string>",
     );
     const groupResult = validateMainEntitlements(withAnotherGroup);
+    expect(groupResult.status).toBe(1);
+    expect(groupResult.stderr).toContain("application-groups must contain only group.app.airmcp");
+  });
+
+  test("uses and enforces one exact sandboxed widget entitlement allowlist", () => {
+    const keys = [...widgetEntitlements.matchAll(/<key>([^<]+)<\/key>/g)].map((match) => match[1]).sort();
+    expect(keys).toEqual(
+      [
+        "com.apple.security.app-sandbox",
+        "com.apple.security.application-groups",
+        "com.apple.security.personal-information.calendars",
+        "com.apple.security.personal-information.reminders",
+      ].sort(),
+    );
+    expect(widgetEntitlements).toMatch(/<key>com\.apple\.security\.app-sandbox<\/key>\s*<true\/>/);
+    expect(validateWidgetEntitlements(widgetEntitlements).status).toBe(0);
+
+    const withDebugEntitlement = widgetEntitlements.replace(
+      "</dict>",
+      "\t<key>com.apple.security.get-task-allow</key>\n\t<true/>\n</dict>",
+    );
+    const debugResult = validateWidgetEntitlements(withDebugEntitlement);
+    expect(debugResult.status).toBe(1);
+    expect(debugResult.stderr).toContain("widget contains an unexpected entitlement");
+
+    const withoutSandbox = widgetEntitlements.replace(
+      /(<key>com\.apple\.security\.app-sandbox<\/key>\s*)<true\/>/,
+      "$1<false/>",
+    );
+    const sandboxResult = validateWidgetEntitlements(withoutSandbox);
+    expect(sandboxResult.status).toBe(1);
+    expect(sandboxResult.stderr).toContain("widget must enable the App Sandbox");
+
+    const withAnotherGroup = widgetEntitlements.replace(
+      "\t\t<string>group.app.airmcp</string>",
+      "\t\t<string>group.app.airmcp</string>\n\t\t<string>group.attacker</string>",
+    );
+    const groupResult = validateWidgetEntitlements(withAnotherGroup);
     expect(groupResult.status).toBe(1);
     expect(groupResult.stderr).toContain("application-groups must contain only group.app.airmcp");
   });

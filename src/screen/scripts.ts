@@ -1,16 +1,31 @@
 // Scripts and shell command helpers for macOS screen capture and window enumeration.
 
+import { randomUUID } from "node:crypto";
 import { join } from "node:path";
-import { esc } from "../shared/esc.js";
+import { esc, escJxaShell } from "../shared/esc.js";
 import { PATHS } from "../shared/constants.js";
+
+const SCREENCAPTURE = "/usr/sbin/screencapture";
 
 /**
  * Build a temp file path for a screenshot.
- * Uses a timestamp to avoid collisions. Honors AIRMCP_TEMP_DIR (PATHS.TEMP_DIR)
- * so sandboxed runtimes can redirect intermediate captures off /tmp.
+ * A UUID prevents same-millisecond concurrent calls from sharing a file.
+ * Honors AIRMCP_TEMP_DIR (PATHS.TEMP_DIR) so sandboxed runtimes can redirect
+ * intermediate captures off /tmp.
  */
 function tempScreenshotPath(): string {
-  return join(PATHS.TEMP_DIR, `airmcp-screenshot-${Date.now()}.png`);
+  return join(PATHS.TEMP_DIR, `airmcp-screenshot-${Date.now()}-${randomUUID()}.png`);
+}
+
+function tempRecordingPath(): string {
+  return join(PATHS.TEMP_DIR, `airmcp-recording-${Date.now()}-${randomUUID()}.mov`);
+}
+
+/** Encode one path for both places it enters generated source: the shell
+ * double-quoted argument nested inside a JXA single-quoted string, and the
+ * separate JXA result literal returned to Node. */
+function encodedCapturePath(filePath: string): { shell: string; jxa: string } {
+  return { shell: escJxaShell(filePath), jxa: esc(filePath) };
 }
 
 /** Fail with an actionable error before invoking screencapture. This tool
@@ -31,13 +46,14 @@ const SCREEN_RECORDING_PREFLIGHT = `
  */
 export function captureScreenScript(display?: number): string {
   const filePath = tempScreenshotPath();
+  const encodedPath = encodedCapturePath(filePath);
   const displayFlag = display !== undefined ? ` -D ${Math.floor(display)}` : "";
   return `
     ${SCREEN_RECORDING_PREFLIGHT}
     const app = Application.currentApplication();
     app.includeStandardAdditions = true;
-    app.doShellScript('screencapture -x -t png${displayFlag} "${filePath}"');
-    JSON.stringify({ path: '${filePath}' });
+    app.doShellScript('${SCREENCAPTURE} -x -t png${displayFlag} "${encodedPath.shell}"');
+    JSON.stringify({ path: '${encodedPath.jxa}' });
   `;
 }
 
@@ -49,6 +65,7 @@ export function captureScreenScript(display?: number): string {
  */
 export function captureWindowScript(appName?: string): string {
   const filePath = tempScreenshotPath();
+  const encodedPath = encodedCapturePath(filePath);
   const activateBlock = appName ? `Application('${esc(appName)}').activate(); delay(1.0);` : "";
   const ownerFilter = appName ? `win.kCGWindowOwnerName !== '${esc(appName)}'` : "false";
   return `
@@ -70,13 +87,11 @@ export function captureWindowScript(appName?: string): string {
       wid = Number(win.kCGWindowNumber) || 0;
       if (wid > 0) break;
     }
-    if (wid > 0) {
-      app.doShellScript('screencapture -x -t png -l ' + wid + ' "${filePath}"');
-    } else {
-      // Fallback: capture full screen if no window found
-      app.doShellScript('screencapture -x -t png "${filePath}"');
+    if (wid <= 0) {
+      throw new Error('No capturable window found for the requested application.');
     }
-    JSON.stringify({ path: '${filePath}' });
+    app.doShellScript('${SCREENCAPTURE} -x -t png -l ' + wid + ' "${encodedPath.shell}"');
+    JSON.stringify({ path: '${encodedPath.jxa}' });
   `;
 }
 
@@ -86,14 +101,15 @@ export function captureWindowScript(appName?: string): string {
  */
 export function recordScreenScript(duration: number, display?: number): string {
   const safeDuration = Math.min(Math.max(Math.floor(duration), 1), 60);
-  const filePath = join(PATHS.TEMP_DIR, `airmcp-recording-${Date.now()}.mov`);
+  const filePath = tempRecordingPath();
+  const encodedPath = encodedCapturePath(filePath);
   const displayFlag = display !== undefined ? ` -D ${Math.floor(display)}` : "";
   return `
     ${SCREEN_RECORDING_PREFLIGHT}
     const app = Application.currentApplication();
     app.includeStandardAdditions = true;
-    app.doShellScript('screencapture -x -v${displayFlag} "${filePath}" & SCPID=$!; sleep ${safeDuration}; kill $SCPID 2>/dev/null; wait $SCPID 2>/dev/null || true');
-    JSON.stringify({ path: '${filePath}', duration: ${safeDuration} });
+    app.doShellScript('${SCREENCAPTURE} -x -v${displayFlag} "${encodedPath.shell}" & SCPID=$!; sleep ${safeDuration}; kill $SCPID 2>/dev/null; wait $SCPID 2>/dev/null || true');
+    JSON.stringify({ path: '${encodedPath.jxa}', duration: ${safeDuration} });
   `;
 }
 
@@ -102,6 +118,7 @@ export function recordScreenScript(duration: number, display?: number): string {
  */
 export function captureAreaScript(x: number, y: number, width: number, height: number): string {
   const filePath = tempScreenshotPath();
+  const encodedPath = encodedCapturePath(filePath);
   const safeX = Math.floor(x);
   const safeY = Math.floor(y);
   const safeW = Math.floor(width);
@@ -110,8 +127,8 @@ export function captureAreaScript(x: number, y: number, width: number, height: n
     ${SCREEN_RECORDING_PREFLIGHT}
     const app = Application.currentApplication();
     app.includeStandardAdditions = true;
-    app.doShellScript('screencapture -x -t png -R ${safeX},${safeY},${safeW},${safeH} "${filePath}"');
-    JSON.stringify({ path: '${filePath}' });
+    app.doShellScript('${SCREENCAPTURE} -x -t png -R ${safeX},${safeY},${safeW},${safeH} "${encodedPath.shell}"');
+    JSON.stringify({ path: '${encodedPath.jxa}' });
   `;
 }
 

@@ -4,6 +4,10 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=scripts/lib/signing-identity.sh
+source "$SCRIPT_DIR/lib/signing-identity.sh"
+
 if [ "$#" -ne 3 ]; then
   echo "usage: scripts/verify-bundle-structure.sh <bundle> <bundle-id> <executable>" >&2
   exit 2
@@ -19,8 +23,17 @@ BUNDLED_NODE="$RUNTIME_ROOT/runtime/bin/node"
 BUNDLED_SERVER="$RUNTIME_ROOT/server/dist/index.js"
 BUNDLED_BRIDGE="$RUNTIME_ROOT/bin/AirMcpBridge"
 LOCALIZATION_BUNDLE="$BUNDLE_DIR/Contents/Resources/AirMCPApp_AirMCPApp.bundle"
+WIDGET_BUNDLE_ID="$BUNDLE_ID.Widget"
+WIDGET_EXECUTABLE="AirMCPWidget"
+WIDGET_EXTENSION_POINT="com.apple.widgetkit-extension"
+WIDGET_APPEX="$BUNDLE_DIR/Contents/PlugIns/AirMCPWidget.appex"
+WIDGET_PLIST="$WIDGET_APPEX/Contents/Info.plist"
+WIDGET_BINARY="$WIDGET_APPEX/Contents/MacOS/$WIDGET_EXECUTABLE"
 SUPPORTED_LOCALES="de en es fr ja ko pt-BR zh-Hans zh-Hant"
 REQUIRE_WIDGET="${AIRMCP_REQUIRE_WIDGET:-0}"
+EXPECTED_SIGNING_MODE="${AIRMCP_EXPECTED_SIGNING_MODE:-developer-id}"
+EXPECTED_SIGNING_AUTHORITY="${AIRMCP_EXPECTED_SIGNING_AUTHORITY:-}"
+EXPECTED_SIGNING_TEAM_ID="${AIRMCP_EXPECTED_SIGNING_TEAM_ID:-}"
 SCREEN_CAPTURE_USAGE_DESCRIPTION="AirMCP captures your screen or app windows only when you explicitly ask it to take a screenshot or screen recording."
 APPLE_EVENTS_USAGE_DESCRIPTION="AirMCP controls other Mac apps only when you explicitly ask it to read or change their data."
 
@@ -28,6 +41,13 @@ if [ "$REQUIRE_WIDGET" != "0" ] && [ "$REQUIRE_WIDGET" != "1" ]; then
   echo "✗ AIRMCP_REQUIRE_WIDGET must be 0 or 1, got: $REQUIRE_WIDGET" >&2
   exit 2
 fi
+case "$EXPECTED_SIGNING_MODE" in
+  developer-id|identity|adhoc) ;;
+  *)
+    echo "✗ AIRMCP_EXPECTED_SIGNING_MODE must be developer-id, identity, or adhoc" >&2
+    exit 2
+    ;;
+esac
 
 require_plist_value() {
   local key="$1"
@@ -36,6 +56,17 @@ require_plist_value() {
   actual="$(/usr/libexec/PlistBuddy -c "Print $key" "$PLIST" 2>/dev/null || true)"
   if [ "$actual" != "$expected" ]; then
     echo "✗ $PLIST has $key=$actual, expected $expected" >&2
+    exit 1
+  fi
+}
+
+require_widget_plist_value() {
+  local key="$1"
+  local expected="$2"
+  local actual
+  actual="$(/usr/libexec/PlistBuddy -c "Print $key" "$WIDGET_PLIST" 2>/dev/null || true)"
+  if [ "$actual" != "$expected" ]; then
+    echo "✗ $WIDGET_PLIST has $key=$actual, expected $expected" >&2
     exit 1
   fi
 }
@@ -94,6 +125,71 @@ if [ ! -x "$BUNDLED_NODE" ] || [ ! -x "$BUNDLED_BRIDGE" ]; then
   exit 1
 fi
 
+if [ -e "$WIDGET_APPEX" ] && [ ! -d "$WIDGET_APPEX" ]; then
+  echo "✗ AirMCPWidget.appex is not a bundle directory" >&2
+  exit 1
+fi
+if [ "$REQUIRE_WIDGET" = "1" ] && [ ! -d "$WIDGET_APPEX" ]; then
+  echo "✗ signed distribution requires a complete AirMCPWidget.appex" >&2
+  exit 1
+fi
+if [ -d "$WIDGET_APPEX" ]; then
+  if [ ! -f "$WIDGET_PLIST" ] || [ ! -x "$WIDGET_BINARY" ]; then
+    echo "✗ AirMCPWidget.appex is incomplete" >&2
+    exit 1
+  fi
+  /usr/bin/plutil -lint "$WIDGET_PLIST" >/dev/null
+  require_widget_plist_value ":CFBundleIdentifier" "$WIDGET_BUNDLE_ID"
+  require_widget_plist_value ":CFBundleExecutable" "$WIDGET_EXECUTABLE"
+  require_widget_plist_value ":CFBundlePackageType" "XPC!"
+  require_widget_plist_value ":NSExtension:NSExtensionPointIdentifier" "$WIDGET_EXTENSION_POINT"
+  WIDGET_VERSION="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$WIDGET_PLIST" 2>/dev/null || true)"
+  WIDGET_BUILD="$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$WIDGET_PLIST" 2>/dev/null || true)"
+  if [ "$WIDGET_VERSION" != "$MAIN_VERSION" ] || [ "$WIDGET_BUILD" != "$MAIN_BUILD" ]; then
+    echo "✗ widget version/build ($WIDGET_VERSION/$WIDGET_BUILD) differs from app ($MAIN_VERSION/$MAIN_BUILD)" >&2
+    exit 1
+  fi
+fi
+
+# Verify the complete signature tree before invoking any executable shipped in
+# the bundle. A modified runtime must fail closed without running attacker-
+# controlled Node/JS during local or CI artifact inspection.
+if ! codesign --verify --deep --strict "$BUNDLE_DIR" 2>/dev/null; then
+  echo "✗ $BUNDLE_DIR did not pass strict code-sign verification" >&2
+  exit 1
+fi
+SIGN_INFO="$(codesign -dv --verbose=4 "$BUNDLE_DIR" 2>&1)"
+SIGN_AUTHORITY="$(printf '%s\n' "$SIGN_INFO" | /usr/bin/sed -nE 's/^Authority=(.*)$/\1/p' | /usr/bin/head -1)"
+SIGN_TEAM="$(printf '%s\n' "$SIGN_INFO" | /usr/bin/sed -nE 's/^TeamIdentifier=([A-Z0-9]+)$/\1/p' | /usr/bin/head -1)"
+case "$EXPECTED_SIGNING_MODE" in
+  adhoc)
+    if ! printf '%s\n' "$SIGN_INFO" | /usr/bin/grep -q '^Signature=adhoc$'; then
+      echo "✗ bundle signature is not the explicitly expected ad-hoc identity" >&2
+      exit 1
+    fi
+    ;;
+  developer-id)
+    if [ "$SIGN_AUTHORITY" != "$AIRMCP_SIGNING_COMMON_NAME" ] || [ "$SIGN_TEAM" != "$AIRMCP_SIGNING_TEAM_ID" ]; then
+      echo "✗ bundle signer does not match the published Developer ID and team" >&2
+      exit 1
+    fi
+    ;;
+  identity)
+    if [ -z "$EXPECTED_SIGNING_AUTHORITY" ]; then
+      echo "✗ AIRMCP_EXPECTED_SIGNING_AUTHORITY is required for identity mode" >&2
+      exit 2
+    fi
+    if [ "$SIGN_AUTHORITY" != "$EXPECTED_SIGNING_AUTHORITY" ]; then
+      echo "✗ bundle signer does not match the expected signing authority" >&2
+      exit 1
+    fi
+    if [ -n "$EXPECTED_SIGNING_TEAM_ID" ] && [ "$SIGN_TEAM" != "$EXPECTED_SIGNING_TEAM_ID" ]; then
+      echo "✗ bundle signer does not match the expected signing team" >&2
+      exit 1
+    fi
+    ;;
+esac
+
 for macho in "$BUNDLED_NODE" "$RUNTIME_ROOT"/runtime/lib/*.dylib; do
   [ -f "$macho" ] || continue
   external_deps="$(otool -L "$macho" | sed -n '2,$p' | sed -E 's/^[[:space:]]+([^[:space:]]+)[[:space:]].*$/\1/' | grep -E '^/(opt/homebrew|usr/local)/' || true)"
@@ -126,26 +222,6 @@ for executable in "$BUNDLED_NODE" "$BUNDLED_BRIDGE"; do
     fi
   done
 done
-
-WIDGET_PLIST="$BUNDLE_DIR/Contents/PlugIns/AirMCPWidget.appex/Contents/Info.plist"
-WIDGET_BINARY="$BUNDLE_DIR/Contents/PlugIns/AirMCPWidget.appex/Contents/MacOS/AirMCPWidget"
-if [ "$REQUIRE_WIDGET" = "1" ] && { [ ! -f "$WIDGET_PLIST" ] || [ ! -x "$WIDGET_BINARY" ]; }; then
-  echo "✗ signed distribution requires a complete AirMCPWidget.appex" >&2
-  exit 1
-fi
-if [ -f "$WIDGET_PLIST" ]; then
-  WIDGET_VERSION="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$WIDGET_PLIST")"
-  WIDGET_BUILD="$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$WIDGET_PLIST")"
-  if [ "$WIDGET_VERSION" != "$MAIN_VERSION" ] || [ "$WIDGET_BUILD" != "$MAIN_BUILD" ]; then
-    echo "✗ widget version/build ($WIDGET_VERSION/$WIDGET_BUILD) differs from app ($MAIN_VERSION/$MAIN_BUILD)" >&2
-    exit 1
-  fi
-fi
-
-if ! codesign --verify --deep --strict "$BUNDLE_DIR" 2>/dev/null; then
-  echo "✗ $BUNDLE_DIR did not pass strict code-sign verification" >&2
-  exit 1
-fi
 
 # Signature validity alone does not prove that required entitlements survived
 # the final outer signing pass. Extract and inspect the signed main app so a
@@ -191,16 +267,48 @@ if [ "$AUTOMATION_ALLOWED" != "true" ]; then
   exit 1
 fi
 
-if [ -d "$BUNDLE_DIR/Contents/PlugIns/AirMCPWidget.appex" ]; then
+if [ -d "$WIDGET_APPEX" ]; then
   WIDGET_ENTITLEMENTS="$ENTITLEMENTS_DIR/widget.plist"
   if ! codesign -d --entitlements "$WIDGET_ENTITLEMENTS" --xml \
-    "$BUNDLE_DIR/Contents/PlugIns/AirMCPWidget.appex" >/dev/null 2>&1 || \
-    ! plutil -lint "$WIDGET_ENTITLEMENTS" >/dev/null 2>&1; then
+    "$WIDGET_APPEX" >/dev/null 2>&1 || \
+    ! /usr/bin/plutil -lint "$WIDGET_ENTITLEMENTS" >/dev/null 2>&1; then
     echo "✗ signed widget has no valid entitlements" >&2
     exit 1
   fi
+  WIDGET_ALLOWLIST_CHECK="$ENTITLEMENTS_DIR/widget-allowlist-check.plist"
+  /bin/cp "$WIDGET_ENTITLEMENTS" "$WIDGET_ALLOWLIST_CHECK"
+  for allowed_key in \
+    com.apple.security.app-sandbox \
+    com.apple.security.application-groups \
+    com.apple.security.personal-information.calendars \
+    com.apple.security.personal-information.reminders; do
+    /usr/libexec/PlistBuddy -c "Delete :$allowed_key" "$WIDGET_ALLOWLIST_CHECK" >/dev/null 2>&1 || true
+  done
+  WIDGET_REMAINING_ENTITLEMENTS="$(
+    /usr/bin/plutil -p "$WIDGET_ALLOWLIST_CHECK" 2>/dev/null | /usr/bin/tr -d '[:space:]'
+  )"
+  if [ "$WIDGET_REMAINING_ENTITLEMENTS" != "{}" ]; then
+    echo "✗ signed widget contains an unexpected entitlement" >&2
+    exit 1
+  fi
+  WIDGET_SANDBOX_TYPE="$(
+    /usr/bin/plutil -type 'com\.apple\.security\.app-sandbox' \
+      "$WIDGET_ENTITLEMENTS" 2>/dev/null || true
+  )"
+  if [ "$WIDGET_SANDBOX_TYPE" != "bool" ]; then
+    echo "✗ signed widget sandbox entitlement must be a boolean" >&2
+    exit 1
+  fi
+  WIDGET_SANDBOX_ENABLED="$(
+    /usr/libexec/PlistBuddy -c "Print :com.apple.security.app-sandbox" \
+      "$WIDGET_ENTITLEMENTS" 2>/dev/null || true
+  )"
+  if [ "$WIDGET_SANDBOX_ENABLED" != "true" ]; then
+    echo "✗ signed widget must enable the App Sandbox" >&2
+    exit 1
+  fi
   WIDGET_APP_GROUPS_TYPE="$(
-    plutil -type 'com\.apple\.security\.application-groups' \
+    /usr/bin/plutil -type 'com\.apple\.security\.application-groups' \
       "$WIDGET_ENTITLEMENTS" 2>/dev/null || true
   )"
   if [ "$WIDGET_APP_GROUPS_TYPE" != "array" ]; then
@@ -211,13 +319,14 @@ if [ -d "$BUNDLE_DIR/Contents/PlugIns/AirMCPWidget.appex" ]; then
     /usr/libexec/PlistBuddy -c "Print :com.apple.security.application-groups" \
       "$WIDGET_ENTITLEMENTS" 2>/dev/null || true
   )"
-  if ! grep -Eq '^[[:space:]]*group\.app\.airmcp[[:space:]]*$' <<<"$WIDGET_APP_GROUPS"; then
-    echo "✗ signed widget is missing the group.app.airmcp entitlement" >&2
+  WIDGET_APP_GROUPS_COMPACT="$(printf '%s' "$WIDGET_APP_GROUPS" | /usr/bin/tr -d '[:space:]')"
+  if [ "$WIDGET_APP_GROUPS_COMPACT" != "Array{group.app.airmcp}" ]; then
+    echo "✗ signed widget application-groups must contain only group.app.airmcp" >&2
     exit 1
   fi
   for capability in calendars reminders; do
     WIDGET_CAPABILITY_TYPE="$(
-      plutil -type "com\.apple\.security\.personal-information\.$capability" \
+      /usr/bin/plutil -type "com\.apple\.security\.personal-information\.$capability" \
         "$WIDGET_ENTITLEMENTS" 2>/dev/null || true
     )"
     if [ "$WIDGET_CAPABILITY_TYPE" != "bool" ]; then

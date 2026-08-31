@@ -228,6 +228,9 @@ final class AirMCPApplicationDelegate: NSObject, NSApplicationDelegate {
     @discardableResult
     func guardPrimaryInstance() -> Bool {
         if isDuplicateLaunch { return false }
+        // Acceptance binaries are launched directly and use isolated state and
+        // a private loopback port. Production builds compile this override out.
+        if acceptanceHarnessForcesAppRuntime { return true }
         guard let bundleIdentifier = Bundle.main.bundleIdentifier else { return true }
 
         let runningApplications = NSRunningApplication.runningApplications(

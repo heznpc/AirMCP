@@ -197,6 +197,22 @@ describe("review route for app-owned runtime trust boundaries", () => {
     );
   });
 
+  test("maps the canonical widget entitlement allowlist to its signing contract test", () => {
+    const { repo, route } = createFixtureRepository();
+    const result = commitAndRoute(repo, route, [
+      "scripts/lib/widget-entitlements.plist",
+      "tests/signed-app-verify-source.test.js",
+    ]);
+
+    expect(result.changed.find((entry) => entry.file === "scripts/lib/widget-entitlements.plist")).toMatchObject({
+      tier: 0,
+      area: "app-runtime-release-harness",
+    });
+    expect(result.unguardedGuardGroups).not.toContainEqual(
+      expect.objectContaining({ area: "app-runtime-release-harness", group: "signed-artifact-verification" }),
+    );
+  });
+
   test("accepts the widget entitlement contract as a direct bundle-app guard", () => {
     const { repo, route } = createFixtureRepository();
     const result = commitAndRoute(repo, route, ["scripts/bundle-app.sh", "tests/widget-app-group.test.js"]);

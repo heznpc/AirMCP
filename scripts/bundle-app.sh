@@ -96,7 +96,13 @@ esac
 BUNDLE_ID="app.airmcp"
 APP_EXECUTABLE="AirMCP"
 APP_BINARY="$BUNDLE_DIR/Contents/MacOS/$APP_EXECUTABLE"
+WIDGET_BUNDLE_ID="$BUNDLE_ID.Widget"
+WIDGET_APPEX="$BUNDLE_DIR/Contents/PlugIns/AirMCPWidget.appex"
+WIDGET_ENTITLEMENTS="$SCRIPT_DIR/lib/widget-entitlements.plist"
 LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+PLUGINKIT="/usr/bin/pluginkit"
+REGISTRATION_ATTEMPTS=20
+REGISTRATION_SLEEP_SECONDS=0.1
 SIGN_IDENTITY="${AIRMCP_SIGN_IDENTITY:--}"
 AIRMCP_EMBED_RUNTIME="${AIRMCP_EMBED_RUNTIME:-1}"
 if [ "$MODE" = "verify-governed" ]; then
@@ -109,8 +115,8 @@ APP_HEALTH_URL="http://127.0.0.1:$APP_HTTP_PORT/health"
 APP_MCP_URL="http://127.0.0.1:$APP_HTTP_PORT/mcp"
 TOKEN_FILE="${AIRMCP_APP_RUNTIME_TOKEN_PATH:-$HOME/Library/Application Support/AirMCP/http-token}"
 OWNER_SECRET_FILE="${AIRMCP_APP_RUNTIME_OWNER_PATH:-$HOME/Library/Application Support/AirMCP/runtime-owner-secret}"
-GOVERNED_STATE_DIR=""
-GOVERNED_STATE_PARENT="${TMPDIR:-/tmp}"
+VERIFICATION_STATE_DIR=""
+VERIFICATION_STATE_PARENT="${TMPDIR:-/tmp}"
 PROCESS_SHUTDOWN_WAIT_STEPS=70 # 7s, above the server's 5s graceful-shutdown budget
 EXPECTED_VERSION="$(
   node -e 'const fs = require("fs"); console.log(JSON.parse(fs.readFileSync(process.argv[1], "utf8")).version)' \
@@ -121,6 +127,52 @@ if ! [[ "$BUILD_NUMBER" =~ ^[0-9]+$ ]]; then
   echo "✗ AIRMCP_BUILD_NUMBER must be a positive integer, got: $BUILD_NUMBER" >&2
   exit 2
 fi
+
+register_bundle_with_launch_services() {
+  local registered_plugins=""
+  local selected_plugin=""
+  local attempt=0
+
+  if [ ! -x "$LSREGISTER" ]; then
+    echo "✗ Launch Services registration tool is unavailable: $LSREGISTER" >&2
+    return 1
+  fi
+  if ! "$LSREGISTER" -lint -f "$BUNDLE_DIR" >/dev/null 2>&1; then
+    echo "✗ Launch Services rejected $BUNDLE_DIR" >&2
+    return 1
+  fi
+  if [ ! -d "$WIDGET_APPEX" ]; then
+    return 0
+  fi
+  if [ ! -x "$PLUGINKIT" ]; then
+    echo "✗ pluginkit is unavailable; widget registration cannot be verified" >&2
+    return 1
+  fi
+  # Launch Services does not synchronously discover an embedded WidgetKit
+  # extension from an arbitrary development build path on every macOS release.
+  # Register the exact appex explicitly, then prove PlugInKit can resolve it.
+  if ! "$PLUGINKIT" -a "$WIDGET_APPEX" >/dev/null 2>&1; then
+    echo "✗ WidgetKit rejected extension registration for $WIDGET_APPEX" >&2
+    return 1
+  fi
+  while [ "$attempt" -lt "$REGISTRATION_ATTEMPTS" ]; do
+    # Query every known instance so a newer installed release cannot hide this
+    # exact build path. A superseded (=) entry is still registered/discoverable;
+    # reject only ignored (-), debugger-only (!), and unknown (?) elections.
+    registered_plugins="$("$PLUGINKIT" -m -A -D -v -i "$WIDGET_BUNDLE_ID" 2>/dev/null || true)"
+    selected_plugin="$(
+      printf '%s\n' "$registered_plugins" |
+        /usr/bin/awk -F '\t' -v target="$WIDGET_APPEX" '$NF == target { print; exit }'
+    )"
+    if [ -n "$selected_plugin" ] && ! [[ "$selected_plugin" =~ ^[[:space:]]*[-?!] ]]; then
+      return 0
+    fi
+    attempt=$((attempt + 1))
+    /bin/sleep "$REGISTRATION_SLEEP_SECONDS"
+  done
+  echo "✗ WidgetKit extension registration failed for $WIDGET_APPEX" >&2
+  return 1
+}
 
 if [ "$MODE" = "verify-appintents" ]; then
   if [ "$SIGN_IDENTITY" = "-" ]; then
@@ -257,31 +309,16 @@ elif [ -f "$WIDGET_DIR/Package.swift" ]; then
     # container. Must match the main app's app-group below and
     # WidgetSnapshotConfig.appGroupID in Swift. calendars/reminders stay for the
     # OS-native EventKit fallback path when no fresh snapshot is present.
-    codesign --force --sign "$SIGN_IDENTITY" --entitlements /dev/stdin "$APPEX_DIR/../" <<'ENTITLEMENTS_EOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-	<key>com.apple.security.app-sandbox</key>
-	<false/>
-	<key>com.apple.security.application-groups</key>
-	<array>
-		<string>group.app.airmcp</string>
-	</array>
-	<key>com.apple.security.personal-information.calendars</key>
-	<true/>
-	<key>com.apple.security.personal-information.reminders</key>
-	<true/>
-</dict>
-</plist>
-ENTITLEMENTS_EOF
+    /usr/bin/plutil -lint "$WIDGET_ENTITLEMENTS" >/dev/null
+    codesign --force --sign "$SIGN_IDENTITY" \
+      --entitlements "$WIDGET_ENTITLEMENTS" \
+      "$WIDGET_APPEX"
     echo "  ✓ Widget extension embedded"
   fi
 fi
 
 if [ "$AIRMCP_REQUIRE_WIDGET" = "1" ]; then
-  REQUIRED_WIDGET="$BUNDLE_DIR/Contents/PlugIns/AirMCPWidget.appex"
-  if [ ! -x "$REQUIRED_WIDGET/Contents/MacOS/AirMCPWidget" ] || [ ! -f "$REQUIRED_WIDGET/Contents/Info.plist" ]; then
+  if [ ! -x "$WIDGET_APPEX/Contents/MacOS/AirMCPWidget" ] || [ ! -f "$WIDGET_APPEX/Contents/Info.plist" ]; then
     echo "✗ signed distribution requires a complete AirMCPWidget.appex" >&2
     exit 1
   fi
@@ -340,9 +377,30 @@ MAIN_APP_ENTITLEMENTS="$SCRIPT_DIR/lib/main-app-entitlements.plist"
 codesign --force --sign "$SIGN_IDENTITY" \
   --entitlements "$MAIN_APP_ENTITLEMENTS" \
   "$BUNDLE_DIR"
-"$SCRIPT_DIR/verify-bundle-structure.sh" "$BUNDLE_DIR" "$BUNDLE_ID" "$APP_EXECUTABLE"
-if [ "$ACCEPTANCE_HARNESS_BUILD" = "0" ] && [ -x "$LSREGISTER" ]; then
-  "$LSREGISTER" -f "$BUNDLE_DIR" 2>/dev/null || true
+if [ "$SIGN_IDENTITY" = "-" ]; then
+  AIRMCP_EXPECTED_SIGNING_MODE=adhoc \
+    "$SCRIPT_DIR/verify-bundle-structure.sh" "$BUNDLE_DIR" "$BUNDLE_ID" "$APP_EXECUTABLE"
+else
+  SIGNED_BUNDLE_INFO="$(codesign -dv --verbose=4 "$BUNDLE_DIR" 2>&1)"
+  SIGNED_AUTHORITY="$(
+    printf '%s\n' "$SIGNED_BUNDLE_INFO" | /usr/bin/sed -nE 's/^Authority=(.*)$/\1/p' | /usr/bin/head -1
+  )"
+  SIGNED_TEAM_ID="$(
+    printf '%s\n' "$SIGNED_BUNDLE_INFO" |
+      /usr/bin/sed -nE 's/^TeamIdentifier=([A-Z0-9]+)$/\1/p' |
+      /usr/bin/head -1
+  )"
+  if [ -z "$SIGNED_AUTHORITY" ] || [ -z "$SIGNED_TEAM_ID" ]; then
+    echo "✗ signed bundle identity could not be resolved after codesign" >&2
+    exit 1
+  fi
+  AIRMCP_EXPECTED_SIGNING_MODE=identity \
+    AIRMCP_EXPECTED_SIGNING_AUTHORITY="$SIGNED_AUTHORITY" \
+    AIRMCP_EXPECTED_SIGNING_TEAM_ID="$SIGNED_TEAM_ID" \
+    "$SCRIPT_DIR/verify-bundle-structure.sh" "$BUNDLE_DIR" "$BUNDLE_ID" "$APP_EXECUTABLE"
+fi
+if [ "$ACCEPTANCE_HARNESS_BUILD" = "0" ]; then
+  register_bundle_with_launch_services
 fi
 
 find_matching_commands() {
@@ -434,24 +492,81 @@ launch_app() {
   case "$MODE" in
     verify|verify-governed|verify-appintents) export AIRMCP_FORCE_APP_RUNTIME=1 ;;
   esac
-  /usr/bin/open -n "$BUNDLE_DIR"
+  if [ "$MODE" = "verify" ] || [ "$MODE" = "verify-governed" ]; then
+    # LaunchServices intentionally enforces the shipping bundle's single-
+    # instance policy. Run the compile-time-gated acceptance binary directly
+    # so an installed AirMCP can remain untouched during local verification.
+    "$APP_BINARY" >/dev/null 2>&1 &
+  else
+    # AppIntents verification must exercise LaunchServices registration.
+    /usr/bin/open -n "$BUNDLE_DIR"
+  fi
 }
 
-setup_governed_environment() {
-  local env_name
-  local config_path
+allocate_acceptance_port() {
+  node -e '
+    const net = require("node:net");
+    const server = net.createServer();
+    server.once("error", (error) => {
+      console.error(error.message);
+      process.exitCode = 1;
+    });
+    server.listen({ host: "127.0.0.1", port: 0, exclusive: true }, () => {
+      const address = server.address();
+      if (!address || typeof address === "string") {
+        console.error("failed to allocate a loopback port");
+        process.exitCode = 1;
+      } else {
+        process.stdout.write(String(address.port));
+      }
+      server.close();
+    });
+  '
+}
 
-  # A host profile/module override would make the acceptance surface depend on
-  # the developer's shell. Clear inherited AirMCP settings after the bundle is
-  # built, then install only the isolated contract below.
+setup_acceptance_environment() {
+  local state_prefix="${1:-airmcp-signed-verify}"
+  local env_name
+
+  # A host override would make the acceptance surface depend on the developer's
+  # shell. Clear inherited AirMCP settings after the bundle is built, then
+  # install only the isolated contract below.
   for env_name in $(env | awk -F= '/^AIRMCP_/ { print $1 }'); do
     unset "$env_name"
   done
 
-  GOVERNED_STATE_PARENT="${GOVERNED_STATE_PARENT%/}"
-  GOVERNED_STATE_DIR="$(mktemp -d "$GOVERNED_STATE_PARENT/airmcp-governed.XXXXXX")"
-  mkdir -p "$GOVERNED_STATE_DIR/home" "$GOVERNED_STATE_DIR/audit" "$GOVERNED_STATE_DIR/tmp"
-  config_path="$GOVERNED_STATE_DIR/config.json"
+  VERIFICATION_STATE_PARENT="${VERIFICATION_STATE_PARENT%/}"
+  VERIFICATION_STATE_DIR="$(mktemp -d "$VERIFICATION_STATE_PARENT/$state_prefix.XXXXXX")"
+  mkdir -p \
+    "$VERIFICATION_STATE_DIR/home" \
+    "$VERIFICATION_STATE_DIR/audit" \
+    "$VERIFICATION_STATE_DIR/tmp"
+
+  APP_HTTP_PORT="$(allocate_acceptance_port)"
+  if ! [[ "$APP_HTTP_PORT" =~ ^[0-9]+$ ]] ||
+    [ "$APP_HTTP_PORT" -lt 1024 ] || [ "$APP_HTTP_PORT" -gt 65535 ]; then
+    echo "✗ failed to allocate an isolated acceptance port" >&2
+    exit 1
+  fi
+  APP_HEALTH_URL="http://127.0.0.1:$APP_HTTP_PORT/health"
+  APP_MCP_URL="http://127.0.0.1:$APP_HTTP_PORT/mcp"
+
+  export HOME="$VERIFICATION_STATE_DIR/home"
+  export CFFIXED_USER_HOME="$VERIFICATION_STATE_DIR/home"
+  export AIRMCP_APP_RUNTIME_TOKEN_PATH="$VERIFICATION_STATE_DIR/http-token"
+  export AIRMCP_APP_RUNTIME_OWNER_PATH="$VERIFICATION_STATE_DIR/runtime-owner-secret"
+  export AIRMCP_FORCE_APP_RUNTIME="1"
+  export AIRMCP_APP_RUNTIME_PORT="$APP_HTTP_PORT"
+  export AIRMCP_NPM_PACKAGE_SPECIFIER="$PROJECT_DIR"
+  TOKEN_FILE="$AIRMCP_APP_RUNTIME_TOKEN_PATH"
+  OWNER_SECRET_FILE="$AIRMCP_APP_RUNTIME_OWNER_PATH"
+}
+
+setup_governed_environment() {
+  local config_path
+
+  setup_acceptance_environment "airmcp-governed"
+  config_path="$VERIFICATION_STATE_DIR/config.json"
   node -e '
     const fs = require("fs");
     const path = process.argv[1];
@@ -467,34 +582,23 @@ setup_governed_environment() {
   # Swift reads the temp config and keeps its notification/socket UI off. The
   # Node child deliberately overrides HITL back to sensitive-only so the MCP
   # elicitation client exercises the production approval gate.
-  export HOME="$GOVERNED_STATE_DIR/home"
-  # Foundation's NSHomeDirectory ignores HOME on macOS. This supported test
-  # override moves the app's fixed home-relative surfaces (including its HITL
-  # socket cleanup) under the same disposable root.
-  export CFFIXED_USER_HOME="$GOVERNED_STATE_DIR/home"
   export AIRMCP_CONFIG_PATH="$config_path"
   export AIRMCP_PROFILE="full"
   export AIRMCP_TOOL_EXPOSURE="full"
   export AIRMCP_REQUIRE_TOOL_SESSION="false"
   export AIRMCP_HITL_LEVEL="sensitive-only"
-  export AIRMCP_HITL_SOCKET_PATH="$GOVERNED_STATE_DIR/hitl.sock"
-  export AIRMCP_APP_RUNTIME_TOKEN_PATH="$GOVERNED_STATE_DIR/http-token"
-  export AIRMCP_APP_RUNTIME_OWNER_PATH="$GOVERNED_STATE_DIR/runtime-owner-secret"
-  export AIRMCP_MEMORY_STORE_PATH="$GOVERNED_STATE_DIR/memory.json"
-  export AIRMCP_VECTOR_STORE_DIR="$GOVERNED_STATE_DIR/audit"
-  export AIRMCP_USAGE_PROFILE_PATH="$GOVERNED_STATE_DIR/usage.json"
-  export AIRMCP_EMERGENCY_STOP_PATH="$GOVERNED_STATE_DIR/emergency-stop"
-  export AIRMCP_TEMP_DIR="$GOVERNED_STATE_DIR/tmp"
+  export AIRMCP_HITL_SOCKET_PATH="$VERIFICATION_STATE_DIR/hitl.sock"
+  export AIRMCP_MEMORY_STORE_PATH="$VERIFICATION_STATE_DIR/memory.json"
+  export AIRMCP_VECTOR_STORE_DIR="$VERIFICATION_STATE_DIR/audit"
+  export AIRMCP_USAGE_PROFILE_PATH="$VERIFICATION_STATE_DIR/usage.json"
+  export AIRMCP_EMERGENCY_STOP_PATH="$VERIFICATION_STATE_DIR/emergency-stop"
+  export AIRMCP_TEMP_DIR="$VERIFICATION_STATE_DIR/tmp"
   export AIRMCP_AUDIT_LOG="true"
   export AIRMCP_AUDIT_FLUSH_INTERVAL="25"
   export AIRMCP_AUDIT_HMAC_KEY
   AIRMCP_AUDIT_HMAC_KEY="$(node -e 'process.stdout.write(require("crypto").randomBytes(32).toString("hex"))')"
   export AIRMCP_RATE_LIMIT="true"
   export AIRMCP_ELICITATION_DISABLE="false"
-  export AIRMCP_FORCE_APP_RUNTIME="1"
-  export AIRMCP_NPM_PACKAGE_SPECIFIER="$PROJECT_DIR"
-  TOKEN_FILE="$AIRMCP_APP_RUNTIME_TOKEN_PATH"
-  OWNER_SECRET_FILE="$AIRMCP_APP_RUNTIME_OWNER_PATH"
 }
 
 verify_governed_workflow() {
@@ -694,7 +798,7 @@ verify_appintents() {
 cleanup_verification() {
   local original_status=$?
   local cleanup_failed=0
-  local state_dir="$GOVERNED_STATE_DIR"
+  local state_dir="$VERIFICATION_STATE_DIR"
 
   stop_bundle_processes
   if ! assert_no_bundle_processes; then cleanup_failed=1; fi
@@ -711,7 +815,8 @@ cleanup_verification() {
 
   if [ -n "$state_dir" ]; then
     case "$state_dir" in
-      "$GOVERNED_STATE_PARENT"/airmcp-governed.*)
+      "$VERIFICATION_STATE_PARENT"/airmcp-governed.*|\
+      "$VERIFICATION_STATE_PARENT"/airmcp-signed-verify.*)
         if ! rm -rf "$state_dir"; then cleanup_failed=1; fi
         if [ -e "$state_dir" ]; then
           echo "✗ governed verification left temporary state behind: $state_dir" >&2
@@ -752,6 +857,7 @@ case "$MODE" in
     echo "✓ Launched $APP_EXECUTABLE"
     ;;
   verify)
+    setup_acceptance_environment
     verify_running
     ;;
   verify-governed)

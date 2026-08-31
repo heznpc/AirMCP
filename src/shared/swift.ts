@@ -106,11 +106,6 @@ const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
  * single-shot responses, so every bridge path is covered.
  */
 function safeParseBridgeResponse(raw: string): BridgeResponse | null {
-  // Fast path: if the raw bytes contain any dangerous key literal, reject
-  // outright. This is defence-in-depth on top of the reviver — even though
-  // `return undefined` below drops the key, rejecting the whole payload is
-  // safer than silently stripping fields we may later need for diagnostics.
-  if (containsDangerousKey(raw)) return null;
   let poisoned = false;
   const parsed: unknown = JSON.parse(raw, (key, value) => {
     if (DANGEROUS_KEYS.has(key)) {
@@ -130,18 +125,10 @@ function safeParseBridgeResponse(raw: string): BridgeResponse | null {
   };
 }
 
-/** Cheap string pre-check for the three dangerous keys. Catches the payload
- *  before it ever enters `JSON.parse`, which closes the theoretical window
- *  between "reviver runs" and "value is assigned" in engines where the
- *  order is not strictly defined. `DANGEROUS_KEYS` is a hot-set of 3 items;
- *  we scan for each quoted form (only object keys must be quoted). */
-function containsDangerousKey(raw: string): boolean {
-  return raw.includes('"__proto__"') || raw.includes('"constructor"') || raw.includes('"prototype"');
-}
-
 // ── Persistent process management ────────────────────────────────────
 
 interface PendingRequest {
+  readonly command: string;
   readonly request: string;
   resolve: (value: unknown) => void;
   reject: (error: Error) => void;
@@ -199,6 +186,13 @@ const defaultLane = createBridgeLane("default");
 const embeddingLane = createBridgeLane("embedding");
 const observerLane = createBridgeLane("observer");
 const bridgeLanes = [defaultLane, embeddingLane, observerLane] as const;
+let observerRunning = false;
+
+/** True only after start-observer succeeds on the currently live observer process. */
+export function isSwiftObserverRunning(): boolean {
+  const proc = observerLane.child;
+  return observerRunning && proc !== null && !proc.killed && proc.exitCode === null;
+}
 
 function laneForCommand(command: string): BridgeLane {
   if (EMBEDDING_COMMANDS.has(command)) return embeddingLane;
@@ -217,6 +211,7 @@ function ensureProcess(lane: BridgeLane): Promise<void> {
   // generation now so its late lifecycle events and buffered stdout cannot
   // share lane state with the replacement launch.
   if (lane.child) {
+    if (lane === observerLane) observerRunning = false;
     lane.child = null;
     rejectAll(lane, "Swift bridge process is no longer running");
   }
@@ -297,6 +292,10 @@ function ensureProcess(lane: BridgeLane): Promise<void> {
           if (msg.error) {
             entry.reject(new Error(msg.error));
           } else {
+            if (lane === observerLane) {
+              if (entry.command === "start-observer") observerRunning = true;
+              if (entry.command === "stop-observer") observerRunning = false;
+            }
             entry.resolve(msg.result);
           }
           dispatchNext(lane);
@@ -319,7 +318,9 @@ function ensureProcess(lane: BridgeLane): Promise<void> {
       const ownsLaunch = lane.launchingChild === proc;
       if (!ownsActiveProcess && !ownsLaunch) return;
       rejectAll(lane, `Swift bridge error: ${err.message}`);
-      if (ownsActiveProcess) lane.child = null;
+      if (ownsActiveProcess) {
+        terminateActiveProcess(lane, proc, `Swift bridge reset after process error: ${err.message}`);
+      }
       if (!ready && ownsLaunch) {
         clearOwnedLaunchState(lane, proc, readyTimer);
         lane.launchFailed = true;
@@ -333,7 +334,10 @@ function ensureProcess(lane: BridgeLane): Promise<void> {
       const ownsLaunch = lane.launchingChild === proc;
       if (!ownsActiveProcess && !ownsLaunch) return;
       rejectAll(lane, `Swift bridge exited with code ${code}`);
-      if (ownsActiveProcess) lane.child = null;
+      if (ownsActiveProcess) {
+        if (lane === observerLane) observerRunning = false;
+        lane.child = null;
+      }
       if (!ready && ownsLaunch) {
         clearOwnedLaunchState(lane, proc, readyTimer);
         lane.launchFailed = true;
@@ -432,6 +436,7 @@ function dispatchNext(lane: BridgeLane): void {
 
 function terminateActiveProcess(lane: BridgeLane, proc: ChildProcess, message: string): void {
   if (lane.child !== proc) return;
+  if (lane === observerLane) observerRunning = false;
   lane.child = null;
   rejectAll(lane, message);
   if (!proc.killed) {
@@ -449,6 +454,7 @@ function closeBridgeLane(lane: BridgeLane): void {
   lane.launching = null;
   lane.launchReject = null;
   lane.launchTimer = null;
+  if (lane === observerLane) observerRunning = false;
   if (launchTimer) clearTimeout(launchTimer);
   rejectAll(lane, "Swift bridge closed");
   rejectLaunch?.(new SwiftBridgeClosedError());
@@ -475,9 +481,11 @@ export async function runSwift<T>(command: string, input: string): Promise<T> {
   // If persistent mode failed to launch, check if recovery is possible
   if (lane.launchFailed) {
     if (lane.launchRetryCount >= LAUNCH_MAX_RETRIES) {
+      if (OBSERVER_COMMANDS.has(command)) throw persistentObserverRequiredError(command);
       return runSwiftSingleShot<T>(command, input);
     }
     if (Date.now() - lane.launchFailedAt < LAUNCH_COOLDOWN_MS) {
+      if (OBSERVER_COMMANDS.has(command)) throw persistentObserverRequiredError(command);
       return runSwiftSingleShot<T>(command, input);
     }
     lane.launchFailed = false;
@@ -491,9 +499,11 @@ export async function runSwift<T>(command: string, input: string): Promise<T> {
     // An explicit shutdown must not be treated as a launch failure: falling
     // back here would spawn a new single-shot helper while closing.
     if (error instanceof SwiftBridgeClosedError) throw error;
-    // Persistent mode unavailable — fall back to single-shot
+    // Observer commands require a process that stays alive after the RPC
+    // response. Other commands can still use the spawn-per-call fallback.
     lane.launchFailed = true;
     lane.launchFailedAt = Date.now();
+    if (OBSERVER_COMMANDS.has(command)) throw persistentObserverRequiredError(command, error);
     return runSwiftSingleShot<T>(command, input);
   }
 
@@ -502,6 +512,7 @@ export async function runSwift<T>(command: string, input: string): Promise<T> {
 
   return new Promise<T>((resolve, reject) => {
     lane.pending.set(id, {
+      command,
       request,
       resolve: resolve as (value: unknown) => void,
       reject,
@@ -510,6 +521,11 @@ export async function runSwift<T>(command: string, input: string): Promise<T> {
     });
     dispatchNext(lane);
   });
+}
+
+function persistentObserverRequiredError(command: string, cause?: unknown): Error {
+  const detail = cause instanceof Error ? `: ${cause.message}` : "";
+  return new Error(`Swift observer command '${command}' requires persistent bridge mode${detail}`);
 }
 
 // ── Single-shot fallback (original spawn-per-call) ───────────────────
@@ -553,12 +569,8 @@ function runSwiftSingleShot<T>(command: string, input: string): Promise<T> {
         return;
       }
       try {
-        // Prototype pollution guard — same layered defence as persistent mode:
-        // fast string pre-check + reviver that drops dangerous keys.
-        if (containsDangerousKey(trimmed)) {
-          reject(new Error("Swift bridge response rejected: suspicious payload"));
-          return;
-        }
+        // Prototype pollution guard — reject dangerous object keys at every
+        // nesting depth without confusing identical string values for keys.
         let poisoned = false;
         const parsed: unknown = JSON.parse(trimmed, (key, value) => {
           if (DANGEROUS_KEYS.has(key)) {

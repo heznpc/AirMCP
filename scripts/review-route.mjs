@@ -200,6 +200,7 @@ const CATALOG = [
     files: [
       "scripts/bundle-app.sh",
       "scripts/lib/main-app-entitlements.plist",
+      "scripts/lib/widget-entitlements.plist",
       "scripts/notarize-app.sh",
       "scripts/probe-app-runtime.mjs",
       "scripts/verify-bundle-structure.sh",
@@ -231,7 +232,12 @@ const CATALOG = [
       },
       {
         name: "signed-artifact-verification",
-        files: ["scripts/lib/main-app-entitlements.plist", "scripts/notarize-app.sh", "scripts/verify-signed-app.sh"],
+        files: [
+          "scripts/lib/main-app-entitlements.plist",
+          "scripts/lib/widget-entitlements.plist",
+          "scripts/notarize-app.sh",
+          "scripts/verify-signed-app.sh",
+        ],
         tests: ["signed-app-verify-source"],
       },
     ],

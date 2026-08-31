@@ -1,4 +1,4 @@
-import { chmodSync, copyFileSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -15,6 +15,7 @@ function makeBundle({
   mainEntitlementTypes = "valid",
   includeWidget = false,
   widgetEntitlements = "valid",
+  widgetMetadata = {},
 } = {}) {
   const temp = mkdtempSync(join(tmpdir(), "airmcp-bundle-"));
   const bundle = join(temp, `${executable}.app`);
@@ -39,8 +40,14 @@ function makeBundle({
   writeFileSync(
     nativeSource,
     `#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 int main(int argc, char **argv) {
+  const char *tripwire = getenv("AIRMCP_BUNDLED_NODE_TRIPWIRE");
+  if (tripwire != NULL) {
+    FILE *sentinel = fopen(tripwire, "w");
+    if (sentinel != NULL) fclose(sentinel);
+  }
   for (int i = 1; i < argc; i++) {
     if (strcmp(argv[i], "-p") == 0) { puts("20"); return 0; }
     if (strcmp(argv[i], "--version") == 0) { puts("1.0.0"); return 0; }
@@ -114,6 +121,10 @@ int main(int argc, char **argv) {
     mkdirSync(widgetMacOS, { recursive: true });
     copyFileSync(bundledNode, widgetBinary);
     chmodSync(widgetBinary, 0o755);
+    const widgetBundleIdentifier = widgetMetadata.bundleIdentifier ?? `${bundleId}.Widget`;
+    const widgetExecutable = widgetMetadata.executable ?? "AirMCPWidget";
+    const widgetPackageType = widgetMetadata.packageType ?? "XPC!";
+    const widgetExtensionPoint = widgetMetadata.extensionPoint ?? "com.apple.widgetkit-extension";
     writeFileSync(
       join(widgetContents, "Info.plist"),
       `<?xml version="1.0" encoding="UTF-8"?>
@@ -121,15 +132,20 @@ int main(int argc, char **argv) {
 <plist version="1.0">
 <dict>
   <key>CFBundleIdentifier</key>
-  <string>app.airmcp.Widget</string>
+  <string>${widgetBundleIdentifier}</string>
   <key>CFBundleExecutable</key>
-  <string>AirMCPWidget</string>
+  <string>${widgetExecutable}</string>
   <key>CFBundlePackageType</key>
-  <string>XPC!</string>
+  <string>${widgetPackageType}</string>
   <key>CFBundleShortVersionString</key>
   <string>1.0.0</string>
   <key>CFBundleVersion</key>
   <string>1</string>
+  <key>NSExtension</key>
+  <dict>
+    <key>NSExtensionPointIdentifier</key>
+    <string>${widgetExtensionPoint}</string>
+  </dict>
 </dict>
 </plist>
 `,
@@ -154,18 +170,29 @@ int main(int argc, char **argv) {
           widgetEntitlements === "string-types" || widgetEntitlements === "string-booleans"
             ? "<string>true</string>"
             : "<true/>";
+        const sandboxValue =
+          widgetEntitlements === "string-sandbox"
+            ? "<string>true</string>"
+            : widgetEntitlements === "false-sandbox"
+              ? "<false/>"
+              : "<true/>";
+        const unexpectedEntitlement =
+          widgetEntitlements === "unexpected" ? "<key>com.apple.security.get-task-allow</key><true/>" : "";
         writeFileSync(
           entitlements,
           `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+  <key>com.apple.security.app-sandbox</key>
+  ${sandboxValue}
   <key>com.apple.security.application-groups</key>
   ${groupValue}
   <key>com.apple.security.personal-information.calendars</key>
   ${capabilityValue}
   <key>com.apple.security.personal-information.reminders</key>
   ${capabilityValue}
+  ${unexpectedEntitlement}
 </dict>
 </plist>
 `,
@@ -208,13 +235,13 @@ int main(int argc, char **argv) {
     const signedResult = spawnSync("codesign", signArguments, { encoding: "utf8" });
     expect(signedResult.status).toBe(0);
   }
-  return { temp, bundle, binary, executable, bundleId, widget };
+  return { temp, bundle, binary, bundledNode, executable, bundleId, widget };
 }
 
 function verifyBundle(bundle, bundleId, executable, env = {}) {
   return spawnSync("bash", [verifier, bundle, bundleId, executable], {
     encoding: "utf8",
-    env: { ...process.env, ...env },
+    env: { ...process.env, AIRMCP_EXPECTED_SIGNING_MODE: "adhoc", ...env },
   });
 }
 
@@ -260,6 +287,46 @@ describe("macOS bundle structure verifier", () => {
     }
   });
 
+  test("rejects a tampered signature before executing the bundled Node runtime", () => {
+    if (process.platform !== "darwin") return;
+    const fixture = makeBundle();
+    const sentinel = join(fixture.temp, "bundled-node-executed");
+    try {
+      writeFileSync(fixture.bundledNode, `#!/bin/sh\n: > ${JSON.stringify(sentinel)}\nexit 97\n`);
+      chmodSync(fixture.bundledNode, 0o755);
+
+      const result = verifyBundle(fixture.bundle, fixture.bundleId, fixture.executable);
+
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("did not pass strict code-sign verification");
+      expect(existsSync(sentinel)).toBe(false);
+    } finally {
+      rmSync(fixture.temp, { recursive: true, force: true });
+    }
+  });
+
+  test("rejects an attacker re-signed bundle before executing its bundled Node runtime", () => {
+    if (process.platform !== "darwin") return;
+    const fixture = makeBundle();
+    const sentinel = join(fixture.temp, "attacker-node-executed");
+    const environment = { ...process.env, AIRMCP_BUNDLED_NODE_TRIPWIRE: sentinel };
+    delete environment.AIRMCP_EXPECTED_SIGNING_MODE;
+    delete environment.AIRMCP_EXPECTED_SIGNING_AUTHORITY;
+    delete environment.AIRMCP_EXPECTED_SIGNING_TEAM_ID;
+    try {
+      const result = spawnSync("bash", [verifier, fixture.bundle, fixture.bundleId, fixture.executable], {
+        encoding: "utf8",
+        env: environment,
+      });
+
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("does not match the published Developer ID and team");
+      expect(existsSync(sentinel)).toBe(false);
+    } finally {
+      rmSync(fixture.temp, { recursive: true, force: true });
+    }
+  });
+
   test("rejects a stale localization left by an incremental SwiftPM build", () => {
     if (process.platform !== "darwin") return;
     const fixture = makeBundle();
@@ -297,6 +364,30 @@ describe("macOS bundle structure verifier", () => {
     } finally {
       rmSync(fixture.temp, { recursive: true, force: true });
       rmSync(withWidget.temp, { recursive: true, force: true });
+    }
+  });
+
+  test.each([
+    ["identifier", { bundleIdentifier: "example.invalid.Widget" }, ":CFBundleIdentifier", true],
+    ["executable", { executable: "WrongWidget" }, ":CFBundleExecutable", false],
+    ["package type", { packageType: "APPL" }, ":CFBundlePackageType", true],
+    [
+      "extension point",
+      { extensionPoint: "example.invalid-extension" },
+      ":NSExtension:NSExtensionPointIdentifier",
+      true,
+    ],
+  ])("rejects a widget with the wrong %s", (_label, widgetMetadata, expectedKey, signed) => {
+    if (process.platform !== "darwin") return;
+    const fixture = makeBundle({ includeWidget: true, signed, widgetMetadata });
+    try {
+      const result = verifyBundle(fixture.bundle, fixture.bundleId, fixture.executable, {
+        AIRMCP_REQUIRE_WIDGET: "1",
+      });
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain(expectedKey);
+    } finally {
+      rmSync(fixture.temp, { recursive: true, force: true });
     }
   });
 
@@ -373,6 +464,34 @@ describe("macOS bundle structure verifier", () => {
       });
       expect(result.status).toBe(1);
       expect(result.stderr).toContain("signed widget calendars entitlement must be a boolean");
+    } finally {
+      rmSync(fixture.temp, { recursive: true, force: true });
+    }
+  });
+
+  test("rejects a signed widget that disables the App Sandbox", () => {
+    if (process.platform !== "darwin") return;
+    const fixture = makeBundle({ includeWidget: true, widgetEntitlements: "false-sandbox" });
+    try {
+      const result = verifyBundle(fixture.bundle, fixture.bundleId, fixture.executable, {
+        AIRMCP_REQUIRE_WIDGET: "1",
+      });
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("must enable the App Sandbox");
+    } finally {
+      rmSync(fixture.temp, { recursive: true, force: true });
+    }
+  });
+
+  test("rejects a signed widget with an unexpected entitlement", () => {
+    if (process.platform !== "darwin") return;
+    const fixture = makeBundle({ includeWidget: true, widgetEntitlements: "unexpected" });
+    try {
+      const result = verifyBundle(fixture.bundle, fixture.bundleId, fixture.executable, {
+        AIRMCP_REQUIRE_WIDGET: "1",
+      });
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("contains an unexpected entitlement");
     } finally {
       rmSync(fixture.temp, { recursive: true, force: true });
     }

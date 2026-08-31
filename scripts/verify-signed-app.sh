@@ -104,6 +104,9 @@ chmod 700 \
 # A final signed distribution must include the widget even when this command is
 # run locally rather than under release-app.yml.
 if ! AIRMCP_REQUIRE_WIDGET=1 \
+  AIRMCP_EXPECTED_SIGNING_MODE=developer-id \
+  AIRMCP_EXPECTED_SIGNING_AUTHORITY="$AIRMCP_SIGNING_COMMON_NAME" \
+  AIRMCP_EXPECTED_SIGNING_TEAM_ID="$AIRMCP_SIGNING_TEAM_ID" \
   bash "$SCRIPT_DIR/verify-bundle-structure.sh" "$APP_BUNDLE" "app.airmcp" "$APP_EXECUTABLE" \
     >/dev/null 2>&1; then
   echo "verify-signed-app: bundle structure verification failed" >&2

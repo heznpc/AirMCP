@@ -171,4 +171,41 @@ describe('JXA module', () => {
     ).resolves.toEqual({ ok: true });
     expect(execFile).toHaveBeenCalledTimes(2);
   });
+
+  test('scrubs an entire user path when it contains spaces', async () => {
+    const { execFile } = await import('node:child_process');
+    execFile.mockClear();
+    execFile.mockImplementationOnce((_path, _args, _options, callback) => {
+      const child = {
+        on: jest.fn(),
+        killed: false,
+        exitCode: null,
+        kill: jest.fn(),
+      };
+      const error = new Error('Command failed: /usr/bin/osascript');
+      queueMicrotask(() =>
+        callback(
+          error,
+          '',
+          'execution error: Could not open /Users/alice/Medical Records/diagnosis.pdf because access failed (-2700)\n',
+        ),
+      );
+      return child;
+    });
+
+    const mod = await import('../dist/shared/jxa.js');
+    let caught;
+    try {
+      await mod.runJxa('throw new Error("file failure")');
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(Error);
+    expect(caught.message).toContain('osascript error: execution error: Could not open [path]');
+    expect(caught.message).not.toContain('/Users/');
+    expect(caught.message).not.toContain('Medical Records');
+    expect(caught.message).not.toContain('diagnosis.pdf');
+    expect(caught.cause).toBeUndefined();
+    expect(execFile).toHaveBeenCalledTimes(1);
+  });
 });

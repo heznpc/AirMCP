@@ -32,7 +32,10 @@ function describeJxaError(msg: string): string | null {
 
 // ── PII scrubbing ────────────────────────────────────────────────────
 const EMAIL_RE = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
-const PATH_RE = /\/Users\/[^\s'",;)}\]]+/g;
+// A path can contain spaces and every printable punctuation character. Once a
+// user-home path starts, conservatively redact the rest of that diagnostic
+// line instead of guessing where the path ends and leaking its tail.
+const PATH_RE = /\/Users\/[^\r\n]*/g;
 const MAX_ERR_LEN = 200;
 
 function scrubPii(msg: string): string {
@@ -132,12 +135,14 @@ function handleOsascriptError(e: unknown, app: string | undefined, timeout: numb
   if (app) recordFailure(app);
   const error = e as OsascriptProcessError;
   if (error.killed || error.signal === "SIGTERM" || error.signal === "SIGKILL") {
-    throw new Error(`osascript timed out after ${timeout / 1000}s`, { cause: e });
+    // Do not retain the raw execFile error as `cause`: its message contains
+    // the complete `-e` script and stderr can contain user paths or email.
+    throw new Error(`osascript timed out after ${timeout / 1000}s`);
   }
   const diagnostic = osascriptDiagnostic(error);
   const cleanMsg = scrubPii(diagnostic);
   const friendly = describeJxaError(diagnostic);
-  throw new Error(friendly ? `osascript error: ${friendly}` : `osascript error: ${cleanMsg}`, { cause: e });
+  throw new Error(friendly ? `osascript error: ${friendly}` : `osascript error: ${cleanMsg}`);
 }
 
 /** Parse osascript stdout → JSON, scrub PII, wrap primitives. */

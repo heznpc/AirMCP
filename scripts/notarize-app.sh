@@ -115,18 +115,26 @@ echo "notarize-app: codesigning with the verified Heznpc Developer ID …"
 # widget can read the host app's shared container). `codesign --remove-signature`
 # drops the entitlements together with the signature, and re-signing WITHOUT
 # `--entitlements` silently ships a widget with none — `codesign --verify` still
-# passes, so the loss is invisible until the widget fails at runtime. So:
-# EXTRACT each appex's entitlements before stripping, then RE-APPLY them on the
-# Developer ID re-sign. (The plists persist on disk across the two find|while
-# subshells, keyed by a hash of the appex path.)
+# passes, so the loss is invisible until the widget fails at runtime. Extract
+# each appex's source entitlements for exact validation, then apply the canonical
+# release allowlist on the Developer ID re-sign. (The plists persist on disk
+# across the two find|while subshells, keyed by a hash of the appex path.)
 ENT_DIR="$(mktemp -d)"
 trap 'rm -rf "$ENT_DIR"' EXIT
 MAIN_ENTITLEMENTS="$SCRIPT_DIR/lib/main-app-entitlements.plist"
+WIDGET_ENTITLEMENTS="$SCRIPT_DIR/lib/widget-entitlements.plist"
 
 MAIN_ALLOWED_ENTITLEMENTS=(
   "com.apple.security.app-sandbox"
   "com.apple.security.application-groups"
   "com.apple.security.automation.apple-events"
+)
+
+WIDGET_ALLOWED_ENTITLEMENTS=(
+  "com.apple.security.app-sandbox"
+  "com.apple.security.application-groups"
+  "com.apple.security.personal-information.calendars"
+  "com.apple.security.personal-information.reminders"
 )
 
 verify_main_entitlement_allowlist() {
@@ -222,21 +230,67 @@ verify_main_entitlements() {
   fi
 }
 
+verify_widget_entitlement_allowlist() {
+  local entitlements_file="$1"
+  local stage="$2"
+  local allowlist_copy="$ENT_DIR/widget-$stage-allowlist-check.plist"
+  local allowed_key
+  local remaining
+
+  if ! /bin/cp "$entitlements_file" "$allowlist_copy"; then
+    echo "notarize-app: $stage widget entitlement allowlist could not be inspected" >&2
+    return 1
+  fi
+  for allowed_key in "${WIDGET_ALLOWED_ENTITLEMENTS[@]}"; do
+    /usr/libexec/PlistBuddy -c "Delete :$allowed_key" "$allowlist_copy" >/dev/null 2>&1 || true
+  done
+  if ! remaining="$(/usr/bin/plutil -p "$allowlist_copy" 2>/dev/null | /usr/bin/tr -d '[:space:]')"; then
+    echo "notarize-app: $stage widget entitlement allowlist could not be inspected" >&2
+    return 1
+  fi
+  if [ "$remaining" != "{}" ]; then
+    echo "notarize-app: $stage widget contains an unexpected entitlement" >&2
+    return 1
+  fi
+}
+
 verify_widget_entitlements() {
   local entitlements_file="$1"
   local stage="$2"
+  local sandbox_type
+  local sandbox_enabled
   local app_groups_type
   local app_groups
+  local app_groups_compact
   local capability
   local capability_type
   local capability_allowed
 
-  if ! plutil -lint "$entitlements_file" >/dev/null 2>&1; then
+  if ! /usr/bin/plutil -lint "$entitlements_file" >/dev/null 2>&1; then
     echo "notarize-app: $stage widget entitlements are missing or invalid" >&2
     return 1
   fi
+  if ! verify_widget_entitlement_allowlist "$entitlements_file" "$stage"; then
+    return 1
+  fi
+  sandbox_type="$(
+    /usr/bin/plutil -type 'com\.apple\.security\.app-sandbox' \
+      "$entitlements_file" 2>/dev/null || true
+  )"
+  if [ "$sandbox_type" != "bool" ]; then
+    echo "notarize-app: $stage widget sandbox entitlement must be a boolean" >&2
+    return 1
+  fi
+  sandbox_enabled="$(
+    /usr/libexec/PlistBuddy -c "Print :com.apple.security.app-sandbox" \
+      "$entitlements_file" 2>/dev/null || true
+  )"
+  if [ "$sandbox_enabled" != "true" ]; then
+    echo "notarize-app: $stage widget must enable the App Sandbox" >&2
+    return 1
+  fi
   app_groups_type="$(
-    plutil -type 'com\.apple\.security\.application-groups' \
+    /usr/bin/plutil -type 'com\.apple\.security\.application-groups' \
       "$entitlements_file" 2>/dev/null || true
   )"
   if [ "$app_groups_type" != "array" ]; then
@@ -247,13 +301,14 @@ verify_widget_entitlements() {
     /usr/libexec/PlistBuddy -c "Print :com.apple.security.application-groups" \
       "$entitlements_file" 2>/dev/null || true
   )"
-  if ! grep -Eq '^[[:space:]]*group\.app\.airmcp[[:space:]]*$' <<<"$app_groups"; then
-    echo "notarize-app: $stage widget entitlements are missing group.app.airmcp" >&2
+  app_groups_compact="$(printf '%s' "$app_groups" | /usr/bin/tr -d '[:space:]')"
+  if [ "$app_groups_compact" != "Array{group.app.airmcp}" ]; then
+    echo "notarize-app: $stage widget application-groups must contain only group.app.airmcp" >&2
     return 1
   fi
   for capability in calendars reminders; do
     capability_type="$(
-      plutil -type "com\.apple\.security\.personal-information\.$capability" \
+      /usr/bin/plutil -type "com\.apple\.security\.personal-information\.$capability" \
         "$entitlements_file" 2>/dev/null || true
     )"
     if [ "$capability_type" != "bool" ]; then
@@ -290,6 +345,10 @@ if ! verify_main_entitlements "$MAIN_ENTITLEMENTS" "allowlisted"; then
   exit 1
 fi
 echo "  constructed allowlisted main-app entitlements"
+if ! verify_widget_entitlements "$WIDGET_ENTITLEMENTS" "allowlisted"; then
+  exit 1
+fi
+echo "  constructed allowlisted widget entitlements"
 
 find "$APP_BUNDLE" -name "*.appex" -print0 2>/dev/null | while IFS= read -r -d '' appex; do
   ent_file="$ENT_DIR/$(printf '%s' "$appex" | shasum -a 256 | cut -d' ' -f1).plist"
@@ -300,7 +359,7 @@ find "$APP_BUNDLE" -name "*.appex" -print0 2>/dev/null | while IFS= read -r -d '
   if ! verify_widget_entitlements "$ent_file" "source"; then
     exit 1
   fi
-  echo "  preserved required widget entitlements"
+  echo "  validated source widget entitlements"
   codesign --remove-signature "$appex" 2>/dev/null || true
 done
 
@@ -351,15 +410,14 @@ for nested in \
 done
 codesign --remove-signature "$APP_BUNDLE" 2>/dev/null || true
 
-# Sign embedded extensions first (innermost-out), re-applying the entitlements
-# preserved above so the widget keeps its app-group / capabilities.
+# Sign embedded extensions first (innermost-out), applying the canonical widget
+# allowlist rather than promoting the source signature's complete plist.
 find "$APP_BUNDLE" -name "*.appex" -print0 2>/dev/null | while IFS= read -r -d '' appex; do
   echo "  signing embedded extension"
   ent_hash="$(printf '%s' "$appex" | shasum -a 256 | cut -d' ' -f1)"
-  ent_file="$ENT_DIR/$ent_hash.plist"
   final_ent_file="$ENT_DIR/final-$ent_hash.plist"
   codesign --force --options=runtime --timestamp \
-    --entitlements "$ent_file" \
+    --entitlements "$WIDGET_ENTITLEMENTS" \
     --sign "$APPLE_DEVELOPER_ID" \
     "$appex" >/dev/null 2>&1 || {
       echo "notarize-app: extension signing failed" >&2

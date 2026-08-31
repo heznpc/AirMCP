@@ -110,6 +110,10 @@ describe("app-owned runtime npm package pin", () => {
     expect(bundleScript).toContain("APP_SWIFT_BUILD_ARGS+=(-Xswiftc -DAIRMCP_ACCEPTANCE_HARNESS)");
     expect(bundleScript).toContain('BUNDLE_DIR="$PROJECT_DIR/.build/AirMCP-Acceptance.app"');
     expect(bundleScript).toContain("AirMCPAcceptanceHarnessBuild");
+    expect(menuContent).toContain('static let envAppRuntimePort = "AIRMCP_APP_RUNTIME_PORT"');
+    expect(menuContent).toMatch(/#if AIRMCP_ACCEPTANCE_HARNESS[\s\S]*?AIRMCP_APP_RUNTIME_PORT/);
+    expect(bundleScript).toContain("setup_acceptance_environment");
+    expect(bundleScript).toContain('export AIRMCP_APP_RUNTIME_PORT="$APP_HTTP_PORT"');
     expect(bundleScript).toMatch(
       /case "\$MODE" in\s+verify\|verify-governed\|verify-appintents\)[\s\S]*?-DAIRMCP_ACCEPTANCE_HARNESS[\s\S]*?;;\s+esac/,
     );

@@ -196,6 +196,7 @@ jest.unstable_mockModule('../dist/shared/cache.js', () => ({
 jest.unstable_mockModule('../dist/shared/swift.js', () => ({
   checkSwiftBridge: jest.fn(async () => null),
   runSwift: jest.fn(async () => ({})),
+  isSwiftObserverRunning: jest.fn(() => false),
   closeSwiftBridge: jest.fn(),
 }));
 jest.unstable_mockModule('../dist/shared/share-guard.js', () => ({

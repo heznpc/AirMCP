@@ -5,7 +5,7 @@ import { getRegisteredTriggers } from "../skills/triggers.js";
 import { eventBus } from "../shared/event-bus.js";
 import { startPollers } from "../shared/pollers.js";
 import { resourceCache } from "../shared/cache.js";
-import { checkSwiftBridge, runSwift } from "../shared/swift.js";
+import { checkSwiftBridge, isSwiftObserverRunning, runSwift } from "../shared/swift.js";
 import type { ToolRegistry } from "../shared/tool-registry.js";
 
 export interface RegisterEventToolsOptions {
@@ -51,7 +51,7 @@ export function registerEventTools(server: McpServer, options: RegisterEventTool
       const bridgeErr = await checkSwiftBridge();
       if (bridgeErr) return errSwift(`Swift bridge required: ${bridgeErr}`);
       try {
-        if (eventBus.isRunning) {
+        if (eventBus.isRunning && isSwiftObserverRunning()) {
           return ok({ status: "already_running", message: "Event observer is already active" });
         }
         await runSwift("start-observer", "{}");
@@ -107,7 +107,7 @@ export function registerEventTools(server: McpServer, options: RegisterEventTool
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async () => {
-      return ok({ running: eventBus.isRunning });
+      return ok({ running: eventBus.isRunning && isSwiftObserverRunning() });
     },
   );
 

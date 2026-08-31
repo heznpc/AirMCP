@@ -27,7 +27,18 @@ enum AirMcpConstants {
             ?? "\(npmPackageName)@\(npmPackageVersion)"
     }
     static let mcpProtocolVersion = "2025-11-25"
-    static let appOwnedHttpPort = 3847
+    static var appOwnedHttpPort: Int {
+        #if AIRMCP_ACCEPTANCE_HARNESS
+        let environment = ProcessInfo.processInfo.environment
+        if environment[envForceAppRuntime] == "1",
+           let rawPort = environment[envAppRuntimePort],
+           let port = Int(rawPort),
+           (1024...65535).contains(port) {
+            return port
+        }
+        #endif
+        return 3847
+    }
     static let appOwnedHttpURL = "http://127.0.0.1:\(appOwnedHttpPort)/mcp"
     static let appOwnedHealthURL = "http://127.0.0.1:\(appOwnedHttpPort)/health"
     static let appOwnedIdentityChallengeURL = "http://127.0.0.1:\(appOwnedHttpPort)/app/identity-challenge"
@@ -38,6 +49,7 @@ enum AirMcpConstants {
     static let keyOnboardingStep = "onboardingCurrentStep"
     static let keyOnboardingDraft = "onboardingDraft"
     static let envForceAppRuntime = "AIRMCP_FORCE_APP_RUNTIME"
+    static let envAppRuntimePort = "AIRMCP_APP_RUNTIME_PORT"
     static let envShowOnboarding = "AIRMCP_SHOW_ONBOARDING"
     static let trustCenterWindowID = "trust-center"
 

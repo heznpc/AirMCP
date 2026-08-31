@@ -123,9 +123,9 @@ describe("governed app-owned acceptance wiring", () => {
     expect(constants).toContain('envStr("AIRMCP_HITL_SOCKET_PATH"');
     expect(tokenNode).toContain("process.env.AIRMCP_APP_RUNTIME_TOKEN_PATH");
     expect(tokenSwift).toContain('environment["AIRMCP_APP_RUNTIME_TOKEN_PATH"]');
-    expect(bundle).toContain('AIRMCP_VECTOR_STORE_DIR="$GOVERNED_STATE_DIR/audit"');
-    expect(bundle).toContain('AIRMCP_EMERGENCY_STOP_PATH="$GOVERNED_STATE_DIR/emergency-stop"');
-    expect(bundle).toContain('CFFIXED_USER_HOME="$GOVERNED_STATE_DIR/home"');
+    expect(bundle).toContain('AIRMCP_VECTOR_STORE_DIR="$VERIFICATION_STATE_DIR/audit"');
+    expect(bundle).toContain('AIRMCP_EMERGENCY_STOP_PATH="$VERIFICATION_STATE_DIR/emergency-stop"');
+    expect(bundle).toContain('CFFIXED_USER_HOME="$VERIFICATION_STATE_DIR/home"');
   });
 
   test("passes exactly the governed Node overrides through the sanitized app launch", () => {
@@ -163,6 +163,10 @@ describe("governed app-owned acceptance wiring", () => {
     expect(bundle).toContain('swift build "${APP_SWIFT_BUILD_ARGS[@]}"');
     expect(bundle).toContain('BUNDLE_DIR="$PROJECT_DIR/.build/AirMCP-Acceptance.app"');
     expect(bundle).toContain("Add :AirMCPAcceptanceHarnessBuild bool true");
+    expect(bundle).toContain('setup_acceptance_environment "airmcp-governed"');
+    expect(bundle).toContain('export AIRMCP_APP_RUNTIME_PORT="$APP_HTTP_PORT"');
+    expect(bundle).toContain('"$APP_BINARY" >/dev/null 2>&1 &');
+    expect(app).toContain("if acceptanceHarnessForcesAppRuntime { return true }");
   });
 
   test("does not request notification permission when the app-side HITL listener is off", () => {

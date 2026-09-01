@@ -12,6 +12,20 @@ const generated = readFileSync(
   "utf8",
 );
 
+function orderedIndices(source, ...markers) {
+  let offset = 0;
+  return markers.map((marker) => {
+    const index = source.indexOf(marker, offset);
+    expect(index).toBeGreaterThanOrEqual(0);
+    offset = index + marker.length;
+    return index;
+  });
+}
+
+function expectInOrder(source, ...markers) {
+  orderedIndices(source, ...markers);
+}
+
 describe("macOS trust and App Intent surfaces", () => {
   test("Trust Center reports live governed runtime evidence", () => {
     expect(app).toContain('Window(L("trust.title"), id: AirMcpConstants.trustCenterWindowID)');
@@ -33,8 +47,11 @@ describe("macOS trust and App Intent surfaces", () => {
     expect(intents).toContain("AppRuntimeProgressiveSessionPolicy.delegatedCallTimeout");
     expect(menu).toContain("in: 10...120");
     expect(intents).toContain("if firstError == nil && toolResponse == nil");
-    const typedCallStart = intents.indexOf("static func callAppRuntimeToolJSON<T: Decodable & Sendable>");
-    const typedCallEnd = intents.indexOf("/// Authenticated readiness probe", typedCallStart);
+    const [typedCallStart, typedCallEnd] = orderedIndices(
+      intents,
+      "static func callAppRuntimeToolJSON<T: Decodable & Sendable>",
+      "/// Authenticated readiness probe",
+    );
     expect(intents.slice(typedCallStart, typedCallEnd)).not.toContain("runAirMCPToolViaAppRuntimeResponse(");
     expect(store).toContain("let args: AppRuntimeToolArguments");
     expect(trust).toContain("TrustCenterRefreshPolicy.allowsAuditHistoryRead(");
@@ -86,12 +103,12 @@ describe("macOS trust and App Intent surfaces", () => {
     expect(store).toContain("func visibleRunsPreservingPending(from runs: [GovernedRun])");
     expect(store).toContain("let pending = runs.filter { !$0.pendingApprovals.isEmpty }");
     expect(trust).toContain("store.visibleRunsPreservingPending(from: mergedRuns)");
-    expect(trust.indexOf("store.isLoading && visibleRuns.isEmpty")).toBeGreaterThan(
-      trust.indexOf("store.visibleRunsPreservingPending(from: mergedRuns)"),
+    expectInOrder(
+      trust,
+      "store.visibleRunsPreservingPending(from: mergedRuns)",
+      "store.isLoading && visibleRuns.isEmpty",
     );
-    expect(trust.indexOf("let loadError = store.loadError")).toBeLessThan(
-      trust.indexOf("store.response == nil && visibleRuns.isEmpty"),
-    );
+    expectInOrder(trust, "let loadError = store.loadError", "store.response == nil && visibleRuns.isEmpty");
   });
 
   test("emergency stop removal requires an explicit confirmation dialog", () => {
@@ -101,9 +118,11 @@ describe("macOS trust and App Intent surfaces", () => {
   });
 
   test("AppShortcutsProvider is compiled for iOS only while macOS keeps AppIntent actions", () => {
-    const providerStart = generated.indexOf("// MARK: - iOS AppShortcutsProvider");
-    const providerEnd = generated.indexOf("#endif // os(iOS)", providerStart);
-    expect(providerStart).toBeGreaterThan(-1);
+    const [providerStart, providerEnd] = orderedIndices(
+      generated,
+      "// MARK: - iOS AppShortcutsProvider",
+      "#endif // os(iOS)",
+    );
     expect(generated.slice(providerStart, providerEnd)).toContain("#if os(iOS)");
     expect(generated.slice(providerStart, providerEnd)).toContain("AppShortcutsProvider");
     expect(menu).not.toContain("Hey Siri");

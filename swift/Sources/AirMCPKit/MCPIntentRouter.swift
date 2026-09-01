@@ -56,6 +56,13 @@ public actor MCPIntentRouter {
         self.handler = handler
     }
 
+    /// Remove the installed transport. Internal so production hosts cannot
+    /// accidentally clear the singleton; `@testable` tests use this to
+    /// exercise the real pre-launch state.
+    func resetHandlerForTesting() {
+        handler = nil
+    }
+
     /// Invoke an AirMCP tool and return its primary text content.
     ///
     /// Throws `MCPIntentError.handlerNotInstalled` if the host never

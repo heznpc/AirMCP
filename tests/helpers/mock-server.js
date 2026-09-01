@@ -8,6 +8,7 @@
  *   - _tools Map — direct access to registered tools for assertions
  */
 import { jest } from '@jest/globals';
+import { z } from 'zod';
 
 export function createMockServer() {
   const tools = new Map();
@@ -43,15 +44,19 @@ export function createMockServer() {
     _prompts: prompts,
 
     /**
-     * Invoke a registered tool by name with the given arguments.
-     * Throws if the tool is not registered.
+     * Invoke a registered tool through the same input-schema boundary as the
+     * MCP SDK. Defaults, transforms, and validation must run before the
+     * handler; bypassing this step creates false-positive tool tests.
      */
     async callTool(name, args = {}) {
       const entry = tools.get(name);
       if (!entry) {
         throw new Error(`Tool "${name}" is not registered. Available: ${[...tools.keys()].join(', ')}`);
       }
-      return entry.handler(args);
+      const input = entry.opts?.inputSchema;
+      if (input === undefined) return entry.handler(args);
+      const schema = typeof input.safeParse === 'function' ? input : z.object(input);
+      return entry.handler(schema.parse(args));
     },
   };
 

@@ -1,5 +1,5 @@
 /**
- * Script ↔ outputSchema contract test.
+ * Hand-maintained example ↔ outputSchema compatibility test.
  *
  * Wave 1/2/3 runtime tests mock `runJxa`/`runSwift`, so the mock return value
  * becomes the `structuredContent` verbatim — those tests can only confirm
@@ -7,14 +7,13 @@
  * They cannot detect a real drift where `scripts.ts` changes the JSON it
  * emits without the matching outputSchema update (or vice versa).
  *
- * This file closes that gap for the Wave 3 JXA modules (messages, shortcuts)
- * and for calendar.
  * Each `scripts.ts` exports a hand-maintained `*_EXAMPLE` constant pinned to
  * the same TypeScript interface the script's final `JSON.stringify(...)` is
  * expected to produce. Here we parse every example through the tool's real
- * declared `outputSchema` via strict Zod. A developer who edits one side
- * (script → new field, or outputSchema → renamed field) without touching
- * the other fails this test even before running a Mac.
+ * declared `outputSchema` via strict Zod. This is a useful review checklist,
+ * but the examples are not derived from script execution: changing a script
+ * without updating its example can still pass. Domain-level VM/osascript or
+ * Swift execution tests are required for a real producer/schema contract.
  *
  * Scope: JXA-backed tools only. Swift-bridge tools (health_*, some photos)
  * need a different contract (Swift `--dump-schema` or similar) and are

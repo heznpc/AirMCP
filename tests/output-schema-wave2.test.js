@@ -1,5 +1,5 @@
 /**
- * outputSchema Wave 2 — drift guard for the next tier of read tools.
+ * outputSchema Wave 2 — fixture/schema compatibility for the next tier of read tools.
  *
  * See output-schema-wave1.test.js for the rationale. This file extends the
  * same strict-parse check to:
@@ -276,8 +276,7 @@ describe('Wave 2 — finder.list_directory', () => {
         { name: 'bar', kind: 'Folder' },
       ],
     });
-    // Mock server doesn't apply Zod `.default()` — pass limit explicitly.
-    const result = await server.callTool('list_directory', { path: '/Users/test', limit: 100 });
+    const result = await server.callTool('list_directory', { path: '/Users/test' });
     assertConforms(server, 'list_directory', result.structuredContent);
   });
 });

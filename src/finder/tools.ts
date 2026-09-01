@@ -31,6 +31,10 @@ export function registerFinderTools(server: McpServer, _config: AirMcpConfig): v
       description: "Search files using Spotlight (mdfind). Searches file names and content.",
       inputSchema: {
         query: z.string().max(500).describe("Search query (Spotlight syntax)"),
+        // Zod 4 `.default()` returns its value without running the inner
+        // transform, which would leave the handler with the literal `~`.
+        // `.prefault()` feeds the default through zFilePath so it resolves to
+        // HOME exactly like an explicitly supplied `~` does.
         folder: zFilePath.prefault("~").describe("Folder to search in (default: home)"),
         limit: z.number().int().min(1).max(200).optional().default(50).describe("Max results (default: 50)"),
       },

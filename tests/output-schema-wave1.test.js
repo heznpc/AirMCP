@@ -1,18 +1,23 @@
 /**
- * outputSchema Wave 1 — fixture/schema compatibility.
+ * outputSchema Wave 1 — drift guard.
  *
- * These tests call tools against representative mocked runtime payloads and
- * parse the captured structuredContent through each tool's own outputSchema.
- * They verify that the documented fixtures and handler wrappers remain
- * compatible. They do not execute JXA/Swift producers and therefore cannot
- * prove that a producer's real output still has the same shape.
+ * MCP's `structuredContent` is validated against each tool's `outputSchema`
+ * on the client side, but we have no server-side check that the runtime
+ * JSON the handler returns actually conforms to the schema it declared.
+ * Over time the two drift: a new field in the JXA script that isn't
+ * added to the Zod object, a field renamed on the Swift side but not the
+ * schema, etc. This file closes that gap for the three highest-traffic
+ * read tools — list/search notes, list/search reminders, and list_events — by calling each
+ * tool against mocked runtimes and running the captured structuredContent
+ * through the tool's own outputSchema via z.object(...).strict().safeParse().
  *
- * The .strict() call is load-bearing: without it, fixtures carrying an
- * undeclared field slip through silently.
+ * The .strict() call is load-bearing: without it, handlers emitting an
+ * undeclared field (the most common drift mode) slip through silently.
  *
- * A failure means the expected fixture and declared schema disagree. Review
- * the real producer contract before deciding whether the fixture or schema is
- * wrong.
+ * If this test fails, either:
+ *   - the handler is emitting a field the schema forgot to declare, or
+ *   - the handler is emitting the wrong type for a declared field.
+ * Both are bugs. The fix is usually in `outputSchema`, not in the test.
  */
 import { describe, test, expect, beforeEach } from '@jest/globals';
 import { z } from 'zod';
@@ -29,8 +34,8 @@ function schemaFor(server, toolName) {
   const tool = server._tools.get(toolName);
   expect(tool).toBeDefined();
   expect(tool.opts.outputSchema).toBeDefined();
-  // .strict() rejects undeclared fixture keys instead of silently stripping
-  // them before the compatibility assertion.
+  // .strict() rejects undeclared keys — catches the "handler added a new field
+  // but forgot to update outputSchema" case, which is the #1 drift mode.
   return z.object(tool.opts.outputSchema).strict();
 }
 
@@ -39,7 +44,7 @@ describe('outputSchema Wave 1 — list_notes', () => {
     mockRunJxa.mockReset();
   });
 
-  test('fixture response conforms to declared outputSchema', async () => {
+  test('runtime response conforms to declared outputSchema', async () => {
     const server = createMockServer();
     registerNoteTools(server, createMockConfig());
 
@@ -69,7 +74,7 @@ describe('outputSchema Wave 1 — search_notes', () => {
     mockRunJxa.mockReset();
   });
 
-  test('fixture response conforms to declared outputSchema', async () => {
+  test('runtime response conforms to declared outputSchema', async () => {
     const server = createMockServer();
     registerNoteTools(server, createMockConfig());
 
@@ -108,7 +113,7 @@ describe('outputSchema Wave 1 — list_reminders', () => {
     mockRunJxa.mockReset();
   });
 
-  test('fixture response conforms to declared outputSchema', async () => {
+  test('runtime response conforms to declared outputSchema', async () => {
     const server = createMockServer();
     registerReminderTools(server, createMockConfig());
 
@@ -152,7 +157,7 @@ describe('outputSchema Wave 1 — search_reminders', () => {
     mockRunJxa.mockReset();
   });
 
-  test('fixture response conforms to declared outputSchema', async () => {
+  test('runtime response conforms to declared outputSchema', async () => {
     const server = createMockServer();
     registerReminderTools(server, createMockConfig());
 
@@ -193,7 +198,7 @@ describe('outputSchema Wave 1 — list_events', () => {
     mockRunJxa.mockReset();
   });
 
-  test('fixture response conforms to declared outputSchema', async () => {
+  test('runtime response conforms to declared outputSchema', async () => {
     const server = createMockServer();
     registerCalendarTools(server, createMockConfig());
 

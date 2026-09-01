@@ -60,10 +60,6 @@ const PERM_MESSAGE =
   'Not authorized to send Apple events. (-1743) Permission denied — grant ' +
   'Automation access in System Settings > Privacy & Security > Automation.';
 const GUIDANCE_MARKER = 'System Settings';
-// Coverage instrumentation makes the Google Workspace CLI failure paths take
-// longer than 10 seconds on CI. Keep a finite per-tool bound while leaving
-// enough headroom for the instrumented all-tool contract run.
-const CONTRACT_TIMEOUT_MS = 30_000;
 
 /**
  * Tools excluded from the contract, each with a reason a reviewer can veto.
@@ -243,10 +239,7 @@ async function runContract(name, entry) {
     res = await Promise.race([
       server.callTool(name, built.args),
       new Promise((_, reject) => {
-        timer = setTimeout(
-          () => reject(new Error(`contract timeout (${CONTRACT_TIMEOUT_MS / 1000}s)`)),
-          CONTRACT_TIMEOUT_MS,
-        );
+        timer = setTimeout(() => reject(new Error('contract timeout (10s)')), 10_000);
       }),
     ]);
   } catch (e) {

@@ -11152,7 +11152,6 @@
         "properties": {
           "folder": {
             "description": "Folder to search (default: home)",
-            "default": "~",
             "type": "string",
             "minLength": 1,
             "maxLength": 4096
@@ -12091,7 +12090,6 @@
           },
           "folder": {
             "description": "Folder to search in (default: home)",
-            "default": "~",
             "type": "string",
             "minLength": 1,
             "maxLength": 4096

@@ -101,7 +101,9 @@ jobs:
         run: npm run typecheck
 
       - name: Test
-        run: npm test
+        # Activates the thresholds declared in jest.config.js; plain `npm test`
+        # does not collect coverage and silently ignores those thresholds.
+        run: npm test -- --coverage
 
       - name: Smoke — boot server + tools/list round-trip
         run: npm run smoke
@@ -207,6 +209,9 @@ jobs:
 
       - name: Swift — Test AirMCP menu bar app
         run: cd app && swift test
+
+      - name: Swift — Test AirMCP widget
+        run: cd app/widget && swift test
 
       - name: Swift — Test AirMCPKit
         run: cd swift && swift test

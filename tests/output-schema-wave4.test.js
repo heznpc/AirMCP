@@ -1,5 +1,5 @@
 /**
- * outputSchema Wave 4 — drift guard for notes / mail / finder / safari
+ * outputSchema Wave 4 — fixture/schema compatibility for notes / mail / finder / safari
  * read tools. Extends Wave 1/2/3 coverage by 7 more tools, bringing the
  * high-traffic read surface from ~40% → ~55%.
  *
@@ -9,11 +9,11 @@
  *   safari:  read_page_content, search_tabs
  *   notes:   scan_notes
  *
- * Each case seeds `runJxa` with a hand-rolled fixture shaped like the
- * real JXA return, calls the tool through the mock server, and asserts
- * `structuredContent` parses through the tool's own `outputSchema` under
- * strict Zod. A drift between handler return shape and schema surfaces
- * here instead of at the first LLM call.
+ * Each case seeds `runJxa` with a hand-rolled expected fixture, calls the
+ * tool through the mock server, and parses `structuredContent` through the
+ * tool's own `outputSchema` under strict Zod. This checks fixture/schema and
+ * handler-wrapper compatibility; it does not execute or verify the real JXA
+ * producer.
  */
 import { describe, test, expect, beforeEach } from '@jest/globals';
 import { z } from 'zod';
@@ -48,10 +48,8 @@ function resetAll() {
 
 // ── mail ──────────────────────────────────────────────────────────────
 
-// Mock-server calls handlers directly without running them through the
-// MCP SDK's zod inputSchema validator, so tests must pass the defaults
-// explicitly — otherwise tools that use `safeInt` / `safeString` on
-// optional-with-default args throw "Expected safe integer, got undefined".
+// The shared mock server applies each tool's inputSchema before invoking the
+// handler, matching the MCP SDK boundary for defaults, transforms, and errors.
 
 describe('Wave 4 — mail.read_message', () => {
   beforeEach(resetAll);

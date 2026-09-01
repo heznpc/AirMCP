@@ -1,5 +1,5 @@
 /**
- * outputSchema Wave 5 — drift guard for photos read tools.
+ * outputSchema Wave 5 — fixture/schema compatibility for photos read tools.
  *
  * Wave 4 covered mail / finder / safari / notes (7 tools). Wave 5
  * extends to photos: `list_photos`, `search_photos`, `get_photo_info`,

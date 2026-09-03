@@ -120,6 +120,20 @@ function assertSafePath(p: string): void {
 // Included in scripts that handle runtime-dynamic paths (e.g. mdfind/ls output).
 const JXA_SHELL_ESC_FN = `function _esc(s){return s.replace(/\\\\/g,'\\\\\\\\').replace(/"/g,'\\\\"').replace(/\\$/g,'\\\\$').replace(/\\\`/g,'\\\\\\\`');}`;
 
+// Run the producer to completion before limiting its output. A direct
+// `producer | head` reports head's status instead of the producer's, while
+// pipefail makes a healthy producer look failed when head closes the pipe.
+// The temporary file preserves both the producer status and the output cap.
+// Check the directory explicitly because mdfind reports rc 0 + no output for a
+// missing `-onlyin` path, which is indistinguishable from a real empty result.
+function checkedLimitShellPrefix(directory: string): string {
+  return String.raw`test -d "${escJxaShell(directory)}" || exit $?; airmcp_tmp=$(/usr/bin/mktemp -t airmcp-finder) || exit $?; trap \'/bin/rm -f "$airmcp_tmp"\' 0; `;
+}
+
+function checkedLimitShellSuffix(limit: number): string {
+  return String.raw` >"$airmcp_tmp"; airmcp_producer_status=$?; [ "$airmcp_producer_status" -eq 0 ] || exit "$airmcp_producer_status"; /usr/bin/head -n ${limit} "$airmcp_tmp"`;
+}
+
 export function searchFilesScript(folder: string, query: string, limit: number): string {
   assertSafePath(folder);
   const n = safeInt(limit);
@@ -127,7 +141,7 @@ export function searchFilesScript(folder: string, query: string, limit: number):
     const app = Application.currentApplication();
     app.includeStandardAdditions = true;
     ${JXA_SHELL_ESC_FN}
-    const results = app.doShellScript('mdfind -onlyin "${escJxaShell(folder)}" "${escJxaShell(query)}" | head -${n}');
+    const results = app.doShellScript('${checkedLimitShellPrefix(folder)}mdfind -onlyin "${escJxaShell(folder)}" "${escJxaShell(query)}"${checkedLimitShellSuffix(n)}');
     const paths = results.split(/[\\r\\n]+/).filter(p => p.length > 0);
     const result = paths.map(p => {
       try {
@@ -197,7 +211,10 @@ export function recentFilesScript(folder: string, days: number, limit: number): 
     const app = Application.currentApplication();
     app.includeStandardAdditions = true;
     const dateStr = new Date(Date.now() - ${d} * 86400000).toISOString().split('T')[0];
-    const results = app.doShellScript('mdfind -onlyin "${escJxaShell(folder)}" "kMDItemContentModificationDate >= $time.iso(' + dateStr + ')" | head -${n}');
+    // Prefix the Spotlight time token with a literal shell backslash. Building
+    // that character explicitly avoids losing it to this generated JXA string.
+    const query = 'kMDItemContentModificationDate >= ' + String.fromCharCode(92) + '$time.iso(' + dateStr + ')';
+    const results = app.doShellScript('${checkedLimitShellPrefix(folder)}mdfind -onlyin "${escJxaShell(folder)}" "' + query + '"${checkedLimitShellSuffix(n)}');
     const paths = results.split(/[\\r\\n]+/).filter(p => p.length > 0);
     const result = paths.map(p => ({path: p, name: p.split('/').pop()}));
     JSON.stringify({total: paths.length, files: result});
@@ -211,7 +228,7 @@ export function listDirectoryScript(path: string, limit: number): string {
     const app = Application.currentApplication();
     app.includeStandardAdditions = true;
     ${JXA_SHELL_ESC_FN}
-    const output = app.doShellScript('ls -1 "${escJxaShell(path)}" | head -${n}');
+    const output = app.doShellScript('${checkedLimitShellPrefix(path)}ls -1 "${escJxaShell(path)}"${checkedLimitShellSuffix(n)}');
     const fileNames = output.split(/[\\r\\n]+/).filter(n => n.length > 0);
     const result = fileNames.map(name => {
       try {

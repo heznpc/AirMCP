@@ -31,7 +31,11 @@ export function registerFinderTools(server: McpServer, _config: AirMcpConfig): v
       description: "Search files using Spotlight (mdfind). Searches file names and content.",
       inputSchema: {
         query: z.string().max(500).describe("Search query (Spotlight syntax)"),
-        folder: zFilePath.optional().default("~").describe("Folder to search in (default: home)"),
+        // Zod 4 `.default()` returns its value without running the inner
+        // transform, which would leave the handler with the literal `~`.
+        // `.prefault()` feeds the default through zFilePath so it resolves to
+        // HOME exactly like an explicitly supplied `~` does.
+        folder: zFilePath.prefault("~").describe("Folder to search in (default: home)"),
         limit: z.number().int().min(1).max(200).optional().default(50).describe("Max results (default: 50)"),
       },
       outputSchema: {
@@ -123,7 +127,7 @@ export function registerFinderTools(server: McpServer, _config: AirMcpConfig): v
       title: "Recent Files",
       description: "Find recently modified files in a folder using Spotlight.",
       inputSchema: {
-        folder: zFilePath.optional().default("~").describe("Folder to search (default: home)"),
+        folder: zFilePath.prefault("~").describe("Folder to search (default: home)"),
         days: z.number().int().min(1).max(365).optional().default(7).describe("Modified within N days (default: 7)"),
         limit: z.number().int().min(1).max(200).optional().default(30).describe("Max results (default: 30)"),
       },

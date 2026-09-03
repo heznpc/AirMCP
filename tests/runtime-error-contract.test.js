@@ -60,6 +60,11 @@ const PERM_MESSAGE =
   'Not authorized to send Apple events. (-1743) Permission denied — grant ' +
   'Automation access in System Settings > Privacy & Security > Automation.';
 const GUIDANCE_MARKER = 'System Settings';
+const nativeFetch = globalThis.fetch;
+// Coverage instrumentation makes the Google Workspace CLI failure paths take
+// longer than 10 seconds on CI. Keep a finite per-tool bound while leaving
+// enough headroom for the instrumented all-tool contract run.
+const CONTRACT_TIMEOUT_MS = 30_000;
 
 /**
  * Tools excluded from the contract, each with a reason a reviewer can veto.
@@ -230,27 +235,28 @@ async function runContract(name, entry) {
   if (!built.ok) return { name, violations: [`args unsynthesizable: ${built.error?.slice(0, 200)}`] };
 
   armExecutorFailure();
-  const fetchSpy = jest
-    .spyOn(globalThis, 'fetch')
-    .mockRejectedValue(new Error(PERM_MESSAGE));
+  const fetchSpy = jest.fn().mockRejectedValue(new Error(PERM_MESSAGE));
+  globalThis.fetch = fetchSpy;
   let res;
   let timer;
   try {
     res = await Promise.race([
       server.callTool(name, built.args),
       new Promise((_, reject) => {
-        timer = setTimeout(() => reject(new Error('contract timeout (10s)')), 10_000);
+        timer = setTimeout(
+          () => reject(new Error(`contract timeout (${CONTRACT_TIMEOUT_MS / 1000}s)`)),
+          CONTRACT_TIMEOUT_MS,
+        );
       }),
     ]);
   } catch (e) {
-    fetchSpy.mockRestore();
     return { name, violations: [`A. handler threw: ${e instanceof Error ? e.message.slice(0, 300) : e}`] };
   } finally {
     clearTimeout(timer);
+    globalThis.fetch = nativeFetch;
   }
   const touched = executorTouched() || fetchSpy.mock.calls.length > 0;
   const appleTouched = appleExecutorTouched();
-  fetchSpy.mockRestore();
 
   const violations = [];
   if (!res || !Array.isArray(res.content) || res.content.some((c) => typeof c.type !== 'string')) {

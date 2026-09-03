@@ -168,7 +168,7 @@
     "@modelcontextprotocol/ext-apps": "1.7.5",
     "@modelcontextprotocol/sdk": "1.30.0",
     "express": "5.2.1",
-    "jose": "6.2.5",
+    "jose": "6.2.10",
     "yaml": "2.9.0",
     "zod": "~4.4.3"
   },

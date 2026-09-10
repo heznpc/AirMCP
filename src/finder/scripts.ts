@@ -5,10 +5,8 @@ import { esc, escJxaShell, safeInt } from "../shared/esc.js";
 // The interfaces below pin the shape of each script's final
 // `JSON.stringify(...)`, and the `*_EXAMPLE` constants carry a concrete
 // instance of it. `tests/script-shape-contract.test.js` parses every example
-// through the matching tool's real `outputSchema`, so changing what a script
-// emits without updating the example (and the outputSchema) fails a test rather
-// than passing the tautological mock-in-mock-out runtime check. Examples and
-// scripts must be kept in lockstep by hand.
+// through the matching tool's real `outputSchema`. The examples are maintained
+// by hand, so producer-execution tests remain the authoritative drift guard.
 //
 // Finder rows are shelling out to `stat`, and both `search_files` and
 // `list_directory` fall back to a REDUCED row when that call throws — the

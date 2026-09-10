@@ -1,5 +1,5 @@
 /**
- * outputSchema Wave 6 — drift guard for system + music read tools.
+ * outputSchema Wave 6 — fixture/schema compatibility for system + music read tools.
  *
  * Wave 5 covered photos. Wave 6 closes the device-state + music-context
  * gap: 7 system reads (list_running_apps, get_screen_info, get_wifi_status,

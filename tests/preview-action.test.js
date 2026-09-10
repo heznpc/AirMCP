@@ -13,12 +13,13 @@ import { z } from "zod";
 jest.unstable_mockModule("../dist/shared/usage-tracker.js", () => ({
   usageTracker: { record: jest.fn() },
 }));
+const sanitizeToolArgsMock = jest.fn((_tool, args) => ({ ...args, _scrubbed: true }));
 jest.unstable_mockModule("../dist/shared/audit.js", () => ({
   auditLog: jest.fn(),
   readAuditEntries: jest.fn(),
   // Real previewCall scrubs args; a marker-wrapping passthrough lets the test
-  // prove auditArgs came from sanitizeArgs without importing the real scrubber.
-  sanitizeArgs: jest.fn((a) => ({ ...a, _scrubbed: true })),
+  // prove auditArgs came from the tool-aware scrubber without importing it.
+  sanitizeToolArgs: sanitizeToolArgsMock,
 }));
 jest.unstable_mockModule("../dist/shared/tool-filter.js", () => ({
   compactDescription: jest.fn((d) => (d ? d.substring(0, 80) : d)),
@@ -67,6 +68,7 @@ describe("ToolRegistry.previewCall", () => {
     expect(preview.annotations).toEqual({ destructive: true, readOnly: false, sensitive: false });
     expect(preview.argsValid).toBe(true);
     expect(preview.auditArgs).toEqual({ id: "abc", _scrubbed: true });
+    expect(sanitizeToolArgsMock).toHaveBeenCalledWith("delete_thing", { id: "abc" });
     // The load-bearing guarantee: the handler was never called.
     expect(handlerSpy).not.toHaveBeenCalled();
   });

@@ -32,6 +32,7 @@ import {
   writeModulePackConfig,
 } from "../shared/addon-operations.js";
 import { isPlainObject } from "../shared/validate.js";
+import { sanitizeToolArgs } from "../shared/audit.js";
 
 export interface MissingPackInstallHint {
   pack: ModulePackName;
@@ -502,7 +503,8 @@ export function registerFrontDoorTools(server: McpServer, options: RegisterFront
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async ({ tool, args }) => {
-      const preview = toolRegistry.previewCall(tool, (args ?? {}) as Record<string, unknown>);
+      const targetArgs = (args ?? {}) as Record<string, unknown>;
+      const preview = toolRegistry.previewCall(tool, targetArgs);
       const rate = getRateLimitStatus();
       const rateLimit = {
         emergencyStop: rate.emergencyStop,
@@ -535,7 +537,7 @@ export function registerFrontDoorTools(server: McpServer, options: RegisterFront
         wouldRequireApproval,
         hitlLevel: config.hitl.level,
         requiredScope: requiredScopeFor({ toolName: tool, isReadOnly: ann.readOnly, isDestructive: ann.destructive }),
-        auditPreview: { tool, status: "would-run", actor: "caller", args: preview.auditArgs ?? {} },
+        auditPreview: { tool, status: "would-run", actor: "caller", args: sanitizeToolArgs(tool, targetArgs) },
         rateLimit,
         sideEffect: "none — handler not invoked",
       });

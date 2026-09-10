@@ -9458,7 +9458,7 @@ public struct MCPListChatsSnippetView: View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(data.chats, id: \.id) { row in
                 Button(intent: _mkReadChatIntent_chatId(chatId: row.id)) {
-                    Text(row.id)
+                    Text((row.name ?? ""))
                         .font(.body)
                         .lineLimit(1)
                 }
@@ -9534,7 +9534,7 @@ public struct MCPListFavoritesSnippetView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(Array(data.photos.enumerated()), id: \.offset) { _, row in
-                Text(row.id)
+                Text((row.filename ?? ""))
                     .font(.body)
                     .lineLimit(1)
             }
@@ -9692,7 +9692,7 @@ public struct MCPListParticipantsSnippetView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(Array(data.participants.enumerated()), id: \.offset) { _, row in
-                Text("(row)")
+                Text((row.name ?? ""))
                     .font(.body)
                     .lineLimit(1)
             }
@@ -9709,7 +9709,7 @@ public struct MCPListPhotosSnippetView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(Array(data.photos.enumerated()), id: \.offset) { _, row in
-                Text(row.id)
+                Text((row.filename ?? ""))
                     .font(.body)
                     .lineLimit(1)
             }
@@ -10213,7 +10213,7 @@ public struct MCPReadChatSnippetView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(Array(data.participants.enumerated()), id: \.offset) { _, row in
-                Text("(row)")
+                Text((row.name ?? ""))
                     .font(.body)
                     .lineLimit(1)
             }
@@ -10319,7 +10319,7 @@ public struct MCPReadEventSnippetView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(Array(data.attendees.enumerated()), id: \.offset) { _, row in
-                Text("(row)")
+                Text((row.name ?? ""))
                     .font(.body)
                     .lineLimit(1)
             }
@@ -10671,7 +10671,7 @@ public struct MCPSearchChatsSnippetView: View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(data.chats, id: \.id) { row in
                 Button(intent: _mkReadChatIntent_chatId(chatId: row.id)) {
-                    Text(row.id)
+                    Text((row.name ?? ""))
                         .font(.body)
                         .lineLimit(1)
                 }
@@ -10784,7 +10784,7 @@ public struct MCPSearchPhotosSnippetView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(Array(data.photos.enumerated()), id: \.offset) { _, row in
-                Text(row.id)
+                Text((row.filename ?? ""))
                     .font(.body)
                     .lineLimit(1)
             }

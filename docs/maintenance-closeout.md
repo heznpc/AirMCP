@@ -12,7 +12,8 @@ anchor, not a new release tag. Subsequent maintenance must not move it.
 
 ## Maintenance integration
 
-The integration branch is `chore/airmcp-maintenance-closeout`, based on main
+The integration is [PR #482](https://github.com/heznpc/AirMCP/pull/482), branch
+`chore/airmcp-maintenance-closeout`, based on main
 `cceaab9cbe1614151af405f5e2f6372dac616fc1`. Original PR commits are retained with
 merge commits so contribution history and source ancestry survive integration.
 
@@ -33,6 +34,27 @@ Zod's `items: false` is a valid way to close a tuple in JSON Schema 2020-12.
 The regression guard accepts valid pairs and null, and rejects missing, extra,
 and incorrectly typed coordinates through the schema returned over MCP.
 See the [JSON Schema array reference](https://json-schema.org/understanding-json-schema/reference/array).
+
+The docs site's remaining audit finding, [GHSA-7w5x-hrqm-74c2](https://github.com/advisories/GHSA-7w5x-hrqm-74c2),
+is addressed by updating its locked `smol-toml` from 1.7.0 to 1.8.0.
+
+## Validation evidence
+
+- Node 22: 233 suites / 2,965 tests pass with coverage thresholds enabled;
+  lint, typecheck, formatting, and build pass.
+- Generated catalog, manifest, intents, version/stats/i18n, package boundaries,
+  profile exposure, and harness adapter wire checks pass.
+- Swift app: 99 tests; widget: 10 tests; AirMCPKit: 31 tests; iOS server package:
+  23 tests pass on macOS.
+- Root and docs-site npm audits report zero vulnerabilities. The docs site
+  builds all 34 pages with the updated TOML dependency.
+- Actual MCP calls return indexed files for both omitted and explicit home
+  folders. A missing directory returns an error instead of an empty success.
+- The packed npm artifact boots from a clean installation in starter and full
+  modes. The local app bundle passes authenticated HTTP/MCP, read, approved and
+  denied writes, emergency stop, and verification of nine audit entries.
+- The runtime bundle used ad-hoc signing. Signed release distribution and
+  AppIntents registration are separate release checks, not established here.
 
 ## External reports and contributions
 

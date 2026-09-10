@@ -27,7 +27,21 @@ struct SystemHitlNotificationAuthorizer: HitlNotificationAuthorizing {
         // anything on current macOS. content.interruptionLevel = .timeSensitive
         // below is the still-current mechanism — it needs the entitlement,
         // not this option, to actually be honored.
-        (try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])) ?? false
+        do {
+            return try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
+        } catch {
+            // This was `try?`, which swallowed the failure whole. When the
+            // request throws, the caller only ever saw `false` and routed to
+            // the visual fallback — no prompt, no authorization record, and
+            // nothing in the log to distinguish "the user said no" from "the
+            // prompt never got a chance to appear". That is the single
+            // hardest state to diagnose from a bug report, and it is the one
+            // state that leaves a gated call to expire unseen. Mirror the
+            // diagnostics HitlManager.requestNotificationPermission() already
+            // emits so the reason survives into the log.
+            NSLog("[AirMCP] Notification authorization request failed: \(error.localizedDescription)")
+            return false
+        }
     }
 }
 
@@ -134,7 +148,7 @@ final class HitlManager {
 
     private let socketPathConfiguration = HitlManager.configuredSocketPath()
 
-    var timeoutSeconds: Int = 30
+    var timeoutSeconds: Int = 120
     /// Injectable for tests; production uses the real notification center.
     var notificationAuthorizer: HitlNotificationAuthorizing = SystemHitlNotificationAuthorizer()
 

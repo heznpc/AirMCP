@@ -100,6 +100,17 @@ interface ToolAnnotations {
   openWorldHint?: boolean;
 }
 
+/** The MCP SDK passes RequestHandlerExtra as the final callback argument: the
+ * only argument for schema-less tools, the second argument for schema tools,
+ * and the final argument for fixed/template resources. Keep this structural
+ * so the lightweight MCP facade does not import the SDK's generic types. */
+function requestWasCancelled(args: readonly unknown[]): boolean {
+  const extra = args.at(-1);
+  if (!extra || typeof extra !== "object" || !("signal" in extra)) return false;
+  const signal = (extra as { signal?: unknown }).signal;
+  return Boolean(signal && typeof signal === "object" && "aborted" in signal && signal.aborted === true);
+}
+
 /**
  * Clients where MCP elicitation should be skipped.
  *
@@ -279,6 +290,15 @@ export function installHitlGuard(server: McpServer, hitlClient: HitlClient, conf
       const destructive = annotations.destructiveHint ?? false;
       const sensitive = annotations.sensitiveHint ?? false;
       const managed = isManagedClient(server);
+      const cancelledResult = () =>
+        errPermission(`Action denied: request for "${name}" was cancelled; the action was not executed.`);
+      const invokeApprovedCallback = () =>
+        requestWasCancelled(args) ? cancelledResult() : (callback as (...a: unknown[]) => unknown)(...args);
+
+      // Do not prompt for a request the client has already abandoned. The
+      // approved callback helper repeats this check after both the decision
+      // and the durable approval-audit write.
+      if (requestWasCancelled(args)) return cancelledResult();
 
       // Resolve the call through MCP elicitation. Returns NOT_HANDLED when the
       // client offers no elicitation channel, so the caller can fall back.
@@ -292,7 +312,7 @@ export function installHitlGuard(server: McpServer, hitlClient: HitlClient, conf
         if (!elicitResult) {
           return errPermission(`Action denied: "${name}" was rejected via MCP elicitation.`);
         }
-        return (callback as (...a: unknown[]) => unknown)(...args);
+        return invokeApprovedCallback();
       };
 
       if (!managed) {
@@ -384,7 +404,7 @@ export function installHitlGuard(server: McpServer, hitlClient: HitlClient, conf
       if (decision !== "approved") {
         return errPermission(`Action denied: "${name}" did not receive a valid approval decision.`);
       }
-      return (callback as (...a: unknown[]) => unknown)(...args);
+      return invokeApprovedCallback();
     };
 
     return original(name, toolConfig as Parameters<typeof original>[1], wrapped as Parameters<typeof original>[2]);
@@ -411,6 +431,14 @@ export function installHitlGuard(server: McpServer, hitlClient: HitlClient, conf
         const requestArgs = resourceRequestMetadata(args, isTemplate);
         const sensitive = annotations.sensitiveHint === true;
         const managed = isManagedClient(server);
+        const denyCancelled = (): never =>
+          resourceDeny(
+            "permission_denied",
+            `Action denied: request for "${governedName}" was cancelled; the action was not executed.`,
+          );
+        const invokeApprovedCallback = () => (requestWasCancelled(args) ? denyCancelled() : callback(...args));
+
+        if (requestWasCancelled(args)) return denyCancelled();
 
         const viaElicitation = async (): Promise<unknown> => {
           const result = await tryElicitApproval(server, governedName, requestArgs, false, sensitive);
@@ -428,7 +456,7 @@ export function installHitlGuard(server: McpServer, hitlClient: HitlClient, conf
               `Action denied: "${governedName}" was rejected via MCP elicitation.`,
             );
           }
-          return callback(...args);
+          return invokeApprovedCallback();
         };
 
         if (!managed) {
@@ -514,7 +542,7 @@ export function installHitlGuard(server: McpServer, hitlClient: HitlClient, conf
             `Action denied: "${governedName}" did not receive a valid approval decision.`,
           );
         }
-        return callback(...args);
+        return invokeApprovedCallback();
       };
     };
 

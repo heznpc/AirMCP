@@ -2,6 +2,7 @@ import { describe, test, expect, beforeEach, jest } from "@jest/globals";
 import { runWithRequestContext } from "../dist/shared/request-context.js";
 
 import { installHitlGuard, consumeApprovalAuditEvents, runWithApprovalAuditSink } from "../dist/shared/hitl-guard.js";
+import { withResourceGovernance } from "../dist/shared/resource-governance.js";
 
 /**
  * Creates a minimal mock McpServer whose registerTool captures registrations.
@@ -270,6 +271,117 @@ describe("approval audit events", () => {
     releaseSink();
     await expect(call).resolves.toBe("ran");
     expect(mutated).toBe(true);
+  });
+
+  test("fails closed when the MCP request is cancelled while an approved decision is being sealed", async () => {
+    const { server, registrations } = makeMockServer();
+    installHitlGuard(server, makeDecisionHitlClient("approved"), makeConfig("all"));
+    const handler = jest.fn(() => "must not run");
+    server.registerTool("cancelled_write", { annotations: { readOnlyHint: false } }, handler);
+
+    let releaseSink;
+    let signalSinkStarted;
+    const sinkStarted = new Promise((resolve) => {
+      signalSinkStarted = resolve;
+    });
+    const sinkBarrier = new Promise((resolve) => {
+      releaseSink = resolve;
+    });
+    const controller = new AbortController();
+    const call = runWithRequestContext({}, () =>
+      runWithApprovalAuditSink(
+        async () => {
+          signalSinkStarted();
+          await sinkBarrier;
+        },
+        () => registrations[0].callback({}, { signal: controller.signal }),
+      ),
+    );
+
+    await sinkStarted;
+    controller.abort();
+    releaseSink();
+
+    const result = await call;
+    expect(handler).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ isError: true });
+    expect(result.content[0].text).toContain("cancelled");
+    expect(result.content[0].text).toContain("not executed");
+  });
+
+  test("fails closed when elicitation resolves after the MCP request is cancelled", async () => {
+    const registrations = [];
+    let resolveElicitation;
+    let signalElicitationStarted;
+    const elicitationStarted = new Promise((resolve) => {
+      signalElicitationStarted = resolve;
+    });
+    const server = {
+      registerTool(name, toolConfig, callback) {
+        registrations.push({ name, toolConfig, callback });
+      },
+      server: {
+        getClientVersion: () => ({ name: "cursor", version: "1.0.0" }),
+        elicitInput: jest.fn(
+          () =>
+            new Promise((resolve) => {
+              resolveElicitation = resolve;
+              signalElicitationStarted();
+            }),
+        ),
+      },
+    };
+    const handler = jest.fn(() => "must not run");
+    installHitlGuard(server, makeMockHitlClient(true, true), makeConfig("all"));
+    server.registerTool("cancelled_elicitation_write", { annotations: { readOnlyHint: false } }, handler);
+
+    const controller = new AbortController();
+    const call = registrations[0].callback({}, { signal: controller.signal });
+    await elicitationStarted;
+    controller.abort();
+    resolveElicitation({ action: "accept", content: { approve: true } });
+
+    const result = await call;
+    expect(handler).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ isError: true });
+    expect(result.content[0].text).toContain("not executed");
+  });
+
+  test("does not read an approved resource after its MCP request is cancelled", async () => {
+    const resourceRegistrations = [];
+    let resolveApproval;
+    let signalApprovalStarted;
+    const approvalStarted = new Promise((resolve) => {
+      signalApprovalStarted = resolve;
+    });
+    const hitl = {
+      isReachable: () => Promise.resolve(true),
+      requestApprovalDecision: () =>
+        new Promise((resolve) => {
+          resolveApproval = resolve;
+          signalApprovalStarted();
+        }),
+      dispose() {},
+    };
+    const server = {
+      registerTool() {},
+      registerResource(name, ...rest) {
+        resourceRegistrations.push({ name, callback: rest.at(-1) });
+      },
+    };
+    const handler = jest.fn(() => ({ contents: [] }));
+    installHitlGuard(server, hitl, makeConfig("all"));
+    const config = withResourceGovernance({ description: "Private resource" }, { sensitiveHint: true });
+    server.registerResource("private-notes", new URL("notes://private"), config, handler);
+
+    const controller = new AbortController();
+    const call = resourceRegistrations[0].callback(new URL("notes://private"), { signal: controller.signal });
+    await approvalStarted;
+    controller.abort();
+    resolveApproval("approved");
+
+    await expect(call).rejects.toThrow(/permission_denied.*cancelled.*not executed/i);
+    expect(handler).not.toHaveBeenCalled();
   });
 });
 

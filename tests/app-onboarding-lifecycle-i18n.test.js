@@ -95,6 +95,20 @@ function formatArguments(value) {
     );
 }
 
+function orderedIndices(source, ...markers) {
+  let offset = 0;
+  return markers.map((marker) => {
+    const index = source.indexOf(marker, offset);
+    expect(index).toBeGreaterThanOrEqual(0);
+    offset = index + marker.length;
+    return index;
+  });
+}
+
+function expectInOrder(source, ...markers) {
+  orderedIndices(source, ...markers);
+}
+
 describe("macOS onboarding lifecycle", () => {
   test("automatically presents setup once, while keeping manual reopen available", () => {
     expect(menu).toContain('static let keyOnboardingPresented = "onboardingPresented"');
@@ -128,9 +142,7 @@ describe("macOS onboarding lifecycle", () => {
     expect(onboarding).toContain("OnboardingDraftStore.load(");
     expect(onboarding).toContain("OnboardingDraftStore.save(");
     expect(onboarding).toContain("OnboardingDraftStore.clear()");
-    expect(onboarding.indexOf("configManager.isOnboardingRuntimeScopePersisted(scope)")).toBeLessThan(
-      onboarding.indexOf("OnboardingDraftStore.clear()"),
-    );
+    expectInOrder(onboarding, "configManager.isOnboardingRuntimeScopePersisted(scope)", "OnboardingDraftStore.clear()");
     expect(onboarding).toContain('L("onboarding.saveFailed")');
     expect(onboarding).toMatch(/let draft = onboardingCompleted\s*\? fallback/);
     expect(onboarding).toContain("configuredDisabledModules: configManager.disabledModules");
@@ -159,11 +171,11 @@ describe("macOS onboarding lifecycle", () => {
     expect(governedWrite).toBeDefined();
     expect(governedPolicyProbe).toBeDefined();
     expect(governedCopy).toBeDefined();
-    expect(onboarding.indexOf("firstSuccessActions")).toBeLessThan(
-      onboarding.indexOf("governedWriteActions"),
-    );
+    expectInOrder(onboarding, "firstSuccessActions", "governedWriteActions");
     expect(onboarding).toContain('onboardingWorkflows.first(where: { $0.id == "today-overview" })');
-    expect(onboarding).toContain('preconditionFailure("The generated onboarding catalog must contain today-overview.")');
+    expect(onboarding).toContain(
+      'preconditionFailure("The generated onboarding catalog must contain today-overview.")',
+    );
     expect(onboarding).toContain("Label(firstSuccessWorkflow.title");
     expect(onboarding).toContain("Text(firstSuccessWorkflow.prompt)");
     expect(onboarding).toContain("Label(firstSuccessWorkflow.accessSummary");
@@ -226,9 +238,7 @@ describe("macOS onboarding lifecycle", () => {
   });
 
   test("labels no-consent completion as Finish Later until the runtime is ready", () => {
-    expect(onboarding).toContain(
-      'Button(firstRunReady ? L("onboarding.finishSetup") : L("onboarding.finishLater"))',
-    );
+    expect(onboarding).toContain('Button(firstRunReady ? L("onboarding.finishSetup") : L("onboarding.finishLater"))');
     expect(onboarding).toMatch(
       /Button\(firstRunReady \? L\("onboarding\.finishSetup"\) : L\("onboarding\.finishLater"\)\) \{\s*Task \{ await saveAndComplete\(\) \}/,
     );
@@ -261,18 +271,10 @@ describe("macOS onboarding lifecycle", () => {
     expect(explicitStart).toContain("serverManager.validateOnboardingRuntime(");
     expect(explicitStart).toContain("serverManager.autoStartEnabled = true");
     expect(explicitStart).toContain("serverManager.activateOnboardingRuntime(");
-    expect(explicitStart.indexOf("let previousAutoStartEnabled")).toBeLessThan(
-      explicitStart.indexOf("AppRuntimeToken.ensure()"),
-    );
-    expect(explicitStart.indexOf("serverManager.activateOnboardingRuntime(")).toBeLessThan(
-      explicitStart.indexOf("activationReady = true"),
-    );
-    expect(explicitStart.indexOf("serverManager.autoStartEnabled = true")).toBeLessThan(
-      explicitStart.indexOf("serverManager.validateOnboardingRuntime("),
-    );
-    expect(explicitStart.indexOf("serverManager.validateOnboardingRuntime(")).toBeLessThan(
-      explicitStart.indexOf("activationReady = true"),
-    );
+    expectInOrder(explicitStart, "let previousAutoStartEnabled", "AppRuntimeToken.ensure()");
+    expectInOrder(explicitStart, "serverManager.activateOnboardingRuntime(", "activationReady = true");
+    expectInOrder(explicitStart, "serverManager.autoStartEnabled = true", "serverManager.validateOnboardingRuntime(");
+    expectInOrder(explicitStart, "serverManager.validateOnboardingRuntime(", "activationReady = true");
     expect(onboarding).toContain(".disabled(!firstRunReady || firstRunChecking || !patchingClients.isEmpty)");
     expect(onboarding).not.toContain(".disabled(!firstRunReady)");
     expect(app).toContain("onComplete: {}");
@@ -291,9 +293,7 @@ describe("macOS onboarding lifecycle", () => {
   test("Quick Setup fails closed when runtime readiness never succeeds", () => {
     expect(setupManager).toContain("guard Self.runtimeReadyForConfiguration(serverManager.status) else");
     expect(setupManager).toMatch(/guard Self\.runtimeReadyForConfiguration[\s\S]*?state = \.failed[\s\S]*?return/);
-    expect(setupManager.indexOf("guard Self.runtimeReadyForConfiguration")).toBeLessThan(
-      setupManager.indexOf("AirMcpConstants.copyToClipboard"),
-    );
+    expectInOrder(setupManager, "guard Self.runtimeReadyForConfiguration", "AirMcpConstants.copyToClipboard");
   });
 
   test("accepts only the exact authenticated app-owned runtime as ready", () => {
@@ -316,8 +316,11 @@ describe("macOS onboarding lifecycle", () => {
   });
 
   test("binds client patching to a persisted scope and runtime generation", () => {
-    const patchStart = onboarding.indexOf("private func patchClient(");
-    const patchEnd = onboarding.indexOf("/// Readiness checks are observational", patchStart);
+    const [patchStart, patchEnd] = orderedIndices(
+      onboarding,
+      "private func patchClient(",
+      "/// Readiness checks are observational",
+    );
     const patchSource = onboarding.slice(patchStart, patchEnd);
 
     expect(draftStore).toContain("var appliedScopeFingerprint: String?");
@@ -332,9 +335,7 @@ describe("macOS onboarding lifecycle", () => {
     expect(patchSource).toContain("runtimeToken: runtimeToken");
     expect(patchSource).toContain("Self.patchConfig(at: client.configPath, token: runtimeToken)");
     expect(patchSource).toContain("Self.patchCodexConfig(token: runtimeToken)");
-    expect(patchSource.indexOf("clientPatchAuthorizationIsCurrent(")).toBeLessThan(
-      patchSource.indexOf("let success = await Task.detached"),
-    );
+    expectInOrder(patchSource, "clientPatchAuthorizationIsCurrent(", "let success = await Task.detached");
     expect(onboarding).toContain("runtimeReceipt == receipt");
     expect(onboarding).toContain("AppRuntimeToken.matchesExisting(runtimeToken)");
   });
@@ -355,11 +356,15 @@ describe("macOS onboarding lifecycle", () => {
     expect(configManager).toContain("beginOnboardingRuntimeScopeTransaction(");
     expect(configManager).toContain("isOnboardingRuntimeScopePersisted(scope)");
     expect(configManager).toContain("rollbackOnboardingRuntimeScope(");
-    expect(serverManager.indexOf("beginOnboardingRuntimeScopeTransaction(scope)")).toBeLessThan(
-      serverManager.indexOf("startServerForOnboardingActivation()"),
+    expectInOrder(
+      serverManager,
+      "beginOnboardingRuntimeScopeTransaction(scope)",
+      "startServerForOnboardingActivation()",
     );
-    expect(serverManager.indexOf("if let manualRuntimeVersion {")).toBeLessThan(
-      serverManager.indexOf("guard configManager.rollbackOnboardingRuntimeScope(transaction)"),
+    expectInOrder(
+      serverManager,
+      "if let manualRuntimeVersion {",
+      "guard configManager.rollbackOnboardingRuntimeScope(transaction)",
     );
   });
 
@@ -371,10 +376,10 @@ describe("macOS onboarding lifecycle", () => {
     expect(onboarding).toContain("ServerManager.authenticatedOwnedRuntimeIdentity(");
     expect(onboarding).toContain("serverManager.activateOnboardingRuntime(");
     expect(onboarding).toContain("// Final completion barrier.");
-    expect(
-      onboarding.indexOf("case .ready(let finalReceipt) = await serverManager.validateOnboardingRuntime("),
-    ).toBeLessThan(
-      onboarding.indexOf("UserDefaults.standard.set(true, forKey: AirMcpConstants.keyOnboardingCompleted)"),
+    expectInOrder(
+      onboarding,
+      "case .ready(let finalReceipt) = await serverManager.validateOnboardingRuntime(",
+      "UserDefaults.standard.set(true, forKey: AirMcpConstants.keyOnboardingCompleted)",
     );
   });
 

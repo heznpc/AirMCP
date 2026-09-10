@@ -6266,8 +6266,8 @@ public struct RecentFilesIntent: AppIntent {
 
     public init() {}
 
-    @Parameter(title: "Folder to search (default: home)")
-    public var folder: String?
+    @Parameter(title: "Folder to search (default: home)", default: "~")
+    public var folder: String
 
     @Parameter(title: "Modified within N days (default: 7)", default: 7, inclusiveRange: (1, 365))
     public var days: Int
@@ -6277,13 +6277,9 @@ public struct RecentFilesIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
-        var args: [String: any Sendable] = [:]
-        if let v = folder { args["folder"] = v }
-        args["days"] = days
-        args["limit"] = limit
         let result = try await MCPIntentRouter.shared.call(
             tool: "recent_files",
-            args: args
+            args: ["folder": folder, "days": days, "limit": limit]
         )
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "recent_files", message: "empty result from router")
@@ -6593,21 +6589,17 @@ public struct SearchFilesIntent: AppIntent {
     @Parameter(title: "Search query (Spotlight syntax)")
     public var query: String
 
-    @Parameter(title: "Folder to search in (default: home)")
-    public var folder: String?
+    @Parameter(title: "Folder to search in (default: home)", default: "~")
+    public var folder: String
 
     @Parameter(title: "Max results (default: 50)", default: 50, inclusiveRange: (1, 200))
     public var limit: Int
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<String> {
-        var args: [String: any Sendable] = [:]
-        args["query"] = query
-        if let v = folder { args["folder"] = v }
-        args["limit"] = limit
         let result = try await MCPIntentRouter.shared.call(
             tool: "search_files",
-            args: args
+            args: ["query": query, "folder": folder, "limit": limit]
         )
         guard let data = result.data(using: .utf8) else {
             throw MCPIntentError.toolCallFailed(tool: "search_files", message: "empty result from router")
@@ -9466,7 +9458,7 @@ public struct MCPListChatsSnippetView: View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(data.chats, id: \.id) { row in
                 Button(intent: _mkReadChatIntent_chatId(chatId: row.id)) {
-                    Text(row.id)
+                    Text((row.name ?? ""))
                         .font(.body)
                         .lineLimit(1)
                 }
@@ -9542,7 +9534,7 @@ public struct MCPListFavoritesSnippetView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(Array(data.photos.enumerated()), id: \.offset) { _, row in
-                Text(row.id)
+                Text((row.filename ?? ""))
                     .font(.body)
                     .lineLimit(1)
             }
@@ -9700,7 +9692,7 @@ public struct MCPListParticipantsSnippetView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(Array(data.participants.enumerated()), id: \.offset) { _, row in
-                Text("(row)")
+                Text((row.name ?? ""))
                     .font(.body)
                     .lineLimit(1)
             }
@@ -9717,7 +9709,7 @@ public struct MCPListPhotosSnippetView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(Array(data.photos.enumerated()), id: \.offset) { _, row in
-                Text(row.id)
+                Text((row.filename ?? ""))
                     .font(.body)
                     .lineLimit(1)
             }
@@ -10221,7 +10213,7 @@ public struct MCPReadChatSnippetView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(Array(data.participants.enumerated()), id: \.offset) { _, row in
-                Text("(row)")
+                Text((row.name ?? ""))
                     .font(.body)
                     .lineLimit(1)
             }
@@ -10327,7 +10319,7 @@ public struct MCPReadEventSnippetView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(Array(data.attendees.enumerated()), id: \.offset) { _, row in
-                Text("(row)")
+                Text((row.name ?? ""))
                     .font(.body)
                     .lineLimit(1)
             }
@@ -10679,7 +10671,7 @@ public struct MCPSearchChatsSnippetView: View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(data.chats, id: \.id) { row in
                 Button(intent: _mkReadChatIntent_chatId(chatId: row.id)) {
-                    Text(row.id)
+                    Text((row.name ?? ""))
                         .font(.body)
                         .lineLimit(1)
                 }
@@ -10792,7 +10784,7 @@ public struct MCPSearchPhotosSnippetView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(Array(data.photos.enumerated()), id: \.offset) { _, row in
-                Text(row.id)
+                Text((row.filename ?? ""))
                     .font(.body)
                     .lineLimit(1)
             }

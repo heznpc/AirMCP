@@ -22,6 +22,27 @@ final class ConfigManagerScopeTransactionTests: XCTestCase {
     }
 
     @MainActor
+    func testHitlTimeoutDefaultsToHumanScaleWindow() throws {
+        let managerWithoutConfig = ConfigManager(configFile: configURL)
+        XCTAssertEqual(managerWithoutConfig.hitlTimeout, 120)
+
+        let partialConfig = Data(
+            """
+            {
+              "hitl": {
+                "level": "sensitive-only",
+                "whitelist": []
+              }
+            }
+            """.utf8
+        )
+        try partialConfig.write(to: configURL)
+
+        let managerWithPartialHitl = ConfigManager(configFile: configURL)
+        XCTAssertEqual(managerWithPartialHitl.hitlTimeout, 120)
+    }
+
+    @MainActor
     func testScopeTransactionVerifiesExactBytesAndRollsBackOriginal() throws {
         let original = Data(
             """

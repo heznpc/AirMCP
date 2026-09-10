@@ -1212,7 +1212,7 @@ macOS의 소켓 기반 HITL 대신 iOS 네이티브 메커니즘:
 | 읽기 전용 | 통과               | 통과                                      |
 | 쓰기      | HITL 설정에 따라   | App Intent `parameterSummary`로 요약 표시 |
 | 파괴적    | 소켓으로 승인 요청 | `requestConfirmation()` 시스템 다이얼로그 |
-| 타임아웃  | 30초 → 거부        | 시스템 관리                               |
+| 타임아웃  | 120초 → 거부       | 시스템 관리                               |
 
 ### 10.3 localhost 전용 보안
 

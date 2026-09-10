@@ -14,6 +14,7 @@
  */
 import { describe, test, expect } from "@jest/globals";
 import { z } from "zod";
+import Ajv2020 from "ajv/dist/2020.js";
 
 const { installToolListSchemaDialectFix, JSON_SCHEMA_2020_12 } = await import("../dist/server/schema-dialect.js");
 const { McpServer } = await import("@modelcontextprotocol/sdk/server/mcp.js");
@@ -113,7 +114,16 @@ describe("tools/list schema dialect", () => {
     // a 2020-12 validator rejects — merely stripping $schema would not do).
     const tuple = windowItem.properties.position.anyOf.find((s) => s.type === "array");
     expect(tuple.prefixItems).toHaveLength(2);
-    expect(tuple.items).toBeUndefined();
+
+    // Zod may close tuples with maxItems or items:false; both are valid
+    // 2020-12. Validate the wire schema's behavior rather than that choice.
+    const validate = new Ajv2020({ strict: true }).compile(tool.outputSchema);
+    const output = (position) => ({ windows: [{ title: "Example", position }] });
+    expect(validate(output([10, 20]))).toBe(true);
+    expect(validate(output(null))).toBe(true);
+    for (const position of [[], [10], [10, 20, 30], ["10", 20], [10, "20"]]) {
+      expect(validate(output(position))).toBe(false);
+    }
 
     // No draft-07 marker survives anywhere in the emitted schemas.
     expect(JSON.stringify(tool)).not.toContain("draft-07");

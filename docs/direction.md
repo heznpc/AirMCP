@@ -119,7 +119,7 @@ rate limits, OAuth scopes, and local controls govern Apple workspace actions.
 | 클라이언트 연결 | 명시적 opt-in (Claude Desktop, Claude Code, Codex, Cursor, Windsurf) |
 | 검증 | 계약 기반 Jest·Swift·실제 npm/MCPB/app 산출물 게이트 |
 
-¹ podcasts 모듈은 macOS 26+에서 `brokenOn: [26]` 게이트로 등록 스킵 (Apple이 Podcasts JXA 딕셔너리 제거). v3.0.0에서 드랍 예정.
+¹ podcasts 모듈은 Apple의 Podcasts JXA 딕셔너리 영구 제거로 `maxMacosVersion: 25`를 선언하며, macOS 26 및 이후 버전에서 등록을 건너뛴다. v3.0.0에서 드랍 예정.
 
 ---
 

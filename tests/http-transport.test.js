@@ -1,5 +1,8 @@
 import { describe, test, expect, jest, beforeAll, beforeEach, afterEach } from "@jest/globals";
 
+const nativeSetInterval = globalThis.setInterval;
+const nativeClearInterval = globalThis.clearInterval;
+
 // Mock all heavy dependencies that would fail in test environment
 jest.unstable_mockModule("@modelcontextprotocol/sdk/server/streamableHttp.js", () => ({
   StreamableHTTPServerTransport: jest.fn(),
@@ -651,8 +654,10 @@ describe("startHttpServer live middleware", () => {
     unregisterShutdownHook.mockImplementation((hook) => {
       activeShutdownHooks.delete(hook);
     });
-    const setIntervalSpy = jest.spyOn(global, "setInterval");
-    const clearIntervalSpy = jest.spyOn(global, "clearInterval");
+    const setIntervalSpy = jest.fn((...args) => nativeSetInterval(...args));
+    const clearIntervalSpy = jest.fn((...args) => nativeClearInterval(...args));
+    globalThis.setInterval = setIntervalSpy;
+    globalThis.clearInterval = clearIntervalSpy;
     const cleanupTimers = [];
 
     try {
@@ -678,8 +683,8 @@ describe("startHttpServer live middleware", () => {
         expect(clearIntervalSpy).toHaveBeenCalledWith(timer);
       }
     } finally {
-      setIntervalSpy.mockRestore();
-      clearIntervalSpy.mockRestore();
+      globalThis.setInterval = nativeSetInterval;
+      globalThis.clearInterval = nativeClearInterval;
       registerShutdownHook.mockReset();
       unregisterShutdownHook.mockReset();
     }

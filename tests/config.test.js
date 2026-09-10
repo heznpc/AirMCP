@@ -529,9 +529,9 @@ describe('parseConfig() — HITL config parsing', () => {
     expect(cfg.hitl.level).toBe('sensitive-only');
   });
 
-  test('HITL timeout defaults to 30', () => {
+  test('HITL timeout defaults to 120', () => {
     const cfg = parseConfig();
-    expect(cfg.hitl.timeout).toBe(30);
+    expect(cfg.hitl.timeout).toBe(120);
   });
 
   test('HITL whitelist defaults to empty set', () => {

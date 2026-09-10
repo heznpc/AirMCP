@@ -1,5 +1,5 @@
 /**
- * outputSchema Wave 3 — drift guard for messages / health / shortcuts.
+ * outputSchema Wave 3 — fixture/schema compatibility for messages / health / shortcuts.
  *
  * Extends the Wave 1/2 contract to modules that were 0% before:
  *   messages:  list_chats, read_chat, search_chats, list_participants

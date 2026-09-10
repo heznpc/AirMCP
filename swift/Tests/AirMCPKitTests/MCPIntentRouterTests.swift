@@ -19,9 +19,7 @@ final class MCPIntentRouterTests: XCTestCase {
         // call — the default `XCTestCase.tearDown()` variants are
         // no-ops and inter-toolchain signature mismatches between
         // sync/async versions on older Xcodes would break CI.
-        await MCPIntentRouter.shared.setHandler { _, _ in
-            throw MCPIntentError.handlerNotInstalled(tool: "reset")
-        }
+        await MCPIntentRouter.shared.resetHandlerForTesting()
     }
 
     // MARK: - Happy path
@@ -52,14 +50,7 @@ final class MCPIntentRouterTests: XCTestCase {
     // MARK: - Handler not installed
 
     func testCallWithoutHandlerThrowsSpecificError() async {
-        // Can't easily construct a fresh MCPIntentRouter (it's a
-        // singleton actor). Instead install a handler that re-throws
-        // the canonical error to mimic the pre-launch state. A real
-        // regression would surface here via a different error type
-        // or a hang.
-        await MCPIntentRouter.shared.setHandler { tool, _ in
-            throw MCPIntentError.handlerNotInstalled(tool: tool)
-        }
+        await MCPIntentRouter.shared.resetHandlerForTesting()
 
         do {
             _ = try await MCPIntentRouter.shared.call(tool: "foo", args: [:])

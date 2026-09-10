@@ -16,7 +16,7 @@
 
 import type { McpServer, AnyFn } from "./mcp.js";
 import { usageTracker } from "./usage-tracker.js";
-import { auditLog, readAuditEntries, sanitizeArgs } from "./audit.js";
+import { auditLog, readAuditEntries, sanitizeToolArgs } from "./audit.js";
 import { compactDescription } from "./tool-filter.js";
 import { withResultSizeHint } from "./result.js";
 import { log } from "./logger.js";
@@ -385,7 +385,7 @@ export class ToolRegistry {
       readOnly: entry.readOnly === true,
       sensitive: entry.sensitive === true,
     };
-    const auditArgs = sanitizeArgs(args);
+    const auditArgs = sanitizeToolArgs(name, args);
     try {
       validateToolArgs(name, entry.inputSchema, args);
       return { exists: true, exposed: entry.exposed, annotations, argsValid: true, auditArgs };

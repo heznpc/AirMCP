@@ -125,3 +125,34 @@ describe('safari module — breakage is tool-scoped, not module-scoped', () => {
     expect(decision.decision).toBe('register');
   });
 });
+
+describe('podcasts module — removed after macOS 25', () => {
+  test('macOS 25 remains supported while surfacing the existing deprecation', async () => {
+    const { MODULE_MANIFEST } = await import('../dist/shared/modules.js');
+    const podcasts = MODULE_MANIFEST.find((m) => m.name === 'podcasts');
+    expect(podcasts).toBeDefined();
+    expect(podcasts.compatibility?.maxMacosVersion).toBe(25);
+    expect(podcasts.compatibility?.brokenOn ?? []).not.toContain(26);
+
+    const decision = resolveModuleCompatibility('podcasts', podcasts.compatibility, {
+      osVersion: 25,
+      cpu: 'arm64',
+      healthkitAvailable: true,
+    });
+    expect(decision.decision).toBe('register-with-deprecation');
+  });
+
+  test.each([26, 27, 99])('macOS %i and later releases stay unavailable', async (osVersion) => {
+    const { MODULE_MANIFEST } = await import('../dist/shared/modules.js');
+    const podcasts = MODULE_MANIFEST.find((m) => m.name === 'podcasts');
+    expect(podcasts).toBeDefined();
+
+    const decision = resolveModuleCompatibility('podcasts', podcasts.compatibility, {
+      osVersion,
+      cpu: 'arm64',
+      healthkitAvailable: true,
+    });
+    expect(decision.decision).toBe('skip-unsupported');
+    expect(decision.reason).toBe(`podcasts was removed after macOS 25 (detected ${osVersion})`);
+  });
+});

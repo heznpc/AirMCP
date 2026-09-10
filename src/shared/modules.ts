@@ -85,10 +85,11 @@ export const MODULE_MANIFEST: ReadonlyArray<ModuleManifestEntry> = [
     compatibility: {
       // Apple removed the entire Podcasts JXA scripting dictionary in
       // macOS 26. All 6 tools fail at runtime; the module is still
-      // registered for ≤25 hosts. RFC 0004 doctor surfaces this so a
-      // user on 26 isn't left guessing why podcasts_* always errors.
+      // registered for ≤25 hosts. The upper bound intentionally covers
+      // macOS 26 and every later release: unlike `brokenOn`, this removal is
+      // permanent rather than a regression isolated to one OS version.
       status: "deprecated",
-      brokenOn: [26],
+      maxMacosVersion: 25,
       deprecation: {
         since: "2.11.0",
         removeAt: "3.0.0",

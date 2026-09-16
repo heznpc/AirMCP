@@ -1,5 +1,9 @@
 # AirMCP — Apple 생태계의 통제형 MCP 런타임
 
+> **2026-09-16 전환:** 앞으로의 제품 개발은 Taxi로 모읍니다.
+> 현재 [아카이브 인계 기록](archive-handoff.md)이 아래의 과거 로드맵보다 우선합니다.
+> Taxi는 아직 공개 배포된 이전 대상이 아니며 AirMCP의 아카이브는 준비 단계입니다.
+
 > **Governed MCP runtime for the Apple ecosystem.**
 > 갱신일: 2026-07-24 (macOS는 현재 제공 플랫폼으로 유지하되 제품 정체성은 Apple 생태계 전체의 통제형 런타임으로 확정.)
 

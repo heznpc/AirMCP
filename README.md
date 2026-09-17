@@ -4,25 +4,6 @@
 
 # AirMCP
 
-> **Maintenance closeout — 2026-09-16.** Future product work is being consolidated
-> in Taxi. Taxi is still in development and has no public release yet.
-> AirMCP's latest published release is **v2.16.5**; later fixes in `main` are
-> not included in that release. See [the handoff record](docs/archive-handoff.md)
-> before choosing a source build or planning a migration.
-
-## Project transition
-
-- **Currently implemented** — the existing Mac runtime and preserved source;
-  source integration and released artifacts have different coverage.
-- **Planned** — repository archival after the release disposition is recorded
-  in the handoff record. No new cross-platform features are planned here.
-- **Design intent** — preserve AirMCP's distribution and contribution history
-  while Taxi develops the broader execution-layer direction.
-- **Non-goals** — an automatic upgrade to Taxi, a new feature roadmap here,
-  or a claim that unreleased fixes reached existing installations.
-- **Redacted** — the handoff excludes accounts, credentials, private paths,
-  device identifiers, and execution payloads.
-
 [![npm version](https://img.shields.io/npm/v/airmcp)](https://www.npmjs.com/package/airmcp)
 [![Tests](https://github.com/heznpc/AirMCP/actions/workflows/ci.yml/badge.svg)](https://github.com/heznpc/AirMCP/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)

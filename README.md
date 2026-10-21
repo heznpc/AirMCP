@@ -1,3 +1,5 @@
+> **Maintenance ended.** [v2.16.6](https://github.com/heznpc/AirMCP/releases/tag/v2.16.6) is the final maintenance release. This project receives no further fixes or support. The source and history are preserved for reference and [forks](https://github.com/heznpc/AirMCP/fork). No successor project is designated. Platform previews and roadmap statements below are historical.
+
 <p align="center">
   <img src="icons/airmcp-icon-256.png" alt="AirMCP" width="128">
 </p>

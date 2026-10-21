@@ -1,5 +1,7 @@
 # Security Policy
 
+> **Maintenance ended on 2026-10-22.** No versions receive security updates. [v2.16.6](https://github.com/heznpc/AirMCP/releases/tag/v2.16.6) is the final maintenance release. The response and fix SLAs below are historical and no longer apply. Fork maintainers must establish their own reporting and update policy.
+
 ## Reporting a Vulnerability
 
 If you discover a security vulnerability, please report it responsibly:

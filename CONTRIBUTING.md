@@ -1,5 +1,7 @@
 # Contributing to AirMCP
 
+> **Maintenance ended.** New issues and pull requests are no longer accepted. The development instructions below are preserved for forks of the final [v2.16.6 source](https://github.com/heznpc/AirMCP/releases/tag/v2.16.6).
+
 Thanks for your interest in contributing to AirMCP! This guide covers everything you need to get started.
 
 ## Development Setup
@@ -14,7 +16,7 @@ npm run build
 ### Requirements
 
 - macOS (required — Apple app automation only works on macOS)
-- Node.js >= 20 (CI runs on Node 22 LTS; the floor will lift to Node 24 before Node 22 reaches end-of-life on 2027-04-30)
+- Node.js >= 20 (the final release was validated on Node 22; fork maintainers own future runtime upgrades)
 - For Swift bridge features: macOS 26+ with Apple Silicon
 
 ### Running Locally

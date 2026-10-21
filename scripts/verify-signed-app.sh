@@ -146,7 +146,8 @@ while read -r pid command; do
   esac
 done < <(ps -axo pid=,command=)
 
-CONFIG_FILE="$STATE_DIR/config.json"
+mkdir -p "$STATE_DIR/home/.config/airmcp"
+CONFIG_FILE="$STATE_DIR/home/.config/airmcp/config.json"
 umask 077
 cat > "$CONFIG_FILE" <<'CONFIG_EOF'
 {

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.16.6] - 2026-10-21
+
 ### Security
 
 - App-owned runtimes read bearer and ownership credentials from private, owner-only files instead of inheriting their values in the process environment. Invalid files fail closed; standalone CLI environment tokens remain supported. Runtime launches now sanitize inherited loader flags, paths, and runtime overrides.
@@ -14,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix Finder `search_files` and `recent_files` default home-folder expansion, preserve Spotlight’s literal `$time` query token, and surface producer failures instead of empty successful results (#459, #460, #463).
+- Redact UI input in audit records and previews; stop waiting for approvals after cancellation or timeout.
+- Keep unsupported Podcasts tools disabled on macOS 26 and later.
 - Prevent duplicate mutations by disabling automatic JXA retries and Swift-to-JXA replay unless an operation explicitly declares itself read-only. JXA failures use subprocess diagnostics without exposing generated scripts or private paths.
 - Serialize Swift bridge requests, start execution timeouts at dispatch, terminate a timed-out bridge, and reject its queued requests. Isolate embedding and observer processes so command recovery cannot stop native observers, and ignore lifecycle events from replaced processes.
 

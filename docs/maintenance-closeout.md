@@ -1,6 +1,8 @@
 # AirMCP maintenance closeout
 
-Snapshot: 2026-09-11. This ledger separates source integration from published
+Snapshot: 2026-10-21. Release preparation: **2.16.6**.
+
+Original integration snapshot: 2026-09-11. This ledger separates source integration from published
 releases. The registry's current `airmcp@latest` is **2.16.5**; the maintenance
 changes below are not included in that published version.
 
@@ -17,18 +19,18 @@ The integration is [PR #482](https://github.com/heznpc/AirMCP/pull/482), branch
 `cceaab9cbe1614151af405f5e2f6372dac616fc1`. Original PR commits are retained with
 merge commits so contribution history and source ancestry survive integration.
 
-| PR | Change | Disposition |
-| --- | --- | --- |
-| [#461](https://github.com/heznpc/AirMCP/pull/461) | Redact UI input in audit rows and previews | Included in maintenance integration |
-| [#462](https://github.com/heznpc/AirMCP/pull/462) | Keep unsupported Podcasts disabled on macOS 26 and later | Included in maintenance integration |
-| [#463](https://github.com/heznpc/AirMCP/pull/463) | Finder defaults, Spotlight time query, producer error propagation | Included in maintenance integration; addresses #459 and #460 |
-| [#464](https://github.com/heznpc/AirMCP/pull/464) | Approval timeout and cancelled-request handling | Included in maintenance integration |
-| [#467](https://github.com/heznpc/AirMCP/pull/467) | Test the actual producer and schema contracts | Included in maintenance integration |
-| [#468](https://github.com/heznpc/AirMCP/pull/468) | Enforce coverage and widget test gates | Included in maintenance integration |
-| [#473](https://github.com/heznpc/AirMCP/pull/473) | jose 6.2.10 and Zod 4.5.4 | Included; schema regression test now validates tuple behavior with Ajv 2020-12 |
-| [#475](https://github.com/heznpc/AirMCP/pull/475) | Pinned GitHub Actions updates | Included in maintenance integration |
-| [#478](https://github.com/heznpc/AirMCP/pull/478) | js-yaml 4.3.2 | Included in maintenance integration |
-| [#480](https://github.com/heznpc/AirMCP/pull/480) | hono 4.13.7 | Included in maintenance integration |
+| PR                                                | Change                                                            | Disposition                                                                    |
+| ------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| [#461](https://github.com/heznpc/AirMCP/pull/461) | Redact UI input in audit rows and previews                        | Included in maintenance integration                                            |
+| [#462](https://github.com/heznpc/AirMCP/pull/462) | Keep unsupported Podcasts disabled on macOS 26 and later          | Included in maintenance integration                                            |
+| [#463](https://github.com/heznpc/AirMCP/pull/463) | Finder defaults, Spotlight time query, producer error propagation | Included in maintenance integration; addresses #459 and #460                   |
+| [#464](https://github.com/heznpc/AirMCP/pull/464) | Approval timeout and cancelled-request handling                   | Included in maintenance integration                                            |
+| [#467](https://github.com/heznpc/AirMCP/pull/467) | Test the actual producer and schema contracts                     | Included in maintenance integration                                            |
+| [#468](https://github.com/heznpc/AirMCP/pull/468) | Enforce coverage and widget test gates                            | Included in maintenance integration                                            |
+| [#473](https://github.com/heznpc/AirMCP/pull/473) | jose 6.2.10 and Zod 4.5.4                                         | Included; schema regression test now validates tuple behavior with Ajv 2020-12 |
+| [#475](https://github.com/heznpc/AirMCP/pull/475) | Pinned GitHub Actions updates                                     | Included in maintenance integration                                            |
+| [#478](https://github.com/heznpc/AirMCP/pull/478) | js-yaml 4.3.2                                                     | Included in maintenance integration                                            |
+| [#480](https://github.com/heznpc/AirMCP/pull/480) | hono 4.13.7                                                       | Included in maintenance integration                                            |
 
 Zod's `items: false` is a valid way to close a tuple in JSON Schema 2020-12.
 The regression guard accepts valid pairs and null, and rejects missing, extra,
@@ -58,12 +60,12 @@ is addressed by updating its locked `smol-toml` from 1.7.0 to 1.8.0.
 
 ## External reports and contributions
 
-| Item | Verified history and remaining action |
-| --- | --- |
-| [#459](https://github.com/heznpc/AirMCP/issues/459) | Folder omission skipped tilde expansion. Fixed by #463; communicate the published fix version after release verification. |
-| [#460](https://github.com/heznpc/AirMCP/issues/460) | Shell expansion consumed Spotlight's time token. Fixed by #463; communicate the published fix version after release verification. |
-| [#406](https://github.com/heznpc/AirMCP/pull/406), [#412](https://github.com/heznpc/AirMCP/pull/412), [#415](https://github.com/heznpc/AirMCP/pull/415), [#417](https://github.com/heznpc/AirMCP/pull/417) | Already merged. Preserve the original PRs and authorship; no replacement commits or new closure needed. |
-| [#418](https://github.com/heznpc/AirMCP/pull/418) | Draft closed by its author on 2026-07-30, followed by deletion of their head branch. No review or explanation was posted. Do not describe this as a maintainer rejection. |
+| Item                                                                                                                                                                                                       | Verified history and remaining action                                                                                                                                     |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [#459](https://github.com/heznpc/AirMCP/issues/459)                                                                                                                                                        | Folder omission skipped tilde expansion. Fixed by #463; communicate the published fix version after release verification.                                                 |
+| [#460](https://github.com/heznpc/AirMCP/issues/460)                                                                                                                                                        | Shell expansion consumed Spotlight's time token. Fixed by #463; communicate the published fix version after release verification.                                         |
+| [#406](https://github.com/heznpc/AirMCP/pull/406), [#412](https://github.com/heznpc/AirMCP/pull/412), [#415](https://github.com/heznpc/AirMCP/pull/415), [#417](https://github.com/heznpc/AirMCP/pull/417) | Already merged. Preserve the original PRs and authorship; no replacement commits or new closure needed.                                                                   |
+| [#418](https://github.com/heznpc/AirMCP/pull/418)                                                                                                                                                          | Draft closed by its author on 2026-07-30, followed by deletion of their head branch. No review or explanation was posted. Do not describe this as a maintainer rejection. |
 
 ## Remaining remote branches
 
@@ -71,14 +73,14 @@ The ten integration PR branches above are retained. Of the other seven remote
 branches in the starting snapshot, `main` is the release base and these six
 remain preserved:
 
-| Branch | Disposition |
-| --- | --- |
-| `claude/chatgpt-local-control-mcp-867bbe` | Contains a separate PR-template simplification; deferred from the runtime maintenance batch. |
-| `codex/fix-app-resource-bundle` | Historical packaging work overlaps #451; retain until any residual changes are individually accounted for. |
-| `codex/fix-execution-host-permissions` | Historical permission-host work overlaps #451; retain until any residual changes are individually accounted for. |
-| `fix/notarize-api-key-auth` | #440 already closed after #451 incorporated the authentication change; retain the historical branch. |
-| `docs/debt-ledger` | Separate documentation work; preserved outside this maintenance batch. |
-| `feat/chatgpt-plugin` | Separate development with changes beyond this batch and a checked-out worktree; preserved. |
+| Branch                                    | Disposition                                                                                                      |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `claude/chatgpt-local-control-mcp-867bbe` | Contains a separate PR-template simplification; deferred from the runtime maintenance batch.                     |
+| `codex/fix-app-resource-bundle`           | Historical packaging work overlaps #451; retain until any residual changes are individually accounted for.       |
+| `codex/fix-execution-host-permissions`    | Historical permission-host work overlaps #451; retain until any residual changes are individually accounted for. |
+| `fix/notarize-api-key-auth`               | #440 already closed after #451 incorporated the authentication change; retain the historical branch.             |
+| `docs/debt-ledger`                        | Separate documentation work; preserved outside this maintenance batch.                                           |
+| `feat/chatgpt-plugin`                     | Separate development with changes beyond this batch and a checked-out worktree; preserved.                       |
 
 Local branch inventory before the integration's final documentation commit:
 48 branches including the new integration branch; 25 are reachable from the
@@ -98,3 +100,29 @@ deletion candidate merely because Git marks it merged or prunable.
 - Only then apply EOL messaging, npm deprecation, and repository archival.
 
 Archive/deprecation is not part of the maintenance integration itself.
+
+## Final maintenance release preparation (2026-10-21)
+
+- #506 is merged at `e0694e0d662a7e2d578c6fcd7bca506591bfd0f2`: private
+  runtime credential files, read-only retries, isolated Swift process lanes,
+  MCP SDK 1.32.1, and security dependency lockfile updates.
+- Dependabot #502 and #503 are closed as superseded by #506. #500's security
+  changes (SDK, qs 6.16.0, proxy-addr 2.0.8) are already present; its remaining
+  upgrades are deferred. #504/#505 routine tooling updates and #485's major
+  ext-apps migration are closed as outside the final maintenance scope.
+- #459 and #460 were reopened after stale automation closed them prematurely.
+  They remain open until the published 2.16.6 artifact is verified.
+- Runtime and docs-site dependency audits report zero vulnerabilities. The
+  development-only Jest chain reports 19 moderate dependency findings rooted
+  in the single unpatched `sprintf-js` advisory
+  [GHSA-hp3w-g68c-fv3c](https://github.com/advisories/GHSA-hp3w-g68c-fv3c).
+  This dependency is not shipped in the production installation; no forced
+  Jest downgrade or unverified override is applied.
+- The owner authorized the final maintenance release, published-version
+  follow-up on both reports, final inventory, and repository archival.
+  Publication and archive completion must be recorded only after verification.
+
+- Release preflight exposed a verification-harness mismatch after #506: app-owned
+  children correctly reject inherited runtime overrides. The app acceptance and
+  signed-artifact probes now use normal config locations under their disposable
+  home, preserving the hardened environment boundary.

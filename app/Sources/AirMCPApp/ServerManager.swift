@@ -918,7 +918,7 @@ final class ServerManager {
                     executable = runtime.node
                     arguments = [runtime.entry, "--http", "--port", "\(AirMcpConstants.appOwnedHttpPort)"]
                 } else {
-                    guard let npxPath = NodeEnvironment.findExecutable(named: "npx") else {
+                    guard let npxPath = NodeEnvironment.findTrustedAppRuntimeExecutable(named: "npx") else {
                         continuation.resume(returning: .failure(
                             "Bundled runtime is unavailable and Node.js was not found"
                         ))
@@ -933,10 +933,9 @@ final class ServerManager {
                         "\(AirMcpConstants.appOwnedHttpPort)",
                     ]
                 }
-                let token: String
                 let ownerSecret: String
                 do {
-                    token = try AppRuntimeToken.ensure()
+                    _ = try AppRuntimeToken.ensure()
                     ownerSecret = try AppRuntimeToken.rotateOwnerSecret()
                 } catch {
                     continuation.resume(returning: .failure(
@@ -950,11 +949,12 @@ final class ServerManager {
                 process.arguments = arguments
                 process.standardOutput = stdoutPipe ?? FileHandle.nullDevice
                 process.standardError = stderrPipe ?? FileHandle.nullDevice
-                var env = NodeEnvironment.buildEnv()
+                var env = NodeEnvironment.buildAppRuntimeEnv(executablePath: executable)
                 env["AIRMCP_ALLOW_NETWORK"] = "with-token"
-                env["AIRMCP_HTTP_TOKEN"] = token
+                // Pass private file locations, keeping credentials out of ps eww.
+                env["AIRMCP_APP_RUNTIME_TOKEN_PATH"] = AppRuntimeToken.tokenURL.path
                 env["AIRMCP_APP_OWNED_RUNTIME"] = "1"
-                env["AIRMCP_APP_RUNTIME_OWNER_SECRET"] = ownerSecret
+                env["AIRMCP_APP_RUNTIME_OWNER_PATH"] = AppRuntimeToken.ownerSecretURL.path
                 if let bridge = AirMcpConstants.bundledBridgePath {
                     env["AIRMCP_BRIDGE_PATH"] = bridge
                 }

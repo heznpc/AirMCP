@@ -9,6 +9,7 @@ import { randomUUID, timingSafeEqual, randomBytes, createHash } from "node:crypt
 import type { Server as NodeHttpServer } from "node:http";
 import { NPM_PACKAGE_NAME } from "../shared/config.js";
 import { LIMITS, TIMEOUT } from "../shared/constants.js";
+import { runtimeOwnerSecret } from "../shared/runtime-credentials.js";
 import { log, errToCtx } from "./../shared/logger.js";
 import { printBanner } from "../shared/banner.js";
 import { auditLog } from "../shared/audit.js";
@@ -825,7 +826,7 @@ export async function startHttpServer(options: HttpServerOptions): Promise<NodeH
   // the private bearer token and an MCP round trip before it trusts a listener.
   // The bit only prevents it from adopting/killing a same-token runtime the
   // user launched manually on the reserved port.
-  const appRuntimeOwnerFingerprint = runtimeOwnerFingerprint(process.env.AIRMCP_APP_RUNTIME_OWNER_SECRET);
+  const appRuntimeOwnerFingerprint = runtimeOwnerFingerprint(runtimeOwnerSecret());
   const appOwnedRuntime =
     process.env.AIRMCP_APP_OWNED_RUNTIME === "1" && Boolean(httpToken) && Boolean(appRuntimeOwnerFingerprint);
   // Warmup owns the authoritative effective module surface. Keep it nullable

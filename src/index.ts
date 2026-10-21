@@ -76,6 +76,7 @@ import { initializeServer } from "./server/init.js";
 import { createServer } from "./server/mcp-setup.js";
 import { startHttpServer } from "./server/http-transport.js";
 import { wireStdioShutdown } from "./server/stdio-shutdown.js";
+import { runtimeHttpToken } from "./shared/runtime-credentials.js";
 
 const ctx = initializeServer();
 
@@ -85,7 +86,7 @@ const portIdx = args.indexOf("--port");
 const port = portIdx !== -1 && args[portIdx + 1] ? parseInt(args[portIdx + 1]!, 10) : IDENTITY.HTTP_PORT;
 const bindAll = args.includes("--bind-all");
 const unsafeNoAuth = args.includes("--unsafe-no-auth");
-const httpToken = process.env.AIRMCP_HTTP_TOKEN ?? "";
+const httpToken = httpMode ? runtimeHttpToken() : "";
 
 async function main() {
   if (httpMode) {

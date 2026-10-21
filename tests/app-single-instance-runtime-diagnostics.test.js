@@ -89,7 +89,10 @@ describe("stale app-owned runtime diagnosis", () => {
     expect(server).toContain("state.ownerFingerprint == expectedOwnerFingerprint");
     expect(server).toContain("verifiedAdoptedRuntimeIdentity(for: initialProbe) == expectedIdentity");
     expect(server).toContain("signalExactProcess(expectedIdentity, signal: SIGTERM)");
-    expect(server).toContain('env["AIRMCP_APP_RUNTIME_OWNER_SECRET"] = ownerSecret');
+    expect(server).toContain('env["AIRMCP_APP_RUNTIME_OWNER_PATH"] = AppRuntimeToken.ownerSecretURL.path');
+    expect(server).toContain('env["AIRMCP_APP_RUNTIME_TOKEN_PATH"] = AppRuntimeToken.tokenURL.path');
+    expect(server).not.toContain('env["AIRMCP_APP_RUNTIME_OWNER_SECRET"]');
+    expect(server).not.toContain('env["AIRMCP_HTTP_TOKEN"]');
     expect(onboarding).not.toContain("AIRMCP_APP_RUNTIME_OWNER_SECRET");
     expect(server).toContain("stopOperationGeneration == nil");
     expect(server).toContain("canStopRuntime");

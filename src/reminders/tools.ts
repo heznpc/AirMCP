@@ -59,6 +59,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
     async () => {
       try {
         const result = await runAutomation<RemindersListInfo[]>({
+          readOnly: true,
           swift: { command: "list-reminder-lists" },
           jxa: () => listReminderListsScript(),
         });
@@ -120,6 +121,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
     async ({ list, completed, limit, offset }) => {
       try {
         const result = await runAutomation<RemindersListOutput>({
+          readOnly: true,
           swift: {
             command: "list-reminders",
             input: { list, completed, limit, offset },
@@ -164,6 +166,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
     async ({ id }) => {
       try {
         const result = await runAutomation<RemindersReadOutput>({
+          readOnly: true,
           swift: { command: "read-reminder", input: { id } },
           jxa: () => readReminderScript(id),
         });
@@ -358,6 +361,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
     async ({ query, limit }) => {
       try {
         const result = await runAutomation<RemindersSearchOutput>({
+          readOnly: true,
           swift: {
             command: "search-reminders",
             input: { query, limit },

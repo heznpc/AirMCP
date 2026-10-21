@@ -121,6 +121,7 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
     async ({ limit, offset }) => {
       try {
         const result = await runAutomation<ContactListResult>({
+          readOnly: true,
           swift: { command: "list-contacts", input: { limit, offset } },
           jxa: () => listContactsScript(limit, offset),
         });
@@ -159,6 +160,7 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
     async ({ query, limit }) => {
       try {
         const result = await runAutomation<ContactSearchResult>({
+          readOnly: true,
           swift: { command: "search-contacts", input: { query, limit } },
           jxa: () => searchContactsScript(query, limit),
         });
@@ -204,6 +206,7 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
     async ({ id }) => {
       try {
         const result = await runAutomation<ContactDetail>({
+          readOnly: true,
           swift: { command: "read-contact", input: { id } },
           jxa: () => readContactScript(id),
         });
@@ -322,6 +325,7 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
     async () => {
       try {
         const result = await runAutomation<GroupInfo[]>({
+          readOnly: true,
           swift: { command: "list-groups" },
           jxa: () => listGroupsScript(),
         });
@@ -414,6 +418,7 @@ export function registerContactTools(server: McpServer, _config: AirMcpConfig): 
     async ({ groupName, limit }) => {
       try {
         const result = await runAutomation<GroupMembersResult>({
+          readOnly: true,
           swift: { command: "list-group-members", input: { groupName, limit } },
           jxa: () => listGroupMembersScript(groupName, limit),
         });

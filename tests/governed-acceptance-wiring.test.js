@@ -115,8 +115,10 @@ describe("governed app-owned acceptance wiring", () => {
     expect(constants).toContain('envStr("AIRMCP_HITL_SOCKET_PATH"');
     expect(tokenNode).toContain("process.env.AIRMCP_APP_RUNTIME_TOKEN_PATH");
     expect(tokenSwift).toContain('environment["AIRMCP_APP_RUNTIME_TOKEN_PATH"]');
-    expect(bundle).toContain('AIRMCP_VECTOR_STORE_DIR="$GOVERNED_STATE_DIR/audit"');
-    expect(bundle).toContain('AIRMCP_EMERGENCY_STOP_PATH="$GOVERNED_STATE_DIR/emergency-stop"');
+    expect(bundle).toContain('AIRMCP_VECTOR_STORE_DIR="$GOVERNED_STATE_DIR/home/.airmcp"');
+    expect(bundle).toContain('AIRMCP_EMERGENCY_STOP_PATH="$GOVERNED_STATE_DIR/home/.config/airmcp/emergency-stop"');
+    expect(bundle).toContain('"$GOVERNED_STATE_DIR/home/.config/airmcp/config.json"');
+    expect(bundle).toContain('"$GOVERNED_STATE_DIR/home/.airmcp/audit-hmac.key"');
     expect(bundle).toContain('CFFIXED_USER_HOME="$GOVERNED_STATE_DIR/home"');
   });
 

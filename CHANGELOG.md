@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- App-owned runtimes read bearer and ownership credentials from private, owner-only files instead of inheriting their values in the process environment. Invalid files fail closed; standalone CLI environment tokens remain supported. Runtime launches now sanitize inherited loader flags, paths, and runtime overrides.
+- Update MCP SDK to 1.32.1 and refresh vulnerable runtime and documentation-site dependencies. Production and documentation dependency audits are clean. The development-only Jest dependency chain still reports the unpatched `sprintf-js` precision denial-of-service advisory (GHSA-hp3w-g68c-fv3c).
+
+### Fixed
+
+- Prevent duplicate mutations by disabling automatic JXA retries and Swift-to-JXA replay unless an operation explicitly declares itself read-only. JXA failures use subprocess diagnostics without exposing generated scripts or private paths.
+- Serialize Swift bridge requests, start execution timeouts at dispatch, terminate a timed-out bridge, and reject its queued requests. Isolate embedding and observer processes so command recovery cannot stop native observers, and ignore lifecycle events from replaced processes.
+
 ## [2.16.5] - 2026-08-13
 
 ### Added

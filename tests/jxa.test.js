@@ -24,4 +24,188 @@ describe('JXA module', () => {
     expect(typeof mod.runJxa).toBe('function');
     expect(typeof mod.runAppleScript).toBe('function');
   });
+
+  test('executes JXA with the fixed system osascript path', async () => {
+    const { execFile } = await import('node:child_process');
+    execFile.mockClear();
+    execFile.mockImplementationOnce((_path, _args, _options, callback) => {
+      const child = {
+        on: jest.fn(),
+        killed: false,
+        exitCode: null,
+        kill: jest.fn(),
+      };
+      queueMicrotask(() => callback(null, '{"ok":true}\n'));
+      return child;
+    });
+
+    const mod = await import('../dist/shared/jxa.js');
+    await expect(mod.runJxa('JSON.stringify({ ok: true })')).resolves.toEqual({ ok: true });
+    expect(execFile).toHaveBeenCalledWith(
+      '/usr/bin/osascript',
+      ['-l', 'JavaScript', '-e', 'JSON.stringify({ ok: true })'],
+      { timeout: 30000, maxBuffer: 10 * 1024 * 1024 },
+      expect.any(Function),
+    );
+  });
+
+  test('uses stderr without classifying an error code embedded in the generated script', async () => {
+    const { execFile } = await import('node:child_process');
+    execFile.mockClear();
+    execFile.mockImplementationOnce((_path, args, _options, callback) => {
+      const child = {
+        on: jest.fn(),
+        killed: false,
+        exitCode: null,
+        kill: jest.fn(),
+      };
+      const error = new Error(`Command failed: /usr/bin/osascript -l JavaScript -e ${args.at(-1)}`);
+      queueMicrotask(() =>
+        callback(error, '', 'execution error: Screen Recording permission denied for AirMCP. (-2700)\n'),
+      );
+      return child;
+    });
+
+    const mod = await import('../dist/shared/jxa.js');
+    await expect(mod.runJxa("const userText = '-1743'; throw new Error('capture failed');")).rejects.toThrow(
+      'osascript error: execution error: Screen Recording permission denied for AirMCP. (-2700)',
+    );
+    expect(execFile).toHaveBeenCalledTimes(1);
+  });
+
+  test('does not retry when only the generated script contains a transient error marker', async () => {
+    const { execFile } = await import('node:child_process');
+    execFile.mockClear();
+    execFile.mockImplementation((_path, args, _options, callback) => {
+      const child = {
+        on: jest.fn(),
+        killed: false,
+        exitCode: null,
+        kill: jest.fn(),
+      };
+      const error = new Error(`Command failed: /usr/bin/osascript -l JavaScript -e ${args.at(-1)}`);
+      queueMicrotask(() => callback(error, '', ''));
+      return child;
+    });
+
+    const mod = await import('../dist/shared/jxa.js');
+    await expect(mod.runJxa("const userText = '-1728'; throw new Error('ordinary failure');")).rejects.toThrow(
+      'osascript error: Command failed: /usr/bin/osascript -l JavaScript -e [script]',
+    );
+    expect(execFile).toHaveBeenCalledTimes(1);
+  });
+
+  test("does not retry when stderr user text contains -1728 but osascript's final code is -2700", async () => {
+    const { execFile } = await import('node:child_process');
+    execFile.mockClear();
+    execFile.mockImplementation((_path, _args, _options, callback) => {
+      const child = {
+        on: jest.fn(),
+        killed: false,
+        exitCode: null,
+        kill: jest.fn(),
+      };
+      const error = new Error('Command failed: /usr/bin/osascript');
+      queueMicrotask(() => callback(error, '', 'execution error: Error: Error: ordinary failure -1728 (-2700)\n'));
+      return child;
+    });
+
+    const mod = await import('../dist/shared/jxa.js');
+    await expect(
+      mod.runJxa("throw new Error('ordinary failure -1728')", undefined, { retryMode: 'read-only' }),
+    ).rejects.toThrow('osascript error: execution error: Error: Error: ordinary failure -1728 (-2700)');
+    expect(execFile).toHaveBeenCalledTimes(1);
+  });
+
+  test('does not replay a write after a genuine terminal Apple -1728 error by default', async () => {
+    const { execFile } = await import('node:child_process');
+    execFile.mockClear();
+    execFile.mockImplementation((_path, _args, _options, callback) => {
+      const child = {
+        on: jest.fn(),
+        killed: false,
+        exitCode: null,
+        kill: jest.fn(),
+      };
+      const error = new Error('Command failed: /usr/bin/osascript');
+      queueMicrotask(() => callback(error, '', 'execution error: Error: Object not found. (-1728)\n'));
+      return child;
+    });
+
+    const mod = await import('../dist/shared/jxa.js');
+    await expect(mod.runJxa('applyWriteThenReadUid()')).rejects.toThrow(
+      'osascript error: Object not found — the app may need to be opened first (-1728)',
+    );
+    expect(execFile).toHaveBeenCalledTimes(1);
+  });
+
+  test('retries a genuine terminal Apple -1728 error only in explicit read-only mode', async () => {
+    const { execFile } = await import('node:child_process');
+    execFile.mockClear();
+    execFile
+      .mockImplementationOnce((_path, _args, _options, callback) => {
+        const child = {
+          on: jest.fn(),
+          killed: false,
+          exitCode: null,
+          kill: jest.fn(),
+        };
+        const error = new Error('Command failed: /usr/bin/osascript');
+        queueMicrotask(() => callback(error, '', 'execution error: Error: Object not found. (-1728)\n'));
+        return child;
+      })
+      .mockImplementationOnce((_path, _args, _options, callback) => {
+        const child = {
+          on: jest.fn(),
+          killed: false,
+          exitCode: null,
+          kill: jest.fn(),
+        };
+        queueMicrotask(() => callback(null, '{"ok":true}\n', ''));
+        return child;
+      });
+
+    const mod = await import('../dist/shared/jxa.js');
+    await expect(
+      mod.runJxa('JSON.stringify({ ok: true })', undefined, { retryMode: 'read-only' }),
+    ).resolves.toEqual({ ok: true });
+    expect(execFile).toHaveBeenCalledTimes(2);
+  });
+
+  test('scrubs an entire user path when it contains spaces', async () => {
+    const { execFile } = await import('node:child_process');
+    execFile.mockClear();
+    execFile.mockImplementationOnce((_path, _args, _options, callback) => {
+      const child = {
+        on: jest.fn(),
+        killed: false,
+        exitCode: null,
+        kill: jest.fn(),
+      };
+      const error = new Error('Command failed: /usr/bin/osascript');
+      queueMicrotask(() =>
+        callback(
+          error,
+          '',
+          'execution error: Could not open /Users/alice/Medical Records/diagnosis.pdf because access failed (-2700)\n',
+        ),
+      );
+      return child;
+    });
+
+    const mod = await import('../dist/shared/jxa.js');
+    let caught;
+    try {
+      await mod.runJxa('throw new Error("file failure")');
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(Error);
+    expect(caught.message).toContain('osascript error: execution error: Could not open [path]');
+    expect(caught.message).not.toContain('/Users/');
+    expect(caught.message).not.toContain('Medical Records');
+    expect(caught.message).not.toContain('diagnosis.pdf');
+    expect(caught.cause).toBeUndefined();
+    expect(execFile).toHaveBeenCalledTimes(1);
+  });
 });

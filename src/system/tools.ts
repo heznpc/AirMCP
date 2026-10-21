@@ -73,6 +73,7 @@ export function registerSystemTools(server: McpServer, _config: AirMcpConfig): v
       try {
         return okUntrustedStructured(
           await runAutomation<{ content: string; length: number; truncated: boolean }>({
+            readOnly: true,
             swift: { command: "get-clipboard" },
             jxa: () => getClipboardScript(),
           }),

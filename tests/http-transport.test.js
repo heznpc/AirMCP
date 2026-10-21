@@ -1,4 +1,8 @@
 import { describe, test, expect, jest, beforeAll, beforeEach, afterEach } from "@jest/globals";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { runtimeHttpToken } from "../dist/shared/runtime-credentials.js";
 
 const nativeSetInterval = globalThis.setInterval;
 const nativeClearInterval = globalThis.clearInterval;
@@ -596,6 +600,7 @@ describe("startHttpServer live middleware", () => {
     resetIpRateLimit();
     delete process.env.AIRMCP_APP_OWNED_RUNTIME;
     delete process.env.AIRMCP_APP_RUNTIME_OWNER_SECRET;
+    delete process.env.AIRMCP_APP_RUNTIME_OWNER_PATH;
     errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
   });
 
@@ -610,6 +615,7 @@ describe("startHttpServer live middleware", () => {
     delete process.env.AIRMCP_OAUTH_TOKEN_ENDPOINT_AUTH_METHODS;
     delete process.env.AIRMCP_APP_OWNED_RUNTIME;
     delete process.env.AIRMCP_APP_RUNTIME_OWNER_SECRET;
+    delete process.env.AIRMCP_APP_RUNTIME_OWNER_PATH;
   });
 
   function options(overrides = {}) {
@@ -821,6 +827,35 @@ describe("startHttpServer live middleware", () => {
       expect(JSON.stringify(state)).not.toContain("a".repeat(43));
     } finally {
       await closeServer(server);
+    }
+  });
+
+  test("private file credentials authenticate and prove app ownership without environment secrets", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "airmcp-http-credentials-"));
+    const tokenPath = join(directory, "token");
+    const ownerPath = join(directory, "owner");
+    const token = "t".repeat(43);
+    const owner = "o".repeat(43);
+    writeFileSync(tokenPath, token + "\n", { mode: 0o600 });
+    writeFileSync(ownerPath, owner + "\n", { mode: 0o600 });
+    process.env.AIRMCP_APP_OWNED_RUNTIME = "1";
+    process.env.AIRMCP_APP_RUNTIME_OWNER_PATH = ownerPath;
+    let server;
+    try {
+      server = await startHttpServer(options({ httpToken: runtimeHttpToken({ AIRMCP_APP_RUNTIME_TOKEN_PATH: tokenPath }) }));
+      expect((await fetch(serverUrl(server, "/app/runtime-state"))).status).toBe(401);
+      const response = await fetch(serverUrl(server, "/app/runtime-state"), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      expect(response.status).toBe(200);
+      const state = await response.json();
+      const { runtimeOwnerFingerprint } = await import("../dist/server/http-transport.js");
+      expect(state.ownerFingerprint).toBe(runtimeOwnerFingerprint(owner));
+      expect(JSON.stringify(state)).not.toContain(token);
+      expect(JSON.stringify(state)).not.toContain(owner);
+    } finally {
+      if (server) await closeServer(server);
+      rmSync(directory, { recursive: true, force: true });
     }
   });
 

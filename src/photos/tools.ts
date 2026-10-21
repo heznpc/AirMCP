@@ -111,6 +111,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
     async () => {
       try {
         const result = await runAutomation<AlbumItem[]>({
+          readOnly: true,
           swift: { command: "list-albums" },
           jxa: () => listAlbumsScript(),
         });
@@ -158,6 +159,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
     async ({ album, limit, offset }) => {
       try {
         const result = await runAutomation<PhotoListResult>({
+          readOnly: true,
           swift: {
             command: "list-photos",
             input: { albumName: album, limit, offset },
@@ -204,6 +206,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
     async ({ query, limit }) => {
       try {
         const result = await runAutomation<SearchPhotosResult>({
+          readOnly: true,
           swift: {
             command: "search-photos",
             input: { query, limit },
@@ -251,6 +254,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
     async ({ id }) => {
       try {
         const result = await runAutomation<PhotoDetail>({
+          readOnly: true,
           swift: {
             command: "get-photo-info",
             input: { id },
@@ -298,6 +302,7 @@ export function registerPhotosTools(server: McpServer, _config: AirMcpConfig): v
     async ({ limit }) => {
       try {
         const result = await runAutomation<FavoritesResult>({
+          readOnly: true,
           swift: {
             command: "list-favorites",
             input: { limit },

@@ -70,6 +70,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
     async () => {
       try {
         const result = await runAutomation<CalendarInfo[]>({
+          readOnly: true,
           swift: { command: "list-calendars" },
           jxa: () => listCalendarsScript(),
         });
@@ -125,6 +126,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
     async ({ startDate, endDate, calendar, limit, offset }) => {
       try {
         const result = await runAutomation<CalendarListEventsOutput>({
+          readOnly: true,
           swift: {
             command: "list-events",
             input: { startDate, endDate, calendar, limit, offset },
@@ -176,6 +178,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
     async ({ id }) => {
       try {
         const result = await runAutomation<CalendarReadEventOutput>({
+          readOnly: true,
           swift: { command: "read-event", input: { id } },
           jxa: () => readEventScript(id),
         });
@@ -332,6 +335,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
     async ({ query, startDate, endDate, limit }) => {
       try {
         const result = await runAutomation<CalendarSearchEventsOutput>({
+          readOnly: true,
           swift: {
             command: "search-events",
             input: { query, startDate, endDate, limit },
@@ -379,6 +383,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
     async ({ limit }) => {
       try {
         const result = await runAutomation<CalendarUpcomingEventsOutput>({
+          readOnly: true,
           swift: { command: "get-upcoming-events", input: { limit } },
           jxa: () => getUpcomingEventsScript(limit),
         });
@@ -422,6 +427,7 @@ export function registerCalendarTools(server: McpServer, _config: AirMcpConfig):
     async () => {
       try {
         const result = await runAutomation<CalendarTodayEventsOutput>({
+          readOnly: true,
           swift: { command: "today-events" },
           jxa: () => todayEventsScript(),
         });

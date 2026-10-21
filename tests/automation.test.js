@@ -49,12 +49,13 @@ describe('runAutomation', () => {
     expect(runSwift).not.toHaveBeenCalled();
   });
 
-  test('falls back to JXA when Swift bridge fails', async () => {
+  test('falls back to JXA after a failed explicit read', async () => {
     hasSwiftCommand.mockResolvedValue(true);
     runSwift.mockRejectedValue(new Error('Swift bridge crashed'));
     runJxa.mockResolvedValue({ data: 'fallback' });
 
     const result = await runAutomation({
+      readOnly: true,
       swift: { command: 'get-clipboard', input: {} },
       jxa: () => 'JSON.stringify({data:"fallback"})',
     });
@@ -62,6 +63,32 @@ describe('runAutomation', () => {
     expect(result).toEqual({ data: 'fallback' });
     expect(runSwift).toHaveBeenCalled();
     expect(runJxa).toHaveBeenCalled();
+  });
+
+  test.each([undefined, false])('does not replay an attempted write (readOnly=%s)', async (readOnly) => {
+    hasSwiftCommand.mockResolvedValue(true);
+    const error = new Error('Swift bridge timed out after applying the mutation');
+    runSwift.mockRejectedValue(error);
+    const jxa = jest.fn(() => 'createReminder()');
+
+    await expect(runAutomation({
+      readOnly,
+      swift: { command: 'create-reminder' },
+      jxa,
+    })).rejects.toBe(error);
+
+    expect(runSwift).toHaveBeenCalledTimes(1);
+    expect(jxa).not.toHaveBeenCalled();
+    expect(runJxa).not.toHaveBeenCalled();
+  });
+
+  test('enables JXA retries only for explicit reads', async () => {
+    hasSwiftCommand.mockResolvedValue(false);
+    runJxa.mockResolvedValue({});
+    await runAutomation({ readOnly: true, swift: { command: 'read-reminder' }, jxa: () => 'read()' });
+    expect(runJxa).toHaveBeenLastCalledWith('read()', undefined, { retryMode: 'read-only' });
+    await runAutomation({ swift: { command: 'create-reminder' }, jxa: () => 'write()' });
+    expect(runJxa).toHaveBeenLastCalledWith('write()', undefined, undefined);
   });
 
   test('serializes Swift input as JSON', async () => {

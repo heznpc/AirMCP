@@ -121,3 +121,8 @@ Archive/deprecation is not part of the maintenance integration itself.
 - The owner authorized the final maintenance release, published-version
   follow-up on both reports, final inventory, and repository archival.
   Publication and archive completion must be recorded only after verification.
+
+- Release preflight exposed a verification-harness mismatch after #506: app-owned
+  children correctly reject inherited runtime overrides. The app acceptance and
+  signed-artifact probes now use normal config locations under their disposable
+  home, preserving the hardened environment boundary.

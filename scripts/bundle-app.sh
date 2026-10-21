@@ -444,7 +444,7 @@ setup_governed_environment() {
 
   GOVERNED_STATE_PARENT="${GOVERNED_STATE_PARENT%/}"
   GOVERNED_STATE_DIR="$(mktemp -d "$GOVERNED_STATE_PARENT/airmcp-governed.XXXXXX")"
-  mkdir -p "$GOVERNED_STATE_DIR/home" "$GOVERNED_STATE_DIR/audit" "$GOVERNED_STATE_DIR/tmp"
+  mkdir -p "$GOVERNED_STATE_DIR/home/.config/airmcp" "$GOVERNED_STATE_DIR/home/.airmcp" "$GOVERNED_STATE_DIR/tmp"
   config_path="$GOVERNED_STATE_DIR/config.json"
   node -e '
     const fs = require("fs");
@@ -458,9 +458,16 @@ setup_governed_environment() {
     fs.writeFileSync(path, JSON.stringify(config, null, 2) + "\n", { mode: 0o600 });
   ' "$config_path"
 
-  # Swift reads the temp config and keeps its notification/socket UI off. The
-  # Node child deliberately overrides HITL back to sensitive-only so the MCP
-  # elicitation client exercises the production approval gate.
+  # Swift reads the UI-only config with HITL off. The hardened Node child does
+  # not inherit AIRMCP_* overrides: put its runtime config and audit key at
+  # their production locations under the disposable Foundation home.
+  node -e '
+    const fs = require("fs");
+    const config = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+    config.hitl.level = "sensitive-only";
+    fs.writeFileSync(process.argv[2], JSON.stringify(config), { mode: 0o600 });
+    fs.writeFileSync(process.argv[3], require("crypto").randomBytes(32).toString("hex"), { mode: 0o600 });
+  ' "$config_path" "$GOVERNED_STATE_DIR/home/.config/airmcp/config.json" "$GOVERNED_STATE_DIR/home/.airmcp/audit-hmac.key"
   export HOME="$GOVERNED_STATE_DIR/home"
   # Foundation's NSHomeDirectory ignores HOME on macOS. This supported test
   # override moves the app's fixed home-relative surfaces (including its HITL
@@ -473,15 +480,12 @@ setup_governed_environment() {
   export AIRMCP_HITL_LEVEL="sensitive-only"
   export AIRMCP_HITL_SOCKET_PATH="$GOVERNED_STATE_DIR/hitl.sock"
   export AIRMCP_APP_RUNTIME_TOKEN_PATH="$GOVERNED_STATE_DIR/http-token"
-  export AIRMCP_MEMORY_STORE_PATH="$GOVERNED_STATE_DIR/memory.json"
-  export AIRMCP_VECTOR_STORE_DIR="$GOVERNED_STATE_DIR/audit"
+  export AIRMCP_MEMORY_STORE_PATH="$GOVERNED_STATE_DIR/home/.cache/airmcp/memory.json"
+  export AIRMCP_VECTOR_STORE_DIR="$GOVERNED_STATE_DIR/home/.airmcp"
   export AIRMCP_USAGE_PROFILE_PATH="$GOVERNED_STATE_DIR/usage.json"
-  export AIRMCP_EMERGENCY_STOP_PATH="$GOVERNED_STATE_DIR/emergency-stop"
+  export AIRMCP_EMERGENCY_STOP_PATH="$GOVERNED_STATE_DIR/home/.config/airmcp/emergency-stop"
   export AIRMCP_TEMP_DIR="$GOVERNED_STATE_DIR/tmp"
   export AIRMCP_AUDIT_LOG="true"
-  export AIRMCP_AUDIT_FLUSH_INTERVAL="25"
-  export AIRMCP_AUDIT_HMAC_KEY
-  AIRMCP_AUDIT_HMAC_KEY="$(node -e 'process.stdout.write(require("crypto").randomBytes(32).toString("hex"))')"
   export AIRMCP_RATE_LIMIT="true"
   export AIRMCP_ELICITATION_DISABLE="false"
   export AIRMCP_FORCE_APP_RUNTIME="1"
@@ -490,6 +494,7 @@ setup_governed_environment() {
 }
 
 verify_governed_workflow() {
+  # Allow the production 30-second audit flush; the child ignores env overrides.
   local output
   if ! output="$(
     node "$SCRIPT_DIR/verify-governed-workflow.mjs" \
@@ -498,7 +503,7 @@ verify_governed_workflow() {
       --memory-store "$AIRMCP_MEMORY_STORE_PATH" \
       --audit-dir "$AIRMCP_VECTOR_STORE_DIR" \
       --emergency-stop "$AIRMCP_EMERGENCY_STOP_PATH" \
-      --timeout-ms 10000 2>&1
+      --timeout-ms 40000 2>&1
   )"; then
     echo "✗ governed workflow acceptance failed" >&2
     echo "$output" >&2

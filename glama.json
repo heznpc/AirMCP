@@ -1,7 +1,7 @@
 {
   "$schema": "https://glama.ai/mcp/schemas/server.json",
   "name": "AirMCP",
-  "description": "Governed MCP runtime for the Apple ecosystem, available on macOS for Notes, Mail, Calendar, Reminders, Shortcuts, and more.",
+  "description": "Maintenance ended. v2.16.6 is the final release of this MCP runtime connecting AI clients to Apple apps on macOS. Source and history are preserved for forks.",
   "icon": "https://raw.githubusercontent.com/heznpc/AirMCP/main/icons/airmcp-icon-256.png",
   "category": "automation",
   "maintainers": [

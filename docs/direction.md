@@ -1,5 +1,7 @@
 # AirMCP — Apple 생태계의 통제형 MCP 런타임
 
+> **2026-10-22 종료 안내:** 최종 유지보수 버전은 [v2.16.6](https://github.com/heznpc/AirMCP/releases/tag/v2.16.6)입니다. 추가 개발·지원은 종료하며, 아래 방향과 로드맵은 당시 기록입니다. 지정된 후속 프로젝트는 없습니다. 소스·이력은 [포크](https://github.com/heznpc/AirMCP/fork)를 위해 보존합니다.
+
 > **Governed MCP runtime for the Apple ecosystem.**
 > 갱신일: 2026-07-24 (macOS는 현재 제공 플랫폼으로 유지하되 제품 정체성은 Apple 생태계 전체의 통제형 런타임으로 확정.)
 

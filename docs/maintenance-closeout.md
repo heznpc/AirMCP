@@ -1,10 +1,11 @@
 # AirMCP maintenance closeout
 
-Snapshot: 2026-10-21. Release preparation: **2.16.6**.
+Closeout snapshot: 2026-10-22 (KST). Final maintenance version: **2.16.6**.
 
 Original integration snapshot: 2026-09-11. This ledger separates source integration from published
-releases. The registry's current `airmcp@latest` is **2.16.5**; the maintenance
-changes below are not included in that published version.
+releases. The final release source is
+[`e22e07a5484175a857fa861bbda2aa8325402dee`](https://github.com/heznpc/AirMCP/commit/e22e07a5484175a857fa861bbda2aa8325402dee),
+prepared in [PR #509](https://github.com/heznpc/AirMCP/pull/509).
 
 ## Preserved source
 
@@ -40,7 +41,7 @@ See the [JSON Schema array reference](https://json-schema.org/understanding-json
 The docs site's remaining audit finding, [GHSA-7w5x-hrqm-74c2](https://github.com/advisories/GHSA-7w5x-hrqm-74c2),
 is addressed by updating its locked `smol-toml` from 1.7.0 to 1.8.0.
 
-## Validation evidence
+## Integration validation evidence (2026-09-11)
 
 - Node 22: 233 suites / 2,965 tests pass with coverage thresholds enabled;
   lint, typecheck, formatting, and build pass.
@@ -67,7 +68,7 @@ is addressed by updating its locked `smol-toml` from 1.7.0 to 1.8.0.
 | [#406](https://github.com/heznpc/AirMCP/pull/406), [#412](https://github.com/heznpc/AirMCP/pull/412), [#415](https://github.com/heznpc/AirMCP/pull/415), [#417](https://github.com/heznpc/AirMCP/pull/417) | Already merged. Preserve the original PRs and authorship; no replacement commits or new closure needed.                                                                   |
 | [#418](https://github.com/heznpc/AirMCP/pull/418)                                                                                                                                                          | Draft closed by its author on 2026-07-30, followed by deletion of their head branch. No review or explanation was posted. Do not describe this as a maintainer rejection. |
 
-## Remaining remote branches
+## Preserved branch inventory (2026-09-11)
 
 The ten integration PR branches above are retained. Of the other seven remote
 branches in the starting snapshot, `main` is the release base and these six
@@ -96,17 +97,18 @@ deletion candidate merely because Git marks it merged or prunable.
 - Publish and verify the maintenance artifacts through the existing protected
   release workflow; record the actual version here and on #459/#460.
 - Keep unresolved development branches and all worktree anchors intact.
-- Prepare a public handoff that points to an actually available successor.
+- The owner clarified on 2026-10-22 (KST) that no successor project is designated.
+  Point users to the final release and preserved source/fork path.
 - Only then apply EOL messaging, npm deprecation, and repository archival.
 
 Archive/deprecation is not part of the maintenance integration itself.
 
-## Final maintenance release preparation (2026-10-21)
+## Final maintenance release preparation (2026-10-22 KST)
 
 - #506 is merged at `e0694e0d662a7e2d578c6fcd7bca506591bfd0f2`: private
   runtime credential files, read-only retries, isolated Swift process lanes,
   MCP SDK 1.32.1, and security dependency lockfile updates.
-- Dependabot #502 and #503 are closed as superseded by #506. #500's security
+- Dependabot #502 and #503 are closed as superseded by #506. #507/#508 are also closed as superseded. #500's security
   changes (SDK, qs 6.16.0, proxy-addr 2.0.8) are already present; its remaining
   upgrades are deferred. #504/#505 routine tooling updates and #485's major
   ext-apps migration are closed as outside the final maintenance scope.
@@ -126,3 +128,26 @@ Archive/deprecation is not part of the maintenance integration itself.
   children correctly reject inherited runtime overrides. The app acceptance and
   signed-artifact probes now use normal config locations under their disposable
   home, preserving the hardened environment boundary.
+
+## Final release verification (2026-10-22 KST)
+
+- Release source: `e22e07a5484175a857fa861bbda2aa8325402dee` (PR #509).
+- [Release CI](https://github.com/heznpc/AirMCP/actions/runs/39624112403):
+  234 JavaScript suites / 3,011 tests; Swift app 106 tests, widget 10,
+  AirMCPKit 31, iOS server 23. Lint, typecheck, formatting, build, smoke,
+  registry introspection, generated contracts and package boundaries pass.
+- The governed app preflight passes authenticated HTTP/MCP, read calls,
+  approved/denied writes, emergency stop and audit verification.
+- Fresh public `airmcp@2.16.6` installation boots the full 297-tool surface.
+  Actual macOS Finder calls with omitted and explicit home folders return
+  matching non-empty results for `search_files` and `recent_files` (`days: 2`);
+  a nonexistent folder reports an error.
+- The documentation site builds all 34 pages with the maintenance-ended notice.
+- Final branch/worktree scan found 11 registered worktrees. All existing
+  development branches, worktrees and source-provenance tags are preserved.
+- Open Dependabot alerts: 0. Open secret-scanning alerts: 0. The 19 remaining
+  code-scanning entries are Scorecard recommendations, not new CodeQL runtime
+  findings. The development-only dependency caveat above remains recorded.
+- The outstanding Cline marketplace registration was closed. Owner-authored
+  open external AirMCP issue/PR searches returned no remaining registrations;
+  repository discussions: 0.

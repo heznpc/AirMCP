@@ -161,7 +161,19 @@ Breaking을 포함한 minor/patch는 **금지**. 직전 메이저에 묶어 둘 
   root와 모든 add-on의 로컬 `npm pack` SHA-512 SRI, registry
   `dist.integrity`, registry `gitHead`, `github.sha`가 모두 일치할 때만
   멱등 skip하며 하나라도 다르거나 registry 조회가 불확실하면 실패해야 한다.
-- [ ] `NPM_TOKEN`을 쓰는 경우 `npm whoami`가 통과하고 해당 토큰이 `airmcp` publish 권한을 가진 automation/granular token인지 확인. 토큰이 비어 있으면 npm trusted publishing이 GitHub environment `npm` + 이 workflow에 설정되어 있어야 한다.
+- [ ] 자동 배포(`auto-release.yml`)는 repository variable `NPM_AUTH_MODE`를
+  CD의 `npm_auth_mode` 입력으로 전달한다. 변수가 없거나 비어 있으면 `token`을
+  사용하며, `token`과 `trusted-publishing` 외의 값은 dispatch 전에 거부한다.
+  수동 CD dispatch의 기본값은 `trusted-publishing`이므로 재시도할 인증 모드를
+  명시적으로 선택한다.
+- [ ] `token` 모드는 `NPM_TOKEN`이 필요하다. `npm whoami` 통과와 별도로
+  root 및 모든 add-on에 대한 publish 권한을 확인한다. 토큰 누락 시 다른
+  인증 모드로 자동 전환하지 않는다.
+- [ ] `trusted-publishing`을 선택하기 전에 root와 모든 add-on 각각의 npm
+  설정을 확인한다: GitHub `heznpc/AirMCP`, workflow `cd.yml`, environment
+  `npm`, direct `npm publish` 허용. 인증된 maintainer의
+  `npm trust list <package> --json` 또는 npm package settings로 확인하며,
+  root publish 성공만으로 add-on 연결까지 검증됐다고 판단하지 않는다.
 - [ ] 호환성 add-on을 publish했다면 `npm view @heznpc/airmcp-productivity@X.Y.Z` 등 scoped package가 같은 버전으로 반영됐는지 확인
 - [ ] `npm view airmcp@X.Y.Z` 로 반영 검증
 - [ ] `npx -y airmcp@X.Y.Z --version` 스모크

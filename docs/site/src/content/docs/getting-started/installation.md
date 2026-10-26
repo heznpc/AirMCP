@@ -17,6 +17,13 @@ AirMCP.app is a third, app-owned runtime path. Use it only when the release you
 are installing actually lists a signed `AirMCP-<version>.zip` asset. If that ZIP
 is absent, there is no public app to start; use `.mcpb` or direct stdio instead.
 
+As of **2026-10-27 KST**, v2.16.7 is published on npm and has a downloadable
+MCPB extension. **There is no `AirMCP-2.16.7.zip` yet:** the signed-app workflow
+stopped at Apple notarization account authentication. An older app does not
+include the v2.16.7 fixes. The
+[release verification record](https://github.com/heznpc/AirMCP/blob/main/docs/maintenance-closeout.md)
+tracks the completed checks and the remaining distribution gate.
+
 ## Claude Desktop: install the `.mcpb`
 
 1. Open [GitHub Releases](https://github.com/heznpc/AirMCP/releases).

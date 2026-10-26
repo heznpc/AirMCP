@@ -15,6 +15,12 @@ Messages, Photos, Safari, Finder, and Shortcuts on your machine — your actual
 data, not a copy and not a sandbox. The macOS runtime is available today; the
 iOS runtime is in preview.
 
+> **Release status (2026-10-27 KST):** v2.16.7 is available through npm and
+> the MCPB extension. Its macOS app ZIP is still unavailable because Apple
+> notarization authentication failed. Use the [CLI](#cli-wizard) or
+> [MCPB](docs/mcpb.md) path; see the [release verification record](docs/maintenance-closeout.md)
+> for completed checks and the remaining app-distribution gate.
+
 ```text
 "Brief me on today's calendar, overdue reminders, and unread mail."
 "For my next meeting, pull up the related notes, contacts, files, and reminders."
@@ -104,7 +110,8 @@ Full guide: [docs/mcpb.md](docs/mcpb.md).
 The desktop distribution is a Developer-ID-signed, notarized, and stapled
 `AirMCP-<version>.zip`. Check the selected version's assets in
 [Releases](https://github.com/heznpc/AirMCP/releases) before choosing this path:
-v2.16.6 has no app ZIP because its notarization submission failed. The ZIP
+v2.16.6 and v2.16.7 have no app ZIP. The v2.16.7 attempt stopped at Apple
+notarization account authentication; its app distribution is incomplete. The ZIP
 needs no build step: the embedded Node runtime, the Swift
 bridge, the menubar Trust Center, and the generated App Intents (Shortcuts
 actions) and widget are all included.

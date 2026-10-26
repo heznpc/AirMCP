@@ -147,13 +147,16 @@ Breaking을 포함한 minor/patch는 **금지**. 직전 메이저에 묶어 둘 
 - [ ] `ci.yml` 전 단계 green
 - [ ] CodeQL·Scorecard 경고 신규 없음
 
-### 3.4 universal root npm publish + optional add-ons + .mcpb → GitHub Release
+### 3.4 universal root npm publish + optional add-ons + .mcpb + signed .app → GitHub Release
 - [ ] Actions에서 **Publish to npm** (`cd.yml`)을 `main` ref로 수동
   dispatch한다. 이 workflow는 checkout SHA가 dispatch 시점의 `main`과
   일치하지 않으면 실패한다.
 - [ ] CD가 `npm run release:preflight -- --app`의 governed app acceptance를
   통과한 후 universal root/add-on을 publish하고, 고정된 `github.sha`에
   `vX.Y.Z` tag·GitHub Release·`.mcpb`를 생성하는지 확인한다.
+- [ ] `SIGNED_APP_RELEASE=true`가 publish 전에 검증되는지 확인한다. CD는
+  signed app workflow를 호출한 뒤 해당 실행의 승인·완료를 기다리며,
+  실패·취소·시간 초과 또는 앱 asset 누락을 전체 릴리스 실패로 전달해야 한다.
 - [ ] 같은 버전이 npm에 이미 존재하는 재시도는 자동으로 신뢰하지 않는다.
   root와 모든 add-on의 로컬 `npm pack` SHA-512 SRI, registry
   `dist.integrity`, registry `gitHead`, `github.sha`가 모두 일치할 때만
@@ -162,16 +165,17 @@ Breaking을 포함한 minor/patch는 **금지**. 직전 메이저에 묶어 둘 
 - [ ] 호환성 add-on을 publish했다면 `npm view @heznpc/airmcp-productivity@X.Y.Z` 등 scoped package가 같은 버전으로 반영됐는지 확인
 - [ ] `npm view airmcp@X.Y.Z` 로 반영 검증
 - [ ] `npx -y airmcp@X.Y.Z --version` 스모크
-- [ ] Release에 `airmcp-X.Y.Z.mcpb`가 첨부되어 있는지 확인 (Claude Desktop 원클릭 설치용)
-- [ ] `npm run release:verify -- --version=X.Y.Z` 로 universal root npm latest, scoped add-on 버전, fresh registry install/import, fresh `npx`, GitHub Release `.mcpb` asset을 한 번에 검증
+- [ ] Release에 `airmcp-X.Y.Z.mcpb`와 `AirMCP-X.Y.Z.zip`가 모두 첨부되어 있고, 두 asset의 상태가 `uploaded`이며 크기가 0보다 큰지 확인
+- [ ] `npm run release:verify -- --version=X.Y.Z` 로 universal root npm latest, scoped add-on 버전, fresh registry install/import, fresh `npx`, GitHub Release `.mcpb`와 signed app asset을 한 번에 검증
 
 ### 3.5 Signed .app → GitHub Release
 
-> **현재 판정: HOLD (2026-07-11).** GitHub의 `release` environment는
-> 존재하지만 required reviewer, admin-bypass 차단, deployment tag policy가
-> 아직 설정되지 않았고 Apple signing secret도 등록되지 않았다. 코드의
-> signed lane은 이 상태에서 의도적으로 실패한다. 외부 설정과 identity
-> 조건을 아래 순서로 닫기 전에는 secret 등록·서명·공증을 시작하지 않는다.
+> **설정 확인: 2026-10-26.** `release` environment의 required reviewer,
+> admin-bypass 차단, tag deployment policy와 6개 signing secret의 존재,
+> `SIGNED_APP_RELEASE=true`를 확인했다. Secret의 존재는 Apple 인증 성공을
+> 보장하지 않는다. v2.16.6은 공증 단계에서 실패하여 `.mcpb`만 배포됐으며,
+> signed app 배포가 완료된 릴리스로 취급할 수 없다. 매 릴리스에서 아래
+> API·계정·공증·asset 검증을 모두 통과해야 한다.
 
 - [ ] Settings → Environments → `release`에 required reviewer를 설정하고,
   administrator bypass를 끄고, custom deployment tag policy `v*.*.*`
@@ -179,20 +183,27 @@ Breaking을 포함한 minor/patch는 **금지**. 직전 메이저에 묶어 둘 
 - [ ] `node scripts/verify-release-environment.mjs --repo=heznpc/AirMCP --tag=vX.Y.Z`
   가 required review + no-admin-bypass + tag-only policy를 API에서 확인한다.
 - [ ] CD가 GitHub Release를 생성한 직후 `release-app.yml`을
-  `workflow_dispatch` 이벤트로 명시적 호출했는지 확인한다.
+  `workflow_dispatch` 이벤트로 명시적 호출하고, 고유 request ID와
+  tag/SHA가 일치하는 실행만 기다리는지 확인한다.
   `GITHUB_TOKEN`이 만든 tag가 다른 workflow의 tag-push trigger를
   재귀적으로 발생시킨다고 가정하지 않는다.
+- [ ] 해당 signed job이 `release` environment 승인을 요청하면 required
+  reviewer가 검토·승인한다. 승인을 우회하지 않으며, 대기 시간 초과는
+  CD 성공으로 처리하지 않는다.
 - [ ] Signed workflow가 요청 tag를 직접 checkout하고,
   tag commit = `HEAD`, tag version = `package.json` = app/widget bundle version을
   검증하며, tag가 `origin/main`에서 도달 가능하고 기존 GitHub Release의
   exact target SHA와 같은지 확인한 후에만 서명 재료를 import하는지 확인한다.
-- [ ] signing secret이 준비된 실행은 인증서 import·앱 서명·공증 전에 `npm run release:preflight -- --app`을 다시 통과해야 한다. 이 게이트 실패는 signed app job을 즉시 중단한다.
+- [ ] 앱 빌드 전에 `node scripts/verify-notary-credentials.mjs`의 읽기 전용
+  Apple 계정 접근 검증을 통과해야 한다. 이 검증은 credential/account 문제를
+  조기에 찾으며 실제 앱의 공증 심사를 대신하지 않는다.
+- [ ] 인증서 import·앱 서명·공증 전에 `npm run release:preflight -- --app`을 다시 통과해야 한다. 이 게이트 실패는 signed app job을 즉시 중단한다.
 - [ ] Apple signing secret은 위 API gate가 통과한 `release` environment에만 저장한다.
-  secret 존재 확인도 environment 승인 후에만 실행된다. secret이
-  없으면 CD가 호출한 signed job은 변경 없이 종료하며,
-  반드시 실패시키려면 수동 dispatch에서 `require_signing=true`를 선택한다.
-- [ ] signed app 릴리스가 필요하면 아래 6개를 Settings →
-  Environments → `release` → Environment secrets에 등록:
+  secret 존재 확인도 environment 승인 후에만 실행된다. 필수 secret이
+  없으면 자동·수동 실행 모두 실패해야 한다. `require_signing` 입력은
+  기존 호출과의 호환용이며, `false`로 설정해도 이 검증을 끄지 않는다.
+- [ ] 아래 6개가 Settings → Environments → `release` → Environment
+  secrets에 등록되어 있는지 확인:
   - `APPLE_DEVELOPER_ID` — Developer ID Application certificate 공통명 (예: `Developer ID Application: Heznpc (TEAMID)`)
   - `APPLE_ID` — notarytool용 Apple ID 이메일
   - `APPLE_ID_PASSWORD` — [App-specific password](https://appleid.apple.com) (Sign-in and security → App-specific passwords)
@@ -206,6 +217,9 @@ Breaking을 포함한 minor/patch는 **금지**. 직전 메이저에 묶어 둘 
 - [ ] 성공 시 Release에 signed app 산출물이 첨부되어 있어야 함:
   - `AirMCP-X.Y.Z.zip` (Developer ID 서명 + 공증 + staple 완료)
 - [ ] `.mcpb`는 3.4의 CD workflow가 같은 Release에 이미 첨부했는지 확인
+- [ ] 앱 workflow가 성공해도 두 asset의 업로드 완료 검증이 실패하면
+  릴리스는 미완료다. 이미 publish된 npm 버전이나 tag를 이동·덮어쓰지 말고,
+  동일 source 검증을 통과하는 재시도 또는 새 패치 버전으로 복구한다.
 - [ ] 공증 실패 시 Actions에는 정제된 issue code와 `AirMCP.app` 기준 상대
   경로만 남는지 확인한다. raw `notarytool log`, submission ID, 계정·team·인증서
   주체는 공개 로그에 복사하지 않고, 필요하면 권한 있는 로컬 환경에서만 조회한다.

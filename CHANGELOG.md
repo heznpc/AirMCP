@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.16.7] - 2026-10-26
+
+### Fixed
+
+- Preserve request cancellation and validate target output schemas when tools are called through `run_tool`.
+- Apply approval mode and timeout changes while the macOS app is running, and handle notification approvals while its menu is closed.
+- Return schema-compatible Safari tab lists and string Mail message IDs.
+- Pass Shortcuts input through the supported file-input option and handle macOS shell output line endings.
+- Keep Reminders flags independent of priority: EventKit omits the unsupported flag value and rejects flag changes before modifying any fields. Report Finder tag-write failures instead of returning success.
+- Require the signed app asset before declaring a signed-enabled release complete, and distinguish notarization submission failures from acceptance.
+- Correct the MCPB installation instructions for optional Swift features.
+
+### Removed
+
+- Unsupported Shortcuts detail, delete, export, import, and duplicate tools. The macOS Shortcuts CLI does not provide these operations; the former detail tool opened the editor instead of returning details.
+
 ## [2.16.6] - 2026-10-21
 
 ### Security

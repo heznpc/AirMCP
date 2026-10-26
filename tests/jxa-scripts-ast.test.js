@@ -99,7 +99,6 @@ const FIXTURES = [
   { module: '../dist/shortcuts/scripts.js', fn: 'listShortcutsScript', args: [] },
   { module: '../dist/shortcuts/scripts.js', fn: 'runShortcutScript', args: ['x'] },
   { module: '../dist/shortcuts/scripts.js', fn: 'searchShortcutsScript', args: ['x'] },
-  { module: '../dist/shortcuts/scripts.js', fn: 'getShortcutDetailScript', args: ['x'] },
   { module: '../dist/ui/scripts.js', fn: 'uiOpenAppScript', args: ['x'] },
   { module: '../dist/ui/scripts.js', fn: 'uiTypeScript', args: ['x'] },
   { module: '../dist/ui/scripts.js', fn: 'uiPressKeyScript', args: ['a'] },

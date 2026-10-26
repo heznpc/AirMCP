@@ -34,4 +34,6 @@ description: Full CRUD for Apple Reminders with lists, search, completion, and r
 
 ## Permissions
 
-Requires **Automation** permission for Apple Reminders (JXA path) or **Reminders** permission (Swift/EventKit path). The `create_recurring_reminder` tool requires the macOS 26+ Swift bridge.
+Reminder tools prefer EventKit when the Swift bridge is available and otherwise use JXA. EventKit requires **Reminders** permission; JXA requires **Automation** permission for Apple Reminders. The `create_recurring_reminder` tool requires the macOS 26+ Swift bridge.
+
+Flag status is independent of priority. EventKit cannot read or change flags: responses omit `flagged` to indicate **unknown**, and an update containing `flagged` returns an unsupported-operation error before changing any fields. The JXA backend reads and updates the real flag without changing priority.

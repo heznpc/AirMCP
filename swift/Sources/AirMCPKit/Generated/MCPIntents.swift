@@ -2,8 +2,8 @@
 //
 // Source: docs/tool-manifest.json
 // Generator: scripts/gen-swift-intents.mjs
-// RFC 0007 Phase A.2b.2 + A.4.1 — 234 auto-selected read-only
-// tools (86 with typed drift-guards + Interactive Snippet
+// RFC 0007 Phase A.2b.2 + A.4.1 — 230 auto-selected read-only
+// tools (85 with typed drift-guards + Interactive Snippet
 // SwiftUI views) + 8 AppShortcutsProvider entries.
 // Run `npm run gen:intents` to refresh after tool metadata changes.
 // CI guards against drift via `npm run gen:intents:check`.
@@ -224,12 +224,6 @@ public struct MCPGetScreenInfoOutput: Codable, Sendable {
     }
 
     public let displays: [DisplaysItem]
-}
-
-// Output type for: get_shortcut_detail
-public struct MCPGetShortcutDetailOutput: Codable, Sendable {
-    public let shortcut: String
-    public let detail: String
 }
 
 // Output type for: get_track_info
@@ -652,7 +646,7 @@ public struct MCPListRemindersOutput: Codable, Sendable {
         public let completed: Bool
         public let dueDate: String?
         public let priority: Double
-        public let flagged: Bool
+        public let flagged: Bool?
         public let list: String
     }
 
@@ -993,7 +987,7 @@ public struct MCPReadReminderOutput: Codable, Sendable {
     public let modificationDate: String
     public let dueDate: String?
     public let priority: Double
-    public let flagged: Bool
+    public let flagged: Bool?
     public let list: String
 }
 
@@ -1147,7 +1141,7 @@ public struct MCPSearchRemindersOutput: Codable, Sendable {
         public let completed: Bool
         public let dueDate: String?
         public let priority: Double
-        public let flagged: Bool
+        public let flagged: Bool?
         public let list: String
     }
 
@@ -2538,35 +2532,6 @@ public struct DropPinIntent: AppIntent {
     }
 }
 
-// Tool: duplicate_shortcut
-@available(iOS 18, macOS 15, *)
-public struct DuplicateShortcutIntent: AppIntent {
-    nonisolated(unsafe) public static var title: LocalizedStringResource = "Duplicate Shortcut"
-    nonisolated(unsafe) public static var description = IntentDescription("Duplicate an existing Siri Shortcut. Exports the shortcut to a temporary file and re-imports it with a new name.")
-    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
-
-    public init() {}
-
-    @Parameter(title: "Name of the shortcut to duplicate (exact match)")
-    public var name: String
-
-    @Parameter(title: "Name for the duplicated shortcut")
-    public var newName: String
-
-    @MainActor
-    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
-        try await requestConfirmation(
-            actionName: .go,
-            dialog: IntentDialog("Duplicate Shortcut with AirMCP? Duplicate an existing Siri Shortcut. Exports the shortcut to a temporary file and re-imports it with a new name.")
-        )
-        let result = try await MCPIntentRouter.shared.call(
-            tool: "duplicate_shortcut",
-            args: ["name": name, "newName": newName]
-        )
-        return .result(value: result)
-    }
-}
-
 // Tool: edit_shortcut
 @available(iOS 18, macOS 15, *)
 public struct EditShortcutIntent: AppIntent {
@@ -2624,35 +2589,6 @@ public struct EventSubscribeIntent: AppIntent {
         let result = try await MCPIntentRouter.shared.call(
             tool: "event_subscribe",
             args: [String: any Sendable]()
-        )
-        return .result(value: result)
-    }
-}
-
-// Tool: export_shortcut
-@available(iOS 18, macOS 15, *)
-public struct ExportShortcutIntent: AppIntent {
-    nonisolated(unsafe) public static var title: LocalizedStringResource = "Export Shortcut"
-    nonisolated(unsafe) public static var description = IntentDescription("Export a Siri Shortcut to a .shortcut file. Uses the macOS shortcuts CLI to save the shortcut to the specified output path.")
-    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
-
-    public init() {}
-
-    @Parameter(title: "Shortcut name to export (exact match)")
-    public var name: String
-
-    @Parameter(title: "File path to export the .shortcut file to (e.g. ~/Desktop/MyShortcut.shortcut)")
-    public var outputPath: String
-
-    @MainActor
-    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
-        try await requestConfirmation(
-            actionName: .go,
-            dialog: IntentDialog("Export Shortcut with AirMCP? Export a Siri Shortcut to a .shortcut file. Uses the macOS shortcuts CLI to save the shortcut to the specified output path.")
-        )
-        let result = try await MCPIntentRouter.shared.call(
-            tool: "export_shortcut",
-            args: ["name": name, "outputPath": outputPath]
         )
         return .result(value: result)
     }
@@ -3246,37 +3182,6 @@ public struct GetScreenInfoIntent: AppIntent {
     }
 }
 
-// Tool: get_shortcut_detail
-public struct GetShortcutDetailIntent: AppIntent {
-    nonisolated(unsafe) public static var title: LocalizedStringResource = "Get Shortcut Detail"
-    nonisolated(unsafe) public static var description = IntentDescription("Get details about a Siri Shortcut including its actions.")
-    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
-
-    public init() {}
-
-    @Parameter(title: "Shortcut name (exact match)")
-    public var name: String
-
-    @MainActor
-    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
-        let result = try await MCPIntentRouter.shared.call(
-            tool: "get_shortcut_detail",
-            args: ["name": name]
-        )
-        guard let data = result.data(using: .utf8) else {
-            throw MCPIntentError.toolCallFailed(tool: "get_shortcut_detail", message: "empty result from router")
-        }
-        let decoded = try JSONDecoder().decode(MCPGetShortcutDetailOutput.self, from: data)
-        #if canImport(SwiftUI) && compiler(>=6.3)
-        if #available(macOS 26, iOS 26, *) {
-            return .result(value: result, view: MCPGetShortcutDetailSnippetView(data: decoded))
-        }
-        #endif
-        _ = decoded
-        return .result(value: result)
-    }
-}
-
 // Tool: get_track_info
 public struct GetTrackInfoIntent: AppIntent {
     nonisolated(unsafe) public static var title: LocalizedStringResource = "Get Track Info"
@@ -3723,32 +3628,6 @@ public struct ImportPhotoIntent: AppIntent {
         let result = try await MCPIntentRouter.shared.call(
             tool: "import_photo",
             args: args
-        )
-        return .result(value: result)
-    }
-}
-
-// Tool: import_shortcut
-@available(iOS 18, macOS 15, *)
-public struct ImportShortcutIntent: AppIntent {
-    nonisolated(unsafe) public static var title: LocalizedStringResource = "Import Shortcut"
-    nonisolated(unsafe) public static var description = IntentDescription("Import a .shortcut file into Siri Shortcuts. Uses the macOS shortcuts CLI to import the shortcut from the specified file path.")
-    nonisolated(unsafe) public static var openAppWhenRun: Bool = false
-
-    public init() {}
-
-    @Parameter(title: "Path to the .shortcut file to import")
-    public var filePath: String
-
-    @MainActor
-    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
-        try await requestConfirmation(
-            actionName: .go,
-            dialog: IntentDialog("Import Shortcut with AirMCP? Import a .shortcut file into Siri Shortcuts. Uses the macOS shortcuts CLI to import the shortcut from the specified file path.")
-        )
-        let result = try await MCPIntentRouter.shared.call(
-            tool: "import_shortcut",
-            args: ["filePath": filePath]
         )
         return .result(value: result)
     }
@@ -9022,32 +8901,6 @@ public struct MCPGetScreenInfoSnippetView: View {
     }
 }
 
-// Snippet view for: get_shortcut_detail  (shape: scalar)
-@available(macOS 26, iOS 26, *)
-public struct MCPGetShortcutDetailSnippetView: View {
-    public let data: MCPGetShortcutDetailOutput
-    public init(data: MCPGetShortcutDetailOutput) { self.data = data }
-    public var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack {
-                Text("Shortcut")
-                Spacer()
-                Text(data.shortcut)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-            }
-            HStack {
-                Text("Detail")
-                Spacer()
-                Text(data.detail)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-            }
-        }
-        .padding()
-    }
-}
-
 // Snippet view for: get_track_info  (shape: scalar)
 @available(macOS 26, iOS 26, *)
 public struct MCPGetTrackInfoSnippetView: View {
@@ -10612,7 +10465,7 @@ public struct MCPReadReminderSnippetView: View {
             HStack {
                 Text("Flagged")
                 Spacer()
-                Text((data.flagged ? "Yes" : "No"))
+                Text((data.flagged.map { $0 ? "Yes" : "No" } ?? "—"))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }

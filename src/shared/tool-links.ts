@@ -152,7 +152,6 @@ const LINK_MAP: Record<string, ToolLink[]> = {
   list_shortcuts: [
     { tool: "run_shortcut", description: "Run a shortcut" },
     { tool: "search_shortcuts", description: "Search shortcuts" },
-    { tool: "get_shortcut_detail", description: "View shortcut details" },
   ],
   run_shortcut: [
     { tool: "list_shortcuts", description: "See all shortcuts" },

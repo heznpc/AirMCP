@@ -309,7 +309,7 @@ export const SYSTEM_IMAGE_BY_PREFIX = [
   [/^(list|search|read)_contacts|list_groups|list_group_members/, "person.crop.circle"],
   [/^list_accounts|list_messages/, "envelope"],
   [/^list_chats|list_participants/, "message"],
-  [/^list_shortcuts|search_shortcuts|get_shortcut_detail/, "square.stack.3d.up"],
+  [/^list_shortcuts|search_shortcuts/, "square.stack.3d.up"],
   [/^list_bookmarks|list_reading_list|list_tabs/, "safari"],
   [/^get_current_weather|get_daily_forecast|get_hourly_forecast/, "cloud.sun"],
   [/^summarize_context|proactive_context/, "sparkles"],

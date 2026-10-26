@@ -106,7 +106,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
             completed: z.boolean(),
             dueDate: z.string().nullable(),
             priority: z.number(),
-            flagged: z.boolean(),
+            flagged: z.boolean().optional().describe("Actual flag status; omitted (unknown) when EventKit is used"),
             list: z.string(),
           }),
         ),
@@ -153,7 +153,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
         modificationDate: z.string(),
         dueDate: z.string().nullable(),
         priority: z.number(),
-        flagged: z.boolean(),
+        flagged: z.boolean().optional().describe("Actual flag status; omitted (unknown) when EventKit is used"),
         list: z.string(),
       },
       annotations: {
@@ -230,7 +230,10 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
           .optional()
           .describe("New due date (ISO 8601, e.g. '2026-03-15T10:00:00Z') or null to clear"),
         priority: z.number().int().min(0).max(9).optional().describe("New priority (0-9)"),
-        flagged: z.boolean().optional().describe("Set flagged status"),
+        flagged: z
+          .boolean()
+          .optional()
+          .describe("Set flagged status (JXA only; EventKit rejects flag updates without changing any fields)"),
       },
       annotations: {
         readOnlyHint: false,
@@ -346,7 +349,7 @@ export function registerReminderTools(server: McpServer, _config: AirMcpConfig):
             completed: z.boolean(),
             dueDate: z.string().nullable(),
             priority: z.number(),
-            flagged: z.boolean(),
+            flagged: z.boolean().optional().describe("Actual flag status; omitted (unknown) when EventKit is used"),
             list: z.string(),
           }),
         ),

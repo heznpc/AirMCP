@@ -34,8 +34,8 @@ Both paths use the same underlying server — the `.mcpb` is literally `server/d
 ## Runtime vs build-time gates
 
 - **Gemini API Key unset + no Swift bridge** → AirMCP still works. Semantic tool search falls back to substring match; note search falls back to literal query. No cloud calls.
-- **Gemini API Key set + no Swift bridge** → Cloud path works. Swift-backed tools (EventKit, HealthKit, Vision, Foundation Models) will fail at call time with a clear "Swift bridge not available" message until the user runs `npm run swift-build` inside the extension bundle.
-- **Swift bridge pre-built** (future) — planned for a later release. Will ship a universal binary for `darwin-arm64` + `darwin-x64` inside the `.mcpb` so EventKit etc. work out of the box.
+- **Gemini API Key set + no Swift bridge** → Cloud embeddings work. Tools that require Swift still need the bridge; the key does not enable native frameworks.
+- **Swift bridge required** → The extension contains neither Swift source nor npm build scripts. `npm run swift-build` cannot run inside it. Use a [source checkout](../README.md#local-development), run `npm install`, `npm run build`, and `npm run swift-build` at the repository root, then configure the MCP client to launch `node /absolute/path/to/AirMCP/dist/index.js`. That server finds the bridge under the same checkout's `swift/.build/release/` directory. Alternatively, install a release that actually lists a signed `AirMCP-<version>.zip` and connect to its app-owned runtime. The `.mcpb` itself does not include a prebuilt bridge.
 
 ## Build locally
 

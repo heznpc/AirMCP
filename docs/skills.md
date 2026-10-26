@@ -1,6 +1,6 @@
 # AirMCP Skills Guide
 
-A practical guide for AI agents to effectively use AirMCP's 298 tools across 32 modules to orchestrate the Apple ecosystem via MCP.
+A practical guide for AI agents to effectively use AirMCP's 293 tools across 32 modules to orchestrate the Apple ecosystem via MCP.
 
 ## Overview
 
@@ -33,7 +33,7 @@ AirMCP bridges AI agents to native macOS applications through JXA (JavaScript fo
 | **reminders** | Reminders | `list_reminders`, `create_reminder`, `complete_reminder`, `search_reminders`, `create_reminder_list`, `create_recurring_reminder` | 11 |
 | **safari** | Safari | `list_tabs`, `read_page_content`, `open_url`, `run_javascript`, `list_bookmarks`, `add_to_reading_list` | 12 |
 | **screen** | Screen Capture | `capture_screen`, `capture_window`, `capture_area`, `list_windows`, `record_screen` | 5 |
-| **shortcuts** | Shortcuts | `list_shortcuts`, `run_shortcut`, `get_shortcut_detail`, `search_shortcuts`, `export_shortcut` | 11 |
+| **shortcuts** | Shortcuts | `list_shortcuts`, `run_shortcut`, `search_shortcuts`, `create_shortcut`, `edit_shortcut` | 5 |
 | **system** | System | `get_clipboard`, `set_clipboard`, `show_notification`, `capture_screenshot`, `get_battery_status`, `toggle_dark_mode`, `system_sleep`, `prevent_sleep`, `allow_sleep`, `system_power` | 28 |
 | **location** | Location | `get_current_location`, `get_location_status` | 2 |
 | **bluetooth** | Bluetooth | `bluetooth_scan`, `bluetooth_connect`, `bluetooth_disconnect`, `bluetooth_list_devices` | 4 |
@@ -181,7 +181,7 @@ AirMCP bridges AI agents to native macOS applications through JXA (JavaScript fo
 #### Shortcut Chaining for Complex Workflows
 ```
 1. search_shortcuts(keyword)    -> find relevant shortcuts
-2. get_shortcut_detail(name)    -> inspect actions and inputs
+2. Inspect actions and inputs in the Shortcuts app with the user
 3. run_shortcut(name, input)    -> execute step 1
 4. Use output as input for next run_shortcut -> chain steps
 5. show_notification            -> report completion
@@ -305,7 +305,7 @@ Prompts are pre-built multi-step workflows invoked via `get_workflow` or the MCP
 1. **If a tool fails, try the search variant first**: `list_notes` failing? Try `search_notes` or `scan_notes`.
 2. **If Intelligence is unavailable**: fall back to manual summarization or skip AI-enhanced steps.
 3. **If a specific mailbox/list/folder is not found**: use the list variant (`list_mailboxes`, `list_reminder_lists`, `list_folders`) to discover available names.
-4. **If a shortcut hangs**: it likely has interactive UI prompts. Use `get_shortcut_detail` to inspect before running.
+4. **If a shortcut hangs**: it likely has interactive UI prompts. Inspect its actions in the Shortcuts app before running.
 5. **If calendar events fail to create**: verify the target calendar exists with `list_calendars` and is writable.
 
 ### Permission Requirements by Module
@@ -337,7 +337,7 @@ Prompts are pre-built multi-step workflows invoked via `get_workflow` or the MCP
 - **HITL for writes**: AirMCP enforces human-in-the-loop confirmation for destructive or sensitive operations. Never assume a write will succeed silently.
 - **Never expose raw email content**: Summarize rather than quoting full email bodies, especially when they may contain signatures with personal information.
 - **Confirm before sending**: `send_mail`, `send_message`, `reply_mail` all require user confirmation. Always show the draft before triggering.
-- **Export before delete**: Back up shortcuts (`export_shortcut`) before deleting. Back up notes content before deleting.
+- **Back up before delete**: Back up notes content before deleting. Manage shortcut backups and deletion in the Shortcuts app.
 - **Sensitive files**: Be cautious with `get_clipboard`, `read_page_content`, and `read_message` -- they may contain passwords, tokens, or private information. Do not log or repeat sensitive content.
 
 ### Semantic Search

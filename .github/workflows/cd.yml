@@ -72,6 +72,40 @@ jobs:
             echo "::notice::Resuming interrupted publish of $RELEASE_SHA (main is at $WORKFLOW_SHA)."
           fi
 
+      # This must be inline: an older release_sha may not contain any of the
+      # new release helpers. Reject that checkout before package publication,
+      # rather than discovering the missing protocol after npm is immutable.
+      - name: Verify release resume protocol
+        env:
+          RELEASE_SHA: ${{ inputs.release_sha || github.sha }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          import { pathToFileURL } from 'node:url';
+          import { resolve } from 'node:path';
+          try {
+            const workflow = readFileSync('.github/workflows/release-app.yml', 'utf8');
+            // Version 1 correlates the dispatch input with this exact run title.
+            // Assemble expression delimiters so Actions does not evaluate them.
+            const expression = (value) => '$' + '{{ ' + value + ' }}';
+            const runName = 'run-name: Signed app ' + expression('inputs.tag')
+              + ' (' + expression('inputs.release_request_id || github.run_id') + ')';
+            if (!workflow.split('\n').some((line) => line.trim() === runName)
+                || !/^ {6}release_request_id:\s*$/m.test(workflow)) {
+              throw new Error('Unsupported signed app workflow protocol');
+            }
+            // Import also verifies that the checked-out helper's dependencies
+            // exist. No GitHub request is made when this module is imported.
+            const dispatcher = await import(pathToFileURL(resolve('scripts/dispatch-signed-app-release.mjs')));
+            if (typeof dispatcher.dispatchSignedAppRelease !== 'function') {
+              throw new Error('Missing signed app dispatcher');
+            }
+          } catch {
+            console.log(`::error::release_sha ${process.env.RELEASE_SHA} does not support the signed app release resume protocol. Publish a new version from current main; this checkout cannot be resumed safely.`);
+            process.exitCode = 1;
+          }
+          NODE
+
       - name: Extract package info
         id: pkg
         run: |
@@ -160,6 +194,15 @@ jobs:
           RELEASE_TAG: v${{ steps.pkg.outputs.version }}
         run: node scripts/verify-release-environment.mjs --repo="${{ github.repository }}" --tag="$RELEASE_TAG"
 
+      - name: Require signed app distribution
+        env:
+          SIGNED_APP_RELEASE: ${{ vars.SIGNED_APP_RELEASE }}
+        run: |
+          if [ "$SIGNED_APP_RELEASE" != "true" ]; then
+            echo "::error::SIGNED_APP_RELEASE must be true; a desktop release requires its signed app ZIP."
+            exit 1
+          fi
+
       # An interrupted earlier attempt may already have published part of this
       # immutable version. Resume only when the registry tarball SRI and
       # npm gitHead prove it is byte-for-byte the artifact from github.sha.
@@ -213,33 +256,16 @@ jobs:
       # workflows. Dispatch the signed lane explicitly and let that workflow
       # re-check the immutable tag, package, bundle, and signing environment.
       #
-      # Gated on the SIGNED_APP_RELEASE repository variable rather than dispatched
-      # unconditionally. Until the Apple signing secrets exist in the `release`
-      # environment, dispatching only produced a deployment-approval request for a
-      # run whose first step would then discover it cannot sign — and, because it
-      # was dispatched with require_signing=false, exit 0 and record a green
-      # "signed release" that produced no artifact. A variable is readable without
-      # entering a protected environment, so the decision can be made before the
-      # approval gate instead of after it.
-      - name: Dispatch signed app release
-        if: vars.SIGNED_APP_RELEASE == 'true'
+      # Wait for this exact dispatch, including its protected-environment review.
+      # A successful npm upload is not a successful desktop release. The observer
+      # propagates signing failures and requires both assets before returning.
+      - name: Dispatch and await signed app release
+        timeout-minutes: 125
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: v${{ steps.pkg.outputs.version }}
-        run: |
-          # require_signing=true: once an operator has declared signing enabled, a
-          # missing secret is a real failure, not something to skip past quietly.
-          gh workflow run release-app.yml \
-            --ref "$RELEASE_TAG" \
-            --field tag="$RELEASE_TAG" \
-            --field require_signing=true
-
-      - name: Note that the signed app lane was skipped
-        if: vars.SIGNED_APP_RELEASE != 'true'
-        run: |
-          echo "::notice::Signed app release skipped — repository variable SIGNED_APP_RELEASE is not 'true'."
-          echo "::notice::To enable: add APPLE_DEVELOPER_ID, APPLE_ID, APPLE_ID_PASSWORD, APPLE_TEAM_ID, APPLE_CERT_P12_BASE64, APPLE_CERT_P12_PASSWORD to the 'release' environment, then set SIGNED_APP_RELEASE=true."
-          echo "::notice::npm and .mcpb distribution are unaffected."
+          RELEASE_SHA: ${{ inputs.release_sha || github.sha }}
+        run: node scripts/dispatch-signed-app-release.mjs
 
       - name: Verify public release state
         env:

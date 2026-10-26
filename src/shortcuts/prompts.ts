@@ -21,7 +21,7 @@ Execute the following steps using AirMCP tools:
 1. **Discover available shortcuts**:
    - list_shortcuts to get all available Siri Shortcuts on this Mac
    - search_shortcuts with keywords related to "${goal}" to find relevant shortcuts
-   - For each promising match, use get_shortcut_detail to understand what it does and what actions it contains
+   - Ask the user to confirm the actions and input/output types of promising matches; the CLI exposes names only
 
 2. **Analyze and plan the workflow**:
    - Identify which shortcuts can be chained together to accomplish the goal
@@ -87,7 +87,7 @@ Execute the following steps using AirMCP tools:
    - Present the categorized list clearly
 
 3. **Deep-dive into interesting shortcuts**:
-   - For shortcuts with unclear names, use get_shortcut_detail to inspect their actions
+   - For shortcuts with unclear names, ask the user to describe their actions or inspect them in the Shortcuts app
    - Identify which shortcuts accept input and what type
    - Identify which shortcuts produce output
    - Flag shortcuts that might interact with external services or perform system changes
@@ -105,12 +105,12 @@ Execute the following steps using AirMCP tools:
    - Potential workflow combinations
 
 Important:
-- Use get_shortcut_detail on shortcuts with ambiguous names to provide accurate descriptions
+- Label name-based categories as guesses; the CLI cannot inspect actions or input types
 - Do not run any shortcuts during discovery — this is a read-only exploration
 - If the list is very large, focus on the most useful categories first
 
 Error handling:
-- If a tool call fails, inform the user and try an alternative (e.g., if get_shortcut_detail fails, use search_shortcuts for basic info)
+- If a tool call fails, inform the user and try an alternative (e.g., if search_shortcuts fails, use list_shortcuts and filter names)
 - On permission errors, guide the user to setup_permissions
 - If an app is unresponsive, skip to the next step`,
       );
@@ -137,7 +137,7 @@ Execute the following steps using AirMCP tools:
    - Confirm the exact name (names are case-sensitive and must match exactly)
 
 2. **Inspect the shortcut**:
-   - get_shortcut_detail(name: "${shortcutName}") to examine its actions and structure
+   - Ask the user to inspect "${shortcutName}" in the Shortcuts app and share the relevant actions and structure
    - Identify what the shortcut is designed to do
    - Check what input it expects (if any)
    - Identify actions that depend on external services, apps, or permissions

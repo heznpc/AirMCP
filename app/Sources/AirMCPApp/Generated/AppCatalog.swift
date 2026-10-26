@@ -106,7 +106,7 @@ let allModules: [ModuleInfo] = [
     ModuleInfo(id: "safari", icon: "safari", toolCount: 12),
     ModuleInfo(id: "system", icon: "gearshape", toolCount: 28),
     ModuleInfo(id: "photos", icon: "photo", toolCount: 11),
-    ModuleInfo(id: "shortcuts", icon: "command", toolCount: 11),
+    ModuleInfo(id: "shortcuts", icon: "command", toolCount: 6),
     ModuleInfo(id: "messages", icon: "bubble.left", toolCount: 6),
     ModuleInfo(id: "intelligence", icon: "brain", toolCount: 13, minMacosVersion: 26),
     ModuleInfo(id: "tv", icon: "tv", toolCount: 6),

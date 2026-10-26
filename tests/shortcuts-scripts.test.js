@@ -22,7 +22,7 @@ describe('shortcuts script generators', () => {
     const script = runShortcutScript('Process Text', 'hello world');
     expect(script).toContain('shortcuts run');
     expect(script).toContain('Process Text');
-    expect(script).toContain('--input-type text');
+    expect(script).toContain('--input-path');
     expect(script).toContain('hello world');
   });
 });

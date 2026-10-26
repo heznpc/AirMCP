@@ -15,11 +15,6 @@ export interface ShortcutsNameList {
   shortcuts: string[];
 }
 
-export interface ShortcutsDetail {
-  shortcut: string;
-  detail: string;
-}
-
 // ── Example fixtures ────────────────────────────────────────────────────
 export const LIST_SHORTCUTS_EXAMPLE: ShortcutsNameList = {
   total: 3,
@@ -31,27 +26,28 @@ export const SEARCH_SHORTCUTS_EXAMPLE: ShortcutsNameList = {
   shortcuts: ["Daily Brief"],
 };
 
-export const GET_SHORTCUT_DETAIL_EXAMPLE: ShortcutsDetail = {
-  shortcut: "Daily Brief",
-  detail: "Actions: Get Current Weather, Get Today's Calendar Events, Combine Text, Create Note",
-};
-
 export function listShortcutsScript(): string {
   return `
     const app = Application.currentApplication();
     app.includeStandardAdditions = true;
     const output = app.doShellScript('shortcuts list');
-    const names = output.split('\\n').filter(n => n.length > 0);
+    const names = output.split(/[\\r\\n]+/).filter(n => n.length > 0);
     JSON.stringify({total: names.length, shortcuts: names});
   `;
 }
 
 export function runShortcutScript(name: string, input?: string): string {
-  const inputPart = input !== undefined ? ` --input-type text --input "${escJxaShell(input)}"` : "";
+  // The CLI accepts input files, not --input/--input-type. Keep text out of
+  // argv, preserve its bytes with printf, and clean up even if the shortcut
+  // fails. A private mktemp directory protects input.txt and its text type.
+  const command =
+    input === undefined
+      ? `shortcuts run "${escJxaShell(name)}"`
+      : String.raw`airmcp_dir=$(/usr/bin/mktemp -d "${escJxaShell(join(PATHS.TEMP_DIR, "airmcp-shortcut.XXXXXX"))}") || exit $?; airmcp_input="$airmcp_dir/input.txt"; trap \'/bin/rm -f "$airmcp_input"; /bin/rmdir "$airmcp_dir"\' 0; printf \'%s\' "${escJxaShell(input)}" >"$airmcp_input" || exit $?; shortcuts run "${escJxaShell(name)}" --input-path "$airmcp_input"`;
   return `
     const app = Application.currentApplication();
     app.includeStandardAdditions = true;
-    const output = app.doShellScript('shortcuts run "${escJxaShell(name)}"${inputPart}');
+    const output = app.doShellScript('${command}');
     JSON.stringify({shortcut: '${esc(name)}', output: output});
   `;
 }
@@ -61,65 +57,10 @@ export function searchShortcutsScript(query: string): string {
     const app = Application.currentApplication();
     app.includeStandardAdditions = true;
     const output = app.doShellScript('shortcuts list');
-    const names = output.split('\\n').filter(n => n.length > 0);
+    const names = output.split(/[\\r\\n]+/).filter(n => n.length > 0);
     const q = '${esc(query)}'.toLowerCase();
     const matches = names.filter(n => n.toLowerCase().includes(q));
     JSON.stringify({total: matches.length, shortcuts: matches});
-  `;
-}
-
-export function getShortcutDetailScript(name: string): string {
-  return `
-    const app = Application.currentApplication();
-    app.includeStandardAdditions = true;
-    let actions = '';
-    try {
-      actions = app.doShellScript('shortcuts view "${escJxaShell(name)}" 2>&1 || true');
-    } catch(e) {
-      actions = 'Details not available';
-    }
-    JSON.stringify({shortcut: '${esc(name)}', detail: actions});
-  `;
-}
-
-export function deleteShortcutScript(name: string): string {
-  return `
-    const app = Application.currentApplication();
-    app.includeStandardAdditions = true;
-    app.doShellScript('shortcuts delete "${escJxaShell(name)}"');
-    JSON.stringify({deleted: '${esc(name)}', success: true});
-  `;
-}
-
-export function exportShortcutScript(name: string, outputPath: string): string {
-  return `
-    const app = Application.currentApplication();
-    app.includeStandardAdditions = true;
-    app.doShellScript('shortcuts export "${escJxaShell(name)}" -o "${escJxaShell(outputPath)}"');
-    JSON.stringify({shortcut: '${esc(name)}', exportedTo: '${esc(outputPath)}', success: true});
-  `;
-}
-
-export function importShortcutScript(filePath: string): string {
-  return `
-    const app = Application.currentApplication();
-    app.includeStandardAdditions = true;
-    app.doShellScript('shortcuts import "${escJxaShell(filePath)}"');
-    JSON.stringify({imported: '${esc(filePath)}', success: true});
-  `;
-}
-
-export function duplicateShortcutScript(name: string, newName: string): string {
-  const safeName = escJxaShell(newName).replace(/[^a-zA-Z0-9_-]/g, "_");
-  // Inline a unique temp file path so concurrent duplicates don't collide and
-  // sandboxed runtimes can redirect via AIRMCP_TEMP_DIR.
-  const tempFile = join(PATHS.TEMP_DIR, `${safeName}-${Date.now()}.shortcut`);
-  return `
-    const app = Application.currentApplication();
-    app.includeStandardAdditions = true;
-    app.doShellScript('shortcuts export "${escJxaShell(name)}" -o "${tempFile}" && shortcuts import "${tempFile}"');
-    app.doShellScript('rm -f "${tempFile}"');
-    JSON.stringify({original: '${esc(name)}', duplicate: '${esc(newName)}', success: true});
   `;
 }
 

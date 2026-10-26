@@ -22,11 +22,9 @@
 //   (P2-1); Claude Desktop currently accepts unsigned .mcpb.
 // - The complete JavaScript module catalog is copied into the bundle. Logical
 //   profiles still control what loads and what tools/list exposes by default.
-// - We do NOT ship a swift-bridge binary yet. Cloud-path tools work
-//   out of the box; Swift-backed tools (EventKit, HealthKit, etc.)
-//   require `npm run swift-build` on the user side. A future pass can
-//   pre-build a universal binary for darwin-arm64 + darwin-x64 and
-//   drop it into the bundle.
+// - Neither the Swift bridge nor its sources/build scripts are shipped here.
+//   Swift-only features require a separate source-built server or the signed
+//   app-owned runtime; `npm run swift-build` cannot run inside this bundle.
 //
 // Usage:
 //   npm run build:mcpb          # produce build/mcpb/airmcp-{version}.mcpb

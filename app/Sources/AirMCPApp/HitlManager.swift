@@ -71,7 +71,7 @@ final class HitlManager {
         let timestamp: Date
     }
 
-    enum ConnectionState: Sendable {
+    enum ConnectionState: Equatable, Sendable {
         case idle
         case listening
         case connected
@@ -126,8 +126,10 @@ final class HitlManager {
     // MARK: - Private
 
     private var listener: NWListener?
+    private var listenerGeneration = UUID()
     private var connections: [NWConnection] = []
     private var pendingTimers: [String: DispatchWorkItem] = [:]
+    private var pendingTimerGenerations: [String: UUID] = [:]
     private var pendingConnections: [String: NWConnection] = [:]
     private(set) var pendingTools: [String: String] = [:]  // id -> tool name
     private var receiveBuffers: [ObjectIdentifier: Data] = [:]
@@ -146,13 +148,34 @@ final class HitlManager {
         let isOverride: Bool
     }
 
-    private let socketPathConfiguration = HitlManager.configuredSocketPath()
+    private let socketPathConfiguration: SocketPathConfiguration
 
     var timeoutSeconds: Int = 120
     /// Injectable for tests; production uses the real notification center.
     var notificationAuthorizer: HitlNotificationAuthorizing = SystemHitlNotificationAuthorizer()
+    var notificationRemover: ([String]) -> Void = { HitlManager.removeNotifications(withIdentifiers: $0) }
 
     // MARK: - Lifecycle
+
+    init(socketPath: String? = nil) {
+        socketPathConfiguration = socketPath.map { SocketPathConfiguration(path: $0, isOverride: true) }
+            ?? Self.configuredSocketPath()
+    }
+
+    func applyConfiguration(level: HitlLevel, timeoutSeconds: Int) {
+        let timeoutChanged = self.timeoutSeconds != timeoutSeconds
+        self.timeoutSeconds = max(1, timeoutSeconds)
+        if level == .off {
+            stopListening()
+        } else {
+            startListening()
+            if timeoutChanged {
+                for request in pendingRequests {
+                    scheduleTimeout(for: request)
+                }
+            }
+        }
+    }
 
     func startListening() {
         guard listener == nil else { return }
@@ -201,16 +224,23 @@ final class HitlManager {
             params.requiredLocalEndpoint = NWEndpoint.unix(path: socketPath)
 
             let nwListener = try NWListener(using: params)
+            let generation = UUID()
+            listenerGeneration = generation
 
             nwListener.stateUpdateHandler = { [weak self] newState in
                 Task { @MainActor [weak self] in
-                    self?.handleListenerState(newState)
+                    guard let self, self.listenerGeneration == generation else { return }
+                    self.handleListenerState(newState)
                 }
             }
 
             nwListener.newConnectionHandler = { [weak self] newConnection in
                 Task { @MainActor [weak self] in
-                    self?.handleNewConnection(newConnection)
+                    guard let self, self.listenerGeneration == generation else {
+                        newConnection.cancel()
+                        return
+                    }
+                    self.handleNewConnection(newConnection)
                 }
             }
 
@@ -223,6 +253,9 @@ final class HitlManager {
     }
 
     func stopListening() {
+        // A delayed cancellation from an old listener must not stop a listener
+        // just enabled by a subsequent settings change.
+        listenerGeneration = UUID()
         let ownedIdentity = ownedSocketIdentity
         ownedSocketIdentity = nil
         let notificationIds = pendingRequests.map(\.id)
@@ -231,6 +264,7 @@ final class HitlManager {
             timer.cancel()
         }
         pendingTimers.removeAll()
+        pendingTimerGenerations.removeAll()
         pendingConnections.removeAll()
         pendingRequests.removeAll()
         pendingTools.removeAll()
@@ -249,7 +283,7 @@ final class HitlManager {
         {
             Self.removeSocketFile(at: socketPath, ifIdentityMatches: ownedIdentity)
         }
-        Self.removeNotifications(withIdentifiers: notificationIds)
+        notificationRemover(notificationIds)
         state = .idle
     }
 
@@ -288,11 +322,12 @@ final class HitlManager {
 
         connection.stateUpdateHandler = { [weak self] newState in
             Task { @MainActor [weak self] in
+                guard let self, self.connections.contains(where: { $0 === connection }) else { return }
                 switch newState {
                 case .ready:
-                    self?.state = .connected
+                    self.state = .connected
                 case .failed, .cancelled:
-                    self?.removeConnection(connection)
+                    self.removeConnection(connection)
                 default:
                     break
                 }
@@ -304,6 +339,9 @@ final class HitlManager {
     }
 
     private func removeConnection(_ connection: NWConnection) {
+        // State and receive callbacks may both report the same cancellation.
+        // A connection removed by stopListening must not revive listener state.
+        guard connections.contains(where: { $0 === connection }) else { return }
         let connId = ObjectIdentifier(connection)
         receiveBuffers.removeValue(forKey: connId)
         connections.removeAll { $0 === connection }
@@ -314,22 +352,26 @@ final class HitlManager {
         for request in orphanedRequests {
             pendingTimers[request.id]?.cancel()
             pendingTimers.removeValue(forKey: request.id)
+            pendingTimerGenerations.removeValue(forKey: request.id)
             pendingConnections.removeValue(forKey: request.id)
             pendingTools.removeValue(forKey: request.id)
             pendingRequests.removeAll { $0.id == request.id }
             recordRecentRequest(request, approved: false, reason: .unavailable)
         }
-        Self.removeNotifications(withIdentifiers: orphanedRequests.map(\.id))
-        state = connections.isEmpty ? .listening : .connected
+        notificationRemover(orphanedRequests.map(\.id))
+        state = listener == nil ? .idle : (connections.isEmpty ? .listening : .connected)
     }
 
     // MARK: - Receive & Parse
 
     private func scheduleReceive(on connection: NWConnection) {
+        guard connections.contains(where: { $0 === connection }) else { return }
         connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) {
             [weak self] content, _, isComplete, error in
             Task { @MainActor [weak self] in
-                guard let self else { return }
+                // A receive completion can already be queued when the listener
+                // is disabled or replaced. Discard both its bytes and state.
+                guard let self, self.connections.contains(where: { $0 === connection }) else { return }
 
                 if let data = content, !data.isEmpty {
                     let connId = ObjectIdentifier(connection)
@@ -402,9 +444,16 @@ final class HitlManager {
         pendingRequests.insert(request, at: 0)
         presentApproval(for: request)
 
+        scheduleTimeout(for: request)
+    }
+
+    private func scheduleTimeout(for request: ApprovalRequest) {
+        pendingTimers[request.id]?.cancel()
+        let generation = UUID()
+        pendingTimerGenerations[request.id] = generation
         let timeout = DispatchWorkItem { [weak self] in
             Task { @MainActor [weak self] in
-                guard let self, self.pendingTimers[request.id] != nil else { return }
+                guard let self, self.pendingTimerGenerations[request.id] == generation else { return }
                 self.respond(
                     id: request.id,
                     approved: false,
@@ -414,8 +463,9 @@ final class HitlManager {
             }
         }
         pendingTimers[request.id] = timeout
+        let remaining = max(0, TimeInterval(timeoutSeconds) - Date().timeIntervalSince(request.timestamp))
         DispatchQueue.main.asyncAfter(
-            deadline: .now() + .seconds(timeoutSeconds),
+            deadline: .now() + remaining,
             execute: timeout
         )
     }
@@ -429,16 +479,17 @@ final class HitlManager {
         guard let request = pendingRequests.first(where: { $0.id == id }) else {
             // A delivered notification can be acted on after timeout. It is
             // stale and must never create a second, misleading approval record.
-            Self.removeNotifications(withIdentifiers: [id])
+            notificationRemover([id])
             return
         }
         let responseReason = reason ?? (approved ? .approved : .denied)
         // Cancel the timeout timer
         pendingTimers[id]?.cancel()
         pendingTimers.removeValue(forKey: id)
+        pendingTimerGenerations.removeValue(forKey: id)
         pendingTools.removeValue(forKey: id)
         pendingRequests.removeAll { $0.id == id }
-        Self.removeNotifications(withIdentifiers: [id])
+        notificationRemover([id])
 
         // Send the response over the socket
         if let connection = pendingConnections.removeValue(forKey: id) {

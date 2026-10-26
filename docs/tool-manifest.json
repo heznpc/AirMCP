@@ -1,8 +1,8 @@
 {
   "generatedAt": "STABLE_PLACEHOLDER",
   "protocolVersion": "2025-11-25",
-  "toolCount": 298,
-  "eligibleCount": 291,
+  "toolCount": 293,
+  "eligibleCount": 286,
   "ineligibleCount": 7,
   "ineligibleByReason": {
     "object-param:recurrence": 2,
@@ -2093,35 +2093,6 @@
       "ineligibleReason": null
     },
     {
-      "name": "delete_shortcut",
-      "title": "Delete Shortcut",
-      "description": "Delete a Siri Shortcut by name. Uses the macOS shortcuts CLI (macOS 13+). This action is permanent and cannot be undone.",
-      "inputSchema": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "maxLength": 500,
-            "description": "Shortcut name to delete (exact match)"
-          }
-        },
-        "required": [
-          "name"
-        ]
-      },
-      "outputSchema": null,
-      "annotations": {
-        "readOnlyHint": false,
-        "destructiveHint": true,
-        "sensitiveHint": false,
-        "idempotentHint": false,
-        "openWorldHint": false
-      },
-      "appIntentEligible": true,
-      "ineligibleReason": null
-    },
-    {
       "name": "describe_tool",
       "title": "Describe Tool",
       "description": "Fetch the full description for one registered AirMCP tool after discover_tools returns a compact match.",
@@ -2358,41 +2329,6 @@
       "ineligibleReason": null
     },
     {
-      "name": "duplicate_shortcut",
-      "title": "Duplicate Shortcut",
-      "description": "Duplicate an existing Siri Shortcut. Exports the shortcut to a temporary file and re-imports it with a new name.",
-      "inputSchema": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "maxLength": 500,
-            "description": "Name of the shortcut to duplicate (exact match)"
-          },
-          "newName": {
-            "type": "string",
-            "maxLength": 500,
-            "description": "Name for the duplicated shortcut"
-          }
-        },
-        "required": [
-          "name",
-          "newName"
-        ]
-      },
-      "outputSchema": null,
-      "annotations": {
-        "readOnlyHint": false,
-        "destructiveHint": false,
-        "sensitiveHint": true,
-        "idempotentHint": false,
-        "openWorldHint": false
-      },
-      "appIntentEligible": true,
-      "ineligibleReason": null
-    },
-    {
       "name": "edit_shortcut",
       "title": "Edit Shortcut",
       "description": "Open a Siri Shortcut in the Shortcuts app for manual editing. Uses UI automation (System Events) to activate the app, search for the shortcut, and open it. The user can then edit the shortcut in the Shortcuts app UI.",
@@ -2502,42 +2438,6 @@
         "destructiveHint": false,
         "sensitiveHint": false,
         "idempotentHint": false,
-        "openWorldHint": false
-      },
-      "appIntentEligible": true,
-      "ineligibleReason": null
-    },
-    {
-      "name": "export_shortcut",
-      "title": "Export Shortcut",
-      "description": "Export a Siri Shortcut to a .shortcut file. Uses the macOS shortcuts CLI to save the shortcut to the specified output path.",
-      "inputSchema": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "maxLength": 500,
-            "description": "Shortcut name to export (exact match)"
-          },
-          "outputPath": {
-            "description": "File path to export the .shortcut file to (e.g. ~/Desktop/MyShortcut.shortcut)",
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 4096
-          }
-        },
-        "required": [
-          "name",
-          "outputPath"
-        ]
-      },
-      "outputSchema": null,
-      "annotations": {
-        "readOnlyHint": false,
-        "destructiveHint": false,
-        "sensitiveHint": true,
-        "idempotentHint": true,
         "openWorldHint": false
       },
       "appIntentEligible": true,
@@ -3681,51 +3581,6 @@
       "ineligibleReason": null
     },
     {
-      "name": "get_shortcut_detail",
-      "title": "Get Shortcut Detail",
-      "description": "Get details about a Siri Shortcut including its actions.",
-      "inputSchema": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "maxLength": 500,
-            "description": "Shortcut name (exact match)"
-          }
-        },
-        "required": [
-          "name"
-        ]
-      },
-      "outputSchema": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "shortcut": {
-            "type": "string"
-          },
-          "detail": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "shortcut",
-          "detail"
-        ],
-        "additionalProperties": false
-      },
-      "annotations": {
-        "readOnlyHint": true,
-        "destructiveHint": false,
-        "sensitiveHint": false,
-        "idempotentHint": true,
-        "openWorldHint": false
-      },
-      "appIntentEligible": true,
-      "ineligibleReason": null
-    },
-    {
       "name": "get_track_info",
       "title": "Get Track Info",
       "description": "Get detailed metadata for a specific track by name.",
@@ -4798,36 +4653,6 @@
             "description": "Album to add the imported photo to (must already exist)",
             "type": "string",
             "maxLength": 500
-          }
-        },
-        "required": [
-          "filePath"
-        ]
-      },
-      "outputSchema": null,
-      "annotations": {
-        "readOnlyHint": false,
-        "destructiveHint": false,
-        "sensitiveHint": true,
-        "idempotentHint": false,
-        "openWorldHint": false
-      },
-      "appIntentEligible": true,
-      "ineligibleReason": null
-    },
-    {
-      "name": "import_shortcut",
-      "title": "Import Shortcut",
-      "description": "Import a .shortcut file into Siri Shortcuts. Uses the macOS shortcuts CLI to import the shortcut from the specified file path.",
-      "inputSchema": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "filePath": {
-            "description": "Path to the .shortcut file to import",
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 4096
           }
         },
         "required": [
@@ -7324,6 +7149,7 @@
                   "type": "number"
                 },
                 "flagged": {
+                  "description": "Actual flag status; omitted (unknown) when EventKit is used",
                   "type": "boolean"
                 },
                 "list": {
@@ -7336,7 +7162,6 @@
                 "completed",
                 "dueDate",
                 "priority",
-                "flagged",
                 "list"
               ],
               "additionalProperties": false
@@ -10805,6 +10630,7 @@
             "type": "number"
           },
           "flagged": {
+            "description": "Actual flag status; omitted (unknown) when EventKit is used",
             "type": "boolean"
           },
           "list": {
@@ -10821,7 +10647,6 @@
           "modificationDate",
           "dueDate",
           "priority",
-          "flagged",
           "list"
         ],
         "additionalProperties": false
@@ -12281,6 +12106,7 @@
                   "type": "number"
                 },
                 "flagged": {
+                  "description": "Actual flag status; omitted (unknown) when EventKit is used",
                   "type": "boolean"
                 },
                 "list": {
@@ -12293,7 +12119,6 @@
                 "completed",
                 "dueDate",
                 "priority",
-                "flagged",
                 "list"
               ],
               "additionalProperties": false
@@ -14966,7 +14791,7 @@
             "maximum": 9
           },
           "flagged": {
-            "description": "Set flagged status",
+            "description": "Set flagged status (JXA only; EventKit rejects flag updates without changing any fields)",
             "type": "boolean"
           }
         },

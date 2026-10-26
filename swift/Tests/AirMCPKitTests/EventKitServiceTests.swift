@@ -8,6 +8,31 @@ final class EventKitServiceTests: XCTestCase {
 
     let service = EventKitService()
 
+    // In-memory EventKit objects only: no authorization or reminder store reads.
+    func testPriorityDoesNotImplyFlag() {
+        let store = EKEventStore()
+        let reminder = EKReminder(eventStore: store)
+        reminder.calendar = EKCalendar(for: .reminder, eventStore: store)
+        reminder.calendar.title = "Fixture"
+        reminder.priority = 1
+        XCTAssertNil(service.reminderToListItem(reminder).flagged)
+    }
+
+    func testFlagUpdatesAreRejectedWithoutChangingPriorityOrTitle() throws {
+        let store = EKEventStore()
+        for (flagged, priority) in [(false, 1), (true, 0)] {
+            let reminder = EKReminder(eventStore: store)
+            reminder.title = "Original"
+            reminder.priority = priority
+            let input = try JSONDecoder().decode(UpdateReminderInput.self, from: Data(
+                "{\"id\":\"fixture\",\"title\":\"Changed\",\"flagged\":\(flagged)}".utf8
+            ))
+            XCTAssertThrowsError(try service.applyReminderUpdate(input, to: reminder))
+            XCTAssertEqual(reminder.priority, priority)
+            XCTAssertEqual(reminder.title, "Original")
+        }
+    }
+
     // MARK: - Recurrence Rule Building
 
     func testDailyRecurrenceRule() throws {

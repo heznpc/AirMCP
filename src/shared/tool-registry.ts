@@ -15,6 +15,8 @@
  */
 
 import type { McpServer, AnyFn } from "./mcp.js";
+import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
+import type { ServerNotification, ServerRequest } from "@modelcontextprotocol/sdk/types.js";
 import { usageTracker } from "./usage-tracker.js";
 import { auditLog, readAuditEntries, sanitizeToolArgs } from "./audit.js";
 import { compactDescription } from "./tool-filter.js";
@@ -441,6 +443,7 @@ export class ToolRegistry {
   async callTool(
     name: string,
     args: Record<string, unknown>,
+    extra?: RequestHandlerExtra<ServerRequest, ServerNotification>,
   ): Promise<{
     content: Array<{ type: string; text: string }>;
     isError?: boolean;
@@ -451,7 +454,9 @@ export class ToolRegistry {
     if (!tool) throw new Error(`Tool "${name}" not found`);
     if (!tool.enabled) throw new Error(`Tool "${name}" is disabled`);
     const validatedArgs = validateToolArgs(name, tool.inputSchema, args);
-    const raw = (await tool.handler(validatedArgs, {})) as {
+    // Delegated tools share the originating MCP request, including cancellation
+    // while HITL waits. Replacing this with {} would let an abandoned action run.
+    const raw = (await tool.handler(validatedArgs, extra ?? {})) as {
       content?: Array<{ type: string; text: string }>;
       isError?: boolean;
       structuredContent?: unknown;
@@ -660,6 +665,10 @@ export class ToolRegistry {
                 // inverse wrapper order and still runs before the callback.
                 await sealPendingApprovalAuditEvents();
                 let result = await runWithApprovalAuditSink(sealApprovalAuditEvent, () => handler(...args));
+                // Internal dispatch (run_tool / skills) does not pass through
+                // the SDK's target schema validator. Enforce the same contract
+                // here, inside the audited handler, for every route.
+                await validateToolOutput(name, entry?.outputSchema, result);
                 const returnedError = isReturnedToolError(result);
                 const safeError = safeReturnedToolError(result);
                 const errorCategory = safeError.category;
@@ -920,6 +929,7 @@ export class ToolRegistry {
 
 interface SafeParseSchema {
   safeParse(input: unknown): { success: true; data: unknown } | { success: false; error: unknown };
+  safeParseAsync?(input: unknown): Promise<{ success: true; data: unknown } | { success: false; error: unknown }>;
 }
 
 function isSafeParseSchema(value: unknown): value is SafeParseSchema {
@@ -966,6 +976,27 @@ function validateToolArgs(name: string, inputSchema: unknown, args: Record<strin
   const parsed = schema.safeParse(args);
   if (parsed.success) return coerceValidatedObject(parsed.data);
   throw new ToolInputValidationError(`Invalid arguments for tool "${name}": ${formatValidationIssues(parsed.error)}`);
+}
+
+async function validateToolOutput(name: string, outputSchema: unknown, result: unknown): Promise<void> {
+  const schema = isSafeParseSchema(outputSchema)
+    ? outputSchema
+    : isZodRawShape(outputSchema)
+      ? z.object(outputSchema)
+      : null;
+  if (!schema) return;
+  const output = result as { isError?: boolean; structuredContent?: unknown } | null;
+  // Error results describe the failure instead of the tool's success schema.
+  if (output?.isError) return;
+  if (output?.structuredContent === undefined) {
+    throw new Error(`Output validation failed for tool "${name}": structuredContent is required by its output schema`);
+  }
+  const parsed = schema.safeParseAsync
+    ? await schema.safeParseAsync(output.structuredContent)
+    : schema.safeParse(output.structuredContent);
+  if (!parsed.success) {
+    throw new Error(`Output validation failed for tool "${name}": ${formatValidationIssues(parsed.error)}`);
+  }
 }
 
 /** Singleton registry instance — shared across the process. */

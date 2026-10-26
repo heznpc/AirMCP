@@ -124,8 +124,12 @@ describe("governed app-owned acceptance wiring", () => {
 
   test("does not request notification permission when the app-side HITL listener is off", () => {
     const setup = app.match(/private func setupHitl\(\)[\s\S]*?\n    }/)?.[0] ?? "";
-    expect(setup).toContain("if configManager.hitlLevel != .off");
+    expect(setup).toContain("hitlManager.applyConfiguration(level: configuration.level, timeoutSeconds: configuration.timeoutSeconds)");
     expect(setup).not.toContain("HitlManager.requestNotificationPermission()");
+    const manager = readFileSync(new URL("../app/Sources/AirMCPApp/HitlManager.swift", import.meta.url), "utf8");
+    const apply = manager.match(/func applyConfiguration\([\s\S]*?\n    }/)?.[0] ?? "";
+    expect(apply).toMatch(/if level == \.off \{\s*stopListening\(\)/);
+    expect(apply).not.toContain("requestNotificationPermission");
   });
 
   test("waits through production shutdown and asserts process/temp cleanup", () => {

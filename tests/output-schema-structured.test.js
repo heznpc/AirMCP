@@ -161,7 +161,7 @@ const TOOL_FIXTURES = {
   // safari
   list_tabs: {
     args: {},
-    mock: { tabs: [] },
+    mock: [],
   },
   get_current_tab: {
     args: {},
@@ -315,10 +315,6 @@ const TOOL_FIXTURES = {
   search_shortcuts: {
     args: { query: 'test' },
     mock: { total: 0, shortcuts: [] },
-  },
-  get_shortcut_detail: {
-    args: { name: 'Daily' },
-    mock: { shortcut: 'Daily', detail: '' },
   },
   // ── Wave 4 additions ──
   // mail

@@ -14,6 +14,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { cleanBootEnv } from "./lib/clean-boot-env.mjs";
 import { MCP_PROTOCOL_VERSION, startMcp } from "./lib/mcp-stdio-client.mjs";
 import { verifyPublishedIdentity } from "./lib/publish-identity.mjs";
+import { verifyReleaseAssets } from "./lib/release-assets.mjs";
 
 const ROOT = dirname(fileURLToPath(new URL("../package.json", import.meta.url)));
 const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
@@ -277,7 +278,6 @@ if (!skipGithub) {
   const gh = run("gh", ["release", "view", `v${version}`, "--json", "tagName,targetCommitish,url,assets"]);
   if (gh.status !== 0) fail(`GitHub Release v${version} not found`, gh.stderr || gh.stdout);
   const release = parseJson("gh release view", gh.stdout);
-  const expectedAsset = `airmcp-${version}.mcpb`;
   if (release.tagName !== `v${version}`) fail(`GitHub Release tag mismatch: ${release.tagName}`);
   if (release.targetCommitish !== expectedGitHead) {
     fail(`GitHub Release target differs from expected release SHA`);
@@ -285,14 +285,13 @@ if (!skipGithub) {
   const tag = run("gh", ["api", `repos/${repositorySlug()}/commits/v${version}`, "--jq", ".sha"]);
   if (tag.status !== 0) fail(`could not resolve GitHub tag v${version}`, tag.stderr || tag.stdout);
   if (tag.stdout !== expectedGitHead) fail(`GitHub tag v${version} differs from expected release SHA`);
-  const asset = release.assets?.find((candidate) => candidate.name === expectedAsset);
-  if (!asset) {
-    fail(`GitHub Release v${version} is missing ${expectedAsset}`);
+  try {
+    for (const asset of verifyReleaseAssets(release, version)) {
+      console.log(`ok: GitHub Release ${release.tagName} has ${asset.name} (${asset.size} bytes)`);
+    }
+  } catch (error) {
+    fail(error.message);
   }
-  if (!Number.isFinite(asset.size) || asset.size <= 0) {
-    fail(`${expectedAsset} has invalid size: ${asset.size}`);
-  }
-  console.log(`ok: GitHub Release ${release.tagName} has ${expectedAsset} (${asset.size} bytes)`);
   console.log(`ok: ${release.url}`);
 }
 

@@ -74,7 +74,7 @@ const CATALOG = [
     tier: 0,
     files: ["src/shared/tool-registry.ts", "src/shared/registry.ts", "src/shared/tool-filter.ts"],
     hunt: "wrapper not forwarding, re-entry/recursion, scope-gate not applied",
-    tests: ["tool-registry", "tool-registry-scope-gate"],
+    tests: ["tool-registry", "tool-registry-scope-gate", "run-tool-runtime-contract"],
   },
   {
     area: "jxa-escaping",

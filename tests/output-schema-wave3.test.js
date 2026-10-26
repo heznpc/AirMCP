@@ -4,7 +4,7 @@
  * Extends the Wave 1/2 contract to modules that were 0% before:
  *   messages:  list_chats, read_chat, search_chats, list_participants
  *   health:    health_today_steps, health_heart_rate, health_sleep
- *   shortcuts: list_shortcuts, search_shortcuts, get_shortcut_detail
+ *   shortcuts: list_shortcuts, search_shortcuts
  *
  * When one of these fails, the fix is almost always in the handler's
  * outputSchema declaration — the payload mirrors the real runtime JSON shape.
@@ -183,16 +183,5 @@ describe('Wave 3 — shortcuts.search_shortcuts', () => {
     mockRunJxa.mockResolvedValue({ total: 1, shortcuts: ['Daily Brief'] });
     const result = await server.callTool('search_shortcuts', { query: 'daily' });
     assertConforms(server, 'search_shortcuts', result.structuredContent);
-  });
-});
-
-describe('Wave 3 — shortcuts.get_shortcut_detail', () => {
-  beforeEach(resetAll);
-  test('structuredContent matches outputSchema', async () => {
-    const server = createMockServer();
-    registerShortcutsTools(server, createMockConfig());
-    mockRunJxa.mockResolvedValue({ shortcut: 'Daily Brief', detail: 'actions: Get URL, Text' });
-    const result = await server.callTool('get_shortcut_detail', { name: 'Daily Brief' });
-    assertConforms(server, 'get_shortcut_detail', result.structuredContent);
   });
 });

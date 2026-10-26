@@ -512,10 +512,10 @@ public struct ReminderListItem: Encodable, Sendable {
     public let completed: Bool
     public let dueDate: String?
     public let priority: Int
-    public let flagged: Bool
+    public let flagged: Bool?
     public let list: String
     public init(id: String, name: String, completed: Bool, dueDate: String?,
-                priority: Int, flagged: Bool, list: String) {
+                priority: Int, flagged: Bool?, list: String) {
         self.id = id; self.name = name; self.completed = completed; self.dueDate = dueDate
         self.priority = priority; self.flagged = flagged; self.list = list
     }
@@ -545,11 +545,11 @@ public struct ReminderDetail: Encodable, Sendable {
     public let modificationDate: String
     public let dueDate: String?
     public let priority: Int
-    public let flagged: Bool
+    public let flagged: Bool?
     public let list: String
     public init(id: String, name: String, body: String, completed: Bool,
                 completionDate: String?, creationDate: String, modificationDate: String,
-                dueDate: String?, priority: Int, flagged: Bool, list: String) {
+                dueDate: String?, priority: Int, flagged: Bool?, list: String) {
         self.id = id; self.name = name; self.body = body; self.completed = completed
         self.completionDate = completionDate; self.creationDate = creationDate
         self.modificationDate = modificationDate; self.dueDate = dueDate

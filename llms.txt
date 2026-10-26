@@ -66,7 +66,7 @@ a step ran, not that the task is complete.
 - **Screen Capture** (5 tools): capture_screen, capture_window, capture_area, list_windows, record_screen
 - **Semantic Search** (7 tools): semantic_index, semantic_search, find_related, spotlight_sync, semantic_clear, spotlight_clear, semantic_status
 - **Setup** (1 tools): setup_permissions
-- **Shortcuts** (10 tools): list_shortcuts, run_shortcut, search_shortcuts, get_shortcut_detail, create_shortcut, delete_shortcut, export_shortcut, import_shortcut, duplicate_shortcut, edit_shortcut
+- **Shortcuts** (5 tools): list_shortcuts, run_shortcut, search_shortcuts, create_shortcut, edit_shortcut
 - **speech** (3 tools): transcribe_audio, speech_availability, smart_clipboard
 - **System** (28 tools): get_clipboard, set_clipboard, get_volume, set_volume, toggle_dark_mode, get_frontmost_app, list_running_apps, get_screen_info, show_notification, capture_screenshot, get_wifi_status, toggle_wifi, list_bluetooth_devices, get_battery_status, get_brightness, set_brightness, toggle_focus_mode, system_sleep, prevent_sleep, allow_sleep, system_power, launch_app, quit_app, is_app_running, list_all_windows, move_window, resize_window, minimize_window
 - **TV** (6 tools): tv_list_playlists, tv_list_tracks, tv_now_playing, tv_playback_control, tv_search, tv_play

@@ -125,7 +125,7 @@ export function registerSafariTools(server: McpServer, config: AirMcpConfig): vo
     },
     async () => {
       try {
-        return okUntrustedLinkedStructured("list_tabs", await runJxa(listTabsScript()));
+        return okUntrustedLinkedStructured("list_tabs", { tabs: await runJxa(listTabsScript()) });
       } catch (e) {
         return toolError("list tabs", e);
       }

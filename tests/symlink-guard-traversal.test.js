@@ -5,7 +5,6 @@
  * realpath-checking it:
  *   • messages.send_file
  *   • intelligence.generate_image
- *   • shortcuts.export_shortcut / import_shortcut
  *
  * `zFilePath` only rejects literal `..` segments. A symlink inside HOME
  * pointing OUTSIDE HOME would slip past and let a caller exfiltrate /etc,
@@ -50,7 +49,6 @@ process.env.AIRMCP_ALLOW_SEND_MESSAGES = 'true';
 
 const { registerMessagesTools } = await import('../dist/messages/tools.js');
 const { registerIntelligenceTools } = await import('../dist/intelligence/tools.js');
-const { registerShortcutsTools } = await import('../dist/shortcuts/tools.js');
 
 function createMockServer() {
   const tools = new Map();
@@ -141,32 +139,5 @@ describe('symlink-traversal guard: generate_image (intelligence)', () => {
     // on undefined paths.
     expect(mockRunSwift).toHaveBeenCalledTimes(1);
     expect(result.isError).toBeFalsy();
-  });
-});
-
-describe('symlink-traversal guard: shortcuts export + import', () => {
-  let server;
-  beforeAll(() => {
-    server = createMockServer();
-    registerShortcutsTools(server, {});
-  });
-
-  test('export_shortcut rejects an outputPath resolving outside HOME', async () => {
-    mockRunJxa.mockReset();
-    const result = await server.callTool('export_shortcut', {
-      name: 'TestShortcut',
-      outputPath: join(symlinkInsideHome, 'pwn.shortcut'),
-    });
-    expect(mockRunJxa).not.toHaveBeenCalled();
-    expect(result.isError).toBe(true);
-  });
-
-  test('import_shortcut rejects a filePath resolving outside HOME', async () => {
-    mockRunJxa.mockReset();
-    const result = await server.callTool('import_shortcut', {
-      filePath: join(symlinkInsideHome, 'evil.shortcut'),
-    });
-    expect(mockRunJxa).not.toHaveBeenCalled();
-    expect(result.isError).toBe(true);
   });
 });

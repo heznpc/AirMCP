@@ -279,17 +279,12 @@ const COVERAGE_PLAN = [
   { tool: "send_message", skip: "Sends real iMessage" },
   { tool: "send_file", skip: "Sends real iMessage with file" },
 
-  // ── Shortcuts (10) ────────────────────────────────────────────────
+  // ── Shortcuts (5) ────────────────────────────────────────────────
   { tool: "list_shortcuts", args: {} },
   { tool: "search_shortcuts", args: { query: "a" } },
-  { tool: "get_shortcut_detail", chain: "shortcutName" },
   { tool: "run_shortcut", skip: "Unknown side effects" },
   { tool: "create_shortcut", skip: "Modifies Shortcuts library (UI automation)" },
-  { tool: "delete_shortcut", skip: "Modifies Shortcuts library" },
-  { tool: "export_shortcut", skip: "Creates file" },
-  { tool: "import_shortcut", skip: "Modifies Shortcuts library" },
   { tool: "edit_shortcut", skip: "Opens UI" },
-  { tool: "duplicate_shortcut", skip: "Modifies Shortcuts library" },
 
   // ── UI Automation (6) ─────────────────────────────────────────────
   { tool: "ui_read", args: { app: "Finder" } },

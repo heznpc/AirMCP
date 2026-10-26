@@ -312,13 +312,8 @@ const MOD_DATA = {
       { name: 'list_shortcuts', desc: 'List shortcuts', type: 'read' },
       { name: 'run_shortcut', desc: 'Run by name', type: 'write' },
       { name: 'search_shortcuts', desc: 'Search', type: 'read' },
-      { name: 'get_shortcut_detail', desc: 'Details', type: 'read' },
       { name: 'create_shortcut', desc: 'Create', type: 'write' },
-      { name: 'delete_shortcut', desc: 'Delete', type: 'destructive' },
-      { name: 'export_shortcut', desc: 'Export .shortcut', type: 'write' },
-      { name: 'import_shortcut', desc: 'Import .shortcut', type: 'write' },
       { name: 'edit_shortcut', desc: 'Open editor', type: 'write' },
-      { name: 'duplicate_shortcut', desc: 'Duplicate', type: 'write' },
     ],
   },
   intelligence: {

@@ -139,10 +139,12 @@ describe("release workflow source and identity hardening", () => {
 
     const release = namedStep(cd, "publish", "Create GitHub Release");
     expect(release.with.target_commitish).toBe("${{ inputs.release_sha || github.sha }}");
-    const dispatch = namedStep(cd, "publish", "Dispatch signed app release");
-    expect(dispatch.run).toContain("gh workflow run release-app.yml");
-    expect(dispatch.run).toContain('--ref "$RELEASE_TAG"');
-    expect(dispatch.run).toContain('--field tag="$RELEASE_TAG"');
+    const dispatch = namedStep(cd, "publish", "Dispatch and await signed app release");
+    expect(dispatch.run).toBe("node scripts/dispatch-signed-app-release.mjs");
+    expect(dispatch.env.RELEASE_TAG).toBe("v${{ steps.pkg.outputs.version }}");
+    expect(dispatch.env.RELEASE_SHA).toBe("${{ inputs.release_sha || github.sha }}");
+    expect(dispatch.if).toBeUndefined();
+    expect(app["run-name"]).toContain("inputs.release_request_id");
     expect(cd.jobs.publish.steps.indexOf(release)).toBeLessThan(cd.jobs.publish.steps.indexOf(dispatch));
   });
 
@@ -155,6 +157,32 @@ describe("release workflow source and identity hardening", () => {
     expect(gate.run).toContain("verify-release-environment.mjs");
     expect(cd.jobs.publish.steps.indexOf(gate)).toBeLessThan(cd.jobs.publish.steps.indexOf(inspect));
     expect(cd.jobs.publish.steps.indexOf(gate)).toBeLessThan(cd.jobs.publish.steps.indexOf(rootPublish));
+  });
+
+  test("disabled signing cannot publish npm or report a successful app workflow", () => {
+    for (const [workflow, job] of [[cd, "publish"], [app, "resolve-release"]]) {
+      const gate = namedStep(workflow, job, "Require signed app distribution");
+      for (const value of ["", "false", "true"]) {
+        const result = spawnSync("bash", ["-c", `set -eu\n${gate.run}`], {
+          encoding: "utf8", env: { ...process.env, SIGNED_APP_RELEASE: value },
+        });
+        expect(result.status).toBe(value === "true" ? 0 : 1);
+      }
+    }
+    const steps = cd.jobs.publish.steps;
+    expect(steps.indexOf(namedStep(cd, "publish", "Require signed app distribution")))
+      .toBeLessThan(steps.indexOf(namedStep(cd, "publish", "Inspect root registry identity")));
+  });
+
+  test("missing signing secrets fail even for an old caller requesting an optional release", () => {
+    const directory = mkdtempSync(join(tmpdir(), "airmcp-signing-required-"));
+    temporaryDirectories.push(directory);
+    const preflight = namedStep(app, "release-app", "Preflight — required secrets present");
+    const env = { ...process.env, GITHUB_OUTPUT: join(directory, "output"), REQUIRE_SIGNING: "false" };
+    for (const key of Object.keys(preflight.env)) env[key] = "";
+    const result = spawnSync("bash", ["-c", `set -eu\n${preflight.run}`], { encoding: "utf8", env });
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain("Missing required secrets");
   });
 
   test("resumes an occupied npm version only after SRI and gitHead verification", () => {
@@ -188,6 +216,10 @@ describe("release workflow source and identity hardening", () => {
     expect(certificateImport.run).toContain("trap 'rm -f cert.p12' EXIT");
     expect(certificateImport.run).toContain("set-key-partition-list");
     expect(certificateImport.run).toContain(">/dev/null 2>&1");
+    const accountCheck = namedStep(app, "release-app", "Verify notarization account access");
+    expect(accountCheck.run).toBe("node scripts/verify-notary-credentials.mjs");
+    expect(app.jobs["release-app"].steps.indexOf(accountCheck))
+      .toBeLessThan(app.jobs["release-app"].steps.indexOf(namedStep(app, "release-app", "Release preflight (governed app gate)")));
   });
 
   test("requires the widget only in the signed lane while local app preflight stays fast", () => {

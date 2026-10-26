@@ -163,15 +163,6 @@ async function testFiles() {
     try { unlinkSync(`${TMP}/airmcp-qa-keynote-${TS}.pdf`); } catch {}
   } else { skip("keynote_export_pdf (app not running)"); skipCount++; }
 
-  // Shortcuts export
-  const scList = parse(await callTool("list_shortcuts", {}));
-  const scName = scList.data?.shortcuts?.[0]?.name;
-  if (scName) {
-    const scPath = `${TMP}/airmcp-qa-shortcut-${TS}.shortcut`;
-    await test("Export shortcut", "export_shortcut", { name: scName, path: scPath });
-    try { unlinkSync(scPath); } catch {}
-  } else { skip("export_shortcut (no shortcuts)"); skipCount++; }
-
   // send_file to tester
   const sendFile = `${TMP}/airmcp-qa-sendfile-${TS}.txt`;
   writeFileSync(sendFile, `${QA} AirMCP send_file test\nTimestamp: ${new Date().toISOString()}\n`);
@@ -376,26 +367,11 @@ async function testPlayback() {
 }
 
 async function testShortcuts() {
-  section("Shortcuts — create/duplicate/delete");
-
-  // Run a known-safe shortcut (if one exists)
-  const scResp = parse(await callTool("list_shortcuts", {}));
-  const shortcuts = scResp.data?.shortcuts || [];
-  if (shortcuts.length > 0) {
-    const safeSc = shortcuts.find(s => /screenshot|clipboard|date|time/i.test(s.name)) || shortcuts[0];
-    await test(`Run shortcut: ${safeSc.name}`, "run_shortcut", { name: safeSc.name }, { timeout: 30000 });
-
-    // Duplicate → delete
-    await test("Duplicate shortcut", "duplicate_shortcut", { name: safeSc.name });
-    // The duplicate gets a "copy" suffix
-    const afterList = parse(await callTool("list_shortcuts", {}));
-    const dup = (afterList.data?.shortcuts || []).find(s =>
-      s.name.includes(safeSc.name) && s.name !== safeSc.name,
-    );
-    if (dup) {
-      await test("Delete duplicated shortcut", "delete_shortcut", { name: dup.name });
-    }
-  } else { skip("Shortcut tests (no shortcuts)"); skipCount += 3; }
+  section("Shortcuts — discovery");
+  await test("List shortcuts", "list_shortcuts", {});
+  await test("Search shortcuts", "search_shortcuts", { query: "test" });
+  // Running arbitrary user shortcuts has unknown side effects; exercise run_shortcut
+  // only with an explicitly prepared fixture in a dedicated manual QA session.
 }
 
 async function testOther() {
@@ -436,7 +412,7 @@ async function main() {
     console.log("## Remaining Tools Test Plan\n");
     console.log("Sections: " + Object.keys(ALL_SECTIONS).join(", "));
     console.log("\nTools to be tested:");
-    console.log("  Files: set_file_tags, move_file, capture_screen/window/area, record_screen, export PDFs, send_file, export_shortcut");
+    console.log("  Files: set_file_tags, move_file, capture_screen/window/area, record_screen, export PDFs, send_file");
     console.log("  Contacts: add_contact_email, add_contact_phone");
     console.log("  Music: add_to_playlist, remove_from_playlist, play_track, playback_control, set_shuffle, set_rating, set_favorited, set_disliked");
     console.log("  System: toggle_dark_mode, toggle_focus_mode, prevent_sleep, move_window, resize_window, minimize_window, launch_app, quit_app");
@@ -445,7 +421,7 @@ async function main() {
     console.log("  Safari: add_to_reading_list, add_bookmark, activate_tab, run_javascript");
     console.log("  Mail: flag_message, mark_message_read, reply_mail");
     console.log("  Playback: tv_playback_control, list_podcast_episodes, podcast_playback_control");
-    console.log("  Shortcuts: run_shortcut, duplicate_shortcut, delete_shortcut");
+    console.log("  Shortcuts: list_shortcuts, search_shortcuts");
     console.log("  Other: keynote_start_slideshow");
     return;
   }

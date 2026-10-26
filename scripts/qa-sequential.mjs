@@ -232,18 +232,13 @@ const MODULE_TESTS = {
       { skip: (ctx) => !ctx.has("photoId") || !ctx.has("newAlbum") }],
   ],
 
-  // ── Shortcuts (10 tools) ──────────────────────────────────────────
+  // ── Shortcuts (5 tools) ──────────────────────────────────────────
   shortcuts: [
-    // Read-only (3)
+    // Read-only (2)
     ["list_shortcuts", {}, { extract: (d, ctx) => {
       const s = (d.shortcuts || []); if (s[0]?.name || s[0]) ctx.set("shortcut", s[0]?.name || s[0]);
     }}],
     ["search_shortcuts", { query: "test" }],
-    ["get_shortcut_detail", (ctx) => ({ name: ctx.get("shortcut") }), { skip: (ctx) => !ctx.has("shortcut") }],
-    ["export_shortcut", (ctx) => ({ name: ctx.get("shortcut"), outputPath: "/tmp/airmcp-qa-shortcut" }),
-      { skip: (ctx) => !ctx.has("shortcut") }],
-    ["duplicate_shortcut", (ctx) => ({ name: ctx.get("shortcut"), newName: "[QA-SEQ] Copy" }),
-      { skip: (ctx) => !ctx.has("shortcut") }],
     // run_shortcut: unknown side effects, skip in auto QA
   ],
 

@@ -459,7 +459,7 @@ public struct EventKitService: Sendable {
             modificationDate: item.lastModifiedDate.map { formatISO8601($0) } ?? "",
             dueDate: dueDateString(item),
             priority: item.priority,
-            flagged: item.priority > 0, // EKReminder doesn't have a direct "flagged" property; approximate via priority
+            flagged: nil, // EventKit does not expose the independent Reminders flag.
             list: item.calendar.title
         )
     }
@@ -491,25 +491,12 @@ public struct EventKitService: Sendable {
     }
 
     public func updateReminder(_ input: UpdateReminderInput) async throws -> ReminderMutationOutput {
+        try validateReminderFlag(input.flagged)
         let store = try await authorizedReminderStore()
         guard let reminder = store.calendarItem(withIdentifier: input.id) as? EKReminder else {
             throw AirMCPKitError.notFound("Reminder not found: \(input.id)")
         }
-        if let title = input.title { reminder.title = title }
-        if let body = input.body { reminder.notes = body }
-        if let clearDue = input.clearDueDate, clearDue {
-            reminder.dueDateComponents = nil
-        } else if let dueDateStr = input.dueDate, let dueDate = parseISO8601(dueDateStr) {
-            reminder.dueDateComponents = Calendar.current.dateComponents(
-                [.year, .month, .day, .hour, .minute, .second], from: dueDate
-            )
-        }
-        if let p = input.priority { reminder.priority = p }
-        if let flagged = input.flagged {
-            // Flagged maps to priority in EventKit: flagged=true sets priority 1 if currently 0
-            if flagged && reminder.priority == 0 { reminder.priority = 1 }
-            else if !flagged { reminder.priority = 0 }
-        }
+        try applyReminderUpdate(input, to: reminder)
 
         try store.save(reminder, commit: true)
         return ReminderMutationOutput(id: reminder.calendarItemIdentifier, name: reminder.title ?? "")
@@ -582,14 +569,34 @@ public struct EventKitService: Sendable {
 
     // MARK: - Reminder helpers
 
-    private func reminderToListItem(_ r: EKReminder) -> ReminderListItem {
+    private func validateReminderFlag(_ flagged: Bool?) throws {
+        guard flagged == nil else {
+            throw AirMCPKitError.unsupported("EventKit cannot change reminder flags. Use macOS Reminders automation or the Reminders app; priority is a separate field.")
+        }
+    }
+
+    func applyReminderUpdate(_ input: UpdateReminderInput, to reminder: EKReminder) throws {
+        try validateReminderFlag(input.flagged)
+        if let title = input.title { reminder.title = title }
+        if let body = input.body { reminder.notes = body }
+        if let clearDue = input.clearDueDate, clearDue {
+            reminder.dueDateComponents = nil
+        } else if let dueDateStr = input.dueDate, let dueDate = parseISO8601(dueDateStr) {
+            reminder.dueDateComponents = Calendar.current.dateComponents(
+                [.year, .month, .day, .hour, .minute, .second], from: dueDate
+            )
+        }
+        if let p = input.priority { reminder.priority = p }
+    }
+
+    func reminderToListItem(_ r: EKReminder) -> ReminderListItem {
         ReminderListItem(
             id: r.calendarItemIdentifier,
             name: r.title ?? "",
             completed: r.isCompleted,
             dueDate: dueDateString(r),
             priority: r.priority,
-            flagged: r.priority > 0,
+            flagged: nil,
             list: r.calendar.title
         )
     }

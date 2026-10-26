@@ -122,9 +122,6 @@ describe('Script shape ↔ outputSchema contract — shortcuts', () => {
   test('search_shortcuts example conforms', () => {
     assertExampleFits(server, 'search_shortcuts', shortcutsScripts.SEARCH_SHORTCUTS_EXAMPLE);
   });
-  test('get_shortcut_detail example conforms', () => {
-    assertExampleFits(server, 'get_shortcut_detail', shortcutsScripts.GET_SHORTCUT_DETAIL_EXAMPLE);
-  });
 });
 
 // Calendar tools route through `runAutomation`, so each shape is a contract for

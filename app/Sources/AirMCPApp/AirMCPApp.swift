@@ -13,6 +13,7 @@ struct AirMCPApp: App {
     @State private var configManager = ConfigManager()
     @State private var setupManager = SetupManager()
     @State private var hitlManager = HitlManager()
+    @State private var hitlRuntime: HitlRuntimeController?
     @State private var logManager = LogManager()
     @State private var updateManager = UpdateManager()
     @State private var addonManager = AddonManager()
@@ -76,14 +77,6 @@ struct AirMCPApp: App {
             .onAppear {
                 initializeRuntimeIfNeeded()
             }
-            .onReceive(NotificationCenter.default.publisher(for: .hitlNotificationResponse)) { notification in
-                guard let userInfo = notification.userInfo,
-                      let requestId = userInfo["id"] as? String,
-                      let approved = userInfo["approved"] as? Bool
-                else { return }
-                let tool = hitlManager.pendingTools[requestId] ?? "unknown"
-                hitlManager.respond(id: requestId, approved: approved, tool: tool)
-            }
         } label: {
             // `label:` — unlike `content:` (MenuContent) above — is the actual
             // status-bar item view. MenuBarExtra(content:label:) tears content
@@ -144,18 +137,24 @@ struct AirMCPApp: App {
     }
 
     private func setupHitl() {
-        hitlManager.timeoutSeconds = configManager.hitlTimeout
-        if configManager.hitlLevel != .off {
-            // Register the local approval channel without prompting at launch.
-            // macOS notification authorization is requested from an explicit
-            // user-initiated runtime start action, or lazily by HitlManager
-            // when the first gated request actually arrives — a reachable
-            // socket alone must never be mistaken for a visible prompt.
-            HitlManager.registerNotificationCategory()
-            hitlManager.startListening()
-        } else {
-            hitlManager.stopListening()
-        }
+        // Registration does not request notification permission. The runtime
+        // remains subscribed even when the menu and settings are both closed.
+        HitlManager.registerNotificationCategory()
+        let configManager = configManager
+        let hitlManager = hitlManager
+        hitlRuntime = HitlRuntimeController(
+            readConfiguration: {
+                .init(level: configManager.hitlLevel, timeoutSeconds: configManager.hitlTimeout)
+            },
+            applyConfiguration: { configuration in
+                hitlManager.applyConfiguration(level: configuration.level, timeoutSeconds: configuration.timeoutSeconds)
+            },
+            respond: { id, approved in
+                let tool = hitlManager.pendingTools[id] ?? "unknown"
+                hitlManager.respond(id: id, approved: approved, tool: tool)
+            }
+        )
+        hitlRuntime?.start()
     }
 
     private func showOnboardingWindow() {

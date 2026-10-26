@@ -7,20 +7,13 @@ import type { AirMcpConfig } from "../shared/config.js";
 import { ok, okLinked, okLinkedStructured, okStructured, errJxaFor } from "../shared/result.js";
 import { TIMEOUT } from "../shared/constants.js";
 import { log, errToCtx } from "../shared/logger.js";
-import { zFilePath, resolveAndGuard } from "../shared/validate.js";
 import {
   listShortcutsScript,
   runShortcutScript,
   searchShortcutsScript,
-  getShortcutDetailScript,
-  deleteShortcutScript,
-  exportShortcutScript,
-  importShortcutScript,
   createShortcutScript,
-  duplicateShortcutScript,
   editShortcutScript,
   type ShortcutsNameList,
-  type ShortcutsDetail,
 } from "./scripts.js";
 
 const execFileAsync = promisify(execFile);
@@ -107,29 +100,6 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
   );
 
   server.registerTool(
-    "get_shortcut_detail",
-    {
-      title: "Get Shortcut Detail",
-      description: "Get details about a Siri Shortcut including its actions.",
-      inputSchema: {
-        name: z.string().max(500).describe("Shortcut name (exact match)"),
-      },
-      outputSchema: {
-        shortcut: z.string(),
-        detail: z.string(),
-      },
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    },
-    async ({ name }) => {
-      try {
-        return okStructured(await runJxa<ShortcutsDetail>(getShortcutDetailScript(name)));
-      } catch (e) {
-        return errJxaFor("get shortcut detail", e);
-      }
-    },
-  );
-
-  server.registerTool(
     "create_shortcut",
     {
       title: "Create Shortcut",
@@ -151,118 +121,6 @@ export function registerShortcutsTools(server: McpServer, _config: AirMcpConfig)
         return ok(await runJxa(createShortcutScript(name)));
       } catch (e) {
         return errJxaFor("create shortcut", e);
-      }
-    },
-  );
-
-  server.registerTool(
-    "delete_shortcut",
-    {
-      title: "Delete Shortcut",
-      description:
-        "Delete a Siri Shortcut by name. Uses the macOS shortcuts CLI (macOS 13+). This action is permanent and cannot be undone.",
-      inputSchema: {
-        name: z.string().max(500).describe("Shortcut name to delete (exact match)"),
-      },
-      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
-    },
-    async ({ name }) => {
-      try {
-        return ok(await runJxa(deleteShortcutScript(name)));
-      } catch (e) {
-        return errJxaFor("delete shortcut", e);
-      }
-    },
-  );
-
-  server.registerTool(
-    "export_shortcut",
-    {
-      title: "Export Shortcut",
-      description:
-        "Export a Siri Shortcut to a .shortcut file. Uses the macOS shortcuts CLI to save the shortcut to the specified output path.",
-      inputSchema: {
-        name: z.string().max(500).describe("Shortcut name to export (exact match)"),
-        outputPath: zFilePath.describe(
-          "File path to export the .shortcut file to (e.g. ~/Desktop/MyShortcut.shortcut)",
-        ),
-      },
-      annotations: {
-        readOnlyHint: false,
-        destructiveHint: false,
-        sensitiveHint: true,
-        idempotentHint: true,
-        openWorldHint: false,
-      },
-    },
-    async ({ name, outputPath }) => {
-      try {
-        // Symlink hardening: shortcuts CLI will follow a symlinked outputPath
-        // and clobber whatever it points to. Require resolution stays inside
-        // HOME so a malicious symlink can't redirect the export into
-        // /etc/launchd.plist.d/ or similar privileged locations.
-        resolveAndGuard(outputPath);
-        return ok(await runJxa(exportShortcutScript(name, outputPath)));
-      } catch (e) {
-        return errJxaFor("export shortcut", e);
-      }
-    },
-  );
-
-  server.registerTool(
-    "import_shortcut",
-    {
-      title: "Import Shortcut",
-      description:
-        "Import a .shortcut file into Siri Shortcuts. Uses the macOS shortcuts CLI to import the shortcut from the specified file path.",
-      inputSchema: {
-        filePath: zFilePath.describe("Path to the .shortcut file to import"),
-      },
-      annotations: {
-        readOnlyHint: false,
-        destructiveHint: false,
-        sensitiveHint: true,
-        idempotentHint: false,
-        openWorldHint: false,
-      },
-    },
-    async ({ filePath }) => {
-      try {
-        // Symlink hardening: import reads the .shortcut bundle off disk,
-        // so a symlink pointing at a system file could be coerced into a
-        // shortcut by a malicious skill. Constrain to HOME like the other
-        // file-touching shortcut tools.
-        resolveAndGuard(filePath);
-        return ok(await runJxa(importShortcutScript(filePath)));
-      } catch (e) {
-        return errJxaFor("import shortcut", e);
-      }
-    },
-  );
-
-  server.registerTool(
-    "duplicate_shortcut",
-    {
-      title: "Duplicate Shortcut",
-      description:
-        "Duplicate an existing Siri Shortcut. Exports the shortcut to a temporary file and re-imports it with a new name.",
-      inputSchema: {
-        name: z.string().max(500).describe("Name of the shortcut to duplicate (exact match)"),
-        newName: z.string().max(500).describe("Name for the duplicated shortcut"),
-      },
-      annotations: {
-        readOnlyHint: false,
-        destructiveHint: false,
-        sensitiveHint: true,
-        idempotentHint: false,
-        openWorldHint: false,
-      },
-    },
-    async ({ name, newName }) => {
-      try {
-        return ok(await runJxa(duplicateShortcutScript(name, newName)));
-      } catch (e) {
-        return errJxaFor("duplicate shortcut", e);
       }
     },
   );
@@ -304,7 +162,7 @@ async function discoverShortcuts(): Promise<string[]> {
   if (cachedShortcutNames) return cachedShortcutNames;
   try {
     const result = await execFileAsync("shortcuts", ["list"], { timeout: TIMEOUT.SHORTCUTS_LIST });
-    const names = result.stdout.split("\n").filter((n) => n.trim().length > 0);
+    const names = result.stdout.split(/[\r\n]+/).filter((n) => n.trim().length > 0);
     if (names.length > LIMITS.DYNAMIC_SHORTCUTS) {
       log.info("dynamic shortcuts: limit reached", {
         found: names.length,

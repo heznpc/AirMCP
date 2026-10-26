@@ -299,7 +299,7 @@ fi
 /usr/libexec/PlistBuddy -c "Delete :CFBundlePackageType" "$PLIST" 2>/dev/null || true
 /usr/libexec/PlistBuddy -c "Add :CFBundlePackageType string APPL" "$PLIST"
 /usr/libexec/PlistBuddy -c "Delete :CFBundleShortVersionString" "$PLIST" 2>/dev/null || true
-/usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 2.16.6" "$PLIST"
+/usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 2.16.7" "$PLIST"
 /usr/libexec/PlistBuddy -c "Delete :CFBundleVersion" "$PLIST" 2>/dev/null || true
 /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $BUILD_NUMBER" "$PLIST"
 /usr/libexec/PlistBuddy -c "Delete :LSUIElement" "$PLIST" 2>/dev/null || true
@@ -494,7 +494,8 @@ setup_governed_environment() {
 }
 
 verify_governed_workflow() {
-  # Allow the production 30-second audit flush; the child ignores env overrides.
+  # Bound each MCP request; the probe explicitly flushes through audit_log
+  # before checking disk, so it does not depend on the background flush timer.
   local output
   if ! output="$(
     node "$SCRIPT_DIR/verify-governed-workflow.mjs" \

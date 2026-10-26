@@ -8,6 +8,18 @@ const trustCenter = readFileSync(new URL("app/Sources/AirMCPApp/Views/TrustCente
 const airmcpApp = readFileSync(new URL("app/Sources/AirMCPApp/AirMCPApp.swift", root), "utf8");
 
 describe("menubar HITL fallback source contract", () => {
+  test("notification approval responses are independent of the ephemeral dropdown", () => {
+    const dropdown = airmcpApp.slice(airmcpApp.indexOf("MenuContent("), airmcpApp.indexOf("} label: {"));
+    expect(dropdown).not.toContain(".hitlNotificationResponse");
+    expect(airmcpApp).toContain("@State private var hitlRuntime: HitlRuntimeController?");
+    expect(airmcpApp).toContain("hitlRuntime?.start()");
+  });
+
+  test("the persistent runtime observes HITL configuration after initial setup", () => {
+    expect(airmcpApp).toContain("readConfiguration:");
+    expect(airmcpApp).toContain("hitlManager.applyConfiguration(level: configuration.level, timeoutSeconds: configuration.timeoutSeconds)");
+  });
+
   test("tracks pending approval requests until a response is sent", () => {
     expect(hitlManager).toContain("var pendingRequests: [ApprovalRequest] = []");
     expect(hitlManager).toContain("pendingRequests.insert(request, at: 0)");
@@ -20,7 +32,7 @@ describe("menubar HITL fallback source contract", () => {
     expect(hitlManager).toContain("removePendingNotificationRequests(withIdentifiers: identifiers)");
     expect(hitlManager).toContain("removeDeliveredNotifications(withIdentifiers: identifiers)");
     expect(hitlManager).toMatch(
-      /guard let request = pendingRequests\.first[\s\S]*else \{[\s\S]*removeNotifications[\s\S]*return[\s\S]*pendingRequests\.removeAll/,
+      /guard let request = pendingRequests\.first[\s\S]*else \{[\s\S]*notificationRemover\(\[id\]\)[\s\S]*return[\s\S]*pendingRequests\.removeAll/,
     );
   });
 

@@ -228,7 +228,7 @@ export function listMessagesScript(mailbox: string, limit: number, offset: numbe
     const result = [];
     for (let i = start; i < start + count; i++) {
       result.push({
-        id: ids[i],
+        id: String(ids[i]),
         subject: subjects[i] || '',
         sender: senders[i] || '',
         dateReceived: dates[i] ? dates[i].toISOString() : null,

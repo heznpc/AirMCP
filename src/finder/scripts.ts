@@ -196,7 +196,9 @@ export function setTagsScript(path: string, tags: string[]): string {
     ObjC.import('Foundation');
     const url = $.NSURL.fileURLWithPath('${esc(path)}');
     const tagArray = $.NSArray.arrayWithArray([${tagArgs}]);
-    url.setResourceValueForKeyError(tagArray, 'NSURLTagNamesKey', null);
+    if (!url.setResourceValueForKeyError(tagArray, $.NSURLTagNamesKey, null)) {
+      throw new Error('Unable to set Finder tags: ${esc(path)}');
+    }
     JSON.stringify({path: '${esc(path)}', tags: [${tagArgs}]});
   `;
 }

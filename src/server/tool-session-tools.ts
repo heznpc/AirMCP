@@ -159,7 +159,7 @@ export function registerToolSessionTools(server: McpServer, options: RegisterToo
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
-    async ({ name, args, sessionId }) => {
+    async ({ name, args, sessionId }, extra) => {
       if (name === "run_tool" || (TOOL_SESSION_CONTROL_TOOLS as readonly string[]).includes(name)) {
         return errInvalidInput("run_tool cannot call itself or session-control tools");
       }
@@ -176,7 +176,7 @@ export function registerToolSessionTools(server: McpServer, options: RegisterToo
       const sessionGate = toolSessions.assertAllowed(sessionId, name);
       if (!sessionGate.ok) return errInvalidInput(sessionGate.message);
       try {
-        return await toolRegistry.callTool(name, args ?? {});
+        return await toolRegistry.callTool(name, args ?? {}, extra);
       } catch (e) {
         if (e instanceof ToolInputValidationError) {
           return errInvalidInput(e.message);

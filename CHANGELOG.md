@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.16.7] - 2026-10-26
 
+### Security
+
+- Update Zod and the body-parser, fast-uri, and ip-address dependency chains to patched releases. Production and development dependency audits report no vulnerabilities.
+
 ### Fixed
 
 - Preserve request cancellation and validate target output schemas when tools are called through `run_tool`.
@@ -17,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pass Shortcuts input through the supported file-input option and handle macOS shell output line endings.
 - Keep Reminders flags independent of priority: EventKit omits the unsupported flag value and rejects flag changes before modifying any fields. Report Finder tag-write failures instead of returning success.
 - Require the signed app asset before declaring a signed-enabled release complete, and distinguish notarization submission failures from acceptance.
+- Flush audit records through the MCP API before checking their persistence in the app release acceptance test.
 - Correct the MCPB installation instructions for optional Swift features.
 
 ### Removed

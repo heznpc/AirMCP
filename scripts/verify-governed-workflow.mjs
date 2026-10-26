@@ -200,13 +200,17 @@ async function main() {
     const afterStop = expectSuccess(await call("memory_stats"), "post-stop memory_stats");
     assert(afterStop?.total === 1, `emergency-stopped delete changed state; got ${afterStop?.total} entries`);
 
-    await waitForAuditFlush(resolve(options.auditDir, "audit.jsonl"), options.timeoutMs);
+    // audit_log awaits the writer's durability barrier before returning its
+    // verified snapshot. Request that barrier before inspecting disk: waiting
+    // for the background flush timer first can falsely fail a healthy app
+    // when macOS defers its background timers or the machine is under load.
     const history = expectSuccess(
       await call("audit_log", { correlationId: runId, limit: 100 }),
       "correlated audit_log",
     );
     assert(history?.verified === true, "audit_log history did not pass HMAC verification");
     assert(history?.auditDisabled === false, "audit_log reported a disabled writer");
+    await waitForAuditFlush(resolve(options.auditDir, "audit.jsonl"), options.timeoutMs);
     const entries = history?.entries ?? [];
     assert(entries.length >= 5, `correlated audit history is incomplete: ${entries.length} entries`);
     assert(

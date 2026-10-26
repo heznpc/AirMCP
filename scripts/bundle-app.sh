@@ -494,7 +494,8 @@ setup_governed_environment() {
 }
 
 verify_governed_workflow() {
-  # Allow the production 30-second audit flush; the child ignores env overrides.
+  # Bound each MCP request; the probe explicitly flushes through audit_log
+  # before checking disk, so it does not depend on the background flush timer.
   local output
   if ! output="$(
     node "$SCRIPT_DIR/verify-governed-workflow.mjs" \

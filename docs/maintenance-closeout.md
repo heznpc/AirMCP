@@ -1,10 +1,85 @@
 # AirMCP maintenance closeout
 
-Snapshot: 2026-10-21. Release preparation: **2.16.6**.
+Current verification: **2026-10-27 KST**, release **v2.16.7**, source
+`15e59b4774209761267597d33d4545d608692023` ([PR #512](https://github.com/heznpc/AirMCP/pull/512)).
+The npm and MCPB distributions are published and verified. **The signed macOS
+app distribution is incomplete.** Repository archival and a claim that the
+release is fully complete must wait for that gate.
 
-Original integration snapshot: 2026-09-11. This ledger separates source integration from published
-releases. The registry's current `airmcp@latest` is **2.16.5**; the maintenance
-changes below are not included in that published version.
+## Current distribution evidence
+
+| Deliverable | Verified state |
+| --- | --- |
+| `airmcp@2.16.7` | Registry version, `latest`, SHA-512 tarball identity and source commit match the release tag. A fresh registry install boots the full runtime with 292 tools; `npx -y airmcp@2.16.7 --version` succeeds. |
+| 12 `@heznpc/airmcp-*` add-ons | All registry versions, `latest` tags, tarball identities and source commits match. Fresh installation and import of all 12 packages succeeds. |
+| `airmcp-2.16.7.mcpb` | Downloaded from the public release and verified to boot self-contained with 291 tools and 28 modules. |
+| `AirMCP-2.16.7.zip` | **Missing.** [Signed-app run 40283570244](https://github.com/heznpc/AirMCP/actions/runs/40283570244) failed at **Verify notarization account access**. No successful notarization or public app ZIP is claimed. |
+
+Registry verification ran from the immutable v2.16.7 source after building the
+runtime and add-on packages, with `release:verify --skip-github`. That flag
+excludes the known missing app asset; its success is **not** full-release
+verification. Running source-identity verification from a later `main` commit
+compares different package contents and is not a valid release check.
+
+The public MCPB was checked with `verify-mcpb-artifact.mjs --path=<downloaded-file>`.
+Its SHA-256 matches the GitHub asset digest:
+`059470aeadf866d06012ebff1b35b9aebd5c338bcc131b728c0f04d7adfb437d`.
+The MCPB probe explicitly disables proactive context, while the npm probe
+retains the default `proactive_context` tool; this accounts for the one-tool
+difference between the recorded smoke checks.
+
+## Fixes and prior validation
+
+[PR #512](https://github.com/heznpc/AirMCP/pull/512) fixes cancelled delegated
+calls, delegated output-schema validation, app approval socket/timer handling,
+Safari and Mail output contracts, Shortcuts input handling and unsupported
+operations, Finder error propagation, Reminders flag semantics, and delayed
+audit flushing during app acceptance. Its regression tests first failed on the
+original implementations and then passed with the fixes.
+
+The recorded validation includes 3,064 JavaScript tests across 239 suites,
+113 Swift app tests, 33 Swift bridge tests, successful CI, and governed app
+preflight covering authenticated reads, approved and denied writes, emergency
+stop, and audit verification. These are the implementation checks recorded in
+that PR, distinct from the fresh public-package checks above. Local app
+acceptance does not establish Apple notarization or public distribution.
+
+[PR #516](https://github.com/heznpc/AirMCP/pull/516) repairs automatic-release
+npm authentication selection. It does not repair the Apple account credentials.
+
+## Remaining release gate and recovery
+
+1. Correct the Apple notarization credentials in GitHub's protected `release`
+   environment. The current blocker is authentication, not a missing source fix.
+2. Resume the signed app for the existing immutable release; do not republish
+   the npm packages or move the tag:
+
+   ```bash
+   GITHUB_REPOSITORY=heznpc/AirMCP \
+   RELEASE_TAG=v2.16.7 \
+   RELEASE_SHA=15e59b4774209761267597d33d4545d608692023 \
+   node scripts/dispatch-signed-app-release.mjs
+   ```
+
+3. Require a successful signed-app workflow, public `AirMCP-2.16.7.zip`, and
+   the full `release:verify` check from the release source without skip flags.
+   Download the public ZIP and verify its signature, stapled ticket, launch,
+   and app-owned runtime before recording app distribution as complete.
+4. Keep [issue #511](https://github.com/heznpc/AirMCP/issues/511) open until its
+   missing-app report is resolved. Update the README, installation guide and
+   release notes when the app asset becomes available.
+
+The v2.16.6 end-of-maintenance proposal in
+[PR #510](https://github.com/heznpc/AirMCP/pull/510) is superseded by this release
+record. Do not apply its old final-version notices or archive the repository
+while the app gate remains unresolved. No public successor is required or
+designated by this record.
+
+## Historical integration record
+
+The sections below preserve the September integration and October 21 release
+preparation snapshots. Their versions, issue states, dependency findings and
+inventories are historical; the current release state is recorded above.
 
 ## Preserved source
 
@@ -90,7 +165,7 @@ missing: squash merges and later revisions require content review. Fifteen
 worktrees are registered, including three with missing paths. None is a
 deletion candidate merely because Git marks it merged or prunable.
 
-## Release and archive gates
+## Historical release and archive plan
 
 - Merge the maintenance integration only after CI and runtime verification.
 - Publish and verify the maintenance artifacts through the existing protected
@@ -101,7 +176,7 @@ deletion candidate merely because Git marks it merged or prunable.
 
 Archive/deprecation is not part of the maintenance integration itself.
 
-## Final maintenance release preparation (2026-10-21)
+## Historical maintenance release preparation (2026-10-21)
 
 - #506 is merged at `e0694e0d662a7e2d578c6fcd7bca506591bfd0f2`: private
   runtime credential files, read-only retries, isolated Swift process lanes,

@@ -58,6 +58,19 @@ jobs:
         # Pass --repo explicitly so `gh` doesn't try to discover the repo from
         # a non-existent local git checkout (this job has no actions/checkout
         # by design — it only needs to fire a workflow_dispatch).
-        run: gh workflow run cd.yml --ref main --repo "$GITHUB_REPOSITORY"
+        run: |
+          # Root and add-ons need separate npm trusted-publisher connections.
+          # Keep automatic releases on token auth until explicitly configured.
+          NPM_AUTH_MODE="${NPM_AUTH_MODE:-token}"
+          case "$NPM_AUTH_MODE" in
+            token|trusted-publishing) ;;
+            *)
+              echo "::error::NPM_AUTH_MODE must be token or trusted-publishing."
+              exit 1
+              ;;
+          esac
+          gh workflow run cd.yml --ref main --repo "$GITHUB_REPOSITORY" \
+            --field "npm_auth_mode=$NPM_AUTH_MODE"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_AUTH_MODE: ${{ vars.NPM_AUTH_MODE }}

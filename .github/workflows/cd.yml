@@ -126,7 +126,7 @@ jobs:
             echo "::notice::Tag v${{ steps.pkg.outputs.version }} already points at this commit — resuming an interrupted publish."
           fi
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
         with:
           node-version: 22
           cache: 'npm'
@@ -243,7 +243,7 @@ jobs:
           npm run addons:publish -- --publish --all --no-build --skip-verify
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v2.5.0
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v2.5.0
         with:
           tag_name: v${{ steps.pkg.outputs.version }}
           target_commitish: ${{ inputs.release_sha || github.sha }}
